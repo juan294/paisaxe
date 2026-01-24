@@ -62,6 +62,43 @@ git push origin main --tags
 git checkout develop
 ```
 
+## CI/CD (GitHub Actions)
+
+Automated quality checks run on every push and pull request to `develop` and `main`.
+
+### Workflow Jobs
+
+| Job | Description |
+|-----|-------------|
+| **lint-and-typecheck** | Runs `npm run typecheck` and `npm run lint` |
+| **test** | Runs `npm run test` |
+| **build** | Verifies production build with `npm run build` |
+
+### Workflow Triggers
+
+- Push to `develop` or `main` branches
+- Pull requests targeting `develop` or `main`
+
+### Required Checks
+
+All three jobs must pass before merging:
+- Lint & Typecheck
+- Test
+- Build
+
+### Fixing CI Failures
+
+1. **Typecheck failures**: Run `npm run typecheck` locally, fix type errors
+2. **Lint failures**: Run `npm run lint` locally, fix or run `npm run lint -- --fix`
+3. **Test failures**: Run `npm run test` locally, fix failing tests
+4. **Build failures**: Run `npm run build` locally, check for build-time errors
+
+### Notes
+
+- Build job uses dummy env vars (APIs not called during build)
+- Vercel deployment is handled separately via Vercel's GitHub integration
+- Database migrations should be validated locally before pushing
+
 ## Test-Driven Development (TDD)
 
 **IMPORTANT: Write tests BEFORE implementing new features.**
