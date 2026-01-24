@@ -23,8 +23,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const voyage = new VoyageAIClient({ apiKey: voyageApiKey });
 
 const EMBEDDING_MODEL = "voyage-3";
-const BATCH_SIZE = 8; // Small batches for rate limiting
-const RATE_LIMIT_DELAY = 25000; // 25 seconds between batches (free tier: 3 RPM)
+const BATCH_SIZE = 64; // Larger batches with paid tier
+const RATE_LIMIT_DELAY = 500; // 500ms between batches (paid tier: 300 RPM)
 
 interface Chunk {
   content: string;
@@ -100,8 +100,7 @@ async function seedChunks(): Promise<void> {
         console.log(`Processed ${processed}/${chunks.length} chunks (${totalTokens.toLocaleString()} tokens used)`);
       }
 
-      // Rate limiting - Free tier has 3 RPM limit
-      console.log(`  Waiting ${RATE_LIMIT_DELAY / 1000}s for rate limit...`);
+      // Small delay between batches
       await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAY));
     } catch (error) {
       console.error(`Error processing batch ${i}:`, error);
