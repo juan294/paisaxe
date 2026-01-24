@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateChatResponse, generateEmbedding, extractSourcesFromChunks } from "@/lib/claude";
+import { generateChatResponse, extractSourcesFromChunks } from "@/lib/claude";
+import { generateEmbedding } from "@/lib/embeddings";
 import { search } from "@/lib/search";
 import type { ChatRequest, ChatResponse } from "@/types";
 
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     const queryEmbedding = await generateEmbedding(message);
 
     // Search for relevant content
-    const { chunks, images } = await search(queryEmbedding, 5);
+    const { chunks, images } = await search(queryEmbedding, 3);
 
     // Generate response using Claude with context
     const responseText = await generateChatResponse(
