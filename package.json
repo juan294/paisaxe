@@ -18,6 +18,7 @@
     "seed-db:stories": "tsx scripts/seed-database.ts --stories",
     "seed-db:stories:clear": "tsx scripts/seed-database.ts --stories --clear",
     "extract-images": "tsx scripts/extract-images.ts",
+    "generate-stories": "tsx scripts/generate-stories.ts",
     "prepare": "husky"
   },
   "dependencies": {

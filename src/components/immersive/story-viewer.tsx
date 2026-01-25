@@ -155,26 +155,71 @@ export function StoryViewer({
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
       </div>
 
-      {/* Progress bar */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex gap-1 p-4">
-        {stories.map((_, i) => (
-          <div
-            key={i}
-            className="flex-1 h-1 rounded-full bg-white/30 overflow-hidden cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              onIndexChange(i);
-            }}
-          >
-            <div
-              className={cn(
-                "h-full bg-white transition-all duration-300",
-                i < currentIndex ? "w-full" : i === currentIndex ? "w-full" : "w-0"
-              )}
-            />
+      {/* Progress bar - sliding window of max 20 indicators */}
+      {(() => {
+        const MAX_VISIBLE = 20;
+        const total = stories.length;
+
+        // Calculate the visible window
+        let startIndex = 0;
+        let endIndex = Math.min(MAX_VISIBLE, total);
+
+        if (total > MAX_VISIBLE) {
+          // Center the current index in the window when possible
+          const halfWindow = Math.floor(MAX_VISIBLE / 2);
+
+          if (currentIndex < halfWindow) {
+            // Near the start - show first MAX_VISIBLE
+            startIndex = 0;
+            endIndex = MAX_VISIBLE;
+          } else if (currentIndex >= total - halfWindow) {
+            // Near the end - show last MAX_VISIBLE
+            startIndex = total - MAX_VISIBLE;
+            endIndex = total;
+          } else {
+            // Middle - center current index
+            startIndex = currentIndex - halfWindow;
+            endIndex = currentIndex + halfWindow;
+          }
+        }
+
+        const visibleIndices = Array.from(
+          { length: endIndex - startIndex },
+          (_, i) => startIndex + i
+        );
+
+        return (
+          <div className="absolute top-0 left-0 right-0 z-20 flex items-center gap-1 p-4">
+            {/* Left fade indicator when not at start */}
+            {startIndex > 0 && (
+              <div className="w-4 h-1 rounded-full bg-gradient-to-r from-transparent to-white/20" />
+            )}
+
+            {visibleIndices.map((i) => (
+              <div
+                key={i}
+                className="flex-1 h-1 rounded-full bg-white/30 overflow-hidden cursor-pointer transition-all duration-300"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onIndexChange(i);
+                }}
+              >
+                <div
+                  className={cn(
+                    "h-full bg-white transition-all duration-300",
+                    i < currentIndex ? "w-full" : i === currentIndex ? "w-full" : "w-0"
+                  )}
+                />
+              </div>
+            ))}
+
+            {/* Right fade indicator when not at end */}
+            {endIndex < total && (
+              <div className="w-4 h-1 rounded-full bg-gradient-to-l from-transparent to-white/20" />
+            )}
           </div>
-        ))}
-      </div>
+        );
+      })()}
 
       {/* Category badge / Filter */}
       <CategoryFilterBadge
