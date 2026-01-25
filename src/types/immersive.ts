@@ -1,11 +1,16 @@
 export interface Story {
   id: string;
+  slug?: string;
   title: string;
   subtitle: string;
   description: string;
   image: string;
   category: StoryCategory;
   sourcePdf: string;
+  location?: StoryLocation;
+  duration?: StoryDuration;
+  displayOrder?: number;
+  relatedStories?: string[];
 }
 
 export type StoryCategory =
@@ -15,6 +20,16 @@ export type StoryCategory =
   | "culture"
   | "activities";
 
+export type StoryLocation =
+  | "eastern"   // Eastern Asturias (Llanes, Cangas de Onís, Picos de Europa)
+  | "central"   // Central Asturias (Oviedo, Gijón, Avilés)
+  | "western";  // Western Asturias (Cudillero, Luarca, Tapia de Casariego)
+
+export type StoryDuration =
+  | "day-trip"  // Single day visit
+  | "weekend"   // 2-3 days
+  | "week";     // Week-long exploration
+
 export const CATEGORY_LABELS: Record<StoryCategory, string> = {
   nature: "Naturaleza",
   cities: "Ciudades",
@@ -22,3 +37,53 @@ export const CATEGORY_LABELS: Record<StoryCategory, string> = {
   culture: "Cultura",
   activities: "Actividades",
 };
+
+export const LOCATION_LABELS: Record<StoryLocation, string> = {
+  eastern: "Asturias Oriental",
+  central: "Asturias Central",
+  western: "Asturias Occidental",
+};
+
+export const DURATION_LABELS: Record<StoryDuration, string> = {
+  "day-trip": "Excursión de un día",
+  weekend: "Fin de semana",
+  week: "Una semana",
+};
+
+// Database row type (snake_case from Supabase)
+export interface StoryRow {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  image_path: string | null;
+  category: string;
+  source_pdf: string | null;
+  location: string | null;
+  duration: string | null;
+  display_order: number;
+  is_active: boolean;
+  related_stories: string[] | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+// Convert database row to Story interface
+export function rowToStory(row: StoryRow): Story {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    subtitle: row.subtitle || "",
+    description: row.description || "",
+    image: row.image_path || "",
+    category: row.category as StoryCategory,
+    sourcePdf: row.source_pdf || "",
+    location: row.location ? (row.location as StoryLocation) : undefined,
+    duration: row.duration ? (row.duration as StoryDuration) : undefined,
+    displayOrder: row.display_order,
+    relatedStories: row.related_stories || undefined,
+  };
+}
