@@ -1,0 +1,17 @@
+#!/bin/sh
+
+echo "Running pre-commit checks..."
+
+# Run typecheck
+echo "→ TypeScript check..."
+npm run typecheck || exit 1
+
+# Run lint
+echo "→ ESLint check..."
+npm run lint || exit 1
+
+# Run tests
+echo "→ Running tests..."
+npm run test || exit 1
+
+echo "✓ All checks passed!"
