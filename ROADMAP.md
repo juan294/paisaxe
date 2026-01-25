@@ -140,14 +140,14 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 
 ---
 
-## Phase 2: Story Organization :construction:
+## Phase 2: Story Organization :white_check_mark:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Category Filtering UI | :white_check_mark: | Filter by Nature, Cities, Food, Culture, Activities |
 | Geographic Filtering | :white_check_mark: | Eastern, Central, Western Asturias |
 | Trip-type Filtering | :white_check_mark: | Day trip, Weekend, Week |
-| AI-suggested Related Stories | :calendar: | Recommendations based on current story |
+| AI-suggested Related Stories | :white_check_mark: | Relevance-based recommendations (category, location, duration) |
 
 ---
 
