@@ -27,11 +27,16 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const contentType = request.headers.get("content-type") || "";
 
     let imagePath: string;
+    let imageSource: string | null = null;
 
     if (contentType.includes("multipart/form-data")) {
       // Handle file upload
       const formData = await request.formData();
       const file = formData.get("file") as File | null;
+      const sourceValue = formData.get("imageSource");
+      if (sourceValue && typeof sourceValue === "string") {
+        imageSource = sourceValue;
+      }
 
       if (!file) {
         return NextResponse.json(
@@ -87,7 +92,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     } else {
       // Handle JSON with URL
       const body = await request.json();
-      const { imageUrl } = body;
+      const { imageUrl, imageSource: bodyImageSource } = body;
 
       if (!imageUrl || typeof imageUrl !== "string") {
         return NextResponse.json(
@@ -107,12 +112,22 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
 
       imagePath = imageUrl;
+      if (bodyImageSource && typeof bodyImageSource === "string") {
+        imageSource = bodyImageSource;
+      }
     }
 
     // Update story in database
+    const updateData: { image_path: string; image_source?: string } = {
+      image_path: imagePath
+    };
+    if (imageSource !== null) {
+      updateData.image_source = imageSource;
+    }
+
     const { data, error } = await supabase
       .from("stories")
-      .update({ image_path: imagePath })
+      .update(updateData)
       .eq("id", id)
       .select()
       .single();
@@ -133,7 +148,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     return NextResponse.json({
-      data: { id: data.id, image: imagePath },
+      data: { id: data.id, image: imagePath, imageSource: data.image_source || undefined },
     });
   } catch (error) {
     console.error("Admin image API error:", error);

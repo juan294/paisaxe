@@ -1,17 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import dynamic from "next/dynamic";
 import { StoryViewer } from "@/components/immersive/story-viewer";
-import { VoiceChat } from "@/components/immersive/voice-chat";
-import { FALLBACK_STORIES, getStoriesFromDB } from "@/lib/stories-data";
+import { useStories } from "@/hooks/use-stories";
 import { useStoryFilters } from "@/hooks/use-story-filters";
-import type { Story } from "@/types/immersive";
+
+// Dynamically import VoiceChat - only loads when chat is opened
+// This saves ~15KB+ from initial bundle
+const VoiceChat = dynamic(
+  () => import("@/components/immersive/voice-chat").then((mod) => mod.VoiceChat),
+  {
+    ssr: false,
+    loading: () => null, // No loading UI needed, chat panel handles its own state
+  }
+);
 
 export default function ImmersivePage() {
-  const [allStories, setAllStories] = useState<Story[]>(FALLBACK_STORIES);
+  const { stories: allStories, isLoading } = useStories();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   const {
     filteredStories,
@@ -23,20 +31,6 @@ export default function ImmersivePage() {
     setSelectedDuration,
     clearAll,
   } = useStoryFilters(allStories);
-
-  useEffect(() => {
-    async function loadStories() {
-      try {
-        const dbStories = await getStoriesFromDB();
-        setAllStories(dbStories);
-      } catch (error) {
-        console.warn("Failed to load stories from DB, using fallback:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadStories();
-  }, []);
 
   // Reset index when filters change and current index is out of bounds
   useEffect(() => {
@@ -85,11 +79,16 @@ export default function ImmersivePage() {
         onDurationChange={setSelectedDuration}
         onClearFilters={clearAll}
       />
-      <VoiceChat
-        story={currentStory}
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
-      />
+      {/* Only render VoiceChat when opened - lazy loaded */}
+      {chatOpen && (
+        <Suspense fallback={null}>
+          <VoiceChat
+            story={currentStory}
+            open={chatOpen}
+            onClose={() => setChatOpen(false)}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

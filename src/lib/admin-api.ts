@@ -48,8 +48,9 @@ export async function fetchStories(
 export async function updateStoryImageUrl(
   adminKey: string,
   storyId: string,
-  imageUrl: string
-): Promise<AdminApiResponse<{ id: string; image: string }>> {
+  imageUrl: string,
+  imageSource?: string
+): Promise<AdminApiResponse<{ id: string; image: string; imageSource?: string }>> {
   try {
     const response = await fetch(`${API_BASE}/stories/${storyId}/image`, {
       method: "PUT",
@@ -57,7 +58,7 @@ export async function updateStoryImageUrl(
         ...getAuthHeaders(adminKey),
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ imageUrl }),
+      body: JSON.stringify({ imageUrl, imageSource }),
     });
 
     if (!response.ok) {
@@ -78,11 +79,15 @@ export async function updateStoryImageUrl(
 export async function uploadStoryImage(
   adminKey: string,
   storyId: string,
-  file: File
-): Promise<AdminApiResponse<{ id: string; image: string }>> {
+  file: File,
+  imageSource?: string
+): Promise<AdminApiResponse<{ id: string; image: string; imageSource?: string }>> {
   try {
     const formData = new FormData();
     formData.append("file", file);
+    if (imageSource) {
+      formData.append("imageSource", imageSource);
+    }
 
     const response = await fetch(`${API_BASE}/stories/${storyId}/image`, {
       method: "PUT",

@@ -20,17 +20,20 @@ create index if not exists user_favorites_created_idx on user_favorites (created
 -- Enable Row Level Security
 alter table user_favorites enable row level security;
 
--- Users can only view their own favorites
+-- Users can only view their own favorites (drop and recreate to be idempotent)
+drop policy if exists "Users can view own favorites" on user_favorites;
 create policy "Users can view own favorites"
   on user_favorites for select
   using (auth.uid() = user_id);
 
 -- Users can insert their own favorites
+drop policy if exists "Users can insert own favorites" on user_favorites;
 create policy "Users can insert own favorites"
   on user_favorites for insert
   with check (auth.uid() = user_id);
 
 -- Users can delete their own favorites
+drop policy if exists "Users can delete own favorites" on user_favorites;
 create policy "Users can delete own favorites"
   on user_favorites for delete
   using (auth.uid() = user_id);

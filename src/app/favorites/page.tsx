@@ -1,125 +1,285 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useFavorites } from "@/hooks/use-favorites";
-import { FALLBACK_STORIES, getStoriesFromDB } from "@/lib/stories-data";
-import { Heart, ArrowLeft, Trash2 } from "lucide-react";
+import { useStories } from "@/hooks/use-stories";
+import { Bookmark, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
+import { CATEGORY_LABELS } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import type { Story } from "@/types/immersive";
 
+const ITEMS_PER_PAGE = 20;
+
 export default function FavoritesPage() {
   const { favorites, toggleFavorite, isLoading: favoritesLoading } = useFavorites();
-  const [allStories, setAllStories] = useState<Story[]>(FALLBACK_STORIES);
-  const [isLoading, setIsLoading] = useState(true);
+  const { stories: allStories, isLoading } = useStories();
+  const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    async function loadStories() {
-      try {
-        const dbStories = await getStoriesFromDB();
-        setAllStories(dbStories);
-      } catch (error) {
-        console.warn("Failed to load stories from DB, using fallback:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadStories();
-  }, []);
-
+  // Filter to only favorited stories
   const favoriteStories = allStories.filter((story) =>
     favorites.includes(story.id)
   );
 
+  // Get the stories to display (paginated)
+  const displayedStories = favoriteStories.slice(0, displayCount);
+  const hasMore = displayCount < favoriteStories.length;
+
+  // Load more items
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore) return;
+
+    setIsLoadingMore(true);
+    // Small delay to show loading state and prevent rapid firing
+    setTimeout(() => {
+      setDisplayCount(prev => Math.min(prev + ITEMS_PER_PAGE, favoriteStories.length));
+      setIsLoadingMore(false);
+    }, 300);
+  }, [isLoadingMore, hasMore, favoriteStories.length]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          loadMore();
+        }
+      },
+      {
+        rootMargin: "200px", // Start loading before user reaches the end
+        threshold: 0
+      }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [hasMore, isLoadingMore, loadMore]);
+
+  // Reset display count when favorites change significantly
+  useEffect(() => {
+    if (favoriteStories.length < displayCount) {
+      setDisplayCount(Math.max(ITEMS_PER_PAGE, favoriteStories.length));
+    }
+  }, [favoriteStories.length, displayCount]);
+
   if (isLoading || favoritesLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-lg">Cargando favoritos...</div>
+      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center">
+        <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
+        <p className="mt-3 text-sm text-neutral-500">Cargando...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
+    <div className="min-h-screen bg-neutral-950">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-black/80 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Link
-            href="/immersive"
-            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 text-white" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <Heart className="h-6 w-6 text-red-500 fill-red-500" />
-            <h1 className="text-xl font-semibold text-white">Mis Favoritos</h1>
+      <header className="sticky top-0 z-40 border-b border-neutral-800 bg-neutral-900/80 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/immersive"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <div className="flex items-center gap-2">
+              <Bookmark className="h-5 w-5 text-white fill-white" />
+              <h1 className="text-sm font-semibold tracking-tight text-white">
+                Guardados
+              </h1>
+            </div>
           </div>
-          <span className="text-white/60 text-sm">
-            {favoriteStories.length} {favoriteStories.length === 1 ? "historia" : "historias"}
-          </span>
+
+          <div className="flex items-center gap-4 text-xs">
+            <span className="text-neutral-500">
+              {favoriteStories.length} {favoriteStories.length === 1 ? "lugar" : "lugares"}
+            </span>
+          </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {favoriteStories.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Heart className="h-16 w-16 text-white/20 mb-4" />
-            <h2 className="text-xl font-medium text-white mb-2">
-              No tienes favoritos todavia
+          <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+            <Bookmark className="h-16 w-16 text-neutral-700 mb-4" />
+            <h2 className="text-lg font-medium text-white mb-2">
+              No tienes guardados todavía
             </h2>
-            <p className="text-white/60 mb-6 max-w-sm">
-              Explora las historias de Asturias y guarda las que mas te gusten para verlas despues.
+            <p className="text-neutral-500 mb-6 max-w-sm text-sm">
+              Explora las historias de Asturias y guarda las que más te gusten para verlas después.
             </p>
             <Link
               href="/immersive"
-              className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105"
+              className="px-5 py-2.5 bg-white text-neutral-900 rounded-full text-sm font-medium transition-all hover:bg-neutral-200"
             >
               Explorar historias
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {favoriteStories.map((story) => (
-              <div
-                key={story.id}
-                className="group relative overflow-hidden rounded-2xl bg-white/5 border border-white/10 transition-all hover:border-white/20 hover:bg-white/10"
-              >
-                <Link href="/immersive" className="block">
-                  <div className="relative aspect-[4/3] overflow-hidden">
-                    <Image
-                      src={story.image}
-                      alt={story.title}
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-1">
-                      {story.subtitle}
-                    </p>
-                    <h3 className="text-white font-semibold text-lg leading-tight">
-                      {story.title}
-                    </h3>
-                  </div>
-                </Link>
-                <button
-                  onClick={() => toggleFavorite(story.id)}
-                  className={cn(
-                    "absolute top-3 right-3 p-2 rounded-full bg-black/50 backdrop-blur-sm transition-all",
-                    "hover:bg-red-500/80 group/btn"
-                  )}
-                  aria-label="Quitar de favoritos"
-                >
-                  <Trash2 className="h-4 w-4 text-white/80 group-hover/btn:text-white transition-colors" />
-                </button>
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {displayedStories.map((story, index) => (
+                <GalleryItem
+                  key={story.id}
+                  story={story}
+                  isFeature={index === 0 && favoriteStories.length > 2}
+                  onRemove={() => toggleFavorite(story.id)}
+                />
+              ))}
+            </div>
+
+            {/* Load more trigger */}
+            <div
+              ref={loadMoreRef}
+              className="flex justify-center py-8"
+            >
+              {isLoadingMore && (
+                <div className="flex items-center gap-2 text-neutral-500">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Cargando más...</span>
+                </div>
+              )}
+              {!hasMore && favoriteStories.length > ITEMS_PER_PAGE && (
+                <span className="text-sm text-neutral-600">
+                  Has visto todos tus guardados
+                </span>
+              )}
+            </div>
+          </>
         )}
       </main>
     </div>
+  );
+}
+
+// Separate component for gallery items to optimize re-renders
+interface GalleryItemProps {
+  story: Story;
+  isFeature: boolean;
+  onRemove: () => void;
+}
+
+function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
+  const [isVisible, setIsVisible] = useState(false);
+  const itemRef = useRef<HTMLAnchorElement>(null);
+
+  // Intersection Observer for lazy rendering
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: "100px",
+        threshold: 0
+      }
+    );
+
+    const currentRef = itemRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, []);
+
+  return (
+    <Link
+      ref={itemRef}
+      href="/immersive"
+      className={cn(
+        "group relative w-full overflow-hidden rounded-lg",
+        isFeature && "sm:col-span-2"
+      )}
+    >
+      {/* Image Container */}
+      <div className={cn(
+        "relative w-full overflow-hidden bg-neutral-900",
+        isFeature ? "aspect-[21/9]" : "aspect-[4/3]"
+      )}>
+        {isVisible && story.image ? (
+          <>
+            <Image
+              src={story.image}
+              alt={story.title}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              sizes={isFeature
+                ? "(max-width: 768px) 100vw, 66vw"
+                : "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              }
+              loading="lazy"
+              placeholder="empty"
+            />
+
+            {/* Gradient overlay - appears on hover */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+            {/* Content overlay - appears on hover */}
+            <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 transition-all duration-300 group-hover:opacity-100">
+              <div className="translate-y-2 transform transition-transform duration-300 group-hover:translate-y-0">
+                <p className="text-xs font-medium uppercase tracking-wider text-white/60">
+                  {CATEGORY_LABELS[story.category]}
+                </p>
+                <h3 className="mt-1 text-base font-semibold text-white">
+                  {story.title}
+                </h3>
+                {story.subtitle && (
+                  <p className="mt-0.5 line-clamp-1 text-sm text-white/70">
+                    {story.subtitle}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Delete button - top right on hover */}
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onRemove();
+              }}
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 hover:bg-red-500 group-hover:opacity-100"
+              aria-label="Quitar de guardados"
+            >
+              <Trash2 className="h-4 w-4 text-neutral-800 group-hover/btn:text-white" />
+            </button>
+          </>
+        ) : (
+          /* Placeholder while loading or no image */
+          <div className="flex h-full flex-col items-center justify-center gap-3 bg-neutral-800 animate-pulse">
+            {!isVisible ? (
+              <div className="h-8 w-8 rounded bg-neutral-700" />
+            ) : (
+              <>
+                <Bookmark className="h-8 w-8 text-neutral-600" />
+                <p className="text-sm font-medium text-neutral-400">
+                  {story.title}
+                </p>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </Link>
   );
 }

@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Play, Pause, Heart } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Pause, Bookmark } from "lucide-react";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import { AuthButton } from "@/components/auth/auth-button";
-import { FavoriteButton } from "./favorite-button";
 import { SignInPrompt } from "@/components/auth/sign-in-prompt";
 import { useFavorites } from "@/hooks/use-favorites";
+
+// Simple dark placeholder for images (prevents flash of white)
+const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
 
 interface StoryViewerProps {
   stories: Story[];
@@ -51,6 +53,31 @@ export function StoryViewer({
   } = useFavorites();
 
   const story = stories[currentIndex];
+  const prefetchedUrls = useRef<Set<string>>(new Set());
+
+  // Prefetch adjacent images for smoother navigation
+  useEffect(() => {
+    const prefetchImage = (url: string) => {
+      if (!url || prefetchedUrls.current.has(url)) return;
+
+      const img = new window.Image();
+      img.src = url;
+      prefetchedUrls.current.add(url);
+    };
+
+    // Prefetch next image
+    if (currentIndex < stories.length - 1) {
+      prefetchImage(stories[currentIndex + 1].image);
+    }
+    // Prefetch previous image
+    if (currentIndex > 0) {
+      prefetchImage(stories[currentIndex - 1].image);
+    }
+    // Prefetch 2 ahead if available (for faster auto-play)
+    if (currentIndex < stories.length - 2) {
+      prefetchImage(stories[currentIndex + 2].image);
+    }
+  }, [currentIndex, stories]);
 
   const goToNext = useCallback(() => {
     if (currentIndex < stories.length - 1) {
@@ -115,11 +142,14 @@ export function StoryViewer({
           src={story.image}
           alt={story.title}
           fill
+          sizes="100vw"
           className={cn(
             "object-cover",
             autoPlay && "animate-slow-zoom"
           )}
           priority
+          placeholder="blur"
+          blurDataURL={darkPlaceholder}
         />
         {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
@@ -172,9 +202,18 @@ export function StoryViewer({
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
           {story.title}
         </h1>
-        <p className="text-lg md:text-xl text-white/80 max-w-2xl leading-relaxed mb-8">
+        <p className="text-lg md:text-xl text-white/80 max-w-2xl leading-relaxed mb-2">
           {story.description}
         </p>
+
+        {/* Image source attribution */}
+        {story.imageSource && (
+          <p className="text-xs text-white/50 mb-6">
+            {story.imageSource}
+          </p>
+        )}
+
+        {!story.imageSource && <div className="mb-6" />}
 
         {/* Action buttons */}
         <div className="flex flex-wrap items-center gap-3">
@@ -187,10 +226,14 @@ export function StoryViewer({
           >
             Preguntar sobre esto
           </button>
-          <FavoriteButton
-            isFavorite={isFavorite(story.id)}
-            onToggle={() => toggleFavorite(story.id)}
-          />
+          <a
+            href="/favorites"
+            onClick={(e) => e.stopPropagation()}
+            className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105 flex items-center gap-2"
+          >
+            <Bookmark className="h-5 w-5" />
+            <span>Guardados</span>
+          </a>
         </div>
       </div>
 
@@ -241,14 +284,21 @@ export function StoryViewer({
             <Play className="h-5 w-5 text-white" />
           )}
         </button>
-        <a
-          href="/favorites"
-          onClick={(e) => e.stopPropagation()}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleFavorite(story.id);
+          }}
           className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-          title="Mis favoritos"
+          title={isFavorite(story.id) ? "Quitar de guardados" : "Agregar a guardados"}
         >
-          <Heart className="h-5 w-5 text-white" />
-        </a>
+          <Bookmark
+            className={cn(
+              "h-5 w-5 text-white transition-all",
+              isFavorite(story.id) && "fill-white"
+            )}
+          />
+        </button>
         <AuthButton />
       </div>
 

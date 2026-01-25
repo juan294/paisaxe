@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import {
   Dialog,
@@ -46,6 +46,7 @@ export function ImageEditorDialog({
 }: ImageEditorDialogProps) {
   const [activeTab, setActiveTab] = useState<TabType>("url");
   const [imageUrl, setImageUrl] = useState("");
+  const [imageSource, setImageSource] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +54,15 @@ export function ImageEditorDialog({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize imageSource when story changes
+  useEffect(() => {
+    if (story?.imageSource) {
+      setImageSource(story.imageSource);
+    } else {
+      setImageSource("");
+    }
+  }, [story]);
 
   const handleUrlChange = (url: string) => {
     setImageUrl(url);
@@ -134,9 +144,9 @@ export function ImageEditorDialog({
       let result;
 
       if (activeTab === "url" && imageUrl) {
-        result = await updateStoryImageUrl(adminKey, story.id, imageUrl);
+        result = await updateStoryImageUrl(adminKey, story.id, imageUrl, imageSource || undefined);
       } else if (activeTab === "upload" && selectedFile) {
-        result = await uploadStoryImage(adminKey, story.id, selectedFile);
+        result = await uploadStoryImage(adminKey, story.id, selectedFile, imageSource || undefined);
       } else {
         setError("Please provide an image URL or upload a file");
         setIsLoading(false);
@@ -146,7 +156,7 @@ export function ImageEditorDialog({
       if (result.error) {
         setError(result.error);
       } else if (result.data) {
-        onUpdate(story.id, { image: result.data.image });
+        onUpdate(story.id, { image: result.data.image, imageSource: result.data.imageSource });
         resetAndClose();
       }
     } catch {
@@ -199,6 +209,7 @@ export function ImageEditorDialog({
 
   const resetAndClose = () => {
     setImageUrl("");
+    setImageSource("");
     setPreviewUrl(null);
     setSelectedFile(null);
     setError("");
@@ -363,6 +374,23 @@ export function ImageEditorDialog({
                   )}
                 </div>
               )}
+
+              {/* Image Source / Attribution */}
+              <div className="pt-2">
+                <label className="mb-1.5 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                  Image Source / Attribution
+                </label>
+                <Input
+                  type="text"
+                  placeholder="e.g., Photo by Juan on Unsplash"
+                  value={imageSource}
+                  onChange={(e) => setImageSource(e.target.value)}
+                  className="h-9 border-neutral-200 text-sm placeholder:text-neutral-400 dark:border-neutral-800"
+                />
+                <p className="mt-1 text-[10px] text-neutral-400">
+                  Will be displayed below the image in stories
+                </p>
+              </div>
 
               {error && (
                 <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
