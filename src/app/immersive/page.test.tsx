@@ -18,6 +18,15 @@ vi.mock("next/image", () => ({
   ),
 }));
 
+// Mock getStoriesFromDB to return fallback stories immediately
+vi.mock("@/lib/stories-data", async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    getStoriesFromDB: vi.fn().mockResolvedValue(actual.FALLBACK_STORIES),
+  };
+});
+
 // Mock fetch for VoiceChat
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -31,23 +40,33 @@ describe("ImmersivePage", () => {
     });
   });
 
+  // Helper to wait for loading to complete
+  const waitForLoaded = async () => {
+    await waitFor(() => {
+      expect(screen.queryByText("Loading stories...")).not.toBeInTheDocument();
+    });
+  };
+
   describe("rendering", () => {
-    it("should render StoryViewer component", () => {
+    it("should render StoryViewer component", async () => {
       render(<ImmersivePage />);
+      await waitForLoaded();
 
       // Should show first story from STORIES
       expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
     });
 
-    it("should render with initial story index of 0", () => {
+    it("should render with initial story index of 0", async () => {
       render(<ImmersivePage />);
+      await waitForLoaded();
 
       // First story should be visible
       expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
     });
 
-    it("should render ask button", () => {
+    it("should render ask button", async () => {
       render(<ImmersivePage />);
+      await waitForLoaded();
 
       expect(
         screen.getByRole("button", { name: "Preguntar sobre esto" })
@@ -56,8 +75,9 @@ describe("ImmersivePage", () => {
   });
 
   describe("chat dialog", () => {
-    it("should not show VoiceChat initially", () => {
+    it("should not show VoiceChat initially", async () => {
       render(<ImmersivePage />);
+      await waitForLoaded();
 
       // VoiceChat should be closed initially - input should not be visible
       expect(
@@ -67,6 +87,7 @@ describe("ImmersivePage", () => {
 
     it("should open VoiceChat when clicking ask button", async () => {
       render(<ImmersivePage />);
+      await waitForLoaded();
 
       fireEvent.click(
         screen.getByRole("button", { name: "Preguntar sobre esto" })
@@ -81,6 +102,7 @@ describe("ImmersivePage", () => {
 
     it("should close VoiceChat when clicking close button", async () => {
       render(<ImmersivePage />);
+      await waitForLoaded();
 
       // Open chat
       fireEvent.click(
@@ -100,6 +122,7 @@ describe("ImmersivePage", () => {
   describe("story navigation", () => {
     it("should show second story after navigating", async () => {
       render(<ImmersivePage />);
+      await waitForLoaded();
 
       // Find next button and click it
       const nextButton = screen.getAllByRole("button").find(
@@ -124,6 +147,7 @@ describe("ImmersivePage", () => {
   describe("integration", () => {
     it("should pass current story to VoiceChat", async () => {
       render(<ImmersivePage />);
+      await waitForLoaded();
 
       // Open chat
       fireEvent.click(
