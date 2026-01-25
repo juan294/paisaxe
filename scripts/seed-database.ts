@@ -460,7 +460,7 @@ async function main(): Promise<void> {
   const storiesOnly = args.includes("--stories");
   const chunksOnly = args.includes("--chunks");
 
-  console.log("=== Asturias Database Seeder ===\n");
+  console.log("=== Paisaxe Database Seeder ===\n");
 
   if (storiesOnly) {
     // Seed only stories

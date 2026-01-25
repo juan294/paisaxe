@@ -8,10 +8,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Descubre Asturias | Discover Asturias",
+  title: "Paisaxe | Descubre Asturias",
   description:
-    "Tu guia personal para explorar Asturias. Encuentra rutas, gastronomia, cultura y mas. Your personal guide to explore Asturias.",
-  keywords: ["Asturias", "turismo", "tourism", "Spain", "travel", "sidra", "naturaleza"],
+    "Tu guía personal para explorar Asturias. Descubre paisajes, rutas, gastronomía y cultura. Your personal guide to explore Asturias.",
+  keywords: ["Paisaxe", "Asturias", "turismo", "tourism", "Spain", "travel", "sidra", "naturaleza"],
 };
 
 export default function RootLayout({

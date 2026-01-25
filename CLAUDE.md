@@ -1,6 +1,8 @@
-# Asturias Tourism Website
+# Paisaxe - Asturias Tourism Website
 
 An immersive tourism experience for Asturias, Spain. Visitors explore the region through full-screen visual stories and can ask questions via voice or text to learn more about each location.
+
+**Domain**: paisaxe.es
 
 ## Project Overview
 
@@ -134,7 +136,7 @@ npm run test:ui        # Open Vitest UI
 ## Project Structure
 
 ```
-asturias/
+paisaxe/
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── page.tsx            # Redirects to /immersive

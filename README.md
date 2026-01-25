@@ -1,6 +1,10 @@
-# Asturias Tourism Guide
+# Paisaxe - Asturias Tourism Guide
+
+**[paisaxe.es](https://paisaxe.es)**
 
 An AI-powered tourism guide for Asturias, Spain. Experience the region through immersive visual stories and ask questions in natural language to discover hidden gems, local gastronomy, hiking routes, and more.
+
+*"Paisaxe" means "landscape" in Asturian (Bable), the traditional language of the region.*
 
 ## Features
 
@@ -35,8 +39,8 @@ An AI-powered tourism guide for Asturias, Spain. Experience the region through i
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/juan294/asturias.git
-   cd asturias
+   git clone https://github.com/juan294/paisaxe.git
+   cd paisaxe
    ```
 
 2. Install dependencies:
@@ -91,7 +95,7 @@ An AI-powered tourism guide for Asturias, Spain. Experience the region through i
 ## Project Structure
 
 ```
-asturias/
+paisaxe/
 ├── src/
 │   ├── app/                    # Next.js App Router pages
 │   │   ├── api/chat/           # Chat API endpoint

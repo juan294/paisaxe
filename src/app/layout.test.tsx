@@ -13,15 +13,16 @@ vi.mock("next/font/google", () => ({
 describe("RootLayout", () => {
   describe("metadata", () => {
     it("should have correct title", () => {
-      expect(metadata.title).toBe("Descubre Asturias | Discover Asturias");
+      expect(metadata.title).toBe("Paisaxe | Descubre Asturias");
     });
 
     it("should have correct description", () => {
-      expect(metadata.description).toContain("Tu guia personal para explorar Asturias");
+      expect(metadata.description).toContain("Tu guía personal para explorar Asturias");
       expect(metadata.description).toContain("Your personal guide to explore Asturias");
     });
 
     it("should have relevant keywords", () => {
+      expect(metadata.keywords).toContain("Paisaxe");
       expect(metadata.keywords).toContain("Asturias");
       expect(metadata.keywords).toContain("turismo");
       expect(metadata.keywords).toContain("tourism");
