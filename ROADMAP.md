@@ -2,6 +2,7 @@
 
 A living document tracking implemented features and future development plans.
 
+**Domain**: paisaxe.es
 **Last Updated**: January 2026
 
 ---
@@ -13,11 +14,38 @@ A living document tracking implemented features and future development plans.
 | :white_check_mark: | Complete |
 | :construction: | In Progress |
 | :calendar: | Planned |
-| :bulb: | Idea / Backlog |
 
 ---
 
-## Phase 1: MVP (Complete)
+## Project Vision
+
+A personal passion project showcasing Asturias, Spain through immersive visual storytelling and an intelligent AI assistant. The site helps visitors discover and plan trips to the region.
+
+**Hero Features**: Stunning visual stories + Smart AI assistant
+
+---
+
+## Requirements Summary
+
+| Aspect | Decision |
+|--------|----------|
+| Audience | Mixed - anyone interested in Asturias |
+| Primary Goals | Inspiration & discovery + Trip planning |
+| Platform Priority | Mobile-first |
+| Content Source | 37 official tourism PDFs |
+| Target Stories | 50+ (currently 20) |
+| Languages | Auto-detect UI language |
+| AI Role | Information assistant + local expert (accurate with personality) |
+| Voice Input | Essential |
+| Voice Output (TTS) | Future feature |
+| User Accounts | Optional SSO for favorites only |
+| Map View | Not needed |
+| Trip Planner | Not needed |
+| Analytics | Basic (page views, popular stories) |
+
+---
+
+## Phase 1: MVP :white_check_mark:
 
 ### Core Experience
 
@@ -28,7 +56,7 @@ A living document tracking implemented features and future development plans.
 | Auto-play Mode | :white_check_mark: | 6-second intervals |
 | Progress Indicator | :white_check_mark: | Shows position in story sequence |
 | Story Categories | :white_check_mark: | 5 categories: Nature, Cities, Food, Culture, Activities |
-| 8 Curated Stories | :white_check_mark: | Hardcoded initial content |
+| 8 Curated Stories | :white_check_mark: | Initial hardcoded content |
 
 ### Voice & Text Chat
 
@@ -48,13 +76,12 @@ A living document tracking implemented features and future development plans.
 | Voyage AI Embeddings | :white_check_mark: | voyage-3 model |
 | Claude Integration | :white_check_mark: | Claude Sonnet for responses |
 | Keyword Fallback Search | :white_check_mark: | Place name matching |
-| Related Images Retrieval | :white_check_mark: | From search results |
 
 ### Data Pipeline
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| PDF Text Extraction | :white_check_mark: | 37 PDFs in content/pdfs/ |
+| PDF Text Extraction | :white_check_mark: | 37 PDFs processed |
 | Content Chunking | :white_check_mark: | Smart paragraph splitting |
 | Batch Embedding Generation | :white_check_mark: | Rate-limited processing |
 | Database Seeding | :white_check_mark: | With clear/reseed option |
@@ -66,126 +93,117 @@ A living document tracking implemented features and future development plans.
 | Next.js 16 App Router | :white_check_mark: | TypeScript strict mode |
 | Supabase PostgreSQL | :white_check_mark: | With pgvector extension |
 | shadcn/ui Components | :white_check_mark: | Button, Card, Dialog, Input |
-| Tailwind CSS Styling | :white_check_mark: | Custom theme config |
-| Vitest Testing | :white_check_mark: | Core test coverage |
+| Tailwind CSS Styling | :white_check_mark: | Custom Paisaxe theme |
+| Vitest Testing | :white_check_mark: | 251 tests passing |
 | GitHub Actions CI | :white_check_mark: | Lint, typecheck, test, build |
 | Git Hooks (Husky) | :white_check_mark: | Pre-commit quality checks |
 
 ---
 
-## Phase 2: Content & Polish (Current)
+## Current Sprint: Content Expansion :construction:
 
-### Content Expansion
+### Task 1: PDF Image Extraction Pipeline
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Create extraction script | :white_check_mark: | `scripts/extract-images.ts` |
+| Extract images from PDFs | :calendar: | Run `npm run extract-images` |
+| Generate manifest file | :white_check_mark: | `content/images/manifest.json` |
+| Seed images table | :calendar: | Populate database with extracted images |
+
+### Task 2: Dynamic Stories from Database
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Create stories table migration | :white_check_mark: | `003_stories_table.sql` |
+| Apply migration to Supabase | :calendar: | Run SQL in Supabase dashboard |
+| Add database loading functions | :white_check_mark: | `getStoriesFromDB()`, etc. |
+| Seed stories table | :calendar: | Run `npm run seed-db:stories` |
+
+### Task 3: Expand Story Content
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Create 12+ additional stories | :white_check_mark: | 20 total stories ready |
+| Add location metadata | :white_check_mark: | Eastern, Central, Western |
+| Add duration metadata | :white_check_mark: | Day-trip, Weekend, Week |
+| Match with extracted images | :calendar: | Replace Unsplash URLs |
+
+---
+
+## Phase 2: Story Organization :calendar:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Dynamic Story Loading | :calendar: | Load from database instead of hardcoded |
-| Additional Stories | :calendar: | Expand beyond 8 initial stories |
-| Image Optimization | :calendar: | Use actual Asturias photos (not Unsplash) |
-| PDF Image Extraction | :calendar: | Extract and use images from source PDFs |
+| Category Filtering UI | :calendar: | Filter by Nature, Cities, Food, Culture, Activities |
+| Geographic Filtering | :calendar: | Eastern, Central, Western Asturias |
+| Trip-type Filtering | :calendar: | Day trip, Weekend, Week |
+| AI-suggested Related Stories | :calendar: | Recommendations based on current story |
 
-### UX Improvements
+---
+
+## Phase 3: AI Improvements :calendar:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Define AI Persona | :calendar: | "Pelayo" - historic Asturian name |
+| Improve Context Retrieval | :calendar: | Better search accuracy |
+| Add Personality to Responses | :calendar: | Warm, knowledgeable local expert |
+| Display Related Images in Chat | :calendar: | Show images inline with responses |
+
+---
+
+## Phase 4: User Features :calendar:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| SSO Authentication | :calendar: | Google, Apple sign-in |
+| Favorites List | :calendar: | Local storage + sync if logged in |
+| Basic Analytics | :calendar: | Vercel Analytics or Plausible |
+
+---
+
+## Phase 5: Internationalization :calendar:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Browser Language Detection | :calendar: | Auto-detect UI language |
+| English UI Translation | :calendar: | Full interface translation |
+| Other Languages | :calendar: | As needed |
+
+---
+
+## Phase 6: Polish :calendar:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Loading Skeleton States | :calendar: | For stories and chat |
 | Error Boundaries | :calendar: | Graceful error handling |
-| Offline Support | :calendar: | Service worker for cached content |
-| Haptic Feedback | :calendar: | For mobile navigation |
-| Swipe Gesture Tutorial | :calendar: | First-time user onboarding |
-
-### Chat Enhancements
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Chat History Persistence | :calendar: | Save across sessions |
-| Suggested Questions | :calendar: | Context-based prompts |
-| Voice Output (TTS) | :calendar: | Read responses aloud |
-| Image Display in Chat | :calendar: | Show related images inline |
-
-### Accessibility
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Screen Reader Support | :calendar: | ARIA labels and live regions |
-| Reduced Motion Mode | :calendar: | Respect prefers-reduced-motion |
-| High Contrast Mode | :calendar: | For visibility |
-| Keyboard Navigation | :white_check_mark: | Arrow keys, Space, 'i' key |
+| Accessibility Audit | :calendar: | Screen readers, reduced motion |
+| SEO Optimization | :calendar: | Organic discovery |
 
 ---
 
-## Phase 3: Discovery & Engagement
+## Verification Checklist
 
-### Navigation Features
+After completing the current sprint:
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Category Filtering | :bulb: | Browse by category |
-| Story Search | :bulb: | Find specific stories |
-| Story Map View | :bulb: | Geographic exploration |
-| Related Stories | :bulb: | Recommendations based on current story |
-
-### Social Features
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Share Story | :bulb: | Social media sharing |
-| Story Deep Links | :bulb: | Direct links to specific stories |
-| Save Favorites | :bulb: | Local storage or account-based |
-| Trip Planner | :bulb: | Create custom itineraries |
-
-### Analytics
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Story View Tracking | :bulb: | Popular content insights |
-| Chat Analytics | :bulb: | Common questions |
-| User Journey Mapping | :bulb: | Navigation patterns |
+- [ ] Image extraction: Run `npm run extract-images`, verify images in `content/images/`
+- [ ] Database migration: Run SQL, verify `stories` table exists
+- [ ] Story seeding: Run `npm run seed-db:stories`, verify stories in database
+- [ ] Frontend: Visit `/immersive`, verify new stories load correctly
+- [ ] Tests: Run `npm run test` - all tests pass
+- [ ] Build: Run `npm run build` - no errors
 
 ---
 
-## Phase 4: Advanced Features
+## Technical Notes
 
-### AI Enhancements
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Multi-turn Conversations | :bulb: | Remember chat context |
-| Personalized Recommendations | :bulb: | Based on browsing history |
-| Semantic Story Search | :bulb: | Natural language queries |
-| AI-Generated Itineraries | :bulb: | Custom trip planning |
-
-### Rich Media
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Video Stories | :bulb: | Embedded video content |
-| 360° Panoramas | :bulb: | Immersive location views |
-| Audio Guides | :bulb: | Narrated story content |
-| Weather Integration | :bulb: | Real-time conditions |
-
-### Integrations
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Google Maps | :bulb: | Location markers |
-| Calendar Export | :bulb: | Save events/festivals |
-| Transportation APIs | :bulb: | Getting there info |
-| Weather APIs | :bulb: | Current conditions |
-
----
-
-## Technical Debt & Improvements
-
-| Item | Priority | Notes |
-|------|----------|-------|
-| Increase test coverage | High | Target 80%+ coverage |
-| Add E2E tests | Medium | Playwright for critical flows |
-| Performance optimization | Medium | Lighthouse audit |
-| Bundle size reduction | Low | Code splitting |
-| API rate limiting | Medium | Protect endpoints |
-| Error logging | Medium | Sentry or similar |
-| Database indexes | Low | Query optimization |
+- Keep mobile-first approach in all UI changes
+- Maintain current visual aesthetic (elegant, natural, warm)
+- Voice input already works - preserve this functionality
+- Tests before implementation (TDD workflow)
+- All work on `develop` branch
 
 ---
 
@@ -194,25 +212,8 @@ A living document tracking implemented features and future development plans.
 | Version | Date | Milestone |
 |---------|------|-----------|
 | v0.1.0 | Jan 2026 | MVP - Immersive stories + voice chat |
-| v0.2.0 | - | Content expansion |
-| v0.3.0 | - | Discovery features |
+| v0.2.0 | - | Content expansion + dynamic loading |
+| v0.3.0 | - | Story organization UI |
+| v0.4.0 | - | AI improvements |
+| v0.5.0 | - | User features |
 | v1.0.0 | - | Production release |
-
----
-
-## Contributing
-
-1. Pick an item from Phase 2 or Technical Debt
-2. Create a feature branch from `develop`
-3. Implement with tests (TDD workflow)
-4. Submit PR for review
-5. Update this roadmap when complete
-
----
-
-## Notes
-
-- All development on `develop` branch
-- Production releases merge to `main`
-- Follow TDD workflow (Red-Green-Refactor)
-- Run `npm run test && npm run typecheck && npm run lint` before commits
