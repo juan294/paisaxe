@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { StoryViewer } from "@/components/immersive/story-viewer";
-import { StoryFilters } from "@/components/immersive/story-filters";
 import { VoiceChat } from "@/components/immersive/voice-chat";
 import { FALLBACK_STORIES, getStoriesFromDB } from "@/lib/stories-data";
 import { useStoryFilters } from "@/hooks/use-story-filters";
@@ -60,17 +59,6 @@ export default function ImmersivePage() {
   if (filteredStories.length === 0) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
-        <div className="absolute top-6 right-6 z-30">
-          <StoryFilters
-            selectedCategory={selectedCategory}
-            selectedLocation={selectedLocation}
-            selectedDuration={selectedDuration}
-            onCategoryChange={setSelectedCategory}
-            onLocationChange={setSelectedLocation}
-            onDurationChange={setSelectedDuration}
-            onClearAll={clearAll}
-          />
-        </div>
         <div className="text-white text-lg mb-4">No hay historias con estos filtros</div>
         <button
           onClick={clearAll}
@@ -84,24 +72,18 @@ export default function ImmersivePage() {
 
   return (
     <>
-      {/* Filter controls */}
-      <div className="absolute top-6 right-6 z-30">
-        <StoryFilters
-          selectedCategory={selectedCategory}
-          selectedLocation={selectedLocation}
-          selectedDuration={selectedDuration}
-          onCategoryChange={setSelectedCategory}
-          onLocationChange={setSelectedLocation}
-          onDurationChange={setSelectedDuration}
-          onClearAll={clearAll}
-        />
-      </div>
-
       <StoryViewer
         stories={filteredStories}
         currentIndex={currentIndex}
         onIndexChange={setCurrentIndex}
         onAskAbout={() => setChatOpen(true)}
+        selectedCategory={selectedCategory}
+        selectedLocation={selectedLocation}
+        selectedDuration={selectedDuration}
+        onCategoryChange={setSelectedCategory}
+        onLocationChange={setSelectedLocation}
+        onDurationChange={setSelectedDuration}
+        onClearFilters={clearAll}
       />
       <VoiceChat
         story={currentStory}
