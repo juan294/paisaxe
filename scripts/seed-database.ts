@@ -45,7 +45,7 @@ async function generateEmbeddings(texts: string[]): Promise<number[][]> {
     throw new Error("No embeddings returned from Voyage AI");
   }
 
-  return result.data.map((d) => d.embedding);
+  return result.data.map((d) => d.embedding).filter((e): e is number[] => e !== undefined);
 }
 
 async function seedChunks(): Promise<void> {

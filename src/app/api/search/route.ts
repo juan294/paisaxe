@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateEmbedding } from "@/lib/claude";
+import { generateEmbedding } from "@/lib/embeddings";
 import { search, keywordSearch } from "@/lib/search";
 
 export async function POST(request: NextRequest) {
