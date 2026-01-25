@@ -25,8 +25,7 @@ const MAX_CONTEXT_LENGTH = 350;
 
 export async function generateChatResponse(
   userMessage: string,
-  context: Chunk[],
-  conversationHistory: { role: "user" | "assistant"; content: string }[] = []
+  context: Chunk[]
 ): Promise<string> {
   // Build context but limit to MAX_CONTEXT_LENGTH to avoid payload size issues
   let contextText = "";
@@ -46,10 +45,6 @@ export async function generateChatResponse(
   }
 
   const messages: AnthropicMessage[] = [
-    ...conversationHistory.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    })),
     {
       role: "user" as const,
       content: contextText

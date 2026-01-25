@@ -1,12 +1,3 @@
-export interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  sources?: Source[];
-  images?: ImageResult[];
-  timestamp: Date;
-}
-
 export interface Source {
   id: string;
   title: string;
@@ -39,19 +30,11 @@ export interface SearchResult {
 
 export interface ChatRequest {
   message: string;
-  conversationHistory?: Pick<Message, "role" | "content">[];
+  context?: string;
 }
 
 export interface ChatResponse {
   message: string;
-  sources: Source[];
-  images: ImageResult[];
-}
-
-export type Locale = "es" | "en";
-
-export interface SuggestionChip {
-  label: string;
-  query: string;
-  icon?: string;
+  sources?: Source[];
+  images?: ImageResult[];
 }
