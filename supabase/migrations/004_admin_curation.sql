@@ -13,22 +13,30 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('story-images', 'story-images', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Add RLS policy to allow public read access to uploaded images
-CREATE POLICY IF NOT EXISTS "Public read access for story images"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'story-images');
+-- Add RLS policies for storage (drop first if exists to make idempotent)
+DO $$
+BEGIN
+  -- Public read access
+  DROP POLICY IF EXISTS "Public read access for story images" ON storage.objects;
+  CREATE POLICY "Public read access for story images"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'story-images');
 
--- Add RLS policy to allow service role to upload images
-CREATE POLICY IF NOT EXISTS "Service role can upload story images"
-  ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'story-images');
+  -- Service role upload
+  DROP POLICY IF EXISTS "Service role can upload story images" ON storage.objects;
+  CREATE POLICY "Service role can upload story images"
+    ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id = 'story-images');
 
--- Add RLS policy to allow service role to update images
-CREATE POLICY IF NOT EXISTS "Service role can update story images"
-  ON storage.objects FOR UPDATE
-  USING (bucket_id = 'story-images');
+  -- Service role update
+  DROP POLICY IF EXISTS "Service role can update story images" ON storage.objects;
+  CREATE POLICY "Service role can update story images"
+    ON storage.objects FOR UPDATE
+    USING (bucket_id = 'story-images');
 
--- Add RLS policy to allow service role to delete images
-CREATE POLICY IF NOT EXISTS "Service role can delete story images"
-  ON storage.objects FOR DELETE
-  USING (bucket_id = 'story-images');
+  -- Service role delete
+  DROP POLICY IF EXISTS "Service role can delete story images" ON storage.objects;
+  CREATE POLICY "Service role can delete story images"
+    ON storage.objects FOR DELETE
+    USING (bucket_id = 'story-images');
+END $$;
