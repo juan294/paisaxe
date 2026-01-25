@@ -1,0 +1,142 @@
+[
+  {
+    "storyId": "lagos-covadonga",
+    "sourcePdf": "0062f6f0-a7d2-5b11-6b58-b47e5912be74.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920",
+    "newImage": "/images/stories/lagos-covadonga.png",
+    "source": "pdf"
+  },
+  {
+    "storyId": "oviedo-catedral",
+    "sourcePdf": "Asturias-en-familia-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "fabada",
+    "sourcePdf": "Asturias-en-familia-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "prerromanico",
+    "sourcePdf": "02e93c24-6cac-6d7d-1ca8-59fd8d3fa337.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1568797629192-789acf8e4df3?w=1920",
+    "newImage": "/images/stories/prerromanico.png",
+    "source": "pdf"
+  },
+  {
+    "storyId": "ruta-cares",
+    "sourcePdf": "0062f6f0-a7d2-5b11-6b58-b47e5912be74.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1920",
+    "newImage": "/images/stories/ruta-cares.png",
+    "source": "pdf"
+  },
+  {
+    "storyId": "playa-silencio",
+    "sourcePdf": "12c86611-ccbe-dbe9-ac86-67ef948a5371.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920",
+    "newImage": "/images/stories/playa-silencio.png",
+    "source": "pdf"
+  },
+  {
+    "storyId": "sidra",
+    "sourcePdf": "Asturias-en-familia-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "gijon",
+    "sourcePdf": "Asturias-en-familia-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1533104816931-20fa691ff6ca?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "aviles",
+    "sourcePdf": "Guia-visitar-Aviles-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=1920",
+    "newImage": "/images/stories/aviles.png",
+    "source": "pdf"
+  },
+  {
+    "storyId": "camino-santiago",
+    "sourcePdf": "Planificador-Camino-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1541623089466-8e777dd05db2?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "llanes",
+    "sourcePdf": "Cuento-de-Asturias-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "cangas-onis",
+    "sourcePdf": "Guia-cultura-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1464278533981-50106e6176b1?w=1920",
+    "newImage": "/images/stories/cangas-onis.png",
+    "source": "pdf"
+  },
+  {
+    "storyId": "descenso-sella",
+    "sourcePdf": "Asturias-en-familia-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "quesos-asturianos",
+    "sourcePdf": "Guia-cultura-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1452195100486-9cc805987862?w=1920",
+    "newImage": "/images/stories/quesos-asturianos.png",
+    "source": "pdf"
+  },
+  {
+    "storyId": "museo-jurrasico",
+    "sourcePdf": "Asturias-en-familia-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "senda-oso",
+    "sourcePdf": "Asturias-en-familia-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1474511320723-9a56873571b7?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "cudillero",
+    "sourcePdf": "Cuento-de-Asturias-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "taramundi",
+    "sourcePdf": "Cuento-de-Asturias-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1500049242364-5f500807cdd7?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "bufones-pria",
+    "sourcePdf": "Cuento-de-Asturias-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1509233725247-49e657c54213?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  },
+  {
+    "storyId": "luarca",
+    "sourcePdf": "Cuento-de-Asturias-ES.pdf",
+    "originalImage": "https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?w=1920",
+    "newImage": null,
+    "source": "unsplash"
+  }
+]

@@ -3,7 +3,7 @@
 A living document tracking implemented features and future development plans.
 
 **Domain**: paisaxe.es
-**Last Updated**: January 2026
+**Last Updated**: January 25, 2026
 
 ---
 
@@ -100,15 +100,15 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 
 ---
 
-## Current Sprint: Content Expansion :construction:
+## Current Sprint: Content Expansion :white_check_mark:
 
-### Task 1: PDF Image Extraction Pipeline
+### Task 1: PDF Image Extraction Pipeline :white_check_mark:
 
 | Item | Status | Notes |
 |------|--------|-------|
 | Create extraction script | :white_check_mark: | `scripts/extract-images.ts` |
-| Extract images from PDFs | :calendar: | Run `npm run extract-images` |
-| Generate manifest file | :white_check_mark: | `content/images/manifest.json` |
+| Extract images from PDFs | :white_check_mark: | 1,773 images from 37 PDFs |
+| Generate manifest file | :white_check_mark: | `content/images/manifest.json` (14K lines) |
 | Seed images table | :calendar: | Populate database with extracted images |
 
 ### Task 2: Dynamic Stories from Database
@@ -120,14 +120,23 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Add database loading functions | :white_check_mark: | `getStoriesFromDB()`, etc. |
 | Seed stories table | :calendar: | Run `npm run seed-db:stories` |
 
-### Task 3: Expand Story Content
+### Task 3: Expand Story Content :white_check_mark:
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Create 12+ additional stories | :white_check_mark: | 20 total stories ready |
+| Create 12+ additional stories | :white_check_mark: | 20 total stories in seed script |
 | Add location metadata | :white_check_mark: | Eastern, Central, Western |
 | Add duration metadata | :white_check_mark: | Day-trip, Weekend, Week |
-| Match with extracted images | :calendar: | Replace Unsplash URLs |
+| Match with extracted images | :calendar: | Replace Unsplash URLs with PDF images |
+
+### Task 4: Database Deployment :white_check_mark:
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Apply stories migration | :white_check_mark: | Stories table exists in Supabase |
+| Seed stories to database | :white_check_mark: | 20 stories seeded via `npm run seed-db:stories` |
+| Copy PDF images to public/ | :white_check_mark: | 7 images in `public/images/stories/` |
+| Update story image paths | :white_check_mark: | 7 stories use PDF images, 13 use Unsplash fallback |
 
 ---
 
@@ -188,12 +197,15 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 
 After completing the current sprint:
 
-- [ ] Image extraction: Run `npm run extract-images`, verify images in `content/images/`
-- [ ] Database migration: Run SQL, verify `stories` table exists
-- [ ] Story seeding: Run `npm run seed-db:stories`, verify stories in database
+- [x] Image extraction: 1,773 images extracted to `content/images/`
+- [x] Manifest generated: `content/images/manifest.json` with metadata
+- [x] 20 stories defined: In `scripts/seed-database.ts`
+- [x] Database migration: Stories table exists in Supabase
+- [x] Story seeding: 20 stories seeded via `npm run seed-db:stories`
+- [x] Image replacement: 7 stories use PDF images, 13 use Unsplash fallback
+- [x] Tests: `npm run test` - 251 tests pass
+- [x] Build: `npm run build` - no errors
 - [ ] Frontend: Visit `/immersive`, verify new stories load correctly
-- [ ] Tests: Run `npm run test` - all tests pass
-- [ ] Build: Run `npm run build` - no errors
 
 ---
 
