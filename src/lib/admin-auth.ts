@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
+type AuthResult =
+  | { valid: true }
+  | { valid: false; error: NextResponse };
+
 /**
  * Validates the admin secret key from the Authorization header.
  * Expects: Authorization: Bearer {ADMIN_SECRET_KEY}
  */
-export function validateAdminAuth(request: NextRequest): { valid: boolean; error?: NextResponse } {
+export function validateAdminAuth(request: NextRequest): AuthResult {
   const adminKey = process.env.ADMIN_SECRET_KEY;
 
   if (!adminKey) {
