@@ -57,3 +57,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Ken Burns slow zoom animation for immersive mode */
+@keyframes slow-zoom {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.1);
+  }
+}
+
+.animate-slow-zoom {
+  animation: slow-zoom 20s ease-out forwards;
+}

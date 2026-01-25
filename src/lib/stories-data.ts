@@ -1,0 +1,85 @@
+import type { Story, StoryCategory } from "@/types/immersive";
+
+export const STORIES: Story[] = [
+  {
+    id: "lagos-covadonga",
+    title: "Lagos de Covadonga",
+    subtitle: "Picos de Europa",
+    description: "Dos lagos de origen glaciar rodeados de las imponentes cumbres de los Picos de Europa. Un paisaje que quita el aliento en cualquier época del año.",
+    image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920",
+    category: "nature",
+    sourcePdf: "0062f6f0-a7d2-5b11-6b58-b47e5912be74.pdf",
+  },
+  {
+    id: "oviedo-catedral",
+    title: "Catedral de Oviedo",
+    subtitle: "Capital del Principado",
+    description: "La joya del gótico asturiano, con su Cámara Santa declarada Patrimonio de la Humanidad. Siglos de historia en cada piedra.",
+    image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920",
+    category: "cities",
+    sourcePdf: "Asturias-en-familia-ES.pdf",
+  },
+  {
+    id: "fabada",
+    title: "Fabada Asturiana",
+    subtitle: "Tradición en cada cucharada",
+    description: "El plato más emblemático de nuestra gastronomía. Fabes, chorizo, morcilla y lacón cocinados a fuego lento con todo el sabor de Asturias.",
+    image: "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=1920",
+    category: "food",
+    sourcePdf: "Asturias-en-familia-ES.pdf",
+  },
+  {
+    id: "prerromanico",
+    title: "Arte Prerrománico",
+    subtitle: "Patrimonio de la Humanidad",
+    description: "Santa María del Naranco, San Miguel de Lillo... Joyas arquitectónicas únicas en el mundo que cuentan la historia del Reino de Asturias.",
+    image: "https://images.unsplash.com/photo-1568797629192-789acf8e4df3?w=1920",
+    category: "culture",
+    sourcePdf: "02e93c24-6cac-6d7d-1ca8-59fd8d3fa337.pdf",
+  },
+  {
+    id: "ruta-cares",
+    title: "Ruta del Cares",
+    subtitle: "La Garganta Divina",
+    description: "12 kilómetros excavados en la roca entre Caín y Poncebos. Una de las rutas de senderismo más espectaculares de Europa.",
+    image: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1920",
+    category: "activities",
+    sourcePdf: "0062f6f0-a7d2-5b11-6b58-b47e5912be74.pdf",
+  },
+  {
+    id: "playa-silencio",
+    title: "Playa del Silencio",
+    subtitle: "Cudillero",
+    description: "Un anfiteatro natural de acantilados que abrazan aguas cristalinas. Silencio, paz y la belleza salvaje del Cantábrico.",
+    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920",
+    category: "nature",
+    sourcePdf: "12c86611-ccbe-dbe9-ac86-67ef948a5371.pdf",
+  },
+  {
+    id: "sidra",
+    title: "Sidra Asturiana",
+    subtitle: "Cultura líquida",
+    description: "El arte del escanciado, los llagares centenarios, el ritual del culín. Más que una bebida, una forma de entender la vida.",
+    image: "https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?w=1920",
+    category: "food",
+    sourcePdf: "Asturias-en-familia-ES.pdf",
+  },
+  {
+    id: "gijon",
+    title: "Gijón",
+    subtitle: "Ciudad y mar",
+    description: "Cimadevilla, San Lorenzo, el Elogio del Horizonte... Una ciudad que mira al mar con la personalidad única de lo auténtico.",
+    image: "https://images.unsplash.com/photo-1533104816931-20fa691ff6ca?w=1920",
+    category: "cities",
+    sourcePdf: "Asturias-en-familia-ES.pdf",
+  },
+];
+
+export function getStoriesByCategory(category: StoryCategory | null): Story[] {
+  if (!category) return STORIES;
+  return STORIES.filter(s => s.category === category);
+}
+
+export function getAllCategories(): StoryCategory[] {
+  return ["nature", "cities", "food", "culture", "activities"];
+}
