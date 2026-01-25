@@ -4,8 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
+import { ChevronLeft, ChevronRight, Volume2, VolumeX, Heart } from "lucide-react";
 import { CategoryFilterBadge } from "./category-filter-badge";
+import { AuthButton } from "@/components/auth/auth-button";
+import { FavoriteButton } from "./favorite-button";
+import { SignInPrompt } from "@/components/auth/sign-in-prompt";
+import { useFavorites } from "@/hooks/use-favorites";
 
 interface StoryViewerProps {
   stories: Story[];
@@ -38,6 +42,13 @@ export function StoryViewer({
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
   const [autoPlay, setAutoPlay] = useState(false);
+
+  const {
+    isFavorite,
+    toggleFavorite,
+    showSignInPrompt,
+    dismissSignInPrompt,
+  } = useFavorites();
 
   const story = stories[currentIndex];
 
@@ -165,17 +176,26 @@ export function StoryViewer({
           {story.description}
         </p>
 
-        {/* Ask button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onAskAbout();
-          }}
-          className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105"
-        >
-          Preguntar sobre esto
-        </button>
+        {/* Action buttons */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAskAbout();
+            }}
+            className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105"
+          >
+            Preguntar sobre esto
+          </button>
+          <FavoriteButton
+            isFavorite={isFavorite(story.id)}
+            onToggle={() => toggleFavorite(story.id)}
+          />
+        </div>
       </div>
+
+      {/* Sign-in prompt modal */}
+      <SignInPrompt open={showSignInPrompt} onClose={dismissSignInPrompt} />
 
       {/* Navigation arrows */}
       <button
@@ -206,20 +226,31 @@ export function StoryViewer({
         <ChevronRight className="h-8 w-8 text-white" />
       </button>
 
-      {/* Auto-play toggle */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setAutoPlay((prev) => !prev);
-        }}
-        className="absolute top-16 right-6 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-      >
-        {autoPlay ? (
-          <Volume2 className="h-5 w-5 text-white" />
-        ) : (
-          <VolumeX className="h-5 w-5 text-white" />
-        )}
-      </button>
+      {/* Top-right controls: Auth + Auto-play + Favorites link */}
+      <div className="absolute top-16 right-6 z-20 flex items-center gap-3">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setAutoPlay((prev) => !prev);
+          }}
+          className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
+        >
+          {autoPlay ? (
+            <Volume2 className="h-5 w-5 text-white" />
+          ) : (
+            <VolumeX className="h-5 w-5 text-white" />
+          )}
+        </button>
+        <a
+          href="/favorites"
+          onClick={(e) => e.stopPropagation()}
+          className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
+          title="Mis favoritos"
+        >
+          <Heart className="h-5 w-5 text-white" />
+        </a>
+        <AuthButton />
+      </div>
 
       {/* Keyboard hints */}
       <div

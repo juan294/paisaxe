@@ -2,6 +2,29 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { StoryViewer } from "./story-viewer";
 import { Story } from "@/types/immersive";
+import { AuthProvider } from "@/components/auth/auth-provider";
+import { ReactNode } from "react";
+
+// Mock Supabase browser client
+vi.mock("@/lib/supabase-browser", () => ({
+  createSupabaseBrowserClient: () => ({
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      onAuthStateChange: vi.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      }),
+      signInWithOAuth: vi.fn(),
+      signOut: vi.fn(),
+    },
+  }),
+}));
+
+// Wrapper component for tests
+const TestWrapper = ({ children }: { children: ReactNode }) => (
+  <AuthProvider>{children}</AuthProvider>
+);
+
+const renderWithAuth = (ui: ReactNode) => render(ui, { wrapper: TestWrapper });
 
 // Mock next/image
 vi.mock("next/image", () => ({
@@ -92,7 +115,7 @@ describe("StoryViewer", () => {
 
   describe("rendering", () => {
     it("should render the current story", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
       expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
@@ -100,7 +123,7 @@ describe("StoryViewer", () => {
     });
 
     it("should render progress bars for all stories", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // There should be 3 progress bar segments
       const progressBars = screen.getAllByRole("generic").filter(
@@ -110,19 +133,19 @@ describe("StoryViewer", () => {
     });
 
     it("should render category badge", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByText("Naturaleza")).toBeInTheDocument();
     });
 
     it("should render ask button", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByRole("button", { name: "Preguntar sobre esto" })).toBeInTheDocument();
     });
 
     it("should render navigation arrows", () => {
-      render(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
       // Find buttons with ChevronLeft and ChevronRight icons
       const buttons = screen.getAllByRole("button");
@@ -130,7 +153,7 @@ describe("StoryViewer", () => {
     });
 
     it("should render keyboard hints", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByText(/navegar/)).toBeInTheDocument();
     });
@@ -138,7 +161,7 @@ describe("StoryViewer", () => {
 
   describe("navigation", () => {
     it("should disable prev button on first story", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const prevButton = screen.getAllByRole("button").find(
         (btn) => btn.classList.contains("left-4")
@@ -147,7 +170,7 @@ describe("StoryViewer", () => {
     });
 
     it("should disable next button on last story", () => {
-      render(<StoryViewer {...getDefaultProps({ currentIndex: 2 })} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 2 })} />);
 
       const nextButton = screen.getAllByRole("button").find(
         (btn) => btn.classList.contains("right-4") && btn.classList.contains("top-1/2")
@@ -156,7 +179,7 @@ describe("StoryViewer", () => {
     });
 
     it("should call onIndexChange when clicking next", async () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const nextButton = screen.getAllByRole("button").find(
         (btn) => btn.classList.contains("right-4") && btn.classList.contains("top-1/2")
@@ -172,7 +195,7 @@ describe("StoryViewer", () => {
     });
 
     it("should call onIndexChange when clicking prev", async () => {
-      render(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
       const prevButton = screen.getAllByRole("button").find(
         (btn) => btn.classList.contains("left-4")
@@ -188,7 +211,7 @@ describe("StoryViewer", () => {
     });
 
     it("should navigate with keyboard right arrow", async () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       fireEvent.keyDown(window, { key: "ArrowRight" });
       act(() => {
@@ -199,7 +222,7 @@ describe("StoryViewer", () => {
     });
 
     it("should navigate with keyboard left arrow", async () => {
-      render(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
       fireEvent.keyDown(window, { key: "ArrowLeft" });
       act(() => {
@@ -210,7 +233,7 @@ describe("StoryViewer", () => {
     });
 
     it("should navigate with spacebar", async () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       fireEvent.keyDown(window, { key: " " });
       act(() => {
@@ -221,7 +244,7 @@ describe("StoryViewer", () => {
     });
 
     it("should toggle info visibility with i key", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // Info should be visible initially
       const title = screen.getByText("Lagos de Covadonga");
@@ -234,7 +257,7 @@ describe("StoryViewer", () => {
     });
 
     it("should jump to specific story when clicking progress bar", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const progressBars = screen.getAllByRole("generic").filter(
         (el) => el.classList.contains("flex-1") && el.classList.contains("h-1")
@@ -249,7 +272,7 @@ describe("StoryViewer", () => {
 
   describe("ask button", () => {
     it("should call onAskAbout when clicking ask button", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Preguntar sobre esto" }));
       expect(onAskAbout).toHaveBeenCalled();
@@ -258,7 +281,7 @@ describe("StoryViewer", () => {
 
   describe("auto-play", () => {
     it("should auto-advance when auto-play is enabled", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // Find and click the auto-play toggle
       const autoPlayButton = screen.getAllByRole("button").find(
@@ -285,7 +308,7 @@ describe("StoryViewer", () => {
 
   describe("info toggle", () => {
     it("should toggle info visibility when clicking screen", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const container = screen.getByText("Lagos de Covadonga").closest(".relative.h-screen");
 
@@ -303,7 +326,7 @@ describe("StoryViewer", () => {
 
   describe("empty stories", () => {
     it("should return null when story is undefined", () => {
-      const { container } = render(
+      const { container } = renderWithAuth(
         <StoryViewer {...getDefaultProps({ stories: [] })} />
       );
 
@@ -313,19 +336,19 @@ describe("StoryViewer", () => {
 
   describe("category labels", () => {
     it("should display correct category label for nature", () => {
-      render(<StoryViewer {...getDefaultProps()} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByText("Naturaleza")).toBeInTheDocument();
     });
 
     it("should display correct category label for culture", () => {
-      render(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
       expect(screen.getByText("Cultura")).toBeInTheDocument();
     });
 
     it("should display correct category label for food", () => {
-      render(<StoryViewer {...getDefaultProps({ currentIndex: 2 })} />);
+      renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 2 })} />);
 
       expect(screen.getByText("Gastronomia")).toBeInTheDocument();
     });
