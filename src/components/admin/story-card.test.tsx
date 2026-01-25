@@ -14,12 +14,16 @@ vi.mock("next/image", () => ({
 describe("StoryCard", () => {
   const mockStory: AdminStory = {
     id: "story-1",
+    slug: "test-story",
     title: "Test Story",
     subtitle: "Test Subtitle",
+    description: "Test description",
     category: "nature",
     image: "/images/test.jpg",
     displayOrder: 1,
     curationStatus: "needs_curation",
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
   };
 
   const mockOnEdit = vi.fn();
@@ -37,7 +41,7 @@ describe("StoryCard", () => {
     });
 
     it("should render story without image", () => {
-      const storyWithoutImage = { ...mockStory, image: null };
+      const storyWithoutImage = { ...mockStory, image: "" };
       render(<StoryCard story={storyWithoutImage} onEdit={mockOnEdit} />);
       expect(screen.getByText("Test Story")).toBeInTheDocument();
       expect(screen.getByText(/No image/i)).toBeInTheDocument();
@@ -65,7 +69,7 @@ describe("StoryCard", () => {
     });
 
     it("should call onEdit for story without image", () => {
-      const storyWithoutImage = { ...mockStory, image: null };
+      const storyWithoutImage = { ...mockStory, image: "" };
       render(<StoryCard story={storyWithoutImage} onEdit={mockOnEdit} />);
       const card = screen.getByRole("button");
       fireEvent.click(card);
@@ -80,7 +84,7 @@ describe("StoryCard", () => {
     });
 
     it("should show needs curation badge for stories without image", () => {
-      const storyWithoutImage = { ...mockStory, image: null };
+      const storyWithoutImage = { ...mockStory, image: "" };
       render(<StoryCard story={storyWithoutImage} onEdit={mockOnEdit} />);
       expect(screen.getByText("Needs curation")).toBeInTheDocument();
     });
@@ -122,13 +126,13 @@ describe("StoryCard", () => {
 
   describe("no image state", () => {
     it("should display click to add text for stories without image", () => {
-      const storyWithoutImage = { ...mockStory, image: null };
+      const storyWithoutImage = { ...mockStory, image: "" };
       render(<StoryCard story={storyWithoutImage} onEdit={mockOnEdit} />);
       expect(screen.getByText(/Click to add/i)).toBeInTheDocument();
     });
 
     it("should not show needs curation badge for approved stories without image", () => {
-      const approvedWithoutImage = { ...mockStory, image: null, curationStatus: "approved" as const };
+      const approvedWithoutImage = { ...mockStory, image: "", curationStatus: "approved" as const };
       render(<StoryCard story={approvedWithoutImage} onEdit={mockOnEdit} />);
       expect(screen.queryByText("Needs curation")).not.toBeInTheDocument();
     });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { validateAdminAuth } from "./admin-auth";
 
@@ -24,7 +24,7 @@ describe("admin-auth", () => {
       const result = validateAdminAuth(request);
 
       expect(result.valid).toBe(true);
-      expect(result.error).toBeUndefined();
+      expect("error" in result).toBe(false);
     });
 
     it("should return 500 when ADMIN_SECRET_KEY is not configured", async () => {
@@ -39,11 +39,11 @@ describe("admin-auth", () => {
       const result = validateAdminAuth(request);
 
       expect(result.valid).toBe(false);
-      expect(result.error).toBeDefined();
-
-      const errorData = await result.error!.json();
-      expect(result.error!.status).toBe(500);
-      expect(errorData.error).toBe("Server configuration error");
+      if (!result.valid) {
+        const errorData = await result.error.json();
+        expect(result.error.status).toBe(500);
+        expect(errorData.error).toBe("Server configuration error");
+      }
     });
 
     it("should return 401 when authorization header is missing", async () => {
@@ -52,11 +52,11 @@ describe("admin-auth", () => {
       const result = validateAdminAuth(request);
 
       expect(result.valid).toBe(false);
-      expect(result.error).toBeDefined();
-
-      const errorData = await result.error!.json();
-      expect(result.error!.status).toBe(401);
-      expect(errorData.error).toBe("Authorization header required");
+      if (!result.valid) {
+        const errorData = await result.error.json();
+        expect(result.error.status).toBe(401);
+        expect(errorData.error).toBe("Authorization header required");
+      }
     });
 
     it("should return 401 for invalid authorization format - missing Bearer", async () => {
@@ -69,10 +69,11 @@ describe("admin-auth", () => {
       const result = validateAdminAuth(request);
 
       expect(result.valid).toBe(false);
-
-      const errorData = await result.error!.json();
-      expect(result.error!.status).toBe(401);
-      expect(errorData.error).toBe("Invalid authorization format. Expected: Bearer {token}");
+      if (!result.valid) {
+        const errorData = await result.error.json();
+        expect(result.error.status).toBe(401);
+        expect(errorData.error).toBe("Invalid authorization format. Expected: Bearer {token}");
+      }
     });
 
     it("should return 401 for invalid authorization format - wrong scheme", async () => {
@@ -85,9 +86,9 @@ describe("admin-auth", () => {
       const result = validateAdminAuth(request);
 
       expect(result.valid).toBe(false);
-
-      const errorData = await result.error!.json();
-      expect(result.error!.status).toBe(401);
+      if (!result.valid) {
+        expect(result.error.status).toBe(401);
+      }
     });
 
     it("should return 403 for invalid admin key", async () => {
@@ -100,10 +101,11 @@ describe("admin-auth", () => {
       const result = validateAdminAuth(request);
 
       expect(result.valid).toBe(false);
-
-      const errorData = await result.error!.json();
-      expect(result.error!.status).toBe(403);
-      expect(errorData.error).toBe("Invalid admin key");
+      if (!result.valid) {
+        const errorData = await result.error.json();
+        expect(result.error.status).toBe(403);
+        expect(errorData.error).toBe("Invalid admin key");
+      }
     });
 
     it("should be case-insensitive for Bearer scheme", () => {
@@ -128,7 +130,9 @@ describe("admin-auth", () => {
       const result = validateAdminAuth(request);
 
       expect(result.valid).toBe(false);
-      expect(result.error!.status).toBe(403);
+      if (!result.valid) {
+        expect(result.error.status).toBe(403);
+      }
     });
   });
 });
