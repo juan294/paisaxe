@@ -1,6 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ImmersivePage from "./page";
+import { AuthProvider } from "@/components/auth/auth-provider";
+import { ReactNode } from "react";
+
+// Mock Supabase browser client
+vi.mock("@/lib/supabase-browser", () => ({
+  createSupabaseBrowserClient: () => ({
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      onAuthStateChange: vi.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      }),
+      signInWithOAuth: vi.fn(),
+      signOut: vi.fn(),
+    },
+  }),
+}));
+
+// Wrapper component for tests
+const TestWrapper = ({ children }: { children: ReactNode }) => (
+  <AuthProvider>{children}</AuthProvider>
+);
+
+const renderWithAuth = (ui: ReactNode) => render(ui, { wrapper: TestWrapper });
 
 // Mock next/image
 vi.mock("next/image", () => ({
@@ -49,7 +72,7 @@ describe("ImmersivePage", () => {
 
   describe("rendering", () => {
     it("should render StoryViewer component", async () => {
-      render(<ImmersivePage />);
+      renderWithAuth(<ImmersivePage />);
       await waitForLoaded();
 
       // Should show first story from STORIES
@@ -57,7 +80,7 @@ describe("ImmersivePage", () => {
     });
 
     it("should render with initial story index of 0", async () => {
-      render(<ImmersivePage />);
+      renderWithAuth(<ImmersivePage />);
       await waitForLoaded();
 
       // First story should be visible
@@ -65,7 +88,7 @@ describe("ImmersivePage", () => {
     });
 
     it("should render ask button", async () => {
-      render(<ImmersivePage />);
+      renderWithAuth(<ImmersivePage />);
       await waitForLoaded();
 
       expect(
@@ -76,7 +99,7 @@ describe("ImmersivePage", () => {
 
   describe("chat dialog", () => {
     it("should not show VoiceChat initially", async () => {
-      render(<ImmersivePage />);
+      renderWithAuth(<ImmersivePage />);
       await waitForLoaded();
 
       // VoiceChat should be closed initially - input should not be visible
@@ -86,7 +109,7 @@ describe("ImmersivePage", () => {
     });
 
     it("should open VoiceChat when clicking ask button", async () => {
-      render(<ImmersivePage />);
+      renderWithAuth(<ImmersivePage />);
       await waitForLoaded();
 
       fireEvent.click(
@@ -101,7 +124,7 @@ describe("ImmersivePage", () => {
     });
 
     it("should close VoiceChat when clicking close button", async () => {
-      render(<ImmersivePage />);
+      renderWithAuth(<ImmersivePage />);
       await waitForLoaded();
 
       // Open chat
@@ -121,7 +144,7 @@ describe("ImmersivePage", () => {
 
   describe("story navigation", () => {
     it("should show second story after navigating", async () => {
-      render(<ImmersivePage />);
+      renderWithAuth(<ImmersivePage />);
       await waitForLoaded();
 
       // Find next button and click it
@@ -146,7 +169,7 @@ describe("ImmersivePage", () => {
 
   describe("integration", () => {
     it("should pass current story to VoiceChat", async () => {
-      render(<ImmersivePage />);
+      renderWithAuth(<ImmersivePage />);
       await waitForLoaded();
 
       // Open chat
