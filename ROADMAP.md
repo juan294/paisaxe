@@ -147,7 +147,7 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Category Filtering UI | :white_check_mark: | Filter by Nature, Cities, Food, Culture, Activities |
 | Geographic Filtering | :white_check_mark: | Eastern, Central, Western Asturias |
 | Trip-type Filtering | :white_check_mark: | Day trip, Weekend, Week |
-| AI-suggested Related Stories | :white_check_mark: | Relevance-based recommendations (category, location, duration) |
+| AI-suggested Related Stories | :white_check_mark: | Implemented but hidden (clean UX priority) |
 
 ---
 
