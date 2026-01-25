@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { Story, CATEGORY_LABELS } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
+import { RelatedStories } from "./related-stories";
+import { getRelatedStories } from "@/lib/related-stories";
 
 interface StoryViewerProps {
   stories: Story[];
@@ -24,6 +26,24 @@ export function StoryViewer({
   const [autoPlay, setAutoPlay] = useState(false);
 
   const story = stories[currentIndex];
+
+  // Compute related stories for the current story
+  const relatedStories = useMemo(() => {
+    if (!story) return [];
+    return getRelatedStories(story, stories, 3);
+  }, [story, stories]);
+
+  // Handle selecting a related story
+  const handleSelectRelated = useCallback((selectedStory: Story) => {
+    const newIndex = stories.findIndex(s => s.id === selectedStory.id);
+    if (newIndex !== -1 && newIndex !== currentIndex) {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        onIndexChange(newIndex);
+        setIsTransitioning(false);
+      }, 300);
+    }
+  }, [stories, currentIndex, onIndexChange]);
 
   const goToNext = useCallback(() => {
     if (currentIndex < stories.length - 1) {
@@ -203,6 +223,14 @@ export function StoryViewer({
           <VolumeX className="h-5 w-5 text-white" />
         )}
       </button>
+
+      {/* Related Stories */}
+      {showInfo && relatedStories.length > 0 && (
+        <RelatedStories
+          stories={relatedStories}
+          onSelectStory={handleSelectRelated}
+        />
+      )}
 
       {/* Keyboard hints */}
       <div
