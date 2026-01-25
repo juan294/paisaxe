@@ -1,19 +1,19 @@
 # Asturias Tourism Website
 
-A chat-based tourism information website for Asturias, Spain. Visitors can ask natural language questions and receive curated recommendations from processed PDF content.
+An immersive tourism experience for Asturias, Spain. Visitors explore the region through full-screen visual stories and can ask questions via voice or text to learn more about each location.
 
 ## Project Overview
 
 - **Purpose**: Informative tourism site (no bookings)
 - **Content Source**: 37 PDFs in `content/pdfs/` with curated tourism info
-- **Interface**: Chat window with suggestions + open text input
-- **Languages**: UI in Spanish (es-ES) and English (en-US); chat responds in visitor's language
+- **Interface**: Immersive visual stories with swipe navigation + voice/text chat
+- **Languages**: UI in Spanish; chat responds in visitor's language
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Next.js 15+ (App Router) |
+| Framework | Next.js 16 (App Router) |
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS + shadcn/ui |
 | Database | Supabase (PostgreSQL + pgvector) |
@@ -137,29 +137,28 @@ npm run test:ui        # Open Vitest UI
 asturias/
 ├── src/
 │   ├── app/                    # Next.js App Router
-│   │   ├── page.tsx            # Main chat interface
+│   │   ├── page.tsx            # Redirects to /immersive
 │   │   ├── layout.tsx
+│   │   ├── immersive/          # Immersive stories page
 │   │   └── api/
-│   │       ├── chat/           # Chat endpoint
-│   │       └── search/         # Vector search endpoint
+│   │       └── chat/           # Chat endpoint
 │   ├── components/
 │   │   ├── ui/                 # shadcn/ui components
-│   │   ├── chat/               # Chat interface components
-│   │   └── results/            # Search result rendering
+│   │   └── immersive/          # Story viewer & voice chat
 │   ├── lib/
 │   │   ├── supabase.ts         # Supabase client
 │   │   ├── claude.ts           # Claude API wrapper
 │   │   ├── embeddings.ts       # Voyage AI embeddings
-│   │   └── search.ts           # Vector search logic
+│   │   ├── search.ts           # Vector search logic
+│   │   └── stories-data.ts     # Story content data
 │   └── types/
-│       └── index.ts            # TypeScript types
+│       ├── index.ts            # Core TypeScript types
+│       └── immersive.ts        # Immersive mode types
 ├── content/
 │   └── pdfs/                   # Source PDF files
 ├── scripts/
 │   ├── process-pdfs.ts         # PDF text extraction
 │   └── seed-database.ts        # Generate embeddings and populate DB
-├── public/
-│   └── images/                 # Extracted PDF images
 ├── supabase/
 │   └── migrations/             # Database schema
 └── vitest.config.ts            # Test configuration
