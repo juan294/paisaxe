@@ -2,15 +2,24 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Story, CATEGORY_LABELS } from "@/types/immersive";
+import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
+import { CategoryFilterBadge } from "./category-filter-badge";
 
 interface StoryViewerProps {
   stories: Story[];
   currentIndex: number;
   onIndexChange: (index: number) => void;
   onAskAbout: () => void;
+  // Filter props
+  selectedCategory: StoryCategory | null;
+  selectedLocation: StoryLocation | null;
+  selectedDuration: StoryDuration | null;
+  onCategoryChange: (category: StoryCategory | null) => void;
+  onLocationChange: (location: StoryLocation | null) => void;
+  onDurationChange: (duration: StoryDuration | null) => void;
+  onClearFilters: () => void;
 }
 
 export function StoryViewer({
@@ -18,6 +27,13 @@ export function StoryViewer({
   currentIndex,
   onIndexChange,
   onAskAbout,
+  selectedCategory,
+  selectedLocation,
+  selectedDuration,
+  onCategoryChange,
+  onLocationChange,
+  onDurationChange,
+  onClearFilters,
 }: StoryViewerProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
@@ -119,17 +135,18 @@ export function StoryViewer({
         ))}
       </div>
 
-      {/* Category badge */}
-      <div
-        className={cn(
-          "absolute top-16 left-6 z-20 transition-all duration-500",
-          showInfo ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
-        )}
-      >
-        <span className="px-3 py-1.5 text-sm font-medium text-white/90 bg-white/20 backdrop-blur-sm rounded-full">
-          {CATEGORY_LABELS[story.category]}
-        </span>
-      </div>
+      {/* Category badge / Filter */}
+      <CategoryFilterBadge
+        currentCategory={story.category}
+        selectedCategory={selectedCategory}
+        selectedLocation={selectedLocation}
+        selectedDuration={selectedDuration}
+        onCategoryChange={onCategoryChange}
+        onLocationChange={onLocationChange}
+        onDurationChange={onDurationChange}
+        onClearAll={onClearFilters}
+        visible={showInfo}
+      />
 
       {/* Main content */}
       <div

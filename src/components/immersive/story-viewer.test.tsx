@@ -56,10 +56,33 @@ const mockStories: Story[] = [
 describe("StoryViewer", () => {
   let onIndexChange: ReturnType<typeof vi.fn>;
   let onAskAbout: ReturnType<typeof vi.fn>;
+  let onCategoryChange: ReturnType<typeof vi.fn>;
+  let onLocationChange: ReturnType<typeof vi.fn>;
+  let onDurationChange: ReturnType<typeof vi.fn>;
+  let onClearFilters: ReturnType<typeof vi.fn>;
+
+  const getDefaultProps = (overrides = {}) => ({
+    stories: mockStories,
+    currentIndex: 0,
+    onIndexChange,
+    onAskAbout,
+    selectedCategory: null,
+    selectedLocation: null,
+    selectedDuration: null,
+    onCategoryChange,
+    onLocationChange,
+    onDurationChange,
+    onClearFilters,
+    ...overrides,
+  });
 
   beforeEach(() => {
     onIndexChange = vi.fn();
     onAskAbout = vi.fn();
+    onCategoryChange = vi.fn();
+    onLocationChange = vi.fn();
+    onDurationChange = vi.fn();
+    onClearFilters = vi.fn();
     vi.useFakeTimers();
   });
 
@@ -69,14 +92,7 @@ describe("StoryViewer", () => {
 
   describe("rendering", () => {
     it("should render the current story", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
       expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
@@ -84,14 +100,7 @@ describe("StoryViewer", () => {
     });
 
     it("should render progress bars for all stories", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       // There should be 3 progress bar segments
       const progressBars = screen.getAllByRole("generic").filter(
@@ -101,40 +110,19 @@ describe("StoryViewer", () => {
     });
 
     it("should render category badge", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByText("Naturaleza")).toBeInTheDocument();
     });
 
     it("should render ask button", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByRole("button", { name: "Preguntar sobre esto" })).toBeInTheDocument();
     });
 
     it("should render navigation arrows", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={1}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
       // Find buttons with ChevronLeft and ChevronRight icons
       const buttons = screen.getAllByRole("button");
@@ -142,14 +130,7 @@ describe("StoryViewer", () => {
     });
 
     it("should render keyboard hints", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByText(/navegar/)).toBeInTheDocument();
     });
@@ -157,14 +138,7 @@ describe("StoryViewer", () => {
 
   describe("navigation", () => {
     it("should disable prev button on first story", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       const prevButton = screen.getAllByRole("button").find(
         (btn) => btn.classList.contains("left-4")
@@ -173,14 +147,7 @@ describe("StoryViewer", () => {
     });
 
     it("should disable next button on last story", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={2}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps({ currentIndex: 2 })} />);
 
       const nextButton = screen.getAllByRole("button").find(
         (btn) => btn.classList.contains("right-4") && btn.classList.contains("top-1/2")
@@ -189,14 +156,7 @@ describe("StoryViewer", () => {
     });
 
     it("should call onIndexChange when clicking next", async () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       const nextButton = screen.getAllByRole("button").find(
         (btn) => btn.classList.contains("right-4") && btn.classList.contains("top-1/2")
@@ -212,14 +172,7 @@ describe("StoryViewer", () => {
     });
 
     it("should call onIndexChange when clicking prev", async () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={1}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
       const prevButton = screen.getAllByRole("button").find(
         (btn) => btn.classList.contains("left-4")
@@ -235,14 +188,7 @@ describe("StoryViewer", () => {
     });
 
     it("should navigate with keyboard right arrow", async () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       fireEvent.keyDown(window, { key: "ArrowRight" });
       act(() => {
@@ -253,14 +199,7 @@ describe("StoryViewer", () => {
     });
 
     it("should navigate with keyboard left arrow", async () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={1}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
       fireEvent.keyDown(window, { key: "ArrowLeft" });
       act(() => {
@@ -271,14 +210,7 @@ describe("StoryViewer", () => {
     });
 
     it("should navigate with spacebar", async () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       fireEvent.keyDown(window, { key: " " });
       act(() => {
@@ -289,14 +221,7 @@ describe("StoryViewer", () => {
     });
 
     it("should toggle info visibility with i key", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       // Info should be visible initially
       const title = screen.getByText("Lagos de Covadonga");
@@ -309,14 +234,7 @@ describe("StoryViewer", () => {
     });
 
     it("should jump to specific story when clicking progress bar", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       const progressBars = screen.getAllByRole("generic").filter(
         (el) => el.classList.contains("flex-1") && el.classList.contains("h-1")
@@ -331,14 +249,7 @@ describe("StoryViewer", () => {
 
   describe("ask button", () => {
     it("should call onAskAbout when clicking ask button", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Preguntar sobre esto" }));
       expect(onAskAbout).toHaveBeenCalled();
@@ -347,14 +258,7 @@ describe("StoryViewer", () => {
 
   describe("auto-play", () => {
     it("should auto-advance when auto-play is enabled", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       // Find and click the auto-play toggle
       const autoPlayButton = screen.getAllByRole("button").find(
@@ -381,14 +285,7 @@ describe("StoryViewer", () => {
 
   describe("info toggle", () => {
     it("should toggle info visibility when clicking screen", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       const container = screen.getByText("Lagos de Covadonga").closest(".relative.h-screen");
 
@@ -407,12 +304,7 @@ describe("StoryViewer", () => {
   describe("empty stories", () => {
     it("should return null when story is undefined", () => {
       const { container } = render(
-        <StoryViewer
-          stories={[]}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
+        <StoryViewer {...getDefaultProps({ stories: [] })} />
       );
 
       expect(container.firstChild).toBeNull();
@@ -421,40 +313,19 @@ describe("StoryViewer", () => {
 
   describe("category labels", () => {
     it("should display correct category label for nature", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={0}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByText("Naturaleza")).toBeInTheDocument();
     });
 
     it("should display correct category label for culture", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={1}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
       expect(screen.getByText("Cultura")).toBeInTheDocument();
     });
 
     it("should display correct category label for food", () => {
-      render(
-        <StoryViewer
-          stories={mockStories}
-          currentIndex={2}
-          onIndexChange={onIndexChange}
-          onAskAbout={onAskAbout}
-        />
-      );
+      render(<StoryViewer {...getDefaultProps({ currentIndex: 2 })} />);
 
       expect(screen.getByText("Gastronomia")).toBeInTheDocument();
     });
