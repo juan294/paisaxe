@@ -43,8 +43,8 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        // Asturias brand colors
-        asturias: {
+        // Paisaxe brand colors
+        paisaxe: {
           blue: "#0077b6",
           green: "#2d6a4f",
           sand: "#e9c46a",
