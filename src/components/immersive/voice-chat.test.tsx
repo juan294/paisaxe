@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VoiceChat } from "./voice-chat";
 import { Story } from "@/types/immersive";
@@ -247,10 +247,12 @@ describe("VoiceChat", () => {
         expect(screen.getByText("Pensando...")).toBeInTheDocument();
       });
 
-      // Resolve to cleanup
-      resolvePromise!({
-        ok: true,
-        json: async () => ({ message: "Done" }),
+      // Resolve and wait for state update to complete
+      await act(async () => {
+        resolvePromise!({
+          ok: true,
+          json: async () => ({ message: "Done" }),
+        });
       });
     });
 
@@ -459,10 +461,12 @@ describe("VoiceChat", () => {
         expect(submitButton).toBeDisabled();
       });
 
-      // Cleanup
-      resolvePromise!({
-        ok: true,
-        json: async () => ({ message: "Done" }),
+      // Resolve and wait for state update to complete
+      await act(async () => {
+        resolvePromise!({
+          ok: true,
+          json: async () => ({ message: "Done" }),
+        });
       });
     });
   });
@@ -645,8 +649,10 @@ describe("VoiceChat", () => {
       if (micButton) {
         fireEvent.click(micButton);
 
-        // Simulate speech recognition result
-        mockRecognition._triggerResult("Hello from speech");
+        // Simulate speech recognition result wrapped in act
+        act(() => {
+          mockRecognition._triggerResult("Hello from speech");
+        });
 
         await waitFor(() => {
           const input = screen.getByPlaceholderText(
@@ -678,8 +684,10 @@ describe("VoiceChat", () => {
         // Verify we're listening
         expect(screen.getByPlaceholderText("Escuchando...")).toBeInTheDocument();
 
-        // Simulate error
-        mockRecognition._triggerError();
+        // Simulate error wrapped in act
+        act(() => {
+          mockRecognition._triggerError();
+        });
 
         await waitFor(() => {
           expect(
@@ -707,8 +715,10 @@ describe("VoiceChat", () => {
       if (micButton) {
         fireEvent.click(micButton);
 
-        // Simulate end
-        mockRecognition._triggerEnd();
+        // Simulate end wrapped in act
+        act(() => {
+          mockRecognition._triggerEnd();
+        });
 
         await waitFor(() => {
           expect(

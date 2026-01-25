@@ -31,7 +31,7 @@ describe("Dialog", () => {
       render(
         <Dialog>
           <DialogTrigger>Open Dialog</DialogTrigger>
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogTitle>Test Dialog</DialogTitle>
           </DialogContent>
         </Dialog>
@@ -62,7 +62,7 @@ describe("Dialog", () => {
     it("should render content when dialog is open", async () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogTitle>Dialog Title</DialogTitle>
             <p>Dialog content here</p>
           </DialogContent>
@@ -76,7 +76,7 @@ describe("Dialog", () => {
     it("should have close button", async () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogTitle>Dialog Title</DialogTitle>
           </DialogContent>
         </Dialog>
@@ -88,7 +88,7 @@ describe("Dialog", () => {
     it("should merge custom className", async () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent className="custom-dialog" data-testid="dialog-content">
+          <DialogContent className="custom-dialog" data-testid="dialog-content" aria-describedby={undefined}>
             <DialogTitle>Title</DialogTitle>
           </DialogContent>
         </Dialog>
@@ -103,7 +103,7 @@ describe("Dialog", () => {
     it("should render header with children", () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogHeader data-testid="header">
               <DialogTitle>Header Title</DialogTitle>
             </DialogHeader>
@@ -118,7 +118,7 @@ describe("Dialog", () => {
     it("should merge custom className", () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogHeader className="custom-header" data-testid="header">
               <DialogTitle>Title</DialogTitle>
             </DialogHeader>
@@ -134,7 +134,7 @@ describe("Dialog", () => {
     it("should render footer with children", () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogTitle>Title</DialogTitle>
             <DialogFooter data-testid="footer">
               <button>Cancel</button>
@@ -152,7 +152,7 @@ describe("Dialog", () => {
     it("should have responsive styles", () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogTitle>Title</DialogTitle>
             <DialogFooter data-testid="footer">Footer</DialogFooter>
           </DialogContent>
@@ -168,7 +168,7 @@ describe("Dialog", () => {
     it("should render title", () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogTitle>My Dialog Title</DialogTitle>
           </DialogContent>
         </Dialog>
@@ -180,7 +180,7 @@ describe("Dialog", () => {
     it("should have styling classes", () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogTitle data-testid="title">Title</DialogTitle>
           </DialogContent>
         </Dialog>
@@ -224,7 +224,7 @@ describe("Dialog", () => {
     it("should close dialog when clicked", async () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent>
+          <DialogContent aria-describedby={undefined}>
             <DialogTitle>Title</DialogTitle>
             <DialogClose data-testid="close-button">Close Me</DialogClose>
           </DialogContent>
@@ -244,9 +244,9 @@ describe("Dialog", () => {
     it("should have proper ARIA attributes", async () => {
       render(
         <Dialog defaultOpen>
-          <DialogContent aria-describedby="desc">
+          <DialogContent>
             <DialogTitle>Accessible Dialog</DialogTitle>
-            <DialogDescription id="desc">Description for screen readers</DialogDescription>
+            <DialogDescription>Description for screen readers</DialogDescription>
           </DialogContent>
         </Dialog>
       );
