@@ -3,6 +3,7 @@ import path from "path";
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { VoyageAIClient } from "voyageai";
+import { GENERATED_STORIES } from "../content/processed/extracted-stories";
 
 // Load environment variables from .env.local
 config({ path: ".env.local" });
@@ -299,6 +300,19 @@ const ALL_STORIES: Story[] = [
     duration: "day-trip",
   },
 ];
+
+// Existing slugs from original stories to avoid duplicates
+const existingSlugs = new Set(ALL_STORIES.map(s => s.slug));
+
+// Add generated stories that don't conflict with existing ones
+const filteredGenerated = GENERATED_STORIES
+  .filter(s => !existingSlugs.has(s.slug))
+  .map((s, i) => ({
+    ...s,
+    displayOrder: s.displayOrder ?? (ALL_STORIES.length + i),
+  }));
+
+ALL_STORIES.push(...filteredGenerated);
 
 async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   if (!voyage) {
