@@ -27,11 +27,11 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     model: EMBEDDING_MODEL,
   });
 
-  if (!result.data || result.data.length === 0) {
+  if (!result.data || result.data.length === 0 || !result.data[0].embedding) {
     throw new Error("No embedding returned from Voyage AI");
   }
 
-  return result.data[0].embedding;
+  return result.data[0].embedding as number[];
 }
 
 /**
@@ -54,7 +54,7 @@ export async function generateEmbeddings(texts: string[]): Promise<BatchEmbeddin
       throw new Error(`No embeddings returned for batch ${i}`);
     }
 
-    allEmbeddings.push(...result.data.map((d) => d.embedding));
+    allEmbeddings.push(...result.data.map((d) => d.embedding).filter((e): e is number[] => e !== undefined));
     totalTokens += result.usage?.totalTokens || 0;
   }
 
