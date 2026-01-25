@@ -9,6 +9,44 @@ process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
 // Mock scrollIntoView for jsdom
 Element.prototype.scrollIntoView = () => {};
 
+// Mock IntersectionObserver for jsdom
+class MockIntersectionObserver implements IntersectionObserver {
+  readonly root: Element | null = null;
+  readonly rootMargin: string = "";
+  readonly thresholds: ReadonlyArray<number> = [];
+
+  constructor(
+    private callback: IntersectionObserverCallback,
+    _options?: IntersectionObserverInit
+  ) {}
+
+  observe(target: Element): void {
+    // Immediately trigger callback with isIntersecting: true for testing
+    this.callback(
+      [
+        {
+          isIntersecting: true,
+          target,
+          boundingClientRect: target.getBoundingClientRect(),
+          intersectionRatio: 1,
+          intersectionRect: target.getBoundingClientRect(),
+          rootBounds: null,
+          time: Date.now(),
+        },
+      ],
+      this
+    );
+  }
+
+  unobserve(): void {}
+  disconnect(): void {}
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+}
+
+global.IntersectionObserver = MockIntersectionObserver;
+
 // Mock window.SpeechRecognition
 Object.defineProperty(window, "SpeechRecognition", {
   value: undefined,

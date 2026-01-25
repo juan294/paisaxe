@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import FavoritesPage from "./page";
@@ -18,21 +19,18 @@ vi.mock("next/image", () => ({
   ),
 }));
 
-// Mock next/link
+// Mock next/link - must forward ref for IntersectionObserver to work
 vi.mock("next/link", () => ({
-  default: ({
-    href,
-    children,
-    className,
-  }: {
-    href: string;
-    children: React.ReactNode;
-    className?: string;
-  }) => (
-    <a href={href} className={className}>
-      {children}
-    </a>
-  ),
+  default: React.forwardRef<
+    HTMLAnchorElement,
+    { href: string; children: React.ReactNode; className?: string }
+  >(function MockLink({ href, children, className }, ref) {
+    return (
+      <a href={href} className={className} ref={ref}>
+        {children}
+      </a>
+    );
+  }),
 }));
 
 // Mock useFavorites hook
@@ -44,34 +42,38 @@ vi.mock("@/hooks/use-favorites", () => ({
 }));
 
 // Mock stories data
-vi.mock("@/lib/stories-data", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    getStoriesFromDB: vi.fn().mockResolvedValue([
-      {
-        id: "story-1",
-        slug: "lagos-covadonga",
-        title: "Lagos de Covadonga",
-        subtitle: "Picos de Europa",
-        description: "Beautiful glacial lakes",
-        image: "/images/lagos.jpg",
-        category: "nature",
-        sourcePdf: "nature.pdf",
-      },
-      {
-        id: "story-2",
-        slug: "catedral-oviedo",
-        title: "Catedral de Oviedo",
-        subtitle: "Arte Romanico",
-        description: "Historic cathedral",
-        image: "/images/catedral.jpg",
-        category: "culture",
-        sourcePdf: "culture.pdf",
-      },
-    ]),
-  };
-});
+const mockStories = [
+  {
+    id: "story-1",
+    slug: "lagos-covadonga",
+    title: "Lagos de Covadonga",
+    subtitle: "Picos de Europa",
+    description: "Beautiful glacial lakes",
+    image: "/images/lagos.jpg",
+    category: "nature" as const,
+    sourcePdf: "nature.pdf",
+  },
+  {
+    id: "story-2",
+    slug: "catedral-oviedo",
+    title: "Catedral de Oviedo",
+    subtitle: "Arte Romanico",
+    description: "Historic cathedral",
+    image: "/images/catedral.jpg",
+    category: "culture" as const,
+    sourcePdf: "culture.pdf",
+  },
+];
+
+// Mock useStories hook
+vi.mock("@/hooks/use-stories", () => ({
+  useStories: () => ({
+    stories: mockStories,
+    isLoading: false,
+    error: null,
+    refresh: vi.fn(),
+  }),
+}));
 
 describe("FavoritesPage", () => {
   beforeEach(() => {
@@ -93,7 +95,7 @@ describe("FavoritesPage", () => {
 
       render(<FavoritesPage />);
 
-      expect(screen.getByText("Cargando favoritos...")).toBeInTheDocument();
+      expect(screen.getByText("Cargando...")).toBeInTheDocument();
     });
   });
 
@@ -102,7 +104,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("No tienes favoritos todavia")).toBeInTheDocument();
+        expect(screen.getByText("No tienes guardados todavía")).toBeInTheDocument();
       });
     });
 
@@ -145,7 +147,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("1 historia")).toBeInTheDocument();
+        expect(screen.getByText("1 lugar")).toBeInTheDocument();
       });
     });
 
@@ -159,7 +161,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("2 historias")).toBeInTheDocument();
+        expect(screen.getByText("2 lugares")).toBeInTheDocument();
       });
     });
 
@@ -170,7 +172,7 @@ describe("FavoritesPage", () => {
         expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
       });
 
-      const removeButton = screen.getByLabelText("Quitar de favoritos");
+      const removeButton = screen.getByLabelText("Quitar de guardados");
       fireEvent.click(removeButton);
 
       expect(mockToggleFavorite).toHaveBeenCalledWith("story-1");
@@ -192,7 +194,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Mis Favoritos")).toBeInTheDocument();
+        expect(screen.getByText("Guardados")).toBeInTheDocument();
       });
     });
 
@@ -200,9 +202,9 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        const backLink = screen.getByRole("link", { name: "" });
-        // The back button is an anchor with ArrowLeft icon
-        expect(backLink).toHaveAttribute("href", "/immersive");
+        const links = screen.getAllByRole("link");
+        const backLink = links.find(link => link.getAttribute("href") === "/immersive");
+        expect(backLink).toBeInTheDocument();
       });
     });
   });
@@ -225,11 +227,12 @@ describe("FavoritesPage", () => {
       });
     });
 
-    it("should display story subtitle", async () => {
+    it("should display story category on hover content", async () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
+        // Category is shown in hover overlay as "Naturaleza"
+        expect(screen.getByText("Naturaleza")).toBeInTheDocument();
       });
     });
   });

@@ -5,6 +5,7 @@ export interface Story {
   subtitle: string;
   description: string;
   image: string;
+  imageSource?: string;
   category: StoryCategory;
   sourcePdf: string;
   location?: StoryLocation;
@@ -58,6 +59,7 @@ export interface StoryRow {
   subtitle: string | null;
   description: string | null;
   image_path: string | null;
+  image_source: string | null;
   category: string;
   source_pdf: string | null;
   location: string | null;
@@ -79,6 +81,7 @@ export function rowToStory(row: StoryRow): Story {
     subtitle: row.subtitle || "",
     description: row.description || "",
     image: row.image_path || "",
+    imageSource: row.image_source || undefined,
     category: row.category as StoryCategory,
     sourcePdf: row.source_pdf || "",
     location: row.location ? (row.location as StoryLocation) : undefined,

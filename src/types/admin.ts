@@ -16,6 +16,7 @@ export interface AdminStory {
   subtitle: string;
   description: string;
   image: string;
+  imageSource?: string;
   category: StoryCategory;
   location?: StoryLocation;
   duration?: StoryDuration;
@@ -34,6 +35,7 @@ export function rowToAdminStory(row: AdminStoryRow): AdminStory {
     subtitle: row.subtitle || "",
     description: row.description || "",
     image: row.image_path || "",
+    imageSource: row.image_source || undefined,
     category: row.category as StoryCategory,
     location: row.location ? (row.location as StoryLocation) : undefined,
     duration: row.duration ? (row.duration as StoryDuration) : undefined,
