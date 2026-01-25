@@ -51,13 +51,13 @@ describe("AuthButton", () => {
     it("should show sign in button when user is null", () => {
       render(<AuthButton />);
 
-      expect(screen.getByText("Iniciar sesion")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
     });
 
     it("should call signInWithGoogle when clicking sign in button", () => {
       render(<AuthButton />);
 
-      fireEvent.click(screen.getByText("Iniciar sesion"));
+      fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
 
       expect(mockSignInWithGoogle).toHaveBeenCalled();
     });
@@ -70,7 +70,7 @@ describe("AuthButton", () => {
         </div>
       );
 
-      fireEvent.click(screen.getByText("Iniciar sesion"));
+      fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
 
       expect(parentHandler).not.toHaveBeenCalled();
     });

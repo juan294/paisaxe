@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Volume2, VolumeX, Heart } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Pause, Heart } from "lucide-react";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import { AuthButton } from "@/components/auth/auth-button";
 import { FavoriteButton } from "./favorite-button";
@@ -236,9 +236,9 @@ export function StoryViewer({
           className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
         >
           {autoPlay ? (
-            <Volume2 className="h-5 w-5 text-white" />
+            <Pause className="h-5 w-5 text-white" />
           ) : (
-            <VolumeX className="h-5 w-5 text-white" />
+            <Play className="h-5 w-5 text-white" />
           )}
         </button>
         <a

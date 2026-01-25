@@ -40,6 +40,7 @@ export function AuthButton({ className }: AuthButtonProps) {
               src={user.avatarUrl}
               alt={user.name || "User avatar"}
               className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
             />
           ) : (
             <span className="text-white text-sm font-medium">
@@ -92,12 +93,13 @@ export function AuthButton({ className }: AuthButtonProps) {
         signInWithGoogle();
       }}
       className={cn(
-        "flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105",
+        "h-10 w-10 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full transition-all hover:scale-105",
         className
       )}
+      aria-label="Entrar"
+      title="Entrar"
     >
-      <LogIn className="h-4 w-4" />
-      <span className="text-sm">Iniciar sesion</span>
+      <LogIn className="h-5 w-5" />
     </button>
   );
 }
