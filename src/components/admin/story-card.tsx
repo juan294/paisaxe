@@ -5,6 +5,8 @@ import { ImageIcon, Pencil } from "lucide-react";
 import type { AdminStory } from "@/types/admin";
 import { CATEGORY_LABELS } from "@/types/immersive";
 import { cn } from "@/lib/utils";
+import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
+import { PlaceholderBadge } from "./placeholder-badge";
 
 interface StoryCardProps {
   story: AdminStory;
@@ -76,6 +78,9 @@ export function StoryCard({ story, onEdit, span = 1 }: StoryCardProps) {
                 </span>
               </div>
             )}
+
+            {/* Placeholder badge - bottom left, always visible */}
+            {isPlaceholderImage(story) && <PlaceholderBadge />}
           </>
         ) : (
           /* No image state - always visible */

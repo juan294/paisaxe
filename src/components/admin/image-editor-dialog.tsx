@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import type { AdminStory, CurationStatus } from "@/types/admin";
 import { cn } from "@/lib/utils";
+import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
 
 interface ImageEditorDialogProps {
   story: AdminStory | null;
@@ -248,6 +249,15 @@ export function ImageEditorDialog({
           </DialogHeader>
 
           <div className="p-5">
+            {/* Placeholder info note */}
+            {isPlaceholderImage(story) && (
+              <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-800 dark:bg-blue-900/20">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  This is a <strong>placeholder image</strong> from Unsplash. Replace it with a real photo of this location.
+                </p>
+              </div>
+            )}
+
             {/* Current/Preview Image */}
             <div className="relative mb-5 aspect-video overflow-hidden rounded-md border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-800">
               {currentPreview ? (

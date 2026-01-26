@@ -4,6 +4,8 @@ import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { VoyageAIClient } from "voyageai";
 import { GENERATED_STORIES } from "../content/processed/extracted-stories";
+import { getPlaceholderForStory } from "../src/lib/unsplash-placeholders";
+import type { StoryCategory } from "../src/types/immersive";
 
 // Load environment variables from .env.local
 config({ path: ".env.local" });
@@ -333,21 +335,36 @@ async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 async function seedStories(): Promise<void> {
   console.log(`\nSeeding ${ALL_STORIES.length} stories...`);
 
-  const records = ALL_STORIES.map((story, index) => ({
-    slug: story.slug || story.id,
-    title: story.title,
-    subtitle: story.subtitle || null,
-    description: story.description || null,
-    image_path: story.image || null,
-    category: story.category,
-    source_pdf: story.sourcePdf || null,
-    location: story.location || null,
-    duration: story.duration || null,
-    display_order: story.displayOrder ?? index,
-    is_active: true,
-    related_stories: story.relatedStories || null,
-    metadata: {},
-  }));
+  const records = ALL_STORIES.map((story, index) => {
+    const slug = story.slug || story.id;
+
+    // Auto-assign placeholder for stories without an image
+    let imagePath = story.image || null;
+    let imageSource: string | null = null;
+    if (!imagePath) {
+      const placeholder = getPlaceholderForStory(slug, story.category as StoryCategory);
+      imagePath = placeholder.image;
+      imageSource = placeholder.imageSource;
+      console.log(`  → Assigned placeholder image for "${story.title}"`);
+    }
+
+    return {
+      slug,
+      title: story.title,
+      subtitle: story.subtitle || null,
+      description: story.description || null,
+      image_path: imagePath,
+      image_source: imageSource,
+      category: story.category,
+      source_pdf: story.sourcePdf || null,
+      location: story.location || null,
+      duration: story.duration || null,
+      display_order: story.displayOrder ?? index,
+      is_active: true,
+      related_stories: story.relatedStories || null,
+      metadata: {},
+    };
+  });
 
   const { error } = await supabase.from("stories").insert(records);
 
