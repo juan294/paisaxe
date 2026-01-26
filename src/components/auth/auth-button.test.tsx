@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { AuthButton } from "./auth-button";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 // Mock the useAuth hook
 const mockSignInWithGoogle = vi.fn();
@@ -51,13 +62,13 @@ describe("AuthButton", () => {
     it("should show sign in button when user is null", () => {
       render(<AuthButton />);
 
-      expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: mockT("auth.sign_in") })).toBeInTheDocument();
     });
 
     it("should call signInWithGoogle when clicking sign in button", () => {
       render(<AuthButton />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+      fireEvent.click(screen.getByRole("button", { name: mockT("auth.sign_in") }));
 
       expect(mockSignInWithGoogle).toHaveBeenCalled();
     });
@@ -70,7 +81,7 @@ describe("AuthButton", () => {
         </div>
       );
 
-      fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+      fireEvent.click(screen.getByRole("button", { name: mockT("auth.sign_in") }));
 
       expect(parentHandler).not.toHaveBeenCalled();
     });
@@ -134,7 +145,7 @@ describe("AuthButton", () => {
       render(<AuthButton />);
 
       // Initially dropdown is closed
-      expect(screen.queryByText("Cerrar sesion")).not.toBeInTheDocument();
+      expect(screen.queryByText(mockT("auth.sign_out"))).not.toBeInTheDocument();
 
       // Click avatar to open dropdown
       fireEvent.click(screen.getByAltText("Test User"));
@@ -142,7 +153,7 @@ describe("AuthButton", () => {
       // Dropdown should be open
       expect(screen.getByText("Test User")).toBeInTheDocument();
       expect(screen.getByText("test@example.com")).toBeInTheDocument();
-      expect(screen.getByText("Cerrar sesion")).toBeInTheDocument();
+      expect(screen.getByText(mockT("auth.sign_out"))).toBeInTheDocument();
     });
 
     it("should close dropdown when clicking outside", () => {
@@ -150,7 +161,7 @@ describe("AuthButton", () => {
 
       // Open dropdown
       fireEvent.click(screen.getByAltText("Test User"));
-      expect(screen.getByText("Cerrar sesion")).toBeInTheDocument();
+      expect(screen.getByText(mockT("auth.sign_out"))).toBeInTheDocument();
 
       // Click backdrop to close
       const backdrop = document.querySelector(".fixed.inset-0.z-40");
@@ -158,7 +169,7 @@ describe("AuthButton", () => {
         fireEvent.click(backdrop);
       }
 
-      expect(screen.queryByText("Cerrar sesion")).not.toBeInTheDocument();
+      expect(screen.queryByText(mockT("auth.sign_out"))).not.toBeInTheDocument();
     });
 
     it("should call signOut when clicking sign out button", () => {
@@ -168,7 +179,7 @@ describe("AuthButton", () => {
       fireEvent.click(screen.getByAltText("Test User"));
 
       // Click sign out
-      fireEvent.click(screen.getByText("Cerrar sesion"));
+      fireEvent.click(screen.getByText(mockT("auth.sign_out")));
 
       expect(mockSignOut).toHaveBeenCalled();
     });
@@ -188,7 +199,7 @@ describe("AuthButton", () => {
       const avatar = screen.getByAltText("User avatar");
       fireEvent.click(avatar);
 
-      expect(screen.getByText("Usuario")).toBeInTheDocument();
+      expect(screen.getByText(mockT("auth.user"))).toBeInTheDocument();
     });
   });
 

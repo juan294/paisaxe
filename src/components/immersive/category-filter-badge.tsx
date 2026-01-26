@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 import {
   StoryCategory,
   StoryLocation,
@@ -42,6 +43,7 @@ export function CategoryFilterBadge({
 }: CategoryFilterBadgeProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   const hasActiveFilters = selectedCategory !== null || selectedLocation !== null || selectedDuration !== null;
   const activeFilterCount = [selectedCategory, selectedLocation, selectedDuration].filter(Boolean).length;
@@ -135,7 +137,7 @@ export function CategoryFilterBadge({
               className="mb-4"
             >
               <div className="text-white/50 text-xs uppercase tracking-wider mb-2 font-medium">
-                Categoría
+                {t("stories.filters.category")}
               </div>
               <div className="flex flex-wrap gap-2">
                 {CATEGORIES.map((category, index) => (
@@ -161,7 +163,7 @@ export function CategoryFilterBadge({
               className="mb-4"
             >
               <div className="text-white/50 text-xs uppercase tracking-wider mb-2 font-medium">
-                Zona
+                {t("stories.filters.location")}
               </div>
               <div className="flex flex-wrap gap-2">
                 {LOCATIONS.map((location, index) => (
@@ -186,7 +188,7 @@ export function CategoryFilterBadge({
               className="mb-4"
             >
               <div className="text-white/50 text-xs uppercase tracking-wider mb-2 font-medium">
-                Duración
+                {t("stories.filters.duration")}
               </div>
               <div className="flex flex-wrap gap-2">
                 {DURATIONS.map((duration, index) => (
@@ -222,7 +224,7 @@ export function CategoryFilterBadge({
                     "transition-colors"
                   )}
                 >
-                  Limpiar filtros
+                  {t("stories.filters.clear")}
                 </motion.button>
               )}
             </AnimatePresence>

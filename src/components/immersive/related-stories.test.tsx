@@ -2,6 +2,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { RelatedStories } from "./related-stories";
 import type { Story } from "@/types/immersive";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 const mockRelatedStories: Story[] = [
   {
@@ -43,7 +54,7 @@ describe("RelatedStories", () => {
   it("should render related stories section title", () => {
     render(<RelatedStories {...defaultProps} />);
 
-    expect(screen.getByText(/también te puede interesar/i)).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(mockT("stories.related"), "i"))).toBeInTheDocument();
   });
 
   it("should render all provided stories", () => {
@@ -81,7 +92,7 @@ describe("RelatedStories", () => {
     expect(screen.getByText("Related Story 1")).toBeInTheDocument();
 
     // Click to collapse
-    const toggleButton = screen.getByRole("button", { name: /también te puede interesar/i });
+    const toggleButton = screen.getByRole("button", { name: new RegExp(mockT("stories.related"), "i") });
     fireEvent.click(toggleButton);
 
     // Stories should not be in the document
@@ -91,6 +102,6 @@ describe("RelatedStories", () => {
   it("should have accessible labels", () => {
     render(<RelatedStories {...defaultProps} />);
 
-    expect(screen.getByRole("region", { name: /historias relacionadas/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: new RegExp(mockT("accessibility.related_stories"), "i") })).toBeInTheDocument();
   });
 });
