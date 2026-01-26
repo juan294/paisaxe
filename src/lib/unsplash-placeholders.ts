@@ -102,6 +102,18 @@ export function isOldUnsplashPlaceholder(story: { image?: string; imageSource?: 
 }
 
 /**
+ * Check whether a story needs a placeholder image. This covers:
+ * - Empty/null image
+ * - Local placeholder.svg files
+ * - Old Unsplash URLs without the new prefix
+ */
+export function needsPlaceholderImage(story: { image?: string; imageSource?: string }): boolean {
+  if (!story.image) return true;
+  if (story.image.endsWith("/placeholder.svg")) return true;
+  return isOldUnsplashPlaceholder(story);
+}
+
+/**
  * Deterministically select a placeholder image for a story based on
  * its slug and category. The same slug+category always yields the
  * same image so cards look stable across reloads.

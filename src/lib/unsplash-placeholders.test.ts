@@ -166,6 +166,59 @@ describe("unsplash-placeholders", () => {
     });
   });
 
+  describe("needsPlaceholderImage", () => {
+    // Import dynamically to get the new function
+    it("should return true for empty image", async () => {
+      const { needsPlaceholderImage } = await import("./unsplash-placeholders");
+      expect(needsPlaceholderImage({ image: "" })).toBe(true);
+    });
+
+    it("should return true for undefined image", async () => {
+      const { needsPlaceholderImage } = await import("./unsplash-placeholders");
+      expect(needsPlaceholderImage({})).toBe(true);
+    });
+
+    it("should return true for placeholder.svg path", async () => {
+      const { needsPlaceholderImage } = await import("./unsplash-placeholders");
+      expect(
+        needsPlaceholderImage({ image: "/images/stories/placeholder.svg" })
+      ).toBe(true);
+    });
+
+    it("should return true for old Unsplash URL without prefix", async () => {
+      const { needsPlaceholderImage } = await import("./unsplash-placeholders");
+      expect(
+        needsPlaceholderImage({
+          image: "https://images.unsplash.com/photo-123?w=1920",
+        })
+      ).toBe(true);
+    });
+
+    it("should return false for new Unsplash placeholder with prefix", async () => {
+      const { needsPlaceholderImage } = await import("./unsplash-placeholders");
+      expect(
+        needsPlaceholderImage({
+          image: "https://images.unsplash.com/photo-123?w=1920",
+          imageSource: `${PLACEHOLDER_PREFIX}Photo by Author on Unsplash`,
+        })
+      ).toBe(false);
+    });
+
+    it("should return false for real local images", async () => {
+      const { needsPlaceholderImage } = await import("./unsplash-placeholders");
+      expect(
+        needsPlaceholderImage({ image: "/images/stories/lagos-covadonga.png" })
+      ).toBe(false);
+    });
+
+    it("should return false for real external URLs", async () => {
+      const { needsPlaceholderImage } = await import("./unsplash-placeholders");
+      expect(
+        needsPlaceholderImage({ image: "https://example.com/photo.jpg" })
+      ).toBe(false);
+    });
+  });
+
   describe("getPlaceholderForStory", () => {
     it("should return an object with image and imageSource", () => {
       const result = getPlaceholderForStory("test-slug", "nature");
