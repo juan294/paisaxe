@@ -1,0 +1,38 @@
+<svg width="800" height="600" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#374151" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="#1f2937"/>
+  <rect width="800" height="600" fill="url(#grid)"/>
+
+  <!-- Center icon container -->
+  <circle cx="400" cy="260" r="80" fill="#374151" stroke="#4b5563" stroke-width="2"/>
+
+  <!-- Mountain icon -->
+  <path d="M360 300 L400 240 L440 300 Z" fill="#6b7280"/>
+  <path d="M380 300 L410 260 L440 300 Z" fill="#9ca3af"/>
+
+  <!-- Sun -->
+  <circle cx="420" cy="250" r="12" fill="#fbbf24"/>
+
+  <!-- Image icon frame -->
+  <rect x="355" y="225" width="90" height="70" rx="4" fill="none" stroke="#9ca3af" stroke-width="3"/>
+
+  <!-- Text -->
+  <text x="400" y="380" text-anchor="middle" fill="#9ca3af" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="600">
+    Imagen pendiente
+  </text>
+  <text x="400" y="410" text-anchor="middle" fill="#6b7280" font-family="system-ui, -apple-system, sans-serif" font-size="16">
+    Añadir desde el panel de administración
+  </text>
+
+  <!-- Corner markers -->
+  <path d="M20 20 L20 50 M20 20 L50 20" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+  <path d="M780 20 L780 50 M780 20 L750 20" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+  <path d="M20 580 L20 550 M20 580 L50 580" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+  <path d="M780 580 L780 550 M780 580 L750 580" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+</svg>
