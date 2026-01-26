@@ -18,6 +18,18 @@ const mockStory: Story = {
   sourcePdf: "nature-guide.pdf",
 };
 
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
+    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    clear: vi.fn(() => { store = {}; }),
+  };
+})();
+Object.defineProperty(window, "localStorage", { value: localStorageMock });
+
 // Mock SpeechRecognition
 const createMockSpeechRecognition = () => {
   const handlers: {
@@ -57,6 +69,7 @@ const createMockSpeechRecognition = () => {
 describe("VoiceChat", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    localStorageMock.clear();
     // Reset speech recognition mock
     Object.defineProperty(window, "SpeechRecognition", {
       value: undefined,
@@ -517,6 +530,47 @@ describe("VoiceChat", () => {
         expect(userMsg.closest("div")).toHaveClass("ml-auto", "bg-white");
         expect(aiMsg.closest("div")).toHaveClass("bg-white/20");
       });
+    });
+  });
+
+  describe("privacy notice", () => {
+    it("should show privacy notice on first open", () => {
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      expect(
+        screen.getByText(/Tus preguntas se procesan con inteligencia artificial/)
+      ).toBeInTheDocument();
+    });
+
+    it("should hide privacy notice after dismissal", async () => {
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      fireEvent.click(screen.getByText("Entendido"));
+
+      expect(
+        screen.queryByText(/Tus preguntas se procesan con inteligencia artificial/)
+      ).not.toBeInTheDocument();
+    });
+
+    it("should store dismissal in localStorage", async () => {
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      fireEvent.click(screen.getByText("Entendido"));
+
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        "paisaxe-privacy-acknowledged",
+        "true"
+      );
+    });
+
+    it("should not show notice if already acknowledged", () => {
+      localStorageMock.getItem.mockReturnValue("true");
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      expect(
+        screen.queryByText(/Tus preguntas se procesan con inteligencia artificial/)
+      ).not.toBeInTheDocument();
     });
   });
 

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Mic, MicOff, X, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PrivacyNotice } from "./privacy-notice";
 
 interface VoiceChatProps {
   story: Story;
@@ -24,6 +25,7 @@ export function VoiceChat({ story, open, onClose }: VoiceChatProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +61,14 @@ export function VoiceChat({ story, open, onClose }: VoiceChatProps) {
     setMessages([]);
   }, [story.id]);
 
+  // Check if privacy notice was already acknowledged
+  useEffect(() => {
+    const acknowledged = localStorage.getItem("paisaxe-privacy-acknowledged");
+    if (acknowledged === "true") {
+      setPrivacyAcknowledged(true);
+    }
+  }, []);
+
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -75,6 +85,11 @@ export function VoiceChat({ story, open, onClose }: VoiceChatProps) {
       setIsListening(true);
     }
   }, [isListening]);
+
+  const handlePrivacyDismiss = useCallback(() => {
+    setPrivacyAcknowledged(true);
+    localStorage.setItem("paisaxe-privacy-acknowledged", "true");
+  }, []);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -145,6 +160,11 @@ export function VoiceChat({ story, open, onClose }: VoiceChatProps) {
             <X className="h-5 w-5" />
           </Button>
         </div>
+
+        {/* Privacy Notice */}
+        {!privacyAcknowledged && (
+          <PrivacyNotice onDismiss={handlePrivacyDismiss} />
+        )}
 
         {/* Messages */}
         <div className="h-64 overflow-y-auto p-4 space-y-4">
