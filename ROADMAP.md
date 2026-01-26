@@ -94,7 +94,7 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Supabase PostgreSQL | :white_check_mark: | With pgvector extension |
 | shadcn/ui Components | :white_check_mark: | Button, Card, Dialog, Input |
 | Tailwind CSS Styling | :white_check_mark: | Custom Paisaxe theme |
-| Vitest Testing | :white_check_mark: | 705 tests passing (48 files, 97.31% coverage) |
+| Vitest Testing | :white_check_mark: | 849 tests passing (63 files) |
 | GitHub Actions CI | :white_check_mark: | Lint, typecheck, test, build |
 | Git Hooks (Husky) | :white_check_mark: | Pre-commit quality checks |
 | Coverage Automation | :white_check_mark: | Nightly scheduled updates via `scripts/coverage-agent.sh` |
@@ -152,14 +152,14 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 
 ---
 
-## Phase 3: AI Improvements :construction:
+## Phase 3: AI Improvements :white_check_mark:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Improve Context Retrieval | :white_check_mark: | Hybrid vector + keyword search working |
-| Add Personality to Responses | :construction: | Generic warmth in system prompt; distinct persona pending |
-| Define AI Persona | :calendar: | "Pelayo" - historic Asturian name |
-| Display Related Images in Chat | :calendar: | Show images inline with responses |
+| Define AI Persona "Pelayo" | :white_check_mark: | First-person persona based on Asturian cultural identity; warm, personal, knowledgeable local |
+| Add Personality to Responses | :white_check_mark: | Pelayo persona in system prompt — speaks as a passionate local friend, not a generic bot |
+| Display Related Images in Chat | :white_check_mark: | Images rendered inline with `<figure>`/`<figcaption>`, captions, source attribution |
 
 ---
 
@@ -189,52 +189,52 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 
 ## Feature Flag Infrastructure :white_check_mark:
 
-Database-backed feature flags (migration `008_feature_flags.sql`) ready for visitor experience features. All default to disabled.
+Database-backed feature flags (migration `008_feature_flags.sql`) with admin panel toggles and analytics tracking. All 10 visitor experience features implemented and individually toggleable. All default to disabled for controlled rollout.
 
 | Flag | Status | Notes |
 |------|--------|-------|
 | `related_stories` | :white_check_mark: | Active and visible in UI |
-| `contextual_prompts` | :calendar: | DB schema ready (`metadata.question_prompts`), UI pending |
-| `randomized_order` | :calendar: | Flag ready, shuffle logic pending |
-| `surprise_me` | :calendar: | Flag ready, button UI pending |
-| `story_sharing` | :calendar: | Flag ready, Web Share API pending |
-| `seasonal_surfacing` | :calendar: | DB field `best_months` ready, weighting logic pending |
-| `mood_discovery` | :calendar: | DB field `metadata.mood_tags` ready, UI pending |
-| `asturianu_touches` | :calendar: | DB fields ready, system prompt updates pending |
-| `ambient_discovery` | :calendar: | Extended auto-play pending |
-| `story_freshness` | :calendar: | Badge UI pending |
+| `contextual_prompts` | :white_check_mark: | Story-specific suggested questions near chat button |
+| `randomized_order` | :white_check_mark: | Fisher-Yates shuffle in story ordering |
+| `surprise_me` | :white_check_mark: | Random unviewed story jump button |
+| `story_sharing` | :white_check_mark: | Web Share API + OG meta tags |
+| `seasonal_surfacing` | :white_check_mark: | Weight order by current month/season |
+| `mood_discovery` | :white_check_mark: | Optional mood selector overlay |
+| `asturianu_touches` | :white_check_mark: | Authentic Asturian words in UI and chat |
+| `ambient_discovery` | :white_check_mark: | Slower transitions with ambient indicator |
+| `story_freshness` | :white_check_mark: | "Nuevo" badge on recent stories |
 
 See `doc/visitor-experience-improvements.md` for full feature descriptions and implementation waves.
 
 ---
 
-## Phase 5: Visitor Experience Enhancements :calendar:
+## Phase 5: Visitor Experience Enhancements :white_check_mark:
 
-Prioritized features from the visitor experience evaluation. See feature flags above for infrastructure status.
+All 10 features implemented behind feature flags (disabled by default, toggleable via admin panel). See feature flags above for individual status.
 
 ### Wave 1 -- Quick Wins (priority >= 4.0)
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Randomized Story Order | :calendar: | Fisher-Yates shuffle in `useStories` hook |
-| "Surprise Me" Button | :calendar: | Random unviewed story jump |
-| Story Freshness Badges | :calendar: | Subtle "Nuevo" badge on recent stories |
+| Randomized Story Order | :white_check_mark: | Fisher-Yates shuffle in `shuffle.ts` |
+| "Surprise Me" Button | :white_check_mark: | `surprise-me-button.tsx` - random unviewed story jump |
+| Story Freshness Badges | :white_check_mark: | `freshness-badge.tsx` - "Nuevo" badge on recent stories |
 
 ### Wave 2 -- High-Impact Features (priority >= 2.0)
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Contextual Question Prompts | :calendar: | Story-specific suggested questions near chat button |
-| Story Sharing | :calendar: | Web Share API + OG meta tags |
-| Seasonal Story Surfacing | :calendar: | Weight order by current month |
-| Mood-Based Discovery | :calendar: | Optional mood selector: Relaxing / Adventurous / Cultural / Delicious |
+| Contextual Question Prompts | :white_check_mark: | `question-prompts.tsx` - story-specific suggested questions |
+| Story Sharing | :white_check_mark: | `share-button.tsx` - Web Share API + OG meta tags |
+| Seasonal Story Surfacing | :white_check_mark: | `seasonal-weighting.ts` - weight order by current month |
+| Mood-Based Discovery | :white_check_mark: | `mood-overlay.tsx` + `mood-mapping.ts` - optional mood selector |
 
 ### Wave 3 -- Experience Elevation
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Asturianu Language Touches | :calendar: | Authentic Asturian words in UI and chat |
-| Ambient Discovery Mode | :calendar: | Slower transitions, optional ambient audio |
+| Asturianu Language Touches | :white_check_mark: | `asturianu.ts` - authentic Asturian words in UI and chat |
+| Ambient Discovery Mode | :white_check_mark: | `ambient-indicator.tsx` - slower transitions with indicator |
 
 ---
 
@@ -267,13 +267,13 @@ Prioritized features from the visitor experience evaluation. See feature flags a
 - [x] Database migration: Stories table exists in Supabase
 - [x] Story seeding: 20 stories seeded via `npm run seed-db:stories`
 - [x] Image replacement: 7 stories use PDF images, 13 use Unsplash fallback
-- [x] Tests: `npm run test` - 705 tests pass (97.31% statement coverage)
+- [x] Tests: `npm run test` - 849 tests pass (63 files)
 - [x] Build: `npm run build` - no errors
 - [x] Auth: Google SSO working with Supabase SSR
 - [x] Favorites: Cloud sync + local storage fallback
 - [x] Admin: Story management panel at `/admin`
-- [x] Feature flags: 10 flags in database, infrastructure ready
-- [x] Analytics: Vercel Analytics active, custom events table ready
+- [x] Feature flags: 10 flags in database, all features implemented
+- [x] Analytics: Vercel Analytics active, custom events table + admin dashboard
 
 ---
 
@@ -297,7 +297,7 @@ Prioritized features from the visitor experience evaluation. See feature flags a
 - Voice input already works - preserve this functionality
 - Tests before implementation (TDD workflow)
 - All work on `develop` branch
-- Feature flags control visitor experience features - enable in DB when UI is ready
+- Feature flags control visitor experience features - enable via admin panel when ready to roll out
 
 ---
 
@@ -309,7 +309,8 @@ Prioritized features from the visitor experience evaluation. See feature flags a
 | v0.2.0 | Jan 2026 | Content expansion + dynamic loading |
 | v0.3.0 | Jan 2026 | Story organization UI + related stories |
 | v0.4.0 | Jan 2026 | User features (auth, favorites, admin panel) |
-| v0.5.0 | - | AI improvements (Pelayo persona, chat images) |
-| v0.6.0 | - | Visitor experience enhancements (Waves 1-3) |
+| v0.5.0 | Jan 2026 | Visitor experience enhancements (Waves 1-3) + feature flags |
+| v0.6.0 | Jan 2026 | AI improvements (Pelayo persona, chat images) |
 | v0.7.0 | - | Internationalization |
+| v0.8.0 | - | Polish (skeleton UI, a11y, SEO, error boundaries) |
 | v1.0.0 | - | Production release |
