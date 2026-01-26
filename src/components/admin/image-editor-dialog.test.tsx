@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { ImageEditorDialog } from "./image-editor-dialog";
 import type { AdminStory } from "@/types/admin";
+import { PLACEHOLDER_PREFIX } from "@/lib/unsplash-placeholders";
 
 // Mock next/image
 vi.mock("next/image", () => ({
@@ -673,6 +674,35 @@ describe("ImageEditorDialog", () => {
 
       // Should show the drop zone again
       expect(screen.getByText("Click or drag")).toBeInTheDocument();
+    });
+  });
+
+  describe("Placeholder image info", () => {
+    const placeholderStory: AdminStory = {
+      ...mockStory,
+      image: "https://images.unsplash.com/photo-123?w=1920",
+      imageSource: `${PLACEHOLDER_PREFIX}Photo by Test Author on Unsplash`,
+    };
+
+    it("shows placeholder info note when editing a placeholder image", () => {
+      render(<ImageEditorDialog {...defaultProps} story={placeholderStory} />);
+      expect(screen.getByText(/placeholder image/i)).toBeInTheDocument();
+    });
+
+    it("suggests replacing with a real photo", () => {
+      render(<ImageEditorDialog {...defaultProps} story={placeholderStory} />);
+      expect(screen.getByText(/replace.*real/i)).toBeInTheDocument();
+    });
+
+    it("does not show placeholder info for regular images", () => {
+      render(<ImageEditorDialog {...defaultProps} />);
+      expect(screen.queryByText(/placeholder image/i)).not.toBeInTheDocument();
+    });
+
+    it("does not show placeholder info when story has normal imageSource", () => {
+      const normalStory = { ...mockStory, imageSource: "Turismo de Asturias" };
+      render(<ImageEditorDialog {...defaultProps} story={normalStory} />);
+      expect(screen.queryByText(/placeholder image/i)).not.toBeInTheDocument();
     });
   });
 });

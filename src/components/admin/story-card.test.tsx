@@ -2,12 +2,20 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { StoryCard } from "./story-card";
 import type { AdminStory } from "@/types/admin";
+import { PLACEHOLDER_PREFIX } from "@/lib/unsplash-placeholders";
 
 // Mock next/image
 vi.mock("next/image", () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt={alt} />
+  ),
+}));
+
+// Mock PlaceholderBadge to verify it renders
+vi.mock("./placeholder-badge", () => ({
+  PlaceholderBadge: ({ className }: { className?: string }) => (
+    <span data-testid="placeholder-badge" className={className}>Placeholder</span>
   ),
 }));
 
@@ -135,6 +143,42 @@ describe("StoryCard", () => {
       const approvedWithoutImage = { ...mockStory, image: "", curationStatus: "approved" as const };
       render(<StoryCard story={approvedWithoutImage} onEdit={mockOnEdit} />);
       expect(screen.queryByText("Needs curation")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("placeholder badge", () => {
+    it("should show placeholder badge when story has placeholder imageSource", () => {
+      const placeholderStory: AdminStory = {
+        ...mockStory,
+        image: "https://images.unsplash.com/photo-123?w=1920",
+        imageSource: `${PLACEHOLDER_PREFIX}Photo by Test on Unsplash`,
+      };
+      render(<StoryCard story={placeholderStory} onEdit={mockOnEdit} />);
+      expect(screen.getByTestId("placeholder-badge")).toBeInTheDocument();
+    });
+
+    it("should not show placeholder badge for regular images", () => {
+      render(<StoryCard story={mockStory} onEdit={mockOnEdit} />);
+      expect(screen.queryByTestId("placeholder-badge")).not.toBeInTheDocument();
+    });
+
+    it("should not show placeholder badge when imageSource is a normal attribution", () => {
+      const normalStory: AdminStory = {
+        ...mockStory,
+        imageSource: "Turismo de Asturias",
+      };
+      render(<StoryCard story={normalStory} onEdit={mockOnEdit} />);
+      expect(screen.queryByTestId("placeholder-badge")).not.toBeInTheDocument();
+    });
+
+    it("should not show placeholder badge for stories without images", () => {
+      const noImageStory: AdminStory = {
+        ...mockStory,
+        image: "",
+        imageSource: undefined,
+      };
+      render(<StoryCard story={noImageStory} onEdit={mockOnEdit} />);
+      expect(screen.queryByTestId("placeholder-badge")).not.toBeInTheDocument();
     });
   });
 });
