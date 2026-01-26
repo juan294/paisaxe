@@ -292,5 +292,6 @@ export function storyToRow(story: Story, order: number = 0): Omit<StoryRow, "id"
     is_active: true,
     related_stories: story.relatedStories || null,
     metadata: {},
+    best_months: story.bestMonths || null,
   };
 }

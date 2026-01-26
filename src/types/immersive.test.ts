@@ -139,6 +139,7 @@ describe("immersive types", () => {
         is_active: true,
         related_stories: ["story-1", "story-2"],
         metadata: {},
+        best_months: null,
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",
       };
@@ -176,6 +177,7 @@ describe("immersive types", () => {
         is_active: true,
         related_stories: null,
         metadata: {},
+        best_months: null,
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",
       };

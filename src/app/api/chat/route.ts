@@ -4,6 +4,7 @@ import { generateEmbedding } from "@/lib/embeddings";
 import { search } from "@/lib/search";
 import { validateChatRequest } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { supabase } from "@/lib/supabase";
 import type { ChatResponse } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -51,8 +52,21 @@ export async function POST(request: NextRequest) {
       ? `${context}\n\nPregunta del usuario: ${message}`
       : message!;
 
+    // Check if Asturianu touches feature is enabled
+    let asturianEnabled = false;
+    try {
+      const { data: flagData } = await supabase
+        .from("feature_flags")
+        .select("enabled")
+        .eq("flag_key", "asturianu_touches")
+        .single();
+      asturianEnabled = flagData?.enabled ?? false;
+    } catch {
+      // Default to false on error
+    }
+
     // Generate response using Claude with context
-    const responseText = await generateChatResponse(enrichedMessage, chunks);
+    const responseText = await generateChatResponse(enrichedMessage, chunks, asturianEnabled);
 
     // Extract sources from chunks
     const sources = extractSourcesFromChunks(chunks);

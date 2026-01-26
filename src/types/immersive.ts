@@ -12,6 +12,17 @@ export interface Story {
   duration?: StoryDuration;
   displayOrder?: number;
   relatedStories?: string[];
+  createdAt?: string;
+  bestMonths?: number[];
+  metadata?: StoryMetadata;
+}
+
+export interface StoryMetadata {
+  question_prompts?: string[];
+  mood_tags?: string[];
+  asturianu_title?: string;
+  asturianu_subtitle?: string;
+  [key: string]: unknown;
 }
 
 export type StoryCategory =
@@ -68,6 +79,7 @@ export interface StoryRow {
   is_active: boolean;
   related_stories: string[] | null;
   metadata: Record<string, unknown>;
+  best_months: number[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -88,5 +100,8 @@ export function rowToStory(row: StoryRow): Story {
     duration: row.duration ? (row.duration as StoryDuration) : undefined,
     displayOrder: row.display_order,
     relatedStories: row.related_stories || undefined,
+    createdAt: row.created_at,
+    bestMonths: row.best_months || undefined,
+    metadata: (row.metadata as StoryMetadata) || undefined,
   };
 }

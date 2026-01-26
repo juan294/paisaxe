@@ -18,6 +18,27 @@ vi.mock("@/lib/supabase-browser", () => ({
   }),
 }));
 
+// Mock next/navigation
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+// Mock feature flags - all disabled by default
+vi.mock("@/hooks/use-feature-flags", () => ({
+  useFeatureFlags: () => ({
+    flags: [],
+    isLoading: false,
+    isEnabled: () => false,
+  }),
+}));
+
+// Mock analytics
+vi.mock("@/hooks/use-analytics", () => ({
+  useAnalytics: () => ({
+    trackEvent: vi.fn(),
+  }),
+}));
+
 // Wrapper component for tests
 const TestWrapper = ({ children }: { children: ReactNode }) => (
   <AuthProvider>{children}</AuthProvider>

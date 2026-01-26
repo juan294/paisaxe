@@ -29,9 +29,15 @@ Instrucciones:
 // This is a workaround for ECONNRESET errors with larger payloads
 const MAX_CONTEXT_LENGTH = 350;
 
+const ASTURIANU_PROMPT_ADDITION = `
+- Cuando sea natural, usa alguna palabra o expresión en asturianu/bable (el idioma local de Asturias)
+- Ejemplos: "ye" (es), "guapu" (bonito), "prestoso" (agradable), "facer" (hacer), "prau" (prado)
+- No fuerces el uso excesivo, solo añade toques sutiles que enriquezcan la experiencia`;
+
 export async function generateChatResponse(
   userMessage: string,
-  context: Chunk[]
+  context: Chunk[],
+  asturianEnabled: boolean = false
 ): Promise<string> {
   // Build context but limit to MAX_CONTEXT_LENGTH to avoid payload size issues
   let contextText = "";
@@ -59,10 +65,14 @@ export async function generateChatResponse(
     },
   ];
 
+  const systemPrompt = asturianEnabled
+    ? SYSTEM_PROMPT + ASTURIANU_PROMPT_ADDITION
+    : SYSTEM_PROMPT;
+
   const body = {
     model: "claude-sonnet-4-20250514",
     max_tokens: 1024,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages,
   };
 

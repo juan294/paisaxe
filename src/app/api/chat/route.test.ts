@@ -24,6 +24,18 @@ vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn(),
 }));
 
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: vi.fn().mockResolvedValue({ data: { enabled: false }, error: null }),
+        }),
+      }),
+    }),
+  },
+}));
+
 import { generateChatResponse, extractSourcesFromChunks } from "@/lib/claude";
 import { generateEmbedding } from "@/lib/embeddings";
 import { search } from "@/lib/search";
@@ -107,7 +119,8 @@ describe("POST /api/chat", () => {
 
     expect(generateChatResponse).toHaveBeenCalledWith(
       expect.stringContaining("Lagos de Covadonga"),
-      expect.any(Array)
+      expect.any(Array),
+      false
     );
   });
 
