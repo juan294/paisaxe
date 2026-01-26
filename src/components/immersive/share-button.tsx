@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Share2 } from "lucide-react";
+import { Share2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { useTranslation } from "@/lib/i18n";
@@ -65,7 +65,11 @@ export function ShareButton({ story }: ShareButtonProps) {
         className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
         title={t("share.share")}
       >
-        <Share2 className="h-5 w-5 text-white" />
+        {toast ? (
+          <Check className="h-5 w-5 text-white animate-in fade-in zoom-in duration-200" />
+        ) : (
+          <Share2 className="h-5 w-5 text-white" />
+        )}
       </button>
 
       {/* Toast */}
