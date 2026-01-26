@@ -369,7 +369,7 @@ export function StoryViewer({
             }}
             className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105"
           >
-            {getLabel("ask_about", ast)}
+            {ast ? getLabel("ask_about", true) : t("stories.ask_about")}
           </button>
           <a
             href="/favorites"
@@ -377,7 +377,7 @@ export function StoryViewer({
             className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105 flex items-center gap-2"
           >
             <Bookmark className="h-5 w-5" />
-            <span>{getLabel("saved", ast)}</span>
+            <span>{ast ? getLabel("saved", true) : t("favorites.saved")}</span>
           </a>
         </div>
       </div>

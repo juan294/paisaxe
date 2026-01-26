@@ -28,6 +28,26 @@ export const mockTranslations: Record<string, string> = {
   "stories.ambient_on": "Activar modo ambiente",
   "stories.ambient_off": "Desactivar modo ambiente",
 
+  // Stories action
+  "stories.ask_about": "Preguntar sobre esto",
+
+  // Stories categories
+  "stories.categories.nature": "Naturaleza",
+  "stories.categories.cities": "Ciudades",
+  "stories.categories.food": "Gastronomía",
+  "stories.categories.culture": "Cultura",
+  "stories.categories.activities": "Actividades",
+
+  // Stories locations
+  "stories.locations.eastern": "Asturias Oriental",
+  "stories.locations.central": "Asturias Central",
+  "stories.locations.western": "Asturias Occidental",
+
+  // Stories durations
+  "stories.durations.day-trip": "Excursión de un día",
+  "stories.durations.weekend": "Fin de semana",
+  "stories.durations.week": "Una semana",
+
   // Stories filters
   "stories.filters.title": "Filtros",
   "stories.filters.category": "Categoría",

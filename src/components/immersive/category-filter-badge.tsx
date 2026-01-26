@@ -9,9 +9,6 @@ import {
   StoryCategory,
   StoryLocation,
   StoryDuration,
-  CATEGORY_LABELS,
-  LOCATION_LABELS,
-  DURATION_LABELS,
 } from "@/types/immersive";
 
 interface CategoryFilterBadgeProps {
@@ -100,7 +97,7 @@ export function CategoryFilterBadge({
           hasActiveFilters && "ring-1 ring-white/30"
         )}
       >
-        <span>{CATEGORY_LABELS[selectedCategory || currentCategory]}</span>
+        <span>{t(`stories.categories.${selectedCategory || currentCategory}`)}</span>
         {activeFilterCount > 0 && (
           <span className="flex items-center justify-center w-5 h-5 text-xs bg-white text-black rounded-full font-semibold">
             {activeFilterCount}
@@ -143,7 +140,7 @@ export function CategoryFilterBadge({
                 {CATEGORIES.map((category, index) => (
                   <FilterChip
                     key={category}
-                    label={CATEGORY_LABELS[category]}
+                    label={t(`stories.categories.${category}`)}
                     selected={selectedCategory === category}
                     highlighted={!selectedCategory && category === currentCategory}
                     onClick={() =>
@@ -169,7 +166,7 @@ export function CategoryFilterBadge({
                 {LOCATIONS.map((location, index) => (
                   <FilterChip
                     key={location}
-                    label={LOCATION_LABELS[location]}
+                    label={t(`stories.locations.${location}`)}
                     selected={selectedLocation === location}
                     onClick={() =>
                       onLocationChange(selectedLocation === location ? null : location)
@@ -194,7 +191,7 @@ export function CategoryFilterBadge({
                 {DURATIONS.map((duration, index) => (
                   <FilterChip
                     key={duration}
-                    label={DURATION_LABELS[duration]}
+                    label={t(`stories.durations.${duration}`)}
                     selected={selectedDuration === duration}
                     onClick={() =>
                       onDurationChange(selectedDuration === duration ? null : duration)

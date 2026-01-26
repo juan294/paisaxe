@@ -6,7 +6,6 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import type { Story } from "@/types/immersive";
-import { CATEGORY_LABELS } from "@/types/immersive";
 
 interface RelatedStoriesProps {
   stories: Story[];
@@ -77,7 +76,7 @@ export function RelatedStories({ stories, onSelectStory }: RelatedStoriesProps) 
             {/* Content */}
             <div className="relative p-3 w-full">
               <span className="text-[10px] uppercase tracking-wider text-white/60 block mb-0.5">
-                {CATEGORY_LABELS[story.category]}
+                {t(`stories.categories.${story.category}`)}
               </span>
               <h3 className="text-sm font-medium text-white line-clamp-1">
                 {story.title}

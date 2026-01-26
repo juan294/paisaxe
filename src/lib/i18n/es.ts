@@ -28,12 +28,30 @@ export const es: Translations = {
     related: 'Tambien te puede interesar',
     no_results: 'No hay historias con estos filtros',
     new_badge: 'Nuevo',
+    ask_about: 'Preguntar sobre esto',
     filters: {
       title: 'Filtros',
       category: 'Categoria',
       location: 'Ubicacion',
       duration: 'Duracion',
       clear: 'Limpiar filtros',
+    },
+    categories: {
+      nature: 'Naturaleza',
+      cities: 'Ciudades',
+      food: 'Gastronomía',
+      culture: 'Cultura',
+      activities: 'Actividades',
+    },
+    locations: {
+      eastern: 'Asturias Oriental',
+      central: 'Asturias Central',
+      western: 'Asturias Occidental',
+    },
+    durations: {
+      'day-trip': 'Excursión de un día',
+      weekend: 'Fin de semana',
+      week: 'Una semana',
     },
   },
 
