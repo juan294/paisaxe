@@ -1,6 +1,24 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  headers: async () => [
+    {
+      source: "/(.*)",
+      headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "X-XSS-Protection", value: "1; mode=block" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" },
+      ],
+    },
+    {
+      source: "/api/:path*",
+      headers: [
+        { key: "Cache-Control", value: "no-store, max-age=0" },
+      ],
+    },
+  ],
   images: {
     // Prefer modern formats for better compression
     formats: ["image/avif", "image/webp"],

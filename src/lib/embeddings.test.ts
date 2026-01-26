@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 // Mock voyageai module
 const mockEmbed = vi.fn();
 vi.mock("voyageai", () => ({
@@ -8,10 +10,23 @@ vi.mock("voyageai", () => ({
   })),
 }));
 
+const mockGet = vi.fn();
+const mockSet = vi.fn();
+vi.mock("./embedding-cache", () => ({
+  EmbeddingCache: vi.fn(() => ({
+    get: mockGet,
+    set: mockSet,
+    clear: vi.fn(),
+  })),
+}));
+
 describe("embeddings", () => {
   beforeEach(() => {
     vi.resetModules();
     mockEmbed.mockReset();
+    mockGet.mockReset();
+    mockSet.mockReset();
+    mockGet.mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -28,6 +43,7 @@ describe("embeddings", () => {
   describe("generateEmbedding", () => {
     it("should return embedding for a single text", async () => {
       const mockEmbedding = Array(1024).fill(0.1);
+      mockGet.mockReturnValue(null);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
       });
@@ -39,10 +55,12 @@ describe("embeddings", () => {
       expect(mockEmbed).toHaveBeenCalledWith({
         input: ["test text"],
         model: "voyage-3",
+        inputType: "query",
       });
     });
 
     it("should throw error when no embedding is returned", async () => {
+      mockGet.mockReturnValue(null);
       mockEmbed.mockResolvedValue({ data: [] });
 
       const { generateEmbedding } = await import("./embeddings");
@@ -53,6 +71,7 @@ describe("embeddings", () => {
     });
 
     it("should throw error when data is null", async () => {
+      mockGet.mockReturnValue(null);
       mockEmbed.mockResolvedValue({ data: null });
 
       const { generateEmbedding } = await import("./embeddings");
@@ -63,6 +82,7 @@ describe("embeddings", () => {
     });
 
     it("should throw error when embedding is undefined", async () => {
+      mockGet.mockReturnValue(null);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: undefined }],
       });
@@ -72,6 +92,49 @@ describe("embeddings", () => {
       await expect(generateEmbedding("test text")).rejects.toThrow(
         "No embedding returned from Voyage AI"
       );
+    });
+
+    it("should return cached embedding without API call", async () => {
+      const cachedEmbedding = Array(1024).fill(0.5);
+      mockGet.mockReturnValue(cachedEmbedding);
+
+      const { generateEmbedding } = await import("./embeddings");
+      const result = await generateEmbedding("cached text");
+
+      expect(result).toEqual(cachedEmbedding);
+      expect(mockEmbed).not.toHaveBeenCalled();
+    });
+
+    it("should cache embedding after API call", async () => {
+      const mockEmbedding = Array(1024).fill(0.1);
+      mockGet.mockReturnValue(null);
+      mockEmbed.mockResolvedValue({
+        data: [{ embedding: mockEmbedding }],
+        usage: { totalTokens: 10 },
+      });
+
+      const { generateEmbedding } = await import("./embeddings");
+      await generateEmbedding("new text");
+
+      expect(mockSet).toHaveBeenCalledWith("new text", mockEmbedding);
+    });
+
+    it("should log token usage", async () => {
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const mockEmbedding = Array(1024).fill(0.1);
+      mockGet.mockReturnValue(null);
+      mockEmbed.mockResolvedValue({
+        data: [{ embedding: mockEmbedding }],
+        usage: { totalTokens: 42 },
+      });
+
+      const { generateEmbedding } = await import("./embeddings");
+      await generateEmbedding("test");
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("42 tokens")
+      );
+      consoleSpy.mockRestore();
     });
   });
 
@@ -163,6 +226,40 @@ describe("embeddings", () => {
       expect(result.embeddings).toHaveLength(0);
       expect(result.totalTokens).toBe(0);
       expect(mockEmbed).not.toHaveBeenCalled();
+    });
+
+    it("should pass inputType document for batch embeddings", async () => {
+      const mockEmbedding = Array(1024).fill(0.1);
+      mockEmbed.mockResolvedValue({
+        data: [{ embedding: mockEmbedding }],
+        usage: { totalTokens: 10 },
+      });
+
+      const { generateEmbeddings } = await import("./embeddings");
+      await generateEmbeddings(["text1"]);
+
+      expect(mockEmbed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputType: "document",
+        })
+      );
+    });
+
+    it("should log total token usage for batch", async () => {
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const mockEmbedding = Array(1024).fill(0.1);
+      mockEmbed.mockResolvedValue({
+        data: [{ embedding: mockEmbedding }],
+        usage: { totalTokens: 50 },
+      });
+
+      const { generateEmbeddings } = await import("./embeddings");
+      await generateEmbeddings(["text1"]);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("total: 50 tokens")
+      );
+      consoleSpy.mockRestore();
     });
   });
 });

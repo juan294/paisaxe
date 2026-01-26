@@ -2,22 +2,46 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateChatResponse, extractSourcesFromChunks } from "@/lib/claude";
 import { generateEmbedding } from "@/lib/embeddings";
 import { search } from "@/lib/search";
-import type { ChatRequest, ChatResponse } from "@/types";
+import { validateChatRequest } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rate-limit";
+import type { ChatResponse } from "@/types";
 
 export async function POST(request: NextRequest) {
   try {
-    const body: ChatRequest = await request.json();
-    const { message, context } = body;
+    // Rate limiting - check before any processing
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rateLimit = checkRateLimit(ip);
 
-    if (!message || typeof message !== "string") {
+    if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: "Message is required" },
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfter),
+            "X-RateLimit-Limit": String(rateLimit.limit),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(rateLimit.resetAt),
+          },
+        }
+      );
+    }
+
+    // Input validation
+    const body = await request.json();
+    const validation = validateChatRequest(body);
+
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: validation.error },
         { status: 400 }
       );
     }
 
+    const { sanitizedMessage: message, sanitizedContext: context } = validation;
+
     // Generate embedding for the user's query
-    const queryEmbedding = await generateEmbedding(message);
+    const queryEmbedding = await generateEmbedding(message!);
 
     // Search for relevant content
     const { chunks, images } = await search(queryEmbedding, 3);
@@ -25,7 +49,7 @@ export async function POST(request: NextRequest) {
     // If context is provided (e.g., from immersive mode), prepend it
     const enrichedMessage = context
       ? `${context}\n\nPregunta del usuario: ${message}`
-      : message;
+      : message!;
 
     // Generate response using Claude with context
     const responseText = await generateChatResponse(enrichedMessage, chunks);
@@ -39,7 +63,11 @@ export async function POST(request: NextRequest) {
       images,
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json(response, {
+      headers: {
+        "X-RateLimit-Remaining": String(rateLimit.remaining),
+      },
+    });
   } catch (error) {
     console.error("Chat API error:", error);
     return NextResponse.json(

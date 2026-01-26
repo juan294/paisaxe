@@ -1,4 +1,6 @@
+import "server-only";
 import { VoyageAIClient } from "voyageai";
+import { EmbeddingCache } from "./embedding-cache";
 
 const voyageClient = new VoyageAIClient({
   apiKey: process.env.VOYAGE_API_KEY,
@@ -7,6 +9,8 @@ const voyageClient = new VoyageAIClient({
 const EMBEDDING_MODEL = "voyage-3";
 const EMBEDDING_DIMENSIONS = 1024;
 const MAX_BATCH_SIZE = 128;
+
+const embeddingCache = new EmbeddingCache();
 
 export interface EmbeddingResult {
   embedding: number[];
@@ -22,16 +26,33 @@ export interface BatchEmbeddingResult {
  * Generate embedding for a single text using Voyage AI
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
+  // Check cache first
+  const cached = embeddingCache.get(text);
+  if (cached) {
+    return cached;
+  }
+
   const result = await voyageClient.embed({
     input: [text],
     model: EMBEDDING_MODEL,
+    inputType: "query",
   });
 
   if (!result.data || result.data.length === 0 || !result.data[0].embedding) {
     throw new Error("No embedding returned from Voyage AI");
   }
 
-  return result.data[0].embedding as number[];
+  const embedding = result.data[0].embedding as number[];
+
+  // Log token usage
+  if (result.usage?.totalTokens) {
+    console.info(`[Voyage AI] generateEmbedding: ${result.usage.totalTokens} tokens`);
+  }
+
+  // Cache the result
+  embeddingCache.set(text, embedding);
+
+  return embedding;
 }
 
 /**
@@ -48,6 +69,7 @@ export async function generateEmbeddings(texts: string[]): Promise<BatchEmbeddin
     const result = await voyageClient.embed({
       input: batch,
       model: EMBEDDING_MODEL,
+      inputType: "document",
     });
 
     if (!result.data) {
@@ -55,9 +77,16 @@ export async function generateEmbeddings(texts: string[]): Promise<BatchEmbeddin
     }
 
     allEmbeddings.push(...result.data.map((d) => d.embedding).filter((e): e is number[] => e !== undefined));
-    totalTokens += result.usage?.totalTokens || 0;
+    const batchTokens = result.usage?.totalTokens || 0;
+    totalTokens += batchTokens;
+
+    // Log token usage per batch
+    if (batchTokens) {
+      console.info(`[Voyage AI] generateEmbeddings batch ${i}: ${batchTokens} tokens`);
+    }
   }
 
+  console.info(`[Voyage AI] generateEmbeddings total: ${totalTokens} tokens for ${texts.length} texts`);
   return { embeddings: allEmbeddings, totalTokens };
 }
 

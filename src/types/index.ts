@@ -38,3 +38,7 @@ export interface ChatResponse {
   sources?: Source[];
   images?: ImageResult[];
 }
+
+export interface ChatErrorResponse {
+  error: string;
+}
