@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { middleware } from "./middleware";
+import { proxy } from "./proxy";
 import { NextRequest } from "next/server";
 
-describe("CORS middleware", () => {
+describe("CORS proxy", () => {
   beforeEach(() => {
     vi.stubEnv("NODE_ENV", "production");
   });
@@ -12,7 +12,7 @@ describe("CORS middleware", () => {
       headers: { origin: "https://paisaxe.com" },
     });
 
-    const response = middleware(request);
+    const response = proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://paisaxe.com");
   });
 
@@ -21,7 +21,7 @@ describe("CORS middleware", () => {
       headers: { origin: "https://www.paisaxe.com" },
     });
 
-    const response = middleware(request);
+    const response = proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://www.paisaxe.com");
   });
 
@@ -30,7 +30,7 @@ describe("CORS middleware", () => {
       headers: { origin: "https://paisaxe.es" },
     });
 
-    const response = middleware(request);
+    const response = proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://paisaxe.es");
   });
 
@@ -39,7 +39,7 @@ describe("CORS middleware", () => {
       headers: { origin: "https://www.paisaxe.es" },
     });
 
-    const response = middleware(request);
+    const response = proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://www.paisaxe.es");
   });
 
@@ -48,7 +48,7 @@ describe("CORS middleware", () => {
       headers: { origin: "https://evil.com" },
     });
 
-    const response = middleware(request);
+    const response = proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
@@ -58,7 +58,7 @@ describe("CORS middleware", () => {
       headers: { origin: "https://paisaxe.com" },
     });
 
-    const response = middleware(request);
+    const response = proxy(request);
     expect(response.status).toBe(204);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://paisaxe.com");
     expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
@@ -70,7 +70,7 @@ describe("CORS middleware", () => {
       headers: { origin: "https://evil.com" },
     });
 
-    const response = middleware(request);
+    const response = proxy(request);
     expect(response.status).toBe(204);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
@@ -79,12 +79,12 @@ describe("CORS middleware", () => {
     const request = new NextRequest("http://localhost:3000/api/chat");
     // No origin header (same-origin)
 
-    const response = middleware(request);
+    const response = proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 });
 
-describe("CORS middleware - development", () => {
+describe("CORS proxy - development", () => {
   it("should not allow localhost in production", () => {
     // Note: The ALLOWED_ORIGINS array is built at module load time.
     // Since NODE_ENV defaults to "test" in vitest (not "development"),
@@ -96,7 +96,7 @@ describe("CORS middleware - development", () => {
       headers: { origin: "http://localhost:3000" },
     });
 
-    const response = middleware(request);
+    const response = proxy(request);
     // In production, localhost should not be allowed
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
