@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { useTranslation } from "@/lib/i18n";
 import type { Mood } from "@/lib/mood-mapping";
 
 interface MoodOverlayProps {
@@ -10,15 +11,16 @@ interface MoodOverlayProps {
   onDismiss: () => void;
 }
 
-const MOOD_OPTIONS: { mood: Mood; label: string; emoji: string; color: string }[] = [
-  { mood: "relajante", label: "Relajante", emoji: "\u{1F30A}", color: "from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30" },
-  { mood: "aventurero", label: "Aventurero", emoji: "\u{26F0}\u{FE0F}", color: "from-emerald-500/20 to-emerald-600/20 hover:from-emerald-500/30 hover:to-emerald-600/30" },
-  { mood: "cultural", label: "Cultural", emoji: "\u{1F3DB}\u{FE0F}", color: "from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30" },
-  { mood: "delicioso", label: "Delicioso", emoji: "\u{1F372}", color: "from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30" },
+const MOOD_OPTIONS: { mood: Mood; labelKey: string; emoji: string; color: string }[] = [
+  { mood: "relajante", labelKey: "mood.relaxing", emoji: "\u{1F30A}", color: "from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30" },
+  { mood: "aventurero", labelKey: "mood.adventurous", emoji: "\u{26F0}\u{FE0F}", color: "from-emerald-500/20 to-emerald-600/20 hover:from-emerald-500/30 hover:to-emerald-600/30" },
+  { mood: "cultural", labelKey: "mood.cultural", emoji: "\u{1F3DB}\u{FE0F}", color: "from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30" },
+  { mood: "delicioso", labelKey: "mood.delicious", emoji: "\u{1F372}", color: "from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30" },
 ];
 
 export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
   const { trackEvent } = useAnalytics();
+  const { t } = useTranslation();
 
   const handleSelect = (mood: Mood) => {
     trackEvent("mood_selected", "mood_discovery", { mood });
@@ -46,14 +48,14 @@ export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
         </button>
 
         <h2 className="text-2xl font-bold text-white mb-2">
-          ¿Qué tipo de experiencia buscas?
+          {t("mood.title")}
         </h2>
         <p className="text-white/60 text-sm mb-8">
-          Elige tu estado de ánimo y te mostraremos las historias perfectas
+          {t("mood.subtitle")}
         </p>
 
         <div className="grid grid-cols-2 gap-3">
-          {MOOD_OPTIONS.map(({ mood, label, emoji, color }) => (
+          {MOOD_OPTIONS.map(({ mood, labelKey, emoji, color }) => (
             <button
               key={mood}
               onClick={() => handleSelect(mood)}
@@ -66,7 +68,7 @@ export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
               )}
             >
               <span className="text-3xl">{emoji}</span>
-              <span className="font-medium">{label}</span>
+              <span className="font-medium">{t(labelKey)}</span>
             </button>
           ))}
         </div>
@@ -75,7 +77,7 @@ export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
           onClick={handleDismiss}
           className="mt-6 text-sm text-white/40 hover:text-white/60 transition-colors"
         >
-          Mostrar todo
+          {t("mood.show_all")}
         </button>
       </div>
     </div>

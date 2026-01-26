@@ -8,6 +8,7 @@ import { Mic, MicOff, X, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PrivacyNotice } from "./privacy-notice";
+import { useTranslation } from "@/lib/i18n";
 
 interface VoiceChatProps {
   story: Story;
@@ -31,6 +32,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   // Check for speech recognition support
   useEffect(() => {
@@ -128,7 +130,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         ...prev,
         {
           role: "assistant",
-          content: data.message || "Lo siento, no pude procesar tu pregunta.",
+          content: data.message || t("chat.error_processing"),
           images: data.images,
         },
       ]);
@@ -137,7 +139,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         ...prev,
         {
           role: "assistant",
-          content: "Lo siento, hubo un error. Intenta de nuevo.",
+          content: t("chat.error_generic"),
         },
       ]);
     } finally {
@@ -182,9 +184,9 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         <div className="h-64 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 && (
             <div className="text-center text-white/50 py-8">
-              <p className="mb-2">Pregunta lo que quieras sobre este lugar</p>
+              <p className="mb-2">{t("chat.empty_state")}</p>
               {speechSupported && (
-                <p className="text-sm">Puedes usar el micrófono para hablar</p>
+                <p className="text-sm">{t("chat.speech_hint")}</p>
               )}
             </div>
           )}
@@ -206,7 +208,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={image.path}
-                        alt={image.caption || "Imagen relacionada de Asturias"}
+                        alt={image.caption || t("chat.image_alt")}
                         className="w-full rounded-xl object-cover"
                         loading="lazy"
                       />
@@ -216,7 +218,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                         </figcaption>
                       )}
                       <p className="mt-0.5 text-xs text-white/40">
-                        Fuente: {image.sourcePdf}
+                        {t("chat.source")}: {image.sourcePdf}
                       </p>
                     </figure>
                   ))}
@@ -227,7 +229,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
           {isLoading && (
             <div className="flex items-center gap-2 text-white/60">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Pensando...</span>
+              <span className="text-sm">{t("chat.thinking")}</span>
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -259,7 +261,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={isListening ? "Escuchando..." : "Escribe tu pregunta..."}
+            placeholder={isListening ? t("chat.listening") : t("chat.placeholder")}
             disabled={isLoading || isListening}
             className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
           />

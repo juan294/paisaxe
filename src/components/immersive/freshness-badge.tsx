@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { isNewStory } from "@/lib/freshness";
+import { useTranslation } from "@/lib/i18n";
 
 interface FreshnessBadgeProps {
   createdAt?: string;
@@ -11,6 +12,7 @@ interface FreshnessBadgeProps {
 
 export function FreshnessBadge({ createdAt, storyId }: FreshnessBadgeProps) {
   const { trackEvent } = useAnalytics();
+  const { t } = useTranslation();
   const trackedRef = useRef(false);
 
   const isNew = createdAt ? isNewStory(createdAt) : false;
@@ -26,7 +28,7 @@ export function FreshnessBadge({ createdAt, storyId }: FreshnessBadgeProps) {
 
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/80 text-white backdrop-blur-sm">
-      Nuevo
+      {t("stories.new_badge")}
     </span>
   );
 }

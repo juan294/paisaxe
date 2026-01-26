@@ -2,6 +2,17 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import FavoritesPage from "./page";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 // Mock next/image
 vi.mock("next/image", () => ({
@@ -98,7 +109,7 @@ describe("FavoritesPage", () => {
 
       render(<FavoritesPage />);
 
-      expect(screen.getByText("Cargando...")).toBeInTheDocument();
+      expect(screen.getByText(mockT("common.loading"))).toBeInTheDocument();
     });
   });
 
@@ -107,7 +118,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("No tienes guardados todavía")).toBeInTheDocument();
+        expect(screen.getByText(mockT("favorites.empty_title"))).toBeInTheDocument();
       });
     });
 
@@ -115,7 +126,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Explorar historias")).toBeInTheDocument();
+        expect(screen.getByText(mockT("favorites.explore"))).toBeInTheDocument();
       });
     });
 
@@ -123,7 +134,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        const link = screen.getByText("Explorar historias");
+        const link = screen.getByText(mockT("favorites.explore"));
         expect(link.closest("a")).toHaveAttribute("href", "/immersive");
       });
     });
@@ -150,7 +161,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("1 lugar")).toBeInTheDocument();
+        expect(screen.getByText(`1 ${mockT("favorites.place_singular")}`)).toBeInTheDocument();
       });
     });
 
@@ -164,7 +175,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("2 lugares")).toBeInTheDocument();
+        expect(screen.getByText(`2 ${mockT("favorites.place_plural")}`)).toBeInTheDocument();
       });
     });
 
@@ -175,7 +186,7 @@ describe("FavoritesPage", () => {
         expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
       });
 
-      const removeButton = screen.getByLabelText("Quitar de guardados");
+      const removeButton = screen.getByLabelText(mockT("favorites.remove_from_saved"));
       fireEvent.click(removeButton);
 
       expect(mockToggleFavorite).toHaveBeenCalledWith("story-1");
@@ -197,7 +208,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Guardados")).toBeInTheDocument();
+        expect(screen.getByText(mockT("favorites.title"))).toBeInTheDocument();
       });
     });
 

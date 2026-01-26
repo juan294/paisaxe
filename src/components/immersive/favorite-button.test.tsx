@@ -1,6 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { FavoriteButton } from "./favorite-button";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 describe("FavoriteButton", () => {
   const defaultProps = {
@@ -9,28 +20,28 @@ describe("FavoriteButton", () => {
   };
 
   describe("rendering", () => {
-    it("should render with 'Guardar' text when not favorited", () => {
+    it("should render with save text when not favorited", () => {
       render(<FavoriteButton {...defaultProps} />);
 
-      expect(screen.getByText("Guardar")).toBeInTheDocument();
+      expect(screen.getByText(mockT("favorites.save"))).toBeInTheDocument();
     });
 
-    it("should render with 'Guardado' text when favorited", () => {
+    it("should render with saved text when favorited", () => {
       render(<FavoriteButton {...defaultProps} isFavorite={true} />);
 
-      expect(screen.getByText("Guardado")).toBeInTheDocument();
+      expect(screen.getByText(mockT("favorites.saved"))).toBeInTheDocument();
     });
 
     it("should have correct aria-label when not favorited", () => {
       render(<FavoriteButton {...defaultProps} />);
 
-      expect(screen.getByLabelText("Agregar a favoritos")).toBeInTheDocument();
+      expect(screen.getByLabelText(mockT("favorites.add"))).toBeInTheDocument();
     });
 
     it("should have correct aria-label when favorited", () => {
       render(<FavoriteButton {...defaultProps} isFavorite={true} />);
 
-      expect(screen.getByLabelText("Quitar de favoritos")).toBeInTheDocument();
+      expect(screen.getByLabelText(mockT("favorites.remove"))).toBeInTheDocument();
     });
 
     it("should show filled heart when favorited", () => {

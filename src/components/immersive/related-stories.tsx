@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 import type { Story } from "@/types/immersive";
 import { CATEGORY_LABELS } from "@/types/immersive";
 
@@ -14,6 +15,7 @@ interface RelatedStoriesProps {
 
 export function RelatedStories({ stories, onSelectStory }: RelatedStoriesProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const { t } = useTranslation();
 
   if (stories.length === 0) {
     return null;
@@ -21,7 +23,7 @@ export function RelatedStories({ stories, onSelectStory }: RelatedStoriesProps) 
 
   return (
     <section
-      aria-label="Historias relacionadas"
+      aria-label={t("accessibility.related_stories")}
       role="region"
       className="absolute bottom-24 left-0 right-0 z-20 px-6"
     >
@@ -36,7 +38,7 @@ export function RelatedStories({ stories, onSelectStory }: RelatedStoriesProps) 
         )}
         aria-expanded={isExpanded}
       >
-        <span>También te puede interesar</span>
+        <span>{t("stories.related")}</span>
         {isExpanded ? (
           <ChevronDown className="h-4 w-4" />
         ) : (
