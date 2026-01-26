@@ -1,0 +1,195 @@
+import type { Translations } from './types';
+
+export const es: Translations = {
+  common: {
+    loading: 'Cargando...',
+    loadingMore: 'Cargando mas...',
+    loadingStories: 'Loading stories...',
+    error: 'Error',
+    close: 'Cerrar',
+    cancel: 'Cancelar',
+    save: 'Guardar',
+    saving: 'Guardando',
+    understood: 'Entendido',
+    showAll: 'Mostrar todo',
+    back: 'Volver',
+  },
+
+  meta: {
+    title: 'Paisaxe | Descubre Asturias',
+    description: 'Tu guia personal para explorar Asturias. Descubre paisajes, rutas, gastronomia y cultura.',
+  },
+
+  chat: {
+    placeholder: 'Escribe tu pregunta...',
+    placeholderListening: 'Escuchando...',
+    send: 'Enviar',
+    thinking: 'Pensando...',
+    askAnything: 'Pregunta lo que quieras sobre este lugar',
+    microphoneHint: 'Puedes usar el microfono para hablar',
+    errorGeneric: 'Lo siento, hubo un error. Intenta de nuevo.',
+    errorProcessing: 'Lo siento, no pude procesar tu pregunta.',
+    imageAlt: 'Imagen relacionada de Asturias',
+    source: 'Fuente',
+  },
+
+  privacy: {
+    notice: 'Tus preguntas se procesan con inteligencia artificial para darte la mejor respuesta sobre Asturias. No guardamos tus conversaciones.',
+  },
+
+  stories: {
+    askAbout: 'Preguntar sobre esto',
+    noStoriesWithFilters: 'No hay historias con estos filtros',
+    clearFilters: 'Limpiar filtros',
+    exploreStories: 'Explorar historias',
+    alsoInteresting: 'Tambien te puede interesar',
+    relatedStories: 'Historias relacionadas',
+    newBadge: 'Nuevo',
+  },
+
+  filters: {
+    filters: 'Filtros',
+    category: 'Categoria',
+    location: 'Ubicacion',
+    zone: 'Zona',
+    duration: 'Duracion',
+    clearFilters: 'Limpiar filtros',
+  },
+
+  categories: {
+    nature: 'Naturaleza',
+    cities: 'Ciudades',
+    food: 'Gastronomia',
+    culture: 'Cultura',
+    activities: 'Actividades',
+  },
+
+  locations: {
+    eastern: 'Asturias Oriental',
+    central: 'Asturias Central',
+    western: 'Asturias Occidental',
+  },
+
+  durations: {
+    'day-trip': 'Excursion de un dia',
+    weekend: 'Fin de semana',
+    week: 'Una semana',
+  },
+
+  favorites: {
+    saved: 'Guardados',
+    save: 'Guardar',
+    addToFavorites: 'Agregar a favoritos',
+    removeFromFavorites: 'Quitar de favoritos',
+    addToSaved: 'Agregar a guardados',
+    removeFromSaved: 'Quitar de guardados',
+    noFavoritesYet: 'No tienes guardados todavia',
+    noFavoritesDescription: 'Explora las historias de Asturias y guarda las que mas te gusten para verlas despues.',
+    placeCount: '{count} {count, plural, one {lugar} other {lugares}}',
+    place: 'lugar',
+    places: 'lugares',
+    seenAll: 'Has visto todos tus guardados',
+    syncFavorites: 'Sincroniza tus favoritos',
+    syncDescription: 'Inicia sesion para guardar tus favoritos en la nube y acceder desde cualquier dispositivo.',
+    maybeLater: 'Quiza mas tarde',
+  },
+
+  mood: {
+    title: 'Que tipo de experiencia buscas?',
+    subtitle: 'Elige tu estado de animo y te mostraremos las historias perfectas',
+    relaxing: 'Relajante',
+    adventurous: 'Aventurero',
+    cultural: 'Cultural',
+    delicious: 'Delicioso',
+  },
+
+  controls: {
+    share: 'Compartir',
+    surprise: 'Sorpresa',
+    ambientModeOn: 'Desactivar modo ambiente',
+    ambientModeOff: 'Modo ambiente',
+    ambient: 'Ambient',
+    navigate: 'navegar',
+    showHide: 'mostrar/ocultar',
+    next: 'siguiente',
+  },
+
+  auth: {
+    signIn: 'Entrar',
+    signOut: 'Cerrar sesion',
+    continueWithGoogle: 'Continuar con Google',
+    user: 'Usuario',
+  },
+
+  admin: {
+    title: 'Paisaxe Admin',
+    login: {
+      enterKey: 'Enter your access key to continue',
+      accessKey: 'Access key',
+      continue: 'Continue',
+      verifying: 'Verifying...',
+      protectedArea: 'Protected area',
+      pleaseEnterKey: 'Please enter the admin key',
+      invalidKey: 'Invalid admin key',
+      failedValidation: 'Failed to validate key',
+    },
+    tabs: {
+      stories: 'Stories',
+      toggles: 'Feature Toggles',
+      analytics: 'Analytics',
+    },
+    stories: {
+      total: 'total',
+      pending: 'pending',
+      approved: 'approved',
+      withImages: 'with images',
+      noStories: 'No stories found',
+      loading: 'Loading...',
+      all: 'All',
+      noImage: 'No image',
+      clickToAdd: 'Click to add',
+      needsCuration: 'Needs curation',
+      updateHeroImage: 'Update hero image',
+      markApproved: 'Mark as approved',
+      markPending: 'Mark as pending',
+      placeholderInfo: 'This is a placeholder image from Unsplash. Replace it with a real photo of this location.',
+      placeholder: 'Placeholder',
+      imageSource: 'Image Source / Attribution',
+      imageSourcePlaceholder: 'e.g., Photo by Juan on Unsplash',
+      imageSourceHint: 'Will be displayed below the image in stories',
+      urlTab: 'URL',
+      uploadTab: 'Upload',
+      dropHere: 'Drop here',
+      clickOrDrag: 'Click or drag',
+      fileConstraints: 'JPEG, PNG, WebP, GIF . Max 5MB',
+      invalidFileType: 'Invalid file type. Allowed: JPEG, PNG, WebP, GIF',
+      fileTooLarge: 'File too large. Maximum size is 5MB',
+      provideImage: 'Please provide an image URL or upload a file',
+      failedUpdateImage: 'Failed to update image',
+      failedApprove: 'Failed to approve story',
+      failedUpdateStatus: 'Failed to update status',
+      logout: 'Logout',
+    },
+    featureToggles: {
+      title: 'Feature Toggles',
+      loading: 'Loading feature flags...',
+      changeNote: 'Changes take effect within 1 minute for all visitors.',
+    },
+    analytics: {
+      title: 'Analytics',
+      loading: 'Loading analytics...',
+      from: 'From',
+      to: 'To',
+      totalEvents: 'Total Events',
+      uniqueSessions: 'Unique Sessions',
+      perFeatureUsage: 'Per-Feature Usage',
+      events: 'events',
+      sessions: 'sessions',
+      noAnalytics: 'No analytics events recorded in this date range.',
+    },
+  },
+
+  keyboard: {
+    space: 'espacio',
+  },
+};
