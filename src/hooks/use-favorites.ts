@@ -10,16 +10,12 @@ interface UseFavoritesReturn {
   isFavorite: (storyId: string) => boolean;
   toggleFavorite: (storyId: string) => void;
   isLoading: boolean;
-  showSignInPrompt: boolean;
-  dismissSignInPrompt: () => void;
 }
 
 export function useFavorites(): UseFavoritesReturn {
   const { user, session } = useAuth();
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
-  const [hasShownPrompt, setHasShownPrompt] = useState(false);
 
   // Load favorites from localStorage on mount
   useEffect(() => {
@@ -102,12 +98,6 @@ export function useFavorites(): UseFavoritesReturn {
       setFavorites(newFavorites);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newFavorites));
 
-      // Show sign-in prompt after first favorite if not logged in
-      if (!user && !isCurrentlyFavorite && !hasShownPrompt) {
-        setShowSignInPrompt(true);
-        setHasShownPrompt(true);
-      }
-
       // Sync to cloud if logged in
       if (user && session) {
         try {
@@ -133,19 +123,13 @@ export function useFavorites(): UseFavoritesReturn {
         }
       }
     },
-    [favorites, user, session, hasShownPrompt]
+    [favorites, user, session]
   );
-
-  const dismissSignInPrompt = useCallback(() => {
-    setShowSignInPrompt(false);
-  }, []);
 
   return {
     favorites,
     isFavorite,
     toggleFavorite,
     isLoading,
-    showSignInPrompt,
-    dismissSignInPrompt,
   };
 }

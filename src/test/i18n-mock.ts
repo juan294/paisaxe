@@ -57,6 +57,9 @@ export const mockTranslations: Record<string, string> = {
   "favorites.explore": "Explorar historias",
   "favorites.loading_more": "Cargando más...",
   "favorites.all_viewed": "Has visto todos tus guardados",
+  "favorites.local_only": "Tus guardados solo estan en este dispositivo",
+  "favorites.local_only_description": "Si borras los datos del navegador o cambias de dispositivo, los perderas.",
+  "favorites.sync_with_google": "Sincronizar con Google",
 
   // Auth
   "auth.sign_in": "Entrar",
@@ -78,6 +81,7 @@ export const mockTranslations: Record<string, string> = {
 
   // Share
   "share.share": "Compartir",
+  "share.link_copied": "Enlace copiado",
 
   // Accessibility
   "accessibility.language_switcher": "Cambiar idioma",

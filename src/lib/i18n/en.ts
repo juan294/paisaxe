@@ -3,95 +3,86 @@ import type { Translations } from './types';
 export const en: Translations = {
   common: {
     loading: 'Loading...',
-    loadingMore: 'Loading more...',
-    loadingStories: 'Loading stories...',
-    error: 'Error',
     close: 'Close',
-    cancel: 'Cancel',
-    save: 'Save',
-    saving: 'Saving',
-    understood: 'Got it',
-    showAll: 'Show all',
-    back: 'Back',
-  },
-
-  meta: {
-    title: 'Paisaxe | Discover Asturias',
-    description: 'Your personal guide to explore Asturias. Discover landscapes, routes, gastronomy and culture.',
   },
 
   chat: {
     placeholder: 'Ask about this place...',
-    placeholderListening: 'Listening...',
-    send: 'Send',
+    listening: 'Listening...',
     thinking: 'Thinking...',
-    askAnything: 'Ask anything about this place',
-    microphoneHint: 'You can use the microphone to speak',
-    errorGeneric: 'Sorry, there was an error. Please try again.',
-    errorProcessing: 'Sorry, I could not process your question.',
-    imageAlt: 'Related image of Asturias',
+    empty_state: 'Ask anything about this place',
+    speech_hint: 'You can use the microphone to speak',
+    error_processing: 'Sorry, I could not process your question.',
+    error_generic: 'Sorry, there was an error. Please try again.',
+    image_alt: 'Related image of Asturias',
     source: 'Source',
-  },
-
-  privacy: {
-    notice: 'Your questions are processed with artificial intelligence to give you the best answers about Asturias. We do not store your conversations.',
+    privacy_notice: 'Your questions are processed with artificial intelligence to give you the best answers about Asturias. We do not store your conversations.',
+    understood: 'Got it',
   },
 
   stories: {
-    askAbout: 'Ask about this',
-    noStoriesWithFilters: 'No stories match these filters',
-    clearFilters: 'Clear filters',
-    exploreStories: 'Explore stories',
-    alsoInteresting: 'You might also like',
-    relatedStories: 'Related stories',
-    newBadge: 'New',
+    ambient_off: 'Turn off ambient mode',
+    ambient_on: 'Ambient mode',
+    ambient: 'Ambient',
+    surprise: 'Surprise',
+    related: 'You might also like',
+    no_results: 'No stories match these filters',
+    new_badge: 'New',
+    filters: {
+      title: 'Filters',
+      category: 'Category',
+      location: 'Location',
+      duration: 'Duration',
+      clear: 'Clear filters',
+    },
   },
 
-  filters: {
-    filters: 'Filters',
-    category: 'Category',
-    location: 'Location',
-    zone: 'Zone',
-    duration: 'Duration',
-    clearFilters: 'Clear filters',
+  nav: {
+    navigate: 'navigate',
+    show_hide: 'show/hide',
+    space: 'space',
+    next: 'next',
   },
 
-  categories: {
-    nature: 'Nature',
-    cities: 'Cities',
-    food: 'Gastronomy',
-    culture: 'Culture',
-    activities: 'Activities',
-  },
-
-  locations: {
-    eastern: 'Eastern Asturias',
-    central: 'Central Asturias',
-    western: 'Western Asturias',
-  },
-
-  durations: {
-    'day-trip': 'Day trip',
-    weekend: 'Weekend',
-    week: 'One week',
+  share: {
+    share: 'Share',
+    link_copied: 'Link copied',
   },
 
   favorites: {
+    remove_saved: 'Remove from saved',
+    add_saved: 'Add to saved',
+    remove: 'Remove from favorites',
+    add: 'Add to favorites',
     saved: 'Saved',
     save: 'Save',
-    addToFavorites: 'Add to favorites',
-    removeFromFavorites: 'Remove from favorites',
-    addToSaved: 'Add to saved',
-    removeFromSaved: 'Remove from saved',
-    noFavoritesYet: 'No saved stories yet',
-    noFavoritesDescription: 'Explore the stories of Asturias and save the ones you like to view later.',
-    placeCount: '{count} {count, plural, one {place} other {places}}',
-    place: 'place',
-    places: 'places',
-    seenAll: 'You have seen all your saved stories',
-    syncFavorites: 'Sync your favorites',
-    syncDescription: 'Sign in to save your favorites to the cloud and access them from any device.',
-    maybeLater: 'Maybe later',
+    title: 'Saved',
+    place_singular: 'place',
+    place_plural: 'places',
+    local_only: 'Your saved stories are only on this device',
+    local_only_description: 'If you clear browser data or switch devices, you\'ll lose them.',
+    sync_with_google: 'Sync with Google',
+    empty_title: 'No saved stories yet',
+    empty_description: 'Explore the stories of Asturias and save the ones you like to view later.',
+    explore: 'Explore stories',
+    loading_more: 'Loading more...',
+    all_viewed: 'You have seen all your saved stories',
+    remove_from_saved: 'Remove from saved',
+  },
+
+  accessibility: {
+    related_stories: 'Related stories',
+    language_switcher: 'Language switcher',
+  },
+
+  auth: {
+    user: 'User',
+    sign_out: 'Sign out',
+    sign_in: 'Sign in',
+    sync_favorites_title: 'Sync your favorites',
+    sync_favorites_description: 'Sign in to save your favorites to the cloud and access them from any device.',
+    continue_with_google: 'Continue with Google',
+    maybe_later: 'Maybe later',
   },
 
   mood: {
@@ -101,24 +92,7 @@ export const en: Translations = {
     adventurous: 'Adventurous',
     cultural: 'Cultural',
     delicious: 'Delicious',
-  },
-
-  controls: {
-    share: 'Share',
-    surprise: 'Surprise',
-    ambientModeOn: 'Turn off ambient mode',
-    ambientModeOff: 'Ambient mode',
-    ambient: 'Ambient',
-    navigate: 'navigate',
-    showHide: 'show/hide',
-    next: 'next',
-  },
-
-  auth: {
-    signIn: 'Sign in',
-    signOut: 'Sign out',
-    continueWithGoogle: 'Continue with Google',
-    user: 'User',
+    show_all: 'Show all',
   },
 
   admin: {
@@ -187,9 +161,5 @@ export const en: Translations = {
       sessions: 'sessions',
       noAnalytics: 'No analytics events recorded in this date range.',
     },
-  },
-
-  keyboard: {
-    space: 'space',
   },
 };

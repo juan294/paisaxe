@@ -5,9 +5,9 @@ import Image from "next/image";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Play, Pause, Bookmark } from "lucide-react";
+import { BookmarkButton } from "./bookmark-button";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import { AuthButton } from "@/components/auth/auth-button";
-import { SignInPrompt } from "@/components/auth/sign-in-prompt";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useAnalytics } from "@/hooks/use-analytics";
@@ -72,8 +72,6 @@ export function StoryViewer({
   const {
     isFavorite,
     toggleFavorite,
-    showSignInPrompt,
-    dismissSignInPrompt,
   } = useFavorites();
 
   const story = stories[currentIndex];
@@ -384,9 +382,6 @@ export function StoryViewer({
         </div>
       </div>
 
-      {/* Sign-in prompt modal */}
-      <SignInPrompt open={showSignInPrompt} onClose={dismissSignInPrompt} />
-
       {/* Navigation arrows */}
       <button
         onClick={(e) => {
@@ -472,21 +467,10 @@ export function StoryViewer({
         {/* Share button */}
         {isEnabled("story_sharing") && <ShareButton story={story} />}
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleFavorite(story.id);
-          }}
-          className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-          title={isFavorite(story.id) ? t("favorites.remove_saved") : t("favorites.add_saved")}
-        >
-          <Bookmark
-            className={cn(
-              "h-5 w-5 text-white transition-all",
-              isFavorite(story.id) && "fill-white"
-            )}
-          />
-        </button>
+        <BookmarkButton
+          isFavorite={isFavorite(story.id)}
+          onToggle={() => toggleFavorite(story.id)}
+        />
         <AuthButton />
       </div>
 

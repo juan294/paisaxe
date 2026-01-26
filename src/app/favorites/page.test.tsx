@@ -44,6 +44,14 @@ vi.mock("next/link", () => ({
   }),
 }));
 
+// Mock useAuth hook
+const mockSignInWithGoogle = vi.fn();
+const mockUseAuth = vi.fn();
+
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 // Mock useFavorites hook
 const mockToggleFavorite = vi.fn();
 const mockUseFavorites = vi.fn();
@@ -86,6 +94,13 @@ vi.mock("@/hooks/use-stories", () => ({
 describe("FavoritesPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      user: null,
+      session: null,
+      isLoading: false,
+      signInWithGoogle: mockSignInWithGoogle,
+      signOut: vi.fn(),
+    });
     mockUseFavorites.mockReturnValue({
       favorites: [],
       toggleFavorite: mockToggleFavorite,
@@ -329,6 +344,76 @@ describe("FavoritesPage", () => {
         expect(screen.getByText("Catedral de Oviedo")).toBeInTheDocument();
         expect(screen.getByText("Playa del Silencio")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("sync banner", () => {
+    it("should show sync banner when user is not logged in and has favorites", async () => {
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.local_only"))).toBeInTheDocument();
+        expect(screen.getByText(mockT("favorites.local_only_description"))).toBeInTheDocument();
+        expect(screen.getByText(mockT("favorites.sync_with_google"))).toBeInTheDocument();
+      });
+    });
+
+    it("should not show sync banner when user is logged in", async () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-1", email: "test@test.com" },
+        session: { access_token: "test-token" },
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: vi.fn(),
+      });
+
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(mockT("favorites.local_only"))).not.toBeInTheDocument();
+    });
+
+    it("should not show sync banner when user has no favorites", async () => {
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.empty_title"))).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(mockT("favorites.local_only"))).not.toBeInTheDocument();
+    });
+
+    it("should call signInWithGoogle when clicking sync button", async () => {
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.sync_with_google"))).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText(mockT("favorites.sync_with_google")));
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
     });
   });
 });
