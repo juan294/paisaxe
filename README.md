@@ -1,5 +1,12 @@
 # Paisaxe - Asturias Tourism Guide
 
+[![CI](https://github.com/juan294/paisaxe/actions/workflows/ci.yml/badge.svg)](https://github.com/juan294/paisaxe/actions/workflows/ci.yml)
+[![Security Scan](https://github.com/juan294/paisaxe/actions/workflows/security.yml/badge.svg)](https://github.com/juan294/paisaxe/actions/workflows/security.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green)](https://nodejs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **[paisaxe.es](https://paisaxe.es)**
 
 An AI-powered tourism guide for Asturias, Spain. Experience the region through immersive visual stories and ask questions in natural language to discover hidden gems, local gastronomy, hiking routes, and more.
