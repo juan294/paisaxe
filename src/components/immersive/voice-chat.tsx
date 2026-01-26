@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Story } from "@/types/immersive";
+import { ImageResult } from "@/types";
 import { cn } from "@/lib/utils";
 import { Mic, MicOff, X, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ interface VoiceChatProps {
 interface Message {
   role: "user" | "assistant";
   content: string;
+  images?: ImageResult[];
 }
 
 export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatProps) {
@@ -127,6 +129,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         {
           role: "assistant",
           content: data.message || "Lo siento, no pude procesar tu pregunta.",
+          images: data.images,
         },
       ]);
     } catch {
@@ -196,6 +199,29 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
               )}
             >
               {msg.content}
+              {msg.images && msg.images.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  {msg.images.map((image) => (
+                    <figure key={image.id} className="overflow-hidden rounded-xl">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={image.path}
+                        alt={image.caption || "Imagen relacionada de Asturias"}
+                        className="w-full rounded-xl object-cover"
+                        loading="lazy"
+                      />
+                      {image.caption && (
+                        <figcaption className="mt-1.5 text-xs text-white/70">
+                          {image.caption}
+                        </figcaption>
+                      )}
+                      <p className="mt-0.5 text-xs text-white/40">
+                        Fuente: {image.sourcePdf}
+                      </p>
+                    </figure>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {isLoading && (
