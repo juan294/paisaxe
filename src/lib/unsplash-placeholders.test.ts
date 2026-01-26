@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isPlaceholderImage,
+  isOldUnsplashPlaceholder,
   getPlaceholderForStory,
   PLACEHOLDER_PREFIX,
   UNSPLASH_POOLS,
@@ -91,6 +92,76 @@ describe("unsplash-placeholders", () => {
     it("should return false when imageSource is a regular attribution", () => {
       expect(
         isPlaceholderImage({ imageSource: "Turismo de Asturias" })
+      ).toBe(false);
+    });
+  });
+
+  describe("isOldUnsplashPlaceholder", () => {
+    it("should return true for old-style Unsplash URL without prefix in imageSource", () => {
+      expect(
+        isOldUnsplashPlaceholder({
+          image: "https://images.unsplash.com/photo-123?w=1920",
+        })
+      ).toBe(true);
+    });
+
+    it("should return true when imageSource is undefined", () => {
+      expect(
+        isOldUnsplashPlaceholder({
+          image: "https://images.unsplash.com/photo-456?w=1920",
+          imageSource: undefined,
+        })
+      ).toBe(true);
+    });
+
+    it("should return true when imageSource is empty", () => {
+      expect(
+        isOldUnsplashPlaceholder({
+          image: "https://images.unsplash.com/photo-789?w=1920",
+          imageSource: "",
+        })
+      ).toBe(true);
+    });
+
+    it("should return true when imageSource is a non-placeholder attribution", () => {
+      expect(
+        isOldUnsplashPlaceholder({
+          image: "https://images.unsplash.com/photo-789?w=1920",
+          imageSource: "Some random source",
+        })
+      ).toBe(true);
+    });
+
+    it("should return false when imageSource has the new placeholder prefix", () => {
+      expect(
+        isOldUnsplashPlaceholder({
+          image: "https://images.unsplash.com/photo-123?w=1920",
+          imageSource: `${PLACEHOLDER_PREFIX}Photo by Author on Unsplash`,
+        })
+      ).toBe(false);
+    });
+
+    it("should return false for local image paths", () => {
+      expect(
+        isOldUnsplashPlaceholder({
+          image: "/images/stories/lagos-covadonga.png",
+        })
+      ).toBe(false);
+    });
+
+    it("should return false for empty image", () => {
+      expect(isOldUnsplashPlaceholder({ image: "" })).toBe(false);
+    });
+
+    it("should return false for undefined image", () => {
+      expect(isOldUnsplashPlaceholder({})).toBe(false);
+    });
+
+    it("should return false for non-Unsplash external URLs", () => {
+      expect(
+        isOldUnsplashPlaceholder({
+          image: "https://example.com/photo.jpg",
+        })
       ).toBe(false);
     });
   });

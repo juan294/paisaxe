@@ -90,6 +90,18 @@ export function isPlaceholderImage(story: { imageSource?: string }): boolean {
 }
 
 /**
+ * Detect old-style Unsplash placeholder images — ones that point to
+ * `images.unsplash.com` but were NOT assigned by the new curated system
+ * (i.e. their `imageSource` does NOT start with the placeholder prefix).
+ */
+export function isOldUnsplashPlaceholder(story: { image?: string; imageSource?: string }): boolean {
+  if (!story.image) return false;
+  const isUnsplash = story.image.startsWith("https://images.unsplash.com/");
+  const hasNewPrefix = !!story.imageSource && story.imageSource.startsWith(PLACEHOLDER_PREFIX);
+  return isUnsplash && !hasNewPrefix;
+}
+
+/**
  * Deterministically select a placeholder image for a story based on
  * its slug and category. The same slug+category always yields the
  * same image so cards look stable across reloads.
