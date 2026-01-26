@@ -2,6 +2,7 @@
 
 import { Share2 } from "lucide-react";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { useTranslation } from "@/lib/i18n";
 import type { Story } from "@/types/immersive";
 
 interface ShareButtonProps {
@@ -10,6 +11,7 @@ interface ShareButtonProps {
 
 export function ShareButton({ story }: ShareButtonProps) {
   const { trackEvent } = useAnalytics();
+  const { t } = useTranslation();
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -46,7 +48,7 @@ export function ShareButton({ story }: ShareButtonProps) {
     <button
       onClick={handleShare}
       className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-      title="Compartir"
+      title={t("share.share")}
     >
       <Share2 className="h-5 w-5 text-white" />
     </button>

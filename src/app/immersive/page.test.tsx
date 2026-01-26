@@ -3,6 +3,17 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ImmersivePage from "./page";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ReactNode } from "react";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 // Mock Supabase browser client
 vi.mock("@/lib/supabase-browser", () => ({
@@ -87,7 +98,7 @@ describe("ImmersivePage", () => {
   // Helper to wait for loading to complete
   const waitForLoaded = async () => {
     await waitFor(() => {
-      expect(screen.queryByText("Loading stories...")).not.toBeInTheDocument();
+      expect(screen.queryByText("Cargando...")).not.toBeInTheDocument();
     });
   };
 
@@ -219,18 +230,18 @@ describe("ImmersivePage", () => {
         fireEvent.click(cultureButton);
 
         await waitFor(() => {
-          expect(screen.getByText("No hay historias con estos filtros")).toBeInTheDocument();
+          expect(screen.getByText(mockT("stories.no_results"))).toBeInTheDocument();
         });
 
         // Should show clear filters button
-        const clearButton = screen.getByText("Limpiar filtros");
+        const clearButton = screen.getByText(mockT("stories.filters.clear"));
         expect(clearButton).toBeInTheDocument();
 
         // Click clear filters
         fireEvent.click(clearButton);
 
         await waitFor(() => {
-          expect(screen.queryByText("No hay historias con estos filtros")).not.toBeInTheDocument();
+          expect(screen.queryByText(mockT("stories.no_results"))).not.toBeInTheDocument();
         });
       }
     });

@@ -18,7 +18,9 @@ import { SurpriseMeButton } from "./surprise-me-button";
 import { FreshnessBadge } from "./freshness-badge";
 import { ShareButton } from "./share-button";
 import { AmbientIndicator } from "./ambient-indicator";
+import { LanguageSwitcher } from "./language-switcher";
 import { getLabel } from "@/lib/asturianu";
+import { useTranslation } from "@/lib/i18n";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -65,6 +67,7 @@ export function StoryViewer({
 
   const { isEnabled } = useFeatureFlags();
   const { trackEvent } = useAnalytics();
+  const { t } = useTranslation();
 
   const {
     isFavorite,
@@ -413,8 +416,11 @@ export function StoryViewer({
         <ChevronRight className="h-8 w-8 text-white" />
       </button>
 
-      {/* Top-right controls: Auth + Auto-play + Share + Surprise + Favorites */}
+      {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}
       <div className="absolute top-16 right-6 z-20 flex items-center gap-3">
+        {/* Language Switcher */}
+        <LanguageSwitcher />
+
         {/* Ambient mode indicator */}
         {isAmbient && <AmbientIndicator />}
 
@@ -429,7 +435,7 @@ export function StoryViewer({
               "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all",
               ambientMode && "ring-1 ring-white/30"
             )}
-            title={ambientMode ? "Desactivar modo ambiente" : "Modo ambiente"}
+            title={ambientMode ? t("stories.ambient_off") : t("stories.ambient_on")}
           >
             {autoPlay ? (
               <Pause className="h-5 w-5 text-white" />
@@ -472,7 +478,7 @@ export function StoryViewer({
             toggleFavorite(story.id);
           }}
           className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-          title={isFavorite(story.id) ? "Quitar de guardados" : "Agregar a guardados"}
+          title={isFavorite(story.id) ? t("favorites.remove_saved") : t("favorites.add_saved")}
         >
           <Bookmark
             className={cn(
@@ -491,7 +497,7 @@ export function StoryViewer({
           showInfo ? "opacity-100" : "opacity-0"
         )}
       >
-        ← → {getLabel("navigate", ast)} · i {getLabel("show_hide", ast)} · espacio {getLabel("next", ast)}
+        ← → {t("nav.navigate")} · i {t("nav.show_hide")} · {t("nav.space")} {t("nav.next")}
       </div>
     </div>
   );

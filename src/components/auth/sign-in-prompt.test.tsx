@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { SignInPrompt } from "./sign-in-prompt";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 // Mock the useAuth hook
 const mockSignInWithGoogle = vi.fn();
@@ -25,13 +36,13 @@ describe("SignInPrompt", () => {
     it("should not render when open is false", () => {
       render(<SignInPrompt open={false} onClose={defaultProps.onClose} />);
 
-      expect(screen.queryByText("Sincroniza tus favoritos")).not.toBeInTheDocument();
+      expect(screen.queryByText(mockT("auth.sync_favorites_title"))).not.toBeInTheDocument();
     });
 
     it("should render when open is true", () => {
       render(<SignInPrompt {...defaultProps} />);
 
-      expect(screen.getByText("Sincroniza tus favoritos")).toBeInTheDocument();
+      expect(screen.getByText(mockT("auth.sync_favorites_title"))).toBeInTheDocument();
     });
   });
 
@@ -39,25 +50,25 @@ describe("SignInPrompt", () => {
     it("should display title", () => {
       render(<SignInPrompt {...defaultProps} />);
 
-      expect(screen.getByText("Sincroniza tus favoritos")).toBeInTheDocument();
+      expect(screen.getByText(mockT("auth.sync_favorites_title"))).toBeInTheDocument();
     });
 
     it("should display description", () => {
       render(<SignInPrompt {...defaultProps} />);
 
-      expect(screen.getByText(/Inicia sesion para guardar tus favoritos/)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(mockT("auth.sync_favorites_description").slice(0, 30)))).toBeInTheDocument();
     });
 
     it("should display Google sign in button", () => {
       render(<SignInPrompt {...defaultProps} />);
 
-      expect(screen.getByText("Continuar con Google")).toBeInTheDocument();
+      expect(screen.getByText(mockT("auth.continue_with_google"))).toBeInTheDocument();
     });
 
     it("should display dismiss button", () => {
       render(<SignInPrompt {...defaultProps} />);
 
-      expect(screen.getByText("Quiza mas tarde")).toBeInTheDocument();
+      expect(screen.getByText(mockT("auth.maybe_later"))).toBeInTheDocument();
     });
   });
 
@@ -65,7 +76,7 @@ describe("SignInPrompt", () => {
     it("should call signInWithGoogle and onClose when clicking Google button", () => {
       render(<SignInPrompt {...defaultProps} />);
 
-      fireEvent.click(screen.getByText("Continuar con Google"));
+      fireEvent.click(screen.getByText(mockT("auth.continue_with_google")));
 
       expect(mockSignInWithGoogle).toHaveBeenCalled();
       expect(defaultProps.onClose).toHaveBeenCalled();
@@ -74,7 +85,7 @@ describe("SignInPrompt", () => {
     it("should call onClose when clicking dismiss button", () => {
       render(<SignInPrompt {...defaultProps} />);
 
-      fireEvent.click(screen.getByText("Quiza mas tarde"));
+      fireEvent.click(screen.getByText(mockT("auth.maybe_later")));
 
       expect(defaultProps.onClose).toHaveBeenCalled();
     });
@@ -93,7 +104,7 @@ describe("SignInPrompt", () => {
     it("should not close when clicking modal content", () => {
       render(<SignInPrompt {...defaultProps} />);
 
-      const modalContent = screen.getByText("Sincroniza tus favoritos").closest("div");
+      const modalContent = screen.getByText(mockT("auth.sync_favorites_title")).closest("div");
       if (modalContent) {
         fireEvent.click(modalContent);
       }
@@ -105,7 +116,7 @@ describe("SignInPrompt", () => {
     it("should call onClose when clicking close button", () => {
       render(<SignInPrompt {...defaultProps} />);
 
-      const closeButton = screen.getByLabelText("Cerrar");
+      const closeButton = screen.getByLabelText(mockT("common.close"));
       fireEvent.click(closeButton);
 
       expect(defaultProps.onClose).toHaveBeenCalled();

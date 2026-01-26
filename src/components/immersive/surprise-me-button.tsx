@@ -2,6 +2,7 @@
 
 import { Shuffle } from "lucide-react";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { useTranslation } from "@/lib/i18n";
 
 interface SurpriseMeButtonProps {
   totalStories: number;
@@ -17,6 +18,7 @@ export function SurpriseMeButton({
   onJumpTo,
 }: SurpriseMeButtonProps) {
   const { trackEvent } = useAnalytics();
+  const { t } = useTranslation();
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -51,7 +53,7 @@ export function SurpriseMeButton({
     <button
       onClick={handleClick}
       className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-      title="Sorpresa"
+      title={t("stories.surprise")}
     >
       <Shuffle className="h-5 w-5 text-white" />
     </button>
