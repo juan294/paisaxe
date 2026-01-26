@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
-import { useFavorites } from "./use-favorites";
+import { renderHook, waitFor, act } from "@testing-library/react";
+
+// Mutable auth mock reference
+const mockAuthReturn: { user: Record<string, unknown> | null; session: Record<string, unknown> | null } = {
+  user: null,
+  session: null,
+};
+
+// Mock useAuth hook with mutable return
+vi.mock("./use-auth", () => ({
+  useAuth: () => mockAuthReturn,
+}));
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -16,26 +26,29 @@ const localStorageMock = (() => {
     clear: vi.fn(() => {
       store = {};
     }),
+    _getStore: () => store,
   };
 })();
 
 Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
 // Mock fetch
-global.fetch = vi.fn();
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
-// Mock useAuth hook
-vi.mock("./use-auth", () => ({
-  useAuth: () => ({
-    user: null,
-    session: null,
-  }),
-}));
+import { useFavorites } from "./use-favorites";
 
 describe("useFavorites", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
+    // Restore getItem implementation after any mockReturnValue overrides
+    localStorageMock.getItem.mockImplementation(
+      (key: string) => localStorageMock._getStore()[key] || null
+    );
+    mockAuthReturn.user = null;
+    mockAuthReturn.session = null;
+    mockFetch.mockReset();
   });
 
   describe("initialization", () => {
@@ -50,7 +63,9 @@ describe("useFavorites", () => {
     });
 
     it("should load favorites from localStorage on mount", async () => {
-      localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1", "story-2"]));
+      localStorageMock.getItem.mockReturnValue(
+        JSON.stringify(["story-1", "story-2"])
+      );
 
       const { result } = renderHook(() => useFavorites());
 
@@ -74,7 +89,9 @@ describe("useFavorites", () => {
     });
 
     it("should handle non-array values in localStorage", async () => {
-      localStorageMock.getItem.mockReturnValue(JSON.stringify({ not: "an array" }));
+      localStorageMock.getItem.mockReturnValue(
+        JSON.stringify({ not: "an array" })
+      );
 
       const { result } = renderHook(() => useFavorites());
 
@@ -125,6 +142,501 @@ describe("useFavorites", () => {
       });
 
       expect(result.current.showSignInPrompt).toBe(false);
+    });
+  });
+
+  describe("toggleFavorite", () => {
+    it("should add a story to favorites and save to localStorage", async () => {
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      expect(result.current.favorites).toEqual(["story-1"]);
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        "paisaxe_favorites",
+        JSON.stringify(["story-1"])
+      );
+    });
+
+    it("should remove a story from favorites", async () => {
+      localStorageMock.getItem.mockReturnValue(
+        JSON.stringify(["story-1", "story-2"])
+      );
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.favorites).toEqual(["story-1", "story-2"]);
+
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      expect(result.current.favorites).toEqual(["story-2"]);
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        "paisaxe_favorites",
+        JSON.stringify(["story-2"])
+      );
+    });
+
+    it("should show sign-in prompt on first favorite when not logged in", async () => {
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.showSignInPrompt).toBe(false);
+
+      // Call toggleFavorite
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      expect(result.current.showSignInPrompt).toBe(true);
+    });
+
+    it("should not show prompt again after first time", async () => {
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // First toggle shows prompt
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      expect(result.current.showSignInPrompt).toBe(true);
+
+      // Dismiss it
+      act(() => {
+        result.current.dismissSignInPrompt();
+      });
+
+      expect(result.current.showSignInPrompt).toBe(false);
+
+      // Second toggle should NOT show prompt again
+      await act(async () => {
+        await result.current.toggleFavorite("story-2");
+      });
+
+      expect(result.current.favorites).toContain("story-2");
+      expect(result.current.showSignInPrompt).toBe(false);
+    });
+
+    it("should not show sign-in prompt when removing a favorite", async () => {
+      localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // Removing (not adding) should not trigger sign-in prompt
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+      expect(result.current.showSignInPrompt).toBe(false);
+    });
+  });
+
+  describe("dismissSignInPrompt", () => {
+    it("should set showSignInPrompt to false", async () => {
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // Trigger prompt first
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      expect(result.current.showSignInPrompt).toBe(true);
+
+      // Dismiss it
+      act(() => {
+        result.current.dismissSignInPrompt();
+      });
+
+      expect(result.current.showSignInPrompt).toBe(false);
+    });
+  });
+
+  describe("cloud sync on toggleFavorite (logged in)", () => {
+    beforeEach(() => {
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+    });
+
+    it("should POST to /api/favorites when adding a favorite", async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
+
+      const { result } = renderHook(() => useFavorites());
+
+      // Wait for cloud sync effect to settle
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      // Find the POST call for toggling (not cloud sync)
+      const postCalls = mockFetch.mock.calls.filter(
+        (call: unknown[]) => (call[1] as Record<string, unknown>)?.method === "POST"
+      );
+      const togglePostCall = postCalls.find((call: unknown[]) => {
+        try {
+          const body = JSON.parse((call[1] as Record<string, string>)?.body);
+          return (
+            body.storyIds &&
+            body.storyIds.length === 1 &&
+            body.storyIds[0] === "story-1"
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      expect(togglePostCall).toBeDefined();
+      expect(togglePostCall![0]).toBe("/api/favorites");
+      expect(togglePostCall![1] as Record<string, unknown>).toEqual(
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            Authorization: "Bearer test-token",
+            "Content-Type": "application/json",
+          }),
+        })
+      );
+    });
+
+    it("should DELETE from /api/favorites when removing a favorite", async () => {
+      // The cloud sync GET returns story-1 so it's in favorites
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          return { ok: true, json: async () => ["story-1"] };
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+
+      localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // story-1 should now be in favorites (from cloud merge or local)
+      await waitFor(() => {
+        expect(result.current.favorites).toContain("story-1");
+      });
+
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      const deleteCalls = mockFetch.mock.calls.filter(
+        (call: unknown[]) => (call[1] as Record<string, unknown>)?.method === "DELETE"
+      );
+      expect(deleteCalls.length).toBeGreaterThanOrEqual(1);
+
+      const deleteCall = deleteCalls[0];
+      expect(deleteCall[0]).toBe("/api/favorites?storyId=story-1");
+      expect(deleteCall[1]).toEqual(
+        expect.objectContaining({
+          method: "DELETE",
+          headers: expect.objectContaining({
+            Authorization: "Bearer test-token",
+          }),
+        })
+      );
+    });
+
+    it("should not show sign-in prompt when logged in", async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      // user is logged in, so prompt should not show
+      expect(result.current.showSignInPrompt).toBe(false);
+    });
+
+    it("should handle cloud sync fetch error gracefully on toggle", async () => {
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      let cloudSyncDone = false;
+
+      // Cloud sync GET succeeds, but toggle POST fails
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          return { ok: true, json: async () => [] };
+        }
+        // Only throw for POST/DELETE (toggle sync)
+        if (cloudSyncDone) {
+          throw new Error("Network error");
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // Now make subsequent POST calls fail
+      cloudSyncDone = true;
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          return { ok: true, json: async () => [] };
+        }
+        throw new Error("Network error");
+      });
+
+      // Should not throw
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      // Favorite should still be added locally even if cloud fails
+      expect(result.current.favorites).toContain("story-1");
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error syncing favorite to cloud:",
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("cloud sync on login", () => {
+    it("should merge local and cloud favorites when user logs in", async () => {
+      // Local has story-1, cloud has story-2
+      localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
+
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          // Cloud returns story-2
+          return { ok: true, json: async () => ["story-2"] };
+        }
+        // POST for uploading new local favorites
+        return { ok: true, json: async () => ({}) };
+      });
+
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // Should have merged favorites
+      await waitFor(() => {
+        expect(result.current.favorites).toContain("story-1");
+        expect(result.current.favorites).toContain("story-2");
+      });
+    });
+
+    it("should upload new local favorites to cloud", async () => {
+      localStorageMock.getItem.mockReturnValue(
+        JSON.stringify(["story-1", "story-3"])
+      );
+
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          // Cloud only has story-1; story-3 is new to cloud
+          return { ok: true, json: async () => ["story-1"] };
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // Wait for sync to complete
+      await waitFor(() => {
+        const postCalls = mockFetch.mock.calls.filter(
+          (call: unknown[]) => (call[1] as Record<string, unknown>)?.method === "POST"
+        );
+        expect(postCalls.length).toBeGreaterThanOrEqual(1);
+      });
+
+      // Should have uploaded story-3 (local-only) to cloud
+      const postCalls = mockFetch.mock.calls.filter(
+        (call: unknown[]) => (call[1] as Record<string, unknown>)?.method === "POST"
+      );
+      const uploadCall = postCalls.find((call: unknown[]) => {
+        try {
+          const body = JSON.parse((call[1] as Record<string, string>)?.body);
+          return body.storyIds && body.storyIds.includes("story-3");
+        } catch {
+          return false;
+        }
+      });
+      expect(uploadCall).toBeDefined();
+    });
+
+    it("should not upload to cloud if no new local favorites", async () => {
+      localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
+
+      mockFetch.mockImplementation(async () => {
+        return { ok: true, json: async () => ["story-1"] };
+      });
+
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // Wait a tick for async operations to settle
+      await waitFor(() => {
+        expect(result.current.favorites).toContain("story-1");
+      });
+
+      // No POST calls should have been made since all local favorites exist in cloud
+      const postCalls = mockFetch.mock.calls.filter(
+        (call: unknown[]) => (call[1] as Record<string, unknown>)?.method === "POST"
+      );
+      expect(postCalls).toHaveLength(0);
+    });
+
+    it("should handle cloud sync fetch error gracefully", async () => {
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      mockFetch.mockRejectedValue(new Error("Network error"));
+
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error syncing favorites:",
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle non-ok response from cloud fetch", async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 500 });
+
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // Should not crash - just skip the merge
+      expect(result.current.favorites).toBeDefined();
+    });
+
+    it("should save merged favorites to localStorage", async () => {
+      localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
+
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          return { ok: true, json: async () => ["story-2"] };
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await waitFor(() => {
+        expect(result.current.favorites.length).toBe(2);
+      });
+
+      // localStorage should be updated with merged favorites
+      const setItemCalls = localStorageMock.setItem.mock.calls.filter(
+        (call: unknown[]) => call[0] === "paisaxe_favorites"
+      );
+      const lastCall = setItemCalls[setItemCalls.length - 1];
+      const savedFavorites = JSON.parse(lastCall[1]);
+      expect(savedFavorites).toContain("story-1");
+      expect(savedFavorites).toContain("story-2");
+    });
+
+    it("should set isLoading during cloud sync", async () => {
+      let resolveCloudFetch: (value: unknown) => void;
+      const cloudFetchPromise = new Promise((resolve) => {
+        resolveCloudFetch = resolve;
+      });
+
+      mockFetch.mockImplementation(async () => {
+        return cloudFetchPromise;
+      });
+
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
+      const { result } = renderHook(() => useFavorites());
+
+      // While cloud fetch is in progress, should be loading
+      // (After initial localStorage load it sets isLoading=false, but then cloud sync sets it back to true)
+      // Resolve the cloud fetch
+      await act(async () => {
+        resolveCloudFetch!({ ok: true, json: async () => [] });
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
     });
   });
 });

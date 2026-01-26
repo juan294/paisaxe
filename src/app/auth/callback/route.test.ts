@@ -79,5 +79,32 @@ describe("Auth Callback Route", () => {
       expect(response.status).toBe(307);
       expect(response.headers.get("location")).toContain("/immersive");
     });
+
+    it("should redirect to /immersive (not /immersive prefixed path) when no code and no next param", async () => {
+      const request = createRequest({});
+      const response = await GET(request);
+
+      expect(response.status).toBe(307);
+      // Should redirect to exactly /immersive (the fallback)
+      const location = response.headers.get("location") || "";
+      expect(location).toBe("http://localhost:3000/immersive");
+      expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    });
+
+    it("should call createServerClient when code is present", async () => {
+      const { createServerClient } = await import("@supabase/ssr");
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({ code: "some-code" });
+      await GET(request);
+
+      expect(createServerClient).toHaveBeenCalled();
+    });
   });
+
+  // Note: Lines 20-21 (getAll) and 22-31 (setAll try/catch) are internal cookie
+  // plumbing passed as callbacks to createServerClient. Since createServerClient
+  // is fully mocked, these callbacks are never invoked in unit tests. This is
+  // expected and acceptable -- the Supabase SSR cookie integration is covered
+  // by the library's own tests and by E2E/integration testing.
 });

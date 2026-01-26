@@ -83,6 +83,27 @@ describe("Favorites API", () => {
       expect(response.status).toBe(401);
     });
 
+    it("should return 401 when getUser returns an error", async () => {
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: null },
+            error: { message: "Token expired" },
+          }),
+        },
+        from: vi.fn(),
+      } as never);
+
+      const request = createRequest("GET", {
+        headers: { Authorization: "Bearer expired-token" },
+      });
+      const response = await GET(request);
+
+      expect(response.status).toBe(401);
+      const json = await response.json();
+      expect(json.error).toBe("Unauthorized");
+    });
+
     it("should return favorites when authenticated", async () => {
       const mockFavorites = [
         { story_id: "story-1" },
