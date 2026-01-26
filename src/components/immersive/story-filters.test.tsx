@@ -2,6 +2,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { StoryFilters } from "./story-filters";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
+import {
+  CATEGORY_LABELS,
+  LOCATION_LABELS,
+  DURATION_LABELS,
+} from "@/types/immersive";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 describe("StoryFilters", () => {
   const defaultProps = {
@@ -21,73 +37,73 @@ describe("StoryFilters", () => {
   describe("rendering", () => {
     it("should render filter toggle button", () => {
       render(<StoryFilters {...defaultProps} />);
-      expect(screen.getByRole("button", { name: /filtros/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") })).toBeInTheDocument();
     });
 
     it("should show filter panel when toggle is clicked", () => {
       render(<StoryFilters {...defaultProps} />);
 
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      expect(screen.getByText("Naturaleza")).toBeInTheDocument();
-      expect(screen.getByText("Ciudades")).toBeInTheDocument();
-      expect(screen.getByText("Gastronomía")).toBeInTheDocument();
+      expect(screen.getByText(CATEGORY_LABELS.nature)).toBeInTheDocument();
+      expect(screen.getByText(CATEGORY_LABELS.cities)).toBeInTheDocument();
+      expect(screen.getByText(CATEGORY_LABELS.food)).toBeInTheDocument();
     });
 
     it("should render all category options", () => {
       render(<StoryFilters {...defaultProps} />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      expect(screen.getByText("Naturaleza")).toBeInTheDocument();
-      expect(screen.getByText("Ciudades")).toBeInTheDocument();
-      expect(screen.getByText("Gastronomía")).toBeInTheDocument();
-      expect(screen.getByText("Cultura")).toBeInTheDocument();
-      expect(screen.getByText("Actividades")).toBeInTheDocument();
+      expect(screen.getByText(CATEGORY_LABELS.nature)).toBeInTheDocument();
+      expect(screen.getByText(CATEGORY_LABELS.cities)).toBeInTheDocument();
+      expect(screen.getByText(CATEGORY_LABELS.food)).toBeInTheDocument();
+      expect(screen.getByText(CATEGORY_LABELS.culture)).toBeInTheDocument();
+      expect(screen.getByText(CATEGORY_LABELS.activities)).toBeInTheDocument();
     });
 
     it("should render all location options", () => {
       render(<StoryFilters {...defaultProps} />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      expect(screen.getByText("Asturias Oriental")).toBeInTheDocument();
-      expect(screen.getByText("Asturias Central")).toBeInTheDocument();
-      expect(screen.getByText("Asturias Occidental")).toBeInTheDocument();
+      expect(screen.getByText(LOCATION_LABELS.eastern)).toBeInTheDocument();
+      expect(screen.getByText(LOCATION_LABELS.central)).toBeInTheDocument();
+      expect(screen.getByText(LOCATION_LABELS.western)).toBeInTheDocument();
     });
 
     it("should render all duration options", () => {
       render(<StoryFilters {...defaultProps} />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      expect(screen.getByText("Excursión de un día")).toBeInTheDocument();
-      expect(screen.getByText("Fin de semana")).toBeInTheDocument();
-      expect(screen.getByText("Una semana")).toBeInTheDocument();
+      expect(screen.getByText(DURATION_LABELS["day-trip"])).toBeInTheDocument();
+      expect(screen.getByText(DURATION_LABELS.weekend)).toBeInTheDocument();
+      expect(screen.getByText(DURATION_LABELS.week)).toBeInTheDocument();
     });
   });
 
   describe("category filtering", () => {
     it("should call onCategoryChange when category is selected", () => {
       render(<StoryFilters {...defaultProps} />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      fireEvent.click(screen.getByText("Naturaleza"));
+      fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
 
       expect(defaultProps.onCategoryChange).toHaveBeenCalledWith("nature");
     });
 
     it("should call onCategoryChange with null when same category is clicked again", () => {
       render(<StoryFilters {...defaultProps} selectedCategory="nature" />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      fireEvent.click(screen.getByText("Naturaleza"));
+      fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
 
       expect(defaultProps.onCategoryChange).toHaveBeenCalledWith(null);
     });
 
     it("should highlight selected category", () => {
       render(<StoryFilters {...defaultProps} selectedCategory="nature" />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      const natureButton = screen.getByText("Naturaleza").closest("button");
+      const natureButton = screen.getByText(CATEGORY_LABELS.nature).closest("button");
       expect(natureButton).toHaveAttribute("data-selected", "true");
     });
   });
@@ -95,18 +111,18 @@ describe("StoryFilters", () => {
   describe("location filtering", () => {
     it("should call onLocationChange when location is selected", () => {
       render(<StoryFilters {...defaultProps} />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      fireEvent.click(screen.getByText("Asturias Oriental"));
+      fireEvent.click(screen.getByText(LOCATION_LABELS.eastern));
 
       expect(defaultProps.onLocationChange).toHaveBeenCalledWith("eastern");
     });
 
     it("should call onLocationChange with null when same location is clicked again", () => {
       render(<StoryFilters {...defaultProps} selectedLocation="eastern" />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      fireEvent.click(screen.getByText("Asturias Oriental"));
+      fireEvent.click(screen.getByText(LOCATION_LABELS.eastern));
 
       expect(defaultProps.onLocationChange).toHaveBeenCalledWith(null);
     });
@@ -115,18 +131,18 @@ describe("StoryFilters", () => {
   describe("duration filtering", () => {
     it("should call onDurationChange when duration is selected", () => {
       render(<StoryFilters {...defaultProps} />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      fireEvent.click(screen.getByText("Fin de semana"));
+      fireEvent.click(screen.getByText(DURATION_LABELS.weekend));
 
       expect(defaultProps.onDurationChange).toHaveBeenCalledWith("weekend");
     });
 
     it("should call onDurationChange with null when same duration is clicked again", () => {
       render(<StoryFilters {...defaultProps} selectedDuration="weekend" />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      fireEvent.click(screen.getByText("Fin de semana"));
+      fireEvent.click(screen.getByText(DURATION_LABELS.weekend));
 
       expect(defaultProps.onDurationChange).toHaveBeenCalledWith(null);
     });
@@ -135,23 +151,23 @@ describe("StoryFilters", () => {
   describe("clear all filters", () => {
     it("should show clear button when any filter is active", () => {
       render(<StoryFilters {...defaultProps} selectedCategory="nature" />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      expect(screen.getByRole("button", { name: /limpiar/i })).toBeInTheDocument();
+      expect(screen.getByText(mockT("stories.filters.clear"))).toBeInTheDocument();
     });
 
     it("should not show clear button when no filters are active", () => {
       render(<StoryFilters {...defaultProps} />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      expect(screen.queryByRole("button", { name: /limpiar/i })).not.toBeInTheDocument();
+      expect(screen.queryByText(mockT("stories.filters.clear"))).not.toBeInTheDocument();
     });
 
     it("should call onClearAll when clear button is clicked", () => {
       render(<StoryFilters {...defaultProps} selectedCategory="nature" />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      fireEvent.click(screen.getByRole("button", { name: /limpiar/i }));
+      fireEvent.click(screen.getByText(mockT("stories.filters.clear")));
 
       expect(defaultProps.onClearAll).toHaveBeenCalled();
     });
@@ -174,11 +190,11 @@ describe("StoryFilters", () => {
   describe("accessibility", () => {
     it("should have accessible labels for filter groups", () => {
       render(<StoryFilters {...defaultProps} />);
-      fireEvent.click(screen.getByRole("button", { name: /filtros/i }));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
 
-      expect(screen.getByRole("group", { name: /categoría/i })).toBeInTheDocument();
-      expect(screen.getByRole("group", { name: /ubicación/i })).toBeInTheDocument();
-      expect(screen.getByRole("group", { name: /duración/i })).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: new RegExp(mockT("stories.filters.category"), "i") })).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: new RegExp(mockT("stories.filters.location"), "i") })).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: new RegExp(mockT("stories.filters.duration"), "i") })).toBeInTheDocument();
     });
   });
 });

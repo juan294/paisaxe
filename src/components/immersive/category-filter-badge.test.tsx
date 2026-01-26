@@ -7,6 +7,17 @@ import {
   LOCATION_LABELS,
   DURATION_LABELS,
 } from "@/types/immersive";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 // --- Mock framer-motion ---
 type MockProps = { children?: ReactNode; [key: string]: unknown };
@@ -80,15 +91,15 @@ describe("CategoryFilterBadge", () => {
     renderBadge();
 
     // Dropdown should not be visible initially
-    expect(screen.queryByText("Categoría")).not.toBeInTheDocument();
+    expect(screen.queryByText(mockT("stories.filters.category"))).not.toBeInTheDocument();
 
     // Click toggle button
     fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
 
     // Dropdown should now be visible
-    expect(screen.getByText("Categoría")).toBeInTheDocument();
-    expect(screen.getByText("Zona")).toBeInTheDocument();
-    expect(screen.getByText("Duración")).toBeInTheDocument();
+    expect(screen.getByText(mockT("stories.filters.category"))).toBeInTheDocument();
+    expect(screen.getByText(mockT("stories.filters.location"))).toBeInTheDocument();
+    expect(screen.getByText(mockT("stories.filters.duration"))).toBeInTheDocument();
   });
 
   it("dropdown shows all category options", () => {
@@ -207,7 +218,7 @@ describe("CategoryFilterBadge", () => {
     // Open dropdown
     fireEvent.click(screen.getByText(CATEGORY_LABELS.food));
 
-    expect(screen.getByText("Limpiar filtros")).toBeInTheDocument();
+    expect(screen.getByText(mockT("stories.filters.clear"))).toBeInTheDocument();
   });
 
   it("clear all button does not appear when no filters active", () => {
@@ -216,7 +227,7 @@ describe("CategoryFilterBadge", () => {
     // Open dropdown
     fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
 
-    expect(screen.queryByText("Limpiar filtros")).not.toBeInTheDocument();
+    expect(screen.queryByText(mockT("stories.filters.clear"))).not.toBeInTheDocument();
   });
 
   it("clear all calls onClearAll and closes dropdown", () => {
@@ -227,12 +238,12 @@ describe("CategoryFilterBadge", () => {
     fireEvent.click(screen.getByText(CATEGORY_LABELS.food));
 
     // Click clear all
-    fireEvent.click(screen.getByText("Limpiar filtros"));
+    fireEvent.click(screen.getByText(mockT("stories.filters.clear")));
 
     expect(onClearAll).toHaveBeenCalled();
 
     // Dropdown should close
-    expect(screen.queryByText("Categoría")).not.toBeInTheDocument();
+    expect(screen.queryByText(mockT("stories.filters.category"))).not.toBeInTheDocument();
   });
 
   it("click outside closes dropdown", () => {
@@ -240,12 +251,12 @@ describe("CategoryFilterBadge", () => {
 
     // Open dropdown
     fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
-    expect(screen.getByText("Categoría")).toBeInTheDocument();
+    expect(screen.getByText(mockT("stories.filters.category"))).toBeInTheDocument();
 
     // Click outside
     fireEvent.mouseDown(document);
 
-    expect(screen.queryByText("Categoría")).not.toBeInTheDocument();
+    expect(screen.queryByText(mockT("stories.filters.category"))).not.toBeInTheDocument();
   });
 
   it("escape key closes dropdown", () => {
@@ -253,12 +264,12 @@ describe("CategoryFilterBadge", () => {
 
     // Open dropdown
     fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
-    expect(screen.getByText("Categoría")).toBeInTheDocument();
+    expect(screen.getByText(mockT("stories.filters.category"))).toBeInTheDocument();
 
     // Press escape
     fireEvent.keyDown(document, { key: "Escape" });
 
-    expect(screen.queryByText("Categoría")).not.toBeInTheDocument();
+    expect(screen.queryByText(mockT("stories.filters.category"))).not.toBeInTheDocument();
   });
 
   it("has opacity-0 and pointer-events-none classes when visible is false", () => {
@@ -293,10 +304,10 @@ describe("CategoryFilterBadge", () => {
 
     // Open
     fireEvent.click(toggleButton);
-    expect(screen.getByText("Categoría")).toBeInTheDocument();
+    expect(screen.getByText(mockT("stories.filters.category"))).toBeInTheDocument();
 
     // Close by clicking toggle again
     fireEvent.click(toggleButton);
-    expect(screen.queryByText("Categoría")).not.toBeInTheDocument();
+    expect(screen.queryByText(mockT("stories.filters.category"))).not.toBeInTheDocument();
   });
 });
