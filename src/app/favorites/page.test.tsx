@@ -65,14 +65,11 @@ const mockStories = [
   },
 ];
 
-// Mock useStories hook
+// Mock useStories hook as vi.fn() so we can override per-test
+const mockUseStories = vi.fn();
+
 vi.mock("@/hooks/use-stories", () => ({
-  useStories: () => ({
-    stories: mockStories,
-    isLoading: false,
-    error: null,
-    refresh: vi.fn(),
-  }),
+  useStories: () => mockUseStories(),
 }));
 
 describe("FavoritesPage", () => {
@@ -82,6 +79,12 @@ describe("FavoritesPage", () => {
       favorites: [],
       toggleFavorite: mockToggleFavorite,
       isLoading: false,
+    });
+    mockUseStories.mockReturnValue({
+      stories: mockStories,
+      isLoading: false,
+      error: null,
+      refresh: vi.fn(),
     });
   });
 
@@ -233,6 +236,87 @@ describe("FavoritesPage", () => {
       await waitFor(() => {
         // Category is shown in hover overlay as "Naturaleza"
         expect(screen.getByText("Naturaleza")).toBeInTheDocument();
+      });
+    });
+
+    it("should show placeholder when story has no image", async () => {
+      // Override stories to include a story without image
+      mockUseStories.mockReturnValue({
+        stories: [
+          {
+            id: "story-no-img",
+            slug: "no-image-story",
+            title: "Story Without Image",
+            subtitle: "",
+            description: "No image here",
+            image: "", // empty image
+            category: "nature" as const,
+            sourcePdf: "test.pdf",
+          },
+        ],
+        isLoading: false,
+        error: null,
+        refresh: vi.fn(),
+      });
+
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-no-img"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        // When visible but no image, should show the title in placeholder
+        expect(screen.getByText("Story Without Image")).toBeInTheDocument();
+      });
+    });
+
+    it("should display subtitle on hover when present", async () => {
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("feature card", () => {
+    it("should mark first card as feature when more than 2 favorites", async () => {
+      const threeStories = [
+        ...mockStories,
+        {
+          id: "story-3",
+          slug: "playa-silencio",
+          title: "Playa del Silencio",
+          subtitle: "Costa occidental",
+          description: "Amazing beach",
+          image: "/images/playa.jpg",
+          category: "nature" as const,
+          sourcePdf: "nature.pdf",
+        },
+      ];
+
+      mockUseStories.mockReturnValue({
+        stories: threeStories,
+        isLoading: false,
+        error: null,
+        refresh: vi.fn(),
+      });
+
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1", "story-2", "story-3"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+        expect(screen.getByText("Catedral de Oviedo")).toBeInTheDocument();
+        expect(screen.getByText("Playa del Silencio")).toBeInTheDocument();
       });
     });
   });

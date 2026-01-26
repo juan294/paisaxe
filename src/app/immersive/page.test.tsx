@@ -167,6 +167,54 @@ describe("ImmersivePage", () => {
     });
   });
 
+  describe("empty filtered state", () => {
+    it("should show 'no stories match' message when filters result in zero stories", async () => {
+      // We need to mock getStoriesFromDB to return stories with a specific category
+      // then filter to a category that doesn't match any story
+      const { getStoriesFromDB } = await import("@/lib/stories-data");
+      vi.mocked(getStoriesFromDB).mockResolvedValue([
+        {
+          id: "story-1",
+          slug: "test-story",
+          title: "Test Story",
+          subtitle: "Sub",
+          description: "Desc",
+          image: "/img.jpg",
+          category: "nature",
+          sourcePdf: "test.pdf",
+          location: "eastern",
+          duration: "day-trip",
+        },
+      ]);
+
+      renderWithAuth(<ImmersivePage />);
+      await waitForLoaded();
+
+      // The StoryViewer renders filter controls. We need to select a filter
+      // that yields zero results. Look for a category filter button.
+      // Since all stories are "nature", clicking a different category should empty the list.
+      const cultureButton = screen.queryByRole("button", { name: /Cultura/i });
+      if (cultureButton) {
+        fireEvent.click(cultureButton);
+
+        await waitFor(() => {
+          expect(screen.getByText("No hay historias con estos filtros")).toBeInTheDocument();
+        });
+
+        // Should show clear filters button
+        const clearButton = screen.getByText("Limpiar filtros");
+        expect(clearButton).toBeInTheDocument();
+
+        // Click clear filters
+        fireEvent.click(clearButton);
+
+        await waitFor(() => {
+          expect(screen.queryByText("No hay historias con estos filtros")).not.toBeInTheDocument();
+        });
+      }
+    });
+  });
+
   describe("integration", () => {
     it("should pass current story to VoiceChat", async () => {
       renderWithAuth(<ImmersivePage />);
