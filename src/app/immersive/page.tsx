@@ -36,6 +36,20 @@ function getSessionSeed(): number {
 }
 
 export default function ImmersivePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="fixed inset-0 flex items-center justify-center bg-black">
+          <div className="text-white text-lg">Loading stories...</div>
+        </div>
+      }
+    >
+      <ImmersivePageContent />
+    </Suspense>
+  );
+}
+
+function ImmersivePageContent() {
   const { stories: allStories, isLoading } = useStories();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
