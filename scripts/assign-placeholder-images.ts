@@ -1,6 +1,6 @@
 /**
  * Assign placeholder images to existing stories in the database
- * that currently have no image.
+ * that have no image OR have old-style Unsplash placeholder URLs.
  *
  * Usage:
  *   npx tsx scripts/assign-placeholder-images.ts
@@ -8,7 +8,7 @@
  */
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import { getPlaceholderForStory } from "../src/lib/unsplash-placeholders";
+import { getPlaceholderForStory, PLACEHOLDER_PREFIX } from "../src/lib/unsplash-placeholders";
 import type { StoryCategory } from "../src/types/immersive";
 
 config({ path: ".env.local" });
@@ -33,11 +33,10 @@ async function main(): Promise<void> {
     console.log("(dry run — no changes will be written)\n");
   }
 
-  // Fetch stories with no image
-  const { data: stories, error } = await supabase
+  // Fetch stories with no image OR old-style Unsplash URLs without the new prefix
+  const { data: allStories, error } = await supabase
     .from("stories")
     .select("id, slug, title, category, image_path, image_source")
-    .or("image_path.is.null,image_path.eq.")
     .eq("is_active", true);
 
   if (error) {
@@ -45,12 +44,20 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  if (!stories || stories.length === 0) {
-    console.log("All stories already have images. Nothing to do.");
+  // Filter: no image, or Unsplash URL without the new placeholder prefix
+  const stories = (allStories || []).filter((s) => {
+    if (!s.image_path) return true;
+    const isUnsplash = s.image_path.startsWith("https://images.unsplash.com/");
+    const hasNewPrefix = s.image_source?.startsWith(PLACEHOLDER_PREFIX);
+    return isUnsplash && !hasNewPrefix;
+  });
+
+  if (stories.length === 0) {
+    console.log("All stories already have proper images. Nothing to do.");
     return;
   }
 
-  console.log(`Found ${stories.length} stories without images:\n`);
+  console.log(`Found ${stories.length} stories needing placeholder replacement:\n`);
 
   let updated = 0;
   for (const story of stories) {
