@@ -18,6 +18,7 @@ interface StoryViewerProps {
   currentIndex: number;
   onIndexChange: (index: number) => void;
   onAskAbout: () => void;
+  chatOpen?: boolean;
   // Filter props
   selectedCategory: StoryCategory | null;
   selectedLocation: StoryLocation | null;
@@ -33,6 +34,7 @@ export function StoryViewer({
   currentIndex,
   onIndexChange,
   onAskAbout,
+  chatOpen = false,
   selectedCategory,
   selectedLocation,
   selectedDuration,
@@ -99,8 +101,10 @@ export function StoryViewer({
     }
   }, [currentIndex, onIndexChange]);
 
-  // Keyboard navigation
+  // Keyboard navigation (disabled while chat is open)
   useEffect(() => {
+    if (chatOpen) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight" || e.key === " ") {
         e.preventDefault();
@@ -115,14 +119,14 @@ export function StoryViewer({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goToNext, goToPrev]);
+  }, [chatOpen, goToNext, goToPrev]);
 
-  // Auto-play
+  // Auto-play (paused while chat is open)
   useEffect(() => {
-    if (!autoPlay) return;
+    if (!autoPlay || chatOpen) return;
     const timer = setInterval(goToNext, 6000);
     return () => clearInterval(timer);
-  }, [autoPlay, goToNext]);
+  }, [autoPlay, chatOpen, goToNext]);
 
   if (!story) return null;
 

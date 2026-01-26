@@ -71,6 +71,7 @@ export default function ImmersivePage() {
         currentIndex={currentIndex}
         onIndexChange={setCurrentIndex}
         onAskAbout={() => setChatOpen(true)}
+        chatOpen={chatOpen}
         selectedCategory={selectedCategory}
         selectedLocation={selectedLocation}
         selectedDuration={selectedDuration}
