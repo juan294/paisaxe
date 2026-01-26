@@ -7,7 +7,6 @@ import { useFavorites } from "@/hooks/use-favorites";
 import { useStories } from "@/hooks/use-stories";
 import { useAuth } from "@/hooks/use-auth";
 import { Bookmark, ArrowLeft, Trash2, RefreshCw, Cloud } from "lucide-react";
-import { CATEGORY_LABELS } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import type { Story } from "@/types/immersive";
@@ -266,7 +265,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
             <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 transition-all duration-300 group-hover:opacity-100">
               <div className="translate-y-2 transform transition-transform duration-300 group-hover:translate-y-0">
                 <p className="text-xs font-medium uppercase tracking-wider text-white/60">
-                  {CATEGORY_LABELS[story.category]}
+                  {t(`stories.categories.${story.category}`)}
                 </p>
                 <h3 className="mt-1 text-base font-semibold text-white">
                   {story.title}

@@ -8,9 +8,6 @@ import {
   StoryCategory,
   StoryLocation,
   StoryDuration,
-  CATEGORY_LABELS,
-  LOCATION_LABELS,
-  DURATION_LABELS,
 } from "@/types/immersive";
 
 interface StoryFiltersProps {
@@ -83,7 +80,7 @@ export function StoryFilters({
               {CATEGORIES.map((category) => (
                 <FilterChip
                   key={category}
-                  label={CATEGORY_LABELS[category]}
+                  label={t(`stories.categories.${category}`)}
                   selected={selectedCategory === category}
                   onClick={() =>
                     onCategoryChange(selectedCategory === category ? null : category)
@@ -102,7 +99,7 @@ export function StoryFilters({
               {LOCATIONS.map((location) => (
                 <FilterChip
                   key={location}
-                  label={LOCATION_LABELS[location]}
+                  label={t(`stories.locations.${location}`)}
                   selected={selectedLocation === location}
                   onClick={() =>
                     onLocationChange(selectedLocation === location ? null : location)
@@ -121,7 +118,7 @@ export function StoryFilters({
               {DURATIONS.map((duration) => (
                 <FilterChip
                   key={duration}
-                  label={DURATION_LABELS[duration]}
+                  label={t(`stories.durations.${duration}`)}
                   selected={selectedDuration === duration}
                   onClick={() =>
                     onDurationChange(selectedDuration === duration ? null : duration)

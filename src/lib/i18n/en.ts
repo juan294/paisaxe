@@ -28,12 +28,30 @@ export const en: Translations = {
     related: 'You might also like',
     no_results: 'No stories match these filters',
     new_badge: 'New',
+    ask_about: 'Ask about this',
     filters: {
       title: 'Filters',
       category: 'Category',
       location: 'Location',
       duration: 'Duration',
       clear: 'Clear filters',
+    },
+    categories: {
+      nature: 'Nature',
+      cities: 'Cities',
+      food: 'Gastronomy',
+      culture: 'Culture',
+      activities: 'Activities',
+    },
+    locations: {
+      eastern: 'Eastern Asturias',
+      central: 'Central Asturias',
+      western: 'Western Asturias',
+    },
+    durations: {
+      'day-trip': 'Day trip',
+      weekend: 'Weekend',
+      week: 'One week',
     },
   },
 
