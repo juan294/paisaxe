@@ -4,7 +4,7 @@ import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { VoyageAIClient } from "voyageai";
 import { GENERATED_STORIES } from "../content/processed/extracted-stories";
-import { getPlaceholderForStory, isOldUnsplashPlaceholder } from "../src/lib/unsplash-placeholders";
+import { getPlaceholderForStory, needsPlaceholderImage } from "../src/lib/unsplash-placeholders";
 import type { StoryCategory } from "../src/types/immersive";
 
 // Load environment variables from .env.local
@@ -341,8 +341,8 @@ async function seedStories(): Promise<void> {
     // Auto-assign placeholder for stories without an image or with old Unsplash URLs
     let imagePath = story.image || null;
     let imageSource: string | null = null;
-    const needsPlaceholder = !imagePath || isOldUnsplashPlaceholder({ image: story.image });
-    if (needsPlaceholder) {
+    const needsReplacement = needsPlaceholderImage({ image: story.image });
+    if (needsReplacement) {
       const placeholder = getPlaceholderForStory(slug, story.category as StoryCategory);
       imagePath = placeholder.image;
       imageSource = placeholder.imageSource;

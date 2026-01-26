@@ -8,7 +8,7 @@
  */
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import { getPlaceholderForStory, PLACEHOLDER_PREFIX } from "../src/lib/unsplash-placeholders";
+import { getPlaceholderForStory, needsPlaceholderImage } from "../src/lib/unsplash-placeholders";
 import type { StoryCategory } from "../src/types/immersive";
 
 config({ path: ".env.local" });
@@ -44,13 +44,13 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Filter: no image, or Unsplash URL without the new placeholder prefix
-  const stories = (allStories || []).filter((s) => {
-    if (!s.image_path) return true;
-    const isUnsplash = s.image_path.startsWith("https://images.unsplash.com/");
-    const hasNewPrefix = s.image_source?.startsWith(PLACEHOLDER_PREFIX);
-    return isUnsplash && !hasNewPrefix;
-  });
+  // Filter: no image, placeholder.svg, or old Unsplash URL without the new prefix
+  const stories = (allStories || []).filter((s) =>
+    needsPlaceholderImage({
+      image: s.image_path || undefined,
+      imageSource: s.image_source || undefined,
+    })
+  );
 
   if (stories.length === 0) {
     console.log("All stories already have proper images. Nothing to do.");
