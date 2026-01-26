@@ -1,0 +1,44 @@
+"use client";
+
+import { cn } from "@/lib/utils";
+import { useAnalytics } from "@/hooks/use-analytics";
+
+interface QuestionPromptsProps {
+  prompts: string[];
+  storyId: string;
+  onSelectPrompt: (prompt: string) => void;
+}
+
+export function QuestionPrompts({ prompts, storyId, onSelectPrompt }: QuestionPromptsProps) {
+  const { trackEvent } = useAnalytics();
+
+  if (!prompts || prompts.length === 0) return null;
+
+  const handleClick = (prompt: string) => {
+    trackEvent("contextual_prompt_click", "contextual_prompts", { storyId, promptText: prompt });
+    onSelectPrompt(prompt);
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-3">
+      {prompts.slice(0, 3).map((prompt) => (
+        <button
+          key={prompt}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClick(prompt);
+          }}
+          className={cn(
+            "px-3 py-1.5 text-xs font-medium rounded-full",
+            "bg-white/10 hover:bg-white/20 backdrop-blur-sm",
+            "text-white/80 hover:text-white",
+            "transition-all hover:scale-105",
+            "border border-white/10"
+          )}
+        >
+          {prompt}
+        </button>
+      ))}
+    </div>
+  );
+}

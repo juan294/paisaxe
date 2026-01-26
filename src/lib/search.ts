@@ -7,7 +7,7 @@ export async function searchChunks(
 ): Promise<Chunk[]> {
   const { data, error } = await supabase.rpc("match_chunks", {
     query_embedding: queryEmbedding,
-    match_threshold: 0.7,
+    match_threshold: 0.5,  // Lowered from 0.7 to get more results
     match_count: limit,
   });
 
