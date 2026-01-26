@@ -3,7 +3,7 @@
 A living document tracking implemented features and future development plans.
 
 **Domain**: paisaxe.es
-**Last Updated**: January 25, 2026
+**Last Updated**: January 26, 2026
 
 ---
 
@@ -75,7 +75,7 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Vector Search | :white_check_mark: | Supabase pgvector (1024 dims) |
 | Voyage AI Embeddings | :white_check_mark: | voyage-3 model |
 | Claude Integration | :white_check_mark: | Claude Sonnet for responses |
-| Keyword Fallback Search | :white_check_mark: | Place name matching |
+| Hybrid Search | :white_check_mark: | Vector similarity + keyword matching for place names |
 
 ### Data Pipeline
 
@@ -94,13 +94,14 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Supabase PostgreSQL | :white_check_mark: | With pgvector extension |
 | shadcn/ui Components | :white_check_mark: | Button, Card, Dialog, Input |
 | Tailwind CSS Styling | :white_check_mark: | Custom Paisaxe theme |
-| Vitest Testing | :white_check_mark: | 251 tests passing |
+| Vitest Testing | :white_check_mark: | 705 tests passing (48 files, 97.31% coverage) |
 | GitHub Actions CI | :white_check_mark: | Lint, typecheck, test, build |
 | Git Hooks (Husky) | :white_check_mark: | Pre-commit quality checks |
+| Coverage Automation | :white_check_mark: | Nightly scheduled updates via `scripts/coverage-agent.sh` |
 
 ---
 
-## Current Sprint: Content Expansion :white_check_mark:
+## Content Expansion Sprint :white_check_mark:
 
 ### Task 1: PDF Image Extraction Pipeline :white_check_mark:
 
@@ -109,16 +110,16 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Create extraction script | :white_check_mark: | `scripts/extract-images.ts` |
 | Extract images from PDFs | :white_check_mark: | 1,773 images from 37 PDFs |
 | Generate manifest file | :white_check_mark: | `content/images/manifest.json` (14K lines) |
-| Seed images table | :calendar: | Populate database with extracted images |
+| Seed images table | :white_check_mark: | Images table populated in database |
 
-### Task 2: Dynamic Stories from Database
+### Task 2: Dynamic Stories from Database :white_check_mark:
 
 | Item | Status | Notes |
 |------|--------|-------|
 | Create stories table migration | :white_check_mark: | `003_stories_table.sql` |
-| Apply migration to Supabase | :calendar: | Run SQL in Supabase dashboard |
+| Apply migration to Supabase | :white_check_mark: | Stories table exists in Supabase |
 | Add database loading functions | :white_check_mark: | `getStoriesFromDB()`, etc. |
-| Seed stories table | :calendar: | Run `npm run seed-db:stories` |
+| Seed stories table | :white_check_mark: | 20 stories seeded via `npm run seed-db:stories` |
 
 ### Task 3: Expand Story Content :white_check_mark:
 
@@ -127,7 +128,7 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Create 12+ additional stories | :white_check_mark: | 20 total stories in seed script |
 | Add location metadata | :white_check_mark: | Eastern, Central, Western |
 | Add duration metadata | :white_check_mark: | Day-trip, Weekend, Week |
-| Match with extracted images | :calendar: | Replace Unsplash URLs with PDF images |
+| Match with extracted images | :white_check_mark: | 7 stories use PDF images, 13 use Unsplash fallback |
 
 ### Task 4: Database Deployment :white_check_mark:
 
@@ -147,32 +148,97 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Category Filtering UI | :white_check_mark: | Filter by Nature, Cities, Food, Culture, Activities |
 | Geographic Filtering | :white_check_mark: | Eastern, Central, Western Asturias |
 | Trip-type Filtering | :white_check_mark: | Day trip, Weekend, Week |
-| AI-suggested Related Stories | :white_check_mark: | Implemented but hidden (clean UX priority) |
+| Related Stories | :white_check_mark: | Visible in UI with category/location/duration scoring |
 
 ---
 
-## Phase 3: AI Improvements :calendar:
+## Phase 3: AI Improvements :construction:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
+| Improve Context Retrieval | :white_check_mark: | Hybrid vector + keyword search working |
+| Add Personality to Responses | :construction: | Generic warmth in system prompt; distinct persona pending |
 | Define AI Persona | :calendar: | "Pelayo" - historic Asturian name |
-| Improve Context Retrieval | :calendar: | Better search accuracy |
-| Add Personality to Responses | :calendar: | Warm, knowledgeable local expert |
 | Display Related Images in Chat | :calendar: | Show images inline with responses |
 
 ---
 
-## Phase 4: User Features :calendar:
+## Phase 4: User Features :white_check_mark:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| SSO Authentication | :calendar: | Google, Apple sign-in |
-| Favorites List | :calendar: | Local storage + sync if logged in |
-| Basic Analytics | :calendar: | Vercel Analytics or Plausible |
+| SSO Authentication | :white_check_mark: | Google OAuth via Supabase SSR |
+| Favorites List | :white_check_mark: | Local storage + cloud sync when logged in |
+| Sign-in Prompts | :white_check_mark: | Prompted after first bookmark if not logged in |
+| Favorites Page | :white_check_mark: | Full UI at `/favorites` with grid view |
+| Basic Analytics | :white_check_mark: | Vercel Analytics integrated; custom events DB table ready |
 
 ---
 
-## Phase 5: Internationalization :calendar:
+## Admin Panel :white_check_mark:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Admin Authentication | :white_check_mark: | Bearer token with timing-safe comparison |
+| Story Management UI | :white_check_mark: | Full CRUD at `/admin` |
+| Image Editor | :white_check_mark: | Upload and manage story images |
+| Curation Workflow | :white_check_mark: | Status tracking: needs_curation, approved |
+| Admin API Routes | :white_check_mark: | Stories list, image upload, status update |
+
+---
+
+## Feature Flag Infrastructure :white_check_mark:
+
+Database-backed feature flags (migration `008_feature_flags.sql`) ready for visitor experience features. All default to disabled.
+
+| Flag | Status | Notes |
+|------|--------|-------|
+| `related_stories` | :white_check_mark: | Active and visible in UI |
+| `contextual_prompts` | :calendar: | DB schema ready (`metadata.question_prompts`), UI pending |
+| `randomized_order` | :calendar: | Flag ready, shuffle logic pending |
+| `surprise_me` | :calendar: | Flag ready, button UI pending |
+| `story_sharing` | :calendar: | Flag ready, Web Share API pending |
+| `seasonal_surfacing` | :calendar: | DB field `best_months` ready, weighting logic pending |
+| `mood_discovery` | :calendar: | DB field `metadata.mood_tags` ready, UI pending |
+| `asturianu_touches` | :calendar: | DB fields ready, system prompt updates pending |
+| `ambient_discovery` | :calendar: | Extended auto-play pending |
+| `story_freshness` | :calendar: | Badge UI pending |
+
+See `doc/visitor-experience-improvements.md` for full feature descriptions and implementation waves.
+
+---
+
+## Phase 5: Visitor Experience Enhancements :calendar:
+
+Prioritized features from the visitor experience evaluation. See feature flags above for infrastructure status.
+
+### Wave 1 -- Quick Wins (priority >= 4.0)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Randomized Story Order | :calendar: | Fisher-Yates shuffle in `useStories` hook |
+| "Surprise Me" Button | :calendar: | Random unviewed story jump |
+| Story Freshness Badges | :calendar: | Subtle "Nuevo" badge on recent stories |
+
+### Wave 2 -- High-Impact Features (priority >= 2.0)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Contextual Question Prompts | :calendar: | Story-specific suggested questions near chat button |
+| Story Sharing | :calendar: | Web Share API + OG meta tags |
+| Seasonal Story Surfacing | :calendar: | Weight order by current month |
+| Mood-Based Discovery | :calendar: | Optional mood selector: Relaxing / Adventurous / Cultural / Delicious |
+
+### Wave 3 -- Experience Elevation
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Asturianu Language Touches | :calendar: | Authentic Asturian words in UI and chat |
+| Ambient Discovery Mode | :calendar: | Slower transitions, optional ambient audio |
+
+---
+
+## Phase 6: Internationalization :calendar:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -182,20 +248,18 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 
 ---
 
-## Phase 6: Polish :calendar:
+## Phase 7: Polish :construction:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Loading Skeleton States | :calendar: | For stories and chat |
-| Error Boundaries | :calendar: | Graceful error handling |
-| Accessibility Audit | :calendar: | Screen readers, reduced motion |
-| SEO Optimization | :calendar: | Organic discovery |
+| Loading States | :construction: | Basic spinners + Suspense boundaries; skeleton UI pending |
+| Accessibility | :construction: | ARIA labels + keyboard nav present; reduced motion + screen reader audit pending |
+| SEO Optimization | :calendar: | Basic title/description; OG tags + structured data pending |
+| Error Boundaries | :calendar: | No error boundary components yet |
 
 ---
 
 ## Verification Checklist
-
-After completing the current sprint:
 
 - [x] Image extraction: 1,773 images extracted to `content/images/`
 - [x] Manifest generated: `content/images/manifest.json` with metadata
@@ -203,9 +267,26 @@ After completing the current sprint:
 - [x] Database migration: Stories table exists in Supabase
 - [x] Story seeding: 20 stories seeded via `npm run seed-db:stories`
 - [x] Image replacement: 7 stories use PDF images, 13 use Unsplash fallback
-- [x] Tests: `npm run test` - 251 tests pass
+- [x] Tests: `npm run test` - 705 tests pass (97.31% statement coverage)
 - [x] Build: `npm run build` - no errors
-- [ ] Frontend: Visit `/immersive`, verify new stories load correctly
+- [x] Auth: Google SSO working with Supabase SSR
+- [x] Favorites: Cloud sync + local storage fallback
+- [x] Admin: Story management panel at `/admin`
+- [x] Feature flags: 10 flags in database, infrastructure ready
+- [x] Analytics: Vercel Analytics active, custom events table ready
+
+---
+
+## Database Migrations
+
+| Migration | Description | Status |
+|-----------|-------------|--------|
+| `001_chunks_table.sql` | PDF content chunks with embeddings | :white_check_mark: |
+| `003_stories_table.sql` | Stories table | :white_check_mark: |
+| `006_user_favorites.sql` | User favorites with cloud sync | :white_check_mark: |
+| `008_feature_flags.sql` | Feature flag system | :white_check_mark: |
+| `009_analytics_events.sql` | Custom analytics events | :white_check_mark: |
+| `010_story_metadata_extensions.sql` | Extended metadata for visitor features | :white_check_mark: |
 
 ---
 
@@ -216,6 +297,7 @@ After completing the current sprint:
 - Voice input already works - preserve this functionality
 - Tests before implementation (TDD workflow)
 - All work on `develop` branch
+- Feature flags control visitor experience features - enable in DB when UI is ready
 
 ---
 
@@ -224,8 +306,10 @@ After completing the current sprint:
 | Version | Date | Milestone |
 |---------|------|-----------|
 | v0.1.0 | Jan 2026 | MVP - Immersive stories + voice chat |
-| v0.2.0 | - | Content expansion + dynamic loading |
-| v0.3.0 | - | Story organization UI |
-| v0.4.0 | - | AI improvements |
-| v0.5.0 | - | User features |
+| v0.2.0 | Jan 2026 | Content expansion + dynamic loading |
+| v0.3.0 | Jan 2026 | Story organization UI + related stories |
+| v0.4.0 | Jan 2026 | User features (auth, favorites, admin panel) |
+| v0.5.0 | - | AI improvements (Pelayo persona, chat images) |
+| v0.6.0 | - | Visitor experience enhancements (Waves 1-3) |
+| v0.7.0 | - | Internationalization |
 | v1.0.0 | - | Production release |

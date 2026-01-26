@@ -1,4 +1,6 @@
 import type { AdminStory, CurationStatus, AdminApiResponse } from "@/types/admin";
+import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
+import type { AnalyticsDashboardData } from "@/types/analytics";
 
 const API_BASE = "/api/admin";
 
@@ -148,5 +150,87 @@ export async function validateAdminKey(adminKey: string): Promise<boolean> {
     return response.ok;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Fetch all feature flags
+ */
+export async function fetchFeatureFlags(
+  adminKey: string
+): Promise<AdminApiResponse<FeatureFlag[]>> {
+  try {
+    const response = await fetch("/api/feature-flags", {
+      headers: getAuthHeaders(adminKey),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to fetch feature flags" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching feature flags:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Toggle a feature flag on or off
+ */
+export async function updateFeatureFlag(
+  adminKey: string,
+  flagKey: FeatureFlagKey,
+  enabled: boolean
+): Promise<AdminApiResponse<FeatureFlag>> {
+  try {
+    const response = await fetch(`${API_BASE}/feature-flags/${flagKey}`, {
+      method: "PUT",
+      headers: {
+        ...getAuthHeaders(adminKey),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ enabled }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to update feature flag" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error updating feature flag:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Fetch analytics dashboard data
+ */
+export async function fetchAnalytics(
+  adminKey: string,
+  from?: string,
+  to?: string
+): Promise<AdminApiResponse<AnalyticsDashboardData>> {
+  try {
+    const url = new URL(`${API_BASE}/analytics`, window.location.origin);
+    if (from) url.searchParams.set("from", from);
+    if (to) url.searchParams.set("to", to);
+
+    const response = await fetch(url.toString(), {
+      headers: getAuthHeaders(adminKey),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to fetch analytics" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching analytics:", error);
+    return { error: "Network error" };
   }
 }

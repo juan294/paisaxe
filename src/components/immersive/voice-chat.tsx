@@ -12,6 +12,7 @@ interface VoiceChatProps {
   story: Story;
   open: boolean;
   onClose: () => void;
+  initialMessage?: string;
 }
 
 interface Message {
@@ -19,7 +20,7 @@ interface Message {
   content: string;
 }
 
-export function VoiceChat({ story, open, onClose }: VoiceChatProps) {
+export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -68,6 +69,14 @@ export function VoiceChat({ story, open, onClose }: VoiceChatProps) {
       setPrivacyAcknowledged(true);
     }
   }, []);
+
+  // Auto-send initial message
+  useEffect(() => {
+    if (initialMessage && messages.length === 0 && !isLoading) {
+      setInputValue(initialMessage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage]);
 
   // Auto-scroll
   useEffect(() => {

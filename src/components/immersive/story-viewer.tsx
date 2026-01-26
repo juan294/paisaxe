@@ -9,15 +9,26 @@ import { CategoryFilterBadge } from "./category-filter-badge";
 import { AuthButton } from "@/components/auth/auth-button";
 import { SignInPrompt } from "@/components/auth/sign-in-prompt";
 import { useFavorites } from "@/hooks/use-favorites";
+import { useFeatureFlags } from "@/hooks/use-feature-flags";
+import { useAnalytics } from "@/hooks/use-analytics";
+import { getRelatedStories } from "@/lib/related-stories";
+import { RelatedStories } from "./related-stories";
+import { QuestionPrompts } from "./question-prompts";
+import { SurpriseMeButton } from "./surprise-me-button";
+import { FreshnessBadge } from "./freshness-badge";
+import { ShareButton } from "./share-button";
+import { AmbientIndicator } from "./ambient-indicator";
+import { getLabel } from "@/lib/asturianu";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
 
 interface StoryViewerProps {
   stories: Story[];
+  allStories: Story[];
   currentIndex: number;
   onIndexChange: (index: number) => void;
-  onAskAbout: () => void;
+  onAskAbout: (initialMessage?: string) => void;
   chatOpen?: boolean;
   // Filter props
   selectedCategory: StoryCategory | null;
@@ -27,10 +38,13 @@ interface StoryViewerProps {
   onLocationChange: (location: StoryLocation | null) => void;
   onDurationChange: (duration: StoryDuration | null) => void;
   onClearFilters: () => void;
+  // Surprise Me props
+  viewedIndices?: Set<number>;
 }
 
 export function StoryViewer({
   stories,
+  allStories,
   currentIndex,
   onIndexChange,
   onAskAbout,
@@ -42,10 +56,15 @@ export function StoryViewer({
   onLocationChange,
   onDurationChange,
   onClearFilters,
+  viewedIndices,
 }: StoryViewerProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
   const [autoPlay, setAutoPlay] = useState(false);
+  const [ambientMode, setAmbientMode] = useState(false);
+
+  const { isEnabled } = useFeatureFlags();
+  const { trackEvent } = useAnalytics();
 
   const {
     isFavorite,
@@ -56,6 +75,16 @@ export function StoryViewer({
 
   const story = stories[currentIndex];
   const prefetchedUrls = useRef<Set<string>>(new Set());
+  const ambientStartRef = useRef<number | null>(null);
+  const asturianTrackedRef = useRef<string | null>(null);
+
+  // Track Asturianu visibility
+  useEffect(() => {
+    if (isEnabled("asturianu_touches") && story && asturianTrackedRef.current !== story.id) {
+      asturianTrackedRef.current = story.id;
+      trackEvent("asturianu_visible", "asturianu_touches", { storyId: story.id });
+    }
+  }, [isEnabled, story, trackEvent]);
 
   // Prefetch adjacent images for smoother navigation
   useEffect(() => {
@@ -122,13 +151,44 @@ export function StoryViewer({
   }, [chatOpen, goToNext, goToPrev]);
 
   // Auto-play (paused while chat is open)
+  const autoPlayInterval = ambientMode && isEnabled("ambient_discovery") ? 12000 : 6000;
   useEffect(() => {
     if (!autoPlay || chatOpen) return;
-    const timer = setInterval(goToNext, 6000);
+    const timer = setInterval(goToNext, autoPlayInterval);
     return () => clearInterval(timer);
-  }, [autoPlay, chatOpen, goToNext]);
+  }, [autoPlay, chatOpen, goToNext, autoPlayInterval]);
+
+  // Toggle ambient mode
+  const toggleAmbient = useCallback(() => {
+    setAmbientMode((prev) => {
+      const newValue = !prev;
+      if (newValue) {
+        ambientStartRef.current = Date.now();
+        setAutoPlay(true);
+      } else {
+        const duration = ambientStartRef.current ? Date.now() - ambientStartRef.current : 0;
+        trackEvent("ambient_mode_toggle", "ambient_discovery", { enabled: false, duration });
+        ambientStartRef.current = null;
+      }
+      trackEvent("ambient_mode_toggle", "ambient_discovery", { enabled: newValue, duration: 0 });
+      return newValue;
+    });
+  }, [trackEvent]);
+
+  // Determine animation class
+  const isAmbient = ambientMode && isEnabled("ambient_discovery");
+  const zoomClass = isAmbient ? "animate-ambient-zoom" : autoPlay ? "animate-slow-zoom" : undefined;
+
+  // Related stories
+  const relatedStories = story ? getRelatedStories(story, allStories) : [];
+
+  // Asturianu labels
+  const ast = isEnabled("asturianu_touches");
 
   if (!story) return null;
+
+  // Question prompts from metadata
+  const questionPrompts = story.metadata?.question_prompts || [];
 
   return (
     <div
@@ -147,13 +207,11 @@ export function StoryViewer({
           alt={story.title}
           fill
           sizes="100vw"
-          className={cn(
-            "object-cover",
-            autoPlay && "animate-slow-zoom"
-          )}
+          className={cn("object-cover", zoomClass)}
           priority
           placeholder="blur"
           blurDataURL={darkPlaceholder}
+          key={`${story.id}-${isAmbient ? "ambient" : autoPlay ? "auto" : "static"}`}
         />
         {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
@@ -238,6 +296,23 @@ export function StoryViewer({
         visible={showInfo}
       />
 
+      {/* Related Stories - shown when info is visible and feature enabled */}
+      {isEnabled("related_stories") && showInfo && relatedStories.length > 0 && (
+        <RelatedStories
+          stories={relatedStories}
+          onSelectStory={(related) => {
+            trackEvent("related_story_click", "related_stories", {
+              fromStoryId: story.id,
+              toStoryId: related.id,
+            });
+            const targetIndex = stories.findIndex((s) => s.id === related.id);
+            if (targetIndex >= 0) {
+              onIndexChange(targetIndex);
+            }
+          }}
+        />
+      )}
+
       {/* Main content */}
       <div
         className={cn(
@@ -245,11 +320,22 @@ export function StoryViewer({
           showInfo ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
         )}
       >
+        {/* Freshness badge */}
+        {isEnabled("story_freshness") && (
+          <div className="mb-2">
+            <FreshnessBadge createdAt={story.createdAt} storyId={story.id} />
+          </div>
+        )}
+
         <p className="text-white/70 text-sm md:text-base font-medium mb-2 tracking-wider uppercase">
-          {story.subtitle}
+          {ast && story.metadata?.asturianu_subtitle
+            ? story.metadata.asturianu_subtitle
+            : story.subtitle}
         </p>
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
-          {story.title}
+          {ast && story.metadata?.asturianu_title
+            ? story.metadata.asturianu_title
+            : story.title}
         </h1>
         <p className="text-lg md:text-xl text-white/80 max-w-2xl leading-relaxed mb-2">
           {story.description}
@@ -264,8 +350,17 @@ export function StoryViewer({
 
         {!story.imageSource && <div className="mb-6" />}
 
+        {/* Contextual question prompts */}
+        {isEnabled("contextual_prompts") && questionPrompts.length > 0 && (
+          <QuestionPrompts
+            prompts={questionPrompts}
+            storyId={story.id}
+            onSelectPrompt={(prompt) => onAskAbout(prompt)}
+          />
+        )}
+
         {/* Action buttons */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 mt-3">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -273,7 +368,7 @@ export function StoryViewer({
             }}
             className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105"
           >
-            Preguntar sobre esto
+            {getLabel("ask_about", ast)}
           </button>
           <a
             href="/favorites"
@@ -281,7 +376,7 @@ export function StoryViewer({
             className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105 flex items-center gap-2"
           >
             <Bookmark className="h-5 w-5" />
-            <span>Guardados</span>
+            <span>{getLabel("saved", ast)}</span>
           </a>
         </div>
       </div>
@@ -318,21 +413,59 @@ export function StoryViewer({
         <ChevronRight className="h-8 w-8 text-white" />
       </button>
 
-      {/* Top-right controls: Auth + Auto-play + Favorites link */}
+      {/* Top-right controls: Auth + Auto-play + Share + Surprise + Favorites */}
       <div className="absolute top-16 right-6 z-20 flex items-center gap-3">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setAutoPlay((prev) => !prev);
-          }}
-          className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-        >
-          {autoPlay ? (
-            <Pause className="h-5 w-5 text-white" />
-          ) : (
-            <Play className="h-5 w-5 text-white" />
-          )}
-        </button>
+        {/* Ambient mode indicator */}
+        {isAmbient && <AmbientIndicator />}
+
+        {/* Ambient / Auto-play toggle */}
+        {isEnabled("ambient_discovery") ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleAmbient();
+            }}
+            className={cn(
+              "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all",
+              ambientMode && "ring-1 ring-white/30"
+            )}
+            title={ambientMode ? "Desactivar modo ambiente" : "Modo ambiente"}
+          >
+            {autoPlay ? (
+              <Pause className="h-5 w-5 text-white" />
+            ) : (
+              <Play className="h-5 w-5 text-white" />
+            )}
+          </button>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setAutoPlay((prev) => !prev);
+            }}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
+          >
+            {autoPlay ? (
+              <Pause className="h-5 w-5 text-white" />
+            ) : (
+              <Play className="h-5 w-5 text-white" />
+            )}
+          </button>
+        )}
+
+        {/* Surprise Me button */}
+        {isEnabled("surprise_me") && viewedIndices && (
+          <SurpriseMeButton
+            totalStories={stories.length}
+            currentIndex={currentIndex}
+            viewedIndices={viewedIndices}
+            onJumpTo={onIndexChange}
+          />
+        )}
+
+        {/* Share button */}
+        {isEnabled("story_sharing") && <ShareButton story={story} />}
+
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -358,7 +491,7 @@ export function StoryViewer({
           showInfo ? "opacity-100" : "opacity-0"
         )}
       >
-        ← → navegar · i mostrar/ocultar · espacio siguiente
+        ← → {getLabel("navigate", ast)} · i {getLabel("show_hide", ast)} · espacio {getLabel("next", ast)}
       </div>
     </div>
   );

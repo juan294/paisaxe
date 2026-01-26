@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { AdminLoginForm } from "@/components/admin/admin-login-form";
 import { StoryGrid } from "@/components/admin/story-grid";
 import { ImageEditorDialog } from "@/components/admin/image-editor-dialog";
+import { AdminTabs, type AdminTab } from "@/components/admin/admin-tabs";
+import { FeatureTogglesPanel } from "@/components/admin/feature-toggles-panel";
+import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
 import { Button } from "@/components/ui/button";
 import { fetchStories } from "@/lib/admin-api";
 import {
@@ -23,6 +26,7 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [editingStory, setEditingStory] = useState<AdminStory | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTab>("stories");
 
   const loadStories = useCallback(async () => {
     if (!adminKey) return;
@@ -46,10 +50,10 @@ export default function AdminPage() {
   }, [adminKey, filter]);
 
   useEffect(() => {
-    if (adminKey) {
+    if (adminKey && activeTab === "stories") {
       loadStories();
     }
-  }, [adminKey, filter, loadStories]);
+  }, [adminKey, filter, loadStories, activeTab]);
 
   const handleLogin = (key: string) => {
     setAdminKey(key);
@@ -97,66 +101,49 @@ export default function AdminPage() {
               Paisaxe Admin
             </h1>
             <div className="hidden h-4 w-px bg-neutral-200 dark:bg-neutral-700 sm:block" />
-            <nav className="hidden items-center gap-1 sm:flex">
-              {filterOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setFilter(option.value)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                    filter === option.value
-                      ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-                      : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-                  )}
-                >
-                  {option.label}
-                  <span
-                    className={cn(
-                      "tabular-nums",
-                      filter === option.value
-                        ? "text-neutral-400 dark:text-neutral-500"
-                        : "text-neutral-400 dark:text-neutral-500"
-                    )}
-                  >
-                    {option.count}
-                  </span>
-                </button>
-              ))}
-            </nav>
+            {/* Tab navigation */}
+            <div className="hidden sm:block">
+              <AdminTabs activeTab={activeTab} onTabChange={setActiveTab} />
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Compact metrics */}
-            <div className="hidden items-center gap-4 text-xs md:flex">
-              <div className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
-                <span className="text-neutral-500 dark:text-neutral-400">{stories.length} total</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                <span className="text-neutral-500 dark:text-neutral-400">{needsCurationCount} pending</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span className="text-neutral-500 dark:text-neutral-400">{approvedCount} approved</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-neutral-600" />
-                <span className="text-neutral-500 dark:text-neutral-400">{withImagesCount} with images</span>
-              </div>
-            </div>
+            {/* Compact metrics - only shown on stories tab */}
+            {activeTab === "stories" && (
+              <>
+                <div className="hidden items-center gap-4 text-xs md:flex">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
+                    <span className="text-neutral-500 dark:text-neutral-400">{stories.length} total</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    <span className="text-neutral-500 dark:text-neutral-400">{needsCurationCount} pending</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="text-neutral-500 dark:text-neutral-400">{approvedCount} approved</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-neutral-600" />
+                    <span className="text-neutral-500 dark:text-neutral-400">{withImagesCount} with images</span>
+                  </div>
+                </div>
+                <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-700" />
+              </>
+            )}
 
-            <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-700" />
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={loadStories}
-              disabled={isLoading}
-              className="h-8 w-8 p-0 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
-            </Button>
+            {activeTab === "stories" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={loadStories}
+                disabled={isLoading}
+                className="h-8 w-8 p-0 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+              </Button>
+            )}
 
             <Button
               variant="ghost"
@@ -170,46 +157,92 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Mobile filters */}
-        <div className="flex gap-1 border-t border-neutral-100 px-4 py-2 dark:border-neutral-800 sm:hidden">
-          {filterOptions.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => setFilter(option.value)}
-              className={cn(
-                "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
-                filter === option.value
-                  ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-                  : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
-              )}
-            >
-              {option.label} ({option.count})
-            </button>
-          ))}
+        {/* Mobile tabs + filters */}
+        <div className="border-t border-neutral-100 dark:border-neutral-800 sm:hidden">
+          <div className="flex gap-1 px-4 py-2">
+            <AdminTabs activeTab={activeTab} onTabChange={setActiveTab} />
+          </div>
+          {activeTab === "stories" && (
+            <div className="flex gap-1 border-t border-neutral-100 px-4 py-2 dark:border-neutral-800">
+              {filterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setFilter(option.value)}
+                  className={cn(
+                    "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+                    filter === option.value
+                      ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+                      : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                  )}
+                >
+                  {option.label} ({option.count})
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Desktop story filters - only on stories tab */}
+        {activeTab === "stories" && (
+          <div className="hidden border-t border-neutral-100 dark:border-neutral-800 sm:block">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <nav className="flex items-center gap-1 py-2">
+                {filterOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setFilter(option.value)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      filter === option.value
+                        ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+                        : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                    )}
+                  >
+                    {option.label}
+                    <span className="tabular-nums text-neutral-400 dark:text-neutral-500">
+                      {option.count}
+                    </span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Error Message */}
-        {error && (
+        {error && activeTab === "stories" && (
           <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
             <p>{error}</p>
           </div>
         )}
 
-        {/* Stories Grid */}
-        {isLoading && stories.length === 0 ? (
-          <div className="flex min-h-[300px] flex-col items-center justify-center">
-            <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
-            <p className="mt-3 text-sm text-neutral-500">Loading...</p>
-          </div>
-        ) : stories.length === 0 ? (
-          <div className="flex min-h-[300px] flex-col items-center justify-center">
-            <p className="text-sm text-neutral-500">No stories found</p>
-          </div>
-        ) : (
-          <StoryGrid stories={stories} onEdit={setEditingStory} />
+        {/* Tab content */}
+        {activeTab === "stories" && (
+          <>
+            {isLoading && stories.length === 0 ? (
+              <div className="flex min-h-[300px] flex-col items-center justify-center">
+                <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
+                <p className="mt-3 text-sm text-neutral-500">Loading...</p>
+              </div>
+            ) : stories.length === 0 ? (
+              <div className="flex min-h-[300px] flex-col items-center justify-center">
+                <p className="text-sm text-neutral-500">No stories found</p>
+              </div>
+            ) : (
+              <StoryGrid stories={stories} onEdit={setEditingStory} />
+            )}
+          </>
+        )}
+
+        {activeTab === "toggles" && (
+          <FeatureTogglesPanel adminKey={adminKey} />
+        )}
+
+        {activeTab === "analytics" && (
+          <AnalyticsDashboard adminKey={adminKey} />
         )}
       </main>
 
