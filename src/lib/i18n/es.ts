@@ -3,95 +3,86 @@ import type { Translations } from './types';
 export const es: Translations = {
   common: {
     loading: 'Cargando...',
-    loadingMore: 'Cargando mas...',
-    loadingStories: 'Loading stories...',
-    error: 'Error',
     close: 'Cerrar',
-    cancel: 'Cancelar',
-    save: 'Guardar',
-    saving: 'Guardando',
-    understood: 'Entendido',
-    showAll: 'Mostrar todo',
-    back: 'Volver',
-  },
-
-  meta: {
-    title: 'Paisaxe | Descubre Asturias',
-    description: 'Tu guia personal para explorar Asturias. Descubre paisajes, rutas, gastronomia y cultura.',
   },
 
   chat: {
     placeholder: 'Escribe tu pregunta...',
-    placeholderListening: 'Escuchando...',
-    send: 'Enviar',
+    listening: 'Escuchando...',
     thinking: 'Pensando...',
-    askAnything: 'Pregunta lo que quieras sobre este lugar',
-    microphoneHint: 'Puedes usar el microfono para hablar',
-    errorGeneric: 'Lo siento, hubo un error. Intenta de nuevo.',
-    errorProcessing: 'Lo siento, no pude procesar tu pregunta.',
-    imageAlt: 'Imagen relacionada de Asturias',
+    empty_state: 'Pregunta lo que quieras sobre este lugar',
+    speech_hint: 'Puedes usar el microfono para hablar',
+    error_processing: 'Lo siento, no pude procesar tu pregunta.',
+    error_generic: 'Lo siento, hubo un error. Intenta de nuevo.',
+    image_alt: 'Imagen relacionada de Asturias',
     source: 'Fuente',
-  },
-
-  privacy: {
-    notice: 'Tus preguntas se procesan con inteligencia artificial para darte la mejor respuesta sobre Asturias. No guardamos tus conversaciones.',
+    privacy_notice: 'Tus preguntas se procesan con inteligencia artificial para darte la mejor respuesta sobre Asturias. No guardamos tus conversaciones.',
+    understood: 'Entendido',
   },
 
   stories: {
-    askAbout: 'Preguntar sobre esto',
-    noStoriesWithFilters: 'No hay historias con estos filtros',
-    clearFilters: 'Limpiar filtros',
-    exploreStories: 'Explorar historias',
-    alsoInteresting: 'Tambien te puede interesar',
-    relatedStories: 'Historias relacionadas',
-    newBadge: 'Nuevo',
+    ambient_off: 'Desactivar modo ambiente',
+    ambient_on: 'Modo ambiente',
+    ambient: 'Ambiente',
+    surprise: 'Sorpresa',
+    related: 'Tambien te puede interesar',
+    no_results: 'No hay historias con estos filtros',
+    new_badge: 'Nuevo',
+    filters: {
+      title: 'Filtros',
+      category: 'Categoria',
+      location: 'Ubicacion',
+      duration: 'Duracion',
+      clear: 'Limpiar filtros',
+    },
   },
 
-  filters: {
-    filters: 'Filtros',
-    category: 'Categoria',
-    location: 'Ubicacion',
-    zone: 'Zona',
-    duration: 'Duracion',
-    clearFilters: 'Limpiar filtros',
+  nav: {
+    navigate: 'navegar',
+    show_hide: 'mostrar/ocultar',
+    space: 'espacio',
+    next: 'siguiente',
   },
 
-  categories: {
-    nature: 'Naturaleza',
-    cities: 'Ciudades',
-    food: 'Gastronomia',
-    culture: 'Cultura',
-    activities: 'Actividades',
-  },
-
-  locations: {
-    eastern: 'Asturias Oriental',
-    central: 'Asturias Central',
-    western: 'Asturias Occidental',
-  },
-
-  durations: {
-    'day-trip': 'Excursion de un dia',
-    weekend: 'Fin de semana',
-    week: 'Una semana',
+  share: {
+    share: 'Compartir',
+    link_copied: 'Enlace copiado',
   },
 
   favorites: {
+    remove_saved: 'Quitar de guardados',
+    add_saved: 'Agregar a guardados',
+    remove: 'Quitar de favoritos',
+    add: 'Agregar a favoritos',
     saved: 'Guardados',
     save: 'Guardar',
-    addToFavorites: 'Agregar a favoritos',
-    removeFromFavorites: 'Quitar de favoritos',
-    addToSaved: 'Agregar a guardados',
-    removeFromSaved: 'Quitar de guardados',
-    noFavoritesYet: 'No tienes guardados todavia',
-    noFavoritesDescription: 'Explora las historias de Asturias y guarda las que mas te gusten para verlas despues.',
-    placeCount: '{count} {count, plural, one {lugar} other {lugares}}',
-    place: 'lugar',
-    places: 'lugares',
-    seenAll: 'Has visto todos tus guardados',
-    syncFavorites: 'Sincroniza tus favoritos',
-    syncDescription: 'Inicia sesion para guardar tus favoritos en la nube y acceder desde cualquier dispositivo.',
-    maybeLater: 'Quiza mas tarde',
+    title: 'Guardados',
+    place_singular: 'lugar',
+    place_plural: 'lugares',
+    local_only: 'Tus guardados solo estan en este dispositivo',
+    local_only_description: 'Si borras los datos del navegador o cambias de dispositivo, los perderas.',
+    sync_with_google: 'Sincronizar con Google',
+    empty_title: 'No tienes guardados todavia',
+    empty_description: 'Explora las historias de Asturias y guarda las que mas te gusten para verlas despues.',
+    explore: 'Explorar historias',
+    loading_more: 'Cargando mas...',
+    all_viewed: 'Has visto todos tus guardados',
+    remove_from_saved: 'Quitar de guardados',
+  },
+
+  accessibility: {
+    related_stories: 'Historias relacionadas',
+    language_switcher: 'Selector de idioma',
+  },
+
+  auth: {
+    user: 'Usuario',
+    sign_out: 'Cerrar sesion',
+    sign_in: 'Entrar',
+    sync_favorites_title: 'Sincroniza tus favoritos',
+    sync_favorites_description: 'Inicia sesion para guardar tus favoritos en la nube y acceder desde cualquier dispositivo.',
+    continue_with_google: 'Continuar con Google',
+    maybe_later: 'Quiza mas tarde',
   },
 
   mood: {
@@ -101,24 +92,7 @@ export const es: Translations = {
     adventurous: 'Aventurero',
     cultural: 'Cultural',
     delicious: 'Delicioso',
-  },
-
-  controls: {
-    share: 'Compartir',
-    surprise: 'Sorpresa',
-    ambientModeOn: 'Desactivar modo ambiente',
-    ambientModeOff: 'Modo ambiente',
-    ambient: 'Ambient',
-    navigate: 'navegar',
-    showHide: 'mostrar/ocultar',
-    next: 'siguiente',
-  },
-
-  auth: {
-    signIn: 'Entrar',
-    signOut: 'Cerrar sesion',
-    continueWithGoogle: 'Continuar con Google',
-    user: 'Usuario',
+    show_all: 'Mostrar todo',
   },
 
   admin: {
@@ -187,9 +161,5 @@ export const es: Translations = {
       sessions: 'sessions',
       noAnalytics: 'No analytics events recorded in this date range.',
     },
-  },
-
-  keyboard: {
-    space: 'espacio',
   },
 };

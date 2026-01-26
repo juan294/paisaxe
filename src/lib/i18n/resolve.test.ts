@@ -62,12 +62,12 @@ describe('resolveTranslation', () => {
   it('resolves correctly with actual Spanish locale keys', () => {
     expect(resolveTranslation('common.loading', es)).toBe('Cargando...');
     expect(resolveTranslation('chat.placeholder', es)).toBe('Escribe tu pregunta...');
-    expect(resolveTranslation('categories.nature', es)).toBe('Naturaleza');
+    expect(resolveTranslation('stories.filters.category', es)).toBe('Categoria');
   });
 
   it('resolves correctly with actual English locale keys', () => {
     expect(resolveTranslation('common.loading', en)).toBe('Loading...');
     expect(resolveTranslation('chat.placeholder', en)).toBe('Ask about this place...');
-    expect(resolveTranslation('categories.nature', en)).toBe('Nature');
+    expect(resolveTranslation('stories.filters.category', en)).toBe('Category');
   });
 });
