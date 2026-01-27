@@ -20,7 +20,6 @@ export async function generateMetadata({ params }: StoryPageProps): Promise<Meta
     openGraph: {
       title: story.title,
       description: story.description,
-      images: story.image ? [{ url: story.image, width: 1200, height: 630 }] : [],
       type: "article",
       siteName: "Paisaxe",
     },
@@ -28,7 +27,6 @@ export async function generateMetadata({ params }: StoryPageProps): Promise<Meta
       card: "summary_large_image",
       title: story.title,
       description: story.description,
-      images: story.image ? [story.image] : [],
     },
   };
 }
