@@ -3,7 +3,7 @@
 A living document tracking implemented features and future development plans.
 
 **Domain**: paisaxe.es
-**Last Updated**: January 26, 2026
+**Last Updated**: January 27, 2026
 
 ---
 
@@ -266,6 +266,53 @@ Note: Story content (titles, descriptions) remains in Spanish — sourced from S
 
 ---
 
+## Phase 8: Automation & Quality Agents :white_check_mark:
+
+Automated agents and scheduled workflows to guarantee code quality, security, and availability at the highest levels. All tools are free or use existing paid services (Anthropic API).
+
+### Security & Dependency Management
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Gitleaks Secret Scanning | :white_check_mark: | `gitleaks.yml` — push/PR + daily 4AM UTC cron |
+| Dependabot | :white_check_mark: | `dependabot.yml` — npm + GitHub Actions, weekly Monday, grouped PRs |
+| License Compliance | :white_check_mark: | `license-check.yml` — fails on GPL/AGPL/EUPL/SSPL/BSL/CPAL/OSL |
+
+### Performance CI
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Lighthouse CI | :white_check_mark: | `lighthouse.yml` + `lighthouserc.json` — 3 runs, perf/a11y/SEO budgets |
+| Bundle Size Tracking | :white_check_mark: | `bundle-size.yml` — PR comments with .next size breakdown + top 20 bundles |
+
+### App Integration
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Vercel Speed Insights | :white_check_mark: | `<SpeedInsights />` in layout.tsx — RUM for Core Web Vitals |
+| Health Check Endpoint | :white_check_mark: | `GET /api/health` — Supabase connectivity, latency, version, uptime (9 tests) |
+
+### Code Quality & AI Review
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Knip Dead Code Detection | :white_check_mark: | `knip.yml` + `knip.json` — report mode (initial rollout), Next.js + Vitest aware |
+| Claude Code Action | :white_check_mark: | `claude-review.yml` — AI review on PRs using claude-sonnet-4, @claude trigger |
+
+### Database Maintenance
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Supabase pg_cron | :white_check_mark: | `011_pg_cron_maintenance.sql` — VACUUM chunks/analytics weekly, ANALYZE daily |
+
+### Availability Monitoring
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Upptime | :white_check_mark: | `.github/upptime/.upptimerc.yml` config ready; requires separate repo setup (see file comments) |
+
+---
+
 ## Verification Checklist
 
 - [x] Image extraction: 1,773 images extracted to `content/images/`
@@ -274,7 +321,7 @@ Note: Story content (titles, descriptions) remains in Spanish — sourced from S
 - [x] Database migration: Stories table exists in Supabase
 - [x] Story seeding: 20 stories seeded via `npm run seed-db:stories`
 - [x] Image replacement: 7 stories use PDF images, 13 use Unsplash fallback
-- [x] Tests: `npm run test` - 984 tests pass (70 files)
+- [x] Tests: `npm run test` - 1054 tests pass (86 files)
 - [x] Build: `npm run build` - no errors
 - [x] Auth: Google SSO working with Supabase SSR
 - [x] Favorites: Cloud sync + local storage fallback
@@ -282,6 +329,12 @@ Note: Story content (titles, descriptions) remains in Spanish — sourced from S
 - [x] Feature flags: 10 flags in database, all features implemented
 - [x] Analytics: Vercel Analytics active, custom events table + admin dashboard
 - [x] i18n: ES/EN language switcher, browser detection, all UI chrome translated
+- [x] Security: Gitleaks, Dependabot, license compliance workflows active
+- [x] Performance CI: Lighthouse CI + bundle size analysis on PRs
+- [x] Monitoring: Speed Insights RUM + `/api/health` endpoint
+- [x] Code quality: Knip dead code detection + Claude AI PR reviews
+- [x] Database: pg_cron maintenance jobs scheduled (VACUUM, ANALYZE)
+- [x] Availability: Upptime config prepared (separate repo setup required)
 
 ---
 
@@ -295,6 +348,7 @@ Note: Story content (titles, descriptions) remains in Spanish — sourced from S
 | `008_feature_flags.sql` | Feature flag system | :white_check_mark: |
 | `009_analytics_events.sql` | Custom analytics events | :white_check_mark: |
 | `010_story_metadata_extensions.sql` | Extended metadata for visitor features | :white_check_mark: |
+| `011_pg_cron_maintenance.sql` | Scheduled VACUUM/ANALYZE via pg_cron | :white_check_mark: |
 
 ---
 
@@ -320,5 +374,6 @@ Note: Story content (titles, descriptions) remains in Spanish — sourced from S
 | v0.5.0 | Jan 2026 | Visitor experience enhancements (Waves 1-3) + feature flags |
 | v0.6.0 | Jan 2026 | AI improvements (Pelayo persona, chat images) |
 | v0.7.0 | Jan 2026 | Internationalization (ES/EN language switcher, browser detection, full UI translation) |
-| v0.8.0 | - | Polish (skeleton UI, a11y, SEO, error boundaries) |
+| v0.8.0 | Jan 2026 | Automation & quality agents (security, performance, availability, AI review) |
+| v0.9.0 | - | Polish (skeleton UI, a11y, SEO, error boundaries) |
 | v1.0.0 | - | Production release |
