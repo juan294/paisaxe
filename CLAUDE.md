@@ -405,12 +405,12 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 ## Architecture Decisions
 
 ### Embeddings (Voyage AI)
-- Model: `voyage-3` (1024 dimensions, optimized for multilingual)
+- Model: `voyage-3` (512 dimensions via Matryoshka embeddings, optimized for multilingual)
 - Batch processing: 128 texts per request
 - Cost: ~$0.0001 per 1000 tokens
 
 ### Vector Search
-- Store in Supabase pgvector with 1024 dimensions
+- Store in Supabase pgvector with 512 dimensions
 - Hybrid search: vector similarity + keyword matching for place names
 - Match threshold: 0.7 similarity
 
@@ -438,11 +438,11 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 ## Database Schema
 
 ```sql
--- chunks table for PDF content (1024 dims for voyage-3)
+-- chunks table for PDF content (512 dims for voyage-3 Matryoshka)
 create table chunks (
   id uuid primary key default gen_random_uuid(),
   content text not null,
-  embedding vector(1024),
+  embedding vector(512),
   source_pdf text not null,
   page_number int,
   section_title text,

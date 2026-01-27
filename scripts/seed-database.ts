@@ -30,6 +30,7 @@ if (voyageApiKey) {
 }
 
 const EMBEDDING_MODEL = "voyage-3";
+const EMBEDDING_DIMENSIONS = 512;
 const BATCH_SIZE = 64; // Larger batches with paid tier
 const RATE_LIMIT_DELAY = 500; // 500ms between batches (paid tier: 300 RPM)
 
@@ -323,6 +324,7 @@ async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   const result = await voyage.embed({
     input: texts,
     model: EMBEDDING_MODEL,
+    outputDimension: EMBEDDING_DIMENSIONS,
   });
 
   if (!result.data) {
@@ -405,7 +407,7 @@ async function seedChunks(): Promise<void> {
 
   const chunks: Chunk[] = JSON.parse(fs.readFileSync(CHUNKS_FILE, "utf-8"));
   console.log(`Loading ${chunks.length} chunks into database...`);
-  console.log(`Using Voyage AI model: ${EMBEDDING_MODEL}`);
+  console.log(`Using Voyage AI model: ${EMBEDDING_MODEL} (${EMBEDDING_DIMENSIONS} dimensions)`);
 
   let processed = 0;
   let totalTokens = 0;
@@ -420,6 +422,7 @@ async function seedChunks(): Promise<void> {
       const result = await voyage.embed({
         input: texts,
         model: EMBEDDING_MODEL,
+        outputDimension: EMBEDDING_DIMENSIONS,
       });
 
       if (!result.data || result.data.length !== texts.length) {
