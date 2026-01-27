@@ -1,6 +1,7 @@
-# Paisaxe - Asturias Tourism Guide
+# Paisaxe - Look. Ask. Explore.
 
 [![CI](https://github.com/juan294/paisaxe/actions/workflows/ci.yml/badge.svg)](https://github.com/juan294/paisaxe/actions/workflows/ci.yml)
+[![E2E Tests](https://github.com/juan294/paisaxe/actions/workflows/e2e.yml/badge.svg)](https://github.com/juan294/paisaxe/actions/workflows/e2e.yml)
 [![Security Scan](https://github.com/juan294/paisaxe/actions/workflows/security.yml/badge.svg)](https://github.com/juan294/paisaxe/actions/workflows/security.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green)](https://nodejs.org/)
@@ -9,35 +10,44 @@
 
 **[paisaxe.es](https://paisaxe.es)**
 
-An AI-powered tourism guide for Asturias, Spain. Experience the region through immersive visual stories and ask questions in natural language to discover hidden gems, local gastronomy, hiking routes, and more.
+An AI-powered tourism experience for Asturias, Spain. Explore the region through immersive visual stories and ask questions via voice or text to discover landscapes, local gastronomy, hiking routes, and more.
 
 *"Paisaxe" means "landscape" in Asturian (Bable), the traditional language of the region.*
 
 ## Features
 
-- **Immersive Visual Stories**: Full-screen images showcasing Asturias' landscapes, cities, and culture
-- **AI-Powered Chat**: Ask questions about any location and get contextual answers
-- **Voice Input**: Use speech recognition to ask questions hands-free
-- **Multilingual**: Responds in Spanish or English based on your query
-- **Curated Content**: Information sourced from official Asturias tourism guides
+- **Immersive Visual Stories**: Full-screen carousel showcasing Asturias' landscapes, cities, and culture
+- **AI-Powered Chat**: Ask questions about any location and get contextual answers with source references
+- **Voice Input**: Speech recognition for hands-free questions
+- **Multilingual**: UI in Spanish; chat responds in the visitor's language
+- **Curated Content**: Information sourced from 37 official Asturias tourism guides
+- **User Favorites**: Save and revisit stories you love (Google OAuth)
+- **Admin Panel**: Content curation and feature flag management
+- **Real-time Updates**: Live content sync via Supabase Realtime
+- **Analytics**: Visitor interaction tracking
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | Framework | Next.js 16 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS + shadcn/ui |
+| Language | TypeScript (strict mode) |
+| Styling | Tailwind CSS 4 + shadcn/ui |
 | Database | Supabase (PostgreSQL + pgvector) |
 | AI Chat | Claude API (Anthropic) |
-| Embeddings | Voyage AI |
+| Embeddings | Voyage AI (voyage-context-3, 512 dims) |
+| Reranking | Voyage AI (rerank-2.5) |
+| Auth | Google OAuth via Supabase Auth |
+| Testing | Vitest + React Testing Library + Playwright |
+| Deployment | Vercel |
+| Monitoring | Upptime + Vercel Speed Insights |
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 20+
-- npm or yarn
+- npm
 - Supabase account
 - Anthropic API key
 - Voyage AI API key
@@ -62,22 +72,39 @@ An AI-powered tourism guide for Asturias, Spain. Experience the region through i
 
 4. Configure your environment variables in `.env.local`:
    ```
-   ANTHROPIC_API_KEY=sk-ant-xxxxx
-   VOYAGE_API_KEY=pa-xxxxx
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxxxx
-   SUPABASE_SERVICE_KEY=eyJxxxxx
+   # AI Services
+   ANTHROPIC_API_KEY=
+   VOYAGE_API_KEY=
+
+   # Supabase
+   NEXT_PUBLIC_SUPABASE_URL=
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=
+   SUPABASE_SERVICE_KEY=
+
+   # Admin
+   ADMIN_SECRET_KEY=
+
+   # Google OAuth
+   GOOGLE_CLIENT_ID=
+   GOOGLE_CLIENT_SECRET=
+
+   # Webhooks
+   WEBHOOK_SECRET=
+
+   # Site URL
+   NEXT_PUBLIC_SITE_URL=http://localhost:3000
    ```
 
 5. Set up the database:
    - Create a Supabase project
-   - Run the migrations in `supabase/migrations/`
    - Enable the pgvector extension
+   - Run the migrations in `supabase/migrations/` (17 migration files)
 
 6. Seed the database with tourism content:
    ```bash
-   npm run process-pdfs   # Extract content from PDFs
-   npm run seed-db        # Generate embeddings and populate DB
+   npm run process-pdfs     # Extract content from PDFs
+   npm run extract-images   # Extract images from PDFs
+   npm run seed-all         # Seed images + embeddings
    ```
 
 7. Start the development server:
@@ -89,6 +116,8 @@ An AI-powered tourism guide for Asturias, Spain. Experience the region through i
 
 ## Scripts
 
+### Development
+
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start development server |
@@ -96,38 +125,124 @@ An AI-powered tourism guide for Asturias, Spain. Experience the region through i
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
 | `npm run typecheck` | Run TypeScript checks |
-| `npm run test` | Run tests |
-| `npm run test:coverage` | Run tests with coverage |
+
+### Testing
+
+| Command | Description |
+|---------|-------------|
+| `npm run test` | Run unit & component tests (Vitest) |
+| `npm run test:watch` | Watch mode |
+| `npm run test:coverage` | Generate coverage report |
+| `npm run test:ui` | Open Vitest UI |
+| `npm run test:e2e` | Run E2E tests (Playwright, headless) |
+| `npm run test:e2e:ui` | Playwright UI mode |
+| `npm run test:e2e:headed` | Run with visible browser |
+| `npm run test:e2e:debug` | Debug mode with inspector |
+
+### Data Pipeline
+
+| Command | Description |
+|---------|-------------|
+| `npm run process-pdfs` | Extract text content from PDFs |
+| `npm run extract-images` | Extract images from PDFs |
+| `npm run generate-stories` | Generate story definitions |
+| `npm run seed-db` | Generate embeddings and populate DB |
+| `npm run seed-db:clear` | Clear and re-seed embeddings |
+| `npm run seed-images` | Seed extracted images to DB |
+| `npm run seed-images:clear` | Clear and re-seed images |
+| `npm run seed-all` | Seed images + embeddings |
+| `npm run seed-all:clear` | Clear and re-seed everything |
 
 ## Project Structure
 
 ```
 paisaxe/
+├── e2e/                        # Playwright E2E tests
+│   ├── fixtures/               # Mock data for E2E
+│   └── *.spec.ts               # Test files
 ├── src/
-│   ├── app/                    # Next.js App Router pages
-│   │   ├── api/chat/           # Chat API endpoint
-│   │   └── immersive/          # Immersive stories page
+│   ├── app/                    # Next.js App Router
+│   │   ├── page.tsx            # Redirects to /immersive
+│   │   ├── layout.tsx          # Root layout
+│   │   ├── admin/              # Admin panel
+│   │   ├── auth/               # OAuth callback
+│   │   ├── favorites/          # User favorites page
+│   │   ├── immersive/          # Immersive stories page
+│   │   ├── story/              # Individual story pages
+│   │   └── api/
+│   │       ├── chat/           # Chat endpoint
+│   │       ├── health/         # Health check (uptime monitoring)
+│   │       └── webhooks/       # Supabase webhook receiver
 │   ├── components/
+│   │   ├── a11y/               # Accessibility components
+│   │   ├── admin/              # Admin panel components
+│   │   ├── auth/               # Authentication UI
 │   │   ├── immersive/          # Story viewer & voice chat
+│   │   ├── seo/                # SEO components
 │   │   └── ui/                 # shadcn/ui components
+│   ├── hooks/                  # Custom React hooks
 │   ├── lib/                    # Utilities & API clients
+│   │   └── i18n/               # Internationalization
 │   └── types/                  # TypeScript definitions
 ├── content/
-│   └── pdfs/                   # Source tourism guides
-├── scripts/                    # Data processing scripts
-└── supabase/
-    └── migrations/             # Database schema
+│   └── pdfs/                   # Source tourism guides (37 PDFs)
+├── scripts/                    # Data processing & automation
+├── supabase/
+│   ├── functions/              # Edge Functions (Deno)
+│   └── migrations/             # Database schema (17 migrations)
+├── docs/                       # Project documentation
+└── .github/
+    └── workflows/              # CI/CD (9 workflows)
 ```
+
+## CI/CD
+
+Automated quality checks run on every push and pull request via GitHub Actions.
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| **CI** | Push/PR | Lint, typecheck, test, build |
+| **E2E** | Push/PR | Playwright end-to-end tests |
+| **Security Audit** | Push/PR + weekly | `npm audit` for vulnerabilities |
+| **Gitleaks** | Push/PR + daily | Scans for secrets in git history |
+| **License Check** | PRs | Blocks copyleft/GPL dependencies |
+| **Lighthouse CI** | PRs | Performance & accessibility auditing |
+| **Bundle Size** | PRs | Reports JS bundle sizes as PR comment |
+| **Knip** | PRs | Dead code & unused dependency detection |
+| **Claude Review** | PRs | AI-powered code review |
+
+Dependabot opens weekly PRs for dependency updates.
+
+## Architecture
+
+### Chat Pipeline
+
+1. User sends a question (text or voice)
+2. Generate embedding via Voyage AI (`voyage-context-3`, 512 dims)
+3. Find top-10 candidate chunks via pgvector similarity search
+4. Rerank candidates to top-3 via Voyage AI `rerank-2.5`
+5. Pass reranked context to Claude for response generation
+6. Render markdown response with inline images and source attribution
+
+### Database
+
+PostgreSQL on Supabase with pgvector for vector similarity search, pg_cron for scheduled maintenance, and pg_net for webhook-driven cache invalidation.
+
+### Edge Functions
+
+Deno-based functions on Supabase for background tasks:
+- **keep-alive**: Prevents free-tier database auto-pause
+- **cleanup-analytics**: Deletes analytics events older than 90 days
 
 ## Content Sources
 
-The tourism information is sourced from official Asturias guides covering:
-- City guides (Oviedo, Gijón, Avilés)
+Tourism information sourced from 37 official Asturias guides:
+- City guides (Oviedo, Gijon, Aviles)
 - Outdoor activities (hiking, cycling)
-- Culture (pre-Romanesque art, museums)
+- Culture (pre-Romanesque art, museums, festivals)
 - Gastronomy (sidra, fabada, local dishes)
 - Camino de Santiago planning
-- Family activities
+- Family activities and seasonal events
 
 ## License
 
