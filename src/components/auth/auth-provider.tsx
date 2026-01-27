@@ -55,12 +55,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [supabase]);
 
-  const signInWithGoogle = useCallback(async () => {
-    const redirectTo = typeof window !== "undefined"
+  const signInWithGoogle = useCallback(async (redirectPath?: string) => {
+    const baseRedirectTo = typeof window !== "undefined"
       ? `${window.location.origin}/auth/callback`
       : process.env.NEXT_PUBLIC_SITE_URL
         ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
         : "http://localhost:3000/auth/callback";
+
+    const redirectTo = redirectPath
+      ? `${baseRedirectTo}?next=${encodeURIComponent(redirectPath)}`
+      : baseRedirectTo;
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",

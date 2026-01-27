@@ -1,138 +1,150 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { NextRequest } from "next/server";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { validateAdminAuth } from "./admin-auth";
 
-describe("admin-auth", () => {
-  const originalEnv = process.env.ADMIN_SECRET_KEY;
+// Mock next/headers cookies
+const mockGetAll = vi.fn();
+const mockSet = vi.fn();
 
+vi.mock("next/headers", () => ({
+  cookies: vi.fn().mockResolvedValue({
+    getAll: () => mockGetAll(),
+    set: (...args: unknown[]) => mockSet(...args),
+  }),
+}));
+
+// Mock Supabase server client
+const mockGetUser = vi.fn();
+const mockFrom = vi.fn();
+const mockSelect = vi.fn();
+const mockEq = vi.fn();
+const mockSingle = vi.fn();
+
+vi.mock("@supabase/ssr", () => ({
+  createServerClient: () => ({
+    auth: {
+      getUser: mockGetUser,
+    },
+    from: mockFrom,
+  }),
+}));
+
+function setupProfileMock(data: { role: string } | null, error: unknown = null) {
+  mockSingle.mockResolvedValue({ data, error });
+  mockEq.mockReturnValue({ single: mockSingle });
+  mockSelect.mockReturnValue({ eq: mockEq });
+  mockFrom.mockReturnValue({ select: mockSelect });
+}
+
+describe("validateAdminAuth", () => {
   beforeEach(() => {
-    process.env.ADMIN_SECRET_KEY = "test-secret-key";
+    vi.clearAllMocks();
+    mockGetAll.mockReturnValue([]);
   });
 
-  afterEach(() => {
-    process.env.ADMIN_SECRET_KEY = originalEnv;
+  it("should return valid true with userId for admin user", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "admin@example.com" } },
+      error: null,
+    });
+    setupProfileMock({ role: "admin" });
+
+    const result = await validateAdminAuth();
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.userId).toBe("user-123");
+    }
+    expect(mockFrom).toHaveBeenCalledWith("user_profiles");
+    expect(mockEq).toHaveBeenCalledWith("user_id", "user-123");
   });
 
-  describe("validateAdminAuth", () => {
-    it("should return valid true for correct authorization", () => {
-      const request = new NextRequest("http://localhost:3000/api/admin/stories", {
-        headers: {
-          authorization: "Bearer test-secret-key",
-        },
-      });
-
-      const result = validateAdminAuth(request);
-
-      expect(result.valid).toBe(true);
-      expect("error" in result).toBe(false);
+  it("should return 401 when no user session exists", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
+      error: null,
     });
 
-    it("should return 500 when ADMIN_SECRET_KEY is not configured", async () => {
-      delete process.env.ADMIN_SECRET_KEY;
+    const result = await validateAdminAuth();
 
-      const request = new NextRequest("http://localhost:3000/api/admin/stories", {
-        headers: {
-          authorization: "Bearer some-key",
-        },
-      });
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      const body = await result.error.json();
+      expect(result.error.status).toBe(401);
+      expect(body.error).toBe("Authentication required");
+    }
+  });
 
-      const result = validateAdminAuth(request);
-
-      expect(result.valid).toBe(false);
-      if (!result.valid) {
-        const errorData = await result.error.json();
-        expect(result.error.status).toBe(500);
-        expect(errorData.error).toBe("Server configuration error");
-      }
+  it("should return 401 when getUser returns an error", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: "Invalid token" },
     });
 
-    it("should return 401 when authorization header is missing", async () => {
-      const request = new NextRequest("http://localhost:3000/api/admin/stories");
+    const result = await validateAdminAuth();
 
-      const result = validateAdminAuth(request);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.error.status).toBe(401);
+    }
+  });
 
-      expect(result.valid).toBe(false);
-      if (!result.valid) {
-        const errorData = await result.error.json();
-        expect(result.error.status).toBe(401);
-        expect(errorData.error).toBe("Authorization header required");
-      }
+  it("should return 403 when user has 'user' role (not admin)", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-456", email: "user@example.com" } },
+      error: null,
     });
+    setupProfileMock({ role: "user" });
 
-    it("should return 401 for invalid authorization format - missing Bearer", async () => {
-      const request = new NextRequest("http://localhost:3000/api/admin/stories", {
-        headers: {
-          authorization: "test-secret-key",
-        },
-      });
+    const result = await validateAdminAuth();
 
-      const result = validateAdminAuth(request);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      const body = await result.error.json();
+      expect(result.error.status).toBe(403);
+      expect(body.error).toBe("Admin access required");
+    }
+  });
 
-      expect(result.valid).toBe(false);
-      if (!result.valid) {
-        const errorData = await result.error.json();
-        expect(result.error.status).toBe(401);
-        expect(errorData.error).toBe("Invalid authorization format. Expected: Bearer {token}");
-      }
+  it("should return 403 when user profile not found", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-789", email: "noone@example.com" } },
+      error: null,
     });
+    setupProfileMock(null);
 
-    it("should return 401 for invalid authorization format - wrong scheme", async () => {
-      const request = new NextRequest("http://localhost:3000/api/admin/stories", {
-        headers: {
-          authorization: "Basic test-secret-key",
-        },
-      });
+    const result = await validateAdminAuth();
 
-      const result = validateAdminAuth(request);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.error.status).toBe(403);
+    }
+  });
 
-      expect(result.valid).toBe(false);
-      if (!result.valid) {
-        expect(result.error.status).toBe(401);
-      }
+  it("should return 403 when profile query returns error", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-000", email: "error@example.com" } },
+      error: null,
     });
+    setupProfileMock(null, { message: "Query failed" });
 
-    it("should return 403 for invalid admin key", async () => {
-      const request = new NextRequest("http://localhost:3000/api/admin/stories", {
-        headers: {
-          authorization: "Bearer wrong-key",
-        },
-      });
+    const result = await validateAdminAuth();
 
-      const result = validateAdminAuth(request);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.error.status).toBe(403);
+    }
+  });
 
-      expect(result.valid).toBe(false);
-      if (!result.valid) {
-        const errorData = await result.error.json();
-        expect(result.error.status).toBe(403);
-        expect(errorData.error).toBe("Invalid admin key");
-      }
-    });
+  it("should return 500 when an unexpected error is thrown", async () => {
+    mockGetUser.mockRejectedValue(new Error("Unexpected failure"));
 
-    it("should be case-insensitive for Bearer scheme", () => {
-      const request = new NextRequest("http://localhost:3000/api/admin/stories", {
-        headers: {
-          authorization: "bearer test-secret-key",
-        },
-      });
+    const result = await validateAdminAuth();
 
-      const result = validateAdminAuth(request);
-
-      expect(result.valid).toBe(true);
-    });
-
-    it("should reject keys that differ only in length", async () => {
-      const request = new NextRequest("http://localhost:3000/api/admin/stories", {
-        headers: {
-          authorization: "Bearer test-secret-key-extra",
-        },
-      });
-
-      const result = validateAdminAuth(request);
-
-      expect(result.valid).toBe(false);
-      if (!result.valid) {
-        expect(result.error.status).toBe(403);
-      }
-    });
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      const body = await result.error.json();
+      expect(result.error.status).toBe(500);
+      expect(body.error).toBe("Authentication failed");
+    }
   });
 });

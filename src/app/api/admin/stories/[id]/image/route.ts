@@ -8,7 +8,7 @@ interface RouteParams {
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   // Validate admin auth
-  const auth = validateAdminAuth(request);
+  const auth = await validateAdminAuth();
   if (!auth.valid) {
     return auth.error;
   }

@@ -20,7 +20,7 @@ describe("GET /api/admin/analytics", () => {
   });
 
   it("should return 401 when auth fails", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({
+    vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: false,
       error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
     });
@@ -32,7 +32,7 @@ describe("GET /api/admin/analytics", () => {
   });
 
   it("should return analytics summary with totalEvents, totalSessions, featureBreakdown", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockEvents = [
       { feature_flag: "contextual_prompts", session_id: "sess-1" },
@@ -91,7 +91,7 @@ describe("GET /api/admin/analytics", () => {
   });
 
   it("should accept from/to query params", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const fromDate = "2025-01-01T00:00:00Z";
     const toDate = "2025-01-31T23:59:59Z";
@@ -131,7 +131,7 @@ describe("GET /api/admin/analytics", () => {
   });
 
   it("should return 500 when count query fails", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockCountLte = vi.fn().mockResolvedValue({
       count: null,
@@ -152,7 +152,7 @@ describe("GET /api/admin/analytics", () => {
   });
 
   it("should return 500 when events query fails", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockCountLte = vi.fn().mockResolvedValue({ count: 5, error: null });
     const mockCountGte = vi.fn().mockReturnValue({ lte: mockCountLte });
@@ -185,7 +185,7 @@ describe("GET /api/admin/analytics", () => {
   });
 
   it("should return 500 on unexpected error", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
     vi.mocked(createAdminClient).mockImplementation(() => {
       throw new Error("Unexpected");
     });
@@ -199,7 +199,7 @@ describe("GET /api/admin/analytics", () => {
   });
 
   it("should handle empty events gracefully", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockCountLte = vi.fn().mockResolvedValue({ count: 0, error: null });
     const mockCountGte = vi.fn().mockReturnValue({ lte: mockCountLte });

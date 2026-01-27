@@ -6,20 +6,13 @@ const API_BASE = "/api/admin";
 
 /**
  * Client-side API helpers for admin panel.
- * All methods require the admin key to be passed.
+ * Auth is handled via session cookies automatically.
  */
-
-function getAuthHeaders(adminKey: string): HeadersInit {
-  return {
-    Authorization: `Bearer ${adminKey}`,
-  };
-}
 
 /**
  * Fetch all stories with optional filter
  */
 export async function fetchStories(
-  adminKey: string,
   filter?: CurationStatus
 ): Promise<AdminApiResponse<AdminStory[]>> {
   try {
@@ -28,9 +21,7 @@ export async function fetchStories(
       url.searchParams.set("filter", filter);
     }
 
-    const response = await fetch(url.toString(), {
-      headers: getAuthHeaders(adminKey),
-    });
+    const response = await fetch(url.toString());
 
     if (!response.ok) {
       const error = await response.json();
@@ -48,7 +39,6 @@ export async function fetchStories(
  * Update story image via URL
  */
 export async function updateStoryImageUrl(
-  adminKey: string,
   storyId: string,
   imageUrl: string,
   imageSource?: string
@@ -57,7 +47,6 @@ export async function updateStoryImageUrl(
     const response = await fetch(`${API_BASE}/stories/${storyId}/image`, {
       method: "PUT",
       headers: {
-        ...getAuthHeaders(adminKey),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ imageUrl, imageSource }),
@@ -79,7 +68,6 @@ export async function updateStoryImageUrl(
  * Upload image file for a story
  */
 export async function uploadStoryImage(
-  adminKey: string,
   storyId: string,
   file: File,
   imageSource?: string
@@ -93,7 +81,6 @@ export async function uploadStoryImage(
 
     const response = await fetch(`${API_BASE}/stories/${storyId}/image`, {
       method: "PUT",
-      headers: getAuthHeaders(adminKey),
       body: formData,
     });
 
@@ -113,7 +100,6 @@ export async function uploadStoryImage(
  * Update story curation status
  */
 export async function updateStoryStatus(
-  adminKey: string,
   storyId: string,
   status: CurationStatus
 ): Promise<AdminApiResponse<{ id: string; curationStatus: CurationStatus }>> {
@@ -121,7 +107,6 @@ export async function updateStoryStatus(
     const response = await fetch(`${API_BASE}/stories/${storyId}/status`, {
       method: "PUT",
       headers: {
-        ...getAuthHeaders(adminKey),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ status }),
@@ -140,29 +125,11 @@ export async function updateStoryStatus(
 }
 
 /**
- * Validate admin key by making a test request
- */
-export async function validateAdminKey(adminKey: string): Promise<boolean> {
-  try {
-    const response = await fetch(`${API_BASE}/stories`, {
-      headers: getAuthHeaders(adminKey),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Fetch all feature flags
  */
-export async function fetchFeatureFlags(
-  adminKey: string
-): Promise<AdminApiResponse<FeatureFlag[]>> {
+export async function fetchFeatureFlags(): Promise<AdminApiResponse<FeatureFlag[]>> {
   try {
-    const response = await fetch("/api/feature-flags", {
-      headers: getAuthHeaders(adminKey),
-    });
+    const response = await fetch("/api/feature-flags");
 
     if (!response.ok) {
       const error = await response.json();
@@ -180,7 +147,6 @@ export async function fetchFeatureFlags(
  * Toggle a feature flag on or off
  */
 export async function updateFeatureFlag(
-  adminKey: string,
   flagKey: FeatureFlagKey,
   enabled: boolean
 ): Promise<AdminApiResponse<FeatureFlag>> {
@@ -188,7 +154,6 @@ export async function updateFeatureFlag(
     const response = await fetch(`${API_BASE}/feature-flags/${flagKey}`, {
       method: "PUT",
       headers: {
-        ...getAuthHeaders(adminKey),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ enabled }),
@@ -210,7 +175,6 @@ export async function updateFeatureFlag(
  * Fetch analytics dashboard data
  */
 export async function fetchAnalytics(
-  adminKey: string,
   from?: string,
   to?: string
 ): Promise<AdminApiResponse<AnalyticsDashboardData>> {
@@ -219,9 +183,7 @@ export async function fetchAnalytics(
     if (from) url.searchParams.set("from", from);
     if (to) url.searchParams.set("to", to);
 
-    const response = await fetch(url.toString(), {
-      headers: getAuthHeaders(adminKey),
-    });
+    const response = await fetch(url.toString());
 
     if (!response.ok) {
       const error = await response.json();

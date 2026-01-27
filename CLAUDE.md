@@ -304,6 +304,7 @@ paisaxe/
 │   │   ├── ui/                 # shadcn/ui components
 │   │   └── immersive/          # Story viewer & voice chat
 │   ├── hooks/
+│   │   ├── use-admin-role.ts              # Client-side admin role check (RBAC)
 │   │   ├── use-realtime-feature-flags.ts  # Live feature flag sync via Realtime
 │   │   └── use-realtime-stories.ts        # Live story update notifications
 │   ├── lib/
@@ -377,10 +378,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_KEY=    # Service role key (for seeding)
 
-# Admin Panel
-ADMIN_SECRET_KEY=        # Admin authentication
-
-# Google OAuth
+# Google OAuth (used by Supabase Auth)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
@@ -471,7 +469,25 @@ create table images (
   tags text[],
   created_at timestamptz default now()
 );
+
+-- user_profiles table for RBAC (admin panel access)
+create table user_profiles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid unique not null references auth.users(id) on delete cascade,
+  email text,
+  role text not null default 'user' check (role in ('user', 'admin')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
 ```
+
+### Admin Authentication
+
+Admin access uses Supabase Auth (Google OAuth) + role-based access control via `user_profiles`:
+- Admins sign in with Google (same as regular users)
+- Server-side: `validateAdminAuth()` reads session cookies, checks `user_profiles.role = 'admin'`
+- Client-side: `useAdminRole()` hook queries the user's role via RLS
+- API routes use cookie-based auth (no bearer tokens); cookies sent automatically by browser fetch
 
 ## Deployment (Vercel)
 

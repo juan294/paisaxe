@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase";
 import type { AnalyticsSummary, FeatureAnalytics } from "@/types/analytics";
 
 export async function GET(request: NextRequest) {
-  const auth = validateAdminAuth(request);
+  const auth = await validateAdminAuth();
   if (!auth.valid) {
     return auth.error;
   }

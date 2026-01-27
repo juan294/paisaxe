@@ -8,7 +8,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ key: string }> }
 ) {
-  const auth = validateAdminAuth(request);
+  const auth = await validateAdminAuth();
   if (!auth.valid) {
     return auth.error;
   }

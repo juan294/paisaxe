@@ -244,6 +244,27 @@ describe("AuthProvider", () => {
     });
   });
 
+  it("signInWithGoogle appends redirectPath as ?next= param when provided", async () => {
+    const { result } = renderHook(() => useAuthContext(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    let signInPromise: Promise<void>;
+    act(() => {
+      signInPromise = result.current.signInWithGoogle("/admin");
+    });
+    await signInPromise!;
+
+    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: expect.stringContaining("/auth/callback?next=%2Fadmin"),
+      },
+    });
+  });
+
   it("signInWithGoogle throws on error", async () => {
     const oauthError = new Error("OAuth failed");
     mockSignInWithOAuth.mockResolvedValue({ error: oauthError });

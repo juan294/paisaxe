@@ -1,76 +1,80 @@
-import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 type AuthResult =
-  | { valid: true }
+  | { valid: true; userId: string }
   | { valid: false; error: NextResponse };
 
 /**
- * Validates the admin secret key from the Authorization header.
- * Expects: Authorization: Bearer {ADMIN_SECRET_KEY}
+ * Validates admin authentication via Supabase session cookie + role check.
+ * Reads cookies internally - no request parameter needed.
  */
-export function validateAdminAuth(request: NextRequest): AuthResult {
-  const adminKey = process.env.ADMIN_SECRET_KEY;
+export async function validateAdminAuth(): Promise<AuthResult> {
+  try {
+    const cookieStore = await cookies();
 
-  if (!adminKey) {
-    console.error("ADMIN_SECRET_KEY not configured");
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Called from a Server Component - can be ignored
+            }
+          },
+        },
+      }
+    );
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return {
+        valid: false,
+        error: NextResponse.json(
+          { error: "Authentication required" },
+          { status: 401 }
+        ),
+      };
+    }
+
+    // Check admin role in user_profiles
+    const { data: profile, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profileError || !profile || profile.role !== "admin") {
+      return {
+        valid: false,
+        error: NextResponse.json(
+          { error: "Admin access required" },
+          { status: 403 }
+        ),
+      };
+    }
+
+    return { valid: true, userId: user.id };
+  } catch {
     return {
       valid: false,
       error: NextResponse.json(
-        { error: "Server configuration error" },
+        { error: "Authentication failed" },
         { status: 500 }
       ),
     };
   }
-
-  const authHeader = request.headers.get("authorization");
-
-  if (!authHeader) {
-    return {
-      valid: false,
-      error: NextResponse.json(
-        { error: "Authorization header required" },
-        { status: 401 }
-      ),
-    };
-  }
-
-  const [scheme, token] = authHeader.split(" ");
-
-  if (scheme?.toLowerCase() !== "bearer" || !token) {
-    return {
-      valid: false,
-      error: NextResponse.json(
-        { error: "Invalid authorization format. Expected: Bearer {token}" },
-        { status: 401 }
-      ),
-    };
-  }
-
-  // Use timing-safe comparison to prevent timing attacks
-  if (!timingSafeEqual(token, adminKey)) {
-    return {
-      valid: false,
-      error: NextResponse.json(
-        { error: "Invalid admin key" },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { valid: true };
-}
-
-/**
- * Timing-safe string comparison to prevent timing attacks.
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  // Use the longer string's length to maintain more constant time
-  const len = Math.max(a.length, b.length);
-  let result = a.length ^ b.length; // Will be non-zero if lengths differ
-
-  for (let i = 0; i < len; i++) {
-    result |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
-  }
-
-  return result === 0;
 }

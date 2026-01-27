@@ -22,7 +22,7 @@ describe("PUT /api/admin/stories/[id]/status", () => {
   });
 
   it("should return 401 when auth fails", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({
+    vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: false,
       error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
     });
@@ -37,7 +37,7 @@ describe("PUT /api/admin/stories/[id]/status", () => {
   });
 
   it("should update status to approved", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockSingle = vi.fn().mockResolvedValue({
       data: { id: "story-123", curation_status: "approved" },
@@ -64,7 +64,7 @@ describe("PUT /api/admin/stories/[id]/status", () => {
   });
 
   it("should update status to needs_curation", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockSingle = vi.fn().mockResolvedValue({
       data: { id: "story-123", curation_status: "needs_curation" },
@@ -90,7 +90,7 @@ describe("PUT /api/admin/stories/[id]/status", () => {
   });
 
   it("should return 400 for invalid status value", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/status", {
       method: "PUT",
@@ -105,7 +105,7 @@ describe("PUT /api/admin/stories/[id]/status", () => {
   });
 
   it("should return 404 when story not found", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockSingle = vi.fn().mockResolvedValue({ data: null, error: null });
     const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
@@ -128,7 +128,7 @@ describe("PUT /api/admin/stories/[id]/status", () => {
   });
 
   it("should return 500 when database update fails", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockSingle = vi.fn().mockResolvedValue({
       data: null,
@@ -154,7 +154,7 @@ describe("PUT /api/admin/stories/[id]/status", () => {
   });
 
   it("should return 500 on unexpected error", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
     vi.mocked(createAdminClient).mockImplementation(() => {
       throw new Error("Unexpected");
     });
