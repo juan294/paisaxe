@@ -9,6 +9,17 @@ interface SupabaseServiceStatus {
   error?: string;
 }
 
+interface DatabaseSizeStatus {
+  size_mb: number;
+  limit_mb: number;
+  usage_percent: number;
+  error?: string;
+}
+
+interface DatabaseSizeErrorStatus {
+  error: string;
+}
+
 interface HealthResponse {
   status: "healthy" | "degraded";
   timestamp: string;
@@ -16,6 +27,7 @@ interface HealthResponse {
   uptime: number;
   services: {
     supabase: SupabaseServiceStatus;
+    database: DatabaseSizeStatus | DatabaseSizeErrorStatus;
   };
 }
 
@@ -40,11 +52,50 @@ async function checkSupabase(): Promise<SupabaseServiceStatus> {
   }
 }
 
+const STORAGE_LIMIT_MB = 500;
+const STORAGE_WARNING_THRESHOLD = 0.8; // 80%
+
+async function checkDatabaseSize(): Promise<
+  DatabaseSizeStatus | DatabaseSizeErrorStatus
+> {
+  try {
+    const { data, error } = await supabase.rpc("get_database_size");
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    const sizeBytes = data as number;
+    const size_mb = Math.round((sizeBytes / (1024 * 1024)) * 10) / 10;
+    const usage_percent =
+      Math.round((size_mb / STORAGE_LIMIT_MB) * 1000) / 10;
+
+    return {
+      size_mb,
+      limit_mb: STORAGE_LIMIT_MB,
+      usage_percent,
+    };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Unknown error",
+    };
+  }
+}
+
 export async function GET(): Promise<NextResponse<HealthResponse>> {
   try {
-    const supabaseStatus = await checkSupabase();
+    const [supabaseStatus, databaseStatus] = await Promise.all([
+      checkSupabase(),
+      checkDatabaseSize(),
+    ]);
 
-    const overallStatus = supabaseStatus.status === "connected" ? "healthy" : "degraded";
+    const isSupabaseError = supabaseStatus.status !== "connected";
+    const isDatabaseOverThreshold =
+      "usage_percent" in databaseStatus &&
+      databaseStatus.usage_percent >= STORAGE_WARNING_THRESHOLD * 100;
+
+    const overallStatus =
+      isSupabaseError || isDatabaseOverThreshold ? "degraded" : "healthy";
 
     const body: HealthResponse = {
       status: overallStatus,
@@ -53,6 +104,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
       uptime: process.uptime(),
       services: {
         supabase: supabaseStatus,
+        database: databaseStatus,
       },
     };
 
@@ -73,6 +125,9 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
         supabase: {
           status: "error",
           latency_ms: 0,
+          error: err instanceof Error ? err.message : "Unknown error",
+        },
+        database: {
           error: err instanceof Error ? err.message : "Unknown error",
         },
       },
