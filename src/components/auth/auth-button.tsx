@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { LogIn, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 
 interface AuthButtonProps {
   className?: string;
@@ -12,6 +13,7 @@ interface AuthButtonProps {
 export function AuthButton({ className }: AuthButtonProps) {
   const { user, isLoading, signInWithGoogle, signOut } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
+  const { t } = useTranslation();
 
   if (isLoading) {
     return (
@@ -64,7 +66,7 @@ export function AuthButton({ className }: AuthButtonProps) {
             >
               <div className="px-4 py-3 border-b border-white/10">
                 <p className="text-white text-sm font-medium truncate">
-                  {user.name || "Usuario"}
+                  {user.name || t("auth.user")}
                 </p>
                 <p className="text-white/60 text-xs truncate">{user.email}</p>
               </div>
@@ -77,7 +79,7 @@ export function AuthButton({ className }: AuthButtonProps) {
                 className="w-full flex items-center gap-2 px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
               >
                 <LogOut className="h-4 w-4" />
-                <span className="text-sm">Cerrar sesion</span>
+                <span className="text-sm">{t("auth.sign_out")}</span>
               </button>
             </div>
           </>
@@ -96,8 +98,8 @@ export function AuthButton({ className }: AuthButtonProps) {
         "h-10 w-10 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full transition-all hover:scale-105",
         className
       )}
-      aria-label="Entrar"
-      title="Entrar"
+      aria-label={t("auth.sign_in")}
+      title={t("auth.sign_in")}
     >
       <LogIn className="h-5 w-5" />
     </button>

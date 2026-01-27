@@ -129,19 +129,7 @@ describe("useFavorites", () => {
       expect(typeof result.current.favorites).toBe("object");
       expect(typeof result.current.isFavorite).toBe("function");
       expect(typeof result.current.toggleFavorite).toBe("function");
-      expect(typeof result.current.dismissSignInPrompt).toBe("function");
       expect(typeof result.current.isLoading).toBe("boolean");
-      expect(typeof result.current.showSignInPrompt).toBe("boolean");
-    });
-
-    it("should start with showSignInPrompt as false", async () => {
-      const { result } = renderHook(() => useFavorites());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      expect(result.current.showSignInPrompt).toBe(false);
     });
   });
 
@@ -188,92 +176,6 @@ describe("useFavorites", () => {
       );
     });
 
-    it("should show sign-in prompt on first favorite when not logged in", async () => {
-      const { result } = renderHook(() => useFavorites());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      expect(result.current.showSignInPrompt).toBe(false);
-
-      // Call toggleFavorite
-      await act(async () => {
-        await result.current.toggleFavorite("story-1");
-      });
-
-      expect(result.current.showSignInPrompt).toBe(true);
-    });
-
-    it("should not show prompt again after first time", async () => {
-      const { result } = renderHook(() => useFavorites());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      // First toggle shows prompt
-      await act(async () => {
-        await result.current.toggleFavorite("story-1");
-      });
-
-      expect(result.current.showSignInPrompt).toBe(true);
-
-      // Dismiss it
-      act(() => {
-        result.current.dismissSignInPrompt();
-      });
-
-      expect(result.current.showSignInPrompt).toBe(false);
-
-      // Second toggle should NOT show prompt again
-      await act(async () => {
-        await result.current.toggleFavorite("story-2");
-      });
-
-      expect(result.current.favorites).toContain("story-2");
-      expect(result.current.showSignInPrompt).toBe(false);
-    });
-
-    it("should not show sign-in prompt when removing a favorite", async () => {
-      localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
-
-      const { result } = renderHook(() => useFavorites());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      // Removing (not adding) should not trigger sign-in prompt
-      await act(async () => {
-        await result.current.toggleFavorite("story-1");
-      });
-      expect(result.current.showSignInPrompt).toBe(false);
-    });
-  });
-
-  describe("dismissSignInPrompt", () => {
-    it("should set showSignInPrompt to false", async () => {
-      const { result } = renderHook(() => useFavorites());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      // Trigger prompt first
-      await act(async () => {
-        await result.current.toggleFavorite("story-1");
-      });
-
-      expect(result.current.showSignInPrompt).toBe(true);
-
-      // Dismiss it
-      act(() => {
-        result.current.dismissSignInPrompt();
-      });
-
-      expect(result.current.showSignInPrompt).toBe(false);
-    });
   });
 
   describe("cloud sync on toggleFavorite (logged in)", () => {
@@ -367,23 +269,6 @@ describe("useFavorites", () => {
           }),
         })
       );
-    });
-
-    it("should not show sign-in prompt when logged in", async () => {
-      mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
-
-      const { result } = renderHook(() => useFavorites());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      await act(async () => {
-        await result.current.toggleFavorite("story-1");
-      });
-
-      // user is logged in, so prompt should not show
-      expect(result.current.showSignInPrompt).toBe(false);
     });
 
     it("should handle cloud sync fetch error gracefully on toggle", async () => {

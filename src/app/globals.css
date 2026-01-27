@@ -85,3 +85,17 @@
 .animate-ambient-zoom {
   animation: ambient-zoom 30s ease-in-out forwards;
 }
+
+/* Accessibility: reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-slow-zoom,
+  .animate-ambient-zoom {
+    animation: none !important;
+  }
+
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,119 @@
+// Shared i18n mock translations for tests
+// Maps translation keys to Spanish strings (the original hardcoded values)
+export const mockTranslations: Record<string, string> = {
+  // Common
+  "common.loading": "Cargando...",
+  "common.close": "Cerrar",
+  "common.error": "Error",
+
+  // Chat
+  "chat.placeholder": "Escribe tu pregunta...",
+  "chat.listening": "Escuchando...",
+  "chat.thinking": "Pensando...",
+  "chat.empty_state": "Pregunta lo que quieras sobre este lugar",
+  "chat.speech_hint": "Puedes usar el micrófono para hablar",
+  "chat.error_generic": "Lo siento, hubo un error. Intenta de nuevo.",
+  "chat.error_processing": "Lo siento, no pude procesar tu pregunta.",
+  "chat.privacy_notice": "Tus preguntas se procesan con inteligencia artificial. No guardamos tus conversaciones.",
+  "chat.understood": "Entendido",
+  "chat.source": "Fuente",
+  "chat.image_alt": "Imagen relacionada",
+
+  // Stories
+  "stories.new_badge": "Nuevo",
+  "stories.ambient": "Ambient",
+  "stories.surprise": "Sorpréndeme",
+  "stories.related": "También te puede interesar",
+  "stories.no_results": "No hay historias con estos filtros",
+  "stories.ambient_on": "Activar modo ambiente",
+  "stories.ambient_off": "Desactivar modo ambiente",
+
+  // Stories action
+  "stories.ask_about": "Preguntar sobre esto",
+
+  // Stories categories
+  "stories.categories.nature": "Naturaleza",
+  "stories.categories.cities": "Ciudades",
+  "stories.categories.food": "Gastronomía",
+  "stories.categories.culture": "Cultura",
+  "stories.categories.activities": "Actividades",
+
+  // Stories locations
+  "stories.locations.eastern": "Asturias Oriental",
+  "stories.locations.central": "Asturias Central",
+  "stories.locations.western": "Asturias Occidental",
+
+  // Stories durations
+  "stories.durations.day-trip": "Excursión de un día",
+  "stories.durations.weekend": "Fin de semana",
+  "stories.durations.week": "Una semana",
+
+  // Stories filters
+  "stories.filters.title": "Filtros",
+  "stories.filters.category": "Categoría",
+  "stories.filters.location": "Zona",
+  "stories.filters.duration": "Duración",
+  "stories.filters.clear": "Limpiar filtros",
+
+  // Navigation
+  "nav.navigate": "navegar",
+  "nav.show_hide": "mostrar/ocultar",
+  "nav.space": "espacio",
+  "nav.next": "siguiente",
+
+  // Favorites
+  "favorites.title": "Guardados",
+  "favorites.save": "Guardar",
+  "favorites.saved": "Guardado",
+  "favorites.add": "Agregar a favoritos",
+  "favorites.remove": "Quitar de favoritos",
+  "favorites.add_saved": "Guardar",
+  "favorites.remove_saved": "Quitar de guardados",
+  "favorites.remove_from_saved": "Quitar de guardados",
+  "favorites.place_singular": "lugar",
+  "favorites.place_plural": "lugares",
+  "favorites.empty_title": "No tienes guardados todavía",
+  "favorites.empty_description": "Explora las historias de Asturias y guarda las que más te gusten para verlas después.",
+  "favorites.explore": "Explorar historias",
+  "favorites.loading_more": "Cargando más...",
+  "favorites.all_viewed": "Has visto todos tus guardados",
+  "favorites.local_only": "Tus guardados solo estan en este dispositivo",
+  "favorites.local_only_description": "Si borras los datos del navegador o cambias de dispositivo, los perderas.",
+  "favorites.sync_with_google": "Sincronizar con Google",
+
+  // Auth
+  "auth.sign_in": "Entrar",
+  "auth.sign_out": "Cerrar sesion",
+  "auth.user": "Usuario",
+  "auth.sync_favorites_title": "Sincroniza tus favoritos",
+  "auth.sync_favorites_description": "Inicia sesion para guardar tus favoritos en la nube y acceder desde cualquier dispositivo.",
+  "auth.continue_with_google": "Continuar con Google",
+  "auth.maybe_later": "Quiza mas tarde",
+
+  // Mood
+  "mood.title": "¿Qué te apetece?",
+  "mood.subtitle": "Elige un estado de ánimo y te mostramos lo mejor",
+  "mood.relaxing": "Relajante",
+  "mood.adventurous": "Aventurero",
+  "mood.cultural": "Cultural",
+  "mood.delicious": "Delicioso",
+  "mood.show_all": "Mostrar todo",
+
+  // Share
+  "share.share": "Compartir",
+  "share.link_copied": "Enlace copiado",
+
+  // Favorites toast
+  "favorites.removed": "Eliminado de favoritos",
+  "favorites.saved_toast": "Guardado en favoritos",
+
+  // Accessibility
+  "accessibility.language_switcher": "Cambiar idioma",
+  "accessibility.related_stories": "Historias relacionadas",
+  "accessibility.suggested_questions": "Preguntas sugeridas",
+  "accessibility.skip_to_content": "Ir al contenido principal",
+};
+
+export function createMockT() {
+  return (key: string) => mockTranslations[key] || key;
+}

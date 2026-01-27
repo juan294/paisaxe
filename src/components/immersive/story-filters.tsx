@@ -3,13 +3,11 @@
 import { useState } from "react";
 import { Filter, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 import {
   StoryCategory,
   StoryLocation,
   StoryDuration,
-  CATEGORY_LABELS,
-  LOCATION_LABELS,
-  DURATION_LABELS,
 } from "@/types/immersive";
 
 interface StoryFiltersProps {
@@ -36,6 +34,7 @@ export function StoryFilters({
   onClearAll,
 }: StoryFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { t } = useTranslation();
 
   const activeFilterCount = [selectedCategory, selectedLocation, selectedDuration].filter(Boolean).length;
   const hasActiveFilters = activeFilterCount > 0;
@@ -54,7 +53,7 @@ export function StoryFilters({
         aria-controls="filter-panel"
       >
         <Filter className="h-4 w-4" />
-        <span>Filtros</span>
+        <span>{t("stories.filters.title")}</span>
         {hasActiveFilters && (
           <span className="flex items-center justify-center w-5 h-5 text-xs bg-white text-black rounded-full">
             {activeFilterCount}
@@ -73,15 +72,15 @@ export function StoryFilters({
           )}
         >
           {/* Category Filter */}
-          <fieldset role="group" aria-label="Categoría" className="mb-4">
+          <fieldset role="group" aria-label={t("stories.filters.category")} className="mb-4">
             <legend className="text-white/60 text-xs uppercase tracking-wider mb-2">
-              Categoría
+              {t("stories.filters.category")}
             </legend>
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map((category) => (
                 <FilterChip
                   key={category}
-                  label={CATEGORY_LABELS[category]}
+                  label={t(`stories.categories.${category}`)}
                   selected={selectedCategory === category}
                   onClick={() =>
                     onCategoryChange(selectedCategory === category ? null : category)
@@ -92,15 +91,15 @@ export function StoryFilters({
           </fieldset>
 
           {/* Location Filter */}
-          <fieldset role="group" aria-label="Ubicación" className="mb-4">
+          <fieldset role="group" aria-label={t("stories.filters.location")} className="mb-4">
             <legend className="text-white/60 text-xs uppercase tracking-wider mb-2">
-              Ubicación
+              {t("stories.filters.location")}
             </legend>
             <div className="flex flex-wrap gap-2">
               {LOCATIONS.map((location) => (
                 <FilterChip
                   key={location}
-                  label={LOCATION_LABELS[location]}
+                  label={t(`stories.locations.${location}`)}
                   selected={selectedLocation === location}
                   onClick={() =>
                     onLocationChange(selectedLocation === location ? null : location)
@@ -111,15 +110,15 @@ export function StoryFilters({
           </fieldset>
 
           {/* Duration Filter */}
-          <fieldset role="group" aria-label="Duración" className="mb-4">
+          <fieldset role="group" aria-label={t("stories.filters.duration")} className="mb-4">
             <legend className="text-white/60 text-xs uppercase tracking-wider mb-2">
-              Duración
+              {t("stories.filters.duration")}
             </legend>
             <div className="flex flex-wrap gap-2">
               {DURATIONS.map((duration) => (
                 <FilterChip
                   key={duration}
-                  label={DURATION_LABELS[duration]}
+                  label={t(`stories.durations.${duration}`)}
                   selected={selectedDuration === duration}
                   onClick={() =>
                     onDurationChange(selectedDuration === duration ? null : duration)
@@ -140,7 +139,7 @@ export function StoryFilters({
               )}
             >
               <X className="h-3 w-3" />
-              <span>Limpiar filtros</span>
+              <span>{t("stories.filters.clear")}</span>
             </button>
           )}
         </div>

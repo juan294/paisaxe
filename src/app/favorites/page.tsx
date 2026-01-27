@@ -5,9 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useStories } from "@/hooks/use-stories";
-import { Bookmark, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
-import { CATEGORY_LABELS } from "@/types/immersive";
+import { useAuth } from "@/hooks/use-auth";
+import { Bookmark, ArrowLeft, Trash2, RefreshCw, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 import type { Story } from "@/types/immersive";
 
 const ITEMS_PER_PAGE = 20;
@@ -15,9 +16,11 @@ const ITEMS_PER_PAGE = 20;
 export default function FavoritesPage() {
   const { favorites, toggleFavorite, isLoading: favoritesLoading } = useFavorites();
   const { stories: allStories, isLoading } = useStories();
+  const { user, signInWithGoogle } = useAuth();
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   // Filter to only favorited stories
   const favoriteStories = allStories.filter((story) =>
@@ -77,7 +80,7 @@ export default function FavoritesPage() {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center">
         <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
-        <p className="mt-3 text-sm text-neutral-500">Cargando...</p>
+        <p className="mt-3 text-sm text-neutral-500">{t("common.loading")}</p>
       </div>
     );
   }
@@ -97,34 +100,57 @@ export default function FavoritesPage() {
             <div className="flex items-center gap-2">
               <Bookmark className="h-5 w-5 text-white fill-white" />
               <h1 className="text-sm font-semibold tracking-tight text-white">
-                Guardados
+                {t("favorites.title")}
               </h1>
             </div>
           </div>
 
           <div className="flex items-center gap-4 text-xs">
             <span className="text-neutral-500">
-              {favoriteStories.length} {favoriteStories.length === 1 ? "lugar" : "lugares"}
+              {favoriteStories.length} {favoriteStories.length === 1 ? t("favorites.place_singular") : t("favorites.place_plural")}
             </span>
           </div>
         </div>
       </header>
+
+      {/* Sync banner for non-logged-in users with favorites */}
+      {!user && favoriteStories.length > 0 && (
+        <div className="border-b border-amber-500/20 bg-amber-500/10">
+          <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+            <Cloud className="h-5 w-5 shrink-0 text-amber-400" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-200">
+                {t("favorites.local_only")}
+              </p>
+              <p className="text-xs text-amber-200/60">
+                {t("favorites.local_only_description")}
+              </p>
+            </div>
+            <button
+              onClick={() => signInWithGoogle()}
+              className="shrink-0 rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+            >
+              {t("favorites.sync_with_google")}
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {favoriteStories.length === 0 ? (
           <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
             <Bookmark className="h-16 w-16 text-neutral-700 mb-4" />
             <h2 className="text-lg font-medium text-white mb-2">
-              No tienes guardados todavía
+              {t("favorites.empty_title")}
             </h2>
             <p className="text-neutral-500 mb-6 max-w-sm text-sm">
-              Explora las historias de Asturias y guarda las que más te gusten para verlas después.
+              {t("favorites.empty_description")}
             </p>
             <Link
               href="/immersive"
               className="px-5 py-2.5 bg-white text-neutral-900 rounded-full text-sm font-medium transition-all hover:bg-neutral-200"
             >
-              Explorar historias
+              {t("favorites.explore")}
             </Link>
           </div>
         ) : (
@@ -148,12 +174,12 @@ export default function FavoritesPage() {
               {isLoadingMore && (
                 <div className="flex items-center gap-2 text-neutral-500">
                   <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Cargando más...</span>
+                  <span className="text-sm">{t("favorites.loading_more")}</span>
                 </div>
               )}
               {!hasMore && favoriteStories.length > ITEMS_PER_PAGE && (
                 <span className="text-sm text-neutral-600">
-                  Has visto todos tus guardados
+                  {t("favorites.all_viewed")}
                 </span>
               )}
             </div>
@@ -174,6 +200,7 @@ interface GalleryItemProps {
 function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
   const [isVisible, setIsVisible] = useState(false);
   const itemRef = useRef<HTMLAnchorElement>(null);
+  const { t } = useTranslation();
 
   // Intersection Observer for lazy rendering
   useEffect(() => {
@@ -238,7 +265,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
             <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 transition-all duration-300 group-hover:opacity-100">
               <div className="translate-y-2 transform transition-transform duration-300 group-hover:translate-y-0">
                 <p className="text-xs font-medium uppercase tracking-wider text-white/60">
-                  {CATEGORY_LABELS[story.category]}
+                  {t(`stories.categories.${story.category}`)}
                 </p>
                 <h3 className="mt-1 text-base font-semibold text-white">
                   {story.title}
@@ -259,7 +286,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
                 onRemove();
               }}
               className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 hover:bg-red-500 group-hover:opacity-100"
-              aria-label="Quitar de guardados"
+              aria-label={t("favorites.remove_from_saved")}
             >
               <Trash2 className="h-4 w-4 text-neutral-800 group-hover/btn:text-white" />
             </button>

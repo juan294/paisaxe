@@ -5,9 +5,9 @@ import Image from "next/image";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Play, Pause, Bookmark } from "lucide-react";
+import { BookmarkButton } from "./bookmark-button";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import { AuthButton } from "@/components/auth/auth-button";
-import { SignInPrompt } from "@/components/auth/sign-in-prompt";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useAnalytics } from "@/hooks/use-analytics";
@@ -18,7 +18,9 @@ import { SurpriseMeButton } from "./surprise-me-button";
 import { FreshnessBadge } from "./freshness-badge";
 import { ShareButton } from "./share-button";
 import { AmbientIndicator } from "./ambient-indicator";
+import { LanguageSwitcher } from "./language-switcher";
 import { getLabel } from "@/lib/asturianu";
+import { useTranslation } from "@/lib/i18n";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -65,12 +67,11 @@ export function StoryViewer({
 
   const { isEnabled } = useFeatureFlags();
   const { trackEvent } = useAnalytics();
+  const { t } = useTranslation();
 
   const {
     isFavorite,
     toggleFavorite,
-    showSignInPrompt,
-    dismissSignInPrompt,
   } = useFavorites();
 
   const story = stories[currentIndex];
@@ -368,7 +369,7 @@ export function StoryViewer({
             }}
             className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105"
           >
-            {getLabel("ask_about", ast)}
+            {ast ? getLabel("ask_about", true) : t("stories.ask_about")}
           </button>
           <a
             href="/favorites"
@@ -376,13 +377,10 @@ export function StoryViewer({
             className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105 flex items-center gap-2"
           >
             <Bookmark className="h-5 w-5" />
-            <span>{getLabel("saved", ast)}</span>
+            <span>{ast ? getLabel("saved", true) : t("favorites.saved")}</span>
           </a>
         </div>
       </div>
-
-      {/* Sign-in prompt modal */}
-      <SignInPrompt open={showSignInPrompt} onClose={dismissSignInPrompt} />
 
       {/* Navigation arrows */}
       <button
@@ -413,8 +411,11 @@ export function StoryViewer({
         <ChevronRight className="h-8 w-8 text-white" />
       </button>
 
-      {/* Top-right controls: Auth + Auto-play + Share + Surprise + Favorites */}
+      {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}
       <div className="absolute top-16 right-6 z-20 flex items-center gap-3">
+        {/* Language Switcher */}
+        <LanguageSwitcher />
+
         {/* Ambient mode indicator */}
         {isAmbient && <AmbientIndicator />}
 
@@ -429,7 +430,7 @@ export function StoryViewer({
               "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all",
               ambientMode && "ring-1 ring-white/30"
             )}
-            title={ambientMode ? "Desactivar modo ambiente" : "Modo ambiente"}
+            title={ambientMode ? t("stories.ambient_off") : t("stories.ambient_on")}
           >
             {autoPlay ? (
               <Pause className="h-5 w-5 text-white" />
@@ -466,21 +467,10 @@ export function StoryViewer({
         {/* Share button */}
         {isEnabled("story_sharing") && <ShareButton story={story} />}
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleFavorite(story.id);
-          }}
-          className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-          title={isFavorite(story.id) ? "Quitar de guardados" : "Agregar a guardados"}
-        >
-          <Bookmark
-            className={cn(
-              "h-5 w-5 text-white transition-all",
-              isFavorite(story.id) && "fill-white"
-            )}
-          />
-        </button>
+        <BookmarkButton
+          isFavorite={isFavorite(story.id)}
+          onToggle={() => toggleFavorite(story.id)}
+        />
         <AuthButton />
       </div>
 
@@ -491,7 +481,7 @@ export function StoryViewer({
           showInfo ? "opacity-100" : "opacity-0"
         )}
       >
-        ← → {getLabel("navigate", ast)} · i {getLabel("show_hide", ast)} · espacio {getLabel("next", ast)}
+        ← → {t("nav.navigate")} · i {t("nav.show_hide")} · {t("nav.space")} {t("nav.next")}
       </div>
     </div>
   );

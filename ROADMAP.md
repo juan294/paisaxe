@@ -3,7 +3,7 @@
 A living document tracking implemented features and future development plans.
 
 **Domain**: paisaxe.es
-**Last Updated**: January 26, 2026
+**Last Updated**: January 27, 2026
 
 ---
 
@@ -94,7 +94,7 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Supabase PostgreSQL | :white_check_mark: | With pgvector extension |
 | shadcn/ui Components | :white_check_mark: | Button, Card, Dialog, Input |
 | Tailwind CSS Styling | :white_check_mark: | Custom Paisaxe theme |
-| Vitest Testing | :white_check_mark: | 705 tests passing (48 files, 97.31% coverage) |
+| Vitest Testing | :white_check_mark: | 984 tests passing (70 files) |
 | GitHub Actions CI | :white_check_mark: | Lint, typecheck, test, build |
 | Git Hooks (Husky) | :white_check_mark: | Pre-commit quality checks |
 | Coverage Automation | :white_check_mark: | Nightly scheduled updates via `scripts/coverage-agent.sh` |
@@ -152,14 +152,14 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 
 ---
 
-## Phase 3: AI Improvements :construction:
+## Phase 3: AI Improvements :white_check_mark:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Improve Context Retrieval | :white_check_mark: | Hybrid vector + keyword search working |
-| Add Personality to Responses | :construction: | Generic warmth in system prompt; distinct persona pending |
-| Define AI Persona | :calendar: | "Pelayo" - historic Asturian name |
-| Display Related Images in Chat | :calendar: | Show images inline with responses |
+| Define AI Persona "Pelayo" | :white_check_mark: | First-person persona based on Asturian cultural identity; warm, personal, knowledgeable local |
+| Add Personality to Responses | :white_check_mark: | Pelayo persona in system prompt — speaks as a passionate local friend, not a generic bot |
+| Display Related Images in Chat | :white_check_mark: | Images rendered inline with `<figure>`/`<figcaption>`, captions, source attribution |
 
 ---
 
@@ -189,62 +189,69 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 
 ## Feature Flag Infrastructure :white_check_mark:
 
-Database-backed feature flags (migration `008_feature_flags.sql`) ready for visitor experience features. All default to disabled.
+Database-backed feature flags (migration `008_feature_flags.sql`) with admin panel toggles and analytics tracking. All 10 visitor experience features implemented and individually toggleable. All default to disabled for controlled rollout.
 
 | Flag | Status | Notes |
 |------|--------|-------|
 | `related_stories` | :white_check_mark: | Active and visible in UI |
-| `contextual_prompts` | :calendar: | DB schema ready (`metadata.question_prompts`), UI pending |
-| `randomized_order` | :calendar: | Flag ready, shuffle logic pending |
-| `surprise_me` | :calendar: | Flag ready, button UI pending |
-| `story_sharing` | :calendar: | Flag ready, Web Share API pending |
-| `seasonal_surfacing` | :calendar: | DB field `best_months` ready, weighting logic pending |
-| `mood_discovery` | :calendar: | DB field `metadata.mood_tags` ready, UI pending |
-| `asturianu_touches` | :calendar: | DB fields ready, system prompt updates pending |
-| `ambient_discovery` | :calendar: | Extended auto-play pending |
-| `story_freshness` | :calendar: | Badge UI pending |
+| `contextual_prompts` | :white_check_mark: | Story-specific suggested questions near chat button |
+| `randomized_order` | :white_check_mark: | Fisher-Yates shuffle in story ordering |
+| `surprise_me` | :white_check_mark: | Random unviewed story jump button |
+| `story_sharing` | :white_check_mark: | Web Share API + OG meta tags |
+| `seasonal_surfacing` | :white_check_mark: | Weight order by current month/season |
+| `mood_discovery` | :white_check_mark: | Optional mood selector overlay |
+| `asturianu_touches` | :white_check_mark: | Authentic Asturian words in UI and chat |
+| `ambient_discovery` | :white_check_mark: | Slower transitions with ambient indicator |
+| `story_freshness` | :white_check_mark: | "Nuevo" badge on recent stories |
 
-See `doc/visitor-experience-improvements.md` for full feature descriptions and implementation waves.
+See `docs/visitor-experience-improvements.md` for full feature descriptions and implementation waves.
 
 ---
 
-## Phase 5: Visitor Experience Enhancements :calendar:
+## Phase 5: Visitor Experience Enhancements :white_check_mark:
 
-Prioritized features from the visitor experience evaluation. See feature flags above for infrastructure status.
+All 10 features implemented behind feature flags (disabled by default, toggleable via admin panel). See feature flags above for individual status.
 
 ### Wave 1 -- Quick Wins (priority >= 4.0)
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Randomized Story Order | :calendar: | Fisher-Yates shuffle in `useStories` hook |
-| "Surprise Me" Button | :calendar: | Random unviewed story jump |
-| Story Freshness Badges | :calendar: | Subtle "Nuevo" badge on recent stories |
+| Randomized Story Order | :white_check_mark: | Fisher-Yates shuffle in `shuffle.ts` |
+| "Surprise Me" Button | :white_check_mark: | `surprise-me-button.tsx` - random unviewed story jump |
+| Story Freshness Badges | :white_check_mark: | `freshness-badge.tsx` - "Nuevo" badge on recent stories |
 
 ### Wave 2 -- High-Impact Features (priority >= 2.0)
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Contextual Question Prompts | :calendar: | Story-specific suggested questions near chat button |
-| Story Sharing | :calendar: | Web Share API + OG meta tags |
-| Seasonal Story Surfacing | :calendar: | Weight order by current month |
-| Mood-Based Discovery | :calendar: | Optional mood selector: Relaxing / Adventurous / Cultural / Delicious |
+| Contextual Question Prompts | :white_check_mark: | `question-prompts.tsx` - story-specific suggested questions |
+| Story Sharing | :white_check_mark: | `share-button.tsx` - Web Share API + OG meta tags |
+| Seasonal Story Surfacing | :white_check_mark: | `seasonal-weighting.ts` - weight order by current month |
+| Mood-Based Discovery | :white_check_mark: | `mood-overlay.tsx` + `mood-mapping.ts` - optional mood selector |
 
 ### Wave 3 -- Experience Elevation
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Asturianu Language Touches | :calendar: | Authentic Asturian words in UI and chat |
-| Ambient Discovery Mode | :calendar: | Slower transitions, optional ambient audio |
+| Asturianu Language Touches | :white_check_mark: | `asturianu.ts` - authentic Asturian words in UI and chat |
+| Ambient Discovery Mode | :white_check_mark: | `ambient-indicator.tsx` - slower transitions with indicator |
 
 ---
 
-## Phase 6: Internationalization :calendar:
+## Phase 6: Internationalization :white_check_mark:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Browser Language Detection | :calendar: | Auto-detect UI language |
-| English UI Translation | :calendar: | Full interface translation |
+| i18n Infrastructure | :white_check_mark: | LanguageProvider context, useTranslation hook, dot-notation key resolver |
+| Browser Language Detection | :white_check_mark: | Auto-detect from `navigator.languages`, persisted to localStorage |
+| Spanish Locale (es) | :white_check_mark: | ~85 translation keys covering all UI chrome |
+| English Locale (en) | :white_check_mark: | Full English translation of all UI strings |
+| Language Switcher | :white_check_mark: | ES/EN pill toggle in story viewer header |
+| Filter Labels i18n | :white_check_mark: | Categories, locations, durations all translated via `t()` |
+| Action Buttons i18n | :white_check_mark: | "Ask about this", "Saved", chat UI, favorites page |
 | Other Languages | :calendar: | As needed |
+
+Note: Story content (titles, descriptions) remains in Spanish — sourced from Supabase DB. Chat responds in the visitor's detected language via Claude.
 
 ---
 
@@ -259,6 +266,53 @@ Prioritized features from the visitor experience evaluation. See feature flags a
 
 ---
 
+## Phase 8: Automation & Quality Agents :white_check_mark:
+
+Automated agents and scheduled workflows to guarantee code quality, security, and availability at the highest levels. All tools are free or use existing paid services (Anthropic API).
+
+### Security & Dependency Management
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Gitleaks Secret Scanning | :white_check_mark: | `gitleaks.yml` — push/PR + daily 4AM UTC cron |
+| Dependabot | :white_check_mark: | `dependabot.yml` — npm + GitHub Actions, weekly Monday, grouped PRs |
+| License Compliance | :white_check_mark: | `license-check.yml` — fails on GPL/AGPL/EUPL/SSPL/BSL/CPAL/OSL |
+
+### Performance CI
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Lighthouse CI | :white_check_mark: | `lighthouse.yml` + `lighthouserc.json` — 3 runs, perf/a11y/SEO budgets |
+| Bundle Size Tracking | :white_check_mark: | `bundle-size.yml` — PR comments with .next size breakdown + top 20 bundles |
+
+### App Integration
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Vercel Speed Insights | :white_check_mark: | `<SpeedInsights />` in layout.tsx — RUM for Core Web Vitals |
+| Health Check Endpoint | :white_check_mark: | `GET /api/health` — Supabase connectivity, latency, version, uptime (9 tests) |
+
+### Code Quality & AI Review
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Knip Dead Code Detection | :white_check_mark: | `knip.yml` + `knip.json` — report mode (initial rollout), Next.js + Vitest aware |
+| Claude Code Action | :white_check_mark: | `claude-review.yml` — AI review on PRs using claude-sonnet-4, @claude trigger |
+
+### Database Maintenance
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Supabase pg_cron | :white_check_mark: | `011_pg_cron_maintenance.sql` — VACUUM chunks/analytics weekly, ANALYZE daily |
+
+### Availability Monitoring
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Upptime | :white_check_mark: | `.github/upptime/.upptimerc.yml` config ready; requires separate repo setup (see file comments) |
+
+---
+
 ## Verification Checklist
 
 - [x] Image extraction: 1,773 images extracted to `content/images/`
@@ -267,13 +321,20 @@ Prioritized features from the visitor experience evaluation. See feature flags a
 - [x] Database migration: Stories table exists in Supabase
 - [x] Story seeding: 20 stories seeded via `npm run seed-db:stories`
 - [x] Image replacement: 7 stories use PDF images, 13 use Unsplash fallback
-- [x] Tests: `npm run test` - 705 tests pass (97.31% statement coverage)
+- [x] Tests: `npm run test` - 1054 tests pass (86 files)
 - [x] Build: `npm run build` - no errors
 - [x] Auth: Google SSO working with Supabase SSR
 - [x] Favorites: Cloud sync + local storage fallback
 - [x] Admin: Story management panel at `/admin`
-- [x] Feature flags: 10 flags in database, infrastructure ready
-- [x] Analytics: Vercel Analytics active, custom events table ready
+- [x] Feature flags: 10 flags in database, all features implemented
+- [x] Analytics: Vercel Analytics active, custom events table + admin dashboard
+- [x] i18n: ES/EN language switcher, browser detection, all UI chrome translated
+- [x] Security: Gitleaks, Dependabot, license compliance workflows active
+- [x] Performance CI: Lighthouse CI + bundle size analysis on PRs
+- [x] Monitoring: Speed Insights RUM + `/api/health` endpoint
+- [x] Code quality: Knip dead code detection + Claude AI PR reviews
+- [x] Database: pg_cron maintenance jobs scheduled (VACUUM, ANALYZE)
+- [x] Availability: Upptime config prepared (separate repo setup required)
 
 ---
 
@@ -287,6 +348,7 @@ Prioritized features from the visitor experience evaluation. See feature flags a
 | `008_feature_flags.sql` | Feature flag system | :white_check_mark: |
 | `009_analytics_events.sql` | Custom analytics events | :white_check_mark: |
 | `010_story_metadata_extensions.sql` | Extended metadata for visitor features | :white_check_mark: |
+| `011_pg_cron_maintenance.sql` | Scheduled VACUUM/ANALYZE via pg_cron | :white_check_mark: |
 
 ---
 
@@ -297,7 +359,7 @@ Prioritized features from the visitor experience evaluation. See feature flags a
 - Voice input already works - preserve this functionality
 - Tests before implementation (TDD workflow)
 - All work on `develop` branch
-- Feature flags control visitor experience features - enable in DB when UI is ready
+- Feature flags control visitor experience features - enable via admin panel when ready to roll out
 
 ---
 
@@ -309,7 +371,9 @@ Prioritized features from the visitor experience evaluation. See feature flags a
 | v0.2.0 | Jan 2026 | Content expansion + dynamic loading |
 | v0.3.0 | Jan 2026 | Story organization UI + related stories |
 | v0.4.0 | Jan 2026 | User features (auth, favorites, admin panel) |
-| v0.5.0 | - | AI improvements (Pelayo persona, chat images) |
-| v0.6.0 | - | Visitor experience enhancements (Waves 1-3) |
-| v0.7.0 | - | Internationalization |
+| v0.5.0 | Jan 2026 | Visitor experience enhancements (Waves 1-3) + feature flags |
+| v0.6.0 | Jan 2026 | AI improvements (Pelayo persona, chat images) |
+| v0.7.0 | Jan 2026 | Internationalization (ES/EN language switcher, browser detection, full UI translation) |
+| v0.8.0 | Jan 2026 | Automation & quality agents (security, performance, availability, AI review) |
+| v0.9.0 | - | Polish (skeleton UI, a11y, SEO, error boundaries) |
 | v1.0.0 | - | Production release |
