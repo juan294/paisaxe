@@ -10,6 +10,15 @@ vi.mock("next/font/google", () => ({
   }),
 }));
 
+// Mock language detection to return Spanish (jsdom defaults to English)
+vi.mock("@/lib/i18n/detect-language", () => ({
+  resolveLocale: () => "es",
+  storeLocale: vi.fn(),
+  detectBrowserLanguage: () => "es",
+  getStoredLocale: () => null,
+  mapLanguageTag: (tag: string) => tag.startsWith("es") ? "es" : tag.startsWith("en") ? "en" : null,
+}));
+
 describe("RootLayout", () => {
   describe("metadata", () => {
     it("should have correct title", () => {

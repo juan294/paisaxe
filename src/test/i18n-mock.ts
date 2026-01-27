@@ -103,10 +103,15 @@ export const mockTranslations: Record<string, string> = {
   "share.share": "Compartir",
   "share.link_copied": "Enlace copiado",
 
+  // Favorites toast
+  "favorites.removed": "Eliminado de favoritos",
+  "favorites.saved_toast": "Guardado en favoritos",
+
   // Accessibility
   "accessibility.language_switcher": "Cambiar idioma",
   "accessibility.related_stories": "Historias relacionadas",
   "accessibility.suggested_questions": "Preguntas sugeridas",
+  "accessibility.skip_to_content": "Ir al contenido principal",
 };
 
 export function createMockT() {

@@ -86,11 +86,14 @@ export const en: Translations = {
     loading_more: 'Loading more...',
     all_viewed: 'You have seen all your saved stories',
     remove_from_saved: 'Remove from saved',
+    removed: 'Removed from favorites',
+    saved_toast: 'Saved to favorites',
   },
 
   accessibility: {
     related_stories: 'Related stories',
     language_switcher: 'Language switcher',
+    skip_to_content: 'Skip to main content',
   },
 
   auth: {

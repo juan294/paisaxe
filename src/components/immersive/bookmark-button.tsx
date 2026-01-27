@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 
 interface BookmarkButtonProps {
   isFavorite: boolean;
@@ -12,6 +13,7 @@ interface BookmarkButtonProps {
 export function BookmarkButton({ isFavorite, onToggle }: BookmarkButtonProps) {
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { t } = useTranslation();
 
   const showToast = (message: string) => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -21,7 +23,7 @@ export function BookmarkButton({ isFavorite, onToggle }: BookmarkButtonProps) {
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    showToast(isFavorite ? "Eliminado" : "Guardado");
+    showToast(isFavorite ? t("favorites.removed") : t("favorites.saved_toast"));
     onToggle();
   };
 
@@ -30,7 +32,7 @@ export function BookmarkButton({ isFavorite, onToggle }: BookmarkButtonProps) {
       <button
         onClick={handleClick}
         className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
-        title={isFavorite ? "Quitar de guardados" : "Agregar a guardados"}
+        title={isFavorite ? t("favorites.remove_saved") : t("favorites.add_saved")}
       >
         <Bookmark
           className={cn(
