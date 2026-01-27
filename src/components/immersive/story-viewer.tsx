@@ -97,39 +97,35 @@ export function StoryViewer({
       prefetchedUrls.current.add(url);
     };
 
-    // Prefetch next image
-    if (currentIndex < stories.length - 1) {
-      prefetchImage(stories[currentIndex + 1].image);
-    }
-    // Prefetch previous image
-    if (currentIndex > 0) {
-      prefetchImage(stories[currentIndex - 1].image);
-    }
-    // Prefetch 2 ahead if available (for faster auto-play)
-    if (currentIndex < stories.length - 2) {
-      prefetchImage(stories[currentIndex + 2].image);
-    }
+    if (stories.length === 0) return;
+    // Prefetch next image (wraps to first)
+    const nextIdx = (currentIndex + 1) % stories.length;
+    prefetchImage(stories[nextIdx].image);
+    // Prefetch previous image (wraps to last)
+    const prevIdx = (currentIndex - 1 + stories.length) % stories.length;
+    prefetchImage(stories[prevIdx].image);
+    // Prefetch 2 ahead (for faster auto-play)
+    const next2Idx = (currentIndex + 2) % stories.length;
+    prefetchImage(stories[next2Idx].image);
   }, [currentIndex, stories]);
 
   const goToNext = useCallback(() => {
-    if (currentIndex < stories.length - 1) {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        onIndexChange(currentIndex + 1);
-        setIsTransitioning(false);
-      }, 300);
-    }
+    setIsTransitioning(true);
+    setTimeout(() => {
+      const nextIndex = currentIndex < stories.length - 1 ? currentIndex + 1 : 0;
+      onIndexChange(nextIndex);
+      setIsTransitioning(false);
+    }, 300);
   }, [currentIndex, stories.length, onIndexChange]);
 
   const goToPrev = useCallback(() => {
-    if (currentIndex > 0) {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        onIndexChange(currentIndex - 1);
-        setIsTransitioning(false);
-      }, 300);
-    }
-  }, [currentIndex, onIndexChange]);
+    setIsTransitioning(true);
+    setTimeout(() => {
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : stories.length - 1;
+      onIndexChange(prevIndex);
+      setIsTransitioning(false);
+    }, 300);
+  }, [currentIndex, stories.length, onIndexChange]);
 
   // Keyboard navigation (disabled while chat is open)
   useEffect(() => {
@@ -218,68 +214,36 @@ export function StoryViewer({
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
       </div>
 
-      {/* Progress bar - sliding window of max 20 indicators */}
+      {/* Progress bar - fixed segments that fill and reset, creating an infinite flow */}
       {(() => {
-        const MAX_VISIBLE = 20;
-        const total = stories.length;
-
-        // Calculate the visible window
-        let startIndex = 0;
-        let endIndex = Math.min(MAX_VISIBLE, total);
-
-        if (total > MAX_VISIBLE) {
-          // Center the current index in the window when possible
-          const halfWindow = Math.floor(MAX_VISIBLE / 2);
-
-          if (currentIndex < halfWindow) {
-            // Near the start - show first MAX_VISIBLE
-            startIndex = 0;
-            endIndex = MAX_VISIBLE;
-          } else if (currentIndex >= total - halfWindow) {
-            // Near the end - show last MAX_VISIBLE
-            startIndex = total - MAX_VISIBLE;
-            endIndex = total;
-          } else {
-            // Middle - center current index
-            startIndex = currentIndex - halfWindow;
-            endIndex = currentIndex + halfWindow;
-          }
-        }
-
-        const visibleIndices = Array.from(
-          { length: endIndex - startIndex },
-          (_, i) => startIndex + i
-        );
+        const PAGE_SIZE = 20;
+        const segmentCount = Math.min(PAGE_SIZE, stories.length);
+        const fillPosition = currentIndex % segmentCount;
 
         return (
           <div className="absolute top-0 left-0 right-0 z-20 flex items-center gap-1 p-4">
-            {/* Left fade indicator when not at start */}
-            {startIndex > 0 && (
-              <div className="w-4 h-1 rounded-full bg-gradient-to-r from-transparent to-white/20" />
-            )}
-
-            {visibleIndices.map((i) => (
+            {Array.from({ length: segmentCount }, (_, i) => (
               <div
                 key={i}
                 className="flex-1 h-1 rounded-full bg-white/30 overflow-hidden cursor-pointer transition-all duration-300"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onIndexChange(i);
+                  // Jump to the story this segment represents in the current cycle
+                  const base = currentIndex - fillPosition;
+                  const targetIndex = base + i;
+                  if (targetIndex >= 0 && targetIndex < stories.length) {
+                    onIndexChange(targetIndex);
+                  }
                 }}
               >
                 <div
                   className={cn(
                     "h-full bg-white transition-all duration-300",
-                    i < currentIndex ? "w-full" : i === currentIndex ? "w-full" : "w-0"
+                    i <= fillPosition ? "w-full" : "w-0"
                   )}
                 />
               </div>
             ))}
-
-            {/* Right fade indicator when not at end */}
-            {endIndex < total && (
-              <div className="w-4 h-1 rounded-full bg-gradient-to-l from-transparent to-white/20" />
-            )}
           </div>
         );
       })()}
@@ -388,11 +352,7 @@ export function StoryViewer({
           e.stopPropagation();
           goToPrev();
         }}
-        disabled={currentIndex === 0}
-        className={cn(
-          "absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all",
-          currentIndex === 0 && "opacity-30 cursor-not-allowed"
-        )}
+        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
       >
         <ChevronLeft className="h-8 w-8 text-white" />
       </button>
@@ -402,11 +362,7 @@ export function StoryViewer({
           e.stopPropagation();
           goToNext();
         }}
-        disabled={currentIndex === stories.length - 1}
-        className={cn(
-          "absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all",
-          currentIndex === stories.length - 1 && "opacity-30 cursor-not-allowed"
-        )}
+        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
       >
         <ChevronRight className="h-8 w-8 text-white" />
       </button>
