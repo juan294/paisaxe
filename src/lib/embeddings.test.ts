@@ -5,19 +5,17 @@ vi.mock("server-only", () => ({}));
 // Mock voyageai module
 const mockEmbed = vi.fn();
 vi.mock("voyageai", () => ({
-  VoyageAIClient: vi.fn(() => ({
-    embed: mockEmbed,
-  })),
+  VoyageAIClient: vi.fn(function () {
+    return { embed: mockEmbed };
+  }),
 }));
 
 const mockGet = vi.fn();
 const mockSet = vi.fn();
 vi.mock("./embedding-cache", () => ({
-  EmbeddingCache: vi.fn(() => ({
-    get: mockGet,
-    set: mockSet,
-    clear: vi.fn(),
-  })),
+  EmbeddingCache: vi.fn(function () {
+    return { get: mockGet, set: mockSet, clear: vi.fn() };
+  }),
 }));
 
 describe("embeddings", () => {

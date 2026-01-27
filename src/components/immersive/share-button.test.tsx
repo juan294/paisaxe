@@ -36,10 +36,10 @@ const mockStory: Story = {
 };
 
 describe("ShareButton", () => {
-  let writeTextMock: ReturnType<typeof vi.fn>;
+  let writeTextMock = vi.fn<(data: string) => Promise<void>>();
 
   beforeEach(() => {
-    writeTextMock = vi.fn().mockResolvedValue(undefined);
+    writeTextMock = vi.fn<(data: string) => Promise<void>>().mockResolvedValue(undefined);
     // Default: no native share, clipboard available, desktop pointer
     Object.defineProperty(navigator, "share", {
       value: undefined,
