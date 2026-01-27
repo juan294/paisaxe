@@ -15,10 +15,10 @@ vi.mock("@/lib/i18n", () => ({
 }));
 
 describe("BookmarkButton", () => {
-  let onToggle: ReturnType<typeof vi.fn>;
+  let onToggle = vi.fn<() => void>();
 
   beforeEach(() => {
-    onToggle = vi.fn();
+    onToggle = vi.fn<() => void>();
   });
 
   it("renders with correct title when not bookmarked", () => {
