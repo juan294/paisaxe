@@ -262,6 +262,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={isListening ? t("chat.listening") : t("chat.placeholder")}
+            aria-label={t("chat.placeholder")}
             disabled={isLoading || isListening}
             className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
           />

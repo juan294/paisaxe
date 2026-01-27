@@ -86,11 +86,14 @@ export const es: Translations = {
     loading_more: 'Cargando mas...',
     all_viewed: 'Has visto todos tus guardados',
     remove_from_saved: 'Quitar de guardados',
+    removed: 'Eliminado de favoritos',
+    saved_toast: 'Guardado en favoritos',
   },
 
   accessibility: {
     related_stories: 'Historias relacionadas',
     language_switcher: 'Selector de idioma',
+    skip_to_content: 'Ir al contenido principal',
   },
 
   auth: {
