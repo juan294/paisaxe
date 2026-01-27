@@ -41,7 +41,7 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should return 401 when auth fails", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({
+    vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: false,
       error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
     });
@@ -53,7 +53,7 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should return stories when auth is valid", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockFrom = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
@@ -73,7 +73,7 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should filter by needs_curation status", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const filteredStories = mockStories.filter(s => s.curation_status === "needs_curation");
 
@@ -91,7 +91,7 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should filter by approved status", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockEq = vi.fn().mockResolvedValue({ data: [], error: null });
     const mockOrder = vi.fn().mockReturnValue({ eq: mockEq });
@@ -107,7 +107,7 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should return 500 when database query fails", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } });
     const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
@@ -124,7 +124,7 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should return 500 on unexpected error", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
     vi.mocked(createAdminClient).mockImplementation(() => {
       throw new Error("Unexpected error");
     });

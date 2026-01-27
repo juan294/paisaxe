@@ -33,7 +33,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
   });
 
   it("should return 401 when auth fails", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({
+    vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: false,
       error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
     });
@@ -48,7 +48,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
   });
 
   it("should update flag and return updated flag on success", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockSingle = vi.fn().mockResolvedValue({ data: mockUpdatedRow, error: null });
     const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
@@ -76,7 +76,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
   });
 
   it("should return 400 if enabled is not a boolean", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
@@ -91,7 +91,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
   });
 
   it("should return 400 if enabled is missing", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
       method: "PUT",
@@ -106,7 +106,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
   });
 
   it("should disable a flag when enabled is false", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const disabledRow = { ...mockUpdatedRow, enabled: false };
     const mockSingle = vi.fn().mockResolvedValue({ data: disabledRow, error: null });
@@ -131,7 +131,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
   });
 
   it("should return 404 when flag is not found", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockSingle = vi.fn().mockResolvedValue({ data: null, error: null });
     const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
@@ -154,7 +154,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
   });
 
   it("should return 500 when database update fails", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const mockSingle = vi.fn().mockResolvedValue({
       data: null,
@@ -180,7 +180,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
   });
 
   it("should return 500 on unexpected error", async () => {
-    vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
     vi.mocked(createAdminClient).mockImplementation(() => {
       throw new Error("Unexpected");
     });

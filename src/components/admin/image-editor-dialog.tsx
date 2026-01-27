@@ -32,7 +32,6 @@ import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
 
 interface ImageEditorDialogProps {
   story: AdminStory | null;
-  adminKey: string;
   onClose: () => void;
   onUpdate: (storyId: string, updates: Partial<AdminStory>) => void;
 }
@@ -41,7 +40,6 @@ type TabType = "url" | "upload";
 
 export function ImageEditorDialog({
   story,
-  adminKey,
   onClose,
   onUpdate,
 }: ImageEditorDialogProps) {
@@ -145,9 +143,9 @@ export function ImageEditorDialog({
       let result;
 
       if (activeTab === "url" && imageUrl) {
-        result = await updateStoryImageUrl(adminKey, story.id, imageUrl, imageSource || undefined);
+        result = await updateStoryImageUrl(story.id, imageUrl, imageSource || undefined);
       } else if (activeTab === "upload" && selectedFile) {
-        result = await uploadStoryImage(adminKey, story.id, selectedFile, imageSource || undefined);
+        result = await uploadStoryImage(story.id, selectedFile, imageSource || undefined);
       } else {
         setError("Please provide an image URL or upload a file");
         setIsLoading(false);
@@ -173,7 +171,7 @@ export function ImageEditorDialog({
     setError("");
 
     try {
-      const result = await updateStoryStatus(adminKey, story.id, "approved");
+      const result = await updateStoryStatus(story.id, "approved");
 
       if (result.error) {
         setError(result.error);
@@ -194,7 +192,7 @@ export function ImageEditorDialog({
     setError("");
 
     try {
-      const result = await updateStoryStatus(adminKey, story.id, "needs_curation");
+      const result = await updateStoryStatus(story.id, "needs_curation");
 
       if (result.error) {
         setError(result.error);

@@ -14,7 +14,7 @@ export interface AuthState {
 }
 
 export interface AuthContextValue extends AuthState {
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: (redirectPath?: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 

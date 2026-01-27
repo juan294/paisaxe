@@ -5,7 +5,7 @@ import { rowToAdminStory, type AdminStoryRow, type CurationStatus } from "@/type
 
 export async function GET(request: NextRequest) {
   // Validate admin auth
-  const auth = validateAdminAuth(request);
+  const auth = await validateAdminAuth();
   if (!auth.valid) {
     return auth.error;
   }

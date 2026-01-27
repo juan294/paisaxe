@@ -3,25 +3,27 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import AdminPage from "./page";
 import type { AdminStory } from "@/types/admin";
 
+// Mock useAuth
+const mockSignInWithGoogle = vi.fn();
+const mockSignOut = vi.fn();
+const mockUseAuth = vi.fn();
+
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+// Mock useAdminRole
+const mockUseAdminRole = vi.fn();
+
+vi.mock("@/hooks/use-admin-role", () => ({
+  useAdminRole: () => mockUseAdminRole(),
+}));
+
 // Mock fetchStories
 const mockFetchStories = vi.fn();
 
 vi.mock("@/lib/admin-api", () => ({
   fetchStories: (...args: unknown[]) => mockFetchStories(...args),
-}));
-
-// Mock AdminLoginForm
-const mockOnLogin = vi.fn();
-vi.mock("@/components/admin/admin-login-form", () => ({
-  AdminLoginForm: ({ onLogin }: { onLogin: (key: string) => void }) => {
-    // Store the onLogin callback so tests can invoke it
-    mockOnLogin.mockImplementation(onLogin);
-    return (
-      <div data-testid="login-form">
-        <button onClick={() => onLogin("test-admin-key")}>Login</button>
-      </div>
-    );
-  },
 }));
 
 // Mock StoryGrid
@@ -51,7 +53,6 @@ vi.mock("@/components/admin/image-editor-dialog", () => ({
     onUpdate,
   }: {
     story: AdminStory | null;
-    adminKey: string;
     onClose: () => void;
     onUpdate: (storyId: string, updates: Partial<AdminStory>) => void;
   }) => {
@@ -68,6 +69,26 @@ vi.mock("@/components/admin/image-editor-dialog", () => ({
   },
 }));
 
+// Mock AdminTabs
+vi.mock("@/components/admin/admin-tabs", () => ({
+  AdminTabs: ({ activeTab, onTabChange }: { activeTab: string; onTabChange: (tab: string) => void }) => (
+    <div data-testid="admin-tabs">
+      <button onClick={() => onTabChange("stories")} data-active={activeTab === "stories"}>Stories</button>
+      <button onClick={() => onTabChange("toggles")} data-active={activeTab === "toggles"}>Toggles</button>
+      <button onClick={() => onTabChange("analytics")} data-active={activeTab === "analytics"}>Analytics</button>
+    </div>
+  ),
+}));
+
+// Mock FeatureTogglesPanel and AnalyticsDashboard
+vi.mock("@/components/admin/feature-toggles-panel", () => ({
+  FeatureTogglesPanel: () => <div data-testid="feature-toggles-panel">Feature Toggles</div>,
+}));
+
+vi.mock("@/components/admin/analytics-dashboard", () => ({
+  AnalyticsDashboard: () => <div data-testid="analytics-dashboard">Analytics</div>,
+}));
+
 // Mock lucide-react icons
 vi.mock("lucide-react", () => ({
   RefreshCw: ({ className, ...props }: Record<string, unknown>) => (
@@ -76,6 +97,12 @@ vi.mock("lucide-react", () => ({
   LogOut: (props: Record<string, unknown>) => <span data-testid="icon-logout" {...props} />,
   AlertCircle: (props: Record<string, unknown>) => (
     <span data-testid="icon-alert" {...props} />
+  ),
+  ShieldX: (props: Record<string, unknown>) => (
+    <span data-testid="icon-shield-x" {...props} />
+  ),
+  Loader2: (props: Record<string, unknown>) => (
+    <span data-testid="icon-loader" {...props} />
   ),
 }));
 
@@ -121,91 +148,122 @@ const mockStories: AdminStory[] = [
   },
 ];
 
+// Helper to set up authenticated admin state
+function setupAdminAuth() {
+  mockUseAuth.mockReturnValue({
+    user: { id: "user-1", email: "admin@example.com" },
+    isLoading: false,
+    signInWithGoogle: mockSignInWithGoogle,
+    signOut: mockSignOut,
+  });
+  mockUseAdminRole.mockReturnValue({ isAdmin: true, isLoading: false });
+}
+
 describe("AdminPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetchStories.mockResolvedValue({ data: mockStories });
   });
 
-  describe("Authentication", () => {
-    it("shows login form when not authenticated", () => {
+  describe("Loading state", () => {
+    it("shows loading spinner while auth is loading", () => {
+      mockUseAuth.mockReturnValue({
+        user: null,
+        isLoading: true,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+      mockUseAdminRole.mockReturnValue({ isAdmin: false, isLoading: true });
+
       render(<AdminPage />);
-      expect(screen.getByTestId("login-form")).toBeInTheDocument();
+      expect(screen.getByText("Loading...")).toBeInTheDocument();
     });
 
-    it("after login, calls fetchStories", async () => {
-      render(<AdminPage />);
-
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
+    it("shows loading spinner while role is loading", () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-1", email: "admin@example.com" },
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
       });
-
-      await waitFor(() => {
-        expect(mockFetchStories).toHaveBeenCalledWith("test-admin-key", undefined);
-      });
-    });
-
-    it("logout clears state and shows login form again", async () => {
-      render(<AdminPage />);
-
-      // Login first
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
-      });
-
-      // Click logout
-      const logoutButton = screen.getByText("Logout").closest("button")!;
-      await act(async () => {
-        fireEvent.click(logoutButton);
-      });
-
-      expect(screen.getByTestId("login-form")).toBeInTheDocument();
-    });
-
-    it("auth error (Invalid) redirects to login", async () => {
-      mockFetchStories.mockResolvedValue({
-        error: "Invalid admin key",
-      });
+      mockUseAdminRole.mockReturnValue({ isAdmin: false, isLoading: true });
 
       render(<AdminPage />);
-
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("login-form")).toBeInTheDocument();
-      });
-    });
-
-    it("auth error (Authorization) redirects to login", async () => {
-      mockFetchStories.mockResolvedValue({
-        error: "Authorization failed",
-      });
-
-      render(<AdminPage />);
-
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("login-form")).toBeInTheDocument();
-      });
+      expect(screen.getByText("Loading...")).toBeInTheDocument();
     });
   });
 
-  describe("Stories display", () => {
-    it("shows stories grid after successful load", async () => {
+  describe("Not authenticated", () => {
+    beforeEach(() => {
+      mockUseAuth.mockReturnValue({
+        user: null,
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+      mockUseAdminRole.mockReturnValue({ isAdmin: false, isLoading: false });
+    });
+
+    it("shows sign-in screen when not authenticated", () => {
+      render(<AdminPage />);
+      expect(screen.getByText("Paisaxe Admin")).toBeInTheDocument();
+      expect(screen.getByText("Sign in to access the admin panel")).toBeInTheDocument();
+      expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
+    });
+
+    it("calls signInWithGoogle with '/admin' redirect when button clicked", async () => {
       render(<AdminPage />);
 
       await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
+        fireEvent.click(screen.getByText("Sign in with Google"));
       });
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith("/admin");
+    });
+  });
+
+  describe("Access denied", () => {
+    it("shows access denied for non-admin users", () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-2", email: "user@example.com" },
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+      mockUseAdminRole.mockReturnValue({ isAdmin: false, isLoading: false });
+
+      render(<AdminPage />);
+      expect(screen.getByText("Access Denied")).toBeInTheDocument();
+      expect(screen.getByText("Your account does not have admin privileges.")).toBeInTheDocument();
+      expect(screen.getByText("Signed in as user@example.com")).toBeInTheDocument();
+    });
+
+    it("sign out from access denied screen calls signOut", async () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-2", email: "user@example.com" },
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+      mockUseAdminRole.mockReturnValue({ isAdmin: false, isLoading: false });
+
+      render(<AdminPage />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Sign out"));
+      });
+
+      expect(mockSignOut).toHaveBeenCalled();
+    });
+  });
+
+  describe("Admin panel", () => {
+    beforeEach(() => {
+      setupAdminAuth();
+    });
+
+    it("shows stories grid after successful load", async () => {
+      render(<AdminPage />);
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -215,14 +273,28 @@ describe("AdminPage", () => {
       });
     });
 
+    it("calls fetchStories without adminKey parameter", async () => {
+      render(<AdminPage />);
+
+      await waitFor(() => {
+        expect(mockFetchStories).toHaveBeenCalledWith(undefined);
+      });
+    });
+
+    it("shows Paisaxe Admin title", async () => {
+      render(<AdminPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      expect(screen.getByText("Paisaxe Admin")).toBeInTheDocument();
+    });
+
     it("shows 'No stories found' when empty", async () => {
       mockFetchStories.mockResolvedValue({ data: [] });
 
       render(<AdminPage />);
-
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
-      });
 
       await waitFor(() => {
         expect(screen.getByText("No stories found")).toBeInTheDocument();
@@ -236,17 +308,61 @@ describe("AdminPage", () => {
 
       render(<AdminPage />);
 
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
-      });
-
       await waitFor(() => {
         expect(screen.getByText("Something went wrong")).toBeInTheDocument();
       });
     });
-  });
 
-  describe("Loading state", () => {
+    it("shows story counts (total, pending, approved, with images)", async () => {
+      render(<AdminPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      expect(screen.getByText("3 total")).toBeInTheDocument();
+      expect(screen.getByText("2 pending")).toBeInTheDocument();
+      expect(screen.getByText("1 approved")).toBeInTheDocument();
+      expect(screen.getByText("2 with images")).toBeInTheDocument();
+    });
+
+    it("logout calls signOut", async () => {
+      render(<AdminPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      const logoutButton = screen.getByText("Logout").closest("button")!;
+      await act(async () => {
+        fireEvent.click(logoutButton);
+      });
+
+      expect(mockSignOut).toHaveBeenCalled();
+    });
+
+    it("refresh button re-fetches stories", async () => {
+      render(<AdminPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      mockFetchStories.mockClear();
+      mockFetchStories.mockResolvedValue({ data: mockStories });
+
+      const refreshIcon = screen.getByTestId("icon-refresh");
+      const refreshButton = refreshIcon.closest("button")!;
+
+      await act(async () => {
+        fireEvent.click(refreshButton);
+      });
+
+      await waitFor(() => {
+        expect(mockFetchStories).toHaveBeenCalledWith(undefined);
+      });
+    });
+
     it("shows loading state while fetching", async () => {
       let resolvePromise: (value: unknown) => void;
       const promise = new Promise((resolve) => {
@@ -256,64 +372,22 @@ describe("AdminPage", () => {
 
       render(<AdminPage />);
 
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
-      });
-
-      // Should show loading state
       expect(screen.getByText("Loading...")).toBeInTheDocument();
 
-      // Resolve the promise
       await act(async () => {
         resolvePromise!({ data: mockStories });
       });
 
-      // Loading should be gone, stories visible
       expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
       expect(screen.getByTestId("story-grid")).toBeInTheDocument();
     });
-  });
 
-  describe("Story counts", () => {
-    it("shows story counts (total, pending, approved, with images)", async () => {
-      render(<AdminPage />);
-
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
-      });
-
-      // Total: 3 stories
-      expect(screen.getByText("3 total")).toBeInTheDocument();
-      // Pending: 2 (story-1, story-3)
-      expect(screen.getByText("2 pending")).toBeInTheDocument();
-      // Approved: 1 (story-2)
-      expect(screen.getByText("1 approved")).toBeInTheDocument();
-      // With images: 2 (story-1, story-2 have images; story-3 has empty string)
-      expect(screen.getByText("2 with images")).toBeInTheDocument();
-    });
-  });
-
-  describe("Filter buttons", () => {
     it("filter buttons work (All, Pending, Approved)", async () => {
       render(<AdminPage />);
 
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
-      });
-
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
       });
-
-      // Initially "All" filter is active
-      // The filter buttons appear twice (desktop nav + mobile filters)
-      // Find All buttons - there should be desktop and mobile versions
-      const allButtons = screen.getAllByText(/^All$/);
-      expect(allButtons.length).toBeGreaterThanOrEqual(1);
 
       // Click "Pending" filter
       mockFetchStories.mockClear();
@@ -325,7 +399,7 @@ describe("AdminPage", () => {
       });
 
       await waitFor(() => {
-        expect(mockFetchStories).toHaveBeenCalledWith("test-admin-key", "needs_curation");
+        expect(mockFetchStories).toHaveBeenCalledWith("needs_curation");
       });
 
       // Click "Approved" filter
@@ -338,51 +412,7 @@ describe("AdminPage", () => {
       });
 
       await waitFor(() => {
-        expect(mockFetchStories).toHaveBeenCalledWith("test-admin-key", "approved");
-      });
-    });
-  });
-
-  describe("Refresh", () => {
-    it("refresh button re-fetches stories", async () => {
-      render(<AdminPage />);
-
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
-      });
-
-      // Clear mock to track next call
-      mockFetchStories.mockClear();
-      mockFetchStories.mockResolvedValue({ data: mockStories });
-
-      // Click refresh button (contains the RefreshCw icon)
-      const refreshIcon = screen.getByTestId("icon-refresh");
-      const refreshButton = refreshIcon.closest("button")!;
-
-      await act(async () => {
-        fireEvent.click(refreshButton);
-      });
-
-      await waitFor(() => {
-        expect(mockFetchStories).toHaveBeenCalledWith("test-admin-key", undefined);
-      });
-    });
-  });
-
-  describe("Header", () => {
-    it("shows Paisaxe Admin title", async () => {
-      render(<AdminPage />);
-
-      await act(async () => {
-        fireEvent.click(screen.getByText("Login"));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText("Paisaxe Admin")).toBeInTheDocument();
+        expect(mockFetchStories).toHaveBeenCalledWith("approved");
       });
     });
   });

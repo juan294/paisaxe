@@ -77,7 +77,6 @@ const mockStory: AdminStory = {
 
 const defaultProps = {
   story: mockStory,
-  adminKey: "test-admin-key",
   onClose: vi.fn(),
   onUpdate: vi.fn(),
 };
@@ -94,7 +93,6 @@ describe("ImageEditorDialog", () => {
       const { container } = render(
         <ImageEditorDialog
           story={null}
-          adminKey="test-key"
           onClose={vi.fn()}
           onUpdate={vi.fn()}
         />
@@ -213,7 +211,6 @@ describe("ImageEditorDialog", () => {
       });
 
       expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
-        "test-admin-key",
         "story-1",
         "https://example.com/new.jpg",
         undefined
@@ -239,7 +236,6 @@ describe("ImageEditorDialog", () => {
       });
 
       expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
-        "test-admin-key",
         "story-1",
         "https://example.com/new.jpg",
         "Test source"
@@ -298,7 +294,6 @@ describe("ImageEditorDialog", () => {
       });
 
       expect(mockUploadStoryImage).toHaveBeenCalledWith(
-        "test-admin-key",
         "story-1",
         file,
         undefined
@@ -387,7 +382,7 @@ describe("ImageEditorDialog", () => {
         fireEvent.click(screen.getByText("Mark as approved"));
       });
 
-      expect(mockUpdateStoryStatus).toHaveBeenCalledWith("test-admin-key", "story-1", "approved");
+      expect(mockUpdateStoryStatus).toHaveBeenCalledWith("story-1", "approved");
     });
 
     it("calls onUpdate and onClose after successful approve", async () => {
@@ -428,7 +423,6 @@ describe("ImageEditorDialog", () => {
       });
 
       expect(mockUpdateStoryStatus).toHaveBeenCalledWith(
-        "test-admin-key",
         "story-1",
         "needs_curation"
       );

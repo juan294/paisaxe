@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { AdminLoginForm } from "@/components/admin/admin-login-form";
+import { useAuth } from "@/hooks/use-auth";
+import { useAdminRole } from "@/hooks/use-admin-role";
 import { StoryGrid } from "@/components/admin/story-grid";
 import { ImageEditorDialog } from "@/components/admin/image-editor-dialog";
 import { AdminTabs, type AdminTab } from "@/components/admin/admin-tabs";
@@ -13,6 +14,8 @@ import {
   RefreshCw,
   LogOut,
   AlertCircle,
+  ShieldX,
+  Loader2,
 } from "lucide-react";
 import type { AdminStory, CurationStatus } from "@/types/admin";
 import { cn } from "@/lib/utils";
@@ -20,7 +23,9 @@ import { cn } from "@/lib/utils";
 type FilterType = "all" | CurationStatus;
 
 export default function AdminPage() {
-  const [adminKey, setAdminKey] = useState<string | null>(null);
+  const { user, isLoading: isAuthLoading, signInWithGoogle, signOut } = useAuth();
+  const { isAdmin, isLoading: isRoleLoading } = useAdminRole();
+
   const [stories, setStories] = useState<AdminStory[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
   const [isLoading, setIsLoading] = useState(false);
@@ -29,40 +34,31 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>("stories");
 
   const loadStories = useCallback(async () => {
-    if (!adminKey) return;
-
     setIsLoading(true);
     setError("");
 
     const filterParam = filter === "all" ? undefined : filter;
-    const result = await fetchStories(adminKey, filterParam);
+    const result = await fetchStories(filterParam);
 
     if (result.error) {
       setError(result.error);
-      if (result.error.includes("Invalid") || result.error.includes("Authorization")) {
-        setAdminKey(null);
-      }
     } else if (result.data) {
       setStories(result.data);
     }
 
     setIsLoading(false);
-  }, [adminKey, filter]);
+  }, [filter]);
 
   useEffect(() => {
-    if (adminKey && activeTab === "stories") {
+    if (isAdmin && activeTab === "stories") {
       loadStories();
     }
-  }, [adminKey, filter, loadStories, activeTab]);
+  }, [isAdmin, filter, loadStories, activeTab]);
 
-  const handleLogin = (key: string) => {
-    setAdminKey(key);
-  };
-
-  const handleLogout = () => {
-    setAdminKey(null);
+  const handleLogout = async () => {
     setStories([]);
     setFilter("all");
+    await signOut();
   };
 
   const handleStoryUpdate = (storyId: string, updates: Partial<AdminStory>) => {
@@ -73,10 +69,72 @@ export default function AdminPage() {
     );
   };
 
-  if (!adminKey) {
-    return <AdminLoginForm onLogin={handleLogin} />;
+  // Loading state
+  if (isAuthLoading || isRoleLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50 dark:bg-neutral-950">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-6 w-6 animate-spin text-neutral-400" />
+          <p className="mt-3 text-sm text-neutral-500">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
+  // Not authenticated: show sign-in
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-4 dark:bg-neutral-950">
+        <div className="w-full max-w-sm text-center">
+          <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+            Paisaxe Admin
+          </h1>
+          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+            Sign in to access the admin panel
+          </p>
+          <Button
+            onClick={() => signInWithGoogle("/admin")}
+            className="mt-6 h-10 w-full bg-neutral-900 text-sm font-medium text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+          >
+            Sign in with Google
+          </Button>
+          <p className="mt-6 text-center text-xs text-neutral-400 dark:text-neutral-500">
+            Protected area
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Authenticated but not admin: access denied
+  if (!isAdmin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-4 dark:bg-neutral-950">
+        <div className="w-full max-w-sm text-center">
+          <ShieldX className="mx-auto h-10 w-10 text-red-400" />
+          <h1 className="mt-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+            Access Denied
+          </h1>
+          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+            Your account does not have admin privileges.
+          </p>
+          <p className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
+            Signed in as {user.email}
+          </p>
+          <Button
+            onClick={handleLogout}
+            variant="ghost"
+            className="mt-6 h-10 text-sm text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign out
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Admin panel
   const needsCurationCount = stories.filter(
     (s) => s.curationStatus === "needs_curation"
   ).length;
@@ -238,18 +296,17 @@ export default function AdminPage() {
         )}
 
         {activeTab === "toggles" && (
-          <FeatureTogglesPanel adminKey={adminKey} />
+          <FeatureTogglesPanel />
         )}
 
         {activeTab === "analytics" && (
-          <AnalyticsDashboard adminKey={adminKey} />
+          <AnalyticsDashboard />
         )}
       </main>
 
       {/* Image Editor Dialog */}
       <ImageEditorDialog
         story={editingStory}
-        adminKey={adminKey}
         onClose={() => setEditingStory(null)}
         onUpdate={handleStoryUpdate}
       />

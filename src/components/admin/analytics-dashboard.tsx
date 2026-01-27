@@ -6,11 +6,7 @@ import { RefreshCw, AlertCircle, BarChart3, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AnalyticsDashboardData, FeatureAnalytics } from "@/types/analytics";
 
-interface AnalyticsDashboardProps {
-  adminKey: string;
-}
-
-export function AnalyticsDashboard({ adminKey }: AnalyticsDashboardProps) {
+export function AnalyticsDashboard() {
   const [data, setData] = useState<AnalyticsDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -26,14 +22,14 @@ export function AnalyticsDashboard({ adminKey }: AnalyticsDashboardProps) {
     const fromISO = new Date(dateRange.from).toISOString();
     const toISO = new Date(dateRange.to + "T23:59:59").toISOString();
 
-    const result = await fetchAnalytics(adminKey, fromISO, toISO);
+    const result = await fetchAnalytics(fromISO, toISO);
     if (result.error) {
       setError(result.error);
     } else if (result.data) {
       setData(result.data);
     }
     setIsLoading(false);
-  }, [adminKey, dateRange]);
+  }, [dateRange]);
 
   useEffect(() => {
     loadData();

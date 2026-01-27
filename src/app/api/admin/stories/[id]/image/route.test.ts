@@ -23,7 +23,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
   describe("authentication", () => {
     it("should return 401 when auth fails", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({
+      vi.mocked(validateAdminAuth).mockResolvedValue({
         valid: false,
         error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
       });
@@ -40,7 +40,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
   describe("URL-based image update", () => {
     it("should update image with valid URL", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
       const mockSingle = vi.fn().mockResolvedValue({
         data: { id: "story-123", image_path: "https://example.com/new-image.jpg" },
@@ -68,7 +68,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should return 400 when imageUrl is missing", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
         method: "PUT",
@@ -84,7 +84,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should return 400 when imageUrl is not a string", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
         method: "PUT",
@@ -100,7 +100,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should return 400 for invalid URL format", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
         method: "PUT",
@@ -118,7 +118,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
   describe("URL-based image update with imageSource", () => {
     it("should include imageSource in update when provided", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
       const mockSingle = vi.fn().mockResolvedValue({
         data: { id: "story-123", image_path: "https://example.com/img.jpg", image_source: "unsplash" },
@@ -149,7 +149,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should not include imageSource when not provided", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
       const mockSingle = vi.fn().mockResolvedValue({
         data: { id: "story-123", image_path: "https://example.com/img.jpg" },
@@ -171,14 +171,13 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const response = await PUT(request, mockParams);
 
       expect(response.status).toBe(200);
-      // When imageSource is not provided, updateData should only contain image_path
       expect(mockUpdate).toHaveBeenCalledWith({
         image_path: "https://example.com/img.jpg",
       });
     });
 
     it("should not include imageSource when it is not a string", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
       const mockSingle = vi.fn().mockResolvedValue({
         data: { id: "story-123", image_path: "https://example.com/img.jpg" },
@@ -247,7 +246,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     };
 
     it("should upload file successfully", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       const { mockUpload, mockGetPublicUrl } = setupStorageMocks();
 
       const formData = new FormData();
@@ -265,7 +264,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should return 400 when no file in FormData", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       setupStorageMocks();
 
       const formData = new FormData();
@@ -280,7 +279,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should return 400 for invalid file type", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       setupStorageMocks();
 
       const formData = new FormData();
@@ -296,7 +295,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should return 400 for oversized file", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       setupStorageMocks();
 
       const formData = new FormData();
@@ -314,7 +313,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should return 500 on storage upload error", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       setupStorageMocks({ message: "Storage error" });
 
       const formData = new FormData();
@@ -330,7 +329,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should include imageSource from FormData when provided", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       const { mockUpdate } = setupStorageMocks();
 
       const formData = new FormData();
@@ -350,7 +349,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
   describe("database errors", () => {
     it("should return 404 when story not found", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
       const mockSingle = vi.fn().mockResolvedValue({ data: null, error: null });
       const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
@@ -374,7 +373,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should return 500 when database update fails", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
       const mockSingle = vi.fn().mockResolvedValue({
         data: null,
@@ -401,7 +400,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
 
     it("should return 500 on unexpected error", async () => {
-      vi.mocked(validateAdminAuth).mockReturnValue({ valid: true });
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       vi.mocked(createAdminClient).mockImplementation(() => {
         throw new Error("Unexpected");
       });

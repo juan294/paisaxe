@@ -6,11 +6,7 @@ import { RefreshCw, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FeatureFlag } from "@/types/feature-flags";
 
-interface FeatureTogglesPanelProps {
-  adminKey: string;
-}
-
-export function FeatureTogglesPanel({ adminKey }: FeatureTogglesPanelProps) {
+export function FeatureTogglesPanel() {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -20,14 +16,14 @@ export function FeatureTogglesPanel({ adminKey }: FeatureTogglesPanelProps) {
     setIsLoading(true);
     setError("");
 
-    const result = await fetchFeatureFlags(adminKey);
+    const result = await fetchFeatureFlags();
     if (result.error) {
       setError(result.error);
     } else if (result.data) {
       setFlags(result.data);
     }
     setIsLoading(false);
-  }, [adminKey]);
+  }, []);
 
   useEffect(() => {
     loadFlags();
@@ -35,7 +31,7 @@ export function FeatureTogglesPanel({ adminKey }: FeatureTogglesPanelProps) {
 
   const handleToggle = async (flag: FeatureFlag) => {
     setUpdatingKey(flag.flagKey);
-    const result = await updateFeatureFlag(adminKey, flag.flagKey, !flag.enabled);
+    const result = await updateFeatureFlag(flag.flagKey, !flag.enabled);
 
     if (result.error) {
       setError(result.error);
