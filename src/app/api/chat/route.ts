@@ -44,8 +44,8 @@ export async function POST(request: NextRequest) {
     // Generate embedding for the user's query
     const queryEmbedding = await generateEmbedding(message!);
 
-    // Search for relevant content
-    const { chunks, images } = await search(queryEmbedding, 3);
+    // Search for relevant content (with reranking via query text)
+    const { chunks, images } = await search(queryEmbedding, 3, message!);
 
     // If context is provided (e.g., from immersive mode), prepend it
     const enrichedMessage = context
