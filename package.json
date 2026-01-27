@@ -23,6 +23,10 @@
     "seed-db:stories:clear": "tsx scripts/seed-database.ts --stories --clear",
     "extract-images": "tsx scripts/extract-images.ts",
     "generate-stories": "tsx scripts/generate-stories.ts",
+    "seed-images": "tsx scripts/seed-images.ts",
+    "seed-images:clear": "tsx scripts/seed-images.ts --clear",
+    "seed-all": "npm run seed-images && npm run seed-db",
+    "seed-all:clear": "npm run seed-images:clear && npm run seed-db:clear",
     "prepare": "husky"
   },
   "dependencies": {
