@@ -1,0 +1,41 @@
+# Upptime monitoring configuration for Paisaxe
+#
+# IMPORTANT: Upptime requires its own SEPARATE GitHub repository.
+# This file is provided as a reference/template. To set up monitoring:
+#
+# 1. Create a new repository from the Upptime template:
+#    https://github.com/upptime/upptime
+# 2. Copy this file to that repository as `.upptimerc.yml` (in the repo root)
+# 3. Enable GitHub Pages on that repository (Settings > Pages > Source: GitHub Actions)
+# 4. Update the `owner` and `repo` fields below to match your new repository
+#
+# For full documentation, see: https://upptime.js.org/docs/
+
+# TODO: Update these to your Upptime repository's owner and repo name
+owner: your-github-username
+repo: paisaxe-upptime
+
+sites:
+  - name: Paisaxe (Main Site)
+    url: https://paisaxe.es
+    method: GET
+    expectedStatusCode: 200
+
+  - name: Paisaxe API Health
+    url: https://paisaxe.es/api/health
+    method: GET
+    expectedStatusCode: 200
+
+status-website:
+  cname: status.paisaxe.es
+  name: Paisaxe Status
+
+# Check every 5 minutes
+workflowSchedule:
+  graphs: "0 0 * * *"
+  responseTime: "0 23 * * *"
+  staticSite: "0 1 * * *"
+  summary: "0 0 * * *"
+  updateTemplate: "0 0 * * *"
+  updates: "*/5 * * * *"
+  uptime: "*/5 * * * *"
