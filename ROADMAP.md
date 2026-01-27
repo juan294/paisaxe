@@ -204,7 +204,7 @@ Database-backed feature flags (migration `008_feature_flags.sql`) with admin pan
 | `ambient_discovery` | :white_check_mark: | Slower transitions with ambient indicator |
 | `story_freshness` | :white_check_mark: | "Nuevo" badge on recent stories |
 
-See `doc/visitor-experience-improvements.md` for full feature descriptions and implementation waves.
+See `docs/visitor-experience-improvements.md` for full feature descriptions and implementation waves.
 
 ---
 
