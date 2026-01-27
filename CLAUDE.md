@@ -296,12 +296,19 @@ paisaxe/
 │   │   ├── immersive/          # Immersive stories page
 │   │   └── api/
 │   │       ├── chat/           # Chat endpoint
-│   │       └── health/         # Health check endpoint (uptime monitoring)
+│   │       ├── health/         # Health check endpoint (uptime monitoring)
+│   │       └── webhooks/
+│   │           └── supabase/   # Database webhook receiver (cache invalidation)
 │   ├── components/
 │   │   ├── ui/                 # shadcn/ui components
 │   │   └── immersive/          # Story viewer & voice chat
+│   ├── hooks/
+│   │   ├── use-realtime-feature-flags.ts  # Live feature flag sync via Realtime
+│   │   └── use-realtime-stories.ts        # Live story update notifications
 │   ├── lib/
 │   │   ├── supabase.ts         # Supabase client
+│   │   ├── supabase-browser.ts # Browser Supabase client (SSR)
+│   │   ├── realtime.ts         # Supabase Realtime subscription utilities
 │   │   ├── claude.ts           # Claude API wrapper
 │   │   ├── embeddings.ts       # Voyage AI embeddings
 │   │   ├── search.ts           # Vector search logic
@@ -316,6 +323,9 @@ paisaxe/
 │   ├── process-pdfs.ts         # PDF text extraction
 │   └── seed-database.ts        # Generate embeddings and populate DB
 ├── supabase/
+│   ├── functions/              # Supabase Edge Functions (Deno)
+│   │   ├── keep-alive/         # Prevents free-tier auto-pause
+│   │   └── cleanup-analytics/  # Deletes old analytics events
 │   └── migrations/             # Database schema (including pg_cron)
 ├── .github/
 │   ├── workflows/              # 9 CI/CD workflows (see CI/CD section)
@@ -372,6 +382,9 @@ ADMIN_SECRET_KEY=        # Admin authentication
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
+# Database Webhooks
+WEBHOOK_SECRET=          # Secret for validating Supabase webhook calls
+
 # Site URL (use production URL on Vercel, localhost in dev)
 NEXT_PUBLIC_SITE_URL=
 ```
@@ -380,6 +393,14 @@ These variables are configured in three places:
 - **`.env.local`** — local development
 - **Vercel** — production & preview deployments (all vars set)
 - **GitHub Secrets** — only `ANTHROPIC_API_KEY` (for Claude PR reviews)
+
+Additionally, the following settings are configured in the Supabase database via SQL:
+```sql
+ALTER DATABASE postgres SET app.webhook_base_url = 'https://paisaxe.com';
+ALTER DATABASE postgres SET app.webhook_secret = 'your-webhook-secret';
+ALTER DATABASE postgres SET app.supabase_functions_url = 'https://YOUR_PROJECT_REF.supabase.co/functions/v1';
+ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
+```
 
 ## Architecture Decisions
 
@@ -455,7 +476,7 @@ create table images (
 
 ### Health Check Endpoint
 
-`GET /api/health` — returns service status, uptime, and Supabase connectivity. Always returns HTTP 200 (reports "healthy" or "degraded" in the response body). Used by Upptime for uptime monitoring.
+`GET /api/health` — returns service status, uptime, Supabase connectivity with latency, and database storage usage (size in MB, percentage of 500 MB free-tier limit). Reports "degraded" if Supabase connection fails or database usage exceeds 80%. Always returns HTTP 200. Used by Upptime for uptime monitoring.
 
 ### Upptime Status Page
 
@@ -471,16 +492,54 @@ Real User Monitoring (RUM) for Core Web Vitals in production. View data in the V
 
 ## Database Maintenance (pg_cron)
 
-Automated maintenance jobs run on Supabase via pg_cron (migration `011_pg_cron_maintenance.sql`):
+Automated maintenance jobs run on Supabase via pg_cron:
 
-| Job | Schedule | Description |
-|-----|----------|-------------|
-| `vacuum-analyze-chunks` | Sundays 3:00 AM UTC | VACUUM ANALYZE on chunks table |
-| `analyze-main-tables` | Daily 4:00 AM UTC | ANALYZE on chunks, images, stories |
-| `cleanup-cron-history` | Sundays 5:00 AM UTC | Delete cron history older than 30 days |
-| `vacuum-analyze-analytics` | Sundays 3:30 AM UTC | VACUUM ANALYZE on analytics_events |
+| Job | Schedule | Migration | Description |
+|-----|----------|-----------|-------------|
+| `vacuum-analyze-chunks` | Sundays 3:00 AM UTC | 011 | VACUUM ANALYZE on chunks table |
+| `analyze-main-tables` | Daily 4:00 AM UTC | 011 | ANALYZE on chunks, images, stories |
+| `cleanup-cron-history` | Sundays 5:00 AM UTC | 011 | Delete cron history older than 30 days |
+| `vacuum-analyze-analytics` | Sundays 3:30 AM UTC | 011 | VACUUM ANALYZE on analytics_events |
+| `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Prevent free-tier auto-pause (7-day timeout) |
+| `edge-keep-alive` | Every 3 days 12:00 PM UTC | 014 | Call keep-alive Edge Function via pg_net |
+| `edge-cleanup-analytics` | 1st of month 2:00 AM UTC | 014 | Call cleanup Edge Function via pg_net |
 
 Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
+
+## Database Webhooks (pg_net)
+
+Database webhooks fire HTTP requests when rows change, using the `pg_net` extension (migration `013_database_webhooks.sql`). Webhooks call `POST /api/webhooks/supabase` on the Next.js app to trigger cache invalidation.
+
+| Table | Event | Effect |
+|-------|-------|--------|
+| `stories` | UPDATE | Revalidates `/immersive` and `/sitemap.xml` |
+| `feature_flags` | UPDATE | Revalidates `/api/feature-flags` |
+
+Setup: Configure `app.webhook_base_url` and `app.webhook_secret` in Supabase SQL Editor (see Environment Variables).
+
+## Supabase Realtime
+
+Realtime subscriptions provide live updates to browser sessions (free tier: 200 concurrent connections, 2M messages/month).
+
+| Subscription | Module | Purpose |
+|-------------|--------|---------|
+| Feature flags | `src/hooks/use-realtime-feature-flags.ts` | Live flag sync when admin toggles |
+| Stories | `src/hooks/use-realtime-stories.ts` | Notify when admin updates story |
+
+Utilities in `src/lib/realtime.ts` provide generic `subscribeToTable()` and specific `subscribeToFeatureFlags()` / `subscribeToStories()` helpers.
+
+## Supabase Edge Functions
+
+Deno-based Edge Functions in `supabase/functions/` (free tier: 500K invocations/month). Scheduled via pg_cron + pg_net.
+
+| Function | Purpose | Schedule |
+|----------|---------|----------|
+| `keep-alive` | Queries active stories to prevent auto-pause | Every 3 days |
+| `cleanup-analytics` | Deletes analytics events older than 90 days | Monthly |
+
+Deploy: `supabase functions deploy keep-alive && supabase functions deploy cleanup-analytics`
+
+See `supabase/functions/README.md` for full setup instructions.
 
 ## Automated Agents
 
