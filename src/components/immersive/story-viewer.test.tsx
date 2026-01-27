@@ -156,14 +156,32 @@ describe("StoryViewer", () => {
       expect(screen.getByText("Beautiful glacial lakes in the mountains")).toBeInTheDocument();
     });
 
-    it("should render progress bars for all stories", async () => {
+    it("should render progress bar segments capped at story count", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // There should be 3 progress bar segments
+      // With 3 stories (< PAGE_SIZE), should show 3 segments
       const progressBars = screen.getAllByRole("generic").filter(
         (el) => el.classList.contains("flex-1") && el.classList.contains("h-1")
       );
       expect(progressBars).toHaveLength(3);
+    });
+
+    it("should cycle progress bar position based on current index", async () => {
+      // At index 1 of 3 stories, position 1 should be filled (segments 0 and 1)
+      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+
+      const progressBars = screen.getAllByRole("generic").filter(
+        (el) => el.classList.contains("flex-1") && el.classList.contains("h-1")
+      );
+
+      // First two segments should have filled inner div (w-full)
+      const filled0 = progressBars[0]?.querySelector("div");
+      const filled1 = progressBars[1]?.querySelector("div");
+      const filled2 = progressBars[2]?.querySelector("div");
+
+      expect(filled0?.classList.contains("w-full")).toBe(true);
+      expect(filled1?.classList.contains("w-full")).toBe(true);
+      expect(filled2?.classList.contains("w-0")).toBe(true);
     });
 
     it("should render category badge", async () => {
@@ -194,22 +212,38 @@ describe("StoryViewer", () => {
   });
 
   describe("navigation", () => {
-    it("should disable prev button on first story", async () => {
+    it("should wrap to last story when pressing prev on first story", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const prevButton = screen.getAllByRole("button").find(
         (btn) => btn.classList.contains("left-4")
       );
-      expect(prevButton).toBeDisabled();
+      expect(prevButton).not.toBeDisabled();
+
+      if (prevButton) {
+        fireEvent.click(prevButton);
+        act(() => {
+          vi.advanceTimersByTime(300);
+        });
+        expect(onIndexChange).toHaveBeenCalledWith(2); // last story index
+      }
     });
 
-    it("should disable next button on last story", async () => {
+    it("should wrap to first story when pressing next on last story", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 2 })} />);
 
       const nextButton = screen.getAllByRole("button").find(
         (btn) => btn.classList.contains("right-4") && btn.classList.contains("top-1/2")
       );
-      expect(nextButton).toBeDisabled();
+      expect(nextButton).not.toBeDisabled();
+
+      if (nextButton) {
+        fireEvent.click(nextButton);
+        act(() => {
+          vi.advanceTimersByTime(300);
+        });
+        expect(onIndexChange).toHaveBeenCalledWith(0); // first story index
+      }
     });
 
     it("should call onIndexChange when clicking next", async () => {
@@ -277,6 +311,28 @@ describe("StoryViewer", () => {
       expect(onIndexChange).toHaveBeenCalledWith(1);
     });
 
+    it("should wrap to first story with right arrow on last story", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 2 })} />);
+
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(onIndexChange).toHaveBeenCalledWith(0);
+    });
+
+    it("should wrap to last story with left arrow on first story", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      fireEvent.keyDown(window, { key: "ArrowLeft" });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(onIndexChange).toHaveBeenCalledWith(2);
+    });
+
     it("should toggle info visibility with i key", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
@@ -336,6 +392,36 @@ describe("StoryViewer", () => {
         });
 
         expect(onIndexChange).toHaveBeenCalledWith(1);
+      }
+    });
+  });
+
+  describe("auto-play looping", () => {
+    it("should wrap to first story when auto-play reaches the end", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 2 })} />
+      );
+
+      // Find and click the auto-play toggle in the top-right controls area
+      const controlsArea = screen.getAllByRole("button");
+      const autoPlayButton = controlsArea.find(
+        (btn) => btn.querySelector("svg.lucide-play")
+      );
+
+      if (autoPlayButton) {
+        fireEvent.click(autoPlayButton);
+
+        // Advance time by auto-play interval
+        act(() => {
+          vi.advanceTimersByTime(6000);
+        });
+
+        // Wait for transition timeout
+        act(() => {
+          vi.advanceTimersByTime(300);
+        });
+
+        expect(onIndexChange).toHaveBeenCalledWith(0);
       }
     });
   });
