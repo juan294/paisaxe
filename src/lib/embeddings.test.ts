@@ -4,9 +4,10 @@ vi.mock("server-only", () => ({}));
 
 // Mock voyageai module
 const mockEmbed = vi.fn();
+const mockContextualizedEmbed = vi.fn();
 vi.mock("voyageai", () => ({
   VoyageAIClient: vi.fn(function () {
-    return { embed: mockEmbed };
+    return { embed: mockEmbed, contextualizedEmbed: mockContextualizedEmbed };
   }),
 }));
 
@@ -22,6 +23,7 @@ describe("embeddings", () => {
   beforeEach(() => {
     vi.resetModules();
     mockEmbed.mockReset();
+    mockContextualizedEmbed.mockReset();
     mockGet.mockReset();
     mockSet.mockReset();
     mockGet.mockReturnValue(null);
@@ -32,7 +34,7 @@ describe("embeddings", () => {
   });
 
   describe("getEmbeddingDimensions", () => {
-    it("should return 1024 for voyage-3 model", async () => {
+    it("should return 1024 for voyage-context-3 model", async () => {
       const { getEmbeddingDimensions } = await import("./embeddings");
       expect(getEmbeddingDimensions()).toBe(1024);
     });
@@ -52,7 +54,7 @@ describe("embeddings", () => {
       expect(result).toEqual(mockEmbedding);
       expect(mockEmbed).toHaveBeenCalledWith({
         input: ["test text"],
-        model: "voyage-3",
+        model: "voyage-context-3",
         inputType: "query",
       });
     });
@@ -256,6 +258,292 @@ describe("embeddings", () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("total: 50 tokens")
+      );
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("generateContextualizedEmbeddings", () => {
+    it("should generate contextualized embeddings for chunk groups", async () => {
+      const mockEmbedding1 = Array(1024).fill(0.1);
+      const mockEmbedding2 = Array(1024).fill(0.2);
+      const mockEmbedding3 = Array(1024).fill(0.3);
+
+      mockContextualizedEmbed
+        .mockResolvedValueOnce({
+          data: [
+            {
+              object: "list",
+              data: [
+                { object: "embedding", embedding: mockEmbedding1, index: 0 },
+                { object: "embedding", embedding: mockEmbedding2, index: 1 },
+              ],
+              index: 0,
+            },
+          ],
+          usage: { totalTokens: 200 },
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              object: "list",
+              data: [
+                { object: "embedding", embedding: mockEmbedding3, index: 0 },
+              ],
+              index: 0,
+            },
+          ],
+          usage: { totalTokens: 100 },
+        });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      const result = await generateContextualizedEmbeddings([
+        ["chunk1 from pdf1", "chunk2 from pdf1"],
+        ["chunk1 from pdf2"],
+      ]);
+
+      expect(result.embeddings).toHaveLength(3);
+      expect(result.embeddings[0]).toEqual(mockEmbedding1);
+      expect(result.embeddings[1]).toEqual(mockEmbedding2);
+      expect(result.embeddings[2]).toEqual(mockEmbedding3);
+      expect(result.totalTokens).toBe(300);
+    });
+
+    it("should call contextualizedEmbed with correct payload structure", async () => {
+      const mockEmbedding = Array(1024).fill(0.1);
+      mockContextualizedEmbed.mockResolvedValue({
+        data: [
+          {
+            object: "list",
+            data: [
+              { object: "embedding", embedding: mockEmbedding, index: 0 },
+              { object: "embedding", embedding: mockEmbedding, index: 1 },
+            ],
+            index: 0,
+          },
+        ],
+        usage: { totalTokens: 50 },
+      });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      await generateContextualizedEmbeddings([["chunk A", "chunk B"]]);
+
+      expect(mockContextualizedEmbed).toHaveBeenCalledWith({
+        inputs: [["chunk A", "chunk B"]],
+        model: "voyage-context-3",
+        inputType: "document",
+      });
+    });
+
+    it("should accumulate embeddings across multiple groups in order", async () => {
+      const embeddings = [
+        Array(1024).fill(0.1),
+        Array(1024).fill(0.2),
+        Array(1024).fill(0.3),
+        Array(1024).fill(0.4),
+      ];
+
+      // Group 1: 2 chunks
+      mockContextualizedEmbed
+        .mockResolvedValueOnce({
+          data: [
+            {
+              data: [
+                { embedding: embeddings[0], index: 0 },
+                { embedding: embeddings[1], index: 1 },
+              ],
+              index: 0,
+            },
+          ],
+          usage: { totalTokens: 100 },
+        })
+        // Group 2: 2 chunks
+        .mockResolvedValueOnce({
+          data: [
+            {
+              data: [
+                { embedding: embeddings[2], index: 0 },
+                { embedding: embeddings[3], index: 1 },
+              ],
+              index: 0,
+            },
+          ],
+          usage: { totalTokens: 150 },
+        });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      const result = await generateContextualizedEmbeddings([
+        ["group1-chunk1", "group1-chunk2"],
+        ["group2-chunk1", "group2-chunk2"],
+      ]);
+
+      expect(result.embeddings).toHaveLength(4);
+      expect(result.embeddings[0]).toEqual(embeddings[0]);
+      expect(result.embeddings[1]).toEqual(embeddings[1]);
+      expect(result.embeddings[2]).toEqual(embeddings[2]);
+      expect(result.embeddings[3]).toEqual(embeddings[3]);
+      expect(result.totalTokens).toBe(250);
+    });
+
+    it("should throw error when no data is returned for a group", async () => {
+      mockContextualizedEmbed.mockResolvedValue({
+        data: null,
+      });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+
+      await expect(
+        generateContextualizedEmbeddings([["chunk1"]])
+      ).rejects.toThrow("No contextualized embeddings returned for group 0");
+    });
+
+    it("should throw error when data array is empty for a group", async () => {
+      mockContextualizedEmbed.mockResolvedValue({
+        data: [],
+      });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+
+      await expect(
+        generateContextualizedEmbeddings([["chunk1"]])
+      ).rejects.toThrow("No contextualized embeddings returned for group 0");
+    });
+
+    it("should throw error when document data is missing chunk embeddings", async () => {
+      mockContextualizedEmbed.mockResolvedValue({
+        data: [
+          {
+            data: undefined,
+            index: 0,
+          },
+        ],
+      });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+
+      await expect(
+        generateContextualizedEmbeddings([["chunk1"]])
+      ).rejects.toThrow("No chunk embeddings in contextualized response for group 0");
+    });
+
+    it("should skip empty groups", async () => {
+      const mockEmbedding = Array(1024).fill(0.5);
+      mockContextualizedEmbed.mockResolvedValue({
+        data: [
+          {
+            data: [{ embedding: mockEmbedding, index: 0 }],
+            index: 0,
+          },
+        ],
+        usage: { totalTokens: 30 },
+      });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      const result = await generateContextualizedEmbeddings([
+        [],
+        ["non-empty chunk"],
+        [],
+      ]);
+
+      expect(mockContextualizedEmbed).toHaveBeenCalledTimes(1);
+      expect(result.embeddings).toHaveLength(1);
+      expect(result.embeddings[0]).toEqual(mockEmbedding);
+      expect(result.totalTokens).toBe(30);
+    });
+
+    it("should filter out undefined embeddings from response", async () => {
+      mockContextualizedEmbed.mockResolvedValue({
+        data: [
+          {
+            data: [
+              { embedding: Array(1024).fill(0.1), index: 0 },
+              { embedding: undefined, index: 1 },
+              { embedding: Array(1024).fill(0.3), index: 2 },
+            ],
+            index: 0,
+          },
+        ],
+        usage: { totalTokens: 75 },
+      });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      const result = await generateContextualizedEmbeddings([
+        ["chunk1", "chunk2", "chunk3"],
+      ]);
+
+      expect(result.embeddings).toHaveLength(2);
+    });
+
+    it("should handle missing usage data", async () => {
+      const mockEmbedding = Array(1024).fill(0.1);
+      mockContextualizedEmbed.mockResolvedValue({
+        data: [
+          {
+            data: [{ embedding: mockEmbedding, index: 0 }],
+            index: 0,
+          },
+        ],
+        // No usage field
+      });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      const result = await generateContextualizedEmbeddings([["chunk1"]]);
+
+      expect(result.totalTokens).toBe(0);
+    });
+
+    it("should return empty result for empty input", async () => {
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      const result = await generateContextualizedEmbeddings([]);
+
+      expect(result.embeddings).toHaveLength(0);
+      expect(result.totalTokens).toBe(0);
+      expect(mockContextualizedEmbed).not.toHaveBeenCalled();
+    });
+
+    it("should log token usage per group", async () => {
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const mockEmbedding = Array(1024).fill(0.1);
+      mockContextualizedEmbed.mockResolvedValue({
+        data: [
+          {
+            data: [{ embedding: mockEmbedding, index: 0 }],
+            index: 0,
+          },
+        ],
+        usage: { totalTokens: 88 },
+      });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      await generateContextualizedEmbeddings([["chunk1"]]);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("88 tokens")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("contextualizedEmbed group 0")
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should log total summary across all groups", async () => {
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const mockEmbedding = Array(1024).fill(0.1);
+      mockContextualizedEmbed.mockResolvedValue({
+        data: [
+          {
+            data: [{ embedding: mockEmbedding, index: 0 }],
+            index: 0,
+          },
+        ],
+        usage: { totalTokens: 50 },
+      });
+
+      const { generateContextualizedEmbeddings } = await import("./embeddings");
+      await generateContextualizedEmbeddings([["chunk1"], ["chunk2"]]);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("generateContextualizedEmbeddings total: 100 tokens for 2 groups")
       );
       consoleSpy.mockRestore();
     });

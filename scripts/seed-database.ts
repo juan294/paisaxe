@@ -29,8 +29,7 @@ if (voyageApiKey) {
   voyage = new VoyageAIClient({ apiKey: voyageApiKey });
 }
 
-const EMBEDDING_MODEL = "voyage-3";
-const BATCH_SIZE = 128; // Max texts per Voyage AI request (up to 1,000 allowed)
+const CONTEXTUALIZED_MODEL = "voyage-context-3";
 // Voyage AI Tier 1 rate limits: 2,000 RPM / 8M TPM — no fixed delay needed
 const MAX_RETRIES = 3; // Max retries on 429 rate limit errors
 const INITIAL_RETRY_DELAY = 1000; // Start with 1s, doubles each retry (exponential backoff)
@@ -318,23 +317,31 @@ const filteredGenerated = GENERATED_STORIES
 
 ALL_STORIES.push(...filteredGenerated);
 
-async function generateEmbeddingsWithRetry(texts: string[]): Promise<{ data: { embedding?: number[] }[]; usage?: { totalTokens?: number } }> {
+async function generateContextualizedEmbeddingsWithRetry(
+  texts: string[],
+  sourcePdf: string
+): Promise<{ data: { embedding?: number[] }[]; totalTokens: number }> {
   if (!voyage) {
     throw new Error("Voyage AI client not initialized. Set VOYAGE_API_KEY environment variable.");
   }
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const result = await voyage.embed({
-        input: texts,
-        model: EMBEDDING_MODEL,
+      const result = await voyage.contextualizedEmbed({
+        inputs: [texts],
+        model: CONTEXTUALIZED_MODEL,
+        inputType: "document",
       });
 
-      if (!result.data) {
-        throw new Error("No embeddings returned from Voyage AI");
+      if (!result.data || result.data.length === 0 || !result.data[0].data) {
+        throw new Error(`No contextualized embeddings returned for ${sourcePdf}`);
       }
 
-      return result;
+      const chunkEmbeddings = result.data[0].data;
+      return {
+        data: chunkEmbeddings,
+        totalTokens: result.usage?.totalTokens || 0,
+      };
     } catch (error: unknown) {
       const isRateLimited =
         error instanceof Error &&
@@ -354,6 +361,7 @@ async function generateEmbeddingsWithRetry(texts: string[]): Promise<{ data: { e
   // Unreachable, but TypeScript needs it
   throw new Error("Max retries exceeded");
 }
+
 
 async function seedStories(): Promise<void> {
   console.log(`\nSeeding ${ALL_STORIES.length} stories...`);
@@ -414,6 +422,23 @@ async function clearStories(): Promise<void> {
   }
 }
 
+/**
+ * Group chunks by their source PDF so that chunks from the same document
+ * can be embedded together with contextual awareness.
+ */
+function groupChunksByPdf(chunks: Chunk[]): Map<string, Chunk[]> {
+  const groups = new Map<string, Chunk[]>();
+  for (const chunk of chunks) {
+    const existing = groups.get(chunk.sourcePdf);
+    if (existing) {
+      existing.push(chunk);
+    } else {
+      groups.set(chunk.sourcePdf, [chunk]);
+    }
+  }
+  return groups;
+}
+
 async function seedChunks(): Promise<void> {
   if (!voyage) {
     console.error("Voyage API key not set. Cannot seed chunks without embeddings.");
@@ -428,28 +453,34 @@ async function seedChunks(): Promise<void> {
 
   const chunks: Chunk[] = JSON.parse(fs.readFileSync(CHUNKS_FILE, "utf-8"));
   console.log(`Loading ${chunks.length} chunks into database...`);
-  console.log(`Using Voyage AI model: ${EMBEDDING_MODEL}`);
+  console.log(`Using Voyage AI model: ${CONTEXTUALIZED_MODEL} (contextualized embeddings)`);
+
+  // Group chunks by source PDF for contextualized embedding
+  const pdfGroups = groupChunksByPdf(chunks);
+  console.log(`Grouped chunks into ${pdfGroups.size} PDF document groups`);
 
   let processed = 0;
   let totalTokens = 0;
 
-  // Process in batches for embeddings
-  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-    const batch = chunks.slice(i, i + BATCH_SIZE);
-    const texts = batch.map((chunk) => chunk.content);
+  // Process each PDF group with contextualized embeddings
+  for (const [sourcePdf, groupChunks] of pdfGroups) {
+    const texts = groupChunks.map((chunk) => chunk.content);
+    console.log(`\nProcessing "${sourcePdf}": ${texts.length} chunks`);
 
     try {
-      // Generate embeddings for batch (with retry on 429)
-      const result = await generateEmbeddingsWithRetry(texts);
+      // Generate contextualized embeddings with retry on 429
+      const result = await generateContextualizedEmbeddingsWithRetry(texts, sourcePdf);
 
       if (result.data.length !== texts.length) {
-        throw new Error(`Embedding count mismatch for batch ${i}`);
+        throw new Error(
+          `Embedding count mismatch for ${sourcePdf}: expected ${texts.length}, got ${result.data.length}`
+        );
       }
 
-      totalTokens += result.usage?.totalTokens || 0;
+      totalTokens += result.totalTokens;
 
       // Prepare records for database
-      const records = batch.map((chunk, idx) => ({
+      const records = groupChunks.map((chunk, idx) => ({
         content: chunk.content,
         embedding: result.data[idx].embedding,
         source_pdf: chunk.sourcePdf,
@@ -463,22 +494,25 @@ async function seedChunks(): Promise<void> {
       const { error } = await supabase.from("chunks").insert(records);
 
       if (error) {
-        console.error(`Error inserting batch ${i}:`, error.message);
+        console.error(`Error inserting chunks for ${sourcePdf}:`, error.message);
       } else {
-        processed += batch.length;
-        console.log(`Processed ${processed}/${chunks.length} chunks (${totalTokens.toLocaleString()} tokens used)`);
+        processed += groupChunks.length;
+        console.log(
+          `  Processed ${processed}/${chunks.length} chunks (${totalTokens.toLocaleString()} tokens used)`
+        );
       }
 
-      // No delay needed — Voyage AI Tier 1 supports 2,000 RPM (~33 req/sec)
+      // No fixed delay needed — Voyage AI Tier 1 supports 2,000 RPM (~33 req/sec)
+      // Exponential backoff retry handles 429 rate limit errors automatically
     } catch (error) {
-      console.error(`Error processing batch ${i}:`, error);
-      // Continue with next batch
+      console.error(`Error processing ${sourcePdf}:`, error);
+      // Continue with next group
     }
   }
 
   console.log(`\nDatabase seeding complete!`);
   console.log(`Total tokens used: ${totalTokens.toLocaleString()}`);
-  console.log(`Estimated cost: $${((totalTokens / 1000) * 0.0001).toFixed(4)}`);
+  console.log(`Estimated cost: $${((totalTokens / 1000) * 0.00018).toFixed(4)}`);
 }
 
 async function clearDatabase(): Promise<void> {
