@@ -30,8 +30,10 @@ if (voyageApiKey) {
 }
 
 const EMBEDDING_MODEL = "voyage-3";
-const BATCH_SIZE = 64; // Larger batches with paid tier
-const RATE_LIMIT_DELAY = 500; // 500ms between batches (paid tier: 300 RPM)
+const BATCH_SIZE = 128; // Max texts per Voyage AI request (up to 1,000 allowed)
+// Voyage AI Tier 1 rate limits: 2,000 RPM / 8M TPM — no fixed delay needed
+const MAX_RETRIES = 3; // Max retries on 429 rate limit errors
+const INITIAL_RETRY_DELAY = 1000; // Start with 1s, doubles each retry (exponential backoff)
 
 interface Chunk {
   content: string;
@@ -316,20 +318,41 @@ const filteredGenerated = GENERATED_STORIES
 
 ALL_STORIES.push(...filteredGenerated);
 
-async function generateEmbeddings(texts: string[]): Promise<number[][]> {
+async function generateEmbeddingsWithRetry(texts: string[]): Promise<{ data: { embedding?: number[] }[]; usage?: { totalTokens?: number } }> {
   if (!voyage) {
     throw new Error("Voyage AI client not initialized. Set VOYAGE_API_KEY environment variable.");
   }
-  const result = await voyage.embed({
-    input: texts,
-    model: EMBEDDING_MODEL,
-  });
 
-  if (!result.data) {
-    throw new Error("No embeddings returned from Voyage AI");
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await voyage.embed({
+        input: texts,
+        model: EMBEDDING_MODEL,
+      });
+
+      if (!result.data) {
+        throw new Error("No embeddings returned from Voyage AI");
+      }
+
+      return result;
+    } catch (error: unknown) {
+      const isRateLimited =
+        error instanceof Error &&
+        (error.message.includes("429") || error.message.includes("rate limit"));
+
+      if (isRateLimited && attempt < MAX_RETRIES) {
+        const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt);
+        console.warn(`Rate limited (429). Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+
+      throw error;
+    }
   }
 
-  return result.data.map((d) => d.embedding).filter((e): e is number[] => e !== undefined);
+  // Unreachable, but TypeScript needs it
+  throw new Error("Max retries exceeded");
 }
 
 async function seedStories(): Promise<void> {
@@ -416,13 +439,10 @@ async function seedChunks(): Promise<void> {
     const texts = batch.map((chunk) => chunk.content);
 
     try {
-      // Generate embeddings for batch
-      const result = await voyage.embed({
-        input: texts,
-        model: EMBEDDING_MODEL,
-      });
+      // Generate embeddings for batch (with retry on 429)
+      const result = await generateEmbeddingsWithRetry(texts);
 
-      if (!result.data || result.data.length !== texts.length) {
+      if (result.data.length !== texts.length) {
         throw new Error(`Embedding count mismatch for batch ${i}`);
       }
 
@@ -431,7 +451,7 @@ async function seedChunks(): Promise<void> {
       // Prepare records for database
       const records = batch.map((chunk, idx) => ({
         content: chunk.content,
-        embedding: result.data![idx].embedding,
+        embedding: result.data[idx].embedding,
         source_pdf: chunk.sourcePdf,
         page_number: chunk.pageNumber,
         section_title: chunk.sectionTitle || null,
@@ -449,8 +469,7 @@ async function seedChunks(): Promise<void> {
         console.log(`Processed ${processed}/${chunks.length} chunks (${totalTokens.toLocaleString()} tokens used)`);
       }
 
-      // Small delay between batches
-      await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAY));
+      // No delay needed — Voyage AI Tier 1 supports 2,000 RPM (~33 req/sec)
     } catch (error) {
       console.error(`Error processing batch ${i}:`, error);
       // Continue with next batch
