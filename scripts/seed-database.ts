@@ -30,6 +30,7 @@ if (voyageApiKey) {
 }
 
 const CONTEXTUALIZED_MODEL = "voyage-context-3";
+const EMBEDDING_DIMENSIONS = 512; // Matryoshka embeddings: reduce from 1024 to save ~50% storage
 // Voyage AI Tier 1 rate limits: 2,000 RPM / 8M TPM — no fixed delay needed
 const MAX_RETRIES = 3; // Max retries on 429 rate limit errors
 const INITIAL_RETRY_DELAY = 1000; // Start with 1s, doubles each retry (exponential backoff)
@@ -331,6 +332,7 @@ async function generateContextualizedEmbeddingsWithRetry(
         inputs: [texts],
         model: CONTEXTUALIZED_MODEL,
         inputType: "document",
+        outputDimension: EMBEDDING_DIMENSIONS,
       });
 
       if (!result.data || result.data.length === 0 || !result.data[0].data) {
@@ -451,6 +453,17 @@ async function seedChunks(): Promise<void> {
     process.exit(1);
   }
 
+  // Load image refs map if available (produced by seed-images.ts)
+  const imageRefsMapPath = path.join(process.cwd(), "content", "processed", "image-refs-map.json");
+  let imageRefsMap: Record<string, string[]> = {};
+  if (fs.existsSync(imageRefsMapPath)) {
+    imageRefsMap = JSON.parse(fs.readFileSync(imageRefsMapPath, "utf-8"));
+    console.log(`Loaded image refs map: ${Object.keys(imageRefsMap).length} page entries`);
+  } else {
+    console.warn("Warning: image-refs-map.json not found. Run 'npm run seed-images' first to link images to chunks.");
+    console.warn("Continuing with empty image_refs.\n");
+  }
+
   const chunks: Chunk[] = JSON.parse(fs.readFileSync(CHUNKS_FILE, "utf-8"));
   console.log(`Loading ${chunks.length} chunks into database...`);
   console.log(`Using Voyage AI model: ${CONTEXTUALIZED_MODEL} (contextualized embeddings)`);
@@ -461,6 +474,7 @@ async function seedChunks(): Promise<void> {
 
   let processed = 0;
   let totalTokens = 0;
+  let chunksWithImages = 0;
 
   // Process each PDF group with contextualized embeddings
   for (const [sourcePdf, groupChunks] of pdfGroups) {
@@ -480,15 +494,20 @@ async function seedChunks(): Promise<void> {
       totalTokens += result.totalTokens;
 
       // Prepare records for database
-      const records = groupChunks.map((chunk, idx) => ({
-        content: chunk.content,
-        embedding: result.data[idx].embedding,
-        source_pdf: chunk.sourcePdf,
-        page_number: chunk.pageNumber,
-        section_title: chunk.sectionTitle || null,
-        image_refs: [],
-        metadata: {},
-      }));
+      const records = groupChunks.map((chunk, idx) => {
+        const refsKey = `${chunk.sourcePdf}:${chunk.pageNumber}`;
+        const refs = imageRefsMap[refsKey] || [];
+        if (refs.length > 0) chunksWithImages++;
+        return {
+          content: chunk.content,
+          embedding: result.data[idx].embedding,
+          source_pdf: chunk.sourcePdf,
+          page_number: chunk.pageNumber,
+          section_title: chunk.sectionTitle || null,
+          image_refs: refs,
+          metadata: {},
+        };
+      });
 
       // Insert into database
       const { error } = await supabase.from("chunks").insert(records);
@@ -511,6 +530,7 @@ async function seedChunks(): Promise<void> {
   }
 
   console.log(`\nDatabase seeding complete!`);
+  console.log(`Chunks with image refs: ${chunksWithImages}/${processed}`);
   console.log(`Total tokens used: ${totalTokens.toLocaleString()}`);
   console.log(`Estimated cost: $${((totalTokens / 1000) * 0.00018).toFixed(4)}`);
 }

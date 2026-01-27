@@ -8,7 +8,7 @@ const voyageClient = new VoyageAIClient({
 
 const EMBEDDING_MODEL = "voyage-context-3";
 const CONTEXTUALIZED_MODEL = "voyage-context-3";
-const EMBEDDING_DIMENSIONS = 1024;
+const EMBEDDING_DIMENSIONS = 512;
 const MAX_BATCH_SIZE = 128;
 
 const embeddingCache = new EmbeddingCache();
@@ -39,6 +39,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     input: [text],
     model: EMBEDDING_MODEL,
     inputType: "query",
+    outputDimension: EMBEDDING_DIMENSIONS,
   });
 
   if (!result.data || result.data.length === 0 || !result.data[0].embedding) {
@@ -74,6 +75,7 @@ export async function generateEmbeddings(texts: string[]): Promise<BatchEmbeddin
       input: batch,
       model: EMBEDDING_MODEL,
       inputType: "document",
+      outputDimension: EMBEDDING_DIMENSIONS,
     });
 
     if (!result.data) {
@@ -120,6 +122,7 @@ export async function generateContextualizedEmbeddings(
       inputs: [group],
       model: CONTEXTUALIZED_MODEL,
       inputType: "document",
+      outputDimension: EMBEDDING_DIMENSIONS,
     });
 
     if (!result.data || result.data.length === 0) {

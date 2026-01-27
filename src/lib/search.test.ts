@@ -48,7 +48,7 @@ describe("search", () => {
         error: null,
       } as never);
 
-      const embedding = new Array(1024).fill(0.1);
+      const embedding = new Array(512).fill(0.1);
       const results = await searchChunks(embedding, 5);
 
       expect(supabase.rpc).toHaveBeenCalledWith("match_chunks", {
@@ -75,7 +75,7 @@ describe("search", () => {
         error: { message: "Database error" },
       } as never);
 
-      const embedding = new Array(1024).fill(0.1);
+      const embedding = new Array(512).fill(0.1);
       const results = await searchChunks(embedding);
 
       expect(results).toEqual([]);
@@ -253,7 +253,7 @@ describe("search", () => {
         select: mockSelect,
       } as never);
 
-      const embedding = new Array(1024).fill(0.1);
+      const embedding = new Array(512).fill(0.1);
       const result = await search(embedding, 5);
 
       // Without query text, reranking should not be called
