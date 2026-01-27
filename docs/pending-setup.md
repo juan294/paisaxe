@@ -81,6 +81,7 @@ Apply the three new migrations in the Supabase SQL Editor (or via CLI):
 - `012_keep_alive_cron.sql` - Keep-alive cron job + get_database_size() function
 - `013_database_webhooks.sql` - pg_net extension + webhook triggers on stories and feature_flags
 - `014_edge_function_schedules.sql` - pg_cron schedules for Edge Functions
+- `015_security_advisor_fixes.sql` - Function search_path hardening, move vector to extensions schema, tighten analytics RLS
 
 ```bash
 # Option A: Via Supabase CLI (if migrations are linked)
@@ -106,7 +107,18 @@ Expected jobs (7 total):
 
 ---
 
-## 6. Update NEXT_PUBLIC_SITE_URL on Vercel
+## 6. Enable Leaked Password Protection
+
+Enable Supabase's leaked password protection to check new passwords against known breach databases (HaveIBeenPwned):
+
+1. Go to [Supabase Auth Settings](https://supabase.com/dashboard/project/axoishtlumlswzhegseq/settings/auth)
+2. Under **Email Provider**, enable **Leaked password protection**
+
+This prevents users from signing up with passwords that appear in public data breaches. Cannot be configured via SQL — dashboard only.
+
+---
+
+## 7. Update NEXT_PUBLIC_SITE_URL on Vercel
 
 Once the domain is finalized, update the production site URL:
 
@@ -118,7 +130,7 @@ vercel env add NEXT_PUBLIC_SITE_URL production
 
 ---
 
-## 7. Verify Everything Works
+## 8. Verify Everything Works
 
 After completing all steps above:
 
@@ -127,6 +139,7 @@ After completing all steps above:
 3. **Realtime**: Open two browser tabs on the immersive page. Toggle a feature flag in the admin panel. Both tabs should reflect the change without refreshing
 4. **Edge Functions**: Check the Supabase Dashboard > Edge Functions to see invocation logs
 5. **Cron jobs**: Wait 3 days and verify the keep-alive job ran: `SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;`
+6. **Security Advisor**: Check [Security Advisor](https://supabase.com/dashboard/project/axoishtlumlswzhegseq/advisors/security) — should show 0 warnings
 
 ---
 
