@@ -140,6 +140,13 @@ describe("VoiceChat", () => {
       ).toBeInTheDocument();
     });
 
+    it("should have aria-label on chat input", () => {
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      expect(input).toHaveAttribute("aria-label", "Escribe tu pregunta...");
+    });
+
     it("should render submit button", () => {
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
