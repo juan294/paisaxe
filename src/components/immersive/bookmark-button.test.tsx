@@ -2,6 +2,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BookmarkButton } from "./bookmark-button";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 describe("BookmarkButton", () => {
   let onToggle: ReturnType<typeof vi.fn>;
@@ -12,7 +23,7 @@ describe("BookmarkButton", () => {
 
   it("renders with correct title when not bookmarked", () => {
     render(<BookmarkButton isFavorite={false} onToggle={onToggle} />);
-    expect(screen.getByTitle("Agregar a guardados")).toBeInTheDocument();
+    expect(screen.getByTitle("Guardar")).toBeInTheDocument();
   });
 
   it("renders with correct title when bookmarked", () => {
@@ -20,7 +31,7 @@ describe("BookmarkButton", () => {
     expect(screen.getByTitle("Quitar de guardados")).toBeInTheDocument();
   });
 
-  it("shows 'Guardado' toast when adding to favorites", async () => {
+  it("shows translated toast when adding to favorites", async () => {
     const user = userEvent.setup();
     render(<BookmarkButton isFavorite={false} onToggle={onToggle} />);
 
@@ -30,10 +41,10 @@ describe("BookmarkButton", () => {
     await waitFor(() => {
       expect(screen.getByRole("status")).toHaveClass("opacity-100");
     });
-    expect(screen.getByRole("status")).toHaveTextContent("Guardado");
+    expect(screen.getByRole("status")).toHaveTextContent("Guardado en favoritos");
   });
 
-  it("shows 'Eliminado' toast when removing from favorites", async () => {
+  it("shows translated toast when removing from favorites", async () => {
     const user = userEvent.setup();
     render(<BookmarkButton isFavorite={true} onToggle={onToggle} />);
 
@@ -43,7 +54,7 @@ describe("BookmarkButton", () => {
     await waitFor(() => {
       expect(screen.getByRole("status")).toHaveClass("opacity-100");
     });
-    expect(screen.getByRole("status")).toHaveTextContent("Eliminado");
+    expect(screen.getByRole("status")).toHaveTextContent("Eliminado de favoritos");
   });
 
   it("hides toast after timeout", async () => {
