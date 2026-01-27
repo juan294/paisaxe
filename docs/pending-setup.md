@@ -74,29 +74,19 @@ supabase functions list
 
 ---
 
-## 5. Run New Database Migrations
+## 5. Verify Database Migrations
 
-Apply the three new migrations in the Supabase SQL Editor (or via CLI):
+Migrations 012–015 have already been applied via `supabase db push`. Verify they are in place:
 
-- `012_keep_alive_cron.sql` - Keep-alive cron job + get_database_size() function
-- `013_database_webhooks.sql` - pg_net extension + webhook triggers on stories and feature_flags
-- `014_edge_function_schedules.sql` - pg_cron schedules for Edge Functions
-- `015_security_advisor_fixes.sql` - Function search_path hardening, move vector to extensions schema, tighten analytics RLS
-
-```bash
-# Option A: Via Supabase CLI (if migrations are linked)
-supabase db push
-
-# Option B: Manually in SQL Editor
-# Copy and paste each migration file contents into the SQL Editor and run
-```
-
-After running migrations, verify cron jobs are registered:
 ```sql
+-- Check all migrations are applied
+SELECT * FROM supabase_migrations.schema_migrations ORDER BY version;
+
+-- Verify cron jobs are registered (expect 7)
 SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;
 ```
 
-Expected jobs (7 total):
+Expected cron jobs (7 total):
 - `analyze-main-tables`
 - `cleanup-cron-history`
 - `edge-cleanup-analytics`
@@ -104,6 +94,12 @@ Expected jobs (7 total):
 - `keep-alive`
 - `vacuum-analyze-analytics`
 - `vacuum-analyze-chunks`
+
+Migrations applied:
+- `012_keep_alive_cron.sql` — Keep-alive cron job + get_database_size() function
+- `013_database_webhooks.sql` — pg_net extension + webhook triggers on stories and feature_flags
+- `014_edge_function_schedules.sql` — pg_cron schedules for Edge Functions
+- `015_security_advisor_fixes.sql` — Function search_path hardening, move vector to extensions schema, tighten analytics RLS
 
 ---
 
@@ -128,7 +124,7 @@ After completing all steps above:
 3. **Realtime**: Open two browser tabs on the immersive page. Toggle a feature flag in the admin panel. Both tabs should reflect the change without refreshing
 4. **Edge Functions**: Check the Supabase Dashboard > Edge Functions to see invocation logs
 5. **Cron jobs**: Wait 3 days and verify the keep-alive job ran: `SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;`
-6. **Security Advisor**: Check [Security Advisor](https://supabase.com/dashboard/project/axoishtlumlswzhegseq/advisors/security) — should show 0 warnings
+6. **Security Advisor**: Check [Security Advisor](https://supabase.com/dashboard/project/axoishtlumlswzhegseq/advisors/security) — should show only 1 warning ("Leaked Password Protection Disabled", which requires a paid Pro plan and can be ignored)
 
 ---
 
