@@ -107,18 +107,7 @@ Expected jobs (7 total):
 
 ---
 
-## 6. Enable Leaked Password Protection
-
-Enable Supabase's leaked password protection to check new passwords against known breach databases (HaveIBeenPwned):
-
-1. Go to [Supabase Auth Settings](https://supabase.com/dashboard/project/axoishtlumlswzhegseq/settings/auth)
-2. Under **Email Provider**, enable **Leaked password protection**
-
-This prevents users from signing up with passwords that appear in public data breaches. Cannot be configured via SQL — dashboard only.
-
----
-
-## 7. Update NEXT_PUBLIC_SITE_URL on Vercel
+## 6. Update NEXT_PUBLIC_SITE_URL on Vercel
 
 Once the domain is finalized, update the production site URL:
 
@@ -130,7 +119,7 @@ vercel env add NEXT_PUBLIC_SITE_URL production
 
 ---
 
-## 8. Verify Everything Works
+## 7. Verify Everything Works
 
 After completing all steps above:
 
