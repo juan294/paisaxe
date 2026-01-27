@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
@@ -40,10 +40,12 @@ async function extractSourceFromPdf(filePath: string): Promise<PdfSource> {
 
   try {
     const dataBuffer = fs.readFileSync(filePath);
-    const data = await pdfParse(dataBuffer);
+    const parser = new PDFParse({ data: dataBuffer });
+    const data = await parser.getText();
+    await parser.destroy();
 
     const text = data.text;
-    const totalPages = data.numpages;
+    const totalPages = data.total;
 
     // Split text roughly by pages (approximate since pdf-parse combines all text)
     const textLength = text.length;
