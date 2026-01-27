@@ -130,7 +130,8 @@ A year from now, if Paisaxe is working:
 | Styling | Tailwind CSS + shadcn/ui |
 | Database | Supabase (PostgreSQL + pgvector) |
 | AI Chat | Claude API (Anthropic) |
-| Embeddings | Voyage AI (voyage-3) |
+| Embeddings | Voyage AI (voyage-context-3) |
+| Reranking | Voyage AI (rerank-2.5) |
 | Testing | Vitest + React Testing Library + Playwright |
 | Deployment | Vercel |
 
@@ -312,6 +313,7 @@ paisaxe/
 │   │   ├── claude.ts           # Claude API wrapper
 │   │   ├── embeddings.ts       # Voyage AI embeddings
 │   │   ├── search.ts           # Vector search logic
+│   │   ├── rerank.ts           # Voyage AI reranker (rerank-2.5)
 │   │   └── stories-data.ts     # Story content data
 │   └── types/
 │       ├── index.ts            # Core TypeScript types
@@ -405,9 +407,16 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 ## Architecture Decisions
 
 ### Embeddings (Voyage AI)
-- Model: `voyage-3` (512 dimensions via Matryoshka embeddings, optimized for multilingual)
-- Batch processing: 128 texts per request
-- Cost: ~$0.0001 per 1000 tokens
+- Model: `voyage-context-3` (contextualized chunk embeddings, 512 dimensions via Matryoshka)
+- Contextualized embeddings: chunks from the same PDF are embedded with sibling awareness
+- Query embeddings: same model (`voyage-context-3`) with `outputDimension: 512`
+- Batch processing: 128 texts per request, exponential backoff on 429
+- Cost: ~$0.00018 per 1000 tokens (contextualized)
+
+### Reranking (Voyage AI)
+- Model: `rerank-2.5` (200M free tokens/month)
+- Two-stage retrieval: fetch 10 vector candidates, rerank to top 3
+- Graceful fallback: returns original order on rerank failure
 
 ### Vector Search
 - Store in Supabase pgvector with 512 dimensions
@@ -416,11 +425,12 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 
 ### Chat Flow
 1. User sends query
-2. Generate embedding via Voyage AI
-3. Find top-k relevant chunks via vector search
-4. Pass chunks as context to Claude
-5. Claude generates response with references
-6. Render response with linked images
+2. Generate embedding via Voyage AI (`voyage-context-3`, 512 dims)
+3. Find top-10 candidate chunks via vector search
+4. Rerank candidates to top-3 via Voyage AI `rerank-2.5`
+5. Pass reranked chunks as context to Claude
+6. Claude generates response with references
+7. Render response with linked images
 
 ### Response Rendering
 - Support markdown in responses
@@ -438,7 +448,7 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 ## Database Schema
 
 ```sql
--- chunks table for PDF content (512 dims for voyage-3 Matryoshka)
+-- chunks table for PDF content (512 dims for voyage-context-3 Matryoshka)
 create table chunks (
   id uuid primary key default gen_random_uuid(),
   content text not null,
