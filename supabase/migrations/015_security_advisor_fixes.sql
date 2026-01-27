@@ -3,49 +3,36 @@
 -- Purpose: Address all warnings from Supabase Security Advisor
 --
 -- Fixes:
---   1. Extension in Public — move pgvector from public to extensions schema
---   2. Function Search Path Mutable — set search_path = '' on all 7 functions
+--   1. Function Search Path Mutable — set explicit search_path on all functions
+--   2. Extension in Public — move pgvector from public to extensions schema
 --   3. RLS Policy Always True — tighten analytics_events INSERT policy
 --
 -- NOT fixable via SQL (requires Supabase Dashboard):
 --   4. Leaked Password Protection Disabled
 --      Enable at: Dashboard > Authentication > Providers > Email >
 --      "Leaked password protection"
+--
+-- ORDER OF OPERATIONS:
+--   Functions are created BEFORE moving the vector extension, so that
+--   vector(1024) type and <=> operator resolve from the public schema
+--   during function creation. After the extension moves to 'extensions',
+--   pre-planned OIDs still resolve and the explicit search_path on
+--   match_chunks includes both schemas for any future re-planning.
 -- ============================================================================
 
 
 -- ============================================================================
--- FIX 1: Move pgvector extension from public to extensions schema
--- ============================================================================
--- Supabase recommends installing extensions in the 'extensions' schema
--- (which is on the default search_path) rather than cluttering public.
--- Existing columns using vector type are stored by OID and are unaffected.
--- ============================================================================
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_extension e
-    JOIN pg_namespace n ON e.extnamespace = n.oid
-    WHERE e.extname = 'vector' AND n.nspname = 'public'
-  ) THEN
-    ALTER EXTENSION vector SET SCHEMA extensions;
-  END IF;
-END $$;
-
-
--- ============================================================================
--- FIX 2: Set search_path on all functions
+-- FIX 1: Set search_path on all functions
 -- ============================================================================
 -- Functions without an explicit search_path are vulnerable to search path
--- injection attacks. Using search_path = '' (empty) with fully qualified
--- table references is the most secure approach.
+-- injection. Setting an explicit value prevents attackers from hijacking
+-- function behavior by manipulating the session search_path.
 --
--- For SQL functions: the body is parsed at creation time using the session
--- search_path, so vector types and operators resolve correctly.
--- At runtime, operators are also resolved via argument type schemas.
+-- match_chunks uses 'public, extensions' because it needs:
+--   - public: for the chunks table
+--   - extensions: for vector type and <=> operator (after extension move)
 --
--- For PL/pgSQL trigger functions: NEW/OLD records and built-in functions
--- (now(), coalesce, etc.) do not depend on search_path.
+-- All other functions use '' (empty) with fully qualified references.
 -- ============================================================================
 
 -- match_chunks: Vector similarity search for embeddings
@@ -65,7 +52,7 @@ RETURNS TABLE (
   similarity float
 )
 LANGUAGE sql STABLE
-SET search_path = ''
+SET search_path = public, extensions
 AS $$
   SELECT
     chunks.id,
@@ -178,6 +165,29 @@ EXCEPTION
     RETURN coalesce(NEW, OLD);
 END;
 $$;
+
+
+-- ============================================================================
+-- FIX 2: Move pgvector extension from public to extensions schema
+-- ============================================================================
+-- Supabase recommends installing extensions in the 'extensions' schema
+-- (which is on the default search_path) rather than cluttering public.
+-- Existing columns and function parameter types are stored by OID and
+-- are unaffected by the schema change.
+--
+-- This runs AFTER function creation so that vector(1024) type references
+-- resolve from public during CREATE OR REPLACE above.
+-- ============================================================================
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_extension e
+    JOIN pg_namespace n ON e.extnamespace = n.oid
+    WHERE e.extname = 'vector' AND n.nspname = 'public'
+  ) THEN
+    ALTER EXTENSION vector SET SCHEMA extensions;
+  END IF;
+END $$;
 
 
 -- ============================================================================
