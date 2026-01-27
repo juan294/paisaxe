@@ -1,5 +1,9 @@
 import { supabase } from "./supabase";
+import { rerankChunks } from "./rerank";
 import type { Chunk, ImageResult, SearchResult } from "@/types";
+
+/** Number of candidates to retrieve from vector search before reranking */
+const RERANK_CANDIDATE_COUNT = 10;
 
 export async function searchChunks(
   queryEmbedding: number[],
@@ -58,11 +62,29 @@ export async function getRelatedImages(
   }));
 }
 
+/**
+ * Search for relevant content using vector search + reranking.
+ *
+ * When `queryText` is provided, the pipeline is:
+ *   1. Vector search retrieves RERANK_CANDIDATE_COUNT candidates
+ *   2. Voyage AI rerank-2.5 reorders by query relevance
+ *   3. Top `limit` results are returned
+ *
+ * Without `queryText`, falls back to plain vector search with `limit`.
+ */
 export async function search(
   queryEmbedding: number[],
-  limit: number = 5
+  limit: number = 5,
+  queryText?: string
 ): Promise<SearchResult> {
-  const chunks = await searchChunks(queryEmbedding, limit);
+  // When reranking, widen the initial search to get more candidates
+  const candidateCount = queryText ? RERANK_CANDIDATE_COUNT : limit;
+  const candidates = await searchChunks(queryEmbedding, candidateCount);
+
+  // Rerank candidates if query text is available
+  const chunks = queryText
+    ? await rerankChunks(queryText, candidates, limit)
+    : candidates;
 
   const allImageRefs = chunks.flatMap((chunk) => chunk.imageRefs || []);
   const uniqueImageRefs = [...new Set(allImageRefs)];

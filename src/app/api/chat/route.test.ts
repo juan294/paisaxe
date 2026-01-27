@@ -94,6 +94,30 @@ describe("POST /api/chat", () => {
     expect(data.images).toEqual(mockImages);
   });
 
+  it("should pass query text to search for reranking", async () => {
+    const mockEmbedding = new Array(1024).fill(0.1);
+
+    vi.mocked(validateChatRequest).mockReturnValue({
+      valid: true,
+      sanitizedMessage: "Best hiking routes",
+      sanitizedContext: undefined,
+    });
+    vi.mocked(generateEmbedding).mockResolvedValue(mockEmbedding);
+    vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+    vi.mocked(generateChatResponse).mockResolvedValue("Response");
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+
+    const request = new NextRequest("http://localhost:3000/api/chat", {
+      method: "POST",
+      body: JSON.stringify({ message: "Best hiking routes" }),
+    });
+
+    await POST(request);
+
+    // search should be called with embedding, limit=3, and the query text for reranking
+    expect(search).toHaveBeenCalledWith(mockEmbedding, 3, "Best hiking routes");
+  });
+
   it("should include context in the message when provided", async () => {
     const mockEmbedding = new Array(1024).fill(0.1);
 
