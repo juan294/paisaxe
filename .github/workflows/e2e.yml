@@ -47,7 +47,7 @@ jobs:
           ADMIN_SECRET_KEY: test-admin-key-12345
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
