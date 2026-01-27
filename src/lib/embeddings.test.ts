@@ -34,15 +34,15 @@ describe("embeddings", () => {
   });
 
   describe("getEmbeddingDimensions", () => {
-    it("should return 1024 for voyage-context-3 model", async () => {
+    it("should return 512 for voyage-context-3 model with Matryoshka embeddings", async () => {
       const { getEmbeddingDimensions } = await import("./embeddings");
-      expect(getEmbeddingDimensions()).toBe(1024);
+      expect(getEmbeddingDimensions()).toBe(512);
     });
   });
 
   describe("generateEmbedding", () => {
     it("should return embedding for a single text", async () => {
-      const mockEmbedding = Array(1024).fill(0.1);
+      const mockEmbedding = Array(512).fill(0.1);
       mockGet.mockReturnValue(null);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
@@ -56,6 +56,7 @@ describe("embeddings", () => {
         input: ["test text"],
         model: "voyage-context-3",
         inputType: "query",
+        outputDimension: 512,
       });
     });
 
@@ -95,7 +96,7 @@ describe("embeddings", () => {
     });
 
     it("should return cached embedding without API call", async () => {
-      const cachedEmbedding = Array(1024).fill(0.5);
+      const cachedEmbedding = Array(512).fill(0.5);
       mockGet.mockReturnValue(cachedEmbedding);
 
       const { generateEmbedding } = await import("./embeddings");
@@ -106,7 +107,7 @@ describe("embeddings", () => {
     });
 
     it("should cache embedding after API call", async () => {
-      const mockEmbedding = Array(1024).fill(0.1);
+      const mockEmbedding = Array(512).fill(0.1);
       mockGet.mockReturnValue(null);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
@@ -121,7 +122,7 @@ describe("embeddings", () => {
 
     it("should log token usage", async () => {
       const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-      const mockEmbedding = Array(1024).fill(0.1);
+      const mockEmbedding = Array(512).fill(0.1);
       mockGet.mockReturnValue(null);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
@@ -140,8 +141,8 @@ describe("embeddings", () => {
 
   describe("generateEmbeddings", () => {
     it("should generate embeddings for multiple texts", async () => {
-      const mockEmbedding1 = Array(1024).fill(0.1);
-      const mockEmbedding2 = Array(1024).fill(0.2);
+      const mockEmbedding1 = Array(512).fill(0.1);
+      const mockEmbedding2 = Array(512).fill(0.2);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding1 }, { embedding: mockEmbedding2 }],
         usage: { totalTokens: 100 },
@@ -159,7 +160,7 @@ describe("embeddings", () => {
     it("should process texts in batches of 128", async () => {
       // Create 150 texts to test batching
       const texts = Array(150).fill("test text");
-      const mockEmbedding = Array(1024).fill(0.1);
+      const mockEmbedding = Array(512).fill(0.1);
 
       mockEmbed
         .mockResolvedValueOnce({
@@ -190,7 +191,7 @@ describe("embeddings", () => {
     });
 
     it("should handle missing usage data", async () => {
-      const mockEmbedding = Array(1024).fill(0.1);
+      const mockEmbedding = Array(512).fill(0.1);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
         // No usage field
@@ -203,7 +204,7 @@ describe("embeddings", () => {
     });
 
     it("should filter out undefined embeddings", async () => {
-      const mockEmbedding = Array(1024).fill(0.1);
+      const mockEmbedding = Array(512).fill(0.1);
       mockEmbed.mockResolvedValue({
         data: [
           { embedding: mockEmbedding },
@@ -228,8 +229,8 @@ describe("embeddings", () => {
       expect(mockEmbed).not.toHaveBeenCalled();
     });
 
-    it("should pass inputType document for batch embeddings", async () => {
-      const mockEmbedding = Array(1024).fill(0.1);
+    it("should pass inputType document and outputDimension for batch embeddings", async () => {
+      const mockEmbedding = Array(512).fill(0.1);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
         usage: { totalTokens: 10 },
@@ -241,13 +242,14 @@ describe("embeddings", () => {
       expect(mockEmbed).toHaveBeenCalledWith(
         expect.objectContaining({
           inputType: "document",
+          outputDimension: 512,
         })
       );
     });
 
     it("should log total token usage for batch", async () => {
       const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-      const mockEmbedding = Array(1024).fill(0.1);
+      const mockEmbedding = Array(512).fill(0.1);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
         usage: { totalTokens: 50 },
@@ -332,6 +334,7 @@ describe("embeddings", () => {
         inputs: [["chunk A", "chunk B"]],
         model: "voyage-context-3",
         inputType: "document",
+        outputDimension: 512,
       });
     });
 

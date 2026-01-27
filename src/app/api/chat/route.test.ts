@@ -63,7 +63,7 @@ describe("POST /api/chat", () => {
   });
 
   it("should return a successful chat response", async () => {
-    const mockEmbedding = new Array(1024).fill(0.1);
+    const mockEmbedding = new Array(512).fill(0.1);
     const mockChunks = [
       { id: "1", content: "Test content", sourcePdf: "test.pdf" },
     ];
@@ -119,7 +119,7 @@ describe("POST /api/chat", () => {
   });
 
   it("should include context in the message when provided", async () => {
-    const mockEmbedding = new Array(1024).fill(0.1);
+    const mockEmbedding = new Array(512).fill(0.1);
 
     vi.mocked(validateChatRequest).mockReturnValue({
       valid: true,
@@ -331,7 +331,7 @@ describe("POST /api/chat", () => {
       sanitizedMessage: "Hello",
       sanitizedContext: undefined,
     });
-    vi.mocked(generateEmbedding).mockResolvedValue(new Array(1024).fill(0.1));
+    vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
     vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
     vi.mocked(generateChatResponse).mockResolvedValue("Response");
     vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
