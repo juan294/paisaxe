@@ -94,7 +94,7 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Supabase PostgreSQL | :white_check_mark: | With pgvector extension |
 | shadcn/ui Components | :white_check_mark: | Button, Card, Dialog, Input |
 | Tailwind CSS Styling | :white_check_mark: | Custom Paisaxe theme |
-| Vitest Testing | :white_check_mark: | 849 tests passing (63 files) |
+| Vitest Testing | :white_check_mark: | 984 tests passing (70 files) |
 | GitHub Actions CI | :white_check_mark: | Lint, typecheck, test, build |
 | Git Hooks (Husky) | :white_check_mark: | Pre-commit quality checks |
 | Coverage Automation | :white_check_mark: | Nightly scheduled updates via `scripts/coverage-agent.sh` |
@@ -238,13 +238,20 @@ All 10 features implemented behind feature flags (disabled by default, toggleabl
 
 ---
 
-## Phase 6: Internationalization :calendar:
+## Phase 6: Internationalization :white_check_mark:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Browser Language Detection | :calendar: | Auto-detect UI language |
-| English UI Translation | :calendar: | Full interface translation |
+| i18n Infrastructure | :white_check_mark: | LanguageProvider context, useTranslation hook, dot-notation key resolver |
+| Browser Language Detection | :white_check_mark: | Auto-detect from `navigator.languages`, persisted to localStorage |
+| Spanish Locale (es) | :white_check_mark: | ~85 translation keys covering all UI chrome |
+| English Locale (en) | :white_check_mark: | Full English translation of all UI strings |
+| Language Switcher | :white_check_mark: | ES/EN pill toggle in story viewer header |
+| Filter Labels i18n | :white_check_mark: | Categories, locations, durations all translated via `t()` |
+| Action Buttons i18n | :white_check_mark: | "Ask about this", "Saved", chat UI, favorites page |
 | Other Languages | :calendar: | As needed |
+
+Note: Story content (titles, descriptions) remains in Spanish — sourced from Supabase DB. Chat responds in the visitor's detected language via Claude.
 
 ---
 
@@ -267,13 +274,14 @@ All 10 features implemented behind feature flags (disabled by default, toggleabl
 - [x] Database migration: Stories table exists in Supabase
 - [x] Story seeding: 20 stories seeded via `npm run seed-db:stories`
 - [x] Image replacement: 7 stories use PDF images, 13 use Unsplash fallback
-- [x] Tests: `npm run test` - 849 tests pass (63 files)
+- [x] Tests: `npm run test` - 984 tests pass (70 files)
 - [x] Build: `npm run build` - no errors
 - [x] Auth: Google SSO working with Supabase SSR
 - [x] Favorites: Cloud sync + local storage fallback
 - [x] Admin: Story management panel at `/admin`
 - [x] Feature flags: 10 flags in database, all features implemented
 - [x] Analytics: Vercel Analytics active, custom events table + admin dashboard
+- [x] i18n: ES/EN language switcher, browser detection, all UI chrome translated
 
 ---
 
@@ -311,6 +319,6 @@ All 10 features implemented behind feature flags (disabled by default, toggleabl
 | v0.4.0 | Jan 2026 | User features (auth, favorites, admin panel) |
 | v0.5.0 | Jan 2026 | Visitor experience enhancements (Waves 1-3) + feature flags |
 | v0.6.0 | Jan 2026 | AI improvements (Pelayo persona, chat images) |
-| v0.7.0 | - | Internationalization |
+| v0.7.0 | Jan 2026 | Internationalization (ES/EN language switcher, browser detection, full UI translation) |
 | v0.8.0 | - | Polish (skeleton UI, a11y, SEO, error boundaries) |
 | v1.0.0 | - | Production release |
