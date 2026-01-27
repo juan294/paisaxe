@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Coverage Agent — Runs nightly at 2:00 CET via cron
-# Checks test coverage, writes missing tests, updates docs/tests.md
+# Checks test coverage, writes missing tests, updates docs/coverage-report.md
 set -euo pipefail
 
 PROJECT_DIR="/Users/juan/Documents/GenAI_Projects/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/coverage-agent-$(date +%Y-%m-%d).log"
-DOC_FILE="$PROJECT_DIR/docs/tests.md"
+DOC_FILE="$PROJECT_DIR/docs/coverage-report.md"
 
 mkdir -p "$LOG_DIR"
 
