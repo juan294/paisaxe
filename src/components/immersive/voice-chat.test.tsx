@@ -596,7 +596,7 @@ describe("VoiceChat", () => {
     it("should show speech support message when available", () => {
       const mockRecognition = createMockSpeechRecognition();
       Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(() => mockRecognition),
+        value: vi.fn(function () { return mockRecognition; }),
         writable: true,
       });
 
@@ -618,7 +618,7 @@ describe("VoiceChat", () => {
     it("should render mic button when speech recognition is supported", () => {
       const mockRecognition = createMockSpeechRecognition();
       Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(() => mockRecognition),
+        value: vi.fn(function () { return mockRecognition; }),
         writable: true,
       });
 
@@ -634,7 +634,7 @@ describe("VoiceChat", () => {
 
     it("should start listening when mic button is clicked", () => {
       const mockRecognition = createMockSpeechRecognition();
-      const MockConstructor = vi.fn(() => mockRecognition);
+      const MockConstructor = vi.fn(function () { return mockRecognition; });
       Object.defineProperty(window, "SpeechRecognition", {
         value: MockConstructor,
         writable: true,
@@ -657,7 +657,7 @@ describe("VoiceChat", () => {
     it("should stop listening when mic button is clicked while listening", () => {
       const mockRecognition = createMockSpeechRecognition();
       Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(() => mockRecognition),
+        value: vi.fn(function () { return mockRecognition; }),
         writable: true,
       });
 
@@ -682,7 +682,7 @@ describe("VoiceChat", () => {
     it("should show 'Escuchando...' placeholder when listening", () => {
       const mockRecognition = createMockSpeechRecognition();
       Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(() => mockRecognition),
+        value: vi.fn(function () { return mockRecognition; }),
         writable: true,
       });
 
@@ -706,7 +706,7 @@ describe("VoiceChat", () => {
     it("should set input value from speech recognition result", async () => {
       const mockRecognition = createMockSpeechRecognition();
       Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(() => mockRecognition),
+        value: vi.fn(function () { return mockRecognition; }),
         writable: true,
       });
 
@@ -738,7 +738,7 @@ describe("VoiceChat", () => {
     it("should stop listening on speech recognition error", async () => {
       const mockRecognition = createMockSpeechRecognition();
       Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(() => mockRecognition),
+        value: vi.fn(function () { return mockRecognition; }),
         writable: true,
       });
 
@@ -772,7 +772,7 @@ describe("VoiceChat", () => {
     it("should stop listening on speech recognition end", async () => {
       const mockRecognition = createMockSpeechRecognition();
       Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(() => mockRecognition),
+        value: vi.fn(function () { return mockRecognition; }),
         writable: true,
       });
 
@@ -803,7 +803,7 @@ describe("VoiceChat", () => {
     it("should support webkitSpeechRecognition", () => {
       const mockRecognition = createMockSpeechRecognition();
       Object.defineProperty(window, "webkitSpeechRecognition", {
-        value: vi.fn(() => mockRecognition),
+        value: vi.fn(function () { return mockRecognition; }),
         writable: true,
       });
 
@@ -817,7 +817,7 @@ describe("VoiceChat", () => {
     it("should show MicOff icon when listening", () => {
       const mockRecognition = createMockSpeechRecognition();
       Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(() => mockRecognition),
+        value: vi.fn(function () { return mockRecognition; }),
         writable: true,
       });
 
@@ -844,7 +844,7 @@ describe("VoiceChat", () => {
     it("should configure speech recognition with correct settings", () => {
       const mockRecognition = createMockSpeechRecognition();
       Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(() => mockRecognition),
+        value: vi.fn(function () { return mockRecognition; }),
         writable: true,
       });
 
