@@ -37,12 +37,12 @@ function makeFlagRow(key: string, enabled: boolean): FeatureFlagRow {
 
 describe("useRealtimeFeatureFlags", () => {
   let capturedCallback: ((row: FeatureFlagRow) => void) | null;
-  let mockCleanup: ReturnType<typeof vi.fn>;
+  let mockCleanup = vi.fn<() => void>();
 
   beforeEach(() => {
     vi.resetModules();
     capturedCallback = null;
-    mockCleanup = vi.fn();
+    mockCleanup = vi.fn<() => void>();
 
     vi.mocked(subscribeToFeatureFlags).mockImplementation((cb) => {
       capturedCallback = cb;

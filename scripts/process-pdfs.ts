@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 
 interface ExtractedChunk {
   content: string;
@@ -23,7 +23,9 @@ async function extractTextFromPdf(filePath: string): Promise<ProcessedPdf> {
   console.log(`Processing: ${filename}`);
 
   const dataBuffer = fs.readFileSync(filePath);
-  const data = await pdfParse(dataBuffer);
+  const parser = new PDFParse({ data: dataBuffer });
+  const data = await parser.getText();
+  await parser.destroy();
 
   const chunks: ExtractedChunk[] = [];
   const text = data.text;
@@ -92,7 +94,7 @@ async function extractTextFromPdf(filePath: string): Promise<ProcessedPdf> {
   return {
     filename,
     chunks,
-    totalPages: data.numpages,
+    totalPages: data.total,
   };
 }
 

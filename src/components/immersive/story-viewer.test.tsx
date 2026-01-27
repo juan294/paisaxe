@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { StoryViewer } from "./story-viewer";
-import { Story } from "@/types/immersive";
+import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ReactNode } from "react";
 import { createMockT } from "@/test/i18n-mock";
@@ -110,12 +110,12 @@ const mockStories: Story[] = [
 ];
 
 describe("StoryViewer", () => {
-  let onIndexChange: ReturnType<typeof vi.fn>;
-  let onAskAbout: ReturnType<typeof vi.fn>;
-  let onCategoryChange: ReturnType<typeof vi.fn>;
-  let onLocationChange: ReturnType<typeof vi.fn>;
-  let onDurationChange: ReturnType<typeof vi.fn>;
-  let onClearFilters: ReturnType<typeof vi.fn>;
+  let onIndexChange = vi.fn<(index: number) => void>();
+  let onAskAbout = vi.fn<(initialMessage?: string) => void>();
+  let onCategoryChange = vi.fn<(category: StoryCategory | null) => void>();
+  let onLocationChange = vi.fn<(location: StoryLocation | null) => void>();
+  let onDurationChange = vi.fn<(duration: StoryDuration | null) => void>();
+  let onClearFilters = vi.fn<() => void>();
 
   const getDefaultProps = (overrides = {}) => ({
     stories: mockStories,
@@ -134,12 +134,12 @@ describe("StoryViewer", () => {
   });
 
   beforeEach(() => {
-    onIndexChange = vi.fn();
-    onAskAbout = vi.fn();
-    onCategoryChange = vi.fn();
-    onLocationChange = vi.fn();
-    onDurationChange = vi.fn();
-    onClearFilters = vi.fn();
+    onIndexChange = vi.fn<(index: number) => void>();
+    onAskAbout = vi.fn<(initialMessage?: string) => void>();
+    onCategoryChange = vi.fn<(category: StoryCategory | null) => void>();
+    onLocationChange = vi.fn<(location: StoryLocation | null) => void>();
+    onDurationChange = vi.fn<(duration: StoryDuration | null) => void>();
+    onClearFilters = vi.fn<() => void>();
     vi.useFakeTimers();
   });
 
