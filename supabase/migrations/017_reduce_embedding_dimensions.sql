@@ -10,6 +10,9 @@
 --       Run: npm run seed-db:clear
 -- ============================================================================
 
+-- Ensure pgvector types are visible (extension lives in 'extensions' schema)
+SET search_path = public, extensions;
+
 -- Step 1: Drop the existing index (must be recreated with new dimensions)
 DROP INDEX IF EXISTS chunks_embedding_idx;
 
