@@ -486,7 +486,7 @@ Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
 
 ### Coverage Agent (Nightly Cron)
 
-`scripts/coverage-agent.sh` runs nightly at 2:00 AM CET via local cron. Uses Claude CLI to analyze test coverage and update `docs/tests.md`. Logs written to `logs/`.
+`scripts/coverage-agent.sh` runs nightly at 2:00 AM CET via local cron. Uses Claude CLI to analyze test coverage and update `docs/coverage-report.md`. Logs written to `logs/`.
 
 ### Security Audit (Weekly Cron)
 
