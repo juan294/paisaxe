@@ -3,6 +3,17 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { VoiceChat } from "./voice-chat";
 import { Story } from "@/types/immersive";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -127,6 +138,13 @@ describe("VoiceChat", () => {
       expect(
         screen.getByPlaceholderText("Escribe tu pregunta...")
       ).toBeInTheDocument();
+    });
+
+    it("should have aria-label on chat input", () => {
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      expect(input).toHaveAttribute("aria-label", "Escribe tu pregunta...");
     });
 
     it("should render submit button", () => {
@@ -835,6 +853,226 @@ describe("VoiceChat", () => {
       expect(mockRecognition.continuous).toBe(false);
       expect(mockRecognition.interimResults).toBe(false);
       expect(mockRecognition.lang).toBe("es-ES");
+    });
+  });
+
+  describe("chat response images", () => {
+    it("should display images from chat response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          message: "Here are some beautiful lakes.",
+          images: [
+            {
+              id: "img-1",
+              path: "https://example.supabase.co/storage/v1/images/lagos.jpg",
+              caption: "Lagos de Covadonga at sunset",
+              sourcePdf: "nature-guide.pdf",
+            },
+          ],
+        }),
+      });
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Show me the lakes");
+
+      const form = input.closest("form");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        const img = screen.getByRole("img", { name: "Lagos de Covadonga at sunset" });
+        expect(img).toBeInTheDocument();
+        expect(img).toHaveAttribute("src", "https://example.supabase.co/storage/v1/images/lagos.jpg");
+      });
+    });
+
+    it("should display image caption when available", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          message: "Beautiful place.",
+          images: [
+            {
+              id: "img-1",
+              path: "https://example.supabase.co/storage/v1/images/lagos.jpg",
+              caption: "Picos de Europa mountain view",
+              sourcePdf: "nature-guide.pdf",
+            },
+          ],
+        }),
+      });
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Question");
+
+      const form = input.closest("form");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText("Picos de Europa mountain view")).toBeInTheDocument();
+      });
+    });
+
+    it("should display source attribution for images", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          message: "A lovely area.",
+          images: [
+            {
+              id: "img-1",
+              path: "https://example.supabase.co/storage/v1/images/test.jpg",
+              caption: "Test image",
+              sourcePdf: "hiking-guide.pdf",
+            },
+          ],
+        }),
+      });
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Question");
+
+      const form = input.closest("form");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText(/hiking-guide\.pdf/)).toBeInTheDocument();
+      });
+    });
+
+    it("should display multiple images from chat response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          message: "Here are several views.",
+          images: [
+            {
+              id: "img-1",
+              path: "https://example.supabase.co/storage/v1/images/img1.jpg",
+              caption: "First image",
+              sourcePdf: "guide-1.pdf",
+            },
+            {
+              id: "img-2",
+              path: "https://example.supabase.co/storage/v1/images/img2.jpg",
+              caption: "Second image",
+              sourcePdf: "guide-2.pdf",
+            },
+          ],
+        }),
+      });
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Show me views");
+
+      const form = input.closest("form");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        const images = screen.getAllByRole("img");
+        expect(images.length).toBe(2);
+        expect(screen.getByText("First image")).toBeInTheDocument();
+        expect(screen.getByText("Second image")).toBeInTheDocument();
+      });
+    });
+
+    it("should handle response with no images gracefully", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          message: "No images for this response.",
+        }),
+      });
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Question");
+
+      const form = input.closest("form");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText("No images for this response.")).toBeInTheDocument();
+        expect(screen.queryByRole("img")).not.toBeInTheDocument();
+      });
+    });
+
+    it("should handle response with empty images array gracefully", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          message: "Empty images array.",
+          images: [],
+        }),
+      });
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Question");
+
+      const form = input.closest("form");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText("Empty images array.")).toBeInTheDocument();
+        expect(screen.queryByRole("img")).not.toBeInTheDocument();
+      });
+    });
+
+    it("should use fallback alt text when image has no caption", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          message: "Image without caption.",
+          images: [
+            {
+              id: "img-1",
+              path: "https://example.supabase.co/storage/v1/images/no-caption.jpg",
+              sourcePdf: "guide.pdf",
+            },
+          ],
+        }),
+      });
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Question");
+
+      const form = input.closest("form");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        const img = screen.getByRole("img");
+        expect(img).toBeInTheDocument();
+        // Should have a meaningful alt text even without caption
+        expect(img.getAttribute("alt")).toBeTruthy();
+        expect(img.getAttribute("alt")).not.toBe("");
+      });
     });
   });
 });

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
-import { AuthProvider } from "@/components/auth/auth-provider";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Providers } from "./providers";
 import "./globals.css";
 
 const inter = Inter({
@@ -24,10 +25,11 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <AuthProvider>
+        <Providers>
           {children}
-        </AuthProvider>
+        </Providers>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

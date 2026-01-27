@@ -1,0 +1,34 @@
+# Upptime monitoring configuration for Paisaxe
+#
+# Live repo: https://github.com/juan294/paisaxe-upptime
+# Status page: https://juan294.github.io/paisaxe-upptime/
+#
+# This file is a reference copy. The live configuration is in the Upptime repo.
+# For full documentation, see: https://upptime.js.org/docs/
+
+owner: juan294
+repo: paisaxe-upptime
+
+sites:
+  - name: Paisaxe (Main Site)
+    url: https://paisaxe.com
+    method: GET
+    expectedStatusCode: 200
+
+  - name: Paisaxe API Health
+    url: https://paisaxe.com/api/health
+    method: GET
+    expectedStatusCode: 200
+
+status-website:
+  baseUrl: /paisaxe-upptime
+  name: Paisaxe Status
+
+workflowSchedule:
+  graphs: "0 0 * * *"
+  responseTime: "0 23 * * *"
+  staticSite: "0 1 * * *"
+  summary: "0 0 * * *"
+  updateTemplate: "0 0 * * *"
+  updates: "*/5 * * * *"
+  uptime: "*/5 * * * *"

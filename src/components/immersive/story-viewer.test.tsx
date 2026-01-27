@@ -4,6 +4,17 @@ import { StoryViewer } from "./story-viewer";
 import { Story } from "@/types/immersive";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ReactNode } from "react";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 // Mock Supabase browser client
 vi.mock("@/lib/supabase-browser", () => ({

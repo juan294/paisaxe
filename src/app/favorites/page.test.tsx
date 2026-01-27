@@ -2,6 +2,17 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import FavoritesPage from "./page";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 // Mock next/image
 vi.mock("next/image", () => ({
@@ -31,6 +42,14 @@ vi.mock("next/link", () => ({
       </a>
     );
   }),
+}));
+
+// Mock useAuth hook
+const mockSignInWithGoogle = vi.fn();
+const mockUseAuth = vi.fn();
+
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => mockUseAuth(),
 }));
 
 // Mock useFavorites hook
@@ -75,6 +94,13 @@ vi.mock("@/hooks/use-stories", () => ({
 describe("FavoritesPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      user: null,
+      session: null,
+      isLoading: false,
+      signInWithGoogle: mockSignInWithGoogle,
+      signOut: vi.fn(),
+    });
     mockUseFavorites.mockReturnValue({
       favorites: [],
       toggleFavorite: mockToggleFavorite,
@@ -98,7 +124,7 @@ describe("FavoritesPage", () => {
 
       render(<FavoritesPage />);
 
-      expect(screen.getByText("Cargando...")).toBeInTheDocument();
+      expect(screen.getByText(mockT("common.loading"))).toBeInTheDocument();
     });
   });
 
@@ -107,7 +133,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("No tienes guardados todavía")).toBeInTheDocument();
+        expect(screen.getByText(mockT("favorites.empty_title"))).toBeInTheDocument();
       });
     });
 
@@ -115,7 +141,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Explorar historias")).toBeInTheDocument();
+        expect(screen.getByText(mockT("favorites.explore"))).toBeInTheDocument();
       });
     });
 
@@ -123,7 +149,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        const link = screen.getByText("Explorar historias");
+        const link = screen.getByText(mockT("favorites.explore"));
         expect(link.closest("a")).toHaveAttribute("href", "/immersive");
       });
     });
@@ -150,7 +176,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("1 lugar")).toBeInTheDocument();
+        expect(screen.getByText(`1 ${mockT("favorites.place_singular")}`)).toBeInTheDocument();
       });
     });
 
@@ -164,7 +190,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("2 lugares")).toBeInTheDocument();
+        expect(screen.getByText(`2 ${mockT("favorites.place_plural")}`)).toBeInTheDocument();
       });
     });
 
@@ -175,7 +201,7 @@ describe("FavoritesPage", () => {
         expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
       });
 
-      const removeButton = screen.getByLabelText("Quitar de guardados");
+      const removeButton = screen.getByLabelText(mockT("favorites.remove_from_saved"));
       fireEvent.click(removeButton);
 
       expect(mockToggleFavorite).toHaveBeenCalledWith("story-1");
@@ -197,7 +223,7 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Guardados")).toBeInTheDocument();
+        expect(screen.getByText(mockT("favorites.title"))).toBeInTheDocument();
       });
     });
 
@@ -318,6 +344,76 @@ describe("FavoritesPage", () => {
         expect(screen.getByText("Catedral de Oviedo")).toBeInTheDocument();
         expect(screen.getByText("Playa del Silencio")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("sync banner", () => {
+    it("should show sync banner when user is not logged in and has favorites", async () => {
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.local_only"))).toBeInTheDocument();
+        expect(screen.getByText(mockT("favorites.local_only_description"))).toBeInTheDocument();
+        expect(screen.getByText(mockT("favorites.sync_with_google"))).toBeInTheDocument();
+      });
+    });
+
+    it("should not show sync banner when user is logged in", async () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-1", email: "test@test.com" },
+        session: { access_token: "test-token" },
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: vi.fn(),
+      });
+
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(mockT("favorites.local_only"))).not.toBeInTheDocument();
+    });
+
+    it("should not show sync banner when user has no favorites", async () => {
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.empty_title"))).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(mockT("favorites.local_only"))).not.toBeInTheDocument();
+    });
+
+    it("should call signInWithGoogle when clicking sync button", async () => {
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.sync_with_google"))).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText(mockT("favorites.sync_with_google")));
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
     });
   });
 });

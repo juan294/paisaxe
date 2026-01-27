@@ -131,7 +131,7 @@ A year from now, if Paisaxe is working:
 | Database | Supabase (PostgreSQL + pgvector) |
 | AI Chat | Claude API (Anthropic) |
 | Embeddings | Voyage AI (voyage-3) |
-| Testing | Vitest + React Testing Library |
+| Testing | Vitest + React Testing Library + Playwright |
 | Deployment | Vercel |
 
 ## Git Workflow
@@ -178,7 +178,7 @@ git checkout develop
 
 Automated quality checks run on every push and pull request to `develop` and `main`.
 
-### Workflow Jobs
+### Core CI (`ci.yml`)
 
 | Job | Description |
 |-----|-------------|
@@ -186,17 +186,40 @@ Automated quality checks run on every push and pull request to `develop` and `ma
 | **test** | Runs `npm run test` |
 | **build** | Verifies production build with `npm run build` |
 
-### Workflow Triggers
+### E2E Tests (`e2e.yml`)
 
-- Push to `develop` or `main` branches
-- Pull requests targeting `develop` or `main`
+Playwright E2E tests run against a built app on push/PR to `develop` and `main`.
+
+### Quality & Security Workflows
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| **Security Audit** (`security.yml`) | Push/PR + weekly Monday 08:00 UTC | `npm audit --audit-level=critical` |
+| **Gitleaks** (`gitleaks.yml`) | Push/PR + daily 04:00 UTC | Scans for secrets in git history |
+| **License Check** (`license-check.yml`) | PRs only | Blocks copyleft/GPL dependencies |
+| **Lighthouse CI** (`lighthouse.yml`) | PRs only | Performance & accessibility auditing |
+| **Bundle Size** (`bundle-size.yml`) | PRs only | Reports JS bundle sizes as PR comment |
+| **Knip** (`knip.yml`) | PRs only | Dead code & unused dependency detection (report mode) |
+| **Claude Review** (`claude-review.yml`) | PRs + `@claude` in PR comments | AI-powered code review via Claude |
+
+### Dependency Management
+
+**Dependabot** (`.github/dependabot.yml`) opens PRs weekly for:
+- npm production dependencies
+- npm dev/type dependencies
+- GitHub Actions versions
+
+Review and merge Dependabot PRs regularly. License Check runs automatically on these PRs.
 
 ### Required Checks
 
-All three jobs must pass before merging:
+All core CI jobs must pass before merging:
 - Lint & Typecheck
 - Test
 - Build
+- E2E (Playwright)
+
+Quality workflows (Lighthouse, Bundle Size, Knip) are informational and do not block merges, but should be reviewed on every PR.
 
 ### Fixing CI Failures
 
@@ -204,12 +227,16 @@ All three jobs must pass before merging:
 2. **Lint failures**: Run `npm run lint` locally, fix or run `npm run lint -- --fix`
 3. **Test failures**: Run `npm run test` locally, fix failing tests
 4. **Build failures**: Run `npm run build` locally, check for build-time errors
+5. **E2E failures**: Run `npm run test:e2e` locally, inspect `playwright-report/` for traces
+6. **License failures**: Run `npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"` to identify problematic deps
+7. **Gitleaks failures**: Remove the detected secret from code and rotate the exposed credential
 
 ### Notes
 
-- Build job uses dummy env vars (APIs not called during build)
+- Build jobs use dummy env vars (APIs not called during build)
 - Vercel deployment is handled separately via Vercel's GitHub integration
 - Database migrations should be validated locally before pushing
+- Claude Review requires `ANTHROPIC_API_KEY` as a GitHub repository secret
 
 ## Test-Driven Development (TDD)
 
@@ -228,17 +255,25 @@ If you're about to write a feature and haven't written a test yet - STOP. Write 
 ### Test Commands
 
 ```bash
+# Unit & Component tests (Vitest)
 npm run test           # Run all tests
 npm run test:watch     # Watch mode for development
 npm run test:coverage  # Generate coverage report
 npm run test:ui        # Open Vitest UI
+
+# E2E tests (Playwright)
+npm run test:e2e       # Run all E2E tests (headless)
+npm run test:e2e:ui    # Open Playwright UI mode
+npm run test:e2e:headed # Run with visible browser
+npm run test:e2e:debug # Debug mode with inspector
 ```
 
 ### Test File Conventions
 
-- Test files: `*.test.ts` or `*.test.tsx`
-- Located next to source files or in `__tests__/` directories
-- Name pattern: `<component-name>.test.tsx`
+- **Unit/Component tests**: `*.test.ts` or `*.test.tsx`, located next to source files
+- **E2E tests**: `*.spec.ts` in the `e2e/` directory
+- E2E mock data lives in `e2e/fixtures/mock-data.ts`
+- E2E has its own `e2e/tsconfig.json` (excluded from the app build)
 
 ### What to Test
 
@@ -251,18 +286,29 @@ npm run test:ui        # Open Vitest UI
 
 ```
 paisaxe/
+├── e2e/                        # Playwright E2E tests
+│   ├── fixtures/               # Mock data for E2E
+│   └── *.spec.ts               # Test files
 ├── src/
 │   ├── app/                    # Next.js App Router
 │   │   ├── page.tsx            # Redirects to /immersive
-│   │   ├── layout.tsx
+│   │   ├── layout.tsx          # Root layout (includes SpeedInsights)
 │   │   ├── immersive/          # Immersive stories page
 │   │   └── api/
-│   │       └── chat/           # Chat endpoint
+│   │       ├── chat/           # Chat endpoint
+│   │       ├── health/         # Health check endpoint (uptime monitoring)
+│   │       └── webhooks/
+│   │           └── supabase/   # Database webhook receiver (cache invalidation)
 │   ├── components/
 │   │   ├── ui/                 # shadcn/ui components
 │   │   └── immersive/          # Story viewer & voice chat
+│   ├── hooks/
+│   │   ├── use-realtime-feature-flags.ts  # Live feature flag sync via Realtime
+│   │   └── use-realtime-stories.ts        # Live story update notifications
 │   ├── lib/
 │   │   ├── supabase.ts         # Supabase client
+│   │   ├── supabase-browser.ts # Browser Supabase client (SSR)
+│   │   ├── realtime.ts         # Supabase Realtime subscription utilities
 │   │   ├── claude.ts           # Claude API wrapper
 │   │   ├── embeddings.ts       # Voyage AI embeddings
 │   │   ├── search.ts           # Vector search logic
@@ -273,11 +319,22 @@ paisaxe/
 ├── content/
 │   └── pdfs/                   # Source PDF files
 ├── scripts/
+│   ├── coverage-agent.sh       # Nightly coverage analysis (cron)
 │   ├── process-pdfs.ts         # PDF text extraction
 │   └── seed-database.ts        # Generate embeddings and populate DB
 ├── supabase/
-│   └── migrations/             # Database schema
-└── vitest.config.ts            # Test configuration
+│   ├── functions/              # Supabase Edge Functions (Deno)
+│   │   ├── keep-alive/         # Prevents free-tier auto-pause
+│   │   └── cleanup-analytics/  # Deletes old analytics events
+│   └── migrations/             # Database schema (including pg_cron)
+├── .github/
+│   ├── workflows/              # 9 CI/CD workflows (see CI/CD section)
+│   ├── dependabot.yml          # Automated dependency updates
+│   └── upptime/                # Reference config for status page
+├── knip.json                   # Dead code detection config
+├── lighthouserc.json           # Lighthouse CI thresholds
+├── vitest.config.ts            # Unit test configuration
+└── playwright.config.ts        # E2E test configuration
 ```
 
 ## Key Commands
@@ -289,10 +346,15 @@ npm run build            # Production build
 npm run typecheck        # Run TypeScript checks
 npm run lint             # Run ESLint
 
-# Testing
+# Unit & Component Testing (Vitest)
 npm run test             # Run all tests
 npm run test:watch       # Watch mode
 npm run test:coverage    # Coverage report
+
+# E2E Testing (Playwright)
+npm run test:e2e         # Run E2E tests (headless)
+npm run test:e2e:headed  # Run with visible browser
+npm run test:e2e:ui      # Playwright UI mode
 
 # Data Pipeline
 npm run process-pdfs     # Extract content from PDFs
@@ -312,6 +374,32 @@ VOYAGE_API_KEY=          # Voyage AI key for embeddings
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_KEY=    # Service role key (for seeding)
+
+# Admin Panel
+ADMIN_SECRET_KEY=        # Admin authentication
+
+# Google OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Database Webhooks
+WEBHOOK_SECRET=          # Secret for validating Supabase webhook calls
+
+# Site URL (use production URL on Vercel, localhost in dev)
+NEXT_PUBLIC_SITE_URL=
+```
+
+These variables are configured in three places:
+- **`.env.local`** — local development
+- **Vercel** — production & preview deployments (all vars set)
+- **GitHub Secrets** — only `ANTHROPIC_API_KEY` (for Claude PR reviews)
+
+Additionally, the following settings are configured in the Supabase database via SQL:
+```sql
+ALTER DATABASE postgres SET app.webhook_base_url = 'https://paisaxe.com';
+ALTER DATABASE postgres SET app.webhook_secret = 'your-webhook-secret';
+ALTER DATABASE postgres SET app.supabase_functions_url = 'https://YOUR_PROJECT_REF.supabase.co/functions/v1';
+ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 ```
 
 ## Architecture Decisions
@@ -374,6 +462,111 @@ create table images (
   created_at timestamptz default now()
 );
 ```
+
+## Deployment (Vercel)
+
+- **Project**: `thecreativetoken/paisaxe` on Vercel
+- **Git integration**: Connected to `juan294/paisaxe` on GitHub
+- **Production branch**: `main` (pushes trigger production deploys)
+- **Preview branches**: All other branches get preview deployments
+- **Domains**: `paisaxe.com`, `paisaxe.es` (+ www variants)
+- **Speed Insights**: `@vercel/speed-insights` integrated in root layout for Real User Monitoring
+
+## Monitoring & Observability
+
+### Health Check Endpoint
+
+`GET /api/health` — returns service status, uptime, Supabase connectivity with latency, and database storage usage (size in MB, percentage of 500 MB free-tier limit). Reports "degraded" if Supabase connection fails or database usage exceeds 80%. Always returns HTTP 200. Used by Upptime for uptime monitoring.
+
+### Upptime Status Page
+
+- **Repo**: https://github.com/juan294/paisaxe-upptime
+- **Status page**: https://juan294.github.io/paisaxe-upptime/
+- **Monitors**: `paisaxe.com` and `paisaxe.com/api/health` every 5 minutes
+- Opens GitHub Issues automatically on detected downtime
+- Reference config kept in `.github/upptime/.upptimerc.yml`
+
+### Vercel Speed Insights
+
+Real User Monitoring (RUM) for Core Web Vitals in production. View data in the Vercel Dashboard under Speed Insights.
+
+## Database Maintenance (pg_cron)
+
+Automated maintenance jobs run on Supabase via pg_cron:
+
+| Job | Schedule | Migration | Description |
+|-----|----------|-----------|-------------|
+| `vacuum-analyze-chunks` | Sundays 3:00 AM UTC | 011 | VACUUM ANALYZE on chunks table |
+| `analyze-main-tables` | Daily 4:00 AM UTC | 011 | ANALYZE on chunks, images, stories |
+| `cleanup-cron-history` | Sundays 5:00 AM UTC | 011 | Delete cron history older than 30 days |
+| `vacuum-analyze-analytics` | Sundays 3:30 AM UTC | 011 | VACUUM ANALYZE on analytics_events |
+| `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Prevent free-tier auto-pause (7-day timeout) |
+| `edge-keep-alive` | Every 3 days 12:00 PM UTC | 014 | Call keep-alive Edge Function via pg_net |
+| `edge-cleanup-analytics` | 1st of month 2:00 AM UTC | 014 | Call cleanup Edge Function via pg_net |
+
+Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
+
+## Database Webhooks (pg_net)
+
+Database webhooks fire HTTP requests when rows change, using the `pg_net` extension (migration `013_database_webhooks.sql`). Webhooks call `POST /api/webhooks/supabase` on the Next.js app to trigger cache invalidation.
+
+| Table | Event | Effect |
+|-------|-------|--------|
+| `stories` | UPDATE | Revalidates `/immersive` and `/sitemap.xml` |
+| `feature_flags` | UPDATE | Revalidates `/api/feature-flags` |
+
+Setup: Configure `app.webhook_base_url` and `app.webhook_secret` in Supabase SQL Editor (see Environment Variables).
+
+## Supabase Realtime
+
+Realtime subscriptions provide live updates to browser sessions (free tier: 200 concurrent connections, 2M messages/month).
+
+| Subscription | Module | Purpose |
+|-------------|--------|---------|
+| Feature flags | `src/hooks/use-realtime-feature-flags.ts` | Live flag sync when admin toggles |
+| Stories | `src/hooks/use-realtime-stories.ts` | Notify when admin updates story |
+
+Utilities in `src/lib/realtime.ts` provide generic `subscribeToTable()` and specific `subscribeToFeatureFlags()` / `subscribeToStories()` helpers.
+
+## Supabase Edge Functions
+
+Deno-based Edge Functions in `supabase/functions/` (free tier: 500K invocations/month). Scheduled via pg_cron + pg_net.
+
+| Function | Purpose | Schedule |
+|----------|---------|----------|
+| `keep-alive` | Queries active stories to prevent auto-pause | Every 3 days |
+| `cleanup-analytics` | Deletes analytics events older than 90 days | Monthly |
+
+Deploy: `supabase functions deploy keep-alive && supabase functions deploy cleanup-analytics`
+
+See `supabase/functions/README.md` for full setup instructions.
+
+## Automated Agents
+
+### Coverage Agent (Nightly Cron)
+
+`scripts/coverage-agent.sh` runs nightly at 2:00 AM CET via local cron. Uses Claude CLI to analyze test coverage and update `docs/coverage-report.md`. Logs written to `logs/`.
+
+### Security Audit (Weekly Cron)
+
+`security.yml` runs `npm audit` weekly on Mondays at 08:00 UTC via GitHub Actions.
+
+### Secret Scanning (Daily Cron)
+
+`gitleaks.yml` scans the full git history daily at 04:00 UTC via GitHub Actions.
+
+## Development Guardrails
+
+Rules enforced by CI. Keep these in mind when developing:
+
+1. **No secrets in code** — Gitleaks scans git history. Use environment variables for all credentials. If a secret is accidentally committed, rotate it immediately.
+2. **No copyleft dependencies** — License Check blocks GPL, AGPL, EUPL, SSPL, and similar licenses. Only use MIT, Apache-2.0, BSD, or ISC licensed packages.
+3. **Performance budgets** — Lighthouse CI enforces: Performance >= 60%, Accessibility >= 80%, FCP < 3000ms, LCP < 4000ms, CLS < 0.25, TBT < 500ms (see `lighthouserc.json`).
+4. **No dead code** — Knip reports unused exports, dependencies, and files on every PR. Clean up flagged items.
+5. **Keep bundle size in check** — Bundle Size workflow comments on PRs with the total JS size. Monitor for unexpected growth.
+6. **Health endpoint must stay healthy** — `/api/health` is monitored 24/7 by Upptime. Don't break it or remove it. It has 9 tests.
+7. **Review Dependabot PRs** — Automated dependency update PRs arrive weekly. Review, test, and merge them regularly.
+8. **Database function security** — All SQL/PL/pgSQL functions must have an explicit `SET search_path` clause. Use `search_path = ''` with fully qualified table references (e.g., `public.chunks`) for security-definer functions. Functions using pgvector operators need `search_path = public, extensions`. Extensions should be installed in the `extensions` schema, not `public`.
 
 ## Content Categories (from PDFs)
 
