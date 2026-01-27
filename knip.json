@@ -1,0 +1,42 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": [
+    "src/app/**/page.tsx",
+    "src/app/**/layout.tsx",
+    "src/app/**/route.ts",
+    "src/app/**/loading.tsx",
+    "src/app/**/error.tsx",
+    "src/app/providers.tsx"
+  ],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignore": [
+    "src/test/**",
+    "**/*.test.{ts,tsx}",
+    "**/__tests__/**"
+  ],
+  "ignoreDependencies": [
+    "@types/*"
+  ],
+  "paths": {
+    "@/*": ["./src/*"]
+  },
+  "next": {
+    "entry": [
+      "next.config.ts",
+      "src/app/**/page.tsx",
+      "src/app/**/layout.tsx",
+      "src/app/**/route.ts",
+      "src/app/**/loading.tsx",
+      "src/app/**/error.tsx",
+      "src/app/robots.ts",
+      "src/app/sitemap.ts",
+      "src/middleware.ts"
+    ]
+  },
+  "vitest": {
+    "entry": [
+      "src/**/*.test.{ts,tsx}",
+      "src/test/setup.ts"
+    ]
+  }
+}
