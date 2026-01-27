@@ -7,10 +7,8 @@
 --   2. Extension in Public — move pgvector from public to extensions schema
 --   3. RLS Policy Always True — tighten analytics_events INSERT policy
 --
--- NOT fixable via SQL (requires Supabase Dashboard):
---   4. Leaked Password Protection Disabled
---      Enable at: Dashboard > Authentication > Providers > Email >
---      "Leaked password protection"
+-- Not applicable (Pro plan only):
+--   4. Leaked Password Protection — requires paid plan, ignored for free tier
 --
 -- ORDER OF OPERATIONS:
 --   Functions are created BEFORE moving the vector extension, so that
@@ -206,13 +204,3 @@ CREATE POLICY "Public can insert analytics events"
     event_name IS NOT NULL
     AND length(event_name) BETWEEN 1 AND 200
   );
-
-
--- ============================================================================
--- MANUAL STEP (Supabase Dashboard):
---
--- Enable "Leaked Password Protection" to check passwords against known breaches:
---   Dashboard > Authentication > Providers > Email > Leaked password protection
---
--- This uses the HaveIBeenPwned API and cannot be configured via SQL.
--- ============================================================================
