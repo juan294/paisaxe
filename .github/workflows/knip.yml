@@ -1,0 +1,38 @@
+name: Dead Code Detection
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  knip:
+    name: Knip Dead Code Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Report dead code but do not fail the build.
+      # --no-exit-code is intentional for the initial rollout so the team can
+      # review results without blocking PRs.  Once the codebase is clean,
+      # remove --no-exit-code to enforce strict dead code prevention.
+      - name: Run Knip (report mode)
+        run: npx knip --no-exit-code
+
+      # Check for unused and unlisted dependencies separately.
+      # Using --no-exit-code during initial rollout because the codebase has
+      # pre-existing dependency issues to address.  Once cleaned up, remove
+      # --no-exit-code to enforce strict dependency hygiene and fail the build
+      # on unused or unlisted dependencies.
+      - name: Check unused dependencies (report mode)
+        run: npx knip --dependencies --no-exit-code
