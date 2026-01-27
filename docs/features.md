@@ -310,7 +310,9 @@ Both produce 1200x630 PNG images. The root image cascades to child routes that d
 
 ## Infrastructure
 
-**Health check** (`GET /api/health`) — Returns service status (healthy/degraded), uptime, app version, and Supabase connectivity with latency. Always returns HTTP 200 to work with uptime monitors. Monitored every 5 minutes by [Upptime](https://juan294.github.io/paisaxe-upptime/).
+**Health check** (`GET /api/health`) — Returns service status (healthy/degraded), uptime, app version, Supabase connectivity with latency, and database storage usage. Reports "degraded" if Supabase connection fails or database usage exceeds 80% of the 500 MB free-tier limit. Always returns HTTP 200 to work with uptime monitors. Monitored every 5 minutes by [Upptime](https://juan294.github.io/paisaxe-upptime/).
+
+**Database size monitoring** — The health endpoint reports `database.size_mb`, `database.limit_mb` (500), and `database.usage_percent`. This is critical for the Supabase free tier where pgvector embeddings can grow storage quickly.
 
 **Rate limiting** — In-memory rate limiting protects the analytics API (60 requests per 60 seconds per IP) and the chat API. Returns 429 with a `Retry-After` header when exceeded.
 
@@ -321,6 +323,46 @@ Both produce 1200x630 PNG images. The root image cascades to child routes that d
 **Error boundaries** — Dedicated error pages for the admin panel and main app with retry buttons. Loading skeletons for all pages.
 
 **Code splitting** — The voice chat component is dynamically imported, reducing the initial bundle by ~15 KB.
+
+### Supabase Free Tier Optimization
+
+Paisaxe runs on the Supabase free tier ($0/month) and takes advantage of every available feature:
+
+**Keep-alive system** — The free tier auto-pauses projects after 7 days of inactivity. Two redundant keep-alive mechanisms prevent this:
+1. A pg_cron job runs `SELECT 1` every 3 days (migration 012)
+2. A Supabase Edge Function is called every 3 days via pg_cron + pg_net, querying active stories count (migration 014)
+
+Additionally, Upptime pings the health endpoint every 5 minutes, which queries the database.
+
+**Database webhooks** — Using the `pg_net` extension, database triggers automatically call the Next.js API (`POST /api/webhooks/supabase`) when data changes. This enables:
+- Cache invalidation when stories are updated (revalidates `/immersive` and `/sitemap.xml`)
+- Cache invalidation when feature flags are toggled (revalidates `/api/feature-flags`)
+
+Webhook payloads include the table name, operation type, and changed record. Authentication uses a shared secret in the `x-webhook-secret` header.
+
+**Realtime subscriptions** — Supabase Realtime (free: 200 concurrent connections, 2M messages/month) provides live updates:
+- Feature flags: When an admin toggles a flag, all active browser sessions pick up the change instantly via `useRealtimeFeatureFlags` hook
+- Story updates: When an admin changes a story's curation status or image, `useRealtimeStories` hook notifies the UI
+
+**Edge Functions** — Two Deno-based Edge Functions (free: 500K invocations/month, ~25 used):
+- `keep-alive`: Queries active stories to generate database activity
+- `cleanup-analytics`: Deletes analytics events older than 90 days to manage storage
+
+Both are scheduled via pg_cron + pg_net and deployed with `supabase functions deploy`.
+
+**Automated database maintenance** — pg_cron runs weekly VACUUM ANALYZE on high-churn tables (chunks, analytics_events), daily ANALYZE on all main tables, and monthly cron history cleanup.
+
+| Supabase Feature | Status | Usage |
+|-----------------|--------|-------|
+| PostgreSQL + pgvector | Active | Vector search, 6 tables |
+| Row Level Security | Active | All tables, user-scoped favorites |
+| Auth (Google OAuth) | Active | Visitor accounts, favorites sync |
+| Storage | Active | Admin story images |
+| pg_cron | Active | 7 scheduled jobs |
+| pg_net + Webhooks | Active | Cache invalidation triggers |
+| Realtime | Active | Feature flags + story update sync |
+| Edge Functions | Active | Keep-alive + analytics cleanup |
+| Full-text search (GIN) | Active | Spanish keyword search fallback |
 
 ---
 
