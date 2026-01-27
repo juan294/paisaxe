@@ -352,6 +352,8 @@ Both are scheduled via pg_cron + pg_net and deployed with `supabase functions de
 
 **Automated database maintenance** — pg_cron runs weekly VACUUM ANALYZE on high-churn tables (chunks, analytics_events), daily ANALYZE on all main tables, and monthly cron history cleanup.
 
+**Security hardening** (migration 015) — All database functions have explicit `SET search_path` to prevent search path injection attacks. Security-critical functions (`is_story_favorited`, `get_database_size`, `notify_webhook`) use `search_path = ''` with fully qualified table references. The pgvector extension has been moved from the `public` schema to the `extensions` schema per Supabase best practices. The `analytics_events` INSERT RLS policy validates that `event_name` is non-empty and under 200 characters (replacing the previous overly permissive `WITH CHECK (true)`).
+
 | Supabase Feature | Status | Usage |
 |-----------------|--------|-------|
 | PostgreSQL + pgvector | Active | Vector search, 6 tables |

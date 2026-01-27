@@ -566,6 +566,7 @@ Rules enforced by CI. Keep these in mind when developing:
 5. **Keep bundle size in check** — Bundle Size workflow comments on PRs with the total JS size. Monitor for unexpected growth.
 6. **Health endpoint must stay healthy** — `/api/health` is monitored 24/7 by Upptime. Don't break it or remove it. It has 9 tests.
 7. **Review Dependabot PRs** — Automated dependency update PRs arrive weekly. Review, test, and merge them regularly.
+8. **Database function security** — All SQL/PL/pgSQL functions must have an explicit `SET search_path` clause. Use `search_path = ''` with fully qualified table references (e.g., `public.chunks`) for security-definer functions. Functions using pgvector operators need `search_path = public, extensions`. Extensions should be installed in the `extensions` schema, not `public`.
 
 ## Content Categories (from PDFs)
 
