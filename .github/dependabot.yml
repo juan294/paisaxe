@@ -17,6 +17,7 @@ updates:
           - "@types/*"
           - "eslint*"
           - "vitest*"
+          - "@vitest/*"
           - "@testing-library/*"
       dev-and-types:
         applies-to: version-updates
@@ -24,6 +25,7 @@ updates:
           - "@types/*"
           - "eslint*"
           - "vitest*"
+          - "@vitest/*"
           - "@testing-library/*"
 
   # GitHub Actions
