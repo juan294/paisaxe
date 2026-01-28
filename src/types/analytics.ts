@@ -1,28 +1,36 @@
-export interface AnalyticsEvent {
-  id: string;
-  eventName: string;
-  featureFlag: string | null;
-  sessionId: string | null;
-  metadata: Record<string, unknown>;
-  userAgent: string | null;
-  ipHash: string | null;
-  createdAt: string;
-}
+// PostHog-powered analytics types
 
 export interface AnalyticsSummary {
-  totalEvents: number;
-  totalSessions: number;
-  featureBreakdown: FeatureAnalytics[];
+  totalPageviews: number;
+  uniqueVisitors: number;
 }
 
-export interface FeatureAnalytics {
-  featureFlag: string;
-  eventCount: number;
-  uniqueSessions: number;
+export interface TopPage {
+  url: string;
+  count: number;
+}
+
+export interface TopReferrer {
+  referrer: string;
+  count: number;
+}
+
+export interface CountryBreakdown {
+  country: string;
+  count: number;
+}
+
+export interface DeviceBreakdown {
+  device: string;
+  count: number;
 }
 
 export interface AnalyticsDashboardData {
   summary: AnalyticsSummary;
+  topPages: TopPage[];
+  topReferrers: TopReferrer[];
+  countries: CountryBreakdown[];
+  devices: DeviceBreakdown[];
   dateRange: {
     from: string;
     to: string;
