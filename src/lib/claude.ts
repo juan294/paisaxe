@@ -6,6 +6,10 @@ interface AnthropicMessage {
   content: string;
 }
 
+// Retry configuration for intermittent network failures
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 500;
+
 export async function callAnthropicAPI(
   system: string,
   messages: AnthropicMessage[],
@@ -15,8 +19,10 @@ export async function callAnthropicAPI(
   // Use curl subprocess to call the Anthropic API. The Turbopack dev server
   // corrupts Node.js HTTPS for api.anthropic.com (ECONNRESET) — even in
   // child node processes. Using curl bypasses Node's networking entirely.
+  // We also retry on transient failures (curl exit codes 56, 7, 28).
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
+  const { setTimeout: sleep } = await import("node:timers/promises");
   const execFileAsync = promisify(execFile);
 
   const body = JSON.stringify({
@@ -29,23 +35,92 @@ export async function callAnthropicAPI(
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
 
-  const { stdout } = await execFileAsync("curl", [
-    "-s",
-    "-X", "POST",
-    "https://api.anthropic.com/v1/messages",
-    "-H", "Content-Type: application/json",
-    "-H", `x-api-key: ${apiKey}`,
-    "-H", "anthropic-version: 2023-06-01",
-    "-d", body,
-  ], {
-    timeout: 30000,
-  });
+  let lastError: Error | null = null;
 
-  const parsed = JSON.parse(stdout);
-  if (parsed.error) {
-    throw new Error(`Anthropic API error: ${parsed.error.message}`);
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    let stdout: string;
+    let stderr: string;
+
+    try {
+      const result = await execFileAsync("curl", [
+        "-s",
+        "-S", // Show errors even with -s
+        "--retry", "2", // curl-level retries for connection issues
+        "--retry-delay", "1",
+        "--retry-connrefused",
+        "-X", "POST",
+        "https://api.anthropic.com/v1/messages",
+        "-H", "Content-Type: application/json",
+        "-H", `x-api-key: ${apiKey}`,
+        "-H", "anthropic-version: 2023-06-01",
+        "-d", body,
+      ], {
+        timeout: 60000, // Increased timeout to allow for curl retries
+      });
+      stdout = result.stdout;
+      stderr = result.stderr;
+    } catch (execError) {
+      const err = execError as { code?: string | number; stderr?: string; killed?: boolean; signal?: string };
+      const exitCode = typeof err.code === "number" ? err.code : parseInt(String(err.code), 10);
+
+      // Retryable curl exit codes: 56 (recv error), 7 (connect refused), 28 (timeout)
+      const isRetryable = [56, 7, 28].includes(exitCode) || isNaN(exitCode);
+
+      if (isRetryable && attempt < MAX_RETRIES) {
+        console.warn(`[Claude API] curl failed (attempt ${attempt}/${MAX_RETRIES}, code ${err.code}), retrying in ${RETRY_DELAY_MS}ms...`);
+        await sleep(RETRY_DELAY_MS * attempt); // Exponential backoff
+        lastError = new Error(`curl failed: ${err.code}`);
+        continue;
+      }
+
+      console.error("[Claude API] curl execution failed:", {
+        code: err.code,
+        stderr: err.stderr,
+        killed: err.killed,
+        signal: err.signal,
+        attempt,
+      });
+      throw new Error(`curl failed: ${err.code || err.stderr || "unknown error"}`);
+    }
+
+    if (stderr) {
+      console.error("[Claude API] curl stderr:", stderr);
+    }
+
+    if (!stdout || stdout.trim() === "") {
+      if (attempt < MAX_RETRIES) {
+        console.warn(`[Claude API] Empty response (attempt ${attempt}/${MAX_RETRIES}), retrying...`);
+        await sleep(RETRY_DELAY_MS * attempt);
+        lastError = new Error("Empty response from Anthropic API");
+        continue;
+      }
+      console.error("[Claude API] Empty response from curl after all retries");
+      throw new Error("Empty response from Anthropic API");
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(stdout);
+    } catch {
+      console.error("[Claude API] Failed to parse response:", stdout.slice(0, 500));
+      throw new Error(`Invalid JSON response: ${stdout.slice(0, 100)}`);
+    }
+
+    if (parsed.error) {
+      // Don't retry API-level errors (rate limits, auth, etc.)
+      console.error("[Claude API] API error:", parsed.error);
+      throw new Error(`Anthropic API error: ${parsed.error.message}`);
+    }
+
+    // Success
+    if (attempt > 1) {
+      console.info(`[Claude API] Succeeded on attempt ${attempt}`);
+    }
+    return parsed as Anthropic.Message;
   }
-  return parsed as Anthropic.Message;
+
+  // Should not reach here, but TypeScript needs it
+  throw lastError || new Error("Max retries exceeded");
 }
 
 // System prompt for the Pelayo persona — a warm Asturian local guide

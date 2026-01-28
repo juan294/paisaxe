@@ -90,6 +90,23 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Chat API error:", error);
+
+    // In development, return detailed error for debugging
+    if (process.env.NODE_ENV === "development") {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      return NextResponse.json(
+        {
+          error: "Internal server error",
+          debug: {
+            message: errorMessage,
+            stack: errorStack,
+          }
+        },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
