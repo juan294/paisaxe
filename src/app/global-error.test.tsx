@@ -1,25 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import RootError from "./error";
+import { renderToStaticMarkup } from "react-dom/server";
+import GlobalError from "./global-error";
 
-// Mock next/link to render a plain anchor
-vi.mock("next/link", () => ({
-  default: ({
-    children,
-    href,
-    ...props
-  }: {
-    children: React.ReactNode;
-    href: string;
-    [key: string]: unknown;
-  }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
-}));
-
-describe("RootError", () => {
+describe("GlobalError", () => {
   const consoleSpy = vi
     .spyOn(console, "error")
     .mockImplementation(() => {});
@@ -29,17 +13,17 @@ describe("RootError", () => {
   });
 
   const defaultProps = {
-    error: new Error("Test error"),
+    error: new Error("Global layout error"),
     reset: vi.fn(),
   };
 
-  it("renders the error message", () => {
-    render(<RootError {...defaultProps} />);
+  it("renders a friendly Spanish error message", () => {
+    render(<GlobalError {...defaultProps} />);
     expect(screen.getByText("Algo salió mal")).toBeInTheDocument();
   });
 
-  it("renders the error description", () => {
-    render(<RootError {...defaultProps} />);
+  it("renders an error description in Spanish", () => {
+    render(<GlobalError {...defaultProps} />);
     expect(
       screen.getByText(
         "Ha ocurrido un error inesperado. Por favor, inténtalo de nuevo."
@@ -48,7 +32,7 @@ describe("RootError", () => {
   });
 
   it("renders a retry button", () => {
-    render(<RootError {...defaultProps} />);
+    render(<GlobalError {...defaultProps} />);
     expect(
       screen.getByRole("button", { name: "Reintentar" })
     ).toBeInTheDocument();
@@ -56,25 +40,30 @@ describe("RootError", () => {
 
   it("calls reset when retry button is clicked", () => {
     const reset = vi.fn();
-    render(<RootError error={new Error("fail")} reset={reset} />);
+    render(<GlobalError error={new Error("fail")} reset={reset} />);
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(reset).toHaveBeenCalledTimes(1);
   });
 
   it("logs the error to console.error", () => {
-    const error = new Error("Test error for logging");
-    render(<RootError error={error} reset={vi.fn()} />);
+    const error = new Error("Global error for logging");
+    render(<GlobalError error={error} reset={vi.fn()} />);
     expect(consoleSpy).toHaveBeenCalledWith(error);
   });
 
-  it("has a dark background", () => {
-    const { container } = render(<RootError {...defaultProps} />);
-    const wrapper = container.firstChild as HTMLElement;
-    expect(wrapper.className).toContain("bg-black");
+  it("includes html and body tags in rendered output", () => {
+    // global-error.tsx must include its own <html> and <body> tags since it
+    // replaces the root layout on error. In jsdom, these tags get absorbed into
+    // the document so we verify via ReactDOMServer instead.
+    const html = renderToStaticMarkup(
+      <GlobalError {...defaultProps} />
+    );
+    expect(html).toContain("<html");
+    expect(html).toContain("<body");
   });
 
   it("renders a home link", () => {
-    render(<RootError {...defaultProps} />);
+    render(<GlobalError {...defaultProps} />);
     const link = screen.getByRole("link", { name: "Volver al inicio" });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "/");
