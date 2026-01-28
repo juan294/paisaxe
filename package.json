@@ -56,6 +56,7 @@
   "devDependencies": {
     "@next/eslint-plugin-next": "^16.1.4",
     "@playwright/test": "^1.58.0",
+    "@tailwindcss/postcss": "^4.0.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -71,7 +72,6 @@
     "jsdom": "^27.0.1",
     "knip": "^5.82.1",
     "lint-staged": "^16.2.7",
-    "@tailwindcss/postcss": "^4.0.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.2",
