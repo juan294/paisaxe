@@ -3,7 +3,7 @@
 A living document tracking implemented features and future development plans.
 
 **Domain**: paisaxe.es
-**Last Updated**: January 27, 2026
+**Last Updated**: January 28, 2026
 
 ---
 
@@ -249,20 +249,20 @@ All 10 features implemented behind feature flags (disabled by default, toggleabl
 | Language Switcher | :white_check_mark: | ES/EN pill toggle in story viewer header |
 | Filter Labels i18n | :white_check_mark: | Categories, locations, durations all translated via `t()` |
 | Action Buttons i18n | :white_check_mark: | "Ask about this", "Saved", chat UI, favorites page |
-| Other Languages | :calendar: | As needed |
+| Other Languages | :white_check_mark: | French, German, Portuguese added (5 locales total) |
 
 Note: Story content (titles, descriptions) remains in Spanish — sourced from Supabase DB. Chat responds in the visitor's detected language via Claude.
 
 ---
 
-## Phase 7: Polish :construction:
+## Phase 7: Polish :white_check_mark:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Loading States | :construction: | Basic spinners + Suspense boundaries; skeleton UI pending |
-| Accessibility | :construction: | ARIA labels + keyboard nav present; reduced motion + screen reader audit pending |
-| SEO Optimization | :calendar: | Basic title/description; OG tags + structured data pending |
-| Error Boundaries | :calendar: | No error boundary components yet |
+| Skeleton UI Loading States | :white_check_mark: | Shimmer skeletons for story cards, chat messages, story details; replaces all spinners |
+| Accessibility Audit | :white_check_mark: | `prefers-reduced-motion` via `useReducedMotion` hook, `aria-live` regions, `focus-visible` rings, semantic HTML (`<main>`, `<article>`), 11 new i18n a11y keys |
+| SEO Optimization | :white_check_mark: | Open Graph + Twitter cards, JSON-LD (WebSite + TouristDestination), `robots.ts`, enhanced `sitemap.ts`, all using `NEXT_PUBLIC_SITE_URL` |
+| Error Boundaries | :white_check_mark: | `error.tsx` (root + immersive), `not-found.tsx` (404), `global-error.tsx` — Spanish UI, dark theme, retry buttons |
 
 ---
 
