@@ -18,7 +18,7 @@ async function queryPostHog(
   apiKey: string
 ): Promise<HogQLResult> {
   const response = await fetch(
-    `https://eu.posthog.com/api/projects/${projectId}/query`,
+    `https://us.posthog.com/api/projects/${projectId}/query`,
     {
       method: "POST",
       headers: {
