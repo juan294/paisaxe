@@ -20,18 +20,21 @@ describe("LanguageSwitcher", () => {
     mockLocale = "es";
   });
 
-  it("should render the language switcher", () => {
+  it("should render all 5 language buttons", () => {
     render(<LanguageSwitcher />);
 
     const buttons = screen.getAllByRole("button");
-    expect(buttons).toHaveLength(2);
+    expect(buttons).toHaveLength(5);
   });
 
-  it("should display ES and EN options", () => {
+  it("should display ES, EN, FR, DE, and PT options", () => {
     render(<LanguageSwitcher />);
 
     expect(screen.getByText("ES")).toBeInTheDocument();
     expect(screen.getByText("EN")).toBeInTheDocument();
+    expect(screen.getByText("FR")).toBeInTheDocument();
+    expect(screen.getByText("DE")).toBeInTheDocument();
+    expect(screen.getByText("PT")).toBeInTheDocument();
   });
 
   it("should highlight ES when locale is es", () => {
@@ -39,7 +42,31 @@ describe("LanguageSwitcher", () => {
     render(<LanguageSwitcher />);
 
     const esButton = screen.getByText("ES").closest("button");
-    expect(esButton?.className).toContain("text-white");
+    expect(esButton?.className).toContain("bg-white/20");
+  });
+
+  it("should highlight FR when locale is fr", () => {
+    mockLocale = "fr";
+    render(<LanguageSwitcher />);
+
+    const frButton = screen.getByText("FR").closest("button");
+    expect(frButton?.className).toContain("bg-white/20");
+  });
+
+  it("should highlight DE when locale is de", () => {
+    mockLocale = "de";
+    render(<LanguageSwitcher />);
+
+    const deButton = screen.getByText("DE").closest("button");
+    expect(deButton?.className).toContain("bg-white/20");
+  });
+
+  it("should highlight PT when locale is pt", () => {
+    mockLocale = "pt";
+    render(<LanguageSwitcher />);
+
+    const ptButton = screen.getByText("PT").closest("button");
+    expect(ptButton?.className).toContain("bg-white/20");
   });
 
   it("should call setLocale with en when EN is clicked", () => {
@@ -58,6 +85,33 @@ describe("LanguageSwitcher", () => {
     fireEvent.click(screen.getByText("ES"));
 
     expect(mockSetLocale).toHaveBeenCalledWith("es");
+  });
+
+  it("should call setLocale with fr when FR is clicked", () => {
+    mockLocale = "es";
+    render(<LanguageSwitcher />);
+
+    fireEvent.click(screen.getByText("FR"));
+
+    expect(mockSetLocale).toHaveBeenCalledWith("fr");
+  });
+
+  it("should call setLocale with de when DE is clicked", () => {
+    mockLocale = "es";
+    render(<LanguageSwitcher />);
+
+    fireEvent.click(screen.getByText("DE"));
+
+    expect(mockSetLocale).toHaveBeenCalledWith("de");
+  });
+
+  it("should call setLocale with pt when PT is clicked", () => {
+    mockLocale = "es";
+    render(<LanguageSwitcher />);
+
+    fireEvent.click(screen.getByText("PT"));
+
+    expect(mockSetLocale).toHaveBeenCalledWith("pt");
   });
 
   it("should stop event propagation on click", () => {
