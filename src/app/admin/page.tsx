@@ -8,6 +8,8 @@ import { ImageEditorDialog } from "@/components/admin/image-editor-dialog";
 import { AdminTabs, type AdminTab } from "@/components/admin/admin-tabs";
 import { FeatureTogglesPanel } from "@/components/admin/feature-toggles-panel";
 import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
+import { AdminThemeProvider } from "@/components/admin/theme-provider";
+import { ThemeToggle } from "@/components/admin/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { fetchStories } from "@/lib/admin-api";
 import {
@@ -16,53 +18,65 @@ import {
   AlertCircle,
   ShieldX,
   Loader2,
+  ImageIcon,
+  CheckCircle2,
+  Clock,
+  Layers,
+  ArrowUpRight,
 } from "lucide-react";
 import type { AdminStory, CurationStatus } from "@/types/admin";
 import { cn } from "@/lib/utils";
 
 type FilterType = "all" | CurationStatus;
 
-export default function AdminPage() {
+function AdminPageContent() {
   const { user, isLoading: isAuthLoading, signInWithGoogle, signOut } = useAuth();
   const { isAdmin, isLoading: isRoleLoading } = useAdminRole();
 
-  const [stories, setStories] = useState<AdminStory[]>([]);
+  const [allStories, setAllStories] = useState<AdminStory[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [editingStory, setEditingStory] = useState<AdminStory | null>(null);
   const [activeTab, setActiveTab] = useState<AdminTab>("stories");
 
+  // Always fetch ALL stories - filter client-side for display
   const loadStories = useCallback(async () => {
     setIsLoading(true);
     setError("");
 
-    const filterParam = filter === "all" ? undefined : filter;
-    const result = await fetchStories(filterParam);
+    // Always fetch all stories (no filter param)
+    const result = await fetchStories(undefined);
 
     if (result.error) {
       setError(result.error);
     } else if (result.data) {
-      setStories(result.data);
+      setAllStories(result.data);
     }
 
     setIsLoading(false);
-  }, [filter]);
+  }, []);
 
   useEffect(() => {
     if (isAdmin && activeTab === "stories") {
       loadStories();
     }
-  }, [isAdmin, filter, loadStories, activeTab]);
+  }, [isAdmin, loadStories, activeTab]);
+
+  // Filter stories client-side for display
+  const filteredStories = allStories.filter((story) => {
+    if (filter === "all") return true;
+    return story.curationStatus === filter;
+  });
 
   const handleLogout = async () => {
-    setStories([]);
+    setAllStories([]);
     setFilter("all");
     await signOut();
   };
 
   const handleStoryUpdate = (storyId: string, updates: Partial<AdminStory>) => {
-    setStories((prev) =>
+    setAllStories((prev) =>
       prev.map((story) =>
         story.id === storyId ? { ...story, ...updates } : story
       )
@@ -72,10 +86,14 @@ export default function AdminPage() {
   // Loading state
   if (isAuthLoading || isRoleLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-50 dark:bg-neutral-950">
-        <div className="text-center">
-          <Loader2 className="mx-auto h-6 w-6 animate-spin text-neutral-400" />
-          <p className="mt-3 text-sm text-neutral-500">Loading...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f3ee] dark:bg-[#1a1917]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 rounded-2xl bg-[#2d2a26] dark:bg-[#f5f3ee] p-3">
+            <Loader2 className="h-6 w-6 animate-spin text-[#f5f3ee] dark:text-[#2d2a26]" />
+          </div>
+          <p className="text-sm font-medium text-[#6b6560] dark:text-[#a39e98]">
+            Loading...
+          </p>
         </div>
       </div>
     );
@@ -84,21 +102,27 @@ export default function AdminPage() {
   // Not authenticated: show sign-in
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-4 dark:bg-neutral-950">
-        <div className="w-full max-w-sm text-center">
-          <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-            Paisaxe Admin
-          </h1>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-            Sign in to access the admin panel
-          </p>
-          <Button
-            onClick={() => signInWithGoogle("/admin")}
-            className="mt-6 h-10 w-full bg-neutral-900 text-sm font-medium text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
-          >
-            Sign in with Google
-          </Button>
-          <p className="mt-6 text-center text-xs text-neutral-400 dark:text-neutral-500">
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f3ee] dark:bg-[#1a1917] p-4">
+        <div className="w-full max-w-sm">
+          <div className="rounded-3xl bg-white p-8 shadow-sm dark:bg-[#252320]">
+            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#2d2a26] dark:bg-[#f5f3ee]">
+              <Layers className="h-7 w-7 text-[#f5f3ee] dark:text-[#2d2a26]" />
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+              Paisaxe Admin
+            </h1>
+            <p className="mt-2 text-sm text-[#6b6560] dark:text-[#a39e98]">
+              Sign in to access the admin panel
+            </p>
+            <Button
+              onClick={() => signInWithGoogle("/admin")}
+              className="mt-6 h-12 w-full rounded-2xl bg-[#2d2a26] text-sm font-medium text-[#f5f3ee] transition-all hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+            >
+              Sign in with Google
+              <ArrowUpRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+          <p className="mt-4 text-center text-xs text-[#a39e98]">
             Protected area
           </p>
         </div>
@@ -109,170 +133,153 @@ export default function AdminPage() {
   // Authenticated but not admin: access denied
   if (!isAdmin) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-4 dark:bg-neutral-950">
-        <div className="w-full max-w-sm text-center">
-          <ShieldX className="mx-auto h-10 w-10 text-red-400" />
-          <h1 className="mt-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-            Access Denied
-          </h1>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-            Your account does not have admin privileges.
-          </p>
-          <p className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
-            Signed in as {user.email}
-          </p>
-          <Button
-            onClick={handleLogout}
-            variant="ghost"
-            className="mt-6 h-10 text-sm text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign out
-          </Button>
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f3ee] dark:bg-[#1a1917] p-4">
+        <div className="w-full max-w-sm">
+          <div className="rounded-3xl bg-white p-8 shadow-sm dark:bg-[#252320]">
+            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#c9a55c]">
+              <ShieldX className="h-7 w-7 text-white" />
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+              Access Denied
+            </h1>
+            <p className="mt-2 text-sm text-[#6b6560] dark:text-[#a39e98]">
+              Your account does not have admin privileges.
+            </p>
+            <p className="mt-3 text-xs text-[#a39e98]">
+              Signed in as {user.email}
+            </p>
+            <Button
+              onClick={handleLogout}
+              variant="ghost"
+              className="mt-6 h-12 w-full rounded-2xl text-sm font-medium text-[#6b6560] hover:bg-[#f5f3ee] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:bg-[#2d2a26] dark:hover:text-[#f5f3ee]"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Admin panel
-  const needsCurationCount = stories.filter(
+  // Admin panel - counts always from ALL stories (not filtered)
+  const totalCount = allStories.length;
+  const needsCurationCount = allStories.filter(
     (s) => s.curationStatus === "needs_curation"
   ).length;
-  const approvedCount = stories.filter(
+  const approvedCount = allStories.filter(
     (s) => s.curationStatus === "approved"
   ).length;
-  const withImagesCount = stories.filter((s) => s.image).length;
+  const withImagesCount = allStories.filter((s) => s.image).length;
 
-  const filterOptions = [
-    { value: "all" as FilterType, label: "All", count: stories.length },
-    { value: "needs_curation" as FilterType, label: "Pending", count: needsCurationCount },
-    { value: "approved" as FilterType, label: "Approved", count: approvedCount },
-  ];
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+    <div className="min-h-screen bg-[#f5f3ee] dark:bg-[#1a1917]">
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-6">
-            <h1 className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
-              Paisaxe Admin
-            </h1>
-            <div className="hidden h-4 w-px bg-neutral-200 dark:bg-neutral-700 sm:block" />
-            {/* Tab navigation */}
-            <div className="hidden sm:block">
-              <AdminTabs activeTab={activeTab} onTabChange={setActiveTab} />
-            </div>
-          </div>
-
+      <header className="sticky top-0 z-40 bg-[#f5f3ee]/80 backdrop-blur-xl dark:bg-[#1a1917]/80">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          {/* Logo */}
           <div className="flex items-center gap-3">
-            {/* Compact metrics - only shown on stories tab */}
-            {activeTab === "stories" && (
-              <>
-                <div className="hidden items-center gap-4 text-xs md:flex">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
-                    <span className="text-neutral-500 dark:text-neutral-400">{stories.length} total</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                    <span className="text-neutral-500 dark:text-neutral-400">{needsCurationCount} pending</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-neutral-500 dark:text-neutral-400">{approvedCount} approved</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-neutral-600" />
-                    <span className="text-neutral-500 dark:text-neutral-400">{withImagesCount} with images</span>
-                  </div>
-                </div>
-                <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-700" />
-              </>
-            )}
-
-            {activeTab === "stories" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={loadStories}
-                disabled={isLoading}
-                className="h-8 w-8 p-0 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-              >
-                <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
-              </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="h-8 gap-1.5 px-2 text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2d2a26] dark:bg-[#f5f3ee]">
+              <Layers className="h-4 w-4 text-[#f5f3ee] dark:text-[#2d2a26]" />
+            </div>
+            <span className="text-sm font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
+              Paisaxe
+            </span>
           </div>
-        </div>
 
-        {/* Mobile tabs + filters */}
-        <div className="border-t border-neutral-100 dark:border-neutral-800 sm:hidden">
-          <div className="flex gap-1 px-4 py-2">
+          {/* Center tabs */}
+          <div className="absolute left-1/2 -translate-x-1/2">
             <AdminTabs activeTab={activeTab} onTabChange={setActiveTab} />
           </div>
-          {activeTab === "stories" && (
-            <div className="flex gap-1 border-t border-neutral-100 px-4 py-2 dark:border-neutral-800">
-              {filterOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setFilter(option.value)}
-                  className={cn(
-                    "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
-                    filter === option.value
-                      ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-                      : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
-                  )}
-                >
-                  {option.label} ({option.count})
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Desktop story filters - only on stories tab */}
-        {activeTab === "stories" && (
-          <div className="hidden border-t border-neutral-100 dark:border-neutral-800 sm:block">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <nav className="flex items-center gap-1 py-2">
-                {filterOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setFilter(option.value)}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                      filter === option.value
-                        ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-                        : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-                    )}
-                  >
-                    {option.label}
-                    <span className="tabular-nums text-neutral-400 dark:text-neutral-500">
-                      {option.count}
-                    </span>
-                  </button>
-                ))}
-              </nav>
-            </div>
+          {/* Right side */}
+          <div className="flex items-center gap-2">
+            {activeTab === "stories" && (
+              <button
+                onClick={loadStories}
+                disabled={isLoading}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
+                  "text-[#6b6560] hover:bg-white hover:text-[#2d2a26]",
+                  "dark:text-[#a39e98] dark:hover:bg-[#252320] dark:hover:text-[#f5f3ee]",
+                  "disabled:opacity-50"
+                )}
+              >
+                <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+              </button>
+            )}
+
+            <ThemeToggle />
+
+            <button
+              onClick={handleLogout}
+              className={cn(
+                "flex h-9 items-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors",
+                "text-[#6b6560] hover:bg-white hover:text-[#2d2a26]",
+                "dark:text-[#a39e98] dark:hover:bg-[#252320] dark:hover:text-[#f5f3ee]"
+              )}
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
-        )}
+        </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Welcome section - Only on stories tab */}
+        {activeTab === "stories" && (
+          <>
+            <div className="mb-8">
+              <h1 className="text-3xl font-semibold tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+                Content Dashboard
+              </h1>
+              <p className="mt-1 text-[#6b6560] dark:text-[#a39e98]">
+                Manage your stories and images
+              </p>
+            </div>
+
+            {/* Stat Cards - clickable as filters */}
+            <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <StatCard
+                icon={<Layers className="h-5 w-5" />}
+                value={totalCount}
+                label="Total"
+                variant="default"
+                isActive={filter === "all"}
+                onClick={() => setFilter("all")}
+              />
+              <StatCard
+                icon={<Clock className="h-5 w-5" />}
+                value={needsCurationCount}
+                label="Pending"
+                variant="warning"
+                isActive={filter === "needs_curation"}
+                onClick={() => setFilter("needs_curation")}
+              />
+              <StatCard
+                icon={<CheckCircle2 className="h-5 w-5" />}
+                value={approvedCount}
+                label="Approved"
+                variant="success"
+                isActive={filter === "approved"}
+                onClick={() => setFilter("approved")}
+              />
+              <StatCard
+                icon={<ImageIcon className="h-5 w-5" />}
+                value={withImagesCount}
+                label="With Images"
+                variant="default"
+              />
+            </div>
+          </>
+        )}
+
         {/* Error Message */}
         {error && activeTab === "stories" && (
-          <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <div className="mb-6 flex items-center gap-3 rounded-2xl bg-[#c9a55c]/10 px-5 py-4 text-sm text-[#8b6c2e] dark:bg-[#c9a55c]/20 dark:text-[#d4b876]">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
             <p>{error}</p>
           </div>
         )}
@@ -280,17 +287,22 @@ export default function AdminPage() {
         {/* Tab content */}
         {activeTab === "stories" && (
           <>
-            {isLoading && stories.length === 0 ? (
-              <div className="flex min-h-[300px] flex-col items-center justify-center">
-                <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
-                <p className="mt-3 text-sm text-neutral-500">Loading...</p>
+            {isLoading && allStories.length === 0 ? (
+              <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-[#252320]">
+                <RefreshCw className="h-6 w-6 animate-spin text-[#a39e98]" />
+                <p className="mt-4 text-sm text-[#6b6560] dark:text-[#a39e98]">Loading stories...</p>
               </div>
-            ) : stories.length === 0 ? (
-              <div className="flex min-h-[300px] flex-col items-center justify-center">
-                <p className="text-sm text-neutral-500">No stories found</p>
+            ) : filteredStories.length === 0 ? (
+              <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-[#252320]">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5f3ee] dark:bg-[#2d2a26]">
+                  <ImageIcon className="h-8 w-8 text-[#a39e98]" />
+                </div>
+                <p className="mt-4 text-sm font-medium text-[#6b6560] dark:text-[#a39e98]">
+                  {allStories.length === 0 ? "No stories found" : "No stories match this filter"}
+                </p>
               </div>
             ) : (
-              <StoryGrid stories={stories} onEdit={setEditingStory} />
+              <StoryGrid stories={filteredStories} onEdit={setEditingStory} />
             )}
           </>
         )}
@@ -310,6 +322,103 @@ export default function AdminPage() {
         onClose={() => setEditingStory(null)}
         onUpdate={handleStoryUpdate}
       />
+    </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <AdminThemeProvider>
+      <AdminPageContent />
+    </AdminThemeProvider>
+  );
+}
+
+interface StatCardProps {
+  icon: React.ReactNode;
+  value: number;
+  label: string;
+  variant: "default" | "warning" | "success";
+  isActive?: boolean;
+  onClick?: () => void;
+}
+
+function StatCard({ icon, value, label, variant, isActive, onClick }: StatCardProps) {
+  const isClickable = !!onClick;
+
+  const variants = {
+    default: {
+      bg: "bg-white dark:bg-[#252320]",
+      activeBg: "bg-[#2d2a26] dark:bg-[#f5f3ee]",
+      icon: "text-[#6b6560] dark:text-[#a39e98]",
+      activeIcon: "text-[#a39e98] dark:text-[#6b6560]",
+      text: "text-[#2d2a26] dark:text-[#f5f3ee]",
+      activeText: "text-[#f5f3ee] dark:text-[#2d2a26]",
+      subtext: "text-[#6b6560] dark:text-[#a39e98]",
+      activeSubtext: "text-[#a39e98] dark:text-[#6b6560]",
+    },
+    warning: {
+      bg: "bg-white dark:bg-[#252320]",
+      activeBg: "bg-[#8b7355] dark:bg-[#8b7355]",
+      icon: "text-[#c9a55c]",
+      activeIcon: "text-[#c9a55c]",
+      text: "text-[#2d2a26] dark:text-[#f5f3ee]",
+      activeText: "text-[#f5f3ee]",
+      subtext: "text-[#6b6560] dark:text-[#a39e98]",
+      activeSubtext: "text-[#d4c4a8]",
+    },
+    success: {
+      bg: "bg-white dark:bg-[#252320]",
+      activeBg: "bg-[#5a7a5a] dark:bg-[#5a7a5a]",
+      icon: "text-[#7a9e7a]",
+      activeIcon: "text-[#a8c9a8]",
+      text: "text-[#2d2a26] dark:text-[#f5f3ee]",
+      activeText: "text-[#f5f3ee]",
+      subtext: "text-[#6b6560] dark:text-[#a39e98]",
+      activeSubtext: "text-[#c4d9c4]",
+    },
+  };
+
+  const v = variants[variant];
+
+  const content = (
+    <>
+      <div className={cn("mb-3", isActive ? v.activeIcon : v.icon)}>
+        {icon}
+      </div>
+      <p className={cn(
+        "text-3xl font-semibold tabular-nums",
+        isActive ? v.activeText : v.text
+      )}>
+        {value}
+      </p>
+      <p className={cn(
+        "mt-1 text-sm",
+        isActive ? v.activeSubtext : v.subtext
+      )}>
+        {label}
+      </p>
+    </>
+  );
+
+  if (isClickable) {
+    return (
+      <button
+        onClick={onClick}
+        className={cn(
+          "rounded-2xl p-5 text-left transition-all",
+          isActive ? v.activeBg : v.bg,
+          !isActive && "hover:scale-[1.02] hover:shadow-md"
+        )}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className={cn("rounded-2xl p-5", v.bg)}>
+      {content}
     </div>
   );
 }
