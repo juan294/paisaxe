@@ -1,6 +1,11 @@
 import type { MetadataRoute } from "next";
 
+function getSiteUrl(): string {
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.com";
+}
+
 export default function robots(): MetadataRoute.Robots {
+  const siteUrl = getSiteUrl();
   return {
     rules: [
       {
@@ -9,6 +14,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/admin/", "/auth/"],
       },
     ],
-    sitemap: "https://paisaxe.com/sitemap.xml",
+    sitemap: `${siteUrl}/sitemap.xml`,
   };
 }
