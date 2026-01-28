@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateChatResponse, extractSourcesFromChunks } from "@/lib/claude";
-import { generateEmbedding } from "@/lib/embeddings";
-import { search } from "@/lib/search";
-import { validateChatRequest } from "@/lib/validation";
-import { checkRateLimit } from "@/lib/rate-limit";
-import { supabase } from "@/lib/supabase";
 import type { ChatResponse } from "@/types";
 
 export async function POST(request: NextRequest) {
+  // Dynamic imports — Turbopack corrupts the HTTP stack for api.anthropic.com
+  // when lib modules (embeddings, search, supabase, claude) are statically
+  // co-bundled in the same route. Each module works fine individually, but the
+  // combination breaks outbound HTTPS to Anthropic. Dynamic imports isolate
+  // each module's loading context and avoid the bundle corruption.
+  const { generateChatResponse, extractSourcesFromChunks } = await import("@/lib/claude");
+  const { generateEmbedding } = await import("@/lib/embeddings");
+  const { search } = await import("@/lib/search");
+  const { validateChatRequest } = await import("@/lib/validation");
+  const { checkRateLimit } = await import("@/lib/rate-limit");
+  const { supabase } = await import("@/lib/supabase");
+
   try {
     // Rate limiting - check before any processing
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
