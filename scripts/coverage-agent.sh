@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Coverage Agent — Runs nightly at 2:00 CET via cron
+# Coverage Agent — Runs nightly at 2:00 AM via launchd (com.paisaxe.coverage-agent)
 # Checks test coverage, writes missing tests, updates docs/coverage-report.md
 set -euo pipefail
 
