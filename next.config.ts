@@ -2,6 +2,17 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@anthropic-ai/sdk"],
+  // Reverse proxy for PostHog to avoid ad blockers
+  rewrites: async () => [
+    {
+      source: "/a/static/:path*",
+      destination: "https://eu-assets.i.posthog.com/static/:path*",
+    },
+    {
+      source: "/a/:path*",
+      destination: "https://eu.i.posthog.com/:path*",
+    },
+  ],
   headers: async () => [
     {
       source: "/(.*)",
