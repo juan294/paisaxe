@@ -1,0 +1,9 @@
+[allowlist]
+  description = "Allowlist for false positives"
+
+  # supabase/functions/README.md contains example curl commands with
+  # placeholder tokens (YOUR_ANON_KEY). The curl-auth-header rule
+  # flags these as secrets even though they are documentation placeholders.
+  paths = [
+    '''supabase/functions/README\.md''',
+  ]
