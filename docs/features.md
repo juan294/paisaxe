@@ -200,15 +200,15 @@ The admin panel is accessible at `/admin`. It has three tabs: Stories, Feature T
 
 ### Access & Authentication
 
-The admin panel uses a secret key (the `ADMIN_SECRET_KEY` environment variable). There is no user account system for admins.
+The admin panel uses Supabase Auth (Google OAuth) with role-based access control (RBAC) via the `user_profiles` table.
 
 1. Navigate to `/admin`.
-2. Enter the admin key in the login form.
-3. The key is validated against the server via a test API call.
-4. If valid, the admin session begins. The key is passed as a Bearer token in all subsequent API requests.
-5. The session lasts until the admin clicks "Logout" or closes the browser.
+2. Sign in with Google (the same OAuth flow used by regular visitors).
+3. The server reads the session cookie and checks `user_profiles.role = 'admin'` via `validateAdminAuth()`.
+4. If the user has the `admin` role, the admin session begins. There is no secret key or bearer token.
+5. The session lasts until the admin clicks "Logout" or the session cookie expires.
 
-All admin API routes (`/api/admin/*`) require the `Authorization: Bearer {key}` header. Invalid or missing tokens return 401/403 errors.
+All admin API routes (`/api/admin/*`) validate the session cookie and confirm the user holds the `admin` role. Cookies are sent automatically by the browser on every fetch request. Requests from unauthenticated users or users without the `admin` role return 401/403 errors. On the client side, the `useAdminRole()` hook queries the user's role via Row Level Security to control UI access.
 
 ### Story Management
 
