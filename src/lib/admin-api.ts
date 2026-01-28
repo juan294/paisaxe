@@ -1,4 +1,4 @@
-import type { AdminStory, CurationStatus, AdminApiResponse } from "@/types/admin";
+import type { AdminStory, CurationStatus, AdminApiResponse, ContentImagesResponse } from "@/types/admin";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import type { AnalyticsDashboardData } from "@/types/analytics";
 
@@ -193,6 +193,27 @@ export async function fetchAnalytics(
     return await response.json();
   } catch (error) {
     console.error("Error fetching analytics:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Search for content images from PDF manifest for a story
+ */
+export async function searchContentImages(
+  storyId: string
+): Promise<AdminApiResponse<ContentImagesResponse>> {
+  try {
+    const response = await fetch(`${API_BASE}/stories/${storyId}/content-images`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to search content images" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error searching content images:", error);
     return { error: "Network error" };
   }
 }
