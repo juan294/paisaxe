@@ -270,7 +270,7 @@ See [Feature Flags Reference](#feature-flags-reference) below for the full list.
 
 ### Analytics Dashboard
 
-The Analytics tab provides usage metrics powered by PostHog (EU Cloud), displayed for a configurable date range (default: last 7 days).
+The Analytics tab provides usage metrics powered by PostHog (US Cloud), displayed for a configurable date range (default: last 7 days).
 
 **Summary cards:**
 
