@@ -12,14 +12,6 @@ Prevents the free-tier Supabase database from auto-pausing due to inactivity (7-
 - **Endpoint**: `POST /functions/v1/keep-alive`
 - **Response**: `{ ok: true, active_stories: number, timestamp: string }`
 
-### cleanup-analytics
-
-Deletes old analytics events to keep the database under the 500 MB free-tier storage limit. Retention period is configurable via query parameter.
-
-- **Schedule**: First of each month at 2:00 AM UTC (`0 2 1 * *`)
-- **Endpoint**: `POST /functions/v1/cleanup-analytics?days=90`
-- **Response**: `{ ok: true, deleted_count: number, retention_days: number, cutoff_date: string, timestamp: string }`
-
 ## Local Development
 
 ```bash
@@ -39,9 +31,8 @@ curl -i --location --request POST \
 ## Deployment
 
 ```bash
-# Deploy a single function
+# Deploy the keep-alive function
 supabase functions deploy keep-alive
-supabase functions deploy cleanup-analytics
 
 # Deploy all functions
 supabase functions deploy
