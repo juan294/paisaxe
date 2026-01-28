@@ -2,9 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { fetchAnalytics } from "@/lib/admin-api";
-import { RefreshCw, AlertCircle, BarChart3, Users } from "lucide-react";
+import { RefreshCw, AlertCircle, Eye, Users, Globe, Monitor, Link2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AnalyticsDashboardData, FeatureAnalytics } from "@/types/analytics";
+import type {
+  AnalyticsDashboardData,
+  TopPage,
+  TopReferrer,
+  CountryBreakdown,
+  DeviceBreakdown,
+} from "@/types/analytics";
 
 export function AnalyticsDashboard() {
   const [data, setData] = useState<AnalyticsDashboardData | null>(null);
@@ -35,10 +41,11 @@ export function AnalyticsDashboard() {
     loadData();
   }, [loadData]);
 
-  const maxEventCount = data?.summary.featureBreakdown.reduce(
-    (max, f) => Math.max(max, f.eventCount),
-    0
-  ) || 1;
+  // Calculate max for bar chart scaling
+  const maxPageCount = data?.topPages.reduce((max, p) => Math.max(max, p.count), 0) || 1;
+  const maxReferrerCount = data?.topReferrers.reduce((max, r) => Math.max(max, r.count), 0) || 1;
+  const maxCountryCount = data?.countries.reduce((max, c) => Math.max(max, c.count), 0) || 1;
+  const maxDeviceCount = data?.devices.reduce((max, d) => Math.max(max, d.count), 0) || 1;
 
   return (
     <div className="space-y-6">
@@ -91,66 +98,152 @@ export function AnalyticsDashboard() {
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
               <div className="flex items-center gap-2 mb-1">
-                <BarChart3 className="h-4 w-4 text-neutral-400" />
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">Total Events</span>
+                <Eye className="h-4 w-4 text-neutral-400" />
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">Total Pageviews</span>
               </div>
               <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
-                {data.summary.totalEvents.toLocaleString()}
+                {data.summary.totalPageviews.toLocaleString()}
               </p>
             </div>
             <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Users className="h-4 w-4 text-neutral-400" />
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">Unique Sessions</span>
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">Unique Visitors</span>
               </div>
               <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
-                {data.summary.totalSessions.toLocaleString()}
+                {data.summary.uniqueVisitors.toLocaleString()}
               </p>
             </div>
           </div>
 
-          {/* Per-feature usage table */}
-          {data.summary.featureBreakdown.length > 0 ? (
-            <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
-              <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-800">
-                <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                  Per-Feature Usage
-                </h3>
-              </div>
-              <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {data.summary.featureBreakdown
-                  .sort((a, b) => b.eventCount - a.eventCount)
-                  .map((feature: FeatureAnalytics) => (
-                    <div key={feature.featureFlag} className="px-4 py-3">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                          {feature.featureFlag}
-                        </span>
-                        <div className="flex items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">
-                          <span>{feature.eventCount} events</span>
-                          <span>{feature.uniqueSessions} sessions</span>
-                        </div>
-                      </div>
-                      {/* CSS bar chart */}
-                      <div className="h-2 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                          style={{ width: `${(feature.eventCount / maxEventCount) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8 text-center">
-              <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                No analytics events recorded in this date range.
-              </p>
-            </div>
-          )}
+          {/* Top Pages */}
+          <DataSection
+            title="Top Pages"
+            icon={<FileText className="h-4 w-4 text-neutral-400" />}
+            items={data.topPages}
+            maxCount={maxPageCount}
+            renderItem={(item: TopPage) => (
+              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 truncate">
+                {formatUrl(item.url)}
+              </span>
+            )}
+            getCount={(item: TopPage) => item.count}
+          />
+
+          {/* Top Referrers */}
+          <DataSection
+            title="Top Referrers"
+            icon={<Link2 className="h-4 w-4 text-neutral-400" />}
+            items={data.topReferrers}
+            maxCount={maxReferrerCount}
+            renderItem={(item: TopReferrer) => (
+              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 truncate">
+                {formatUrl(item.referrer)}
+              </span>
+            )}
+            getCount={(item: TopReferrer) => item.count}
+          />
+
+          {/* Countries */}
+          <DataSection
+            title="Countries"
+            icon={<Globe className="h-4 w-4 text-neutral-400" />}
+            items={data.countries}
+            maxCount={maxCountryCount}
+            renderItem={(item: CountryBreakdown) => (
+              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                {item.country}
+              </span>
+            )}
+            getCount={(item: CountryBreakdown) => item.count}
+          />
+
+          {/* Devices */}
+          <DataSection
+            title="Devices"
+            icon={<Monitor className="h-4 w-4 text-neutral-400" />}
+            items={data.devices}
+            maxCount={maxDeviceCount}
+            renderItem={(item: DeviceBreakdown) => (
+              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 capitalize">
+                {item.device}
+              </span>
+            )}
+            getCount={(item: DeviceBreakdown) => item.count}
+          />
         </>
       ) : null}
+    </div>
+  );
+}
+
+// Helper to format URLs for display
+function formatUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname === "/" ? parsed.hostname : `${parsed.hostname}${parsed.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
+// Reusable data section component
+interface DataSectionProps<T> {
+  title: string;
+  icon: React.ReactNode;
+  items: T[];
+  maxCount: number;
+  renderItem: (item: T) => React.ReactNode;
+  getCount: (item: T) => number;
+}
+
+function DataSection<T>({
+  title,
+  icon,
+  items,
+  maxCount,
+  renderItem,
+  getCount,
+}: DataSectionProps<T>) {
+  if (items.length === 0) {
+    return (
+      <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          {icon}
+          <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{title}</h3>
+        </div>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">No data available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
+      <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 flex items-center gap-2">
+        {icon}
+        <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{title}</h3>
+      </div>
+      <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+        {items.map((item, idx) => {
+          const count = getCount(item);
+          return (
+            <div key={idx} className="px-4 py-3">
+              <div className="flex items-center justify-between mb-1.5">
+                {renderItem(item)}
+                <span className="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums ml-2">
+                  {count.toLocaleString()}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                  style={{ width: `${(count / maxCount) * 100}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -1,22 +1,30 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "./route";
 
 // Mock dependencies
-vi.mock("@/lib/supabase", () => ({
-  createAdminClient: vi.fn(),
-}));
-
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
 
-import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 
-describe("GET /api/admin/analytics", () => {
+describe("GET /api/admin/analytics (PostHog)", () => {
+  const originalEnv = process.env;
+  const mockFetch = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    global.fetch = mockFetch;
+    process.env = {
+      ...originalEnv,
+      POSTHOG_PROJECT_ID: "12345",
+      POSTHOG_PERSONAL_API_KEY: "phx_test_key",
+    };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   it("should return 401 when auth fails", async () => {
@@ -31,63 +39,60 @@ describe("GET /api/admin/analytics", () => {
     expect(response.status).toBe(401);
   });
 
-  it("should return analytics summary with totalEvents, totalSessions, featureBreakdown", async () => {
+  it("should return 500 when PostHog env vars are missing", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    delete process.env.POSTHOG_PROJECT_ID;
+
+    const request = new NextRequest("http://localhost:3000/api/admin/analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Analytics configuration missing");
+  });
+
+  it("should return analytics data from PostHog", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-    const mockEvents = [
-      { feature_flag: "contextual_prompts", session_id: "sess-1" },
-      { feature_flag: "contextual_prompts", session_id: "sess-2" },
-      { feature_flag: "related_stories", session_id: "sess-1" },
-      { feature_flag: null, session_id: "sess-3" },
+    // Track call order to return different responses
+    let callIndex = 0;
+    const responses = [
+      // 1. Total pageviews
+      { results: [[1234]] },
+      // 2. Unique visitors
+      { results: [[567]] },
+      // 3. Top pages
+      { results: [["https://paisaxe.com/", 500], ["https://paisaxe.com/immersive", 300]] },
+      // 4. Top referrers
+      { results: [["https://google.com", 200], ["https://twitter.com", 50]] },
+      // 5. Countries
+      { results: [["Spain", 400], ["United States", 100]] },
+      // 6. Devices
+      { results: [["Desktop", 600], ["Mobile", 400]] },
     ];
 
-    // Mock for the count query: .from().select().gte().lte()
-    const mockCountLte = vi.fn().mockResolvedValue({ count: 42, error: null });
-    const mockCountGte = vi.fn().mockReturnValue({ lte: mockCountLte });
-    const mockCountSelect = vi.fn().mockReturnValue({ gte: mockCountGte });
-
-    // Mock for the events query: .from().select().gte().lte()
-    const mockEventsLte = vi.fn().mockResolvedValue({ data: mockEvents, error: null });
-    const mockEventsGte = vi.fn().mockReturnValue({ lte: mockEventsLte });
-    const mockEventsSelect = vi.fn().mockReturnValue({ gte: mockEventsGte });
-
-    let callCount = 0;
-    const mockFrom = vi.fn().mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        return { select: mockCountSelect };
-      }
-      return { select: mockEventsSelect };
+    mockFetch.mockImplementation(() => {
+      const response = responses[callIndex] || { results: [] };
+      callIndex++;
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(response),
+      });
     });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
     const request = new NextRequest("http://localhost:3000/api/admin/analytics");
     const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.data.summary.totalEvents).toBe(42);
-    expect(data.data.summary.totalSessions).toBe(3);
-    expect(data.data.summary.featureBreakdown).toHaveLength(2);
-
-    const cpBreakdown = data.data.summary.featureBreakdown.find(
-      (f: { featureFlag: string }) => f.featureFlag === "contextual_prompts"
-    );
-    expect(cpBreakdown).toBeDefined();
-    expect(cpBreakdown.eventCount).toBe(2);
-    expect(cpBreakdown.uniqueSessions).toBe(2);
-
-    const rsBreakdown = data.data.summary.featureBreakdown.find(
-      (f: { featureFlag: string }) => f.featureFlag === "related_stories"
-    );
-    expect(rsBreakdown).toBeDefined();
-    expect(rsBreakdown.eventCount).toBe(1);
-    expect(rsBreakdown.uniqueSessions).toBe(1);
-
+    expect(data.data.summary.totalPageviews).toBe(1234);
+    expect(data.data.summary.uniqueVisitors).toBe(567);
+    expect(data.data.topPages).toHaveLength(2);
+    expect(data.data.topPages[0].url).toBe("https://paisaxe.com/");
+    expect(data.data.topReferrers).toHaveLength(2);
+    expect(data.data.countries).toHaveLength(2);
+    expect(data.data.devices).toHaveLength(2);
     expect(data.data.dateRange).toBeDefined();
-    expect(data.data.dateRange.from).toBeDefined();
-    expect(data.data.dateRange.to).toBeDefined();
   });
 
   it("should accept from/to query params", async () => {
@@ -96,24 +101,10 @@ describe("GET /api/admin/analytics", () => {
     const fromDate = "2025-01-01T00:00:00Z";
     const toDate = "2025-01-31T23:59:59Z";
 
-    const mockCountLte = vi.fn().mockResolvedValue({ count: 10, error: null });
-    const mockCountGte = vi.fn().mockReturnValue({ lte: mockCountLte });
-    const mockCountSelect = vi.fn().mockReturnValue({ gte: mockCountGte });
-
-    const mockEventsLte = vi.fn().mockResolvedValue({ data: [], error: null });
-    const mockEventsGte = vi.fn().mockReturnValue({ lte: mockEventsLte });
-    const mockEventsSelect = vi.fn().mockReturnValue({ gte: mockEventsGte });
-
-    let callCount = 0;
-    const mockFrom = vi.fn().mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        return { select: mockCountSelect };
-      }
-      return { select: mockEventsSelect };
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ results: [[0]] }),
     });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
     const request = new NextRequest(
       `http://localhost:3000/api/admin/analytics?from=${fromDate}&to=${toDate}`
@@ -124,24 +115,24 @@ describe("GET /api/admin/analytics", () => {
     expect(response.status).toBe(200);
     expect(data.data.dateRange.from).toBe(fromDate);
     expect(data.data.dateRange.to).toBe(toDate);
-    expect(mockCountGte).toHaveBeenCalledWith("created_at", fromDate);
-    expect(mockCountLte).toHaveBeenCalledWith("created_at", toDate);
-    expect(mockEventsGte).toHaveBeenCalledWith("created_at", fromDate);
-    expect(mockEventsLte).toHaveBeenCalledWith("created_at", toDate);
+
+    // Verify queries were called with correct date range
+    expect(mockFetch).toHaveBeenCalled();
+    const calls = mockFetch.mock.calls;
+    expect(calls.some((call: unknown[]) => {
+      const body = JSON.parse((call[1] as { body: string })?.body || "{}");
+      return body.query?.query?.includes(fromDate) && body.query?.query?.includes(toDate);
+    })).toBe(true);
   });
 
-  it("should return 500 when count query fails", async () => {
+  it("should return 500 when PostHog API fails", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-    const mockCountLte = vi.fn().mockResolvedValue({
-      count: null,
-      error: { message: "Count failed" },
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve("Internal Server Error"),
     });
-    const mockCountGte = vi.fn().mockReturnValue({ lte: mockCountLte });
-    const mockCountSelect = vi.fn().mockReturnValue({ gte: mockCountGte });
-
-    const mockFrom = vi.fn().mockReturnValue({ select: mockCountSelect });
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
     const request = new NextRequest("http://localhost:3000/api/admin/analytics");
     const response = await GET(request);
@@ -151,82 +142,24 @@ describe("GET /api/admin/analytics", () => {
     expect(data.error).toBe("Failed to fetch analytics");
   });
 
-  it("should return 500 when events query fails", async () => {
+  it("should handle empty results gracefully", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-    const mockCountLte = vi.fn().mockResolvedValue({ count: 5, error: null });
-    const mockCountGte = vi.fn().mockReturnValue({ lte: mockCountLte });
-    const mockCountSelect = vi.fn().mockReturnValue({ gte: mockCountGte });
-
-    const mockEventsLte = vi.fn().mockResolvedValue({
-      data: null,
-      error: { message: "Events query failed" },
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ results: [] }),
     });
-    const mockEventsGte = vi.fn().mockReturnValue({ lte: mockEventsLte });
-    const mockEventsSelect = vi.fn().mockReturnValue({ gte: mockEventsGte });
-
-    let callCount = 0;
-    const mockFrom = vi.fn().mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        return { select: mockCountSelect };
-      }
-      return { select: mockEventsSelect };
-    });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
-
-    const request = new NextRequest("http://localhost:3000/api/admin/analytics");
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(data.error).toBe("Failed to fetch analytics");
-  });
-
-  it("should return 500 on unexpected error", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-    vi.mocked(createAdminClient).mockImplementation(() => {
-      throw new Error("Unexpected");
-    });
-
-    const request = new NextRequest("http://localhost:3000/api/admin/analytics");
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(data.error).toBe("Internal server error");
-  });
-
-  it("should handle empty events gracefully", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
-    const mockCountLte = vi.fn().mockResolvedValue({ count: 0, error: null });
-    const mockCountGte = vi.fn().mockReturnValue({ lte: mockCountLte });
-    const mockCountSelect = vi.fn().mockReturnValue({ gte: mockCountGte });
-
-    const mockEventsLte = vi.fn().mockResolvedValue({ data: [], error: null });
-    const mockEventsGte = vi.fn().mockReturnValue({ lte: mockEventsLte });
-    const mockEventsSelect = vi.fn().mockReturnValue({ gte: mockEventsGte });
-
-    let callCount = 0;
-    const mockFrom = vi.fn().mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        return { select: mockCountSelect };
-      }
-      return { select: mockEventsSelect };
-    });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
     const request = new NextRequest("http://localhost:3000/api/admin/analytics");
     const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.data.summary.totalEvents).toBe(0);
-    expect(data.data.summary.totalSessions).toBe(0);
-    expect(data.data.summary.featureBreakdown).toEqual([]);
+    expect(data.data.summary.totalPageviews).toBe(0);
+    expect(data.data.summary.uniqueVisitors).toBe(0);
+    expect(data.data.topPages).toEqual([]);
+    expect(data.data.topReferrers).toEqual([]);
+    expect(data.data.countries).toEqual([]);
+    expect(data.data.devices).toEqual([]);
   });
 });
