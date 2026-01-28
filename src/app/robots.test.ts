@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import robots from "./robots";
 
 describe("robots", () => {
@@ -20,8 +20,25 @@ describe("robots", () => {
     expect(rule.disallow).toContain("/auth/");
   });
 
-  it("includes sitemap URL", () => {
+  it("includes sitemap URL with default fallback", () => {
     const result = robots();
     expect(result.sitemap).toBe("https://paisaxe.com/sitemap.xml");
+  });
+
+  describe("uses NEXT_PUBLIC_SITE_URL env var", () => {
+    const CUSTOM_URL = "https://custom.example.com";
+
+    beforeEach(() => {
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", CUSTOM_URL);
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("uses env var for sitemap URL", () => {
+      const result = robots();
+      expect(result.sitemap).toBe(`${CUSTOM_URL}/sitemap.xml`);
+    });
   });
 });

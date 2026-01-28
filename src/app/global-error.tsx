@@ -1,0 +1,43 @@
+"use client";
+
+import { useEffect } from "react";
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    console.error(error);
+  }, [error]);
+
+  return (
+    <html lang="es">
+      <body style={{ margin: 0 }}>
+        <div className="flex min-h-screen flex-col items-center justify-center bg-black px-4 text-center">
+          <h1 className="text-2xl font-bold text-white">Algo salió mal</h1>
+          <p className="mt-4 max-w-md text-white/70">
+            Ha ocurrido un error inesperado. Por favor, inténtalo de nuevo.
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <button
+              onClick={reset}
+              className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-6 py-3 text-white transition-colors"
+            >
+              Reintentar
+            </button>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- global-error replaces the root layout, so next/link is unavailable */}
+            <a
+              href="/"
+              className="text-white/60 hover:text-white transition-colors text-sm underline underline-offset-4"
+            >
+              Volver al inicio
+            </a>
+          </div>
+        </div>
+      </body>
+    </html>
+  );
+}

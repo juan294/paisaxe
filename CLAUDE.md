@@ -322,7 +322,7 @@ paisaxe/
 ├── content/
 │   └── pdfs/                   # Source PDF files
 ├── scripts/
-│   ├── coverage-agent.sh       # Nightly coverage analysis (cron)
+│   ├── coverage-agent.sh       # Nightly coverage analysis (launchd)
 │   ├── process-pdfs.ts         # PDF text extraction
 │   └── seed-database.ts        # Generate embeddings and populate DB
 ├── supabase/
@@ -569,9 +569,9 @@ See `supabase/functions/README.md` for full setup instructions.
 
 ## Automated Agents
 
-### Coverage Agent (Nightly Cron)
+### Coverage Agent (Nightly via launchd)
 
-`scripts/coverage-agent.sh` runs nightly at 2:00 AM CET via local cron. Uses Claude CLI to analyze test coverage and update `docs/coverage-report.md`. Logs written to `logs/`.
+`scripts/coverage-agent.sh` runs nightly at 2:00 AM via macOS launchd (`com.paisaxe.coverage-agent` in `~/Library/LaunchAgents/`). Unlike cron, launchd runs missed jobs when the Mac wakes from sleep. Uses Claude CLI to analyze test coverage and update `docs/coverage-report.md`. Logs written to `logs/`.
 
 ### Security Audit (Weekly Cron)
 

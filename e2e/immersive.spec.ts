@@ -24,13 +24,12 @@ test.describe("Immersive story viewer", () => {
     // Wait for the story to render
     await expect(page.locator("h1")).toBeVisible();
 
-    // Navigation arrows — left is disabled on first story
+    // Navigation arrows — both enabled since carousel loops infinitely
     const prevButton = page.locator("button").filter({ has: page.locator("svg.lucide-chevron-left") });
     const nextButton = page.locator("button").filter({ has: page.locator("svg.lucide-chevron-right") });
 
     await expect(prevButton).toBeVisible();
     await expect(nextButton).toBeVisible();
-    await expect(prevButton).toBeDisabled();
   });
 
   test("navigates to next story via arrow click", async ({ page }) => {
