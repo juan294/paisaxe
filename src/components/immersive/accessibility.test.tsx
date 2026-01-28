@@ -41,13 +41,6 @@ vi.mock("@/hooks/use-feature-flags", () => ({
   }),
 }));
 
-// Mock analytics
-vi.mock("@/hooks/use-analytics", () => ({
-  useAnalytics: () => ({
-    trackEvent: vi.fn(),
-  }),
-}));
-
 // Mock useReducedMotion
 const mockUseReducedMotion = vi.fn(() => false);
 vi.mock("@/hooks/use-reduced-motion", () => ({

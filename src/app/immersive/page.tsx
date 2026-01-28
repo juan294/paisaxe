@@ -7,7 +7,6 @@ import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
 import { useStories } from "@/hooks/use-stories";
 import { useStoryFilters } from "@/hooks/use-story-filters";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
-import { useAnalytics } from "@/hooks/use-analytics";
 import { useViewedStories } from "@/hooks/use-viewed-stories";
 import { fisherYatesShuffle } from "@/lib/shuffle";
 import { applySeasonalWeighting } from "@/lib/seasonal-weighting";
@@ -56,7 +55,6 @@ function ImmersivePageContent() {
   const [moodDismissed, setMoodDismissed] = useState(false);
 
   const { isEnabled } = useFeatureFlags();
-  const { trackEvent } = useAnalytics();
   const { t } = useTranslation();
   const { viewedIndices, markViewed } = useViewedStories();
   const searchParams = useSearchParams();
@@ -91,27 +89,18 @@ function ImmersivePageContent() {
 
     // 2. Seasonal weighting (if enabled)
     if (isEnabled("seasonal_surfacing")) {
-      const { stories: weighted, boostedCount } = applySeasonalWeighting(stories);
+      const { stories: weighted } = applySeasonalWeighting(stories);
       stories = weighted;
-      if (boostedCount > 0) {
-        trackEvent("seasonal_weight_applied", "seasonal_surfacing", {
-          month: new Date().getMonth() + 1,
-          boostedCount,
-        });
-      }
     }
 
     // 3. Shuffle (if enabled)
     if (isEnabled("randomized_order")) {
       const seed = getSessionSeed();
       stories = fisherYatesShuffle(stories, seed);
-      trackEvent("session_story_order", "randomized_order", { orderSeed: seed });
     }
 
     return stories;
-    // Only re-run when source data or flags change, not on every trackEvent reference change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allStories, selectedMood, isEnabled("seasonal_surfacing"), isEnabled("randomized_order")]);
+  }, [allStories, selectedMood, isEnabled]);
 
   const {
     filteredStories,

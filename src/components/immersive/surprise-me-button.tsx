@@ -1,7 +1,6 @@
 "use client";
 
 import { Shuffle } from "lucide-react";
-import { useAnalytics } from "@/hooks/use-analytics";
 import { useTranslation } from "@/lib/i18n";
 
 interface SurpriseMeButtonProps {
@@ -17,7 +16,6 @@ export function SurpriseMeButton({
   viewedIndices,
   onJumpTo,
 }: SurpriseMeButtonProps) {
-  const { trackEvent } = useAnalytics();
   const { t } = useTranslation();
 
   const handleClick = (e: React.MouseEvent) => {
@@ -39,12 +37,6 @@ export function SurpriseMeButton({
     if (candidates.length === 0) return;
 
     const targetIndex = candidates[Math.floor(Math.random() * candidates.length)];
-
-    trackEvent("surprise_me_click", "surprise_me", {
-      fromIndex: currentIndex,
-      toIndex: targetIndex,
-      storyId: targetIndex.toString(),
-    });
 
     onJumpTo(targetIndex);
   };
