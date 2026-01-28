@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { fetchFeatureFlags, updateFeatureFlag } from "@/lib/admin-api";
-import { RefreshCw, AlertCircle } from "lucide-react";
+import { RefreshCw, AlertCircle, ToggleRight, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FeatureFlag } from "@/types/feature-flags";
 
@@ -43,77 +43,120 @@ export function FeatureTogglesPanel() {
     setUpdatingKey(null);
   };
 
+  const enabledCount = flags.filter((f) => f.enabled).length;
+
   if (isLoading && flags.length === 0) {
     return (
-      <div className="flex min-h-[300px] flex-col items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
-        <p className="mt-3 text-sm text-neutral-500">Loading feature flags...</p>
+      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-[#252320]">
+        <RefreshCw className="h-6 w-6 animate-spin text-[#a39e98]" />
+        <p className="mt-4 text-sm text-[#6b6560] dark:text-[#a39e98]">Loading feature flags...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-          Feature Toggles
-        </h2>
-        <button
-          onClick={loadFlags}
-          disabled={isLoading}
-          className="p-2 rounded-md text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 dark:hover:text-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-        >
-          <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-        </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
+            Feature Toggles
+          </h2>
+          <p className="mt-1 text-[#6b6560] dark:text-[#a39e98]">
+            Control feature availability across the site
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Status badge */}
+          <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 dark:bg-[#252320]">
+            <Zap className="h-4 w-4 text-[#c9a55c]" />
+            <span className="text-sm font-medium text-[#6b6560] dark:text-[#a39e98]">
+              {enabledCount}/{flags.length} active
+            </span>
+          </div>
+          <button
+            onClick={loadFlags}
+            disabled={isLoading}
+            className={cn(
+              "flex h-10 w-10 items-center justify-center rounded-xl transition-colors",
+              "text-[#6b6560] hover:bg-white hover:text-[#2d2a26]",
+              "dark:text-[#a39e98] dark:hover:bg-[#252320] dark:hover:text-[#f5f3ee]",
+              "disabled:opacity-50"
+            )}
+          >
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+          </button>
+        </div>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+        <div className="flex items-center gap-3 rounded-2xl bg-[#c9a55c]/10 px-5 py-4 text-sm text-[#8b6c2e] dark:bg-[#c9a55c]/20 dark:text-[#d4b876]">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
           <p>{error}</p>
         </div>
       )}
 
-      <div className="divide-y divide-neutral-200 dark:divide-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
-        {flags.map((flag) => (
-          <div
-            key={flag.flagKey}
-            className="flex items-center justify-between px-4 py-3"
-          >
-            <div className="flex-1 min-w-0 mr-4">
-              <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                {flag.label}
-              </h3>
-              {flag.description && (
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
-                  {flag.description}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={() => handleToggle(flag)}
-              disabled={updatingKey === flag.flagKey}
+      {/* Flags list */}
+      <div className="overflow-hidden rounded-3xl bg-white dark:bg-[#252320]">
+        <div className="divide-y divide-[#f5f3ee] dark:divide-[#2d2a26]">
+          {flags.map((flag) => (
+            <div
+              key={flag.flagKey}
               className={cn(
-                "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2",
-                flag.enabled ? "bg-emerald-500" : "bg-neutral-300 dark:bg-neutral-600",
-                updatingKey === flag.flagKey && "opacity-50 cursor-wait"
+                "flex items-center justify-between p-5 transition-colors",
+                flag.enabled && "bg-[#7a9e7a]/5 dark:bg-[#7a9e7a]/10"
               )}
-              role="switch"
-              aria-checked={flag.enabled}
-              aria-label={`Toggle ${flag.label}`}
             >
-              <span
+              <div className="flex min-w-0 flex-1 items-center gap-4">
+                <div className={cn(
+                  "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl transition-colors",
+                  flag.enabled
+                    ? "bg-[#7a9e7a]/10 text-[#7a9e7a] dark:bg-[#7a9e7a]/20"
+                    : "bg-[#f5f3ee] text-[#a39e98] dark:bg-[#2d2a26]"
+                )}>
+                  <ToggleRight className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                    {flag.label}
+                  </h3>
+                  {flag.description && (
+                    <p className="mt-0.5 truncate text-sm text-[#6b6560] dark:text-[#a39e98]">
+                      {flag.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Toggle switch */}
+              <button
+                onClick={() => handleToggle(flag)}
+                disabled={updatingKey === flag.flagKey}
                 className={cn(
-                  "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                  flag.enabled ? "translate-x-5" : "translate-x-0"
+                  "relative ml-4 inline-flex h-7 w-12 flex-shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200",
+                  flag.enabled
+                    ? "bg-[#7a9e7a]"
+                    : "bg-[#e5e3de] dark:bg-[#3d3a36]",
+                  updatingKey === flag.flagKey && "cursor-wait opacity-50"
                 )}
-              />
-            </button>
-          </div>
-        ))}
+                role="switch"
+                aria-checked={flag.enabled}
+                aria-label={`Toggle ${flag.label}`}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-200",
+                    flag.enabled ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <p className="text-xs text-neutral-400 dark:text-neutral-500">
+      {/* Note */}
+      <p className="text-sm text-[#a39e98]">
         Changes take effect within 1 minute for all visitors.
       </p>
     </div>

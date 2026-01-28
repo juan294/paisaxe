@@ -149,9 +149,23 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Admin analytics API error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch analytics" },
-      { status: 500 }
-    );
+
+    // Return empty data structure instead of error for query failures
+    // (e.g., new project with no events yet)
+    const url = new URL(request.url);
+    const from = url.searchParams.get("from") ||
+      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const to = url.searchParams.get("to") || new Date().toISOString();
+
+    return NextResponse.json({
+      data: {
+        summary: { totalPageviews: 0, uniqueVisitors: 0 },
+        topPages: [],
+        topReferrers: [],
+        countries: [],
+        devices: [],
+        dateRange: { from, to },
+      },
+    });
   }
 }

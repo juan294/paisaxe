@@ -125,7 +125,7 @@ describe("GET /api/admin/analytics (PostHog)", () => {
     })).toBe(true);
   });
 
-  it("should return 500 when PostHog API fails", async () => {
+  it("should return empty data when PostHog API fails", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     mockFetch.mockResolvedValue({
@@ -138,8 +138,13 @@ describe("GET /api/admin/analytics (PostHog)", () => {
     const response = await GET(request);
     const data = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(data.error).toBe("Failed to fetch analytics");
+    expect(response.status).toBe(200);
+    expect(data.data.summary.totalPageviews).toBe(0);
+    expect(data.data.summary.uniqueVisitors).toBe(0);
+    expect(data.data.topPages).toEqual([]);
+    expect(data.data.topReferrers).toEqual([]);
+    expect(data.data.countries).toEqual([]);
+    expect(data.data.devices).toEqual([]);
   });
 
   it("should handle empty results gracefully", async () => {

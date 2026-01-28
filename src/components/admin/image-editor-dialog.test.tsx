@@ -16,11 +16,13 @@ vi.mock("next/image", () => ({
 const mockUpdateStoryImageUrl = vi.fn();
 const mockUploadStoryImage = vi.fn();
 const mockUpdateStoryStatus = vi.fn();
+const mockSearchContentImages = vi.fn();
 
 vi.mock("@/lib/admin-api", () => ({
   updateStoryImageUrl: (...args: unknown[]) => mockUpdateStoryImageUrl(...args),
   uploadStoryImage: (...args: unknown[]) => mockUploadStoryImage(...args),
   updateStoryStatus: (...args: unknown[]) => mockUpdateStoryStatus(...args),
+  searchContentImages: (...args: unknown[]) => mockSearchContentImages(...args),
 }));
 
 // Mock lucide-react icons
@@ -32,6 +34,9 @@ vi.mock("lucide-react", () => ({
   X: (props: Record<string, unknown>) => <span data-testid="icon-x" {...props} />,
   Loader2: (props: Record<string, unknown>) => <span data-testid="icon-loader" {...props} />,
   AlertCircle: (props: Record<string, unknown>) => <span data-testid="icon-alert" {...props} />,
+  FolderSearch: (props: Record<string, unknown>) => <span data-testid="icon-folder-search" {...props} />,
+  ChevronLeft: (props: Record<string, unknown>) => <span data-testid="icon-chevron-left" {...props} />,
+  ChevronRight: (props: Record<string, unknown>) => <span data-testid="icon-chevron-right" {...props} />,
 }));
 
 // Mock the Dialog components to render children directly (avoid Radix portal issues)
@@ -126,10 +131,20 @@ describe("ImageEditorDialog", () => {
   });
 
   describe("Tabs", () => {
-    it("shows URL tab by default", () => {
+    it("shows Content tab by default", () => {
       render(<ImageEditorDialog {...defaultProps} />);
+      expect(screen.getByText("Content")).toBeInTheDocument();
       expect(screen.getByText("URL")).toBeInTheDocument();
       expect(screen.getByText("Upload")).toBeInTheDocument();
+      // Content tab should be visible with Search PDF button
+      expect(screen.getByText(/Search PDF/i)).toBeInTheDocument();
+    });
+
+    it("can switch to URL tab", () => {
+      render(<ImageEditorDialog {...defaultProps} />);
+
+      fireEvent.click(screen.getByText("URL"));
+
       // URL input should be visible
       expect(screen.getByPlaceholderText("https://example.com/image.jpg")).toBeInTheDocument();
     });
@@ -160,6 +175,9 @@ describe("ImageEditorDialog", () => {
   describe("URL input", () => {
     it("URL input updates preview", () => {
       render(<ImageEditorDialog {...defaultProps} />);
+
+      // Switch to URL tab first (Content is default)
+      fireEvent.click(screen.getByText("URL"));
 
       const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
       fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
@@ -202,6 +220,9 @@ describe("ImageEditorDialog", () => {
 
       render(<ImageEditorDialog {...defaultProps} />);
 
+      // Switch to URL tab first (Content is default)
+      fireEvent.click(screen.getByText("URL"));
+
       const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
       fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
 
@@ -223,6 +244,9 @@ describe("ImageEditorDialog", () => {
       });
 
       render(<ImageEditorDialog {...defaultProps} />);
+
+      // Switch to URL tab first (Content is default)
+      fireEvent.click(screen.getByText("URL"));
 
       const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
       fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
@@ -248,6 +272,9 @@ describe("ImageEditorDialog", () => {
       });
 
       render(<ImageEditorDialog {...defaultProps} />);
+
+      // Switch to URL tab first (Content is default)
+      fireEvent.click(screen.getByText("URL"));
 
       const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
       fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
@@ -310,7 +337,7 @@ describe("ImageEditorDialog", () => {
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
       });
 
-      expect(screen.getByText("Please provide an image URL or upload a file")).toBeInTheDocument();
+      expect(screen.getByText("Please provide an image URL, upload a file, or select a content image")).toBeInTheDocument();
     });
 
     it("shows error from API response on URL save", async () => {
@@ -319,6 +346,9 @@ describe("ImageEditorDialog", () => {
       });
 
       render(<ImageEditorDialog {...defaultProps} />);
+
+      // Switch to URL tab first (Content is default)
+      fireEvent.click(screen.getByText("URL"));
 
       const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
       fireEvent.change(urlInput, { target: { value: "https://example.com/bad.jpg" } });
@@ -359,6 +389,9 @@ describe("ImageEditorDialog", () => {
 
       render(<ImageEditorDialog {...defaultProps} />);
 
+      // Switch to URL tab first (Content is default)
+      fireEvent.click(screen.getByText("URL"));
+
       const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
       fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
 
@@ -385,7 +418,7 @@ describe("ImageEditorDialog", () => {
       expect(mockUpdateStoryStatus).toHaveBeenCalledWith("story-1", "approved");
     });
 
-    it("calls onUpdate and onClose after successful approve", async () => {
+    it("calls onUpdate but keeps modal open after successful approve", async () => {
       mockUpdateStoryStatus.mockResolvedValue({
         data: { id: "story-1", curationStatus: "approved" },
       });
@@ -399,7 +432,8 @@ describe("ImageEditorDialog", () => {
       expect(defaultProps.onUpdate).toHaveBeenCalledWith("story-1", {
         curationStatus: "approved",
       });
-      expect(defaultProps.onClose).toHaveBeenCalled();
+      // Modal stays open so user can continue editing
+      expect(defaultProps.onClose).not.toHaveBeenCalled();
     });
 
     it("shows 'Mark as pending' button when status is approved", () => {
@@ -492,6 +526,9 @@ describe("ImageEditorDialog", () => {
       mockUpdateStoryImageUrl.mockReturnValue(promise);
 
       render(<ImageEditorDialog {...defaultProps} />);
+
+      // Switch to URL tab first (Content is default)
+      fireEvent.click(screen.getByText("URL"));
 
       const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
       fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
@@ -697,6 +734,225 @@ describe("ImageEditorDialog", () => {
       const normalStory = { ...mockStory, imageSource: "Turismo de Asturias" };
       render(<ImageEditorDialog {...defaultProps} story={normalStory} />);
       expect(screen.queryByText(/placeholder image/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Content images tab", () => {
+    const mockContentImages = [
+      {
+        filename: "test_page1_img.png",
+        sourcePdf: "test.pdf",
+        pageNumber: 1,
+        width: 1200,
+        height: 800,
+        aspectRatio: 1.5,
+        type: "extracted",
+        url: "/content/images/test/test_page1_img.png",
+        score: 170,
+      },
+      {
+        filename: "test_page2_img.png",
+        sourcePdf: "test.pdf",
+        pageNumber: 2,
+        width: 900,
+        height: 600,
+        aspectRatio: 1.5,
+        type: "extracted",
+        url: "/content/images/test/test_page2_img.png",
+        score: 150,
+      },
+    ];
+
+    const storyWithSourcePdf = { ...mockStory, sourcePdf: "test.pdf" };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("renders Content tab button", () => {
+      render(<ImageEditorDialog {...defaultProps} />);
+      expect(screen.getByText("Content")).toBeInTheDocument();
+    });
+
+    it("can switch to Content tab from URL tab", () => {
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      // Switch to URL tab first
+      fireEvent.click(screen.getByText("URL"));
+      expect(screen.getByPlaceholderText("https://example.com/image.jpg")).toBeInTheDocument();
+
+      // Then switch back to Content
+      fireEvent.click(screen.getByText("Content"));
+
+      // Content tab should show search button
+      expect(screen.getByText(/Search PDF/i)).toBeInTheDocument();
+    });
+
+    it("shows no source PDF message when story has no sourcePdf", () => {
+      render(<ImageEditorDialog {...defaultProps} />);
+
+      fireEvent.click(screen.getByText("Content"));
+
+      expect(screen.getByText(/no source PDF/i)).toBeInTheDocument();
+    });
+
+    it("search button calls searchContentImages API", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      fireEvent.click(screen.getByText("Content"));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      expect(mockSearchContentImages).toHaveBeenCalledWith("story-1");
+    });
+
+    it("shows image count after successful search", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      fireEvent.click(screen.getByText("Content"));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      expect(screen.getByText(/1 of 2/i)).toBeInTheDocument();
+    });
+
+    it("shows no images found message when search returns empty", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: [], total: 0 },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      fireEvent.click(screen.getByText("Content"));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      expect(screen.getByText(/No images found/i)).toBeInTheDocument();
+    });
+
+    it("can navigate to next image with chevron buttons", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      fireEvent.click(screen.getByText("Content"));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Should show 1 of 2
+      expect(screen.getByText(/1 of 2/i)).toBeInTheDocument();
+
+      // Click next button
+      const nextButton = screen.getByTestId("icon-chevron-right").closest("button")!;
+      fireEvent.click(nextButton);
+
+      // Should now show 2 of 2
+      expect(screen.getByText(/2 of 2/i)).toBeInTheDocument();
+    });
+
+    it("shows resolution info for selected content image", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      fireEvent.click(screen.getByText("Content"));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Should show resolution info (appears in multiple places, so use getAllByText)
+      const resolutionElements = screen.getAllByText(/1200 × 800/);
+      expect(resolutionElements.length).toBeGreaterThan(0);
+    });
+
+    it("auto-populates imageSource when searching content images", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      fireEvent.click(screen.getByText("Content"));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Should auto-populate the imageSource field
+      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      expect(sourceInput).toHaveValue("Turismo de Asturias");
+    });
+
+    it("updates imageSource when navigating between content images", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      fireEvent.click(screen.getByText("Content"));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Clear the imageSource to verify it gets set again on navigation
+      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      fireEvent.change(sourceInput, { target: { value: "" } });
+      expect(sourceInput).toHaveValue("");
+
+      // Navigate to next image
+      const nextButton = screen.getByTestId("icon-chevron-right").closest("button")!;
+      fireEvent.click(nextButton);
+
+      // Should have set imageSource again
+      expect(sourceInput).toHaveValue("Turismo de Asturias");
+    });
+
+    it("saves content image with auto-populated imageSource", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+      mockUpdateStoryImageUrl.mockResolvedValue({
+        data: { id: "story-1", image: mockContentImages[0].url, imageSource: "Turismo de Asturias" },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
+        "story-1",
+        mockContentImages[0].url,
+        "Turismo de Asturias"
+      );
     });
   });
 });
