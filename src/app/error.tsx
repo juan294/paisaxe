@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 
 export default function RootError({
   error,
@@ -19,12 +20,20 @@ export default function RootError({
       <p className="mt-4 max-w-md text-white/70">
         Ha ocurrido un error inesperado. Por favor, inténtalo de nuevo.
       </p>
-      <button
-        onClick={reset}
-        className="mt-8 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-6 py-3 text-white transition-colors"
-      >
-        Reintentar
-      </button>
+      <div className="mt-8 flex flex-col items-center gap-4">
+        <button
+          onClick={reset}
+          className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-6 py-3 text-white transition-colors"
+        >
+          Reintentar
+        </button>
+        <Link
+          href="/"
+          className="text-white/60 hover:text-white transition-colors text-sm underline underline-offset-4"
+        >
+          Volver al inicio
+        </Link>
+      </div>
     </div>
   );
 }

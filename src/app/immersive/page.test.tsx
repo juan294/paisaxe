@@ -50,6 +50,11 @@ vi.mock("@/hooks/use-analytics", () => ({
   }),
 }));
 
+// Mock useReducedMotion
+vi.mock("@/hooks/use-reduced-motion", () => ({
+  useReducedMotion: () => false,
+}));
+
 // Wrapper component for tests
 const TestWrapper = ({ children }: { children: ReactNode }) => (
   <AuthProvider>{children}</AuthProvider>
@@ -98,7 +103,8 @@ describe("ImmersivePage", () => {
   // Helper to wait for loading to complete
   const waitForLoaded = async () => {
     await waitFor(() => {
-      expect(screen.queryByText("Cargando...")).not.toBeInTheDocument();
+      // Skeleton loading state uses data-testid="skeleton-story-card"
+      expect(screen.queryByTestId("skeleton-story-card")).not.toBeInTheDocument();
     });
   };
 

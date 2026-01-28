@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { StoryViewer } from "@/components/immersive/story-viewer";
+import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
 import { useStories } from "@/hooks/use-stories";
 import { useStoryFilters } from "@/hooks/use-story-filters";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
@@ -39,11 +40,7 @@ function getSessionSeed(): number {
 export default function ImmersivePage() {
   return (
     <Suspense
-      fallback={
-        <div className="fixed inset-0 flex items-center justify-center bg-black">
-          <div className="text-white text-lg" />
-        </div>
-      }
+      fallback={<StoryCardSkeleton />}
     >
       <ImmersivePageContent />
     </Suspense>
@@ -167,11 +164,7 @@ function ImmersivePageContent() {
   const showMoodOverlay = isEnabled("mood_discovery") && !moodDismissed && !isLoading && allStories.length > 0;
 
   if (isLoading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black">
-        <div className="text-white text-lg">{t("common.loading")}</div>
-      </div>
-    );
+    return <StoryCardSkeleton />;
   }
 
   // Show message when no stories match filters

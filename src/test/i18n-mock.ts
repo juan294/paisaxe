@@ -112,6 +112,16 @@ export const mockTranslations: Record<string, string> = {
   "accessibility.related_stories": "Historias relacionadas",
   "accessibility.suggested_questions": "Preguntas sugeridas",
   "accessibility.skip_to_content": "Ir al contenido principal",
+  "accessibility.previous_story": "Historia anterior",
+  "accessibility.next_story": "Historia siguiente",
+  "accessibility.play_stories": "Reproducir historias",
+  "accessibility.pause_stories": "Pausar historias",
+  "accessibility.story_counter": "Historia {current} de {total}",
+  "accessibility.chat_dialog": "Chat sobre {title}",
+  "accessibility.close_chat": "Cerrar chat",
+  "accessibility.send_message": "Enviar mensaje",
+  "accessibility.chat_messages": "Mensajes del chat",
+  "accessibility.story_progress": "Progreso de historias",
 };
 
 export function createMockT() {

@@ -32,8 +32,9 @@ export function QuestionPrompts({ prompts, storyId, onSelectPrompt }: QuestionPr
             "px-3 py-1.5 text-xs font-medium rounded-full",
             "bg-white/10 hover:bg-white/20 backdrop-blur-sm",
             "text-white/80 hover:text-white",
-            "transition-all hover:scale-105",
-            "border border-white/10"
+            "transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100",
+            "border border-white/10",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-1 focus-visible:ring-offset-black"
           )}
         >
           {prompt}
