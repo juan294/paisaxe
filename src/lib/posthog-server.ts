@@ -12,7 +12,7 @@ export function getPostHogServerClient(): PostHog | null {
 
   if (!posthogClient) {
     posthogClient = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-      host: "https://eu.i.posthog.com",
+      host: "https://us.i.posthog.com",
       flushAt: 1, // Flush immediately for serverless
       flushInterval: 0, // No interval batching
     });
