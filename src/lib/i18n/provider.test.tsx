@@ -14,6 +14,9 @@ function TestConsumer() {
       <span data-testid="missing-key">{t('nonexistent.key')}</span>
       <button onClick={() => setLocale('en')} data-testid="switch-en">Switch to EN</button>
       <button onClick={() => setLocale('es')} data-testid="switch-es">Switch to ES</button>
+      <button onClick={() => setLocale('fr')} data-testid="switch-fr">Switch to FR</button>
+      <button onClick={() => setLocale('de')} data-testid="switch-de">Switch to DE</button>
+      <button onClick={() => setLocale('pt')} data-testid="switch-pt">Switch to PT</button>
     </div>
   );
 }
@@ -158,6 +161,114 @@ describe('LanguageProvider', () => {
     );
 
     expect(screen.getByTestId('locale').textContent).toBe('es');
+  });
+
+  it('renders with locale "fr" when initialLocale is "fr"', () => {
+    render(
+      <LanguageProvider initialLocale="fr">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('locale').textContent).toBe('fr');
+    expect(screen.getByTestId('translation').textContent).toBe('Chargement...');
+  });
+
+  it('renders with locale "de" when initialLocale is "de"', () => {
+    render(
+      <LanguageProvider initialLocale="de">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('locale').textContent).toBe('de');
+    expect(screen.getByTestId('translation').textContent).toBe('Laden...');
+  });
+
+  it('renders with locale "pt" when initialLocale is "pt"', () => {
+    render(
+      <LanguageProvider initialLocale="pt">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('locale').textContent).toBe('pt');
+    expect(screen.getByTestId('translation').textContent).toBe('Carregando...');
+  });
+
+  it('switches locale from es to fr', () => {
+    render(
+      <LanguageProvider initialLocale="es">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    act(() => {
+      screen.getByTestId('switch-fr').click();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('fr');
+    expect(screen.getByTestId('translation').textContent).toBe('Chargement...');
+  });
+
+  it('switches locale from es to de', () => {
+    render(
+      <LanguageProvider initialLocale="es">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    act(() => {
+      screen.getByTestId('switch-de').click();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('de');
+    expect(screen.getByTestId('translation').textContent).toBe('Laden...');
+  });
+
+  it('switches locale from es to pt', () => {
+    render(
+      <LanguageProvider initialLocale="es">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    act(() => {
+      screen.getByTestId('switch-pt').click();
+    });
+
+    expect(screen.getByTestId('locale').textContent).toBe('pt');
+    expect(screen.getByTestId('translation').textContent).toBe('Carregando...');
+  });
+
+  it('resolves chat placeholder in French', () => {
+    render(
+      <LanguageProvider initialLocale="fr">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('chat-placeholder').textContent).toBe('Posez une question sur ce lieu...');
+  });
+
+  it('resolves chat placeholder in German', () => {
+    render(
+      <LanguageProvider initialLocale="de">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('chat-placeholder').textContent).toBe('Fragen Sie nach diesem Ort...');
+  });
+
+  it('resolves chat placeholder in Portuguese', () => {
+    render(
+      <LanguageProvider initialLocale="pt">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('chat-placeholder').textContent).toBe('Pergunte sobre este lugar...');
   });
 });
 
