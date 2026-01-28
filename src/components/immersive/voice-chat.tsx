@@ -151,7 +151,11 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 md:items-center">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center p-4 md:items-center"
+      role="dialog"
+      aria-label={t("accessibility.chat_dialog").replace("{title}", story.title)}
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -159,18 +163,19 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
       />
 
       {/* Chat panel */}
-      <div className="relative w-full max-w-lg bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+      <div className="relative w-full max-w-lg bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden animate-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <div>
-            <h3 className="font-semibold text-white">{story.title}</h3>
+            <h2 className="font-semibold text-white">{story.title}</h2>
             <p className="text-sm text-white/60">{story.subtitle}</p>
           </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="text-white hover:bg-white/10"
+            aria-label={t("accessibility.close_chat")}
+            className="text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             <X className="h-5 w-5" />
           </Button>
@@ -182,7 +187,12 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         )}
 
         {/* Messages */}
-        <div className="h-64 overflow-y-auto p-4 space-y-4">
+        <div
+          role="log"
+          aria-live="polite"
+          aria-label={t("accessibility.chat_messages")}
+          className="h-64 overflow-y-auto p-4 space-y-4"
+        >
           {messages.length === 0 && (
             <div className="text-center text-white/50 py-8">
               <p className="mb-2">{t("chat.empty_state")}</p>
@@ -244,8 +254,9 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
               variant="ghost"
               size="icon"
               onClick={toggleListening}
+              aria-label={isListening ? t("chat.listening") : t("chat.speech_hint")}
               className={cn(
-                "text-white hover:bg-white/10",
+                "text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
                 isListening && "bg-red-500/50 hover:bg-red-500/60"
               )}
             >
@@ -267,7 +278,8 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
           <Button
             type="submit"
             disabled={isLoading || !inputValue.trim()}
-            className="bg-white text-gray-900 hover:bg-white/90"
+            aria-label={t("accessibility.send_message")}
+            className="bg-white text-gray-900 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             <Send className="h-4 w-4" />
           </Button>
