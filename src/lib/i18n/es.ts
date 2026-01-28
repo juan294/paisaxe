@@ -94,6 +94,17 @@ export const es: Translations = {
     related_stories: 'Historias relacionadas',
     language_switcher: 'Selector de idioma',
     skip_to_content: 'Ir al contenido principal',
+    previous_story: 'Historia anterior',
+    next_story: 'Historia siguiente',
+    play_stories: 'Reproducir historias',
+    pause_stories: 'Pausar historias',
+    story_counter: 'Historia {current} de {total}',
+    chat_dialog: 'Chat sobre {title}',
+    close_chat: 'Cerrar chat',
+    send_message: 'Enviar mensaje',
+    chat_messages: 'Mensajes del chat',
+    story_progress: 'Progreso de historias',
+    suggested_questions: 'Preguntas sugeridas',
   },
 
   auth: {

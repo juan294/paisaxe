@@ -50,6 +50,11 @@ vi.mock("@/hooks/use-analytics", () => ({
   }),
 }));
 
+// Mock useReducedMotion
+vi.mock("@/hooks/use-reduced-motion", () => ({
+  useReducedMotion: () => false,
+}));
+
 // Wrapper component for tests
 const TestWrapper = ({ children }: { children: ReactNode }) => (
   <AuthProvider>{children}</AuthProvider>

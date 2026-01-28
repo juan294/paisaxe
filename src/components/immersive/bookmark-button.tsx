@@ -31,7 +31,8 @@ export function BookmarkButton({ isFavorite, onToggle }: BookmarkButtonProps) {
     <div className="relative">
       <button
         onClick={handleClick}
-        className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
+        className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+        aria-label={isFavorite ? t("favorites.remove_saved") : t("favorites.add_saved")}
         title={isFavorite ? t("favorites.remove_saved") : t("favorites.add_saved")}
       >
         <Bookmark
