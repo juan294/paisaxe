@@ -92,6 +92,16 @@ export function AnalyticsDashboard() {
           <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
           <p className="mt-3 text-sm text-neutral-500">Loading analytics...</p>
         </div>
+      ) : data && isEmptyData(data) ? (
+        <div className="flex min-h-[200px] flex-col items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8">
+          <Eye className="h-8 w-8 text-neutral-300 dark:text-neutral-600" />
+          <p className="mt-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            No analytics data yet
+          </p>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400 text-center max-w-sm">
+            Data will appear here once visitors start browsing the site. PostHog tracks pageviews, referrers, countries, and devices automatically.
+          </p>
+        </div>
       ) : data ? (
         <>
           {/* Summary cards */}
@@ -174,6 +184,18 @@ export function AnalyticsDashboard() {
         </>
       ) : null}
     </div>
+  );
+}
+
+// Check if all analytics data is empty (no events collected yet)
+function isEmptyData(data: AnalyticsDashboardData): boolean {
+  return (
+    data.summary.totalPageviews === 0 &&
+    data.summary.uniqueVisitors === 0 &&
+    data.topPages.length === 0 &&
+    data.topReferrers.length === 0 &&
+    data.countries.length === 0 &&
+    data.devices.length === 0
   );
 }
 
