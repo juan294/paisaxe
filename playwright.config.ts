@@ -38,7 +38,6 @@ export default defineConfig({
       VOYAGE_API_KEY: "dummy_key_for_e2e",
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "dummy_key_for_e2e",
-      ADMIN_SECRET_KEY: "test-admin-key-12345",
     },
   },
 });

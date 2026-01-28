@@ -40,30 +40,3 @@ export const MOCK_FEATURE_FLAGS = {
   ],
 };
 
-export const MOCK_ADMIN_STORIES = {
-  data: [
-    {
-      id: "lagos-covadonga",
-      title: "Lagos de Covadonga",
-      subtitle: "Picos de Europa",
-      category: "nature",
-      image: "/images/stories/lagos-covadonga.png",
-      curationStatus: "approved",
-      isActive: true,
-      displayOrder: 1,
-    },
-    {
-      id: "oviedo-catedral",
-      title: "Catedral de Oviedo",
-      subtitle: "Capital del Principado",
-      category: "cities",
-      image: null,
-      curationStatus: "needs_curation",
-      isActive: true,
-      displayOrder: 2,
-    },
-  ],
-};
-
-/** The admin key configured in playwright.config.ts webServer env */
-export const TEST_ADMIN_KEY = "test-admin-key-12345";
