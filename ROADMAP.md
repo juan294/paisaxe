@@ -94,7 +94,7 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Supabase PostgreSQL | :white_check_mark: | With pgvector extension |
 | shadcn/ui Components | :white_check_mark: | Button, Card, Dialog, Input |
 | Tailwind CSS Styling | :white_check_mark: | Custom Paisaxe theme |
-| Vitest Testing | :white_check_mark: | 984 tests passing (70 files) |
+| Vitest Testing | :white_check_mark: | 1247 tests passing (102 files) |
 | GitHub Actions CI | :white_check_mark: | Lint, typecheck, test, build |
 | Git Hooks (Husky) | :white_check_mark: | Pre-commit quality checks |
 | Coverage Automation | :white_check_mark: | Nightly scheduled updates via `scripts/coverage-agent.sh` |
@@ -321,7 +321,7 @@ Automated agents and scheduled workflows to guarantee code quality, security, an
 - [x] Database migration: Stories table exists in Supabase
 - [x] Story seeding: 20 stories seeded via `npm run seed-db:stories`
 - [x] Image replacement: 7 stories use PDF images, 13 use Unsplash fallback
-- [x] Tests: `npm run test` - 1054 tests pass (86 files)
+- [x] Tests: `npm run test` - 1247 tests pass (102 files)
 - [x] Build: `npm run build` - no errors
 - [x] Auth: Google SSO working with Supabase SSR
 - [x] Favorites: Cloud sync + local storage fallback
@@ -375,5 +375,5 @@ Automated agents and scheduled workflows to guarantee code quality, security, an
 | v0.6.0 | Jan 2026 | AI improvements (Pelayo persona, chat images) |
 | v0.7.0 | Jan 2026 | Internationalization (ES/EN language switcher, browser detection, full UI translation) |
 | v0.8.0 | Jan 2026 | Automation & quality agents (security, performance, availability, AI review) |
-| v0.9.0 | - | Polish (skeleton UI, a11y, SEO, error boundaries) |
+| v0.9.0 | Jan 2026 | Polish (skeleton UI, a11y, SEO, error boundaries) |
 | v1.0.0 | - | Production release |
