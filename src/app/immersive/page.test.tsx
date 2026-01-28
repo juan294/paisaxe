@@ -98,7 +98,8 @@ describe("ImmersivePage", () => {
   // Helper to wait for loading to complete
   const waitForLoaded = async () => {
     await waitFor(() => {
-      expect(screen.queryByText("Cargando...")).not.toBeInTheDocument();
+      // Skeleton loading state uses data-testid="skeleton-story-card"
+      expect(screen.queryByTestId("skeleton-story-card")).not.toBeInTheDocument();
     });
   };
 
