@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Story } from "@/types/immersive";
 import { ImageResult } from "@/types";
 import { cn } from "@/lib/utils";
-import { Mic, MicOff, X, Send, Loader2 } from "lucide-react";
+import { Mic, MicOff, X, Send } from "lucide-react";
+import { ChatMessageSkeleton } from "./skeleton-chat-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PrivacyNotice } from "./privacy-notice";
@@ -227,10 +228,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             </div>
           ))}
           {isLoading && (
-            <div className="flex items-center gap-2 text-white/60">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">{t("chat.thinking")}</span>
-            </div>
+            <ChatMessageSkeleton />
           )}
           <div ref={messagesEndRef} />
         </div>

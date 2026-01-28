@@ -256,7 +256,7 @@ describe("VoiceChat", () => {
       });
     });
 
-    it("should show loading indicator while waiting for response", async () => {
+    it("should show skeleton loading indicator while waiting for response", async () => {
       let resolvePromise: (value: unknown) => void;
       const pendingPromise = new Promise((resolve) => {
         resolvePromise = resolve;
@@ -275,7 +275,10 @@ describe("VoiceChat", () => {
       }
 
       await waitFor(() => {
-        expect(screen.getByText("Pensando...")).toBeInTheDocument();
+        // Should show a skeleton message bubble with role="status"
+        const skeleton = screen.getByRole("status");
+        expect(skeleton).toBeInTheDocument();
+        expect(skeleton).toHaveAttribute("aria-label", "Loading");
       });
 
       // Resolve and wait for state update to complete
