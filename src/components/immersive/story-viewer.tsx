@@ -10,7 +10,6 @@ import { CategoryFilterBadge } from "./category-filter-badge";
 import { AuthButton } from "@/components/auth/auth-button";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
-import { useAnalytics } from "@/hooks/use-analytics";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { getRelatedStories } from "@/lib/related-stories";
 import { RelatedStories } from "./related-stories";
@@ -67,7 +66,6 @@ export function StoryViewer({
   const [ambientMode, setAmbientMode] = useState(false);
 
   const { isEnabled } = useFeatureFlags();
-  const { trackEvent } = useAnalytics();
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
 
@@ -79,15 +77,6 @@ export function StoryViewer({
   const story = stories[currentIndex];
   const prefetchedUrls = useRef<Set<string>>(new Set());
   const ambientStartRef = useRef<number | null>(null);
-  const asturianTrackedRef = useRef<string | null>(null);
-
-  // Track Asturianu visibility
-  useEffect(() => {
-    if (isEnabled("asturianu_touches") && story && asturianTrackedRef.current !== story.id) {
-      asturianTrackedRef.current = story.id;
-      trackEvent("asturianu_visible", "asturianu_touches", { storyId: story.id });
-    }
-  }, [isEnabled, story, trackEvent]);
 
   // Prefetch adjacent images for smoother navigation
   useEffect(() => {
@@ -173,14 +162,11 @@ export function StoryViewer({
         ambientStartRef.current = Date.now();
         setAutoPlay(true);
       } else {
-        const duration = ambientStartRef.current ? Date.now() - ambientStartRef.current : 0;
-        trackEvent("ambient_mode_toggle", "ambient_discovery", { enabled: false, duration });
         ambientStartRef.current = null;
       }
-      trackEvent("ambient_mode_toggle", "ambient_discovery", { enabled: newValue, duration: 0 });
       return newValue;
     });
-  }, [trackEvent]);
+  }, []);
 
   // Determine animation class (disabled when reduced motion is preferred)
   const isAmbient = ambientMode && isEnabled("ambient_discovery");
@@ -296,10 +282,6 @@ export function StoryViewer({
         <RelatedStories
           stories={relatedStories}
           onSelectStory={(related) => {
-            trackEvent("related_story_click", "related_stories", {
-              fromStoryId: story.id,
-              toStoryId: related.id,
-            });
             const targetIndex = stories.findIndex((s) => s.id === related.id);
             if (targetIndex >= 0) {
               onIndexChange(targetIndex);

@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { es } from './es';
 import { en } from './en';
+import { fr } from './fr';
+import { de } from './de';
+import { pt } from './pt';
 import type { Translations } from './types';
 
 /**
@@ -20,67 +23,68 @@ function collectKeys(obj: Translations, prefix = ''): string[] {
   return keys;
 }
 
+function checkEmptyValues(obj: Translations, prefix = ''): string[] {
+  const empties: string[] = [];
+  for (const key of Object.keys(obj)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    const value = obj[key];
+    if (typeof value === 'string' && value === '') {
+      empties.push(fullKey);
+    } else if (typeof value === 'object' && value !== null) {
+      empties.push(...checkEmptyValues(value as Translations, fullKey));
+    }
+  }
+  return empties;
+}
+
+const allLocales = {
+  es: { name: 'Spanish', data: es },
+  en: { name: 'English', data: en },
+  fr: { name: 'French', data: fr },
+  de: { name: 'German', data: de },
+  pt: { name: 'Portuguese', data: pt },
+};
+
+const allLocaleKeys = Object.fromEntries(
+  Object.entries(allLocales).map(([code, { data }]) => [code, collectKeys(data)])
+);
+
 describe('locale files', () => {
-  const esKeys = collectKeys(es);
-  const enKeys = collectKeys(en);
+  const esKeys = allLocaleKeys.es;
 
-  it('Spanish locale has translation keys', () => {
-    expect(esKeys.length).toBeGreaterThan(0);
-  });
+  for (const [code, { name }] of Object.entries(allLocales)) {
+    it(`${name} locale has translation keys`, () => {
+      expect(allLocaleKeys[code].length).toBeGreaterThan(0);
+    });
+  }
 
-  it('English locale has translation keys', () => {
-    expect(enKeys.length).toBeGreaterThan(0);
-  });
+  for (const [code, { name }] of Object.entries(allLocales)) {
+    if (code === 'es') continue;
+    it(`${name} locale has the same number of keys as Spanish`, () => {
+      expect(allLocaleKeys[code].length).toBe(esKeys.length);
+    });
+  }
 
-  it('both locales have the same number of keys', () => {
-    expect(esKeys.length).toBe(enKeys.length);
-  });
+  for (const [code, { name }] of Object.entries(allLocales)) {
+    if (code === 'es') continue;
+    it(`every key in Spanish locale exists in ${name} locale`, () => {
+      const targetKeySet = new Set(allLocaleKeys[code]);
+      const missing = esKeys.filter((key) => !targetKeySet.has(key));
+      expect(missing).toEqual([]);
+    });
 
-  it('every key in Spanish locale exists in English locale', () => {
-    const enKeySet = new Set(enKeys);
-    const missingInEn = esKeys.filter((key) => !enKeySet.has(key));
-    expect(missingInEn).toEqual([]);
-  });
+    it(`every key in ${name} locale exists in Spanish locale`, () => {
+      const esKeySet = new Set(esKeys);
+      const missing = allLocaleKeys[code].filter((key) => !esKeySet.has(key));
+      expect(missing).toEqual([]);
+    });
+  }
 
-  it('every key in English locale exists in Spanish locale', () => {
-    const esKeySet = new Set(esKeys);
-    const missingInEs = enKeys.filter((key) => !esKeySet.has(key));
-    expect(missingInEs).toEqual([]);
-  });
-
-  it('no value is an empty string in Spanish locale', () => {
-    function checkValues(obj: Translations, prefix = ''): string[] {
-      const empties: string[] = [];
-      for (const key of Object.keys(obj)) {
-        const fullKey = prefix ? `${prefix}.${key}` : key;
-        const value = obj[key];
-        if (typeof value === 'string' && value === '') {
-          empties.push(fullKey);
-        } else if (typeof value === 'object' && value !== null) {
-          empties.push(...checkValues(value as Translations, fullKey));
-        }
-      }
-      return empties;
-    }
-    expect(checkValues(es)).toEqual([]);
-  });
-
-  it('no value is an empty string in English locale', () => {
-    function checkValues(obj: Translations, prefix = ''): string[] {
-      const empties: string[] = [];
-      for (const key of Object.keys(obj)) {
-        const fullKey = prefix ? `${prefix}.${key}` : key;
-        const value = obj[key];
-        if (typeof value === 'string' && value === '') {
-          empties.push(fullKey);
-        } else if (typeof value === 'object' && value !== null) {
-          empties.push(...checkValues(value as Translations, fullKey));
-        }
-      }
-      return empties;
-    }
-    expect(checkValues(en)).toEqual([]);
-  });
+  for (const [, { name, data }] of Object.entries(allLocales)) {
+    it(`no value is an empty string in ${name} locale`, () => {
+      expect(checkEmptyValues(data)).toEqual([]);
+    });
+  }
 
   describe('essential keys exist', () => {
     const essentialKeys = [
@@ -152,9 +156,10 @@ describe('locale files', () => {
     ];
 
     for (const key of essentialKeys) {
-      it(`contains key "${key}" in both locales`, () => {
-        expect(esKeys).toContain(key);
-        expect(enKeys).toContain(key);
+      it(`contains key "${key}" in all locales`, () => {
+        for (const [code, keys] of Object.entries(allLocaleKeys)) {
+          expect(keys, `Missing in ${code}`).toContain(key);
+        }
       });
     }
   });

@@ -1,4 +1,4 @@
-export type Locale = 'es' | 'en';
+export type Locale = 'es' | 'en' | 'fr' | 'de' | 'pt';
 
 export type TranslationKey = string;
 

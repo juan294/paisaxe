@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { JsonLd } from "@/components/seo/json-ld";
 import { Providers } from "./providers";
+import { PostHogPageView } from "@/components/posthog-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -61,6 +62,7 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <JsonLd type="website" />
         <Providers>
+          <PostHogPageView />
           {children}
         </Providers>
         <Analytics />
