@@ -46,6 +46,8 @@
     "next": "^16.1.4",
     "pdf-parse": "^2.0.0",
     "pdfjs-dist": "^5.0.0",
+    "posthog-js": "^1.335.5",
+    "posthog-node": "^5.24.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "server-only": "^0.0.1",
