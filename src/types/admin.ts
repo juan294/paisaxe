@@ -18,6 +18,7 @@ export interface AdminStory {
   image: string;
   imageSource?: string;
   category: StoryCategory;
+  sourcePdf?: string;
   location?: StoryLocation;
   duration?: StoryDuration;
   displayOrder: number;
@@ -37,6 +38,7 @@ export function rowToAdminStory(row: AdminStoryRow): AdminStory {
     image: row.image_path || "",
     imageSource: row.image_source || undefined,
     category: row.category as StoryCategory,
+    sourcePdf: row.source_pdf || undefined,
     location: row.location ? (row.location as StoryLocation) : undefined,
     duration: row.duration ? (row.duration as StoryDuration) : undefined,
     displayOrder: row.display_order,
@@ -63,4 +65,22 @@ export interface UpdateStatusRequest {
 export interface AdminApiResponse<T> {
   data?: T;
   error?: string;
+}
+
+// Content image from PDF manifest
+export interface ContentImage {
+  filename: string;
+  sourcePdf: string;
+  pageNumber: number;
+  width: number;
+  height: number;
+  aspectRatio: number;
+  type: string;
+  url: string;
+  score: number;
+}
+
+export interface ContentImagesResponse {
+  images: ContentImage[];
+  total: number;
 }
