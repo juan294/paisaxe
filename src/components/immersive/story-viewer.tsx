@@ -11,6 +11,7 @@ import { AuthButton } from "@/components/auth/auth-button";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { getRelatedStories } from "@/lib/related-stories";
 import { RelatedStories } from "./related-stories";
 import { QuestionPrompts } from "./question-prompts";
@@ -68,6 +69,7 @@ export function StoryViewer({
   const { isEnabled } = useFeatureFlags();
   const { trackEvent } = useAnalytics();
   const { t } = useTranslation();
+  const prefersReducedMotion = useReducedMotion();
 
   const {
     isFavorite,
@@ -110,22 +112,30 @@ export function StoryViewer({
   }, [currentIndex, stories]);
 
   const goToNext = useCallback(() => {
+    const nextIndex = currentIndex < stories.length - 1 ? currentIndex + 1 : 0;
+    if (prefersReducedMotion) {
+      onIndexChange(nextIndex);
+      return;
+    }
     setIsTransitioning(true);
     setTimeout(() => {
-      const nextIndex = currentIndex < stories.length - 1 ? currentIndex + 1 : 0;
       onIndexChange(nextIndex);
       setIsTransitioning(false);
     }, 300);
-  }, [currentIndex, stories.length, onIndexChange]);
+  }, [currentIndex, stories.length, onIndexChange, prefersReducedMotion]);
 
   const goToPrev = useCallback(() => {
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : stories.length - 1;
+    if (prefersReducedMotion) {
+      onIndexChange(prevIndex);
+      return;
+    }
     setIsTransitioning(true);
     setTimeout(() => {
-      const prevIndex = currentIndex > 0 ? currentIndex - 1 : stories.length - 1;
       onIndexChange(prevIndex);
       setIsTransitioning(false);
     }, 300);
-  }, [currentIndex, stories.length, onIndexChange]);
+  }, [currentIndex, stories.length, onIndexChange, prefersReducedMotion]);
 
   // Keyboard navigation (disabled while chat is open)
   useEffect(() => {
@@ -147,13 +157,13 @@ export function StoryViewer({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [chatOpen, goToNext, goToPrev]);
 
-  // Auto-play (paused while chat is open)
+  // Auto-play (paused while chat is open, disabled when reduced motion is preferred)
   const autoPlayInterval = ambientMode && isEnabled("ambient_discovery") ? 12000 : 6000;
   useEffect(() => {
-    if (!autoPlay || chatOpen) return;
+    if (!autoPlay || chatOpen || prefersReducedMotion) return;
     const timer = setInterval(goToNext, autoPlayInterval);
     return () => clearInterval(timer);
-  }, [autoPlay, chatOpen, goToNext, autoPlayInterval]);
+  }, [autoPlay, chatOpen, goToNext, autoPlayInterval, prefersReducedMotion]);
 
   // Toggle ambient mode
   const toggleAmbient = useCallback(() => {
@@ -172,9 +182,11 @@ export function StoryViewer({
     });
   }, [trackEvent]);
 
-  // Determine animation class
+  // Determine animation class (disabled when reduced motion is preferred)
   const isAmbient = ambientMode && isEnabled("ambient_discovery");
-  const zoomClass = isAmbient ? "animate-ambient-zoom" : autoPlay ? "animate-slow-zoom" : undefined;
+  const zoomClass = prefersReducedMotion
+    ? undefined
+    : isAmbient ? "animate-ambient-zoom" : autoPlay ? "animate-slow-zoom" : undefined;
 
   // Related stories
   const relatedStories = story ? getRelatedStories(story, allStories) : [];
@@ -188,14 +200,25 @@ export function StoryViewer({
   const questionPrompts = story.metadata?.question_prompts || [];
 
   return (
-    <div
+    <main
       className="relative h-screen w-screen overflow-hidden bg-black cursor-pointer"
       onClick={() => setShowInfo((prev) => !prev)}
     >
+      {/* Screen reader announcement for story changes */}
+      <div
+        role="status"
+        aria-live="polite"
+        className="sr-only"
+      >
+        {t("accessibility.story_counter")
+          .replace("{current}", String(currentIndex + 1))
+          .replace("{total}", String(stories.length))}: {story.title} — {story.subtitle}
+      </div>
+
       {/* Background Image with Ken Burns effect */}
       <div
         className={cn(
-          "absolute inset-0 transition-opacity duration-500",
+          "absolute inset-0 transition-opacity duration-500 motion-reduce:transition-none",
           isTransitioning ? "opacity-0" : "opacity-100"
         )}
       >
@@ -221,11 +244,18 @@ export function StoryViewer({
         const fillPosition = currentIndex % segmentCount;
 
         return (
-          <div className="absolute top-0 left-0 right-0 z-20 flex items-center gap-1 p-4">
+          <div
+            role="progressbar"
+            aria-label={t("accessibility.story_progress")}
+            aria-valuenow={currentIndex + 1}
+            aria-valuemin={1}
+            aria-valuemax={stories.length}
+            className="absolute top-0 left-0 right-0 z-20 flex items-center gap-1 p-4"
+          >
             {Array.from({ length: segmentCount }, (_, i) => (
               <div
                 key={i}
-                className="flex-1 h-1 rounded-full bg-white/30 overflow-hidden cursor-pointer transition-all duration-300"
+                className="flex-1 h-1 rounded-full bg-white/30 overflow-hidden cursor-pointer transition-all duration-300 motion-reduce:transition-none"
                 onClick={(e) => {
                   e.stopPropagation();
                   // Jump to the story this segment represents in the current cycle
@@ -238,7 +268,7 @@ export function StoryViewer({
               >
                 <div
                   className={cn(
-                    "h-full bg-white transition-all duration-300",
+                    "h-full bg-white transition-all duration-300 motion-reduce:transition-none",
                     i <= fillPosition ? "w-full" : "w-0"
                   )}
                 />
@@ -279,10 +309,10 @@ export function StoryViewer({
       )}
 
       {/* Main content */}
-      <div
+      <article
         className={cn(
-          "absolute bottom-0 left-0 right-0 p-8 md:p-12 z-10 transition-all duration-500",
-          showInfo ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          "absolute bottom-0 left-0 right-0 p-8 md:p-12 z-10 transition-all duration-500 motion-reduce:transition-none",
+          showInfo ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 motion-reduce:translate-y-0"
         )}
       >
         {/* Freshness badge */}
@@ -331,20 +361,20 @@ export function StoryViewer({
               e.stopPropagation();
               onAskAbout();
             }}
-            className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105"
+            className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
           >
             {ast ? getLabel("ask_about", true) : t("stories.ask_about")}
           </button>
           <a
             href="/favorites"
             onClick={(e) => e.stopPropagation()}
-            className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all hover:scale-105 flex items-center gap-2"
+            className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
           >
             <Bookmark className="h-5 w-5" />
             <span>{ast ? getLabel("saved", true) : t("favorites.saved")}</span>
           </a>
         </div>
-      </div>
+      </article>
 
       {/* Navigation arrows */}
       <button
@@ -352,7 +382,8 @@ export function StoryViewer({
           e.stopPropagation();
           goToPrev();
         }}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
+        aria-label={t("accessibility.previous_story")}
+        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
       >
         <ChevronLeft className="h-8 w-8 text-white" />
       </button>
@@ -362,13 +393,14 @@ export function StoryViewer({
           e.stopPropagation();
           goToNext();
         }}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
+        aria-label={t("accessibility.next_story")}
+        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
       >
         <ChevronRight className="h-8 w-8 text-white" />
       </button>
 
       {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}
-      <div className="absolute top-16 right-6 z-20 flex items-center gap-3">
+      <nav aria-label="Story controls" className="absolute top-16 right-6 z-20 flex items-center gap-3">
         {/* Language Switcher */}
         <LanguageSwitcher />
 
@@ -383,9 +415,10 @@ export function StoryViewer({
               toggleAmbient();
             }}
             className={cn(
-              "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all",
+              "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
               ambientMode && "ring-1 ring-white/30"
             )}
+            aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
             title={ambientMode ? t("stories.ambient_off") : t("stories.ambient_on")}
           >
             {autoPlay ? (
@@ -400,7 +433,8 @@ export function StoryViewer({
               e.stopPropagation();
               setAutoPlay((prev) => !prev);
             }}
-            className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all"
+            aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
           >
             {autoPlay ? (
               <Pause className="h-5 w-5 text-white" />
@@ -428,17 +462,18 @@ export function StoryViewer({
           onToggle={() => toggleFavorite(story.id)}
         />
         <AuthButton />
-      </div>
+      </nav>
 
       {/* Keyboard hints */}
       <div
         className={cn(
-          "absolute bottom-4 right-4 z-20 text-white/40 text-xs transition-opacity duration-500",
+          "absolute bottom-4 right-4 z-20 text-white/40 text-xs transition-opacity duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100" : "opacity-0"
         )}
+        aria-hidden="true"
       >
         ← → {t("nav.navigate")} · i {t("nav.show_hide")} · {t("nav.space")} {t("nav.next")}
       </div>
-    </div>
+    </main>
   );
 }

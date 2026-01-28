@@ -46,6 +46,11 @@ vi.mock("@/hooks/use-analytics", () => ({
   }),
 }));
 
+// Mock useReducedMotion
+vi.mock("@/hooks/use-reduced-motion", () => ({
+  useReducedMotion: () => false,
+}));
+
 // Wrapper component for tests
 const TestWrapper = ({ children }: { children: ReactNode }) => (
   <AuthProvider>{children}</AuthProvider>
@@ -338,12 +343,13 @@ describe("StoryViewer", () => {
 
       // Info should be visible initially
       const title = screen.getByText("Lagos de Covadonga");
-      expect(title.closest("div")?.closest("div")).toHaveClass("opacity-100");
+      const contentArea = title.closest("article[class*='bottom-0']");
+      expect(contentArea).toHaveClass("opacity-100");
 
       fireEvent.keyDown(window, { key: "i" });
 
       // After pressing i, info should be hidden
-      expect(title.closest("div")?.closest("div")).toHaveClass("opacity-0");
+      expect(contentArea).toHaveClass("opacity-0");
     });
 
     it("should jump to specific story when clicking progress bar", async () => {
@@ -438,7 +444,7 @@ describe("StoryViewer", () => {
         // After clicking, info should be hidden
         const bottomContent = screen
           .getByText("Lagos de Covadonga")
-          .closest("div[class*='bottom-0']");
+          .closest("article[class*='bottom-0']");
         expect(bottomContent).toHaveClass("opacity-0");
       }
     });

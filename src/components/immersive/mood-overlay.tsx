@@ -38,11 +38,12 @@ export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
 
       {/* Content */}
-      <div className="relative max-w-md w-full text-center animate-in fade-in zoom-in-95 duration-300">
+      <div className="relative max-w-md w-full text-center animate-in fade-in zoom-in-95 duration-300 motion-reduce:animate-none" role="dialog" aria-label={t("mood.title")}>
         {/* Dismiss button */}
         <button
           onClick={handleDismiss}
-          className="absolute -top-2 -right-2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white transition-all z-10"
+          aria-label={t("common.close")}
+          className="absolute -top-2 -right-2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white transition-all motion-reduce:transition-none z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         >
           <X className="h-5 w-5" />
         </button>
@@ -63,7 +64,8 @@ export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
                 "flex flex-col items-center gap-2 p-6 rounded-2xl",
                 "bg-gradient-to-br backdrop-blur-sm",
                 "border border-white/10",
-                "text-white transition-all hover:scale-105",
+                "text-white transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
                 color
               )}
             >

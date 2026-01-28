@@ -18,7 +18,8 @@ export function LanguageSwitcher() {
           setLocale("es");
         }}
         className={cn(
-          "px-2.5 py-1 text-xs font-medium transition-all",
+          "px-2.5 py-1 text-xs font-medium transition-all motion-reduce:transition-none",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
           locale === "es"
             ? "text-white bg-white/20"
             : "text-white/50 hover:text-white/80"
@@ -33,7 +34,8 @@ export function LanguageSwitcher() {
           setLocale("en");
         }}
         className={cn(
-          "px-2.5 py-1 text-xs font-medium transition-all",
+          "px-2.5 py-1 text-xs font-medium transition-all motion-reduce:transition-none",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
           locale === "en"
             ? "text-white bg-white/20"
             : "text-white/50 hover:text-white/80"

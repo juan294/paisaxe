@@ -33,7 +33,8 @@ export function RelatedStories({ stories, onSelectStory }: RelatedStoriesProps) 
           "flex items-center gap-2 mb-3 px-3 py-1.5 rounded-full",
           "bg-white/10 hover:bg-white/20 backdrop-blur-sm",
           "text-white/80 hover:text-white text-sm font-medium",
-          "transition-all"
+          "transition-all motion-reduce:transition-none",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         )}
         aria-expanded={isExpanded}
       >
@@ -48,7 +49,7 @@ export function RelatedStories({ stories, onSelectStory }: RelatedStoriesProps) 
       {/* Stories Grid */}
       {isExpanded && (
         <div
-          className="grid grid-cols-2 md:grid-cols-3 gap-3 animate-in fade-in duration-300"
+          className="grid grid-cols-2 md:grid-cols-3 gap-3 animate-in fade-in duration-300 motion-reduce:animate-none"
         >
         {stories.map((story) => (
           <button
@@ -58,7 +59,8 @@ export function RelatedStories({ stories, onSelectStory }: RelatedStoriesProps) 
               "group relative flex items-end overflow-hidden rounded-lg",
               "h-24 md:h-28",
               "bg-black/40 backdrop-blur-sm",
-              "hover:ring-2 hover:ring-white/50 transition-all"
+              "hover:ring-2 hover:ring-white/50 transition-all motion-reduce:transition-none",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             )}
           >
             {/* Background Image */}
