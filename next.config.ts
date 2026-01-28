@@ -6,11 +6,11 @@ const nextConfig: NextConfig = {
   rewrites: async () => [
     {
       source: "/a/static/:path*",
-      destination: "https://us-assets.i.posthog.com/static/:path*",
+      destination: "https://eu-assets.i.posthog.com/static/:path*",
     },
     {
       source: "/a/:path*",
-      destination: "https://us.i.posthog.com/:path*",
+      destination: "https://eu.i.posthog.com/:path*",
     },
   ],
   headers: async () => [
