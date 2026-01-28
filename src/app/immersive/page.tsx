@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { StoryViewer } from "@/components/immersive/story-viewer";
 import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
@@ -25,17 +25,6 @@ const VoiceChat = dynamic(
   }
 );
 
-// Generate a session-stable seed for shuffling
-function getSessionSeed(): number {
-  if (typeof window === "undefined") return 0;
-  let seed = sessionStorage.getItem("paisaxe-shuffle-seed");
-  if (!seed) {
-    seed = String(Math.floor(Math.random() * 2147483647));
-    sessionStorage.setItem("paisaxe-shuffle-seed", seed);
-  }
-  return parseInt(seed, 10);
-}
-
 export default function ImmersivePage() {
   return (
     <Suspense
@@ -53,6 +42,9 @@ function ImmersivePageContent() {
   const [initialMessage, setInitialMessage] = useState<string | undefined>();
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [moodDismissed, setMoodDismissed] = useState(false);
+
+  // Generate a fresh seed on each page load (stored in ref for stability during re-renders)
+  const shuffleSeed = useRef(Math.floor(Math.random() * 2147483647));
 
   const { isEnabled } = useFeatureFlags();
   const { t } = useTranslation();
@@ -93,10 +85,9 @@ function ImmersivePageContent() {
       stories = weighted;
     }
 
-    // 3. Shuffle (if enabled)
+    // 3. Shuffle (if enabled) - uses fresh seed per page load
     if (isEnabled("randomized_order")) {
-      const seed = getSessionSeed();
-      stories = fisherYatesShuffle(stories, seed);
+      stories = fisherYatesShuffle(stories, shuffleSeed.current);
     }
 
     return stories;
