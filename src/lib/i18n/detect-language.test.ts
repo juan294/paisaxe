@@ -42,11 +42,47 @@ describe('detect-language', () => {
       expect(mapLanguageTag('EN-US')).toBe('en');
     });
 
+    it('maps "fr" to "fr"', () => {
+      expect(mapLanguageTag('fr')).toBe('fr');
+    });
+
+    it('maps "fr-FR" to "fr"', () => {
+      expect(mapLanguageTag('fr-FR')).toBe('fr');
+    });
+
+    it('maps "fr-CA" to "fr"', () => {
+      expect(mapLanguageTag('fr-CA')).toBe('fr');
+    });
+
+    it('maps "de" to "de"', () => {
+      expect(mapLanguageTag('de')).toBe('de');
+    });
+
+    it('maps "de-DE" to "de"', () => {
+      expect(mapLanguageTag('de-DE')).toBe('de');
+    });
+
+    it('maps "de-AT" to "de"', () => {
+      expect(mapLanguageTag('de-AT')).toBe('de');
+    });
+
+    it('maps "pt" to "pt"', () => {
+      expect(mapLanguageTag('pt')).toBe('pt');
+    });
+
+    it('maps "pt-BR" to "pt"', () => {
+      expect(mapLanguageTag('pt-BR')).toBe('pt');
+    });
+
+    it('maps "pt-PT" to "pt"', () => {
+      expect(mapLanguageTag('pt-PT')).toBe('pt');
+    });
+
     it('returns null for unsupported languages', () => {
-      expect(mapLanguageTag('fr')).toBeNull();
-      expect(mapLanguageTag('de-DE')).toBeNull();
       expect(mapLanguageTag('ja')).toBeNull();
       expect(mapLanguageTag('zh-CN')).toBeNull();
+      expect(mapLanguageTag('ko')).toBeNull();
+      expect(mapLanguageTag('ar')).toBeNull();
     });
 
     it('returns null for empty string', () => {
@@ -73,10 +109,34 @@ describe('detect-language', () => {
 
     it('returns first supported language from navigator.languages', () => {
       Object.defineProperty(navigator, 'languages', {
-        value: ['fr', 'de', 'en-GB'],
+        value: ['ja', 'ko', 'en-GB'],
         configurable: true,
       });
       expect(detectBrowserLanguage()).toBe('en');
+    });
+
+    it('returns "fr" when navigator.languages starts with "fr-FR"', () => {
+      Object.defineProperty(navigator, 'languages', {
+        value: ['fr-FR', 'en-US'],
+        configurable: true,
+      });
+      expect(detectBrowserLanguage()).toBe('fr');
+    });
+
+    it('returns "de" when navigator.languages starts with "de-DE"', () => {
+      Object.defineProperty(navigator, 'languages', {
+        value: ['de-DE', 'en-US'],
+        configurable: true,
+      });
+      expect(detectBrowserLanguage()).toBe('de');
+    });
+
+    it('returns "pt" when navigator.languages starts with "pt-BR"', () => {
+      Object.defineProperty(navigator, 'languages', {
+        value: ['pt-BR', 'en-US'],
+        configurable: true,
+      });
+      expect(detectBrowserLanguage()).toBe('pt');
     });
 
     it('falls back to navigator.language when languages is empty', () => {
@@ -93,11 +153,11 @@ describe('detect-language', () => {
 
     it('returns "es" (default) when no supported language is found', () => {
       Object.defineProperty(navigator, 'languages', {
-        value: ['fr', 'de', 'ja'],
+        value: ['ja', 'ko', 'zh'],
         configurable: true,
       });
       Object.defineProperty(navigator, 'language', {
-        value: 'fr',
+        value: 'ja',
         configurable: true,
       });
       expect(detectBrowserLanguage()).toBe('es');
@@ -109,7 +169,7 @@ describe('detect-language', () => {
         configurable: true,
       });
       Object.defineProperty(navigator, 'language', {
-        value: 'pt-BR',
+        value: 'ar',
         configurable: true,
       });
       expect(detectBrowserLanguage()).toBe('es');
@@ -131,8 +191,23 @@ describe('detect-language', () => {
       expect(getStoredLocale()).toBe('es');
     });
 
+    it('stores and retrieves "fr"', () => {
+      storeLocale('fr');
+      expect(getStoredLocale()).toBe('fr');
+    });
+
+    it('stores and retrieves "de"', () => {
+      storeLocale('de');
+      expect(getStoredLocale()).toBe('de');
+    });
+
+    it('stores and retrieves "pt"', () => {
+      storeLocale('pt');
+      expect(getStoredLocale()).toBe('pt');
+    });
+
     it('returns null for invalid stored values', () => {
-      localStorage.setItem('paisaxe-locale', 'fr');
+      localStorage.setItem('paisaxe-locale', 'ja');
       expect(getStoredLocale()).toBeNull();
     });
 
@@ -164,14 +239,38 @@ describe('detect-language', () => {
 
     it('falls back to "es" when nothing is available', () => {
       Object.defineProperty(navigator, 'languages', {
-        value: ['fr'],
+        value: ['ja'],
         configurable: true,
       });
       Object.defineProperty(navigator, 'language', {
-        value: 'fr',
+        value: 'ja',
         configurable: true,
       });
       expect(resolveLocale()).toBe('es');
+    });
+
+    it('returns "fr" when browser language is French', () => {
+      Object.defineProperty(navigator, 'languages', {
+        value: ['fr-FR'],
+        configurable: true,
+      });
+      expect(resolveLocale()).toBe('fr');
+    });
+
+    it('returns "de" when browser language is German', () => {
+      Object.defineProperty(navigator, 'languages', {
+        value: ['de-DE'],
+        configurable: true,
+      });
+      expect(resolveLocale()).toBe('de');
+    });
+
+    it('returns "pt" when browser language is Portuguese', () => {
+      Object.defineProperty(navigator, 'languages', {
+        value: ['pt-BR'],
+        configurable: true,
+      });
+      expect(resolveLocale()).toBe('pt');
     });
   });
 });
