@@ -1,6 +1,6 @@
 # PostHog Analytics Migration
 
-This document describes the migration from custom Supabase-based analytics to PostHog EU Cloud.
+This document describes the migration from custom Supabase-based analytics to PostHog US Cloud.
 
 ---
 
@@ -17,7 +17,7 @@ PostHog provides:
 
 - **Zero storage impact** — All data stored in PostHog's infrastructure
 - **Rich automatic data** — Pageviews, referrers, countries, devices, and more out of the box
-- **EU data residency** — PostHog EU Cloud (Frankfurt) for GDPR compliance
+- **Cloud-hosted analytics** — PostHog US Cloud (Virginia) for GDPR compliance
 - **Cookieless mode** — No cookies, no consent banners required
 - **HogQL queries** — Powerful SQL-like queries for custom analytics
 - **Free tier** — 1M events/month on the free plan
@@ -92,8 +92,8 @@ To avoid ad blockers, PostHog requests route through a Next.js rewrite:
 ```typescript
 // next.config.ts
 rewrites: async () => [
-  { source: "/a/static/:path*", destination: "https://eu-assets.i.posthog.com/static/:path*" },
-  { source: "/a/:path*", destination: "https://eu.i.posthog.com/:path*" },
+  { source: "/a/static/:path*", destination: "https://us-assets.i.posthog.com/static/:path*" },
+  { source: "/a/:path*", destination: "https://us.i.posthog.com/:path*" },
 ],
 ```
 
@@ -127,13 +127,13 @@ The admin analytics dashboard (`src/components/admin/analytics-dashboard.tsx`) q
 
 1. **Local development**: Add to `.env.local`
 2. **Vercel**: Add to Environment Variables (production + preview)
-3. **PostHog**: Create keys at https://eu.posthog.com > Project Settings
+3. **PostHog**: Create keys at https://us.posthog.com > Project Settings
 
 ---
 
 ## PostHog Setup Checklist
 
-1. Create account at https://eu.posthog.com (EU Cloud / Frankfurt)
+1. Create account at https://us.posthog.com (US Cloud / Frankfurt)
 2. Create a project and note the Project API Key (`phc_...`)
 3. Find the Project ID in project settings
 4. Create a Personal API Key with query read access (`phx_...`)
@@ -147,7 +147,7 @@ The admin analytics dashboard (`src/components/admin/analytics-dashboard.tsx`) q
 After deployment, verify the migration:
 
 1. **Pageviews tracking**: Visit the site, check PostHog Live Events
-2. **Reverse proxy**: Network tab should show requests to `/a/e/`, not `eu.i.posthog.com`
+2. **Reverse proxy**: Network tab should show requests to `/a/e/`, not `us.i.posthog.com`
 3. **Cookieless mode**: Application > Cookies should have no PostHog cookies
 4. **Admin dashboard**: Visit `/admin` > Analytics tab, confirm data renders
 5. **Database cleanup**: Run `SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'analytics_events');` — should return `false`
