@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useAnalytics } from "@/hooks/use-analytics";
 
 interface QuestionPromptsProps {
   prompts: string[];
@@ -9,13 +8,10 @@ interface QuestionPromptsProps {
   onSelectPrompt: (prompt: string) => void;
 }
 
-export function QuestionPrompts({ prompts, storyId, onSelectPrompt }: QuestionPromptsProps) {
-  const { trackEvent } = useAnalytics();
-
+export function QuestionPrompts({ prompts, storyId: _storyId, onSelectPrompt }: QuestionPromptsProps) {
   if (!prompts || prompts.length === 0) return null;
 
   const handleClick = (prompt: string) => {
-    trackEvent("contextual_prompt_click", "contextual_prompts", { storyId, promptText: prompt });
     onSelectPrompt(prompt);
   };
 

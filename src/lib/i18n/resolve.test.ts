@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { resolveTranslation } from './resolve';
 import { es } from './es';
 import { en } from './en';
+import { fr } from './fr';
+import { de } from './de';
+import { pt } from './pt';
 import type { Translations } from './types';
 
 const testTranslations: Translations = {
@@ -69,5 +72,23 @@ describe('resolveTranslation', () => {
     expect(resolveTranslation('common.loading', en)).toBe('Loading...');
     expect(resolveTranslation('chat.placeholder', en)).toBe('Ask about this place...');
     expect(resolveTranslation('stories.filters.category', en)).toBe('Category');
+  });
+
+  it('resolves correctly with actual French locale keys', () => {
+    expect(resolveTranslation('common.loading', fr)).toBe('Chargement...');
+    expect(resolveTranslation('chat.placeholder', fr)).toBe('Posez une question sur ce lieu...');
+    expect(resolveTranslation('stories.filters.category', fr)).toBe('Catégorie');
+  });
+
+  it('resolves correctly with actual German locale keys', () => {
+    expect(resolveTranslation('common.loading', de)).toBe('Laden...');
+    expect(resolveTranslation('chat.placeholder', de)).toBe('Fragen Sie nach diesem Ort...');
+    expect(resolveTranslation('stories.filters.category', de)).toBe('Kategorie');
+  });
+
+  it('resolves correctly with actual Portuguese locale keys', () => {
+    expect(resolveTranslation('common.loading', pt)).toBe('Carregando...');
+    expect(resolveTranslation('chat.placeholder', pt)).toBe('Pergunte sobre este lugar...');
+    expect(resolveTranslation('stories.filters.category', pt)).toBe('Categoria');
   });
 });

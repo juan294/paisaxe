@@ -15,13 +15,6 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-// Mock analytics
-vi.mock("@/hooks/use-analytics", () => ({
-  useAnalytics: () => ({
-    trackEvent: vi.fn(),
-  }),
-}));
-
 const mockStory: Story = {
   id: "test-123",
   title: "Test Story",

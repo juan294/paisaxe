@@ -2,7 +2,6 @@
 
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAnalytics } from "@/hooks/use-analytics";
 import { useTranslation } from "@/lib/i18n";
 import type { Mood } from "@/lib/mood-mapping";
 
@@ -19,16 +18,13 @@ const MOOD_OPTIONS: { mood: Mood; labelKey: string; emoji: string; color: string
 ];
 
 export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
-  const { trackEvent } = useAnalytics();
   const { t } = useTranslation();
 
   const handleSelect = (mood: Mood) => {
-    trackEvent("mood_selected", "mood_discovery", { mood });
     onSelectMood(mood);
   };
 
   const handleDismiss = () => {
-    trackEvent("mood_dismissed", "mood_discovery", {});
     onDismiss();
   };
 

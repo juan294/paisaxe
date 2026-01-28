@@ -200,15 +200,15 @@ The admin panel is accessible at `/admin`. It has three tabs: Stories, Feature T
 
 ### Access & Authentication
 
-The admin panel uses a secret key (the `ADMIN_SECRET_KEY` environment variable). There is no user account system for admins.
+The admin panel uses Supabase Auth (Google OAuth) with role-based access control (RBAC) via the `user_profiles` table.
 
 1. Navigate to `/admin`.
-2. Enter the admin key in the login form.
-3. The key is validated against the server via a test API call.
-4. If valid, the admin session begins. The key is passed as a Bearer token in all subsequent API requests.
-5. The session lasts until the admin clicks "Logout" or closes the browser.
+2. Sign in with Google (the same OAuth flow used by regular visitors).
+3. The server reads the session cookie and checks `user_profiles.role = 'admin'` via `validateAdminAuth()`.
+4. If the user has the `admin` role, the admin session begins. There is no secret key or bearer token.
+5. The session lasts until the admin clicks "Logout" or the session cookie expires.
 
-All admin API routes (`/api/admin/*`) require the `Authorization: Bearer {key}` header. Invalid or missing tokens return 401/403 errors.
+All admin API routes (`/api/admin/*`) validate the session cookie and confirm the user holds the `admin` role. Cookies are sent automatically by the browser on every fetch request. Requests from unauthenticated users or users without the `admin` role return 401/403 errors. On the client side, the `useAdminRole()` hook queries the user's role via Row Level Security to control UI access.
 
 ### Story Management
 
@@ -270,20 +270,29 @@ See [Feature Flags Reference](#feature-flags-reference) below for the full list.
 
 ### Analytics Dashboard
 
-The Analytics tab provides usage metrics for a configurable date range (default: last 7 days).
+The Analytics tab provides usage metrics powered by PostHog (EU Cloud), displayed for a configurable date range (default: last 7 days).
 
 **Summary cards:**
 
 | Metric | Description |
 |--------|-------------|
-| Total Events | All analytics events in the date range |
-| Unique Sessions | Count of distinct session IDs |
+| Total Pageviews | All pageview events in the date range |
+| Unique Visitors | Count of distinct visitor identifiers |
 
-**Per-feature breakdown** — A table sorted by event count (descending) showing for each feature flag: event count, unique sessions, and a visual bar chart. This helps identify which features are being used and by how many visitors.
+**Breakdown sections:**
+
+| Section | Description |
+|---------|-------------|
+| Top Pages | Most visited URLs with pageview counts and visual bars |
+| Top Referrers | Traffic sources showing where visitors come from |
+| Countries | Geographic distribution of visitors |
+| Devices | Device type breakdown (Desktop, Mobile, Tablet) |
+
+Each section displays up to 10 entries sorted by count, with a visual bar chart for easy comparison.
 
 **Date range picker** — Two date inputs (from/to) to narrow the analytics window.
 
-**Analytics events tracked** include: story views, filter usage, shares, chat interactions, button clicks (Surprise Me, Share, etc.), mood selections, and feature flag exposure. Events are anonymous (IP is hashed, no personal data stored without auth).
+**PostHog integration** — Analytics are collected via PostHog in cookieless mode (no cookies, memory-only persistence) with a reverse proxy through `/a/` to avoid ad blockers. The admin dashboard queries PostHog's HogQL API to fetch aggregated metrics.
 
 ---
 
@@ -344,26 +353,25 @@ Webhook payloads include the table name, operation type, and changed record. Aut
 - Feature flags: When an admin toggles a flag, all active browser sessions pick up the change instantly via `useRealtimeFeatureFlags` hook
 - Story updates: When an admin changes a story's curation status or image, `useRealtimeStories` hook notifies the UI
 
-**Edge Functions** — Two Deno-based Edge Functions (free: 500K invocations/month, ~25 used):
-- `keep-alive`: Queries active stories to generate database activity
-- `cleanup-analytics`: Deletes analytics events older than 90 days to manage storage
+**Edge Functions** — One Deno-based Edge Function (free: 500K invocations/month):
+- `keep-alive`: Queries active stories to generate database activity and prevent auto-pause
 
-Both are scheduled via pg_cron + pg_net and deployed with `supabase functions deploy`.
+Scheduled via pg_cron + pg_net and deployed with `supabase functions deploy keep-alive`.
 
-**Automated database maintenance** — pg_cron runs weekly VACUUM ANALYZE on high-churn tables (chunks, analytics_events), daily ANALYZE on all main tables, and monthly cron history cleanup.
+**Automated database maintenance** — pg_cron runs weekly VACUUM ANALYZE on high-churn tables (chunks), daily ANALYZE on all main tables, and monthly cron history cleanup.
 
-**Security hardening** (migration 015) — All database functions have explicit `SET search_path` to prevent search path injection attacks. Security-critical functions (`is_story_favorited`, `get_database_size`, `notify_webhook`) use `search_path = ''` with fully qualified table references. The pgvector extension has been moved from the `public` schema to the `extensions` schema per Supabase best practices. The `analytics_events` INSERT RLS policy validates that `event_name` is non-empty and under 200 characters (replacing the previous overly permissive `WITH CHECK (true)`).
+**Security hardening** (migration 015) — All database functions have explicit `SET search_path` to prevent search path injection attacks. Security-critical functions (`is_story_favorited`, `get_database_size`, `notify_webhook`) use `search_path = ''` with fully qualified table references. The pgvector extension has been moved from the `public` schema to the `extensions` schema per Supabase best practices.
 
 | Supabase Feature | Status | Usage |
 |-----------------|--------|-------|
-| PostgreSQL + pgvector | Active | Vector search, 6 tables |
+| PostgreSQL + pgvector | Active | Vector search, 5 tables |
 | Row Level Security | Active | All tables, user-scoped favorites |
 | Auth (Google OAuth) | Active | Visitor accounts, favorites sync |
 | Storage | Active | Admin story images |
-| pg_cron | Active | 7 scheduled jobs |
+| pg_cron | Active | 5 scheduled jobs |
 | pg_net + Webhooks | Active | Cache invalidation triggers |
 | Realtime | Active | Feature flags + story update sync |
-| Edge Functions | Active | Keep-alive + analytics cleanup |
+| Edge Functions | Active | Keep-alive |
 | Full-text search (GIN) | Active | Spanish keyword search fallback |
 
 ---
