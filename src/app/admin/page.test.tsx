@@ -1,7 +1,24 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import AdminPage from "./page";
 import type { AdminStory } from "@/types/admin";
+
+// Mock matchMedia for next-themes
+beforeAll(() => {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+});
 
 // Mock useAuth
 const mockSignInWithGoogle = vi.fn();
@@ -104,6 +121,36 @@ vi.mock("lucide-react", () => ({
   Loader2: (props: Record<string, unknown>) => (
     <span data-testid="icon-loader" {...props} />
   ),
+  ImageIcon: (props: Record<string, unknown>) => (
+    <span data-testid="icon-image" {...props} />
+  ),
+  CheckCircle2: (props: Record<string, unknown>) => (
+    <span data-testid="icon-check" {...props} />
+  ),
+  Clock: (props: Record<string, unknown>) => (
+    <span data-testid="icon-clock" {...props} />
+  ),
+  Layers: (props: Record<string, unknown>) => (
+    <span data-testid="icon-layers" {...props} />
+  ),
+  ArrowUpRight: (props: Record<string, unknown>) => (
+    <span data-testid="icon-arrow-up-right" {...props} />
+  ),
+  Moon: (props: Record<string, unknown>) => (
+    <span data-testid="icon-moon" {...props} />
+  ),
+  Sun: (props: Record<string, unknown>) => (
+    <span data-testid="icon-sun" {...props} />
+  ),
+}));
+
+// Mock theme components
+vi.mock("@/components/admin/theme-provider", () => ({
+  AdminThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock("@/components/admin/theme-toggle", () => ({
+  ThemeToggle: () => <button data-testid="theme-toggle">Toggle Theme</button>,
 }));
 
 const mockStories: AdminStory[] = [
@@ -281,14 +328,14 @@ describe("AdminPage", () => {
       });
     });
 
-    it("shows Paisaxe Admin title", async () => {
+    it("shows Paisaxe title", async () => {
       render(<AdminPage />);
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
       });
 
-      expect(screen.getByText("Paisaxe Admin")).toBeInTheDocument();
+      expect(screen.getByText("Paisaxe")).toBeInTheDocument();
     });
 
     it("shows 'No stories found' when empty", async () => {
@@ -313,17 +360,19 @@ describe("AdminPage", () => {
       });
     });
 
-    it("shows story counts (total, pending, approved, with images)", async () => {
+    it("shows story counts in metric cards (total, pending, approved, with images)", async () => {
       render(<AdminPage />);
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
       });
 
-      expect(screen.getByText("3 total")).toBeInTheDocument();
-      expect(screen.getByText("2 pending")).toBeInTheDocument();
-      expect(screen.getByText("1 approved")).toBeInTheDocument();
-      expect(screen.getByText("2 with images")).toBeInTheDocument();
+      // New warm design uses StatCard components with short labels
+      // Use getAllByText since some labels also appear in filter buttons
+      expect(screen.getByText("Total")).toBeInTheDocument();
+      expect(screen.getAllByText("Pending").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Approved").length).toBeGreaterThan(0);
+      expect(screen.getByText("With Images")).toBeInTheDocument();
     });
 
     it("logout calls signOut", async () => {
@@ -372,7 +421,7 @@ describe("AdminPage", () => {
 
       render(<AdminPage />);
 
-      expect(screen.getByText("Loading...")).toBeInTheDocument();
+      expect(screen.getByText("Loading stories...")).toBeInTheDocument();
 
       await act(async () => {
         resolvePromise!({ data: mockStories });
@@ -382,37 +431,68 @@ describe("AdminPage", () => {
       expect(screen.getByTestId("story-grid")).toBeInTheDocument();
     });
 
-    it("filter buttons work (All, Pending, Approved)", async () => {
+    it("stat cards work as filter buttons (Total, Pending, Approved)", async () => {
       render(<AdminPage />);
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
       });
 
-      // Click "Pending" filter
-      mockFetchStories.mockClear();
-      mockFetchStories.mockResolvedValue({ data: [mockStories[0], mockStories[2]] });
+      // Initially all 3 stories are shown (filter = "all")
+      expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
+      expect(screen.getByTestId("story-story-2")).toBeInTheDocument();
+      expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
 
-      const pendingButtons = screen.getAllByText(/^Pending/);
+      // Stat cards are clickable filter buttons with rounded-2xl class
+      // Click "Pending" stat card to filter client-side
+      const pendingCard = screen.getAllByRole("button").find(btn =>
+        btn.classList.contains("rounded-2xl") && btn.textContent?.includes("Pending")
+      );
+      expect(pendingCard).toBeDefined();
+
       await act(async () => {
-        fireEvent.click(pendingButtons[0]);
+        fireEvent.click(pendingCard!);
       });
 
+      // Now only pending stories (story-1 and story-3) should be visible
       await waitFor(() => {
-        expect(mockFetchStories).toHaveBeenCalledWith("needs_curation");
+        expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
+        expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
+        expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
       });
 
-      // Click "Approved" filter
-      mockFetchStories.mockClear();
-      mockFetchStories.mockResolvedValue({ data: [mockStories[1]] });
+      // Click "Approved" stat card
+      const approvedCard = screen.getAllByRole("button").find(btn =>
+        btn.classList.contains("rounded-2xl") && btn.textContent?.includes("Approved")
+      );
+      expect(approvedCard).toBeDefined();
 
-      const approvedButtons = screen.getAllByText(/^Approved/);
       await act(async () => {
-        fireEvent.click(approvedButtons[0]);
+        fireEvent.click(approvedCard!);
       });
 
+      // Now only approved story (story-2) should be visible
       await waitFor(() => {
-        expect(mockFetchStories).toHaveBeenCalledWith("approved");
+        expect(screen.queryByTestId("story-story-1")).not.toBeInTheDocument();
+        expect(screen.getByTestId("story-story-2")).toBeInTheDocument();
+        expect(screen.queryByTestId("story-story-3")).not.toBeInTheDocument();
+      });
+
+      // Click "Total" stat card to show all again
+      const totalCard = screen.getAllByRole("button").find(btn =>
+        btn.classList.contains("rounded-2xl") && btn.textContent?.includes("Total")
+      );
+      expect(totalCard).toBeDefined();
+
+      await act(async () => {
+        fireEvent.click(totalCard!);
+      });
+
+      // All stories visible again
+      await waitFor(() => {
+        expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
+        expect(screen.getByTestId("story-story-2")).toBeInTheDocument();
+        expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
       });
     });
   });

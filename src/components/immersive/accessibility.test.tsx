@@ -32,12 +32,12 @@ vi.mock("@/lib/supabase-browser", () => ({
   }),
 }));
 
-// Mock feature flags - all disabled by default
+// Mock feature flags - enable autoplay_button for accessibility tests
 vi.mock("@/hooks/use-feature-flags", () => ({
   useFeatureFlags: () => ({
     flags: [],
     isLoading: false,
-    isEnabled: () => false,
+    isEnabled: (flag: string) => flag === "autoplay_button",
   }),
 }));
 
