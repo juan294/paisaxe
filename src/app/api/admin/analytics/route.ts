@@ -76,37 +76,37 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       // Total pageviews
       queryPostHog(
-        `SELECT count() FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}'`,
+        `SELECT count() FROM events WHERE event = '$pageview' AND timestamp BETWEEN toDateTime('${from}') AND toDateTime('${to}')`,
         projectId,
         apiKey
       ),
       // Unique visitors
       queryPostHog(
-        `SELECT count(DISTINCT distinct_id) FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}'`,
+        `SELECT count(DISTINCT distinct_id) FROM events WHERE event = '$pageview' AND timestamp BETWEEN toDateTime('${from}') AND toDateTime('${to}')`,
         projectId,
         apiKey
       ),
       // Top pages
       queryPostHog(
-        `SELECT properties.$current_url as url, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}' GROUP BY url ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$current_url as url, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN toDateTime('${from}') AND toDateTime('${to}') GROUP BY url ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
       // Top referrers
       queryPostHog(
-        `SELECT properties.$referrer as referrer, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}' AND referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$referrer as referrer, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN toDateTime('${from}') AND toDateTime('${to}') AND referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
       // Countries
       queryPostHog(
-        `SELECT properties.$geoip_country_name as country, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}' AND country IS NOT NULL GROUP BY country ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$geoip_country_name as country, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN toDateTime('${from}') AND toDateTime('${to}') AND country IS NOT NULL GROUP BY country ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
       // Devices
       queryPostHog(
-        `SELECT properties.$device_type as device, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}' AND device IS NOT NULL GROUP BY device ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$device_type as device, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN toDateTime('${from}') AND toDateTime('${to}') AND device IS NOT NULL GROUP BY device ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
