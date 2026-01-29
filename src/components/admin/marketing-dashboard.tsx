@@ -15,16 +15,7 @@ import { ELEVENLABS_AGENT_IDS } from "@/config/elevenlabs-agents";
 import {
   RefreshCw,
   AlertCircle,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Calendar,
-  Send,
-  BarChart3,
-  Settings,
   ExternalLink,
-  Zap,
-  Pause,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -32,16 +23,15 @@ import type {
   MarketingDashboardSummary,
   MarketingAccountPublic,
   MarketingPost,
-  MarketingSchedule,
   MarketingPlatform,
 } from "@/types/marketing";
 
-// Platform icons (using text for now, can be replaced with proper icons)
-const PLATFORM_ICONS: Record<MarketingPlatform, string> = {
-  x: "𝕏",
-  instagram: "📷",
-  pinterest: "📌",
-  tiktok: "🎵",
+// Platform letter badges for Swiss Minimal aesthetic
+const PLATFORM_BADGES: Record<MarketingPlatform, string> = {
+  x: "X",
+  instagram: "IG",
+  pinterest: "Pi",
+  tiktok: "Tk",
 };
 
 const PLATFORM_NAMES: Record<MarketingPlatform, string> = {
@@ -142,29 +132,21 @@ export function MarketingDashboard() {
 
   if (isLoading && !data) {
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-[#252320]">
-        <RefreshCw className="h-6 w-6 animate-spin text-[#a39e98]" />
-        <p className="mt-4 text-sm text-[#6b6560] dark:text-[#a39e98]">
-          Loading marketing data...
-        </p>
+      <div className="flex min-h-[400px] items-center justify-center">
+        <RefreshCw className="h-5 w-5 animate-spin text-stone-300" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-[#252320]">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#c9a55c]/10 dark:bg-[#c9a55c]/20">
-          <AlertCircle className="h-8 w-8 text-[#c9a55c]" />
-        </div>
-        <p className="mt-4 text-sm font-medium text-[#8b6c2e] dark:text-[#d4b876]">
-          {error}
-        </p>
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
+        <AlertCircle className="h-6 w-6 text-red-500" />
+        <p className="font-mono text-xs text-red-600">{error}</p>
         <button
           onClick={loadData}
-          className="mt-4 flex items-center gap-2 rounded-xl bg-[#2d2a26] px-4 py-2 text-sm font-medium text-[#f5f3ee] transition-colors hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+          className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 dark:hover:text-stone-100"
         >
-          <RefreshCw className="h-4 w-4" />
           Retry
         </button>
       </div>
@@ -174,36 +156,28 @@ export function MarketingDashboard() {
   if (!data) return null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-16">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <header className="flex items-end justify-between border-b border-stone-200 pb-6 dark:border-stone-800">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">Admin / Marketing</p>
+          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-stone-900 dark:text-stone-100">
             Marketing Automation
           </h1>
-          <p className="mt-1 text-[#6b6560] dark:text-[#a39e98]">
-            Manage social media accounts and scheduled posts
-          </p>
         </div>
         <button
           onClick={loadData}
           disabled={isLoading}
-          className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
-            "text-[#6b6560] hover:bg-white hover:text-[#2d2a26]",
-            "dark:text-[#a39e98] dark:hover:bg-[#252320] dark:hover:text-[#f5f3ee]",
-            "disabled:opacity-50"
-          )}
+          className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 disabled:opacity-50 dark:hover:text-stone-100"
         >
-          <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+          {isLoading ? "Loading..." : "Refresh"}
         </button>
-      </div>
+      </header>
 
       {/* Connected Accounts */}
       <section>
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
-          <Zap className="h-5 w-5 text-[#c9a55c]" />
-          Connected Accounts
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+          01 — Connected Accounts
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {(["x", "instagram", "pinterest", "tiktok"] as MarketingPlatform[]).map(
@@ -225,131 +199,133 @@ export function MarketingDashboard() {
 
       {/* Stats Overview */}
       <section>
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
-          <BarChart3 className="h-5 w-5 text-[#7a9e7a]" />
-          Performance Overview
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+          02 — Performance Overview
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            icon={<Send className="h-5 w-5" />}
-            value={data.stats.totalPosts}
-            label="Total Posts"
-            variant="default"
-          />
-          <StatCard
-            icon={<Calendar className="h-5 w-5" />}
-            value={data.stats.postsThisWeek}
-            label="This Week"
-            variant="default"
-          />
-          <StatCard
-            icon={<Clock className="h-5 w-5" />}
-            value={data.upcomingPosts.length}
-            label="Scheduled"
-            variant="warning"
-          />
-          <StatCard
-            icon={<XCircle className="h-5 w-5" />}
-            value={data.stats.failedPosts}
-            label="Failed"
-            variant={data.stats.failedPosts > 0 ? "error" : "default"}
-          />
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard number="01" value={data.stats.totalPosts} label="Total Posts" />
+          <StatCard number="02" value={data.stats.postsThisWeek} label="This Week" />
+          <StatCard number="03" value={data.upcomingPosts.length} label="Scheduled" />
+          <StatCard number="04" value={data.stats.failedPosts} label="Failed" isError={data.stats.failedPosts > 0} />
         </div>
       </section>
 
-      {/* Two-column layout for posts and schedule */}
-      <div className="grid gap-8 lg:grid-cols-2">
+      {/* Two-column layout for posts */}
+      <div className="grid gap-16 lg:grid-cols-2">
         {/* Upcoming Posts */}
         <section>
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
-            <Clock className="h-5 w-5 text-[#c9a55c]" />
-            Upcoming Posts
+          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+            03 — Upcoming Posts
           </h2>
-          <div className="rounded-2xl bg-white p-4 dark:bg-[#252320]">
-            {data.upcomingPosts.length === 0 ? (
-              <p className="py-8 text-center text-sm text-[#a39e98]">
-                No scheduled posts
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {data.upcomingPosts.slice(0, 5).map((post) => (
-                  <PostCard key={post.id} post={post} />
+          {data.upcomingPosts.length === 0 ? (
+            <p className="py-8 text-center font-mono text-xs text-stone-300">
+              No scheduled posts
+            </p>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-stone-200 text-left dark:border-stone-800">
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">#</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Platform</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Content</th>
+                  <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Scheduled</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+                {data.upcomingPosts.slice(0, 5).map((post, idx) => (
+                  <PostRow key={post.id} post={post} index={idx} />
                 ))}
-              </div>
-            )}
-          </div>
+              </tbody>
+            </table>
+          )}
         </section>
 
         {/* Recent Posts */}
         <section>
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
-            <CheckCircle2 className="h-5 w-5 text-[#7a9e7a]" />
-            Recent Posts
+          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+            04 — Recent Posts
           </h2>
-          <div className="rounded-2xl bg-white p-4 dark:bg-[#252320]">
-            {data.recentPosts.length === 0 ? (
-              <p className="py-8 text-center text-sm text-[#a39e98]">
-                No posts yet
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {data.recentPosts.slice(0, 5).map((post) => (
-                  <PostCard key={post.id} post={post} />
+          {data.recentPosts.length === 0 ? (
+            <p className="py-8 text-center font-mono text-xs text-stone-300">
+              No posts yet
+            </p>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-stone-200 text-left dark:border-stone-800">
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">#</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Platform</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Content</th>
+                  <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+                {data.recentPosts.slice(0, 5).map((post, idx) => (
+                  <PostRow key={post.id} post={post} index={idx} />
                 ))}
-              </div>
-            )}
-          </div>
+              </tbody>
+            </table>
+          )}
         </section>
       </div>
 
       {/* Posting Schedule */}
       <section>
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
-          <Settings className="h-5 w-5 text-[#6b6560] dark:text-[#a39e98]" />
-          Posting Schedule
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+          05 — Posting Schedule
         </h2>
-        <div className="rounded-2xl bg-white p-6 dark:bg-[#252320]">
-          {data.schedules.length === 0 ? (
-            <p className="py-8 text-center text-sm text-[#a39e98]">
-              No schedules configured
-            </p>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {(["x", "instagram", "pinterest", "tiktok"] as MarketingPlatform[]).map(
-                (platform) => {
-                  const platformSchedules = data.schedules.filter(
-                    (s) => s.platform === platform && s.isActive
-                  );
-                  return (
-                    <ScheduleCard
-                      key={platform}
-                      platform={platform}
-                      schedules={platformSchedules}
-                    />
-                  );
-                }
-              )}
-            </div>
-          )}
-        </div>
+        {data.schedules.length === 0 ? (
+          <p className="py-8 text-center font-mono text-xs text-stone-300">
+            No schedules configured
+          </p>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-stone-200 text-left dark:border-stone-800">
+                <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Platform</th>
+                <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Day</th>
+                <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Time (UTC)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+              {data.schedules
+                .filter((s) => s.isActive)
+                .map((schedule) => (
+                  <tr key={schedule.id}>
+                    <td className="py-3">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-stone-200 font-mono text-[10px] font-medium text-stone-600 dark:border-stone-700 dark:text-stone-400">
+                        {PLATFORM_BADGES[schedule.platform]}
+                      </span>
+                    </td>
+                    <td className="py-3 text-sm text-stone-700 dark:text-stone-300">
+                      {schedule.dayOfWeek !== null ? DAY_NAMES[schedule.dayOfWeek] : "Daily"}
+                    </td>
+                    <td className="py-3 text-right font-mono text-sm tabular-nums text-stone-900 dark:text-stone-100">
+                      {schedule.timeUtc}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        )}
       </section>
 
       {/* Marketing Agents Chat */}
       <section>
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+          06 — Marketing Agents
+        </h2>
         <VoiceAgentChat agentIds={ELEVENLABS_AGENT_IDS} />
       </section>
 
       {/* Setup Instructions */}
       {data.accounts.length === 0 && (
-        <section className="rounded-2xl border-2 border-dashed border-[#e5e3de] bg-white/50 p-8 text-center dark:border-[#3d3a36] dark:bg-[#252320]/50">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5f3ee] dark:bg-[#2d2a26]">
-            <Zap className="h-8 w-8 text-[#c9a55c]" />
-          </div>
-          <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
-            Get Started with Marketing Automation
-          </h3>
-          <p className="mt-2 text-sm text-[#6b6560] dark:text-[#a39e98]">
-            Click on any platform above to connect your social media accounts.
+        <section className="border-t border-stone-200 pt-8 text-center dark:border-stone-800">
+          <p className="text-lg font-extralight text-stone-400">
+            No accounts connected
+          </p>
+          <p className="mt-2 font-mono text-xs uppercase tracking-widest text-stone-300">
+            Click on any platform above to connect your social media accounts
           </p>
         </section>
       )}
@@ -382,54 +358,58 @@ function AccountCard({
   return (
     <div
       className={cn(
-        "group relative rounded-2xl p-4 transition-all",
+        "group relative border border-stone-200 p-4 transition-all dark:border-stone-800",
         isConnected
-          ? "bg-white dark:bg-[#252320]"
-          : "cursor-pointer border-2 border-dashed border-[#e5e3de] bg-white/50 hover:border-[#c9a55c] hover:bg-white dark:border-[#3d3a36] dark:bg-[#252320]/50 dark:hover:border-[#c9a55c] dark:hover:bg-[#252320]"
+          ? "bg-stone-50 dark:bg-stone-900/50"
+          : "cursor-pointer hover:border-stone-400 dark:hover:border-stone-600"
       )}
       onClick={!isConnected ? onConfigure : undefined}
     >
       <div className="flex items-center gap-3">
         <div
           className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-xl text-lg",
+            "flex h-8 w-8 items-center justify-center border font-mono text-xs font-medium",
             isConnected
-              ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
-              : "bg-[#f5f3ee] text-[#a39e98] dark:bg-[#2d2a26]"
+              ? "border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100"
+              : "border-stone-300 text-stone-400 dark:border-stone-700"
           )}
         >
-          {PLATFORM_ICONS[platform]}
+          {PLATFORM_BADGES[platform]}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+          <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
             {PLATFORM_NAMES[platform]}
           </p>
           {isConnected && account?.accountHandle ? (
-            <p className="truncate text-sm text-[#6b6560] dark:text-[#a39e98]">
+            <p className="truncate font-mono text-xs text-stone-500">
               {account.accountHandle}
             </p>
           ) : (
-            <p className="text-sm text-[#a39e98]">Click to connect</p>
+            <p className="font-mono text-xs text-stone-400">Click to connect</p>
           )}
         </div>
         {isConnected ? (
-          <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-[#7a9e7a]" />
+          <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-emerald-600">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Active
+          </span>
         ) : (
-          <div className="h-5 w-5 flex-shrink-0 rounded-full border-2 border-[#e5e3de] transition-colors group-hover:border-[#c9a55c] dark:border-[#3d3a36]" />
+          <span className="font-mono text-[10px] uppercase tracking-widest text-stone-300">
+            Inactive
+          </span>
         )}
       </div>
 
       {/* Action buttons for connected accounts */}
       {isConnected && (
-        <div className="mt-3 flex items-center gap-2 border-t border-[#f5f3ee] pt-3 dark:border-[#3d3a36]">
+        <div className="mt-3 flex items-center gap-2 border-t border-stone-200 pt-3 dark:border-stone-700">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onConfigure();
             }}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#f5f3ee] px-3 py-1.5 text-xs font-medium text-[#6b6560] transition-colors hover:bg-[#e5e3de] hover:text-[#2d2a26] dark:bg-[#2d2a26] dark:text-[#a39e98] dark:hover:bg-[#3d3a36] dark:hover:text-[#f5f3ee]"
+            className="flex-1 font-mono text-[10px] uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 dark:hover:text-stone-100"
           >
-            <Settings className="h-3 w-3" />
             Configure
           </button>
           <button
@@ -437,10 +417,9 @@ function AccountCard({
               e.stopPropagation();
               onToggle();
             }}
-            className="flex items-center justify-center gap-1.5 rounded-lg bg-[#c95c5c]/10 px-3 py-1.5 text-xs font-medium text-[#c95c5c] transition-colors hover:bg-[#c95c5c]/20"
+            className="font-mono text-[10px] uppercase tracking-widest text-red-500 transition-colors hover:text-red-700"
             title="Pause this account"
           >
-            <Pause className="h-3 w-3" />
             Pause
           </button>
         </div>
@@ -526,23 +505,23 @@ function AccountConfigDialog({
 
   return (
     <Dialog open={!!platform} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md bg-white dark:bg-[#252320]">
+      <DialogContent className="max-w-md border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3 text-[#2d2a26] dark:text-[#f5f3ee]">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2d2a26] text-lg text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]">
-              {PLATFORM_ICONS[platform]}
+          <DialogTitle className="flex items-center gap-3 text-stone-900 dark:text-stone-100">
+            <div className="flex h-8 w-8 items-center justify-center border border-stone-900 font-mono text-xs font-medium dark:border-stone-100">
+              {PLATFORM_BADGES[platform]}
             </div>
             {existingAccount ? "Configure" : "Connect"} {PLATFORM_NAMES[platform]}
           </DialogTitle>
-          <DialogDescription className="text-[#6b6560] dark:text-[#a39e98]">
-            Enter your API credentials to enable automated posting.
+          <DialogDescription className="font-mono text-xs text-stone-500">
+            Enter your API credentials to enable automated posting
           </DialogDescription>
         </DialogHeader>
 
-        <div className="mt-4 space-y-4">
+        <div className="mt-6 space-y-4">
           {/* Account Name */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-stone-400">
               Account Name
             </label>
             <input
@@ -550,13 +529,13 @@ function AccountConfigDialog({
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
               placeholder="Paisaxe"
-              className="w-full rounded-xl border border-[#e5e3de] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#c9a55c] dark:border-[#3d3a36] dark:bg-[#2d2a26] dark:text-[#f5f3ee]"
+              className="w-full border border-stone-200 bg-transparent px-3 py-2 text-sm text-stone-900 placeholder-stone-300 outline-none transition-colors focus:border-stone-400 dark:border-stone-700 dark:text-stone-100"
             />
           </div>
 
           {/* Account Handle */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-stone-400">
               Handle / Username
             </label>
             <input
@@ -564,20 +543,20 @@ function AccountConfigDialog({
               value={accountHandle}
               onChange={(e) => setAccountHandle(e.target.value)}
               placeholder="@paisaxe"
-              className="w-full rounded-xl border border-[#e5e3de] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#c9a55c] dark:border-[#3d3a36] dark:bg-[#2d2a26] dark:text-[#f5f3ee]"
+              className="w-full border border-stone-200 bg-transparent px-3 py-2 text-sm text-stone-900 placeholder-stone-300 outline-none transition-colors focus:border-stone-400 dark:border-stone-700 dark:text-stone-100"
             />
           </div>
 
           {/* Credential Fields */}
-          <div className="space-y-3 border-t border-[#f5f3ee] pt-4 dark:border-[#3d3a36]">
-            <p className="text-xs font-medium uppercase tracking-wide text-[#a39e98]">
+          <div className="space-y-3 border-t border-stone-200 pt-4 dark:border-stone-800">
+            <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
               API Credentials
             </p>
             {credentialFields.map((field) => (
               <div key={field.key}>
-                <label className="mb-1.5 flex items-center gap-1 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                <label className="mb-2 flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-stone-400">
                   {field.label}
-                  {field.required && <span className="text-[#c95c5c]">*</span>}
+                  {field.required && <span className="text-red-500">*</span>}
                 </label>
                 <div className="relative">
                   <input
@@ -587,14 +566,14 @@ function AccountConfigDialog({
                       setCredentials((prev) => ({ ...prev, [field.key]: e.target.value }))
                     }
                     placeholder={field.placeholder}
-                    className="w-full rounded-xl border border-[#e5e3de] bg-white px-4 py-2.5 pr-10 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#c9a55c] dark:border-[#3d3a36] dark:bg-[#2d2a26] dark:text-[#f5f3ee]"
+                    className="w-full border border-stone-200 bg-transparent px-3 py-2 pr-10 text-sm text-stone-900 placeholder-stone-300 outline-none transition-colors focus:border-stone-400 dark:border-stone-700 dark:text-stone-100"
                   />
                   <button
                     type="button"
                     onClick={() =>
                       setShowSecrets((prev) => ({ ...prev, [field.key]: !prev[field.key] }))
                     }
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#a39e98] hover:text-[#6b6560]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
                   >
                     {showSecrets[field.key] ? (
                       <EyeOff className="h-4 w-4" />
@@ -609,25 +588,25 @@ function AccountConfigDialog({
 
           {/* Error */}
           {error && (
-            <div className="flex items-center gap-2 rounded-xl bg-[#c95c5c]/10 px-4 py-3 text-sm text-[#c95c5c]">
+            <div className="flex items-center gap-2 font-mono text-xs text-red-600">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
               {error}
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-3 border-t border-[#f5f3ee] pt-4 dark:border-[#3d3a36]">
+          <div className="flex items-center gap-3 border-t border-stone-200 pt-4 dark:border-stone-800">
             <Button
               variant="ghost"
               onClick={onClose}
-              className="flex-1 rounded-xl text-[#6b6560] hover:bg-[#f5f3ee] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:bg-[#2d2a26] dark:hover:text-[#f5f3ee]"
+              className="flex-1 font-mono text-xs uppercase tracking-widest text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 rounded-xl bg-[#2d2a26] text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+              className="flex-1 bg-stone-900 font-mono text-xs uppercase tracking-widest text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200"
             >
               {isSaving ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -644,18 +623,18 @@ function AccountConfigDialog({
   );
 }
 
-// Post Card Component
-function PostCard({ post }: { post: MarketingPost }) {
-  const statusColors = {
-    draft: "text-[#a39e98]",
-    scheduled: "text-[#c9a55c]",
-    posting: "text-[#6b9bd2]",
-    posted: "text-[#7a9e7a]",
-    failed: "text-[#c95c5c]",
+// Post Row Component (for table layout)
+function PostRow({ post, index }: { post: MarketingPost; index: number }) {
+  const statusStyles = {
+    draft: "text-stone-400",
+    scheduled: "text-amber-600",
+    posting: "text-blue-600",
+    posted: "text-emerald-600",
+    failed: "text-red-600",
   };
 
   const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return null;
+    if (!dateStr) return "—";
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", {
       month: "short",
@@ -666,133 +645,67 @@ function PostCard({ post }: { post: MarketingPost }) {
   };
 
   return (
-    <div className="flex items-start gap-3 rounded-xl bg-[#f5f3ee]/50 p-3 dark:bg-[#2d2a26]/50">
-      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white text-sm dark:bg-[#252320]">
-        {PLATFORM_ICONS[post.platform]}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 text-sm text-[#2d2a26] dark:text-[#f5f3ee]">
+    <tr>
+      <td className="py-3 font-mono text-sm tabular-nums text-stone-300">
+        {String(index + 1).padStart(2, '0')}
+      </td>
+      <td className="py-3">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-stone-200 font-mono text-[10px] font-medium text-stone-600 dark:border-stone-700 dark:text-stone-400">
+          {PLATFORM_BADGES[post.platform]}
+        </span>
+      </td>
+      <td className="max-w-xs py-3">
+        <p className="truncate text-sm text-stone-700 dark:text-stone-300">
           {post.content}
         </p>
-        <div className="mt-1 flex items-center gap-2 text-xs">
-          <span className={statusColors[post.status]}>{post.status}</span>
-          {post.scheduledFor && post.status === "scheduled" && (
-            <span className="text-[#a39e98]">
-              {formatDate(post.scheduledFor)}
-            </span>
-          )}
-          {post.postedAt && post.status === "posted" && (
-            <span className="text-[#a39e98]">{formatDate(post.postedAt)}</span>
-          )}
-        </div>
-      </div>
-      {post.postUrl && (
-        <a
-          href={post.postUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-shrink-0 text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
-        >
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      )}
-    </div>
-  );
-}
-
-// Schedule Card Component
-function ScheduleCard({
-  platform,
-  schedules,
-}: {
-  platform: MarketingPlatform;
-  schedules: MarketingSchedule[];
-}) {
-  if (schedules.length === 0) {
-    return (
-      <div className="rounded-xl bg-[#f5f3ee]/50 p-4 dark:bg-[#2d2a26]/50">
-        <div className="mb-2 flex items-center gap-2">
-          <span className="text-sm">{PLATFORM_ICONS[platform]}</span>
-          <span className="text-sm font-medium text-[#6b6560] dark:text-[#a39e98]">
-            {PLATFORM_NAMES[platform]}
+      </td>
+      <td className="py-3 text-right">
+        {post.status === "scheduled" && post.scheduledFor ? (
+          <span className="font-mono text-xs text-stone-500">
+            {formatDate(post.scheduledFor)}
           </span>
-        </div>
-        <p className="text-xs text-[#a39e98]">No schedule set</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-xl bg-[#f5f3ee]/50 p-4 dark:bg-[#2d2a26]/50">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="text-sm">{PLATFORM_ICONS[platform]}</span>
-        <span className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
-          {PLATFORM_NAMES[platform]}
-        </span>
-      </div>
-      <div className="space-y-1">
-        {schedules.map((schedule) => (
-          <div
-            key={schedule.id}
-            className="flex items-center justify-between text-xs"
+        ) : (
+          <span className={cn("font-mono text-xs uppercase", statusStyles[post.status])}>
+            {post.status}
+          </span>
+        )}
+        {post.postUrl && (
+          <a
+            href={post.postUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 inline-block text-stone-400 hover:text-stone-600"
           >
-            <span className="text-[#6b6560] dark:text-[#a39e98]">
-              {schedule.dayOfWeek !== null
-                ? DAY_NAMES[schedule.dayOfWeek]
-                : "Daily"}
-            </span>
-            <span className="font-mono text-[#2d2a26] dark:text-[#f5f3ee]">
-              {schedule.timeUtc} UTC
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+      </td>
+    </tr>
   );
 }
 
-// Stat Card Component
+// Stat Card Component (Swiss Minimal style)
 function StatCard({
-  icon,
+  number,
   value,
   label,
-  variant,
+  isError = false,
 }: {
-  icon: React.ReactNode;
+  number: string;
   value: number;
   label: string;
-  variant: "default" | "warning" | "error";
+  isError?: boolean;
 }) {
-  const variants = {
-    default: {
-      bg: "bg-white dark:bg-[#252320]",
-      icon: "text-[#6b6560] dark:text-[#a39e98]",
-      text: "text-[#2d2a26] dark:text-[#f5f3ee]",
-      subtext: "text-[#6b6560] dark:text-[#a39e98]",
-    },
-    warning: {
-      bg: "bg-white dark:bg-[#252320]",
-      icon: "text-[#c9a55c]",
-      text: "text-[#2d2a26] dark:text-[#f5f3ee]",
-      subtext: "text-[#6b6560] dark:text-[#a39e98]",
-    },
-    error: {
-      bg: "bg-[#c95c5c]/10 dark:bg-[#c95c5c]/20",
-      icon: "text-[#c95c5c]",
-      text: "text-[#c95c5c]",
-      subtext: "text-[#c95c5c]/70",
-    },
-  };
-
-  const v = variants[variant];
-
   return (
-    <div className={cn("rounded-2xl p-5", v.bg)}>
-      <div className={cn("mb-3", v.icon)}>{icon}</div>
-      <p className={cn("text-3xl font-semibold tabular-nums", v.text)}>
-        {value}
+    <div>
+      <p className="font-mono text-xs tabular-nums text-stone-300">{number}</p>
+      <p className={cn(
+        "mt-2 text-5xl font-extralight tabular-nums tracking-tighter",
+        isError && value > 0 ? "text-red-500" : "text-stone-900 dark:text-stone-100"
+      )}>
+        {value.toLocaleString()}
       </p>
-      <p className={cn("mt-1 text-sm", v.subtext)}>{label}</p>
+      <p className="mt-2 font-mono text-xs uppercase tracking-widest text-stone-400">{label}</p>
     </div>
   );
 }
