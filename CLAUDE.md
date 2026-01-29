@@ -132,6 +132,7 @@ A year from now, if Paisaxe is working:
 | AI Chat | Claude API (Anthropic) |
 | Embeddings | Voyage AI (voyage-3) |
 | Reranking | Voyage AI (rerank-2.5) |
+| Voice Agents | ElevenLabs Conversational AI |
 | Testing | Vitest + React Testing Library + Playwright |
 | Deployment | Vercel |
 
@@ -298,15 +299,23 @@ paisaxe/
 │   │   └── api/
 │   │       ├── chat/           # Chat endpoint
 │   │       ├── health/         # Health check endpoint (uptime monitoring)
+│   │       ├── admin/
+│   │       │   └── elevenlabs-analytics/  # Voice agent metrics API
 │   │       └── webhooks/
 │   │           └── supabase/   # Database webhook receiver (cache invalidation)
 │   ├── components/
 │   │   ├── ui/                 # shadcn/ui components
+│   │   ├── admin/              # Admin panel components
+│   │   │   └── elevenlabs-analytics-panel.tsx  # Voice agent metrics
 │   │   └── immersive/          # Story viewer & voice chat
+│   │       └── voice-chat-elevenlabs.tsx  # ElevenLabs voice UI
+│   ├── config/
+│   │   └── elevenlabs-agents.ts  # Voice agent IDs configuration
 │   ├── hooks/
 │   │   ├── use-admin-role.ts              # Client-side admin role check (RBAC)
 │   │   ├── use-realtime-feature-flags.ts  # Live feature flag sync via Realtime
-│   │   └── use-realtime-stories.ts        # Live story update notifications
+│   │   ├── use-realtime-stories.ts        # Live story update notifications
+│   │   └── use-visitor-voice-access.ts    # Voice agent feature flag check
 │   ├── lib/
 │   │   ├── supabase.ts         # Supabase client
 │   │   ├── supabase-browser.ts # Browser Supabase client (SSR)
@@ -318,7 +327,8 @@ paisaxe/
 │   │   └── stories-data.ts     # Story content data
 │   └── types/
 │       ├── index.ts            # Core TypeScript types
-│       └── immersive.ts        # Immersive mode types
+│       ├── immersive.ts        # Immersive mode types
+│       └── elevenlabs-analytics.ts  # Voice agent analytics types
 ├── content/
 │   └── pdfs/                   # Source PDF files
 ├── scripts/
@@ -372,6 +382,7 @@ Required in `.env.local`:
 # AI Services
 ANTHROPIC_API_KEY=       # Claude API key
 VOYAGE_API_KEY=          # Voyage AI key for embeddings
+ELEVENLABS_API_KEY=      # ElevenLabs voice agents (optional)
 
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
@@ -434,6 +445,16 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 - Support markdown in responses
 - Display related images from PDFs inline
 - Show source attribution (which guide, which section)
+
+### Voice Agents (ElevenLabs)
+ElevenLabs Conversational AI powers interactive voice guides for immersive storytelling:
+- **Pelayo** - Default visitor guide for story exploration
+- WebSocket-based real-time voice streaming
+- Automatic speech recognition + text-to-speech
+- Conversation transcript displayed alongside voice UI
+- Gated by `visitor_voice_agent` feature flag (toggle in admin panel)
+- Agent IDs configured in `src/config/elevenlabs-agents.ts`
+- Admin analytics dashboard shows conversation metrics, agent usage, and active calls
 
 ## Code Style
 
