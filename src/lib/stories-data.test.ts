@@ -288,11 +288,10 @@ describe("stories-data", () => {
     });
 
     it("should return stories from database when successful", async () => {
-      const mockSelect = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [mockStoryRow], error: null }),
-        }),
-      });
+      const mockOrder = vi.fn().mockResolvedValue({ data: [mockStoryRow], error: null });
+      const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesFromDB();
@@ -302,12 +301,25 @@ describe("stories-data", () => {
       expect(result[0].slug).toBe("test-story");
     });
 
+    it("should filter by curation_status approved", async () => {
+      const mockOrder = vi.fn().mockResolvedValue({ data: [mockStoryRow], error: null });
+      const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      await getStoriesFromDB();
+
+      // Verify both filters are applied: is_active and curation_status
+      expect(mockEqActive).toHaveBeenCalledWith("is_active", true);
+      expect(mockEqCuration).toHaveBeenCalledWith("curation_status", "approved");
+    });
+
     it("should return fallback stories on database error", async () => {
-      const mockSelect = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } }),
-        }),
-      });
+      const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } });
+      const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesFromDB();
@@ -316,11 +328,10 @@ describe("stories-data", () => {
     });
 
     it("should return fallback stories when data is empty", async () => {
-      const mockSelect = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      });
+      const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null });
+      const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesFromDB();
@@ -345,11 +356,10 @@ describe("stories-data", () => {
     });
 
     it("should call getStoriesFromDB when category is null", async () => {
-      const mockSelect = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [mockStoryRow], error: null }),
-        }),
-      });
+      const mockOrder = vi.fn().mockResolvedValue({ data: [mockStoryRow], error: null });
+      const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesByCategoryFromDB(null);
@@ -358,12 +368,11 @@ describe("stories-data", () => {
     });
 
     it("should return stories filtered by category from database", async () => {
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [mockStoryRow], error: null }),
-        }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockOrder = vi.fn().mockResolvedValue({ data: [mockStoryRow], error: null });
+      const mockEqCategory = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqCategory });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesByCategoryFromDB("nature");
@@ -373,12 +382,11 @@ describe("stories-data", () => {
     });
 
     it("should return filtered fallback stories on error", async () => {
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: null, error: { message: "Error" } }),
-        }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "Error" } });
+      const mockEqCategory = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqCategory });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesByCategoryFromDB("nature");
@@ -388,12 +396,11 @@ describe("stories-data", () => {
     });
 
     it("should return filtered fallback stories when data is empty", async () => {
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null });
+      const mockEqCategory = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqCategory });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesByCategoryFromDB("nature");
@@ -420,12 +427,11 @@ describe("stories-data", () => {
 
     it("should return stories filtered by location from database", async () => {
       const locationRow = { ...mockStoryRow, location: "eastern" };
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [locationRow], error: null }),
-        }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockOrder = vi.fn().mockResolvedValue({ data: [locationRow], error: null });
+      const mockEqLocation = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqLocation });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesByLocationFromDB("eastern");
@@ -435,12 +441,11 @@ describe("stories-data", () => {
     });
 
     it("should return filtered fallback stories on error", async () => {
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: null, error: { message: "Error" } }),
-        }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "Error" } });
+      const mockEqLocation = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqLocation });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesByLocationFromDB("eastern");
@@ -450,12 +455,11 @@ describe("stories-data", () => {
     });
 
     it("should return filtered fallback stories when data is empty", async () => {
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null });
+      const mockEqLocation = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqLocation });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesByLocationFromDB("western");
@@ -482,12 +486,11 @@ describe("stories-data", () => {
 
     it("should return stories filtered by duration from database", async () => {
       const durationRow = { ...mockStoryRow, duration: "weekend" };
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [durationRow], error: null }),
-        }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockOrder = vi.fn().mockResolvedValue({ data: [durationRow], error: null });
+      const mockEqDuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqDuration });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesByDurationFromDB("weekend");
@@ -497,12 +500,11 @@ describe("stories-data", () => {
     });
 
     it("should return filtered fallback stories on error", async () => {
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: null, error: { message: "Error" } }),
-        }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "Error" } });
+      const mockEqDuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqDuration });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesByDurationFromDB("day-trip");
@@ -512,12 +514,11 @@ describe("stories-data", () => {
     });
 
     it("should return filtered fallback stories when data is empty", async () => {
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null });
+      const mockEqDuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqDuration });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoriesByDurationFromDB("day-trip");
@@ -544,10 +545,10 @@ describe("stories-data", () => {
 
     it("should return story from database when found", async () => {
       const mockSingle = vi.fn().mockResolvedValue({ data: mockStoryRow, error: null });
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({ single: mockSingle }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoryBySlugFromDB("test-story");
@@ -558,10 +559,10 @@ describe("stories-data", () => {
 
     it("should return fallback story on database error", async () => {
       const mockSingle = vi.fn().mockResolvedValue({ data: null, error: { message: "Not found" } });
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({ single: mockSingle }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoryBySlugFromDB("lagos-covadonga");
@@ -572,10 +573,10 @@ describe("stories-data", () => {
 
     it("should return null when story not found in fallback", async () => {
       const mockSingle = vi.fn().mockResolvedValue({ data: null, error: { message: "Not found" } });
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({ single: mockSingle }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoryBySlugFromDB("non-existent-slug");
@@ -585,10 +586,10 @@ describe("stories-data", () => {
 
     it("should return null when data is null", async () => {
       const mockSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({ single: mockSingle }),
-      });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
       mockSupabaseFrom.mockReturnValue({ select: mockSelect });
 
       const result = await getStoryBySlugFromDB("test");

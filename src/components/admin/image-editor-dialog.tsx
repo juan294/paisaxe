@@ -294,7 +294,7 @@ export function ImageEditorDialog({
   return (
     <>
       <Dialog open={!!story} onOpenChange={resetAndClose}>
-        <DialogContent className="max-w-xl gap-0 overflow-hidden rounded-2xl border-white/50 bg-white/80 p-0 shadow-xl shadow-black/10 backdrop-blur-xl">
+        <DialogContent hideCloseButton className="max-w-xl gap-0 overflow-hidden rounded-2xl border-white/50 bg-white/80 p-0 shadow-xl shadow-black/10 backdrop-blur-xl">
           {/* Header */}
           <DialogHeader className="border-b border-slate-100/80 px-5 py-4">
             <div className="flex items-center justify-between">
