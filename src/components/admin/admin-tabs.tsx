@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-export type AdminTab = "stories" | "toggles" | "analytics";
+export type AdminTab = "stories" | "toggles" | "analytics" | "marketing";
 
 interface AdminTabsProps {
   activeTab: AdminTab;
@@ -13,6 +13,7 @@ const TABS: { value: AdminTab; label: string }[] = [
   { value: "stories", label: "Stories" },
   { value: "toggles", label: "Toggles" },
   { value: "analytics", label: "Analytics" },
+  { value: "marketing", label: "Marketing" },
 ];
 
 export function AdminTabs({ activeTab, onTabChange }: AdminTabsProps) {
