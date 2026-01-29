@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { AgentChat } from "./agent-chat";
 import {
   RefreshCw,
   AlertCircle,
@@ -330,6 +331,11 @@ export function MarketingDashboard() {
             </div>
           )}
         </div>
+      </section>
+
+      {/* Marketing Agents Chat */}
+      <section>
+        <AgentChat />
       </section>
 
       {/* Setup Instructions */}
