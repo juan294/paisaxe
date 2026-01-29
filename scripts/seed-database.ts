@@ -29,7 +29,7 @@ if (voyageApiKey) {
   voyage = new VoyageAIClient({ apiKey: voyageApiKey });
 }
 
-const CONTEXTUALIZED_MODEL = "voyage-context-3";
+const CONTEXTUALIZED_MODEL = "voyage-3";
 const EMBEDDING_DIMENSIONS = 512; // Matryoshka embeddings: reduce from 1024 to save ~50% storage
 // Voyage AI Tier 1 rate limits: 2,000 RPM / 8M TPM — no fixed delay needed
 const MAX_RETRIES = 3; // Max retries on 429 rate limit errors

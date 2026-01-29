@@ -94,7 +94,7 @@ describe("StoryCard", () => {
     it("should show needs curation badge for stories without image", () => {
       const storyWithoutImage = { ...mockStory, image: "" };
       render(<StoryCard story={storyWithoutImage} onEdit={mockOnEdit} />);
-      expect(screen.getByText("Needs curation")).toBeInTheDocument();
+      expect(screen.getByText("Pending")).toBeInTheDocument();
     });
   });
 
@@ -142,7 +142,7 @@ describe("StoryCard", () => {
     it("should not show needs curation badge for approved stories without image", () => {
       const approvedWithoutImage = { ...mockStory, image: "", curationStatus: "approved" as const };
       render(<StoryCard story={approvedWithoutImage} onEdit={mockOnEdit} />);
-      expect(screen.queryByText("Needs curation")).not.toBeInTheDocument();
+      expect(screen.queryByText("Pending")).not.toBeInTheDocument();
     });
   });
 

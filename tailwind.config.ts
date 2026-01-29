@@ -55,6 +55,15 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      keyframes: {
+        soundbar: {
+          "0%, 100%": { transform: "scaleY(1)" },
+          "50%": { transform: "scaleY(0.6)" },
+        },
+      },
+      animation: {
+        soundbar: "soundbar 0.8s ease-in-out infinite",
+      },
     },
   },
   plugins: [],

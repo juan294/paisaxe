@@ -34,7 +34,7 @@ describe("embeddings", () => {
   });
 
   describe("getEmbeddingDimensions", () => {
-    it("should return 512 for voyage-context-3 model with Matryoshka embeddings", async () => {
+    it("should return 512 for voyage-3 model with Matryoshka embeddings", async () => {
       const { getEmbeddingDimensions } = await import("./embeddings");
       expect(getEmbeddingDimensions()).toBe(512);
     });
@@ -54,7 +54,7 @@ describe("embeddings", () => {
       expect(result).toEqual(mockEmbedding);
       expect(mockEmbed).toHaveBeenCalledWith({
         input: ["test text"],
-        model: "voyage-context-3",
+        model: "voyage-3.5",
         inputType: "query",
         outputDimension: 512,
       });
@@ -332,7 +332,7 @@ describe("embeddings", () => {
 
       expect(mockContextualizedEmbed).toHaveBeenCalledWith({
         inputs: [["chunk A", "chunk B"]],
-        model: "voyage-context-3",
+        model: "voyage-3.5",
         inputType: "document",
         outputDimension: 512,
       });

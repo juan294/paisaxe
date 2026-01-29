@@ -16,19 +16,48 @@ export async function PUT(
   try {
     const { key } = await params;
     const body = await request.json();
-    const { enabled } = body;
+    const { enabled, config } = body;
 
-    if (typeof enabled !== "boolean") {
+    // Validate enabled if provided (must be boolean if present)
+    if (enabled !== undefined && typeof enabled !== "boolean") {
       return NextResponse.json(
         { error: "enabled must be a boolean" },
         { status: 400 }
       );
     }
 
+    // Validate config if provided (must be a plain object)
+    if (config !== undefined && (typeof config !== "object" || config === null || Array.isArray(config))) {
+      return NextResponse.json(
+        { error: "config must be an object" },
+        { status: 400 }
+      );
+    }
+
+    // Validate that at least one valid field is provided
+    const hasEnabled = typeof enabled === "boolean";
+    const hasConfig = config !== undefined;
+
+    if (!hasEnabled && !hasConfig) {
+      return NextResponse.json(
+        { error: "Must provide enabled (boolean) or config (object)" },
+        { status: 400 }
+      );
+    }
+
+    // Build update object with only the provided fields
+    const updateData: { enabled?: boolean; config?: Record<string, unknown> } = {};
+    if (hasEnabled) {
+      updateData.enabled = enabled;
+    }
+    if (hasConfig) {
+      updateData.config = config;
+    }
+
     const adminClient = createAdminClient();
     const { data, error } = await adminClient
       .from("feature_flags")
-      .update({ enabled })
+      .update(updateData)
       .eq("flag_key", key)
       .select()
       .single();

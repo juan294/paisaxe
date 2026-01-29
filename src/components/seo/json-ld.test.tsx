@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/react";
-import { JsonLd } from "./json-ld";
+import { JsonLd, StoryJsonLd, BreadcrumbJsonLd, FAQJsonLd } from "./json-ld";
+import type { Story } from "@/types/immersive";
 
 describe("JsonLd", () => {
   it("renders website structured data", () => {
@@ -117,5 +118,336 @@ describe("JsonLd", () => {
       const data = JSON.parse(script!.textContent!);
       expect(data.potentialAction.target).toContain(CUSTOM_URL);
     });
+  });
+});
+
+describe("StoryJsonLd", () => {
+  const mockNatureStory: Story = {
+    id: "test-123",
+    slug: "lagos-covadonga",
+    title: "Lagos de Covadonga",
+    subtitle: "Los lagos glaciares más famosos de Asturias",
+    description:
+      "Descubre la belleza de los lagos Enol y Ercina en los Picos de Europa.",
+    image: "/images/stories/lagos-covadonga.png",
+    category: "nature",
+    sourcePdf: "picos-europa.pdf",
+    location: "eastern",
+    metadata: {
+      question_prompts: [
+        "¿Cómo llegar a los Lagos de Covadonga?",
+        "¿Cuál es la mejor época para visitar?",
+      ],
+    },
+  };
+
+  const mockFoodStory: Story = {
+    id: "test-456",
+    slug: "fabada-asturiana",
+    title: "Fabada Asturiana",
+    subtitle: "El plato más emblemático de la gastronomía asturiana",
+    description:
+      "La fabada es un guiso tradicional hecho con fabes de la granja.",
+    image: "/images/stories/fabada.png",
+    category: "food",
+    sourcePdf: "gastronomia.pdf",
+    location: "central",
+  };
+
+  it("renders TouristAttraction schema for nature stories", () => {
+    const { container } = render(<StoryJsonLd story={mockNatureStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+
+    expect(script).toBeInTheDocument();
+    const data = JSON.parse(script!.textContent!);
+    expect(data["@context"]).toBe("https://schema.org");
+    expect(data["@type"]).toBe("TouristAttraction");
+    expect(data.name).toBe("Lagos de Covadonga");
+    expect(data.description).toBe(mockNatureStory.description);
+  });
+
+  it("renders TouristAttraction schema for activities stories", () => {
+    const activityStory: Story = {
+      ...mockNatureStory,
+      category: "activities",
+      title: "Ruta del Cares",
+    };
+    const { container } = render(<StoryJsonLd story={activityStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+    expect(data["@type"]).toBe("TouristAttraction");
+  });
+
+  it("renders TouristAttraction schema for culture stories", () => {
+    const cultureStory: Story = {
+      ...mockNatureStory,
+      category: "culture",
+      title: "Prerrománico Asturiano",
+    };
+    const { container } = render(<StoryJsonLd story={cultureStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+    expect(data["@type"]).toBe("TouristAttraction");
+  });
+
+  it("renders Restaurant schema for food stories", () => {
+    const { container } = render(<StoryJsonLd story={mockFoodStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+
+    expect(script).toBeInTheDocument();
+    const data = JSON.parse(script!.textContent!);
+    expect(data["@context"]).toBe("https://schema.org");
+    expect(data["@type"]).toBe("Restaurant");
+    expect(data.name).toBe("Fabada Asturiana");
+    expect(data.servesCuisine).toBe("Asturian");
+  });
+
+  it("includes geo coordinates for location-based stories", () => {
+    const { container } = render(<StoryJsonLd story={mockNatureStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.geo).toBeDefined();
+    expect(data.geo["@type"]).toBe("GeoCoordinates");
+    expect(data.geo.latitude).toBeDefined();
+    expect(data.geo.longitude).toBeDefined();
+  });
+
+  it("includes image URL in schema", () => {
+    const { container } = render(<StoryJsonLd story={mockNatureStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.image).toContain("lagos-covadonga.png");
+  });
+
+  it("includes isPartOf reference to Paisaxe", () => {
+    const { container } = render(<StoryJsonLd story={mockNatureStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.isPartOf).toBeDefined();
+    expect(data.isPartOf.name).toBe("Paisaxe");
+  });
+
+  it("renders TouristAttraction for cities stories", () => {
+    const citiesStory: Story = {
+      ...mockNatureStory,
+      category: "cities",
+      title: "Oviedo",
+    };
+    const { container } = render(<StoryJsonLd story={citiesStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+    expect(data["@type"]).toBe("TouristAttraction");
+  });
+
+  it("uses correct geo coordinates for eastern location", () => {
+    const { container } = render(<StoryJsonLd story={mockNatureStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    // Eastern Asturias coordinates (Cangas de Onís area)
+    expect(data.geo.latitude).toBe(43.35);
+    expect(data.geo.longitude).toBe(-4.85);
+  });
+
+  it("uses correct geo coordinates for central location", () => {
+    const { container } = render(<StoryJsonLd story={mockFoodStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    // Central Asturias coordinates (Oviedo/Gijón area)
+    expect(data.geo.latitude).toBe(43.36);
+    expect(data.geo.longitude).toBe(-5.85);
+  });
+
+  it("defaults to central coordinates when no location specified", () => {
+    const storyNoLocation: Story = {
+      ...mockNatureStory,
+      location: undefined,
+    };
+    const { container } = render(<StoryJsonLd story={storyNoLocation} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.geo.latitude).toBe(43.36);
+    expect(data.geo.longitude).toBe(-5.85);
+  });
+});
+
+describe("BreadcrumbJsonLd", () => {
+  it("renders BreadcrumbList schema", () => {
+    const { container } = render(
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Inicio", url: "/" },
+          { name: "Explorar", url: "/immersive" },
+          {
+            name: "Lagos de Covadonga",
+            url: "/immersive?story=lagos-covadonga",
+          },
+        ]}
+      />
+    );
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+
+    expect(script).toBeInTheDocument();
+    const data = JSON.parse(script!.textContent!);
+    expect(data["@context"]).toBe("https://schema.org");
+    expect(data["@type"]).toBe("BreadcrumbList");
+  });
+
+  it("renders correct number of items", () => {
+    const { container } = render(
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Inicio", url: "/" },
+          { name: "Explorar", url: "/immersive" },
+        ]}
+      />
+    );
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.itemListElement).toHaveLength(2);
+  });
+
+  it("includes position for each item", () => {
+    const { container } = render(
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Inicio", url: "/" },
+          { name: "Explorar", url: "/immersive" },
+        ]}
+      />
+    );
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.itemListElement[0].position).toBe(1);
+    expect(data.itemListElement[1].position).toBe(2);
+  });
+
+  it("includes ListItem type for each item", () => {
+    const { container } = render(
+      <BreadcrumbJsonLd items={[{ name: "Inicio", url: "/" }]} />
+    );
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.itemListElement[0]["@type"]).toBe("ListItem");
+    expect(data.itemListElement[0].item["@type"]).toBe("WebPage");
+  });
+
+  it("prepends site URL to relative paths", () => {
+    const { container } = render(
+      <BreadcrumbJsonLd items={[{ name: "Explorar", url: "/immersive" }]} />
+    );
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.itemListElement[0].item["@id"]).toBe(
+      "https://paisaxe.com/immersive"
+    );
+  });
+});
+
+describe("FAQJsonLd", () => {
+  const questions = [
+    {
+      question: "¿Cómo llegar a los Lagos de Covadonga?",
+      answer: "Puedes llegar en coche o en autobús desde Cangas de Onís.",
+    },
+    {
+      question: "¿Cuál es la mejor época para visitar?",
+      answer:
+        "La mejor época es entre mayo y octubre, evitando agosto por las restricciones.",
+    },
+  ];
+
+  it("renders FAQPage schema", () => {
+    const { container } = render(<FAQJsonLd questions={questions} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+
+    expect(script).toBeInTheDocument();
+    const data = JSON.parse(script!.textContent!);
+    expect(data["@context"]).toBe("https://schema.org");
+    expect(data["@type"]).toBe("FAQPage");
+  });
+
+  it("includes correct number of questions", () => {
+    const { container } = render(<FAQJsonLd questions={questions} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.mainEntity).toHaveLength(2);
+  });
+
+  it("includes Question type for each item", () => {
+    const { container } = render(<FAQJsonLd questions={questions} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.mainEntity[0]["@type"]).toBe("Question");
+    expect(data.mainEntity[0].name).toBe(questions[0].question);
+  });
+
+  it("includes Answer type for each answer", () => {
+    const { container } = render(<FAQJsonLd questions={questions} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.mainEntity[0].acceptedAnswer["@type"]).toBe("Answer");
+    expect(data.mainEntity[0].acceptedAnswer.text).toBe(questions[0].answer);
+  });
+
+  it("returns null for empty questions array", () => {
+    const { container } = render(<FAQJsonLd questions={[]} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+
+    expect(script).not.toBeInTheDocument();
   });
 });

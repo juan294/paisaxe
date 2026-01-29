@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { fetchAnalytics } from "@/lib/admin-api";
-import { RefreshCw, AlertCircle, Eye, Users, Globe, Monitor, Link2, FileText, Calendar } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { RefreshCw, AlertCircle } from "lucide-react";
 import type {
   AnalyticsDashboardData,
   TopPage,
@@ -11,6 +10,7 @@ import type {
   CountryBreakdown,
   DeviceBreakdown,
 } from "@/types/analytics";
+import { ElevenLabsAnalyticsPanel } from "./elevenlabs-analytics-panel";
 
 export function AnalyticsDashboard() {
   const [data, setData] = useState<AnalyticsDashboardData | null>(null);
@@ -41,178 +41,116 @@ export function AnalyticsDashboard() {
     loadData();
   }, [loadData]);
 
-  // Calculate max for bar chart scaling
-  const maxPageCount = data?.topPages.reduce((max, p) => Math.max(max, p.count), 0) || 1;
-  const maxReferrerCount = data?.topReferrers.reduce((max, r) => Math.max(max, r.count), 0) || 1;
-  const maxCountryCount = data?.countries.reduce((max, c) => Math.max(max, c.count), 0) || 1;
-  const maxDeviceCount = data?.devices.reduce((max, d) => Math.max(max, d.count), 0) || 1;
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-16">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex items-end justify-between border-b border-stone-200 pb-6 dark:border-stone-800">
         <div>
-          <h2 className="text-2xl font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
-            Analytics
-          </h2>
-          <p className="mt-1 text-[#6b6560] dark:text-[#a39e98]">
-            Track visitor engagement and behavior
-          </p>
+          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">Admin / Analytics</p>
+          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-stone-900 dark:text-stone-100">
+            Visitor Data
+          </h1>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Date range picker */}
-          <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 dark:bg-[#252320]">
-            <Calendar className="h-4 w-4 text-[#a39e98]" />
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 font-mono text-xs text-stone-400">
             <input
               type="date"
               value={dateRange.from}
               onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
-              className="bg-transparent text-sm text-[#2d2a26] focus:outline-none dark:text-[#f5f3ee]"
+              className="bg-transparent outline-none"
             />
-            <span className="text-[#a39e98]">—</span>
+            <span>—</span>
             <input
               type="date"
               value={dateRange.to}
               onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
-              className="bg-transparent text-sm text-[#2d2a26] focus:outline-none dark:text-[#f5f3ee]"
+              className="bg-transparent outline-none"
             />
           </div>
           <button
             onClick={loadData}
             disabled={isLoading}
-            className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-xl transition-colors",
-              "text-[#6b6560] hover:bg-white hover:text-[#2d2a26]",
-              "dark:text-[#a39e98] dark:hover:bg-[#252320] dark:hover:text-[#f5f3ee]",
-              "disabled:opacity-50"
-            )}
+            className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 disabled:opacity-50 dark:hover:text-stone-100"
           >
-            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+            {isLoading ? "Loading..." : "Refresh"}
           </button>
         </div>
-      </div>
+      </header>
 
       {error && (
-        <div className="flex items-center gap-3 rounded-2xl bg-[#c9a55c]/10 px-5 py-4 text-sm text-[#8b6c2e] dark:bg-[#c9a55c]/20 dark:text-[#d4b876]">
-          <AlertCircle className="h-5 w-5 flex-shrink-0" />
-          <p>{error}</p>
+        <div className="flex items-center gap-3 font-mono text-xs text-red-600">
+          <AlertCircle className="h-4 w-4" />
+          {error}
         </div>
       )}
 
       {isLoading && !data ? (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-[#252320]">
-          <RefreshCw className="h-6 w-6 animate-spin text-[#a39e98]" />
-          <p className="mt-4 text-sm text-[#6b6560] dark:text-[#a39e98]">Loading analytics...</p>
+        <div className="flex min-h-[300px] items-center justify-center">
+          <RefreshCw className="h-5 w-5 animate-spin text-stone-300" />
         </div>
       ) : data && isEmptyData(data) ? (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-3xl bg-white p-8 dark:bg-[#252320]">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5f3ee] dark:bg-[#2d2a26]">
-            <Eye className="h-8 w-8 text-[#a39e98]" />
-          </div>
-          <p className="mt-4 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
-            No analytics data yet
-          </p>
-          <p className="mt-1 max-w-sm text-center text-sm text-[#6b6560] dark:text-[#a39e98]">
-            Data will appear here once visitors start browsing. PostHog tracks pageviews, referrers, countries, and devices automatically.
+        <div className="flex min-h-[300px] flex-col items-center justify-center gap-4">
+          <p className="text-2xl font-extralight text-stone-300">No data yet</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+            Visitor data will appear here once browsing begins
           </p>
         </div>
       ) : data ? (
         <>
-          {/* Summary cards */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl bg-white p-6 dark:bg-[#252320]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-4xl font-semibold tabular-nums text-[#2d2a26] dark:text-[#f5f3ee]">
-                    {data.summary.totalPageviews.toLocaleString()}
-                  </p>
-                  <p className="mt-1 text-sm text-[#6b6560] dark:text-[#a39e98]">
-                    Total Pageviews
-                  </p>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#c9a55c]/10 text-[#c9a55c] dark:bg-[#c9a55c]/20">
-                  <Eye className="h-6 w-6" />
-                </div>
-              </div>
+          {/* Large Stats */}
+          <section className="grid grid-cols-2 gap-16">
+            <div>
+              <p className="text-8xl font-extralight tabular-nums tracking-tighter text-stone-900 dark:text-stone-100">
+                {data.summary.totalPageviews.toLocaleString()}
+              </p>
+              <p className="mt-4 font-mono text-xs uppercase tracking-widest text-stone-400">Total Pageviews</p>
             </div>
-
-            <div className="rounded-2xl bg-white p-6 dark:bg-[#252320]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-4xl font-semibold tabular-nums text-[#2d2a26] dark:text-[#f5f3ee]">
-                    {data.summary.uniqueVisitors.toLocaleString()}
-                  </p>
-                  <p className="mt-1 text-sm text-[#6b6560] dark:text-[#a39e98]">
-                    Unique Visitors
-                  </p>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#7a9e7a]/10 text-[#7a9e7a] dark:bg-[#7a9e7a]/20">
-                  <Users className="h-6 w-6" />
-                </div>
-              </div>
+            <div>
+              <p className="text-8xl font-extralight tabular-nums tracking-tighter text-stone-900 dark:text-stone-100">
+                {data.summary.uniqueVisitors.toLocaleString()}
+              </p>
+              <p className="mt-4 font-mono text-xs uppercase tracking-widest text-stone-400">Unique Visitors</p>
             </div>
-          </div>
+          </section>
 
-          {/* Data sections */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <DataSection
+          {/* Data Tables */}
+          <div className="grid gap-16 lg:grid-cols-2">
+            <DataTable
+              number="01"
               title="Top Pages"
-              icon={<FileText className="h-4 w-4" />}
               items={data.topPages}
-              maxCount={maxPageCount}
-              color="gold"
-              renderItem={(item: TopPage) => (
-                <span className="truncate text-sm text-[#2d2a26] dark:text-[#f5f3ee]">
-                  {formatUrl(item.url)}
-                </span>
-              )}
+              renderItem={(item: TopPage) => formatUrl(item.url)}
               getCount={(item: TopPage) => item.count}
             />
-
-            <DataSection
+            <DataTable
+              number="02"
               title="Top Referrers"
-              icon={<Link2 className="h-4 w-4" />}
               items={data.topReferrers}
-              maxCount={maxReferrerCount}
-              color="sage"
-              renderItem={(item: TopReferrer) => (
-                <span className="truncate text-sm text-[#2d2a26] dark:text-[#f5f3ee]">
-                  {formatUrl(item.referrer)}
-                </span>
-              )}
+              renderItem={(item: TopReferrer) => formatUrl(item.referrer)}
               getCount={(item: TopReferrer) => item.count}
             />
-
-            <DataSection
+            <DataTable
+              number="03"
               title="Countries"
-              icon={<Globe className="h-4 w-4" />}
               items={data.countries}
-              maxCount={maxCountryCount}
-              color="gold"
-              renderItem={(item: CountryBreakdown) => (
-                <span className="text-sm text-[#2d2a26] dark:text-[#f5f3ee]">
-                  {item.country}
-                </span>
-              )}
+              renderItem={(item: CountryBreakdown) => item.country}
               getCount={(item: CountryBreakdown) => item.count}
             />
-
-            <DataSection
+            <DataTable
+              number="04"
               title="Devices"
-              icon={<Monitor className="h-4 w-4" />}
               items={data.devices}
-              maxCount={maxDeviceCount}
-              color="sage"
-              renderItem={(item: DeviceBreakdown) => (
-                <span className="text-sm capitalize text-[#2d2a26] dark:text-[#f5f3ee]">
-                  {item.device}
-                </span>
-              )}
+              renderItem={(item: DeviceBreakdown) => item.device}
               getCount={(item: DeviceBreakdown) => item.count}
             />
           </div>
         </>
       ) : null}
+
+      {/* ElevenLabs Voice Agent Analytics */}
+      <div className="mt-16 border-t border-stone-200 pt-16 dark:border-stone-800">
+        <ElevenLabsAnalyticsPanel />
+      </div>
     </div>
   );
 }
@@ -237,81 +175,61 @@ function formatUrl(url: string): string {
   }
 }
 
-interface DataSectionProps<T> {
+interface DataTableProps<T> {
+  number: string;
   title: string;
-  icon: React.ReactNode;
   items: T[];
-  maxCount: number;
-  color: "gold" | "sage";
-  renderItem: (item: T) => React.ReactNode;
+  renderItem: (item: T) => string;
   getCount: (item: T) => number;
 }
 
-const colorConfig = {
-  gold: {
-    icon: "bg-[#c9a55c]/10 text-[#c9a55c] dark:bg-[#c9a55c]/20",
-    bar: "bg-[#c9a55c]",
-  },
-  sage: {
-    icon: "bg-[#7a9e7a]/10 text-[#7a9e7a] dark:bg-[#7a9e7a]/20",
-    bar: "bg-[#7a9e7a]",
-  },
-};
-
-function DataSection<T>({
+function DataTable<T>({
+  number,
   title,
-  icon,
   items,
-  maxCount,
-  color,
   renderItem,
   getCount,
-}: DataSectionProps<T>) {
-  const colors = colorConfig[color];
-
+}: DataTableProps<T>) {
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl bg-white p-5 dark:bg-[#252320]">
-        <div className="flex items-center gap-3">
-          <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", colors.icon)}>
-            {icon}
-          </div>
-          <h3 className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">{title}</h3>
-        </div>
-        <p className="mt-4 text-sm text-[#6b6560] dark:text-[#a39e98]">No data available</p>
-      </div>
+      <section>
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+          {number} — {title}
+        </h2>
+        <p className="py-8 text-center font-mono text-xs text-stone-300">No data available</p>
+      </section>
     );
   }
 
   return (
-    <div className="rounded-2xl bg-white dark:bg-[#252320]">
-      <div className="flex items-center gap-3 border-b border-[#f5f3ee] px-5 py-4 dark:border-[#2d2a26]">
-        <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", colors.icon)}>
-          {icon}
-        </div>
-        <h3 className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">{title}</h3>
-      </div>
-      <div className="divide-y divide-[#f5f3ee]/50 dark:divide-[#2d2a26]/50">
-        {items.map((item, idx) => {
-          const count = getCount(item);
-          return (
-            <div key={idx} className="px-5 py-3">
-              <div className="mb-2 flex items-center justify-between">
+    <section>
+      <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+        {number} — {title}
+      </h2>
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-stone-200 text-left dark:border-stone-800">
+            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">#</th>
+            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Name</th>
+            <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Count</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+          {items.map((item, idx) => (
+            <tr key={idx}>
+              <td className="py-3 font-mono text-sm tabular-nums text-stone-300">
+                {String(idx + 1).padStart(2, '0')}
+              </td>
+              <td className="py-3 text-sm capitalize text-stone-700 dark:text-stone-300">
                 {renderItem(item)}
-                <span className="ml-3 text-sm font-medium tabular-nums text-[#6b6560] dark:text-[#a39e98]">
-                  {count.toLocaleString()}
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-[#f5f3ee] dark:bg-[#2d2a26]">
-                <div
-                  className={cn("h-full rounded-full transition-all duration-500", colors.bar)}
-                  style={{ width: `${(count / maxCount) * 100}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+              </td>
+              <td className="py-3 text-right font-mono text-sm tabular-nums text-stone-900 dark:text-stone-100">
+                {getCount(item).toLocaleString()}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }

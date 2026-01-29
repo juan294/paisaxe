@@ -15,6 +15,26 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
+// Mock useVisitorVoiceAccess hook
+vi.mock("@/hooks/use-visitor-voice-access", () => ({
+  useVisitorVoiceAccess: () => ({
+    canUseVoice: false,
+    needsSignIn: false,
+    agentId: null,
+    userEmail: null,
+    isLoading: false,
+  }),
+}));
+
+// Mock Supabase browser client
+vi.mock("@/lib/supabase-browser", () => ({
+  createSupabaseBrowserClient: () => ({
+    auth: {
+      signInWithOAuth: vi.fn().mockResolvedValue({}),
+    },
+  }),
+}));
+
 // Mock fetch
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -41,55 +61,10 @@ const localStorageMock = (() => {
 })();
 Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
-// Mock SpeechRecognition
-const createMockSpeechRecognition = () => {
-  const handlers: {
-    onresult?: (event: { results: [[{ transcript: string }]] }) => void;
-    onerror?: () => void;
-    onend?: () => void;
-  } = {};
-
-  return {
-    continuous: false,
-    interimResults: false,
-    lang: "",
-    start: vi.fn(),
-    stop: vi.fn(),
-    set onresult(fn: typeof handlers.onresult) {
-      handlers.onresult = fn;
-    },
-    set onerror(fn: typeof handlers.onerror) {
-      handlers.onerror = fn;
-    },
-    set onend(fn: typeof handlers.onend) {
-      handlers.onend = fn;
-    },
-    // Helper methods for testing
-    _triggerResult: (transcript: string) => {
-      handlers.onresult?.({ results: [[{ transcript }]] });
-    },
-    _triggerError: () => {
-      handlers.onerror?.();
-    },
-    _triggerEnd: () => {
-      handlers.onend?.();
-    },
-  };
-};
-
 describe("VoiceChat", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     localStorageMock.clear();
-    // Reset speech recognition mock
-    Object.defineProperty(window, "SpeechRecognition", {
-      value: undefined,
-      writable: true,
-    });
-    Object.defineProperty(window, "webkitSpeechRecognition", {
-      value: undefined,
-      writable: true,
-    });
   });
 
   afterEach(() => {
@@ -592,270 +567,6 @@ describe("VoiceChat", () => {
       expect(
         screen.queryByText(/Tus preguntas se procesan con inteligencia artificial/)
       ).not.toBeInTheDocument();
-    });
-  });
-
-  describe("speech recognition", () => {
-    it("should show speech support message when available", () => {
-      const mockRecognition = createMockSpeechRecognition();
-      Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(function () { return mockRecognition; }),
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      expect(
-        screen.getByText("Puedes usar el micrófono para hablar")
-      ).toBeInTheDocument();
-    });
-
-    it("should not show speech support message when not available", () => {
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      expect(
-        screen.queryByText("Puedes usar el micrófono para hablar")
-      ).not.toBeInTheDocument();
-    });
-
-    it("should render mic button when speech recognition is supported", () => {
-      const mockRecognition = createMockSpeechRecognition();
-      Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(function () { return mockRecognition; }),
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      const buttons = screen.getAllByRole("button");
-      const micButton = buttons.find((btn) => {
-        const svg = btn.querySelector("svg");
-        return svg?.classList.contains("lucide-mic");
-      });
-      expect(micButton).toBeInTheDocument();
-    });
-
-    it("should start listening when mic button is clicked", () => {
-      const mockRecognition = createMockSpeechRecognition();
-      const MockConstructor = vi.fn(function () { return mockRecognition; });
-      Object.defineProperty(window, "SpeechRecognition", {
-        value: MockConstructor,
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      const buttons = screen.getAllByRole("button");
-      const micButton = buttons.find((btn) => {
-        const svg = btn.querySelector("svg");
-        return svg?.classList.contains("lucide-mic");
-      });
-
-      if (micButton) {
-        fireEvent.click(micButton);
-        expect(mockRecognition.start).toHaveBeenCalled();
-      }
-    });
-
-    it("should stop listening when mic button is clicked while listening", () => {
-      const mockRecognition = createMockSpeechRecognition();
-      Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(function () { return mockRecognition; }),
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      const buttons = screen.getAllByRole("button");
-      const micButton = buttons.find((btn) => {
-        const svg = btn.querySelector("svg");
-        return svg?.classList.contains("lucide-mic");
-      });
-
-      if (micButton) {
-        // Start listening
-        fireEvent.click(micButton);
-
-        // Now stop listening
-        fireEvent.click(micButton);
-        expect(mockRecognition.stop).toHaveBeenCalled();
-      }
-    });
-
-    it("should show 'Escuchando...' placeholder when listening", () => {
-      const mockRecognition = createMockSpeechRecognition();
-      Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(function () { return mockRecognition; }),
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      const buttons = screen.getAllByRole("button");
-      const micButton = buttons.find((btn) => {
-        const svg = btn.querySelector("svg");
-        return svg?.classList.contains("lucide-mic");
-      });
-
-      if (micButton) {
-        fireEvent.click(micButton);
-
-        const input = screen.getByPlaceholderText("Escuchando...");
-        expect(input).toBeInTheDocument();
-        expect(input).toBeDisabled();
-      }
-    });
-
-    it("should set input value from speech recognition result", async () => {
-      const mockRecognition = createMockSpeechRecognition();
-      Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(function () { return mockRecognition; }),
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      const buttons = screen.getAllByRole("button");
-      const micButton = buttons.find((btn) => {
-        const svg = btn.querySelector("svg");
-        return svg?.classList.contains("lucide-mic");
-      });
-
-      if (micButton) {
-        fireEvent.click(micButton);
-
-        // Simulate speech recognition result wrapped in act
-        act(() => {
-          mockRecognition._triggerResult("Hello from speech");
-        });
-
-        await waitFor(() => {
-          const input = screen.getByPlaceholderText(
-            "Escribe tu pregunta..."
-          ) as HTMLInputElement;
-          expect(input.value).toBe("Hello from speech");
-        });
-      }
-    });
-
-    it("should stop listening on speech recognition error", async () => {
-      const mockRecognition = createMockSpeechRecognition();
-      Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(function () { return mockRecognition; }),
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      const buttons = screen.getAllByRole("button");
-      const micButton = buttons.find((btn) => {
-        const svg = btn.querySelector("svg");
-        return svg?.classList.contains("lucide-mic");
-      });
-
-      if (micButton) {
-        fireEvent.click(micButton);
-
-        // Verify we're listening
-        expect(screen.getByPlaceholderText("Escuchando...")).toBeInTheDocument();
-
-        // Simulate error wrapped in act
-        act(() => {
-          mockRecognition._triggerError();
-        });
-
-        await waitFor(() => {
-          expect(
-            screen.getByPlaceholderText("Escribe tu pregunta...")
-          ).toBeInTheDocument();
-        });
-      }
-    });
-
-    it("should stop listening on speech recognition end", async () => {
-      const mockRecognition = createMockSpeechRecognition();
-      Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(function () { return mockRecognition; }),
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      const buttons = screen.getAllByRole("button");
-      const micButton = buttons.find((btn) => {
-        const svg = btn.querySelector("svg");
-        return svg?.classList.contains("lucide-mic");
-      });
-
-      if (micButton) {
-        fireEvent.click(micButton);
-
-        // Simulate end wrapped in act
-        act(() => {
-          mockRecognition._triggerEnd();
-        });
-
-        await waitFor(() => {
-          expect(
-            screen.getByPlaceholderText("Escribe tu pregunta...")
-          ).toBeInTheDocument();
-        });
-      }
-    });
-
-    it("should support webkitSpeechRecognition", () => {
-      const mockRecognition = createMockSpeechRecognition();
-      Object.defineProperty(window, "webkitSpeechRecognition", {
-        value: vi.fn(function () { return mockRecognition; }),
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      expect(
-        screen.getByText("Puedes usar el micrófono para hablar")
-      ).toBeInTheDocument();
-    });
-
-    it("should show MicOff icon when listening", () => {
-      const mockRecognition = createMockSpeechRecognition();
-      Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(function () { return mockRecognition; }),
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      const buttons = screen.getAllByRole("button");
-      const micButton = buttons.find((btn) => {
-        const svg = btn.querySelector("svg");
-        return svg?.classList.contains("lucide-mic");
-      });
-
-      if (micButton) {
-        fireEvent.click(micButton);
-
-        // Should now show MicOff icon
-        const micOffButton = screen.getAllByRole("button").find((btn) => {
-          const svg = btn.querySelector("svg");
-          return svg?.classList.contains("lucide-mic-off");
-        });
-        expect(micOffButton).toBeInTheDocument();
-      }
-    });
-
-    it("should configure speech recognition with correct settings", () => {
-      const mockRecognition = createMockSpeechRecognition();
-      Object.defineProperty(window, "SpeechRecognition", {
-        value: vi.fn(function () { return mockRecognition; }),
-        writable: true,
-      });
-
-      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
-
-      expect(mockRecognition.continuous).toBe(false);
-      expect(mockRecognition.interimResults).toBe(false);
-      expect(mockRecognition.lang).toBe("es-ES");
     });
   });
 

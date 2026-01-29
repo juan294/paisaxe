@@ -75,7 +75,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
     expect(mockEq).toHaveBeenCalledWith("flag_key", "contextual_prompts");
   });
 
-  it("should return 400 if enabled is not a boolean", async () => {
+  it("should return 400 if enabled is not a boolean (invalid type)", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
@@ -90,7 +90,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
     expect(data.error).toBe("enabled must be a boolean");
   });
 
-  it("should return 400 if enabled is missing", async () => {
+  it("should return 400 if neither enabled nor config is provided", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
     const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
@@ -102,7 +102,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("enabled must be a boolean");
+    expect(data.error).toBe("Must provide enabled (boolean) or config (object)");
   });
 
   it("should disable a flag when enabled is false", async () => {
@@ -195,5 +195,86 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("Internal server error");
+  });
+
+  describe("config updates", () => {
+    const mockVisitorVoiceRow = {
+      id: "flag-voice",
+      flag_key: "visitor_voice_agent",
+      enabled: true,
+      label: "Visitor Voice Agent",
+      description: "Enable voice for whitelisted visitors",
+      config: { whitelisted_emails: ["test@example.com"], agent_id: "agent-123" },
+      created_at: "2025-01-01T00:00:00Z",
+      updated_at: "2025-01-15T00:00:00Z",
+    };
+
+    const mockVoiceParams = { params: Promise.resolve({ key: "visitor_voice_agent" }) };
+
+    it("should update config only when enabled is not provided", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const mockSingle = vi.fn().mockResolvedValue({ data: mockVisitorVoiceRow, error: null });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      const newConfig = { whitelisted_emails: ["new@example.com"], agent_id: "new-agent" };
+      const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/visitor_voice_agent", {
+        method: "PUT",
+        body: JSON.stringify({ config: newConfig }),
+      });
+
+      const response = await PUT(request, mockVoiceParams);
+      await response.json();
+
+      expect(response.status).toBe(200);
+      expect(mockUpdate).toHaveBeenCalledWith({ config: newConfig });
+    });
+
+    it("should update both enabled and config when both are provided", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const updatedRow = { ...mockVisitorVoiceRow, enabled: false };
+      const mockSingle = vi.fn().mockResolvedValue({ data: updatedRow, error: null });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      const newConfig = { whitelisted_emails: ["both@example.com"], agent_id: "both-agent" };
+      const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/visitor_voice_agent", {
+        method: "PUT",
+        body: JSON.stringify({ enabled: false, config: newConfig }),
+      });
+
+      const response = await PUT(request, mockVoiceParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data.enabled).toBe(false);
+      expect(mockUpdate).toHaveBeenCalledWith({ enabled: false, config: newConfig });
+    });
+
+    it("should return 400 if config is not an object", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/visitor_voice_agent", {
+        method: "PUT",
+        body: JSON.stringify({ config: "invalid" }),
+      });
+
+      const response = await PUT(request, mockVoiceParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("config must be an object");
+    });
+
   });
 });

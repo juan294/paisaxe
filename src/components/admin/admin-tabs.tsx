@@ -2,23 +2,24 @@
 
 import { cn } from "@/lib/utils";
 
-export type AdminTab = "stories" | "toggles" | "analytics";
+export type AdminTab = "stories" | "toggles" | "analytics" | "marketing";
 
 interface AdminTabsProps {
   activeTab: AdminTab;
   onTabChange: (tab: AdminTab) => void;
 }
 
-const TABS: { value: AdminTab; label: string }[] = [
-  { value: "stories", label: "Stories" },
-  { value: "toggles", label: "Toggles" },
-  { value: "analytics", label: "Analytics" },
+const TABS: { value: AdminTab; label: string; number: string }[] = [
+  { value: "stories", label: "Stories", number: "01" },
+  { value: "toggles", label: "Toggles", number: "02" },
+  { value: "analytics", label: "Analytics", number: "03" },
+  { value: "marketing", label: "Marketing", number: "04" },
 ];
 
 export function AdminTabs({ activeTab, onTabChange }: AdminTabsProps) {
   return (
     <nav
-      className="flex items-center gap-1"
+      className="flex items-center gap-8 border-b border-stone-200 dark:border-stone-800"
       role="tablist"
     >
       {TABS.map((tab) => (
@@ -28,13 +29,19 @@ export function AdminTabs({ activeTab, onTabChange }: AdminTabsProps) {
           aria-selected={activeTab === tab.value}
           onClick={() => onTabChange(tab.value)}
           className={cn(
-            "rounded-full px-4 py-2 text-sm font-medium transition-all",
+            "group relative flex items-center gap-2 pb-4 font-mono text-xs uppercase tracking-widest transition-colors",
             activeTab === tab.value
-              ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
-              : "text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+              ? "text-stone-900 dark:text-stone-100"
+              : "text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
           )}
         >
+          <span className="tabular-nums text-stone-300 group-hover:text-stone-400 dark:text-stone-600">
+            {tab.number}
+          </span>
           {tab.label}
+          {activeTab === tab.value && (
+            <span className="absolute bottom-0 left-0 h-px w-full bg-stone-900 dark:bg-stone-100" />
+          )}
         </button>
       ))}
     </nav>
