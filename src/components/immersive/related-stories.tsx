@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import Image from "next/image";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,10 @@ interface RelatedStoriesProps {
   onSelectStory: (story: Story) => void;
 }
 
-export function RelatedStories({ stories, onSelectStory }: RelatedStoriesProps) {
+export const RelatedStories = memo(function RelatedStories({
+  stories,
+  onSelectStory,
+}: RelatedStoriesProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const { t } = useTranslation();
 
@@ -90,4 +93,4 @@ export function RelatedStories({ stories, onSelectStory }: RelatedStoriesProps) 
       )}
     </section>
   );
-}
+});

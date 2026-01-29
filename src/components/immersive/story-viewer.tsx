@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
@@ -174,8 +174,11 @@ export function StoryViewer({
     ? undefined
     : isAmbient ? "animate-ambient-zoom" : autoPlay ? "animate-slow-zoom" : undefined;
 
-  // Related stories
-  const relatedStories = story ? getRelatedStories(story, allStories) : [];
+  // Related stories - memoized to prevent recomputation on every render
+  const relatedStories = useMemo(
+    () => (story ? getRelatedStories(story, allStories) : []),
+    [story, allStories]
+  );
 
   // Asturianu labels
   const ast = isEnabled("asturianu_touches");
@@ -390,40 +393,42 @@ export function StoryViewer({
         {isAmbient && <AmbientIndicator />}
 
         {/* Ambient / Auto-play toggle */}
-        {isEnabled("ambient_discovery") ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleAmbient();
-            }}
-            className={cn(
-              "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
-              ambientMode && "ring-1 ring-white/30"
-            )}
-            aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
-            title={ambientMode ? t("stories.ambient_off") : t("stories.ambient_on")}
-          >
-            {autoPlay ? (
-              <Pause className="h-5 w-5 text-white" />
-            ) : (
-              <Play className="h-5 w-5 text-white" />
-            )}
-          </button>
-        ) : (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setAutoPlay((prev) => !prev);
-            }}
-            aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
-            className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-          >
-            {autoPlay ? (
-              <Pause className="h-5 w-5 text-white" />
-            ) : (
-              <Play className="h-5 w-5 text-white" />
-            )}
-          </button>
+        {isEnabled("autoplay_button") && (
+          isEnabled("ambient_discovery") ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleAmbient();
+              }}
+              className={cn(
+                "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+                ambientMode && "ring-1 ring-white/30"
+              )}
+              aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
+              title={ambientMode ? t("stories.ambient_off") : t("stories.ambient_on")}
+            >
+              {autoPlay ? (
+                <Pause className="h-5 w-5 text-white" />
+              ) : (
+                <Play className="h-5 w-5 text-white" />
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setAutoPlay((prev) => !prev);
+              }}
+              aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            >
+              {autoPlay ? (
+                <Pause className="h-5 w-5 text-white" />
+              ) : (
+                <Play className="h-5 w-5 text-white" />
+              )}
+            </button>
+          )
         )}
 
         {/* Surprise Me button */}
