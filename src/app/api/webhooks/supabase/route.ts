@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { timingSafeEqual } from "crypto";
 
 interface WebhookPayload {
   table_name: string;
@@ -35,7 +36,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const secret = request.headers.get("x-webhook-secret");
     const expectedSecret = process.env.WEBHOOK_SECRET;
 
-    if (!secret || secret !== expectedSecret) {
+    // Use constant-time comparison to prevent timing attacks
+    if (
+      !secret ||
+      !expectedSecret ||
+      secret.length !== expectedSecret.length ||
+      !timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret))
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
