@@ -1,6 +1,7 @@
 import type { AdminStory, CurationStatus, AdminApiResponse, ContentImagesResponse } from "@/types/admin";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import type { AnalyticsDashboardData } from "@/types/analytics";
+import type { ElevenLabsAnalyticsDashboardData } from "@/types/elevenlabs-analytics";
 
 const API_BASE = "/api/admin";
 
@@ -172,6 +173,34 @@ export async function updateFeatureFlag(
 }
 
 /**
+ * Update a feature flag's configuration
+ */
+export async function updateFeatureFlagConfig(
+  flagKey: FeatureFlagKey,
+  config: Record<string, unknown>
+): Promise<AdminApiResponse<FeatureFlag>> {
+  try {
+    const response = await fetch(`${API_BASE}/feature-flags/${flagKey}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ config }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to update feature flag config" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error updating feature flag config:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
  * Fetch analytics dashboard data
  */
 export async function fetchAnalytics(
@@ -214,6 +243,32 @@ export async function searchContentImages(
     return await response.json();
   } catch (error) {
     console.error("Error searching content images:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Fetch ElevenLabs voice agent analytics
+ */
+export async function fetchElevenLabsAnalytics(
+  from?: string,
+  to?: string
+): Promise<AdminApiResponse<ElevenLabsAnalyticsDashboardData>> {
+  try {
+    const url = new URL(`${API_BASE}/elevenlabs-analytics`, window.location.origin);
+    if (from) url.searchParams.set("from", from);
+    if (to) url.searchParams.set("to", to);
+
+    const response = await fetch(url.toString());
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to fetch ElevenLabs analytics" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching ElevenLabs analytics:", error);
     return { error: "Network error" };
   }
 }

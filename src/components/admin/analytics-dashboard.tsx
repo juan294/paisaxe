@@ -10,6 +10,7 @@ import type {
   CountryBreakdown,
   DeviceBreakdown,
 } from "@/types/analytics";
+import { ElevenLabsAnalyticsPanel } from "./elevenlabs-analytics-panel";
 
 export function AnalyticsDashboard() {
   const [data, setData] = useState<AnalyticsDashboardData | null>(null);
@@ -145,6 +146,11 @@ export function AnalyticsDashboard() {
           </div>
         </>
       ) : null}
+
+      {/* ElevenLabs Voice Agent Analytics */}
+      <div className="mt-16 border-t border-stone-200 pt-16 dark:border-stone-800">
+        <ElevenLabsAnalyticsPanel />
+      </div>
     </div>
   );
 }
