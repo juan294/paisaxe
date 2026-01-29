@@ -3,6 +3,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
   RefreshCw,
   AlertCircle,
   CheckCircle2,
@@ -14,6 +22,9 @@ import {
   Settings,
   ExternalLink,
   Zap,
+  Pause,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import type {
   MarketingDashboardSummary,
@@ -38,12 +49,43 @@ const PLATFORM_NAMES: Record<MarketingPlatform, string> = {
   tiktok: "TikTok",
 };
 
+// Credential fields for each platform
+const PLATFORM_CREDENTIALS: Record<
+  MarketingPlatform,
+  { key: string; label: string; placeholder: string; required: boolean }[]
+> = {
+  x: [
+    { key: "apiKey", label: "API Key", placeholder: "Your X API Key", required: true },
+    { key: "apiSecret", label: "API Secret", placeholder: "Your X API Secret", required: true },
+    { key: "accessToken", label: "Access Token", placeholder: "Your Access Token", required: true },
+    { key: "refreshToken", label: "Access Token Secret", placeholder: "Your Access Token Secret", required: false },
+  ],
+  instagram: [
+    { key: "accessToken", label: "Long-Lived Access Token", placeholder: "Your Instagram access token", required: true },
+    { key: "clientId", label: "App ID", placeholder: "Facebook App ID", required: false },
+    { key: "clientSecret", label: "App Secret", placeholder: "Facebook App Secret", required: false },
+  ],
+  pinterest: [
+    { key: "accessToken", label: "Access Token", placeholder: "Your Pinterest access token", required: true },
+    { key: "refreshToken", label: "Refresh Token", placeholder: "Your refresh token", required: false },
+    { key: "clientId", label: "App ID", placeholder: "Pinterest App ID", required: false },
+    { key: "clientSecret", label: "App Secret", placeholder: "Pinterest App Secret", required: false },
+  ],
+  tiktok: [
+    { key: "accessToken", label: "Access Token", placeholder: "Your TikTok access token", required: true },
+    { key: "refreshToken", label: "Refresh Token", placeholder: "Your refresh token", required: false },
+    { key: "clientId", label: "Client Key", placeholder: "TikTok Client Key", required: false },
+    { key: "clientSecret", label: "Client Secret", placeholder: "TikTok Client Secret", required: false },
+  ],
+};
+
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function MarketingDashboard() {
   const [data, setData] = useState<MarketingDashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [configuringPlatform, setConfiguringPlatform] = useState<MarketingPlatform | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -68,6 +110,33 @@ export function MarketingDashboard() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleAccountSaved = () => {
+    setConfiguringPlatform(null);
+    loadData();
+  };
+
+  const handleToggleAccount = async (platform: MarketingPlatform, currentlyActive: boolean) => {
+    try {
+      if (currentlyActive) {
+        // Deactivate (pause) the account
+        const response = await fetch(`/api/admin/marketing/accounts?platform=${platform}`, {
+          method: "DELETE",
+        });
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error || "Failed to pause account");
+        }
+      } else {
+        // Can't reactivate from here - need to reconfigure
+        setConfiguringPlatform(platform);
+        return;
+      }
+      loadData();
+    } catch (err) {
+      console.error("Toggle account error:", err);
+    }
+  };
 
   if (isLoading && !data) {
     return (
@@ -139,7 +208,13 @@ export function MarketingDashboard() {
             (platform) => {
               const account = data.accounts.find((a) => a.platform === platform);
               return (
-                <AccountCard key={platform} platform={platform} account={account} />
+                <AccountCard
+                  key={platform}
+                  platform={platform}
+                  account={account}
+                  onConfigure={() => setConfiguringPlatform(platform)}
+                  onToggle={() => handleToggleAccount(platform, account?.isActive ?? false)}
+                />
               );
             }
           )}
@@ -267,14 +342,18 @@ export function MarketingDashboard() {
             Get Started with Marketing Automation
           </h3>
           <p className="mt-2 text-sm text-[#6b6560] dark:text-[#a39e98]">
-            Connect your social media accounts to enable automated posting.
-          </p>
-          <p className="mt-4 text-xs text-[#a39e98]">
-            See the marketing setup documentation for instructions on connecting
-            each platform.
+            Click on any platform above to connect your social media accounts.
           </p>
         </section>
       )}
+
+      {/* Account Configuration Dialog */}
+      <AccountConfigDialog
+        platform={configuringPlatform}
+        existingAccount={data.accounts.find((a) => a.platform === configuringPlatform)}
+        onClose={() => setConfiguringPlatform(null)}
+        onSaved={handleAccountSaved}
+      />
     </div>
   );
 }
@@ -283,20 +362,25 @@ export function MarketingDashboard() {
 function AccountCard({
   platform,
   account,
+  onConfigure,
+  onToggle,
 }: {
   platform: MarketingPlatform;
   account: MarketingAccountPublic | undefined;
+  onConfigure: () => void;
+  onToggle: () => void;
 }) {
   const isConnected = account?.isActive;
 
   return (
     <div
       className={cn(
-        "rounded-2xl p-4 transition-all",
+        "group relative rounded-2xl p-4 transition-all",
         isConnected
           ? "bg-white dark:bg-[#252320]"
-          : "border-2 border-dashed border-[#e5e3de] bg-white/50 dark:border-[#3d3a36] dark:bg-[#252320]/50"
+          : "cursor-pointer border-2 border-dashed border-[#e5e3de] bg-white/50 hover:border-[#c9a55c] hover:bg-white dark:border-[#3d3a36] dark:bg-[#252320]/50 dark:hover:border-[#c9a55c] dark:hover:bg-[#252320]"
       )}
+      onClick={!isConnected ? onConfigure : undefined}
     >
       <div className="flex items-center gap-3">
         <div
@@ -309,25 +393,247 @@ function AccountCard({
         >
           {PLATFORM_ICONS[platform]}
         </div>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <p className="font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
             {PLATFORM_NAMES[platform]}
           </p>
           {isConnected && account?.accountHandle ? (
-            <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
+            <p className="truncate text-sm text-[#6b6560] dark:text-[#a39e98]">
               {account.accountHandle}
             </p>
           ) : (
-            <p className="text-sm text-[#a39e98]">Not connected</p>
+            <p className="text-sm text-[#a39e98]">Click to connect</p>
           )}
         </div>
         {isConnected ? (
-          <CheckCircle2 className="h-5 w-5 text-[#7a9e7a]" />
+          <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-[#7a9e7a]" />
         ) : (
-          <div className="h-5 w-5 rounded-full border-2 border-[#e5e3de] dark:border-[#3d3a36]" />
+          <div className="h-5 w-5 flex-shrink-0 rounded-full border-2 border-[#e5e3de] transition-colors group-hover:border-[#c9a55c] dark:border-[#3d3a36]" />
         )}
       </div>
+
+      {/* Action buttons for connected accounts */}
+      {isConnected && (
+        <div className="mt-3 flex items-center gap-2 border-t border-[#f5f3ee] pt-3 dark:border-[#3d3a36]">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onConfigure();
+            }}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#f5f3ee] px-3 py-1.5 text-xs font-medium text-[#6b6560] transition-colors hover:bg-[#e5e3de] hover:text-[#2d2a26] dark:bg-[#2d2a26] dark:text-[#a39e98] dark:hover:bg-[#3d3a36] dark:hover:text-[#f5f3ee]"
+          >
+            <Settings className="h-3 w-3" />
+            Configure
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="flex items-center justify-center gap-1.5 rounded-lg bg-[#c95c5c]/10 px-3 py-1.5 text-xs font-medium text-[#c95c5c] transition-colors hover:bg-[#c95c5c]/20"
+            title="Pause this account"
+          >
+            <Pause className="h-3 w-3" />
+            Pause
+          </button>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Account Configuration Dialog
+function AccountConfigDialog({
+  platform,
+  existingAccount,
+  onClose,
+  onSaved,
+}: {
+  platform: MarketingPlatform | null;
+  existingAccount: MarketingAccountPublic | undefined;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [accountName, setAccountName] = useState("");
+  const [accountHandle, setAccountHandle] = useState("");
+  const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  // Reset form when platform changes
+  useEffect(() => {
+    if (platform) {
+      setAccountName(existingAccount?.accountName || "Paisaxe");
+      setAccountHandle(existingAccount?.accountHandle || "");
+      setCredentials({});
+      setShowSecrets({});
+      setError("");
+    }
+  }, [platform, existingAccount]);
+
+  const handleSave = async () => {
+    if (!platform) return;
+
+    // Validate required fields
+    const requiredFields = PLATFORM_CREDENTIALS[platform].filter((f) => f.required);
+    const missingFields = requiredFields.filter((f) => !credentials[f.key]?.trim());
+
+    if (missingFields.length > 0) {
+      setError(`Please fill in: ${missingFields.map((f) => f.label).join(", ")}`);
+      return;
+    }
+
+    setIsSaving(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/admin/marketing/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform,
+          accountName: accountName.trim() || "Paisaxe",
+          accountHandle: accountHandle.trim() || undefined,
+          credentials,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save account");
+      }
+
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!platform) return null;
+
+  const credentialFields = PLATFORM_CREDENTIALS[platform];
+
+  return (
+    <Dialog open={!!platform} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md bg-white dark:bg-[#252320]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3 text-[#2d2a26] dark:text-[#f5f3ee]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2d2a26] text-lg text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]">
+              {PLATFORM_ICONS[platform]}
+            </div>
+            {existingAccount ? "Configure" : "Connect"} {PLATFORM_NAMES[platform]}
+          </DialogTitle>
+          <DialogDescription className="text-[#6b6560] dark:text-[#a39e98]">
+            Enter your API credentials to enable automated posting.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-4 space-y-4">
+          {/* Account Name */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+              Account Name
+            </label>
+            <input
+              type="text"
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              placeholder="Paisaxe"
+              className="w-full rounded-xl border border-[#e5e3de] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#c9a55c] dark:border-[#3d3a36] dark:bg-[#2d2a26] dark:text-[#f5f3ee]"
+            />
+          </div>
+
+          {/* Account Handle */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+              Handle / Username
+            </label>
+            <input
+              type="text"
+              value={accountHandle}
+              onChange={(e) => setAccountHandle(e.target.value)}
+              placeholder="@paisaxe"
+              className="w-full rounded-xl border border-[#e5e3de] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#c9a55c] dark:border-[#3d3a36] dark:bg-[#2d2a26] dark:text-[#f5f3ee]"
+            />
+          </div>
+
+          {/* Credential Fields */}
+          <div className="space-y-3 border-t border-[#f5f3ee] pt-4 dark:border-[#3d3a36]">
+            <p className="text-xs font-medium uppercase tracking-wide text-[#a39e98]">
+              API Credentials
+            </p>
+            {credentialFields.map((field) => (
+              <div key={field.key}>
+                <label className="mb-1.5 flex items-center gap-1 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                  {field.label}
+                  {field.required && <span className="text-[#c95c5c]">*</span>}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSecrets[field.key] ? "text" : "password"}
+                    value={credentials[field.key] || ""}
+                    onChange={(e) =>
+                      setCredentials((prev) => ({ ...prev, [field.key]: e.target.value }))
+                    }
+                    placeholder={field.placeholder}
+                    className="w-full rounded-xl border border-[#e5e3de] bg-white px-4 py-2.5 pr-10 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#c9a55c] dark:border-[#3d3a36] dark:bg-[#2d2a26] dark:text-[#f5f3ee]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowSecrets((prev) => ({ ...prev, [field.key]: !prev[field.key] }))
+                    }
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#a39e98] hover:text-[#6b6560]"
+                  >
+                    {showSecrets[field.key] ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-[#c95c5c]/10 px-4 py-3 text-sm text-[#c95c5c]">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-3 border-t border-[#f5f3ee] pt-4 dark:border-[#3d3a36]">
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              className="flex-1 rounded-xl text-[#6b6560] hover:bg-[#f5f3ee] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:bg-[#2d2a26] dark:hover:text-[#f5f3ee]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex-1 rounded-xl bg-[#2d2a26] text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+            >
+              {isSaving ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : existingAccount ? (
+                "Update"
+              ) : (
+                "Connect"
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
