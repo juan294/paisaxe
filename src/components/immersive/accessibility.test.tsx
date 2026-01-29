@@ -47,6 +47,17 @@ vi.mock("@/hooks/use-reduced-motion", () => ({
   useReducedMotion: () => mockUseReducedMotion(),
 }));
 
+// Mock useVisitorVoiceAccess hook
+vi.mock("@/hooks/use-visitor-voice-access", () => ({
+  useVisitorVoiceAccess: () => ({
+    canUseVoice: false,
+    needsSignIn: false,
+    agentId: null,
+    userEmail: null,
+    isLoading: false,
+  }),
+}));
+
 // Mock next/image
 vi.mock("next/image", () => ({
   default: ({ src, alt, className }: {
