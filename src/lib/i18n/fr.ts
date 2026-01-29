@@ -18,6 +18,10 @@ export const fr: Translations = {
     source: 'Source',
     privacy_notice: 'Vos questions sont traitées par intelligence artificielle pour vous offrir les meilleures réponses sur les Asturies. Nous ne conservons pas vos conversations.',
     understood: 'Compris',
+    call: 'Appeler',
+    directions: 'Itinéraire',
+    copy_conversation: 'Copier la conversation',
+    copied: 'Copié',
   },
 
   stories: {
@@ -28,7 +32,7 @@ export const fr: Translations = {
     related: 'Cela pourrait aussi vous plaire',
     no_results: 'Aucune histoire ne correspond à ces filtres',
     new_badge: 'Nouveau',
-    ask_about: 'Poser une question',
+    ask_about: 'Découvre',
     filters: {
       title: 'Filtres',
       category: 'Catégorie',
@@ -125,6 +129,25 @@ export const fr: Translations = {
     cultural: 'Culture',
     delicious: 'Gourmand',
     show_all: 'Tout afficher',
+  },
+
+  voice: {
+    try_voice: 'Parler',
+    use_text: 'Écrire',
+    sign_in_prompt: 'Connectez-vous pour parler avec Pelayo',
+    sign_in: 'Se connecter',
+    connecting: 'Connexion...',
+    connected: 'Connecté',
+    speaking: 'Pelayo parle...',
+    listening: 'Je vous écoute...',
+    tap_to_talk: 'Appuyez pour parler',
+    talk_to_me: 'Parlez-moi',
+    stop: 'Arrêter',
+    mute: 'Couper le son',
+    unmute: 'Activer le son',
+    error: 'Erreur de connexion',
+    no_permission: 'Accès au micro requis',
+    you: 'Vous',
   },
 
   admin: {
