@@ -342,6 +342,7 @@ export function StoryViewer({
         {/* Action buttons */}
         <div className="flex flex-wrap items-center gap-3 mt-3">
           <button
+            data-testid="ask-button"
             onClick={(e) => {
               e.stopPropagation();
               onAskAbout();
