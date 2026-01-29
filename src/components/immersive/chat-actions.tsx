@@ -5,6 +5,12 @@ import { Phone, MapPin, Copy, Check } from "lucide-react";
 import { detectChatActions } from "@/lib/chat-action-detection";
 import { useTranslation } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Message {
   role: "user" | "assistant";
@@ -75,51 +81,69 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
   );
 
   return (
-    <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-white/10">
-      {/* Call buttons */}
-      {actions.phones.map((phone, index) => (
-        <a
-          key={`phone-${index}`}
-          href={`tel:${phone.number}`}
-          aria-label={`${t("chat.call")} ${phone.display}`}
-          title={`${t("chat.call")} ${phone.display}`}
-          className={iconButtonClass}
-          style={{ animationDelay: `${index * 50}ms` }}
-        >
-          <Phone className="h-4 w-4" />
-        </a>
-      ))}
+    <TooltipProvider delayDuration={300}>
+      <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-white/10">
+        {/* Call buttons */}
+        {actions.phones.map((phone, index) => (
+          <Tooltip key={`phone-${index}`}>
+            <TooltipTrigger asChild>
+              <a
+                href={`tel:${phone.number}`}
+                aria-label={`${t("chat.call")} ${phone.display}`}
+                className={iconButtonClass}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <Phone className="h-4 w-4" />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>
+              {t("chat.call")} {phone.display}
+            </TooltipContent>
+          </Tooltip>
+        ))}
 
-      {/* Directions buttons */}
-      {actions.addresses.map((address, index) => (
-        <a
-          key={`address-${index}`}
-          href={address.mapsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`${t("chat.directions")} - ${address.text}`}
-          title={`${t("chat.directions")} - ${address.text}`}
-          className={iconButtonClass}
-          style={{ animationDelay: `${(actions.phones.length + index) * 50}ms` }}
-        >
-          <MapPin className="h-4 w-4" />
-        </a>
-      ))}
+        {/* Directions buttons */}
+        {actions.addresses.map((address, index) => (
+          <Tooltip key={`address-${index}`}>
+            <TooltipTrigger asChild>
+              <a
+                href={address.mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${t("chat.directions")} - ${address.text}`}
+                className={iconButtonClass}
+                style={{ animationDelay: `${(actions.phones.length + index) * 50}ms` }}
+              >
+                <MapPin className="h-4 w-4" />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>
+              {t("chat.directions")}
+            </TooltipContent>
+          </Tooltip>
+        ))}
 
-      {/* Copy conversation button - always visible when messages exist */}
-      <button
-        onClick={handleCopy}
-        aria-label={t("chat.copy_conversation")}
-        title={t("chat.copy_conversation")}
-        className={iconButtonClass}
-        style={{ animationDelay: `${(actions.phones.length + actions.addresses.length) * 50}ms` }}
-      >
-        {copied ? (
-          <Check className="h-4 w-4" />
-        ) : (
-          <Copy className="h-4 w-4" />
-        )}
-      </button>
-    </div>
+        {/* Copy conversation button - always visible when messages exist */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleCopy}
+              aria-label={t("chat.copy_conversation")}
+              className={iconButtonClass}
+              style={{ animationDelay: `${(actions.phones.length + actions.addresses.length) * 50}ms` }}
+            >
+              {copied ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {copied ? t("chat.copied") : t("chat.copy_conversation")}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
   );
 }

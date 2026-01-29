@@ -36,6 +36,7 @@
     "@elevenlabs/react": "^0.13.1",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-slot": "^1.1.1",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.47.10",
     "@vercel/analytics": "^1.6.1",
@@ -52,6 +53,7 @@
     "posthog-js": "^1.335.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.0.0",
     "voyageai": "^0.1.0"
