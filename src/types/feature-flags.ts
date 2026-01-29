@@ -8,7 +8,8 @@ export type FeatureFlagKey =
   | "mood_discovery"
   | "asturianu_touches"
   | "ambient_discovery"
-  | "story_freshness";
+  | "story_freshness"
+  | "autoplay_button";
 
 export interface FeatureFlag {
   id: string;
