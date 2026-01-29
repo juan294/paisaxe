@@ -126,6 +126,34 @@ export async function updateStoryStatus(
 }
 
 /**
+ * Bulk update story curation status
+ */
+export async function bulkUpdateStoryStatus(
+  storyIds: string[],
+  status: CurationStatus
+): Promise<AdminApiResponse<{ updatedIds: string[]; status: CurationStatus }>> {
+  try {
+    const response = await fetch(`${API_BASE}/stories/bulk-status`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ storyIds, status }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to update stories" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error bulk updating status:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
  * Fetch all feature flags
  */
 export async function fetchFeatureFlags(): Promise<AdminApiResponse<FeatureFlag[]>> {
