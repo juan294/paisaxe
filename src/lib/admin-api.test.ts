@@ -4,6 +4,7 @@ import {
   updateStoryImageUrl,
   uploadStoryImage,
   updateStoryStatus,
+  updateFeatureFlagConfig,
 } from "./admin-api";
 
 // Helper to create a mock Response
@@ -280,6 +281,77 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockRejectedValue(new Error("Network failure"));
 
       const result = await updateStoryStatus(storyId, "approved");
+      expect(result).toEqual({ error: "Network error" });
+    });
+  });
+
+  // ─── updateFeatureFlagConfig ─────────────────────────────────────────
+
+  describe("updateFeatureFlagConfig", () => {
+    const flagKey = "visitor_voice_agent";
+    const mockConfig = {
+      whitelisted_emails: ["test@example.com"],
+      agent_id: "agent-123",
+    };
+
+    it("sends PUT request with config in JSON body", async () => {
+      const data = {
+        data: {
+          flagKey,
+          enabled: true,
+          config: mockConfig,
+        },
+      };
+      vi.mocked(fetch).mockResolvedValue(mockResponse(data));
+
+      await updateFeatureFlagConfig(flagKey, mockConfig);
+
+      expect(fetch).toHaveBeenCalledOnce();
+      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      expect(String(url)).toBe(`/api/admin/feature-flags/${flagKey}`);
+      expect(init?.method).toBe("PUT");
+      expect(init?.headers).toEqual(
+        expect.objectContaining({
+          "Content-Type": "application/json",
+        })
+      );
+      expect(JSON.parse(init?.body as string)).toEqual({ config: mockConfig });
+    });
+
+    it("returns data on successful response", async () => {
+      const data = {
+        data: {
+          flagKey,
+          enabled: true,
+          config: mockConfig,
+        },
+      };
+      vi.mocked(fetch).mockResolvedValue(mockResponse(data));
+
+      const result = await updateFeatureFlagConfig(flagKey, mockConfig);
+      expect(result).toEqual(data);
+    });
+
+    it("returns error on API error response", async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({ error: "config must be an object" }, false, 400)
+      );
+
+      const result = await updateFeatureFlagConfig(flagKey, mockConfig);
+      expect(result).toEqual({ error: "config must be an object" });
+    });
+
+    it("returns fallback error when API error has no error field", async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse({}, false, 500));
+
+      const result = await updateFeatureFlagConfig(flagKey, mockConfig);
+      expect(result).toEqual({ error: "Failed to update feature flag config" });
+    });
+
+    it("returns network error when fetch throws", async () => {
+      vi.mocked(fetch).mockRejectedValue(new Error("Network failure"));
+
+      const result = await updateFeatureFlagConfig(flagKey, mockConfig);
       expect(result).toEqual({ error: "Network error" });
     });
   });
