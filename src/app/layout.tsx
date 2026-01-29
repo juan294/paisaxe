@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -18,11 +18,48 @@ const title = "Paisaxe | Descubre Asturias";
 const description =
   "Tu guía personal para explorar Asturias. Descubre paisajes, rutas, gastronomía y cultura. Your personal guide to explore Asturias.";
 
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title,
   description,
-  keywords: ["Paisaxe", "Asturias", "turismo", "tourism", "Spain", "travel", "sidra", "naturaleza"],
+  keywords: [
+    "Paisaxe",
+    "Asturias",
+    "turismo",
+    "tourism",
+    "Spain",
+    "travel",
+    "sidra",
+    "naturaleza",
+    "Picos de Europa",
+    "Oviedo",
+    "Gijón",
+  ],
+  authors: [{ name: "Paisaxe" }],
+  creator: "Paisaxe",
+  publisher: "Paisaxe",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  manifest: "/manifest.json",
   openGraph: {
     title,
     description:
@@ -49,6 +86,21 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: SITE_URL,
+    languages: {
+      "es-ES": SITE_URL,
+      "x-default": SITE_URL,
+    },
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 };
 
@@ -59,6 +111,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <JsonLd type="website" />
         <Providers>

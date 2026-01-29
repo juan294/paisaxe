@@ -20,6 +20,31 @@ describe("robots", () => {
     expect(rule.disallow).toContain("/auth/");
   });
 
+  it("includes AI crawler rules", () => {
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+
+    // Check for AI crawler user agents
+    const aiCrawlers = [
+      "GPTBot",
+      "ChatGPT-User",
+      "anthropic-ai",
+      "Claude-Web",
+      "PerplexityBot",
+      "Bytespider",
+      "Google-Extended",
+    ];
+
+    aiCrawlers.forEach((crawler) => {
+      expect(rules).toContainEqual(
+        expect.objectContaining({
+          userAgent: crawler,
+          allow: "/",
+        })
+      );
+    });
+  });
+
   it("includes sitemap URL with default fallback", () => {
     const result = robots();
     expect(result.sitemap).toBe("https://paisaxe.com/sitemap.xml");
