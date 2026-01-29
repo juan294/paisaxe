@@ -42,6 +42,9 @@ Thumbs.db
 # Processed content (can be regenerated)
 content/processed/
 
+# PDF extracted images (local processing only, uses Supabase Storage in prod)
+content/images/
+
 # Testing
 coverage/
 test-results/

@@ -18,6 +18,10 @@ export const en: Translations = {
     source: 'Source',
     privacy_notice: 'Your questions are processed with artificial intelligence to give you the best answers about Asturias. We do not store your conversations.',
     understood: 'Got it',
+    call: 'Call',
+    directions: 'Directions',
+    copy_conversation: 'Copy conversation',
+    copied: 'Copied',
   },
 
   stories: {
@@ -28,7 +32,7 @@ export const en: Translations = {
     related: 'You might also like',
     no_results: 'No stories match these filters',
     new_badge: 'New',
-    ask_about: 'Ask about this',
+    ask_about: 'Discover it',
     filters: {
       title: 'Filters',
       category: 'Category',
@@ -125,6 +129,25 @@ export const en: Translations = {
     cultural: 'Cultural',
     delicious: 'Delicious',
     show_all: 'Show all',
+  },
+
+  voice: {
+    try_voice: 'Talk',
+    use_text: 'Type',
+    sign_in_prompt: 'Sign in to talk with Pelayo',
+    sign_in: 'Sign in',
+    connecting: 'Connecting...',
+    connected: 'Connected',
+    speaking: 'Pelayo is speaking...',
+    listening: 'Listening...',
+    tap_to_talk: 'Tap to talk',
+    talk_to_me: 'Talk to me',
+    stop: 'Stop',
+    mute: 'Mute',
+    unmute: 'Unmute',
+    error: 'Connection error',
+    no_permission: 'Microphone access needed',
+    you: 'You',
   },
 
   admin: {

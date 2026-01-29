@@ -61,9 +61,18 @@ export async function GET(request: NextRequest) {
 
   try {
     const url = new URL(request.url);
-    const from = url.searchParams.get("from") ||
+    const fromParam = url.searchParams.get("from") ||
       new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const to = url.searchParams.get("to") || new Date().toISOString();
+    const toParam = url.searchParams.get("to") || new Date().toISOString();
+
+    // Format dates for HogQL: 'YYYY-MM-DD HH:MM:SS' (no milliseconds, no timezone)
+    // PostHog EU uses DateTime64 with Europe/Madrid timezone, simpler format works better
+    const formatForHogQL = (isoString: string) => {
+      const date = new Date(isoString);
+      return date.toISOString().slice(0, 19).replace("T", " ");
+    };
+    const from = formatForHogQL(fromParam);
+    const to = formatForHogQL(toParam);
 
     // Run all queries in parallel
     const [
@@ -76,37 +85,37 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       // Total pageviews
       queryPostHog(
-        `SELECT count() FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}'`,
+        `SELECT count() FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}'`,
         projectId,
         apiKey
       ),
       // Unique visitors
       queryPostHog(
-        `SELECT count(DISTINCT distinct_id) FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}'`,
+        `SELECT count(DISTINCT distinct_id) FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}'`,
         projectId,
         apiKey
       ),
       // Top pages
       queryPostHog(
-        `SELECT properties.$current_url as url, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}' GROUP BY url ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$current_url as url, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' GROUP BY url ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
       // Top referrers
       queryPostHog(
-        `SELECT properties.$referrer as referrer, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}' AND referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$referrer as referrer, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
       // Countries
       queryPostHog(
-        `SELECT properties.$geoip_country_name as country, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}' AND country IS NOT NULL GROUP BY country ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$geoip_country_name as country, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND country IS NOT NULL GROUP BY country ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
       // Devices
       queryPostHog(
-        `SELECT properties.$device_type as device, count() as count FROM events WHERE event = '$pageview' AND timestamp BETWEEN '${from}' AND '${to}' AND device IS NOT NULL GROUP BY device ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$device_type as device, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND device IS NOT NULL GROUP BY device ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
@@ -144,7 +153,7 @@ export async function GET(request: NextRequest) {
         topReferrers,
         countries,
         devices,
-        dateRange: { from, to },
+        dateRange: { from: fromParam, to: toParam },
       },
     });
   } catch (error) {
@@ -153,9 +162,9 @@ export async function GET(request: NextRequest) {
     // Return empty data structure instead of error for query failures
     // (e.g., new project with no events yet)
     const url = new URL(request.url);
-    const from = url.searchParams.get("from") ||
+    const fromFallback = url.searchParams.get("from") ||
       new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const to = url.searchParams.get("to") || new Date().toISOString();
+    const toFallback = url.searchParams.get("to") || new Date().toISOString();
 
     return NextResponse.json({
       data: {
@@ -164,7 +173,7 @@ export async function GET(request: NextRequest) {
         topReferrers: [],
         countries: [],
         devices: [],
-        dateRange: { from, to },
+        dateRange: { from: fromFallback, to: toFallback },
       },
     });
   }

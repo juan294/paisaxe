@@ -1,15 +1,20 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 import { Story } from "@/types/immersive";
 import { ImageResult } from "@/types";
 import { cn } from "@/lib/utils";
-import { Mic, MicOff, X, Send } from "lucide-react";
+import { X, Send, AudioLines, LogIn, Keyboard } from "lucide-react";
 import { ChatMessageSkeleton } from "./skeleton-chat-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PrivacyNotice } from "./privacy-notice";
+import { ChatActions } from "./chat-actions";
 import { useTranslation } from "@/lib/i18n";
+import { useVisitorVoiceAccess } from "@/hooks/use-visitor-voice-access";
+import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 interface VoiceChatProps {
   story: Story;
@@ -28,39 +33,13 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [useElevenLabs, setUseElevenLabs] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
 
-  // Check for speech recognition support
-  useEffect(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      setSpeechSupported(true);
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = "es-ES";
-
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInputValue(transcript);
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
-    }
-  }, []);
+  // Check for ElevenLabs voice access
+  const { canUseVoice, needsSignIn, agentId } = useVisitorVoiceAccess();
 
   // Reset messages when story changes
   useEffect(() => {
@@ -88,21 +67,22 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const toggleListening = useCallback(() => {
-    if (!recognitionRef.current) return;
-
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      recognitionRef.current.start();
-      setIsListening(true);
-    }
-  }, [isListening]);
-
   const handlePrivacyDismiss = useCallback(() => {
     setPrivacyAcknowledged(true);
     localStorage.setItem("paisaxe-privacy-acknowledged", "true");
+  }, []);
+
+  const handleSignIn = async () => {
+    const supabase = createSupabaseBrowserClient();
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}`;
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+  };
+
+  const handleVoiceFallback = useCallback(() => {
+    setUseElevenLabs(false);
   }, []);
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -164,21 +144,43 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
 
       {/* Chat panel */}
       <div className="relative w-full max-w-lg bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden animate-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
-        {/* Header */}
+        {/* Header with voice mode toggle */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <div>
+          <div className="flex-1">
             <h2 className="font-semibold text-white">{story.title}</h2>
             <p className="text-sm text-white/60">{story.subtitle}</p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            aria-label={t("accessibility.close_chat")}
-            className="text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-          >
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Voice mode toggle - only show when user can use voice */}
+            {canUseVoice && agentId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setUseElevenLabs(!useElevenLabs)}
+                aria-label={useElevenLabs ? t("voice.use_text") : t("voice.try_voice")}
+                className={cn(
+                  "text-white hover:bg-white/10 text-xs gap-1.5",
+                  useElevenLabs && "bg-white/20"
+                )}
+              >
+                {useElevenLabs ? (
+                  <Keyboard className="h-3.5 w-3.5" />
+                ) : (
+                  <AudioLines className="h-3.5 w-3.5" />
+                )}
+                {useElevenLabs ? t("voice.use_text") : t("voice.try_voice")}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label={t("accessibility.close_chat")}
+              className="text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Privacy Notice */}
@@ -186,150 +188,132 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
           <PrivacyNotice onDismiss={handlePrivacyDismiss} />
         )}
 
-        {/* Messages */}
-        <div
-          role="log"
-          aria-live="polite"
-          aria-label={t("accessibility.chat_messages")}
-          className="h-64 overflow-y-auto p-4 space-y-4"
-        >
-          {messages.length === 0 && (
-            <div className="text-center text-white/50 py-8">
-              <p className="mb-2">{t("chat.empty_state")}</p>
-              {speechSupported && (
-                <p className="text-sm">{t("chat.speech_hint")}</p>
-              )}
-            </div>
-          )}
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={cn(
-                "max-w-[85%] p-3 rounded-2xl",
-                msg.role === "user"
-                  ? "ml-auto bg-white text-gray-900"
-                  : "bg-white/20 text-white"
-              )}
+        {/* Sign-in prompt for voice access */}
+        {needsSignIn && !useElevenLabs && (
+          <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-lg bg-white/5 p-3 border border-white/10">
+            <p className="text-sm text-white/70">{t("voice.sign_in_prompt")}</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignIn}
+              className="text-white hover:bg-white/10 text-xs gap-1.5 shrink-0"
             >
-              {msg.content}
-              {msg.images && msg.images.length > 0 && (
-                <div className="mt-3 space-y-3">
-                  {msg.images.map((image) => (
-                    <figure key={image.id} className="overflow-hidden rounded-xl">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={image.path}
-                        alt={image.caption || t("chat.image_alt")}
-                        className="w-full rounded-xl object-cover"
-                        loading="lazy"
-                      />
-                      {image.caption && (
-                        <figcaption className="mt-1.5 text-xs text-white/70">
-                          {image.caption}
-                        </figcaption>
-                      )}
-                      <p className="mt-0.5 text-xs text-white/40">
-                        {t("chat.source")}: {image.sourcePdf}
-                      </p>
-                    </figure>
-                  ))}
+              <LogIn className="h-3.5 w-3.5" />
+              {t("voice.sign_in")}
+            </Button>
+          </div>
+        )}
+
+        {/* ElevenLabs Voice Chat or Text Chat */}
+        {useElevenLabs && canUseVoice && agentId ? (
+          <VoiceChatElevenLabs
+            story={story}
+            agentId={agentId}
+            onFallbackToText={handleVoiceFallback}
+          />
+        ) : (
+          <>
+            {/* Messages */}
+            <div
+              role="log"
+              aria-live="polite"
+              aria-label={t("accessibility.chat_messages")}
+              className="h-64 overflow-y-auto p-4 space-y-4"
+            >
+              {messages.length === 0 && (
+                <div className="text-center text-white/50 py-8">
+                  <p>{t("chat.empty_state")}</p>
                 </div>
               )}
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "max-w-[85%] p-3 rounded-2xl",
+                    msg.role === "user"
+                      ? "ml-auto bg-white text-gray-900"
+                      : "bg-white/20 text-white"
+                  )}
+                >
+                  {msg.role === "user" ? (
+                    msg.content
+                  ) : (
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                        ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                        li: ({ children }) => <li>{children}</li>,
+                        a: ({ href, children }) => (
+                          <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">
+                            {children}
+                          </a>
+                        ),
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  )}
+                  {msg.images && msg.images.length > 0 && (
+                    <div className="mt-3 space-y-3">
+                      {msg.images.map((image) => (
+                        <figure key={image.id} className="overflow-hidden rounded-xl">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={image.path}
+                            alt={image.caption || t("chat.image_alt")}
+                            className="w-full rounded-xl object-cover"
+                            loading="lazy"
+                          />
+                          {image.caption && (
+                            <figcaption className="mt-1.5 text-xs text-white/70">
+                              {image.caption}
+                            </figcaption>
+                          )}
+                          <p className="mt-0.5 text-xs text-white/40">
+                            {t("chat.source")}: {image.sourcePdf}
+                          </p>
+                        </figure>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {isLoading && (
+                <ChatMessageSkeleton />
+              )}
+              <div ref={messagesEndRef} />
             </div>
-          ))}
-          {isLoading && (
-            <ChatMessageSkeleton />
-          )}
-          <div ref={messagesEndRef} />
-        </div>
 
-        {/* Input */}
-        <form
-          onSubmit={handleSubmit}
-          className="p-4 border-t border-white/10 flex gap-2"
-        >
-          {speechSupported && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={toggleListening}
-              aria-label={isListening ? t("chat.listening") : t("chat.speech_hint")}
-              className={cn(
-                "text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
-                isListening && "bg-red-500/50 hover:bg-red-500/60"
-              )}
+            {/* Context-aware action buttons */}
+            <ChatActions messages={messages} isLoading={isLoading} />
+
+            {/* Input */}
+            <form
+              onSubmit={handleSubmit}
+              className="p-4 border-t border-white/10 flex gap-2"
             >
-              {isListening ? (
-                <MicOff className="h-5 w-5" />
-              ) : (
-                <Mic className="h-5 w-5" />
-              )}
-            </Button>
-          )}
-          <Input
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder={isListening ? t("chat.listening") : t("chat.placeholder")}
-            aria-label={t("chat.placeholder")}
-            disabled={isLoading || isListening}
-            className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
-          />
-          <Button
-            type="submit"
-            disabled={isLoading || !inputValue.trim()}
-            aria-label={t("accessibility.send_message")}
-            className="bg-white text-gray-900 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
+              <Input
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={t("chat.placeholder")}
+                aria-label={t("chat.placeholder")}
+                disabled={isLoading}
+                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
+              />
+              <Button
+                type="submit"
+                disabled={isLoading || !inputValue.trim()}
+                aria-label={t("accessibility.send_message")}
+                className="bg-white text-gray-900 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
-}
-
-// Add type declarations for Web Speech API
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-  isFinal: boolean;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: Event) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-}
-
-interface SpeechRecognitionConstructor {
-  new (): SpeechRecognition;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: SpeechRecognitionConstructor;
-    webkitSpeechRecognition: SpeechRecognitionConstructor;
-  }
 }

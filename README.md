@@ -19,6 +19,7 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 - **Immersive Visual Stories**: Full-screen carousel showcasing Asturias' landscapes, cities, and culture
 - **AI-Powered Chat**: Ask questions about any location and get contextual answers with source references
 - **Voice Input**: Speech recognition for hands-free questions
+- **Voice Agents**: AI-powered conversational guides via ElevenLabs for immersive storytelling
 - **Multilingual**: UI in Spanish; chat responds in the visitor's language
 - **Curated Content**: Information sourced from 37 official Asturias tourism guides
 - **User Favorites**: Save and revisit stories you love (Google OAuth)
@@ -35,8 +36,9 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 | Styling | Tailwind CSS 4 + shadcn/ui |
 | Database | Supabase (PostgreSQL + pgvector) |
 | AI Chat | Claude API (Anthropic) |
-| Embeddings | Voyage AI (voyage-context-3, 512 dims) |
+| Embeddings | Voyage AI (voyage-3, 512 dims) |
 | Reranking | Voyage AI (rerank-2.5) |
+| Voice Agents | ElevenLabs Conversational AI |
 | Auth | Google OAuth via Supabase Auth |
 | Testing | Vitest + React Testing Library + Playwright |
 | Deployment | Vercel |
@@ -51,6 +53,7 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 - Supabase account
 - Anthropic API key
 - Voyage AI API key
+- ElevenLabs API key (optional, for voice agents)
 
 ### Installation
 
@@ -75,6 +78,7 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
    # AI Services
    ANTHROPIC_API_KEY=
    VOYAGE_API_KEY=
+   ELEVENLABS_API_KEY=     # Voice agents (optional)
 
    # Supabase
    NEXT_PUBLIC_SUPABASE_URL=
@@ -180,6 +184,8 @@ paisaxe/
 │   │   ├── immersive/          # Story viewer & voice chat
 │   │   ├── seo/                # SEO components
 │   │   └── ui/                 # shadcn/ui components
+│   ├── config/                 # Feature configuration
+│   │   └── elevenlabs-agents.ts # Voice agent IDs
 │   ├── hooks/                  # Custom React hooks
 │   ├── lib/                    # Utilities & API clients
 │   │   └── i18n/               # Internationalization
@@ -218,11 +224,20 @@ Dependabot opens weekly PRs for dependency updates.
 ### Chat Pipeline
 
 1. User sends a question (text or voice)
-2. Generate embedding via Voyage AI (`voyage-context-3`, 512 dims)
+2. Generate embedding via Voyage AI (`voyage-3`, 512 dims)
 3. Find top-10 candidate chunks via pgvector similarity search
 4. Rerank candidates to top-3 via Voyage AI `rerank-2.5`
 5. Pass reranked context to Claude for response generation
 6. Render markdown response with inline images and source attribution
+
+### Voice Agents
+
+ElevenLabs Conversational AI powers interactive voice guides for immersive storytelling:
+- **Pelayo** - Visitor guide for story exploration (default agent)
+- Real-time voice conversation with WebSocket streaming
+- Automatic speech recognition and text-to-speech
+- Transcript displayed alongside voice interaction
+- Gated by `visitor_voice_agent` feature flag in admin panel
 
 ### Database
 

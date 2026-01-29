@@ -18,6 +18,10 @@ export const mockTranslations: Record<string, string> = {
   "chat.understood": "Entendido",
   "chat.source": "Fuente",
   "chat.image_alt": "Imagen relacionada",
+  "chat.call": "Llamar",
+  "chat.directions": "Cómo llegar",
+  "chat.copy_conversation": "Copiar conversación",
+  "chat.copied": "Copiado",
 
   // Stories
   "stories.new_badge": "Nuevo",

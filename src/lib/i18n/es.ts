@@ -18,6 +18,10 @@ export const es: Translations = {
     source: 'Fuente',
     privacy_notice: 'Tus preguntas se procesan con inteligencia artificial para darte la mejor respuesta sobre Asturias. No guardamos tus conversaciones.',
     understood: 'Entendido',
+    call: 'Llamar',
+    directions: 'Cómo llegar',
+    copy_conversation: 'Copiar conversación',
+    copied: 'Copiado',
   },
 
   stories: {
@@ -28,7 +32,7 @@ export const es: Translations = {
     related: 'Tambien te puede interesar',
     no_results: 'No hay historias con estos filtros',
     new_badge: 'Nuevo',
-    ask_about: 'Preguntar sobre esto',
+    ask_about: 'Descúbrelo',
     filters: {
       title: 'Filtros',
       category: 'Categoria',
@@ -125,6 +129,25 @@ export const es: Translations = {
     cultural: 'Cultural',
     delicious: 'Delicioso',
     show_all: 'Mostrar todo',
+  },
+
+  voice: {
+    try_voice: 'Hablar',
+    use_text: 'Escribir',
+    sign_in_prompt: 'Inicia sesion para hablar con Pelayo',
+    sign_in: 'Iniciar sesion',
+    connecting: 'Conectando...',
+    connected: 'Conectado',
+    speaking: 'Pelayo esta hablando...',
+    listening: 'Te escucho...',
+    tap_to_talk: 'Toca para hablar',
+    talk_to_me: 'Hablame',
+    stop: 'Parar',
+    mute: 'Silenciar',
+    unmute: 'Activar sonido',
+    error: 'Error de conexion',
+    no_permission: 'Necesito acceso al microfono',
+    you: 'Tu',
   },
 
   admin: {

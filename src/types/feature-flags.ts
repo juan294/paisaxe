@@ -8,7 +8,14 @@ export type FeatureFlagKey =
   | "mood_discovery"
   | "asturianu_touches"
   | "ambient_discovery"
-  | "story_freshness";
+  | "story_freshness"
+  | "autoplay_button"
+  | "visitor_voice_agent";
+
+export interface VisitorVoiceConfig {
+  whitelisted_emails: string[];
+  agent_id: string;
+}
 
 export interface FeatureFlag {
   id: string;

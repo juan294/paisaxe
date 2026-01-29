@@ -85,6 +85,18 @@ describe("Dialog", () => {
       expect(screen.getByText("Close")).toBeInTheDocument();
     });
 
+    it("should hide close button when hideCloseButton is true", async () => {
+      render(
+        <Dialog defaultOpen>
+          <DialogContent aria-describedby={undefined} hideCloseButton>
+            <DialogTitle>Dialog Title</DialogTitle>
+          </DialogContent>
+        </Dialog>
+      );
+
+      expect(screen.queryByText("Close")).not.toBeInTheDocument();
+    });
+
     it("should merge custom className", async () => {
       render(
         <Dialog defaultOpen>

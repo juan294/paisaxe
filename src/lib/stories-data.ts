@@ -115,6 +115,7 @@ export async function getStoriesFromDB(): Promise<Story[]> {
       .from("stories")
       .select("*")
       .eq("is_active", true)
+      .eq("curation_status", "approved")
       .order("display_order", { ascending: true });
 
     if (error) {
@@ -146,6 +147,7 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
       .from("stories")
       .select("*")
       .eq("is_active", true)
+      .eq("curation_status", "approved")
       .eq("category", category)
       .order("display_order", { ascending: true });
 
@@ -174,6 +176,7 @@ export async function getStoriesByLocationFromDB(location: StoryLocation): Promi
       .from("stories")
       .select("*")
       .eq("is_active", true)
+      .eq("curation_status", "approved")
       .eq("location", location)
       .order("display_order", { ascending: true });
 
@@ -202,6 +205,7 @@ export async function getStoriesByDurationFromDB(duration: StoryDuration): Promi
       .from("stories")
       .select("*")
       .eq("is_active", true)
+      .eq("curation_status", "approved")
       .eq("duration", duration)
       .order("display_order", { ascending: true });
 
@@ -231,6 +235,7 @@ export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> 
       .select("*")
       .eq("slug", slug)
       .eq("is_active", true)
+      .eq("curation_status", "approved")
       .single();
 
     if (error) {

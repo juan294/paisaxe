@@ -18,6 +18,10 @@ export const pt: Translations = {
     source: 'Fonte',
     privacy_notice: 'As suas perguntas são processadas com inteligência artificial para lhe oferecer as melhores respostas sobre as Astúrias. Não guardamos as suas conversas.',
     understood: 'Entendido',
+    call: 'Ligar',
+    directions: 'Como chegar',
+    copy_conversation: 'Copiar conversa',
+    copied: 'Copiado',
   },
 
   stories: {
@@ -28,7 +32,7 @@ export const pt: Translations = {
     related: 'Também pode gostar de',
     no_results: 'Nenhuma história corresponde a estes filtros',
     new_badge: 'Novo',
-    ask_about: 'Perguntar sobre isto',
+    ask_about: 'Descobre',
     filters: {
       title: 'Filtros',
       category: 'Categoria',
@@ -125,6 +129,25 @@ export const pt: Translations = {
     cultural: 'Cultural',
     delicious: 'Delicioso',
     show_all: 'Mostrar tudo',
+  },
+
+  voice: {
+    try_voice: 'Falar',
+    use_text: 'Escrever',
+    sign_in_prompt: 'Inicie sessão para falar com Pelayo',
+    sign_in: 'Iniciar sessão',
+    connecting: 'A conectar...',
+    connected: 'Conectado',
+    speaking: 'Pelayo está a falar...',
+    listening: 'Estou a ouvir...',
+    tap_to_talk: 'Toque para falar',
+    talk_to_me: 'Fale comigo',
+    stop: 'Parar',
+    mute: 'Silenciar',
+    unmute: 'Ativar som',
+    error: 'Erro de conexão',
+    no_permission: 'Acesso ao microfone necessário',
+    you: 'Você',
   },
 
   admin: {

@@ -6,8 +6,8 @@ const voyageClient = new VoyageAIClient({
   apiKey: process.env.VOYAGE_API_KEY,
 });
 
-const EMBEDDING_MODEL = "voyage-context-3";
-const CONTEXTUALIZED_MODEL = "voyage-context-3";
+const EMBEDDING_MODEL = "voyage-3.5";
+const CONTEXTUALIZED_MODEL = "voyage-3.5";
 const EMBEDDING_DIMENSIONS = 512;
 const MAX_BATCH_SIZE = 128;
 
@@ -25,7 +25,7 @@ export interface BatchEmbeddingResult {
 
 /**
  * Generate embedding for a single text using Voyage AI.
- * Used at query time — uses the same model (voyage-context-3) as document
+ * Used at query time — uses the same model (voyage-3) as document
  * embeddings to ensure compatible vector spaces.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
@@ -100,7 +100,7 @@ export async function generateEmbeddings(texts: string[]): Promise<BatchEmbeddin
  * Generate contextualized embeddings for groups of chunks.
  *
  * Each group is a list of chunks from the same document (PDF). The
- * voyage-context-3 model embeds each chunk with awareness of its sibling
+ * voyage-3 model embeds each chunk with awareness of its sibling
  * chunks, significantly improving retrieval quality for split documents.
  *
  * @param chunkGroups - Array of chunk groups. Each group is an array of text

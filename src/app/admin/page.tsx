@@ -5,13 +5,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAdminRole } from "@/hooks/use-admin-role";
 import { StoryGrid } from "@/components/admin/story-grid";
 import { ImageEditorDialog } from "@/components/admin/image-editor-dialog";
+import { SelectionToolbar } from "@/components/admin/selection-toolbar";
 import { AdminTabs, type AdminTab } from "@/components/admin/admin-tabs";
 import { FeatureTogglesPanel } from "@/components/admin/feature-toggles-panel";
 import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
+import { MarketingDashboard } from "@/components/admin/marketing-dashboard";
 import { AdminThemeProvider } from "@/components/admin/theme-provider";
 import { ThemeToggle } from "@/components/admin/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { fetchStories } from "@/lib/admin-api";
+import { fetchStories, bulkUpdateStoryStatus } from "@/lib/admin-api";
 import {
   RefreshCw,
   LogOut,
@@ -39,6 +41,8 @@ function AdminPageContent() {
   const [error, setError] = useState("");
   const [editingStory, setEditingStory] = useState<AdminStory | null>(null);
   const [activeTab, setActiveTab] = useState<AdminTab>("stories");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   // Always fetch ALL stories - filter client-side for display
   const loadStories = useCallback(async () => {
@@ -81,6 +85,68 @@ function AdminPageContent() {
         story.id === storyId ? { ...story, ...updates } : story
       )
     );
+  };
+
+  const handleToggleSelect = (storyId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(storyId)) {
+        next.delete(storyId);
+      } else {
+        next.add(storyId);
+      }
+      return next;
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkMarkApproved = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkUpdating(true);
+
+    const result = await bulkUpdateStoryStatus(Array.from(selectedIds), "approved");
+
+    if (result.error) {
+      setError(result.error);
+    } else if (result.data) {
+      // Update local state
+      setAllStories((prev) =>
+        prev.map((story) =>
+          selectedIds.has(story.id)
+            ? { ...story, curationStatus: "approved" }
+            : story
+        )
+      );
+      setSelectedIds(new Set());
+    }
+
+    setIsBulkUpdating(false);
+  };
+
+  const handleBulkMarkPending = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkUpdating(true);
+
+    const result = await bulkUpdateStoryStatus(Array.from(selectedIds), "needs_curation");
+
+    if (result.error) {
+      setError(result.error);
+    } else if (result.data) {
+      // Update local state
+      setAllStories((prev) =>
+        prev.map((story) =>
+          selectedIds.has(story.id)
+            ? { ...story, curationStatus: "needs_curation" }
+            : story
+        )
+      );
+      setSelectedIds(new Set());
+    }
+
+    setIsBulkUpdating(false);
   };
 
   // Loading state
@@ -232,12 +298,12 @@ function AdminPageContent() {
         {activeTab === "stories" && (
           <>
             <div className="mb-8">
-              <h1 className="text-3xl font-semibold tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+              <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+                Admin / Stories
+              </p>
+              <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
                 Content Dashboard
               </h1>
-              <p className="mt-1 text-[#6b6560] dark:text-[#a39e98]">
-                Manage your stories and images
-              </p>
             </div>
 
             {/* Stat Cards - clickable as filters */}
@@ -302,7 +368,13 @@ function AdminPageContent() {
                 </p>
               </div>
             ) : (
-              <StoryGrid stories={filteredStories} onEdit={setEditingStory} />
+              <StoryGrid
+                stories={filteredStories}
+                onEdit={setEditingStory}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+                selectionMode={selectedIds.size > 0}
+              />
             )}
           </>
         )}
@@ -314,6 +386,10 @@ function AdminPageContent() {
         {activeTab === "analytics" && (
           <AnalyticsDashboard />
         )}
+
+        {activeTab === "marketing" && (
+          <MarketingDashboard />
+        )}
       </main>
 
       {/* Image Editor Dialog */}
@@ -321,6 +397,15 @@ function AdminPageContent() {
         story={editingStory}
         onClose={() => setEditingStory(null)}
         onUpdate={handleStoryUpdate}
+      />
+
+      {/* Selection Toolbar */}
+      <SelectionToolbar
+        selectedCount={selectedIds.size}
+        onMarkApproved={handleBulkMarkApproved}
+        onMarkPending={handleBulkMarkPending}
+        onClearSelection={handleClearSelection}
+        isLoading={isBulkUpdating}
       />
     </div>
   );
@@ -383,17 +468,17 @@ function StatCard({ icon, value, label, variant, isActive, onClick }: StatCardPr
 
   const content = (
     <>
-      <div className={cn("mb-3", isActive ? v.activeIcon : v.icon)}>
+      <div className={cn("mb-4", isActive ? v.activeIcon : v.icon)}>
         {icon}
       </div>
       <p className={cn(
-        "text-3xl font-semibold tabular-nums",
+        "text-4xl font-extralight tabular-nums tracking-tighter",
         isActive ? v.activeText : v.text
       )}>
         {value}
       </p>
       <p className={cn(
-        "mt-1 text-sm",
+        "mt-2 font-mono text-[10px] uppercase tracking-widest",
         isActive ? v.activeSubtext : v.subtext
       )}>
         {label}

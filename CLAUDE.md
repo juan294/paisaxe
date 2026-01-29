@@ -130,8 +130,9 @@ A year from now, if Paisaxe is working:
 | Styling | Tailwind CSS + shadcn/ui |
 | Database | Supabase (PostgreSQL + pgvector) |
 | AI Chat | Claude API (Anthropic) |
-| Embeddings | Voyage AI (voyage-context-3) |
+| Embeddings | Voyage AI (voyage-3) |
 | Reranking | Voyage AI (rerank-2.5) |
+| Voice Agents | ElevenLabs Conversational AI |
 | Testing | Vitest + React Testing Library + Playwright |
 | Deployment | Vercel |
 
@@ -298,15 +299,23 @@ paisaxe/
 │   │   └── api/
 │   │       ├── chat/           # Chat endpoint
 │   │       ├── health/         # Health check endpoint (uptime monitoring)
+│   │       ├── admin/
+│   │       │   └── elevenlabs-analytics/  # Voice agent metrics API
 │   │       └── webhooks/
 │   │           └── supabase/   # Database webhook receiver (cache invalidation)
 │   ├── components/
 │   │   ├── ui/                 # shadcn/ui components
+│   │   ├── admin/              # Admin panel components
+│   │   │   └── elevenlabs-analytics-panel.tsx  # Voice agent metrics
 │   │   └── immersive/          # Story viewer & voice chat
+│   │       └── voice-chat-elevenlabs.tsx  # ElevenLabs voice UI
+│   ├── config/
+│   │   └── elevenlabs-agents.ts  # Voice agent IDs configuration
 │   ├── hooks/
 │   │   ├── use-admin-role.ts              # Client-side admin role check (RBAC)
 │   │   ├── use-realtime-feature-flags.ts  # Live feature flag sync via Realtime
-│   │   └── use-realtime-stories.ts        # Live story update notifications
+│   │   ├── use-realtime-stories.ts        # Live story update notifications
+│   │   └── use-visitor-voice-access.ts    # Voice agent feature flag check
 │   ├── lib/
 │   │   ├── supabase.ts         # Supabase client
 │   │   ├── supabase-browser.ts # Browser Supabase client (SSR)
@@ -318,7 +327,8 @@ paisaxe/
 │   │   └── stories-data.ts     # Story content data
 │   └── types/
 │       ├── index.ts            # Core TypeScript types
-│       └── immersive.ts        # Immersive mode types
+│       ├── immersive.ts        # Immersive mode types
+│       └── elevenlabs-analytics.ts  # Voice agent analytics types
 ├── content/
 │   └── pdfs/                   # Source PDF files
 ├── scripts/
@@ -372,6 +382,7 @@ Required in `.env.local`:
 # AI Services
 ANTHROPIC_API_KEY=       # Claude API key
 VOYAGE_API_KEY=          # Voyage AI key for embeddings
+ELEVENLABS_API_KEY=      # ElevenLabs voice agents (optional)
 
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
@@ -405,9 +416,9 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 ## Architecture Decisions
 
 ### Embeddings (Voyage AI)
-- Model: `voyage-context-3` (contextualized chunk embeddings, 512 dimensions via Matryoshka)
+- Model: `voyage-3` (512 dimensions via Matryoshka)
 - Contextualized embeddings: chunks from the same PDF are embedded with sibling awareness
-- Query embeddings: same model (`voyage-context-3`) with `outputDimension: 512`
+- Query embeddings: same model (`voyage-3`) with `outputDimension: 512`
 - Batch processing: 128 texts per request, exponential backoff on 429
 - Cost: ~$0.00018 per 1000 tokens (contextualized)
 
@@ -423,7 +434,7 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 
 ### Chat Flow
 1. User sends query
-2. Generate embedding via Voyage AI (`voyage-context-3`, 512 dims)
+2. Generate embedding via Voyage AI (`voyage-3`, 512 dims)
 3. Find top-10 candidate chunks via vector search
 4. Rerank candidates to top-3 via Voyage AI `rerank-2.5`
 5. Pass reranked chunks as context to Claude
@@ -434,6 +445,16 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 - Support markdown in responses
 - Display related images from PDFs inline
 - Show source attribution (which guide, which section)
+
+### Voice Agents (ElevenLabs)
+ElevenLabs Conversational AI powers interactive voice guides for immersive storytelling:
+- **Pelayo** - Default visitor guide for story exploration
+- WebSocket-based real-time voice streaming
+- Automatic speech recognition + text-to-speech
+- Conversation transcript displayed alongside voice UI
+- Gated by `visitor_voice_agent` feature flag (toggle in admin panel)
+- Agent IDs configured in `src/config/elevenlabs-agents.ts`
+- Admin analytics dashboard shows conversation metrics, agent usage, and active calls
 
 ## Code Style
 
@@ -446,7 +467,7 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 ## Database Schema
 
 ```sql
--- chunks table for PDF content (512 dims for voyage-context-3 Matryoshka)
+-- chunks table for PDF content (512 dims for voyage-3 Matryoshka)
 create table chunks (
   id uuid primary key default gen_random_uuid(),
   content text not null,

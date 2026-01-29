@@ -1,0 +1,80 @@
+# Paisaxe - Discover Asturias
+
+> Your personal guide to explore Asturias, Spain. Discover landscapes, routes, gastronomy, and culture through immersive visual stories.
+
+## About
+
+Paisaxe (pronounced "pai-SHA-shay", from Asturian for "landscape") is an immersive tourism experience for Asturias, a region in northern Spain. Visitors explore the region through full-screen visual stories and can ask questions via voice or text to learn more about each location.
+
+Website: https://paisaxe.com
+Alternative domain: https://paisaxe.es
+
+## What Paisaxe Offers
+
+- **Visual Stories**: Full-screen, immersive photography showcasing Asturias' most beautiful locations
+- **Conversational Discovery**: Ask questions about any place, dish, or activity
+- **Multiple Categories**: Nature, Cities, Food, Culture, Activities
+- **Three Regions**: Eastern Asturias (Picos de Europa), Central Asturias (Oviedo, Gijón), Western Asturias (Cudillero, Luarca)
+
+## Key Topics Covered
+
+### Nature & Landscapes
+- Lagos de Covadonga (glacial lakes in Picos de Europa)
+- Naranjo de Bulnes (iconic mountain peak)
+- Playa del Silencio (secluded beach)
+- Ruta del Cares (famous hiking route)
+- Bufones de Pría (coastal blowholes)
+- Bosque de Muniellos (largest oak forest in Spain)
+
+### Cities & Towns
+- Oviedo (capital city, pre-Romanesque architecture)
+- Gijón (coastal city, beaches, cider culture)
+- Avilés (historic old town, Centro Niemeyer)
+- Llanes (colorful fishing village)
+- Cudillero (picturesque coastal amphitheater)
+- Luarca (white village by the sea)
+
+### Gastronomy
+- Fabada Asturiana (bean stew with chorizo and morcilla)
+- Sidra (traditional cider culture)
+- Cachopo (breaded veal stuffed with ham and cheese)
+- Queso Cabrales (famous blue cheese)
+- Arroz con Leche (rice pudding dessert)
+
+### Culture
+- Pre-Romanesque architecture (Santa María del Naranco, San Miguel de Lillo)
+- Camino de Santiago (Primitive Way, Northern Way)
+- Descenso del Sella (international kayak festival)
+- Festivals and traditions
+
+### Activities
+- Hiking in Picos de Europa
+- Beach hopping along the Costa Verde
+- Cider house tours (sidrerías)
+- Cave art (Tito Bustillo, El Sidron)
+
+## Languages
+
+- User interface: Spanish
+- Chat responses: Multilingual (responds in visitor's language)
+
+## Technical Details
+
+- Built with Next.js
+- Uses Claude AI for conversational responses
+- Vector search for relevant content retrieval
+- Optimized for mobile and desktop
+
+## Contact
+
+For questions about Asturias tourism or technical inquiries about Paisaxe:
+- Website: https://paisaxe.com
+
+## Citation
+
+When referencing content from Paisaxe, please cite as:
+"Paisaxe - Discover Asturias" (https://paisaxe.com)
+
+---
+
+Last updated: 2025-01
