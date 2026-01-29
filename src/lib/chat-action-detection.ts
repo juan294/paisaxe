@@ -120,8 +120,7 @@ export function detectPhoneNumbers(text: string): PhoneMatch[] {
  * - Postal codes (5 digits) + city names
  */
 export function detectAddresses(text: string): AddressMatch[] {
-  const matches: AddressMatch[] = [];
-  const seen = new Set<string>();
+  const candidates: Array<{ text: string; normalized: string; start: number; end: number }> = [];
 
   // Address prefixes and their patterns
   const streetPatterns = [
@@ -152,13 +151,12 @@ export function detectAddresses(text: string): AddressMatch[] {
       // Normalize for deduplication (lowercase, remove extra spaces)
       const normalized = addressText.toLowerCase().replace(/\s+/g, " ");
 
-      if (!seen.has(normalized)) {
-        seen.add(normalized);
-        matches.push({
-          text: addressText,
-          mapsUrl: generateMapsUrl(addressText),
-        });
-      }
+      candidates.push({
+        text: addressText,
+        normalized,
+        start: match.index,
+        end: match.index + match[0].length,
+      });
     }
   }
 
@@ -174,14 +172,57 @@ export function detectAddresses(text: string): AddressMatch[] {
       const addressText = match[0].trim();
       const normalized = addressText.toLowerCase().replace(/\s+/g, " ");
 
-      if (!seen.has(normalized)) {
-        seen.add(normalized);
-        matches.push({
-          text: addressText,
-          mapsUrl: generateMapsUrl(addressText),
-        });
-      }
+      candidates.push({
+        text: addressText,
+        normalized,
+        start: match.index,
+        end: match.index + match[0].length,
+      });
     }
+  }
+
+  // Deduplicate: remove addresses that overlap or are adjacent to longer addresses
+  const seen = new Set<string>();
+  const matches: AddressMatch[] = [];
+
+  // Sort by start position, then by length (longest first for same start)
+  candidates.sort((a, b) => a.start - b.start || b.text.length - a.text.length);
+
+  // Merge adjacent candidates that are close to each other (within 5 chars)
+  const ADJACENCY_THRESHOLD = 5;
+
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+
+    // Skip if we've already seen this normalized address
+    if (seen.has(candidate.normalized)) continue;
+
+    // Check if this candidate overlaps or is adjacent to an already-added address
+    const conflictsWithExisting = matches.some((existing) => {
+      const existingCandidate = candidates.find((c) => c.text === existing.text);
+      if (!existingCandidate) return false;
+
+      // Check if ranges overlap or are adjacent
+      const overlaps =
+        (candidate.start >= existingCandidate.start && candidate.start < existingCandidate.end) ||
+        (candidate.end > existingCandidate.start && candidate.end <= existingCandidate.end) ||
+        (candidate.start <= existingCandidate.start && candidate.end >= existingCandidate.end);
+
+      // Check if adjacent (within threshold chars)
+      const adjacent =
+        Math.abs(candidate.start - existingCandidate.end) <= ADJACENCY_THRESHOLD ||
+        Math.abs(existingCandidate.start - candidate.end) <= ADJACENCY_THRESHOLD;
+
+      return overlaps || adjacent;
+    });
+
+    if (conflictsWithExisting) continue;
+
+    seen.add(candidate.normalized);
+    matches.push({
+      text: candidate.text,
+      mapsUrl: generateMapsUrl(candidate.text),
+    });
   }
 
   return matches;
