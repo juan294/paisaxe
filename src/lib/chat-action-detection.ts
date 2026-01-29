@@ -31,7 +31,8 @@ export interface ChatActionsResult {
  * Supported formats:
  * - +34 XXX XXX XXX (international with spaces)
  * - +34XXXXXXXXX (international without spaces)
- * - XXX XXX XXX (local with spaces)
+ * - XXX XXX XXX (local 3-3-3 with spaces)
+ * - XXX XX XX XX (local 3-2-2-2 with spaces)
  * - XXXXXXXXX (local without spaces)
  *
  * Spanish numbers start with:
@@ -43,11 +44,29 @@ export function detectPhoneNumbers(text: string): PhoneMatch[] {
   const matches: PhoneMatch[] = [];
   const seen = new Set<string>();
 
-  // Pattern 1: International format +34 with optional spaces
-  const internationalRegex = /\+34\s?(\d{3})\s?(\d{3})\s?(\d{3})/g;
+  // Pattern 1: International format +34 with optional spaces (various groupings)
+  const internationalRegex = /\+34\s?(\d{3})\s?(\d{2,3})\s?(\d{2,3})\s?(\d{0,2})/g;
   let match;
 
   while ((match = internationalRegex.exec(text)) !== null) {
+    // Combine all digit groups
+    const digits = match[1] + match[2] + match[3] + (match[4] || "");
+    if (digits.length === 9) {
+      const normalized = `+34${digits}`;
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        matches.push({
+          number: normalized,
+          display: match[0].trim(),
+        });
+      }
+    }
+  }
+
+  // Pattern 2: Local Spanish numbers - 3-3-3 format (XXX XXX XXX)
+  const local333Regex = /(?<!\d)([6-9]\d{2})\s(\d{3})\s(\d{3})(?!\d)/g;
+
+  while ((match = local333Regex.exec(text)) !== null) {
     const normalized = `+34${match[1]}${match[2]}${match[3]}`;
     if (!seen.has(normalized)) {
       seen.add(normalized);
@@ -58,13 +77,25 @@ export function detectPhoneNumbers(text: string): PhoneMatch[] {
     }
   }
 
-  // Pattern 2: Local Spanish numbers (9 digits starting with 6, 7, 8, or 9)
-  // Use word boundaries to avoid matching numbers embedded in other text
-  const localRegex = /(?<!\d)([6-9]\d{2})\s?(\d{3})\s?(\d{3})(?!\d)/g;
+  // Pattern 3: Local Spanish numbers - 3-2-2-2 format (XXX XX XX XX)
+  const local3222Regex = /(?<!\d)([6-9]\d{2})\s(\d{2})\s(\d{2})\s(\d{2})(?!\d)/g;
 
-  while ((match = localRegex.exec(text)) !== null) {
-    const normalized = `+34${match[1]}${match[2]}${match[3]}`;
-    // Skip if already matched via international format
+  while ((match = local3222Regex.exec(text)) !== null) {
+    const normalized = `+34${match[1]}${match[2]}${match[3]}${match[4]}`;
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      matches.push({
+        number: normalized,
+        display: match[0],
+      });
+    }
+  }
+
+  // Pattern 4: Local Spanish numbers without spaces (9 consecutive digits)
+  const localNoSpaceRegex = /(?<!\d)([6-9]\d{8})(?!\d)/g;
+
+  while ((match = localNoSpaceRegex.exec(text)) !== null) {
+    const normalized = `+34${match[1]}`;
     if (!seen.has(normalized)) {
       seen.add(normalized);
       matches.push({

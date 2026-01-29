@@ -75,12 +75,12 @@ describe("ChatActions", () => {
       expect(clipboardContent).toContain("The number is 985 123 456.");
     });
 
-    it("shows confirmation when copied", async () => {
+    it("shows check icon when copied", async () => {
       const messages: Message[] = [
         { role: "assistant", content: "Hello!" },
       ];
 
-      render(<ChatActions messages={messages} />);
+      const { container } = render(<ChatActions messages={messages} />);
 
       const copyButton = screen.getByRole("button", {
         name: /copiar conversación/i,
@@ -88,9 +88,36 @@ describe("ChatActions", () => {
       fireEvent.click(copyButton);
 
       await waitFor(() => {
-        // Spanish translation for "Copied"
-        expect(screen.getByText(/copiado/i)).toBeInTheDocument();
+        // After copying, the check icon should appear (lucide-check class)
+        const checkIcon = container.querySelector(".lucide-check");
+        expect(checkIcon).toBeInTheDocument();
       });
+    });
+
+    it("does not render when isLoading is true", () => {
+      const messages: Message[] = [
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi there!" },
+      ];
+
+      render(<ChatActions messages={messages} isLoading={true} />);
+
+      expect(
+        screen.queryByRole("button", { name: /copiar conversación/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders after loading completes", () => {
+      const messages: Message[] = [
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi there!" },
+      ];
+
+      render(<ChatActions messages={messages} isLoading={false} />);
+
+      expect(
+        screen.getByRole("button", { name: /copiar conversación/i })
+      ).toBeInTheDocument();
     });
   });
 

@@ -78,6 +78,24 @@ describe("chat-action-detection", () => {
 
       expect(result).toHaveLength(1);
     });
+
+    it("detects phone numbers in 3-2-2-2 format (XXX XX XX XX)", () => {
+      const text = "Turismo Asturias: 985 10 55 00";
+      const result = detectPhoneNumbers(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].number).toBe("+34985105500");
+      expect(result[0].display).toBe("985 10 55 00");
+    });
+
+    it("detects phone numbers in 3-2-2-2 format with mobile prefix", () => {
+      const text = "Contacta al 612 34 56 78 para más información.";
+      const result = detectPhoneNumbers(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].number).toBe("+34612345678");
+      expect(result[0].display).toBe("612 34 56 78");
+    });
   });
 
   describe("detectAddresses", () => {
