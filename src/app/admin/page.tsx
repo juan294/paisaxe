@@ -8,6 +8,7 @@ import { ImageEditorDialog } from "@/components/admin/image-editor-dialog";
 import { AdminTabs, type AdminTab } from "@/components/admin/admin-tabs";
 import { FeatureTogglesPanel } from "@/components/admin/feature-toggles-panel";
 import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
+import { MarketingDashboard } from "@/components/admin/marketing-dashboard";
 import { AdminThemeProvider } from "@/components/admin/theme-provider";
 import { ThemeToggle } from "@/components/admin/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -313,6 +314,10 @@ function AdminPageContent() {
 
         {activeTab === "analytics" && (
           <AnalyticsDashboard />
+        )}
+
+        {activeTab === "marketing" && (
+          <MarketingDashboard />
         )}
       </main>
 
