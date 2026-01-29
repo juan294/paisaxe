@@ -100,6 +100,9 @@ describe("GET /api/admin/analytics (PostHog)", () => {
 
     const fromDate = "2025-01-01T00:00:00Z";
     const toDate = "2025-01-31T23:59:59Z";
+    // HogQL queries use formatted dates: 'YYYY-MM-DD HH:MM:SS' (no T, no Z)
+    const formattedFrom = "2025-01-01 00:00:00";
+    const formattedTo = "2025-01-31 23:59:59";
 
     mockFetch.mockResolvedValue({
       ok: true,
@@ -116,12 +119,12 @@ describe("GET /api/admin/analytics (PostHog)", () => {
     expect(data.data.dateRange.from).toBe(fromDate);
     expect(data.data.dateRange.to).toBe(toDate);
 
-    // Verify queries were called with correct date range
+    // Verify queries were called with correctly formatted date range
     expect(mockFetch).toHaveBeenCalled();
     const calls = mockFetch.mock.calls;
     expect(calls.some((call: unknown[]) => {
       const body = JSON.parse((call[1] as { body: string })?.body || "{}");
-      return body.query?.query?.includes(fromDate) && body.query?.query?.includes(toDate);
+      return body.query?.query?.includes(formattedFrom) && body.query?.query?.includes(formattedTo);
     })).toBe(true);
   });
 
