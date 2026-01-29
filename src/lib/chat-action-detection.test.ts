@@ -182,6 +182,15 @@ describe("chat-action-detection", () => {
       expect(result).toHaveLength(1);
     });
 
+    it("deduplicates overlapping street and postal code patterns", () => {
+      // This text could match both "Calle Uría, 58, Oviedo" and "33003 Oviedo"
+      const text = "Visita Calle Uría, 58, 33003 Oviedo para más información.";
+      const result = detectAddresses(text);
+
+      // Should only return ONE address, not two
+      expect(result).toHaveLength(1);
+    });
+
     it("detects addresses with Paseo", () => {
       const text = "En el Paseo del Muelle, junto al puerto.";
       const result = detectAddresses(text);
