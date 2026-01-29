@@ -287,7 +287,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             </div>
 
             {/* Context-aware action buttons */}
-            <ChatActions messages={messages} />
+            <ChatActions messages={messages} isLoading={isLoading} />
 
             {/* Input */}
             <form
