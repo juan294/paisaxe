@@ -10,7 +10,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AgentChat } from "./agent-chat";
+import { VoiceAgentChat } from "./voice-agent-chat";
+import { ELEVENLABS_AGENT_IDS } from "@/config/elevenlabs-agents";
 import {
   RefreshCw,
   AlertCircle,
@@ -335,7 +336,7 @@ export function MarketingDashboard() {
 
       {/* Marketing Agents Chat */}
       <section>
-        <AgentChat />
+        <VoiceAgentChat agentIds={ELEVENLABS_AGENT_IDS} />
       </section>
 
       {/* Setup Instructions */}

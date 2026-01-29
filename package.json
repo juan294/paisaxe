@@ -27,10 +27,13 @@
     "seed-images:clear": "tsx scripts/seed-images.ts --clear",
     "seed-all": "npm run seed-images && npm run seed-db",
     "seed-all:clear": "npm run seed-images:clear && npm run seed-db:clear",
+    "setup-elevenlabs": "tsx scripts/setup-elevenlabs-agents.ts",
     "prepare": "husky"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
+    "@elevenlabs/client": "^0.13.1",
+    "@elevenlabs/react": "^0.13.1",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-slot": "^1.1.1",
     "@supabase/ssr": "^0.8.0",
