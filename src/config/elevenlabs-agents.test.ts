@@ -38,14 +38,15 @@ describe("ElevenLabs Agent Configuration", () => {
       expect(getElevenLabsAgentId("unknown")).toBeUndefined();
     });
 
-    it("should return undefined for unconfigured agents", () => {
-      // Before setup, all agents return undefined
+    it("should return agent ID for configured agents", () => {
+      // After setup, all agents return their IDs
       const xanderId = getElevenLabsAgentId("xander");
-      // If not configured, should be undefined
-      if (ELEVENLABS_AGENT_IDS.xander === "") {
+      // If configured (has length), should return string; if not, undefined
+      if (ELEVENLABS_AGENT_IDS.xander.length === 0) {
         expect(xanderId).toBeUndefined();
       } else {
         expect(typeof xanderId).toBe("string");
+        expect(xanderId).toBe(ELEVENLABS_AGENT_IDS.xander);
       }
     });
 

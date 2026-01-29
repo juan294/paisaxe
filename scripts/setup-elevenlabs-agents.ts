@@ -196,12 +196,12 @@ Always stay in character as Tiko and focus on TikTok content.`,
   },
 ];
 
-// Popular free voices from ElevenLabs library (pre-selected based on quality and fit)
+// Voice IDs from ElevenLabs library (available in free tier)
 const VOICE_SUGGESTIONS = {
-  xander: "pNInz6obpgDQGcFmaJgB", // Adam - conversational male
-  iris: "EXAVITQu4vr4xnSDxMaL", // Bella - warm female
-  penny: "21m00Tcm4TlvDq8ikWAM", // Rachel - professional female
-  tiko: "VR6AewLTigWG4xSOukaG", // Arnold - energetic male
+  xander: "CwhRBWXzGAHq8TQ4Fs17", // Roger - Laid-Back, Casual, Resonant
+  iris: "EXAVITQu4vr4xnSDxMaL", // Sarah - Mature, Reassuring, Confident
+  penny: "Xb7hH8MSUJpSbSDYk0k2", // Alice - Clear, Engaging Educator
+  tiko: "TX3LPaxmHKxFdv7VOQHJ", // Liam - Energetic, Social Media Creator
 };
 
 async function listAvailableVoices(): Promise<void> {
@@ -247,7 +247,7 @@ async function createAgent(config: AgentConfig): Promise<string | null> {
         },
       },
       tts: {
-        model_id: "eleven_turbo_v2_5", // Fast and cost-effective
+        model_id: "eleven_turbo_v2", // Required for English conversational agents
         voice_id: voiceId,
         stability: 0.5,
         similarity_boost: 0.75,
@@ -320,6 +320,24 @@ export const ELEVENLABS_AGENT_IDS = {
 } as const;
 
 export type ElevenLabsAgentId = keyof typeof ELEVENLABS_AGENT_IDS;
+
+/**
+ * Check if ElevenLabs agents are configured
+ */
+export function areAgentsConfigured(): boolean {
+  return Object.values(ELEVENLABS_AGENT_IDS).some((id) => id.length > 0);
+}
+
+/**
+ * Get the ElevenLabs agent ID for a given agent
+ */
+export function getElevenLabsAgentId(agentId: string): string | undefined {
+  if (!(agentId in ELEVENLABS_AGENT_IDS)) {
+    return undefined;
+  }
+  const id: string = ELEVENLABS_AGENT_IDS[agentId as ElevenLabsAgentId];
+  return id.length > 0 ? id : undefined;
+}
 `;
 
   const configPath = path.join(
