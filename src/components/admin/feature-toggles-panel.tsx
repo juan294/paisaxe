@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { fetchFeatureFlags, updateFeatureFlag } from "@/lib/admin-api";
-import { RefreshCw, AlertCircle, ToggleRight, Zap } from "lucide-react";
+import { RefreshCw, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FeatureFlag } from "@/types/feature-flags";
 
@@ -47,117 +47,108 @@ export function FeatureTogglesPanel() {
 
   if (isLoading && flags.length === 0) {
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-[#252320]">
-        <RefreshCw className="h-6 w-6 animate-spin text-[#a39e98]" />
-        <p className="mt-4 text-sm text-[#6b6560] dark:text-[#a39e98]">Loading feature flags...</p>
+      <div className="flex min-h-[400px] items-center justify-center">
+        <RefreshCw className="h-5 w-5 animate-spin text-stone-300" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-16">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex items-end justify-between border-b border-stone-200 pb-6 dark:border-stone-800">
         <div>
-          <h2 className="text-2xl font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
+          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">Admin / Settings</p>
+          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-stone-900 dark:text-stone-100">
             Feature Toggles
-          </h2>
-          <p className="mt-1 text-[#6b6560] dark:text-[#a39e98]">
-            Control feature availability across the site
-          </p>
+          </h1>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Status badge */}
-          <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 dark:bg-[#252320]">
-            <Zap className="h-4 w-4 text-[#c9a55c]" />
-            <span className="text-sm font-medium text-[#6b6560] dark:text-[#a39e98]">
-              {enabledCount}/{flags.length} active
-            </span>
-          </div>
+        <div className="flex items-center gap-6">
+          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+            {enabledCount}/{flags.length} Active
+          </p>
           <button
             onClick={loadFlags}
             disabled={isLoading}
-            className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-xl transition-colors",
-              "text-[#6b6560] hover:bg-white hover:text-[#2d2a26]",
-              "dark:text-[#a39e98] dark:hover:bg-[#252320] dark:hover:text-[#f5f3ee]",
-              "disabled:opacity-50"
-            )}
+            className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 disabled:opacity-50 dark:hover:text-stone-100"
           >
-            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+            {isLoading ? "Loading..." : "Refresh"}
           </button>
         </div>
-      </div>
+      </header>
 
       {error && (
-        <div className="flex items-center gap-3 rounded-2xl bg-[#c9a55c]/10 px-5 py-4 text-sm text-[#8b6c2e] dark:bg-[#c9a55c]/20 dark:text-[#d4b876]">
-          <AlertCircle className="h-5 w-5 flex-shrink-0" />
-          <p>{error}</p>
+        <div className="flex items-center gap-3 font-mono text-xs text-red-600">
+          <AlertCircle className="h-4 w-4" />
+          {error}
         </div>
       )}
 
-      {/* Flags list */}
-      <div className="overflow-hidden rounded-3xl bg-white dark:bg-[#252320]">
-        <div className="divide-y divide-[#f5f3ee] dark:divide-[#2d2a26]">
-          {flags.map((flag) => (
-            <div
-              key={flag.flagKey}
-              className={cn(
-                "flex items-center justify-between p-5 transition-colors",
-                flag.enabled && "bg-[#7a9e7a]/5 dark:bg-[#7a9e7a]/10"
-              )}
-            >
-              <div className="flex min-w-0 flex-1 items-center gap-4">
-                <div className={cn(
-                  "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl transition-colors",
-                  flag.enabled
-                    ? "bg-[#7a9e7a]/10 text-[#7a9e7a] dark:bg-[#7a9e7a]/20"
-                    : "bg-[#f5f3ee] text-[#a39e98] dark:bg-[#2d2a26]"
-                )}>
-                  <ToggleRight className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
-                    {flag.label}
-                  </h3>
-                  {flag.description && (
-                    <p className="mt-0.5 truncate text-sm text-[#6b6560] dark:text-[#a39e98]">
-                      {flag.description}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Toggle switch */}
-              <button
-                onClick={() => handleToggle(flag)}
-                disabled={updatingKey === flag.flagKey}
-                className={cn(
-                  "relative ml-4 inline-flex h-7 w-12 flex-shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200",
-                  flag.enabled
-                    ? "bg-[#7a9e7a]"
-                    : "bg-[#e5e3de] dark:bg-[#3d3a36]",
-                  updatingKey === flag.flagKey && "cursor-wait opacity-50"
+      {/* Flags Table */}
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-stone-200 text-left dark:border-stone-800">
+            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">#</th>
+            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Feature</th>
+            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Description</th>
+            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Status</th>
+            <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Toggle</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+          {flags.map((flag, idx) => (
+            <tr key={flag.flagKey} className={cn(flag.enabled && "bg-stone-50 dark:bg-stone-900/50")}>
+              <td className="py-5 font-mono text-sm tabular-nums text-stone-300">
+                {String(idx + 1).padStart(2, '0')}
+              </td>
+              <td className="py-5 text-sm font-medium text-stone-900 dark:text-stone-100">
+                {flag.label}
+              </td>
+              <td className="py-5 text-sm text-stone-500">
+                {flag.description || "—"}
+              </td>
+              <td className="py-5">
+                {flag.enabled ? (
+                  <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-stone-900 dark:text-stone-100">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    On
+                  </span>
+                ) : (
+                  <span className="font-mono text-xs uppercase tracking-widest text-stone-300">
+                    Off
+                  </span>
                 )}
-                role="switch"
-                aria-checked={flag.enabled}
-                aria-label={`Toggle ${flag.label}`}
-              >
-                <span
+              </td>
+              <td className="py-5 text-right">
+                <button
+                  onClick={() => handleToggle(flag)}
+                  disabled={updatingKey === flag.flagKey}
                   className={cn(
-                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-200",
-                    flag.enabled ? "translate-x-6" : "translate-x-1"
+                    "relative h-6 w-11 rounded-full transition-colors",
+                    flag.enabled ? "bg-stone-900 dark:bg-stone-100" : "bg-stone-200 dark:bg-stone-800",
+                    updatingKey === flag.flagKey && "cursor-wait opacity-50"
                   )}
-                />
-              </button>
-            </div>
+                  role="switch"
+                  aria-checked={flag.enabled}
+                  aria-label={`Toggle ${flag.label}`}
+                >
+                  <span
+                    className={cn(
+                      "absolute top-0.5 h-5 w-5 rounded-full transition-all",
+                      flag.enabled
+                        ? "left-[22px] bg-white dark:bg-stone-900"
+                        : "left-0.5 bg-white dark:bg-stone-600"
+                    )}
+                  />
+                </button>
+              </td>
+            </tr>
           ))}
-        </div>
-      </div>
+        </tbody>
+      </table>
 
-      {/* Note */}
-      <p className="text-sm text-[#a39e98]">
-        Changes take effect within 1 minute for all visitors.
+      <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+        Changes propagate to all visitors within 1 minute
       </p>
     </div>
   );
