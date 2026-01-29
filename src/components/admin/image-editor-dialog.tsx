@@ -413,7 +413,7 @@ export function ImageEditorDialog({
                   placeholder="https://example.com/image.jpg"
                   value={imageUrl}
                   onChange={(e) => handleUrlChange(e.target.value)}
-                  className="h-10 rounded-xl border-slate-200/80 bg-white/80 text-sm shadow-sm backdrop-blur-sm placeholder:text-slate-400 focus:border-blue-300 focus:ring-blue-200"
+                  className="h-10 rounded-xl border-slate-200/80 bg-white/80 text-sm text-slate-900 shadow-sm backdrop-blur-sm placeholder:text-slate-400 focus:border-blue-300 focus:ring-blue-200"
                 />
               ) : activeTab === "content" ? (
                 <div className="space-y-3">
@@ -556,7 +556,7 @@ export function ImageEditorDialog({
                   placeholder="e.g., Photo by Juan on Unsplash"
                   value={imageSource}
                   onChange={(e) => setImageSource(e.target.value)}
-                  className="h-10 rounded-xl border-slate-200/80 bg-white/80 text-sm shadow-sm backdrop-blur-sm placeholder:text-slate-400 focus:border-blue-300 focus:ring-blue-200"
+                  className="h-10 rounded-xl border-slate-200/80 bg-white/80 text-sm text-slate-900 shadow-sm backdrop-blur-sm placeholder:text-slate-400 focus:border-blue-300 focus:ring-blue-200"
                 />
                 <p className="mt-1.5 text-[10px] text-slate-400">
                   Will be displayed below the image in stories
