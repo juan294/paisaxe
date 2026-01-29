@@ -18,6 +18,10 @@ export const de: Translations = {
     source: 'Quelle',
     privacy_notice: 'Ihre Fragen werden mit künstlicher Intelligenz verarbeitet, um Ihnen die besten Antworten über Asturien zu geben. Wir speichern Ihre Gespräche nicht.',
     understood: 'Verstanden',
+    call: 'Anrufen',
+    directions: 'Wegbeschreibung',
+    copy_conversation: 'Gespräch kopieren',
+    copied: 'Kopiert',
   },
 
   stories: {
@@ -28,7 +32,7 @@ export const de: Translations = {
     related: 'Das könnte Sie auch interessieren',
     no_results: 'Keine Geschichten entsprechen diesen Filtern',
     new_badge: 'Neu',
-    ask_about: 'Frage stellen',
+    ask_about: 'Entdecke es',
     filters: {
       title: 'Filter',
       category: 'Kategorie',
@@ -125,6 +129,25 @@ export const de: Translations = {
     cultural: 'Kulturell',
     delicious: 'Kulinarisch',
     show_all: 'Alle anzeigen',
+  },
+
+  voice: {
+    try_voice: 'Sprechen',
+    use_text: 'Schreiben',
+    sign_in_prompt: 'Melden Sie sich an, um mit Pelayo zu sprechen',
+    sign_in: 'Anmelden',
+    connecting: 'Verbindung...',
+    connected: 'Verbunden',
+    speaking: 'Pelayo spricht...',
+    listening: 'Ich höre zu...',
+    tap_to_talk: 'Tippen zum Sprechen',
+    talk_to_me: 'Sprich mit mir',
+    stop: 'Stopp',
+    mute: 'Stummschalten',
+    unmute: 'Ton aktivieren',
+    error: 'Verbindungsfehler',
+    no_permission: 'Mikrofonzugriff benötigt',
+    you: 'Du',
   },
 
   admin: {
