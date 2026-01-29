@@ -31,6 +31,17 @@ interface ElevenLabsConversationResponse {
   next_cursor?: string;
 }
 
+interface ElevenLabsAgentsResponse {
+  agents: Array<{
+    agent_id: string;
+    name: string;
+  }>;
+}
+
+interface ElevenLabsLiveCountResponse {
+  count: number;
+}
+
 async function fetchElevenLabs<T>(
   endpoint: string,
   apiKey: string
@@ -49,12 +60,22 @@ async function fetchElevenLabs<T>(
   return response.json();
 }
 
-function getAgentNameFromId(agentId: string): string {
+function getAgentNameFromId(
+  agentId: string,
+  agentNameMap: Map<string, string>
+): string {
+  // First check the dynamic map from ElevenLabs API
+  const apiName = agentNameMap.get(agentId);
+  if (apiName) return apiName;
+
+  // Fallback to local config
   for (const [name, id] of Object.entries(ELEVENLABS_AGENT_IDS)) {
     if (id === agentId) {
       return name.charAt(0).toUpperCase() + name.slice(1);
     }
   }
+
+  // Last resort: truncated ID
   return agentId.slice(0, 8);
 }
 
@@ -83,27 +104,53 @@ export async function GET(request: NextRequest) {
     const fromUnix = Math.floor(new Date(fromParam).getTime() / 1000);
     const toUnix = Math.floor(new Date(toParam).getTime() / 1000);
 
-    // Fetch conversations with date filter
+    // Fetch agents list first to get Paisaxe agent IDs
+    const agentsResponse = await fetchElevenLabs<ElevenLabsAgentsResponse>(
+      `/convai/agents`,
+      apiKey
+    ).catch(() => ({ agents: [] }));
+
+    // Filter to only Paisaxe agents (names starting with "Paisaxe")
+    const paisaxeAgents = (agentsResponse.agents || []).filter(
+      (agent) => agent.name?.startsWith("Paisaxe")
+    );
+    const paisaxeAgentIds = new Set(paisaxeAgents.map((a) => a.agent_id));
+
+    // Build agent name map (only Paisaxe agents)
+    const agentNameMap = new Map<string, string>();
+    for (const agent of paisaxeAgents) {
+      if (agent.name) {
+        // Simplify name: "Paisaxe - Pelayo (Visitor Guide)" -> "Pelayo"
+        const match = agent.name.match(/Paisaxe\s*-\s*([^(]+)/);
+        const displayName = match ? match[1].trim() : agent.name;
+        agentNameMap.set(agent.agent_id, displayName);
+      }
+    }
+
+    // Fetch conversations and calculate active calls for Paisaxe agents
     const conversationsResponse = await fetchElevenLabs<ElevenLabsConversationResponse>(
-      `/convai/conversations?call_successful=true&start_time_unix_gte=${fromUnix}&start_time_unix_lte=${toUnix}`,
+      `/convai/conversations?start_time_unix_gte=${fromUnix}&start_time_unix_lte=${toUnix}`,
       apiKey
     );
 
-    const conversations = conversationsResponse.conversations || [];
+    // Filter conversations to only Paisaxe agents
+    const allConversations = (conversationsResponse.conversations || []).filter(
+      (conv) => paisaxeAgentIds.has(conv.agent_id)
+    );
 
-    // Also fetch failed conversations
-    let failedConversations: typeof conversations = [];
-    try {
-      const failedResponse = await fetchElevenLabs<ElevenLabsConversationResponse>(
-        `/convai/conversations?call_successful=false&start_time_unix_gte=${fromUnix}&start_time_unix_lte=${toUnix}`,
-        apiKey
-      );
-      failedConversations = failedResponse.conversations || [];
-    } catch {
-      // Ignore failed fetch for failed conversations
+    // Get active calls count per Paisaxe agent and sum them
+    let activeCalls = 0;
+    for (const agentId of paisaxeAgentIds) {
+      try {
+        const liveCount = await fetchElevenLabs<ElevenLabsLiveCountResponse>(
+          `/convai/analytics/live-count?agent_id=${agentId}`,
+          apiKey
+        );
+        activeCalls += liveCount.count;
+      } catch {
+        // Ignore errors for individual agent counts
+      }
     }
-
-    const allConversations = [...conversations, ...failedConversations];
 
     // Calculate summary
     const completedConvos = allConversations.filter(c => c.status === "done");
@@ -142,7 +189,7 @@ export async function GET(request: NextRequest) {
     const conversationsByAgent: ElevenLabsAgentBreakdown[] = Array.from(agentCounts.entries())
       .map(([agentId, data]) => ({
         agentId,
-        agentName: getAgentNameFromId(agentId),
+        agentName: getAgentNameFromId(agentId, agentNameMap),
         conversationCount: data.count,
         totalMinutes: Math.round(data.minutes * 10) / 10,
       }))
@@ -189,6 +236,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       data: {
         summary,
+        activeCalls,
         conversationsByAgent,
         conversationsByLanguage,
         conversationsByStatus,
@@ -215,6 +263,7 @@ export async function GET(request: NextRequest) {
           averageCallDuration: 0,
           averageRating: null,
         },
+        activeCalls: 0,
         conversationsByAgent: [],
         conversationsByLanguage: [],
         conversationsByStatus: [],
