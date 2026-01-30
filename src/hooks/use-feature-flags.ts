@@ -17,9 +17,21 @@ const cache: FlagsCache = {
   promise: null,
 };
 
+/**
+ * Feature flags hook with deferred loading.
+ *
+ * Returns flags immediately with defaults (all disabled) and fetches actual
+ * values in the background. This prevents blocking the initial render while
+ * still enabling feature flags to control UI behavior.
+ *
+ * Use `isReady` to determine if flags have actually been loaded from the server.
+ * Use `isEnabled` to check individual flags (returns false if not loaded).
+ */
 export function useFeatureFlags() {
   const [flags, setFlags] = useState<FeatureFlag[]>(cache.data || []);
-  const [isLoading, setIsLoading] = useState(!cache.data);
+  // isReady indicates whether flags have been fetched at least once
+  // This is different from isLoading - we render immediately with defaults
+  const [isReady, setIsReady] = useState(!!cache.data);
 
   const fetchFlags = useCallback(async (): Promise<FeatureFlag[]> => {
     const now = Date.now();
@@ -63,12 +75,12 @@ export function useFeatureFlags() {
         const data = await fetchFlags();
         if (mounted) {
           setFlags(data);
-          setIsLoading(false);
+          setIsReady(true);
         }
       } catch {
         if (mounted) {
           setFlags([]);
-          setIsLoading(false);
+          setIsReady(true);
         }
       }
     }
@@ -85,5 +97,26 @@ export function useFeatureFlags() {
     [flags]
   );
 
-  return { flags, isLoading, isEnabled };
+  /**
+   * Check if a flag is enabled, with a fallback value while loading.
+   * Use this when you want to show UI optimistically during initial load.
+   */
+  const isEnabledWithDefault = useCallback(
+    (key: FeatureFlagKey, defaultValue: boolean = false): boolean => {
+      if (!isReady) return defaultValue;
+      const flag = flags.find((f) => f.flagKey === key);
+      return flag?.enabled ?? false;
+    },
+    [flags, isReady]
+  );
+
+  return {
+    flags,
+    /** Whether flags have been loaded from server */
+    isReady,
+    /** Check if a flag is enabled (returns false while loading) */
+    isEnabled,
+    /** Check if a flag is enabled with a default value while loading */
+    isEnabledWithDefault,
+  };
 }

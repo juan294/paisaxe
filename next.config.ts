@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@anthropic-ai/sdk"],
+  serverExternalPackages: ["@anthropic-ai/sdk", "sharp"],
   // Reverse proxy for PostHog to avoid ad blockers
   rewrites: async () => [
     {
@@ -36,7 +36,7 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     // Optimize image quality (default is 75, lower = smaller files)
     // 80 is a good balance for photography
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 2560, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     remotePatterns: [
       {
@@ -53,7 +53,7 @@ const nextConfig: NextConfig = {
       },
     ],
     // Increase cache duration for images (default is 60 seconds)
-    minimumCacheTTL: 60 * 60 * 24 * 7, // 7 days
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days for immutable images
   },
 };
 

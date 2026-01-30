@@ -6,6 +6,8 @@ export interface Story {
   description: string;
   image: string;
   imageSource?: string;
+  /** Base64 blur placeholder for progressive loading */
+  blurDataUrl?: string;
   category: StoryCategory;
   sourcePdf: string;
   location?: StoryLocation;
@@ -71,6 +73,7 @@ export interface StoryRow {
   description: string | null;
   image_path: string | null;
   image_source: string | null;
+  blur_data_url: string | null;
   category: string;
   source_pdf: string | null;
   location: string | null;
@@ -94,6 +97,7 @@ export function rowToStory(row: StoryRow): Story {
     description: row.description || "",
     image: row.image_path || "",
     imageSource: row.image_source || undefined,
+    blurDataUrl: row.blur_data_url || undefined,
     category: row.category as StoryCategory,
     sourcePdf: row.source_pdf || "",
     location: row.location ? (row.location as StoryLocation) : undefined,

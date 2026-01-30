@@ -113,10 +113,25 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
+        {/* Font preconnects */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
           href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        {/* Supabase preconnects - critical for image loading LCP */}
+        <link rel="dns-prefetch" href="https://axoishtlumlswzhegseq.supabase.co" />
+        <link
+          rel="preconnect"
+          href="https://axoishtlumlswzhegseq.supabase.co"
+          crossOrigin="anonymous"
+        />
+        {/* Unsplash preconnect for external images */}
+        <link rel="dns-prefetch" href="https://images.unsplash.com" />
+        <link
+          rel="preconnect"
+          href="https://images.unsplash.com"
           crossOrigin="anonymous"
         />
       </head>

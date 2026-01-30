@@ -55,6 +55,7 @@
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "server-only": "^0.0.1",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^3.0.0",
     "voyageai": "^0.1.0"
   },

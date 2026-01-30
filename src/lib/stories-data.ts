@@ -289,6 +289,7 @@ export function storyToRow(story: Story, order: number = 0): Omit<StoryRow, "id"
     description: story.description || null,
     image_path: story.image || null,
     image_source: story.imageSource || null,
+    blur_data_url: story.blurDataUrl || null,
     category: story.category,
     source_pdf: story.sourcePdf || null,
     location: story.location || null,
