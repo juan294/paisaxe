@@ -181,6 +181,9 @@ export const fr: Translations = {
     error_rate_limit: 'Veuillez attendre avant d\'envoyer une autre suggestion',
     error_generic: 'Erreur lors de l\'envoi. Veuillez réessayer.',
     community_pick: 'Suggestion communauté',
+    attribution_label: 'Comment souhaitez-vous être crédité ? (optionnel)',
+    attribution_placeholder: 'ex. @votrenom, Votre Nom',
+    attribution_hint: 'Si publié, nous vous créditerons ainsi. Laissez vide pour rester anonyme.',
   },
 
   admin: {

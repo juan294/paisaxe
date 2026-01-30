@@ -181,6 +181,9 @@ export const en: Translations = {
     error_rate_limit: 'Please wait before submitting another suggestion',
     error_generic: 'Error submitting suggestion. Please try again.',
     community_pick: 'Community Pick',
+    attribution_label: 'How would you like to be credited? (optional)',
+    attribution_placeholder: 'e.g., @yourusername, Your Name',
+    attribution_hint: 'If published, we\'ll credit you this way. Leave empty to stay anonymous.',
   },
 
   admin: {

@@ -181,6 +181,9 @@ export const es: Translations = {
     error_rate_limit: 'Por favor espera antes de enviar otra sugerencia',
     error_generic: 'Error al enviar la sugerencia. Intenta de nuevo.',
     community_pick: 'Sugerido',
+    attribution_label: 'Como quieres que te nombremos? (opcional)',
+    attribution_placeholder: 'ej. @tuusuario, Tu Nombre',
+    attribution_hint: 'Si se publica, te daremos credito asi. Dejalo vacio para anonimo.',
   },
 
   admin: {
