@@ -1598,4 +1598,683 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       description: 'Iguaria marinha de inverno. Ouriços-do-mar frescos servidos na sua carapaça, manjar dos entendidos.',
     },
   },
+
+  // ============================================
+  // ADDITIONAL RESTAURANTS (20 stories)
+  // ============================================
+
+  'restaurant-el-cenador-del-azul': {
+    en: {
+      title: 'El Cenador del Azul',
+      subtitle: 'Mieres',
+      description: 'A reference in the Caudal region with updated traditional recipes and exquisite service.',
+    },
+    fr: {
+      title: 'El Cenador del Azul',
+      subtitle: 'Mieres',
+      description: 'Référence de la région du Caudal avec recettes traditionnelles revisitées et service raffiné en salle.',
+    },
+    de: {
+      title: 'El Cenador del Azul',
+      subtitle: 'Mieres',
+      description: 'Referenz in der Region Caudal mit aktualisierten traditionellen Rezepten und exquisitem Service.',
+    },
+    pt: {
+      title: 'El Cenador del Azul',
+      subtitle: 'Mieres',
+      description: 'Referência da comarca do Caudal com receituário tradicional atualizado e trato requintado em sala.',
+    },
+  },
+
+  'restaurant-casa-adela': {
+    en: {
+      title: 'Casa Adela',
+      subtitle: 'Lada, Langreo',
+      description: 'Home-style restaurant in a charming chalet with traditional stews. The corn tortos and terrace under the hórreo are unmissable.',
+    },
+    fr: {
+      title: 'Casa Adela',
+      subtitle: 'Lada, Langreo',
+      description: 'Restaurant familial dans un joli chalet avec plats mijotés traditionnels. Incontournables : les tortos de maïs et la terrasse sous le hórreo.',
+    },
+    de: {
+      title: 'Casa Adela',
+      subtitle: 'Lada, Langreo',
+      description: 'Gasthaus im hübschen Chalet mit traditionellen Eintöpfen. Die Maistortos und die Terrasse unter dem Hórreo sind ein Muss.',
+    },
+    pt: {
+      title: 'Casa Adela',
+      subtitle: 'Lada, Langreo',
+      description: 'Casa de comidas em bonito chalé com guisados tradicionais. Imperdíveis os tortos de milho e o terraço sob o hórreo.',
+    },
+  },
+
+  'restaurant-casa-telva': {
+    en: {
+      title: 'Casa Telva',
+      subtitle: 'Valdesoto, Siero',
+      description: 'Mother and daughter prepare finger-licking tripe, roast kid and stuffed onions, away from the hustle and bustle.',
+    },
+    fr: {
+      title: 'Casa Telva',
+      subtitle: 'Valdesoto, Siero',
+      description: 'Mère et fille préparent tripes, chevreau et oignons farcis à s\'en lécher les doigts, loin du tumulte.',
+    },
+    de: {
+      title: 'Casa Telva',
+      subtitle: 'Valdesoto, Siero',
+      description: 'Mutter und Tochter bereiten köstliche Kutteln, Zicklein und gefüllte Zwiebeln zu, abseits vom Trubel.',
+    },
+    pt: {
+      title: 'Casa Telva',
+      subtitle: 'Valdesoto, Siero',
+      description: 'Mãe e filha preparam tripas, cabrito e cebolas recheadas de lamber os dedos, longe do bulício.',
+    },
+  },
+
+  'restaurant-la-ferrada': {
+    en: {
+      title: 'La Ferrada',
+      subtitle: 'Noreña',
+      description: 'Former stables converted into a restaurant with four cozy dining rooms, terrace with grills and reasonable prices.',
+    },
+    fr: {
+      title: 'La Ferrada',
+      subtitle: 'Noreña',
+      description: 'Anciennes écuries transformées en restaurant avec quatre salles chaleureuses, terrasse avec grills et prix contenus.',
+    },
+    de: {
+      title: 'La Ferrada',
+      subtitle: 'Noreña',
+      description: 'Ehemalige Stallungen, zum Restaurant umgewandelt, mit vier gemütlichen Speisesälen, Grillterrasse und moderaten Preisen.',
+    },
+    pt: {
+      title: 'La Ferrada',
+      subtitle: 'Noreña',
+      description: 'Antigas cavalariças convertidas em restaurante com quatro acolhedoras salas, esplanada com grelhadores e preços contidos.',
+    },
+  },
+
+  'restaurant-casa-belarmino': {
+    en: {
+      title: 'Casa Belarmino',
+      subtitle: 'Mazaneda, Gozón',
+      description: 'Traditional bar-shop with over 90 years of history. Their croquettes are among the best in Spain.',
+    },
+    fr: {
+      title: 'Casa Belarmino',
+      subtitle: 'Mazaneda, Gozón',
+      description: 'Bar-épicerie traditionnel de plus de 90 ans d\'histoire. Ses croquettes comptent parmi les meilleures d\'Espagne.',
+    },
+    de: {
+      title: 'Casa Belarmino',
+      subtitle: 'Mazaneda, Gozón',
+      description: 'Traditionelle Bar mit Laden und über 90 Jahren Geschichte. Ihre Kroketten gehören zu den besten Spaniens.',
+    },
+    pt: {
+      title: 'Casa Belarmino',
+      subtitle: 'Mazaneda, Gozón',
+      description: 'Bar-mercearia tradicional com mais de 90 anos de história. Os seus croquetes estão entre os melhores de Espanha.',
+    },
+  },
+
+  'restaurant-abarike': {
+    en: {
+      title: 'Abarike',
+      subtitle: 'Gijón',
+      description: 'Contemporary seafood restaurant where sustainability and quality meet chef Lara Roguez\'s playful vision.',
+    },
+    fr: {
+      title: 'Abarike',
+      subtitle: 'Gijón',
+      description: 'Restaurant de fruits de mer d\'auteur où durabilité et qualité rencontrent la vision décontractée de la chef Lara Roguez.',
+    },
+    de: {
+      title: 'Abarike',
+      subtitle: 'Gijón',
+      description: 'Kreatives Fischrestaurant, wo Nachhaltigkeit und Qualität auf die unbeschwerte Vision von Köchin Lara Roguez treffen.',
+    },
+    pt: {
+      title: 'Abarike',
+      subtitle: 'Gijón',
+      description: 'Marisqueira de autor onde sustentabilidade e qualidade se unem à visão descontraída da chef Lara Roguez.',
+    },
+  },
+
+  'restaurant-ciudadela': {
+    en: {
+      title: 'Ciudadela',
+      subtitle: 'Gijón',
+      description: 'Restaurant with caves on the lower floor, wine bar by the glass and one of the most complete lunch menus in the city.',
+    },
+    fr: {
+      title: 'Ciudadela',
+      subtitle: 'Gijón',
+      description: 'Restaurant avec caves en sous-sol, bar à vins au verre et l\'un des menus du jour les plus complets de la ville.',
+    },
+    de: {
+      title: 'Ciudadela',
+      subtitle: 'Gijón',
+      description: 'Restaurant mit Gewölbekellern, Weinbar mit glasweisem Ausschank und eines der vollständigsten Mittagsmenüs der Stadt.',
+    },
+    pt: {
+      title: 'Ciudadela',
+      subtitle: 'Gijón',
+      description: 'Restaurante com caves no piso inferior, bar de vinhos a copo e um dos menus do dia mais completos da cidade.',
+    },
+  },
+
+  'restaurant-la-pondala': {
+    en: {
+      title: 'La Pondala',
+      subtitle: 'Somió, Gijón',
+      description: 'Nearly 130 years of history, a favorite among business people. Roast beef, seasonal vegetables and the most coveted terrace in summer.',
+    },
+    fr: {
+      title: 'La Pondala',
+      subtitle: 'Somió, Gijón',
+      description: 'Près de 130 ans d\'histoire, favori des hommes d\'affaires. Rosbif, légumes de saison et la terrasse la plus convoitée en été.',
+    },
+    de: {
+      title: 'La Pondala',
+      subtitle: 'Somió, Gijón',
+      description: 'Fast 130 Jahre Geschichte, Favorit der Geschäftsleute. Roastbeef, Saisongemüse und die begehrteste Sommerterrasse.',
+    },
+    pt: {
+      title: 'La Pondala',
+      subtitle: 'Somió, Gijón',
+      description: 'Quase 130 anos de história, favorito dos empresários. Rosbife, legumes da época e o terraço mais desejado no verão.',
+    },
+  },
+
+  'restaurant-mamaguaja': {
+    en: {
+      title: 'Mamáguaja',
+      subtitle: 'Gijón',
+      description: 'A tribute to Asturian forests with high-quality seasonal products, from meats to seafood and rice dishes.',
+    },
+    fr: {
+      title: 'Mamáguaja',
+      subtitle: 'Gijón',
+      description: 'Hommage aux forêts asturiennes avec des produits de saison de haute qualité, des viandes aux fruits de mer et riz.',
+    },
+    de: {
+      title: 'Mamáguaja',
+      subtitle: 'Gijón',
+      description: 'Hommage an die asturischen Wälder mit hochwertigen Saisonprodukten, von Fleisch über Meeresfrüchte bis zu Reisgerichten.',
+    },
+    pt: {
+      title: 'Mamáguaja',
+      subtitle: 'Gijón',
+      description: 'Homenagem aos bosques asturianos com produtos de temporada de alta qualidade, desde carnes a mariscos e arrozes.',
+    },
+  },
+
+  'restaurant-the-green-artiem-asturias': {
+    en: {
+      title: 'The Green - Artiem Asturias',
+      subtitle: 'Quintueles',
+      description: 'Healthy and sustainable gastronomy in a privileged natural setting, with its own vegetable garden.',
+    },
+    fr: {
+      title: 'The Green - Artiem Asturias',
+      subtitle: 'Quintueles',
+      description: 'Gastronomie saine et durable dans un cadre naturel privilégié, avec potager propre.',
+    },
+    de: {
+      title: 'The Green - Artiem Asturias',
+      subtitle: 'Quintueles',
+      description: 'Gesunde und nachhaltige Gastronomie in privilegierter Naturumgebung mit eigenem Gemüsegarten.',
+    },
+    pt: {
+      title: 'The Green - Artiem Asturias',
+      subtitle: 'Quintueles',
+      description: 'Proposta gastronómica saudável e sustentável em envolvente natural privilegiada, com horta própria.',
+    },
+  },
+
+  'restaurant-el-balcon-de-torazo': {
+    en: {
+      title: 'El Balcón de Torazo',
+      subtitle: 'Torazo, Cabranes',
+      description: 'Traditional Asturian cuisine with spectacular views of the Sierra del Sueve.',
+    },
+    fr: {
+      title: 'El Balcón de Torazo',
+      subtitle: 'Torazo, Cabranes',
+      description: 'Cuisine traditionnelle asturienne avec vues spectaculaires sur la Sierra del Sueve.',
+    },
+    de: {
+      title: 'El Balcón de Torazo',
+      subtitle: 'Torazo, Cabranes',
+      description: 'Traditionelle asturische Küche mit spektakulärem Blick auf die Sierra del Sueve.',
+    },
+    pt: {
+      title: 'El Balcón de Torazo',
+      subtitle: 'Torazo, Cabranes',
+      description: 'Cozinha tradicional asturiana com vistas espetaculares para a Sierra del Sueve.',
+    },
+  },
+
+  'restaurant-eutimio': {
+    en: {
+      title: 'Eutimio',
+      subtitle: 'Lastres',
+      description: 'A benchmark for Asturian seafood cuisine with views of the fishing port of Lastres.',
+    },
+    fr: {
+      title: 'Eutimio',
+      subtitle: 'Lastres',
+      description: 'Référence de la cuisine marine asturienne avec vues sur le port de pêche de Lastres.',
+    },
+    de: {
+      title: 'Eutimio',
+      subtitle: 'Lastres',
+      description: 'Referenz für asturische Meeresküche mit Blick auf den Fischerhafen von Lastres.',
+    },
+    pt: {
+      title: 'Eutimio',
+      subtitle: 'Lastres',
+      description: 'Referência da cozinha marineira asturiana com vistas para o porto pesqueiro de Lastres.',
+    },
+  },
+
+  'restaurant-tella': {
+    en: {
+      title: 'Tella',
+      subtitle: 'Nueva de Llanes',
+      description: 'Creative cuisine in an intimate setting with local seasonal products.',
+    },
+    fr: {
+      title: 'Tella',
+      subtitle: 'Nueva de Llanes',
+      description: 'Cuisine d\'auteur dans un cadre intime avec produits locaux de saison.',
+    },
+    de: {
+      title: 'Tella',
+      subtitle: 'Nueva de Llanes',
+      description: 'Kreative Küche in intimem Ambiente mit lokalen Saisonprodukten.',
+    },
+    pt: {
+      title: 'Tella',
+      subtitle: 'Nueva de Llanes',
+      description: 'Cozinha de autor em ambiente íntimo com produtos locais da época.',
+    },
+  },
+
+  'restaurant-zascandil': {
+    en: {
+      title: 'Zascandil',
+      subtitle: 'Gijón',
+      description: 'Mediterranean market cuisine with its own vegetable garden and views of San Lorenzo Bay.',
+    },
+    fr: {
+      title: 'Zascandil',
+      subtitle: 'Gijón',
+      description: 'Cuisine méditerranéenne de marché avec potager propre et vues sur la baie de San Lorenzo.',
+    },
+    de: {
+      title: 'Zascandil',
+      subtitle: 'Gijón',
+      description: 'Mediterrane Marktküche mit eigenem Garten und Blick auf die Bucht von San Lorenzo.',
+    },
+    pt: {
+      title: 'Zascandil',
+      subtitle: 'Gijón',
+      description: 'Cozinha de mercado mediterrânica com horta própria e vistas para a baía de San Lorenzo.',
+    },
+  },
+
+  'restaurant-puebloastur': {
+    en: {
+      title: 'Puebloastur',
+      subtitle: 'Cofiño, Parres',
+      description: 'Boutique hotel with restaurant offering updated traditional cuisine in a spectacular rural setting.',
+    },
+    fr: {
+      title: 'Puebloastur',
+      subtitle: 'Cofiño, Parres',
+      description: 'Hôtel boutique avec restaurant proposant une cuisine traditionnelle revisitée dans un cadre rural spectaculaire.',
+    },
+    de: {
+      title: 'Puebloastur',
+      subtitle: 'Cofiño, Parres',
+      description: 'Boutique-Hotel mit Restaurant, das aktualisierte traditionelle Küche in spektakulärer ländlicher Umgebung bietet.',
+    },
+    pt: {
+      title: 'Puebloastur',
+      subtitle: 'Cofiño, Parres',
+      description: 'Hotel boutique com restaurante que oferece cozinha tradicional revista em espetacular envolvente rural.',
+    },
+  },
+
+  'restaurant-el-corral-del-indianu': {
+    en: {
+      title: 'El Corral del Indianu',
+      subtitle: 'Arriondas',
+      description: 'Gastronomic reference of eastern Asturias with José Antonio Campoviejo at the helm.',
+    },
+    fr: {
+      title: 'El Corral del Indianu',
+      subtitle: 'Arriondas',
+      description: 'Référence gastronomique de l\'est asturien avec José Antonio Campoviejo aux commandes.',
+    },
+    de: {
+      title: 'El Corral del Indianu',
+      subtitle: 'Arriondas',
+      description: 'Gastronomische Referenz Ostasturiens mit José Antonio Campoviejo am Ruder.',
+    },
+    pt: {
+      title: 'El Corral del Indianu',
+      subtitle: 'Arriondas',
+      description: 'Referência gastronómica do oriente asturiano com José Antonio Campoviejo à frente.',
+    },
+  },
+
+  'restaurant-los-arcos': {
+    en: {
+      title: 'Los Arcos',
+      subtitle: 'Ribadesella',
+      description: 'Ribadesella hospitality tradition with products from the sea and local garden.',
+    },
+    fr: {
+      title: 'Los Arcos',
+      subtitle: 'Ribadesella',
+      description: 'Tradition hôtelière de Ribadesella avec produits de la mer et du potager local.',
+    },
+    de: {
+      title: 'Los Arcos',
+      subtitle: 'Ribadesella',
+      description: 'Gastronomische Tradition aus Ribadesella mit Produkten aus dem Meer und dem lokalen Garten.',
+    },
+    pt: {
+      title: 'Los Arcos',
+      subtitle: 'Ribadesella',
+      description: 'Tradição hoteleira de Ribadesella com produtos do mar e da horta local.',
+    },
+  },
+
+  'restaurant-quince-nudos': {
+    en: {
+      title: 'Quince Nudos',
+      subtitle: 'Llanes',
+      description: 'Quality seafood cuisine with views of Llanes harbor and the Picos de Europa.',
+    },
+    fr: {
+      title: 'Quince Nudos',
+      subtitle: 'Llanes',
+      description: 'Cuisine marine de qualité avec vues sur le port de Llanes et les Pics d\'Europe.',
+    },
+    de: {
+      title: 'Quince Nudos',
+      subtitle: 'Llanes',
+      description: 'Hochwertige Meeresküche mit Blick auf den Hafen von Llanes und die Picos de Europa.',
+    },
+    pt: {
+      title: 'Quince Nudos',
+      subtitle: 'Llanes',
+      description: 'Cozinha marineira de qualidade com vistas para o porto de Llanes e os Picos da Europa.',
+    },
+  },
+
+  'restaurant-v-crespo': {
+    en: {
+      title: 'V. Crespo',
+      subtitle: 'Gijón',
+      description: 'Hospitality tradition with over a century of history offering top-quality Cantabrian products.',
+    },
+    fr: {
+      title: 'V. Crespo',
+      subtitle: 'Gijón',
+      description: 'Tradition hôtelière de plus d\'un siècle d\'histoire offrant des produits de première qualité du Cantabrique.',
+    },
+    de: {
+      title: 'V. Crespo',
+      subtitle: 'Gijón',
+      description: 'Gastronomische Tradition mit über einem Jahrhundert Geschichte, die erstklassige kantabrische Produkte bietet.',
+    },
+    pt: {
+      title: 'V. Crespo',
+      subtitle: 'Gijón',
+      description: 'Tradição hoteleira com mais de um século de história oferecendo produtos de primeira qualidade do Cantábrico.',
+    },
+  },
+
+  'restaurant-palacio-de-cutre': {
+    en: {
+      title: 'Palacio de Cutre',
+      subtitle: 'Cutre, Piloña',
+      description: '17th-century manor house converted into a restaurant with cuisine rooted in Asturian tradition.',
+    },
+    fr: {
+      title: 'Palacio de Cutre',
+      subtitle: 'Cutre, Piloña',
+      description: 'Maison seigneuriale du XVIIe siècle transformée en restaurant avec cuisine aux racines asturiennes.',
+    },
+    de: {
+      title: 'Palacio de Cutre',
+      subtitle: 'Cutre, Piloña',
+      description: 'Herrenhaus aus dem 17. Jahrhundert, zum Restaurant umgewandelt, mit Küche aus asturischer Tradition.',
+    },
+    pt: {
+      title: 'Palacio de Cutre',
+      subtitle: 'Cutre, Piloña',
+      description: 'Casona palaciana do século XVII convertida em restaurante com cozinha de raízes asturianas.',
+    },
+  },
+
+  // ============================================
+  // ADDITIONAL CULTURE & CAMINO (5 stories)
+  // ============================================
+
+  'museo-de-bellas-artes-de-asturias': {
+    en: {
+      title: 'Museum of Fine Arts of Asturias',
+      subtitle: 'Oviedo',
+      description: 'One of the finest art collections in Spain, with works from the 14th century to the present day.',
+    },
+    fr: {
+      title: 'Musée des Beaux-Arts des Asturies',
+      subtitle: 'Oviedo',
+      description: 'L\'une des plus belles collections d\'art d\'Espagne, avec des œuvres du XIVe siècle à nos jours.',
+    },
+    de: {
+      title: 'Museum der Schönen Künste Asturiens',
+      subtitle: 'Oviedo',
+      description: 'Eine der besten Kunstsammlungen Spaniens mit Werken vom 14. Jahrhundert bis heute.',
+    },
+    pt: {
+      title: 'Museu de Belas Artes das Astúrias',
+      subtitle: 'Oviedo',
+      description: 'Uma das melhores coleções de arte de Espanha, com obras desde o século XIV até à atualidade.',
+    },
+  },
+
+  'cueva-del-sidron': {
+    en: {
+      title: 'El Sidrón Cave',
+      subtitle: 'Piloña',
+      description: 'Site where 49,000-year-old Neanderthal remains were found. Fascinating interpretation center.',
+    },
+    fr: {
+      title: 'Grotte d\'El Sidrón',
+      subtitle: 'Piloña',
+      description: 'Site où furent trouvés des restes de néandertaliens de 49 000 ans. Centre d\'interprétation fascinant.',
+    },
+    de: {
+      title: 'Höhle von El Sidrón',
+      subtitle: 'Piloña',
+      description: 'Fundstätte von 49.000 Jahre alten Neandertaler-Überresten. Faszinierendes Interpretationszentrum.',
+    },
+    pt: {
+      title: 'Gruta de El Sidrón',
+      subtitle: 'Piloña',
+      description: 'Jazida onde foram encontrados restos de neandertais de 49.000 anos. Centro de interpretação fascinante.',
+    },
+  },
+
+  'camino-camara-santa-de-oviedo': {
+    en: {
+      title: 'Holy Chamber of Oviedo',
+      subtitle: 'Oviedo',
+      description: 'Essential pilgrimage site on the Camino. Houses the Holy Ark and the Cross of Victory and Cross of the Angels.',
+    },
+    fr: {
+      title: 'Chambre Sainte d\'Oviedo',
+      subtitle: 'Oviedo',
+      description: 'Lieu de pèlerinage essentiel sur le Chemin. Abrite l\'Arche Sainte et les croix de la Victoire et des Anges.',
+    },
+    de: {
+      title: 'Heilige Kammer von Oviedo',
+      subtitle: 'Oviedo',
+      description: 'Wesentlicher Wallfahrtsort am Jakobsweg. Beherbergt die Heilige Arche und das Sieges- und Engelskreuz.',
+    },
+    pt: {
+      title: 'Câmara Santa de Oviedo',
+      subtitle: 'Oviedo',
+      description: 'Local de peregrinação essencial no Caminho. Guarda a Arca Santa e as cruzes da Vitória e dos Anjos.',
+    },
+  },
+
+  'camino-monasterio-de-san-salvador': {
+    en: {
+      title: 'Monastery of San Salvador',
+      subtitle: 'Cornellana',
+      description: 'Mandatory stop on the Primitive Way, with Romanesque cloister and beautiful Baroque altarpiece.',
+    },
+    fr: {
+      title: 'Monastère de San Salvador',
+      subtitle: 'Cornellana',
+      description: 'Étape obligée sur le Chemin Primitif, avec cloître roman et magnifique retable baroque.',
+    },
+    de: {
+      title: 'Kloster San Salvador',
+      subtitle: 'Cornellana',
+      description: 'Obligatorische Station auf dem Primitiven Weg mit romanischem Kreuzgang und wunderschönem Barockaltar.',
+    },
+    pt: {
+      title: 'Mosteiro de San Salvador',
+      subtitle: 'Cornellana',
+      description: 'Paragem obrigatória no Caminho Primitivo, com claustro românico e belo retábulo barroco.',
+    },
+  },
+
+  'camino-puerto-del-palo': {
+    en: {
+      title: 'Puerto del Palo',
+      subtitle: 'Tineo',
+      description: 'Mountain pass on the Primitive Way with hermitage and panoramic views. One of the highest points of the route.',
+    },
+    fr: {
+      title: 'Puerto del Palo',
+      subtitle: 'Tineo',
+      description: 'Col de montagne sur le Chemin Primitif avec ermitage et vues panoramiques. Un des points les plus hauts de la route.',
+    },
+    de: {
+      title: 'Puerto del Palo',
+      subtitle: 'Tineo',
+      description: 'Bergpass auf dem Primitiven Weg mit Einsiedelei und Panoramablick. Einer der höchsten Punkte der Route.',
+    },
+    pt: {
+      title: 'Puerto del Palo',
+      subtitle: 'Tineo',
+      description: 'Passo de montanha no Caminho Primitivo com ermida e vistas panorâmicas. Um dos pontos mais altos da rota.',
+    },
+  },
+
+  // ============================================
+  // NATURE (alternate slugs - 4 stories)
+  // ============================================
+
+  'lagos-de-covadonga': {
+    en: {
+      title: 'Lakes of Covadonga',
+      subtitle: 'Picos de Europa',
+      description: 'Enol and Ercina, two glacial lakes surrounded by the most imposing peaks of Picos de Europa.',
+    },
+    fr: {
+      title: 'Lacs de Covadonga',
+      subtitle: 'Pics d\'Europe',
+      description: 'Enol et Ercina, deux lacs d\'origine glaciaire entourés des sommets les plus imposants des Pics d\'Europe.',
+    },
+    de: {
+      title: 'Seen von Covadonga',
+      subtitle: 'Picos de Europa',
+      description: 'Enol und Ercina, zwei Gletscherseen umgeben von den imposantesten Gipfeln der Picos de Europa.',
+    },
+    pt: {
+      title: 'Lagos de Covadonga',
+      subtitle: 'Picos da Europa',
+      description: 'Enol e Ercina, dois lagos de origem glaciar rodeados dos picos mais imponentes dos Picos da Europa.',
+    },
+  },
+
+  'ruta-del-cares': {
+    en: {
+      title: 'Cares Route',
+      subtitle: 'Picos de Europa',
+      description: '12 kilometers of trail carved into the rock between León and Asturias, the most famous hiking route in Spain.',
+    },
+    fr: {
+      title: 'Route du Cares',
+      subtitle: 'Pics d\'Europe',
+      description: '12 kilomètres de sentier creusé dans la roche entre León et les Asturies, la randonnée la plus célèbre d\'Espagne.',
+    },
+    de: {
+      title: 'Cares-Route',
+      subtitle: 'Picos de Europa',
+      description: '12 Kilometer Wanderweg in den Felsen gehauen zwischen León und Asturien, Spaniens berühmtester Wanderweg.',
+    },
+    pt: {
+      title: 'Rota do Cares',
+      subtitle: 'Picos da Europa',
+      description: '12 quilómetros de trilho talhado na rocha entre Leão e Astúrias, a rota de caminhada mais famosa de Espanha.',
+    },
+  },
+
+  'playa-del-silencio': {
+    en: {
+      title: 'Beach of Silence',
+      subtitle: 'Cudillero',
+      description: 'Pristine beach surrounded by cliffs, accessible only on foot, considered one of the most beautiful in Asturias.',
+    },
+    fr: {
+      title: 'Plage du Silence',
+      subtitle: 'Cudillero',
+      description: 'Plage vierge entourée de falaises, accessible uniquement à pied, considérée comme l\'une des plus belles des Asturies.',
+    },
+    de: {
+      title: 'Strand der Stille',
+      subtitle: 'Cudillero',
+      description: 'Unberührter Strand umgeben von Klippen, nur zu Fuß erreichbar, gilt als einer der schönsten Asturiens.',
+    },
+    pt: {
+      title: 'Praia do Silêncio',
+      subtitle: 'Cudillero',
+      description: 'Praia virgem rodeada de falésias, acessível apenas a pé, considerada uma das mais bonitas das Astúrias.',
+    },
+  },
+
+  'senda-del-oso': {
+    en: {
+      title: 'Bear Trail',
+      subtitle: 'Teverga-Quirós',
+      description: '36 kilometers of greenway perfect for cycling, with a bear enclosure and spectacular mountain landscapes.',
+    },
+    fr: {
+      title: 'Sentier de l\'Ours',
+      subtitle: 'Teverga-Quirós',
+      description: '36 kilomètres de voie verte parfaite pour le vélo, avec enclos d\'ours et paysages de montagne spectaculaires.',
+    },
+    de: {
+      title: 'Bärenpfad',
+      subtitle: 'Teverga-Quirós',
+      description: '36 Kilometer Grüner Weg perfekt zum Radfahren, mit Bärengehege und spektakulären Berglandschaften.',
+    },
+    pt: {
+      title: 'Senda do Urso',
+      subtitle: 'Teverga-Quirós',
+      description: '36 quilómetros de via verde perfeita para bicicleta, com cercado de ursos e paisagens de montanha espetaculares.',
+    },
+  },
 };
