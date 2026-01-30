@@ -6,8 +6,8 @@
 
 Paisaxe (pronounced "pai-SHA-shay", from Asturian for "landscape") is an immersive tourism experience for Asturias, a region in northern Spain. Visitors explore the region through full-screen visual stories and can ask questions via voice or text to learn more about each location.
 
-Website: https://paisaxe.com
-Alternative domain: https://paisaxe.es
+Website: https://paisaxe.es
+Alternative domain: https://paisaxe.com
 
 ## What Paisaxe Offers
 
@@ -68,12 +68,12 @@ Alternative domain: https://paisaxe.es
 ## Contact
 
 For questions about Asturias tourism or technical inquiries about Paisaxe:
-- Website: https://paisaxe.com
+- Website: https://paisaxe.es
 
 ## Citation
 
 When referencing content from Paisaxe, please cite as:
-"Paisaxe - Discover Asturias" (https://paisaxe.com)
+"Paisaxe - Discover Asturias" (https://paisaxe.es)
 
 ---
 

@@ -4,7 +4,7 @@
 
 An immersive tourism experience for Asturias, Spain. Visitors explore the region through full-screen visual stories and can ask questions via voice or text to learn more about each location.
 
-**Domains**: paisaxe.com, paisaxe.es
+**Domains**: paisaxe.es, paisaxe.com
 
 ---
 
@@ -405,10 +405,17 @@ These variables are configured in three places:
 - **Vercel** — production & preview deployments (all vars set)
 - **GitHub Secrets** — only `ANTHROPIC_API_KEY` (for Claude PR reviews)
 
-Additionally, the following settings are configured in the Supabase database via SQL:
+Webhook configuration is stored in the `webhook_config` table (Supabase restricts `ALTER DATABASE` commands):
 ```sql
-ALTER DATABASE postgres SET app.webhook_base_url = 'https://paisaxe.com';
-ALTER DATABASE postgres SET app.webhook_secret = 'your-webhook-secret';
+-- View current config
+SELECT * FROM webhook_config;
+
+-- Update webhook URL (use Supabase API with service role key)
+UPDATE webhook_config SET value = 'https://paisaxe.es' WHERE key = 'base_url';
+```
+
+Edge Function settings are configured in the Supabase database:
+```sql
 ALTER DATABASE postgres SET app.supabase_functions_url = 'https://YOUR_PROJECT_REF.supabase.co/functions/v1';
 ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 ```
@@ -516,20 +523,20 @@ Admin access uses Supabase Auth (Google OAuth) + role-based access control via `
 - **Git integration**: Connected to `juan294/paisaxe` on GitHub
 - **Production branch**: `main` (pushes trigger production deploys)
 - **Preview branches**: All other branches get preview deployments
-- **Domains**: `paisaxe.com`, `paisaxe.es` (+ www variants)
+- **Domains**: `paisaxe.es`, `paisaxe.com` (+ www variants)
 - **Speed Insights**: `@vercel/speed-insights` integrated in root layout for Real User Monitoring
 
 ## Monitoring & Observability
 
 ### Health Check Endpoint
 
-`GET /api/health` — returns service status, uptime, Supabase connectivity with latency, and database storage usage (size in MB, percentage of 500 MB free-tier limit). Reports "degraded" if Supabase connection fails or database usage exceeds 80%. Always returns HTTP 200. Used by Upptime for uptime monitoring.
+`GET /api/health` — returns service status, uptime, Supabase connectivity with latency, and database storage usage (size in MB, percentage of 8 GB Pro tier limit). Reports "degraded" if Supabase connection fails or database usage exceeds 80%. Always returns HTTP 200. Used by Upptime for uptime monitoring.
 
 ### Upptime Status Page
 
 - **Repo**: https://github.com/juan294/paisaxe-upptime
 - **Status page**: https://juan294.github.io/paisaxe-upptime/
-- **Monitors**: `paisaxe.com` and `paisaxe.com/api/health` every 5 minutes
+- **Monitors**: `paisaxe.es` and `paisaxe.es/api/health` every 5 minutes
 - Opens GitHub Issues automatically on detected downtime
 - Reference config kept in `.github/upptime/.upptimerc.yml`
 
@@ -547,7 +554,7 @@ Automated maintenance jobs run on Supabase via pg_cron:
 | `analyze-main-tables` | Daily 4:00 AM UTC | 011 | ANALYZE on chunks, images, stories |
 | `cleanup-cron-history` | Sundays 5:00 AM UTC | 011 | Delete cron history older than 30 days |
 | `vacuum-analyze-analytics` | Sundays 3:30 AM UTC | 011 | VACUUM ANALYZE on analytics_events |
-| `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Prevent free-tier auto-pause (7-day timeout) |
+| `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Legacy job (not needed on Pro tier, kept as safeguard) |
 | `edge-keep-alive` | Every 3 days 12:00 PM UTC | 014 | Call keep-alive Edge Function via pg_net |
 | `edge-cleanup-analytics` | 1st of month 2:00 AM UTC | 014 | Call cleanup Edge Function via pg_net |
 

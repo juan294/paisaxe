@@ -24,17 +24,33 @@ After adding, trigger a redeployment so the new env var takes effect.
 
 ## 2. Configure Supabase Database Webhook Settings
 
-Run these SQL commands in the [Supabase SQL Editor](https://supabase.com/dashboard/project/axoishtlumlswzhegseq/sql) to tell the database where to send webhook HTTP calls:
+Webhook settings are stored in the `webhook_config` table (Supabase restricts ALTER DATABASE commands).
 
+**View current config:**
 ```sql
--- Set the webhook target URL (your production domain)
-ALTER DATABASE postgres SET app.webhook_base_url = 'https://paisaxe.com';
-
--- Set the webhook secret (must match WEBHOOK_SECRET env var above)
-ALTER DATABASE postgres SET app.webhook_secret = '(see .env.local WEBHOOK_SECRET)';
+SELECT * FROM webhook_config;
 ```
 
-**Note**: If using `paisaxe.es` as the primary domain instead, update the URL accordingly.
+**Update via Supabase API (using service role key):**
+```bash
+# Update base_url
+curl -X PATCH \
+  "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/webhook_config?key=eq.base_url" \
+  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"value": "https://paisaxe.es"}'
+
+# Update secret
+curl -X PATCH \
+  "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/webhook_config?key=eq.secret" \
+  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"value": "YOUR_WEBHOOK_SECRET"}'
+```
+
+**✓ COMPLETED**: Webhook config is set to `https://paisaxe.es` with the correct secret.
 
 ---
 
@@ -110,7 +126,7 @@ Once the domain is finalized, update the production site URL:
 ```bash
 vercel env rm NEXT_PUBLIC_SITE_URL production
 vercel env add NEXT_PUBLIC_SITE_URL production
-# Enter: https://paisaxe.com (or https://paisaxe.es)
+# Enter: https://paisaxe.es (or https://paisaxe.es)
 ```
 
 ---
@@ -119,7 +135,7 @@ vercel env add NEXT_PUBLIC_SITE_URL production
 
 After completing all steps above:
 
-1. **Health check**: Visit `https://paisaxe.com/api/health` - should show `"healthy"` with database size info
+1. **Health check**: Visit `https://paisaxe.es/api/health` - should show `"healthy"` with database size info
 2. **Webhooks**: Toggle a feature flag in the admin panel, then check if the cache is invalidated (the flag change should reflect immediately)
 3. **Realtime**: Open two browser tabs on the immersive page. Toggle a feature flag in the admin panel. Both tabs should reflect the change without refreshing
 4. **Edge Functions**: Check the Supabase Dashboard > Edge Functions to see invocation logs

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/seo/json-ld";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
 
 const title = "Explora Asturias | Paisaxe";
 const description =

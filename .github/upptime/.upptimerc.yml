@@ -11,12 +11,12 @@ repo: paisaxe-upptime
 
 sites:
   - name: Paisaxe (Main Site)
-    url: https://paisaxe.com
+    url: https://paisaxe.es
     method: GET
     expectedStatusCode: 200
 
   - name: Paisaxe API Health
-    url: https://paisaxe.com/api/health
+    url: https://paisaxe.es/api/health
     method: GET
     expectedStatusCode: 200
 

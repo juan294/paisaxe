@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 function getSiteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.com";
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
 }
 
 export default function robots(): MetadataRoute.Robots {

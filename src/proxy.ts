@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const ALLOWED_ORIGINS = [
-  "https://paisaxe.com",
-  "https://www.paisaxe.com",
   "https://paisaxe.es",
   "https://www.paisaxe.es",
+  "https://paisaxe.com",
+  "https://www.paisaxe.com",
 ];
 
 // Allow localhost in development

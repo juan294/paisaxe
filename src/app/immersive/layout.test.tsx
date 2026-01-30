@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import ImmersiveLayout, { metadata } from "./layout";
 
-const SITE_URL = "https://paisaxe.com";
+const SITE_URL = "https://paisaxe.es";
 
 describe("ImmersiveLayout", () => {
   it("renders children", () => {

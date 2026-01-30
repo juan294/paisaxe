@@ -108,7 +108,7 @@ describe("rowToMarketingPost", () => {
     content: "Beautiful morning in Asturias!",
     media_urls: ["https://example.com/image1.jpg"],
     hashtags: ["#Asturias", "#Spain"],
-    link_url: "https://paisaxe.com/stories/covadonga",
+    link_url: "https://paisaxe.es/stories/covadonga",
     scheduled_for: "2025-01-20T14:00:00.000Z",
     posted_at: null,
     status: "scheduled",

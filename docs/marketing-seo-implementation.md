@@ -26,7 +26,7 @@ Created an AI-readable site summary following the emerging `llms.txt` standard. 
 - Technical details
 - Citation guidelines
 
-Access at: `https://paisaxe.com/llms.txt`
+Access at: `https://paisaxe.es/llms.txt`
 
 ### 3. Enhanced Schema Markup (`src/components/seo/json-ld.tsx`)
 
@@ -95,14 +95,14 @@ After deployment, verify:
 
 1. **Schema Markup**
    - Test at: https://search.google.com/test/rich-results
-   - Enter: `https://paisaxe.com`
+   - Enter: `https://paisaxe.es`
 
 2. **Robots.txt**
-   - Verify at: `https://paisaxe.com/robots.txt`
+   - Verify at: `https://paisaxe.es/robots.txt`
    - Check AI crawler rules are present
 
 3. **llms.txt**
-   - Accessible at: `https://paisaxe.com/llms.txt`
+   - Accessible at: `https://paisaxe.es/llms.txt`
 
 4. **PWA**
    - Chrome DevTools > Application > Manifest
@@ -462,7 +462,7 @@ This is the emerging frontier. Key insights:
 - [ ] Create Instagram account (@paisaxe or @paisaxeapp)
 - [ ] Create Pinterest business account
 - [ ] Create basic content bank (10-15 visual pieces minimum)
-- [ ] Link all accounts in bios to paisaxe.com
+- [ ] Link all accounts in bios to paisaxe.es
 
 ##### Phase 2: Launch (Week 1-2)
 - [ ] Start posting on X (daily or near-daily, low friction)

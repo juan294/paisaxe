@@ -12,7 +12,7 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
 
 const title = "Paisaxe | Descubre Asturias";
 const description =

@@ -296,8 +296,8 @@ A dedicated endpoint for uptime monitoring that reports application and service 
 A separate GitHub repository that monitors site availability using GitHub Actions and displays results on a GitHub Pages status page.
 
 **Monitors**:
-- `paisaxe.com` — main site (every 5 minutes)
-- `paisaxe.com/api/health` — API health endpoint (every 5 minutes)
+- `paisaxe.es` — main site (every 5 minutes)
+- `paisaxe.es/api/health` — API health endpoint (every 5 minutes)
 
 **Features**:
 - Automatic GitHub Issues when downtime is detected
@@ -351,7 +351,7 @@ SELECT * FROM cron.job_run_details ORDER BY end_time DESC LIMIT 10;
 - Node.js: 24.x
 
 **Domains**:
-- `paisaxe.com` + `www.paisaxe.com`
+- `paisaxe.es` + `www.paisaxe.es`
 - `paisaxe.es` + `www.paisaxe.es` (pending domain registration)
 
 **Environment variables**: All 9 variables configured for production and preview environments. Sensitive keys (API keys, secrets) are marked as sensitive in Vercel.
