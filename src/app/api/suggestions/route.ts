@@ -168,6 +168,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Validate attribution if provided (how they want to be credited)
+  const attribution = body.attribution?.trim() || null;
+  if (attribution && attribution.length > 100) {
+    return NextResponse.json(
+      { error: "Attribution must not exceed 100 characters" },
+      { status: 400 }
+    );
+  }
+
   const supabase = await getSupabaseClient();
 
   const { data, error } = await supabase
@@ -177,6 +186,7 @@ export async function POST(request: NextRequest) {
       place_name: placeName,
       comment,
       location,
+      attribution,
       status: "pending",
     })
     .select()

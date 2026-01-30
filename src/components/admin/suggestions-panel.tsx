@@ -17,6 +17,7 @@ import {
   User,
   Calendar,
   MessageSquare,
+  AtSign,
 } from "lucide-react";
 import type { AdminStorySuggestion, SuggestionStatus } from "@/types/suggestions";
 
@@ -278,6 +279,12 @@ export function SuggestionsPanel() {
                             {LOCATION_LABELS[suggestion.location] || suggestion.location}
                           </span>
                         )}
+                        {suggestion.attribution && (
+                          <span className="flex items-center gap-1">
+                            <AtSign className="h-3 w-3" />
+                            {suggestion.attribution}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -308,6 +315,19 @@ export function SuggestionsPanel() {
                       </label>
                       <p className="text-sm text-stone-600 dark:text-stone-300">
                         {suggestion.comment}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Attribution */}
+                  {suggestion.attribution && (
+                    <div className="mb-4">
+                      <label className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-widest text-stone-400">
+                        <AtSign className="h-3 w-3" />
+                        Credit As
+                      </label>
+                      <p className="text-sm text-stone-600 dark:text-stone-300">
+                        {suggestion.attribution}
                       </p>
                     </div>
                   )}

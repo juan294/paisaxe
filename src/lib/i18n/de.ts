@@ -181,6 +181,9 @@ export const de: Translations = {
     error_rate_limit: 'Bitte warten Sie, bevor Sie einen weiteren Vorschlag senden',
     error_generic: 'Fehler beim Senden. Bitte versuchen Sie es erneut.',
     community_pick: 'Community-Vorschlag',
+    attribution_label: 'Wie möchten Sie genannt werden? (optional)',
+    attribution_placeholder: 'z.B. @IhrBenutzername, Ihr Name',
+    attribution_hint: 'Bei Veröffentlichung werden wir Sie so nennen. Leer lassen für anonym.',
   },
 
   admin: {

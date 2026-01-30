@@ -12,6 +12,7 @@ export interface StorySuggestionRow {
   status: SuggestionStatus;
   admin_notes: string | null;
   converted_story_id: string | null;
+  attribution: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +27,8 @@ export interface StorySuggestion {
   status: SuggestionStatus;
   adminNotes: string | null;
   convertedStoryId: string | null;
+  /** How the user wants to be credited (name, social handle, etc.) */
+  attribution: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,6 +43,8 @@ export interface CreateSuggestionRequest {
   placeName: string;
   comment?: string;
   location?: "eastern" | "central" | "western";
+  /** How the user wants to be credited (name, social handle, etc.) */
+  attribution?: string;
 }
 
 // Request type for updating a suggestion (admin)
@@ -59,6 +64,7 @@ export function rowToStorySuggestion(row: StorySuggestionRow): StorySuggestion {
     status: row.status,
     adminNotes: row.admin_notes,
     convertedStoryId: row.converted_story_id,
+    attribution: row.attribution,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

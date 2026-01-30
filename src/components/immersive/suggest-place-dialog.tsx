@@ -38,6 +38,7 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
   const [placeName, setPlaceName] = useState("");
   const [comment, setComment] = useState("");
   const [location, setLocation] = useState<string>("");
+  const [attribution, setAttribution] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -71,6 +72,7 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
           placeName: trimmedPlaceName,
           comment: comment.trim() || undefined,
           location: location || undefined,
+          attribution: attribution.trim() || undefined,
         }),
       });
 
@@ -91,6 +93,7 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
         setPlaceName("");
         setComment("");
         setLocation("");
+        setAttribution("");
         setSubmitState("idle");
         onClose();
       }, 2000);
@@ -204,6 +207,25 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
               />
               <p className="text-xs text-white/40">
                 {comment.length}/500 {t("suggestions.characters")}
+              </p>
+            </div>
+
+            {/* Attribution */}
+            <div className="space-y-2">
+              <Label htmlFor="attribution" className="text-white/80">
+                {t("suggestions.attribution_label")}
+              </Label>
+              <Input
+                id="attribution"
+                value={attribution}
+                onChange={(e) => setAttribution(e.target.value)}
+                placeholder={t("suggestions.attribution_placeholder")}
+                maxLength={100}
+                disabled={submitState === "loading"}
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-white/40"
+              />
+              <p className="text-xs text-white/40">
+                {t("suggestions.attribution_hint")}
               </p>
             </div>
 

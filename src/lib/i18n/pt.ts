@@ -181,6 +181,9 @@ export const pt: Translations = {
     error_rate_limit: 'Por favor aguarde antes de enviar outra sugestão',
     error_generic: 'Erro ao enviar. Por favor tente novamente.',
     community_pick: 'Sugestão da comunidade',
+    attribution_label: 'Como gostaria de ser creditado? (opcional)',
+    attribution_placeholder: 'ex. @seuusername, Seu Nome',
+    attribution_hint: 'Se publicado, daremos crédito assim. Deixe vazio para ficar anónimo.',
   },
 
   admin: {
