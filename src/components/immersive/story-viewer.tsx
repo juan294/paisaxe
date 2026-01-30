@@ -17,7 +17,6 @@ import { QuestionPrompts } from "./question-prompts";
 import { SurpriseMeButton } from "./surprise-me-button";
 import { FreshnessBadge } from "./freshness-badge";
 import { ShareButton } from "./share-button";
-import { AmbientIndicator } from "./ambient-indicator";
 import { LanguageSwitcher } from "./language-switcher";
 import { getLabel } from "@/lib/asturianu";
 import { useTranslation } from "@/lib/i18n";
@@ -389,9 +388,6 @@ export function StoryViewer({
       <nav aria-label="Story controls" className="absolute top-16 right-6 z-20 flex items-center gap-3">
         {/* Language Switcher */}
         <LanguageSwitcher />
-
-        {/* Ambient mode indicator */}
-        {isAmbient && <AmbientIndicator />}
 
         {/* Ambient / Auto-play toggle */}
         {isEnabled("autoplay_button") && (
