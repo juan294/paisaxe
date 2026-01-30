@@ -5,6 +5,7 @@ import {
   uploadStoryImage,
   updateStoryStatus,
   updateFeatureFlagConfig,
+  updateStoryImageSource,
 } from "./admin-api";
 
 // Helper to create a mock Response
@@ -147,6 +148,63 @@ describe("admin-api", () => {
       vi.mocked(fetch).mockRejectedValue(new Error("Network failure"));
 
       const result = await updateStoryImageUrl(storyId, imageUrl);
+      expect(result).toEqual({ error: "Network error" });
+    });
+  });
+
+  // ─── updateStoryImageSource ───────────────────────────────────────
+
+  describe("updateStoryImageSource", () => {
+    const storyId = "story-1";
+    const imageSource = "Turismo Asturias";
+
+    it("sends PUT request with JSON body", async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({ data: { id: storyId, imageSource } })
+      );
+
+      await updateStoryImageSource(storyId, imageSource);
+
+      expect(fetch).toHaveBeenCalledOnce();
+      const [url, init] = vi.mocked(fetch).mock.calls[0];
+      expect(String(url)).toBe(`/api/admin/stories/${storyId}/image-source`);
+      expect(init?.method).toBe("PUT");
+      expect(init?.headers).toEqual(
+        expect.objectContaining({
+          "Content-Type": "application/json",
+        })
+      );
+      expect(JSON.parse(init?.body as string)).toEqual({ imageSource });
+    });
+
+    it("returns data on successful response", async () => {
+      const data = { data: { id: storyId, imageSource } };
+      vi.mocked(fetch).mockResolvedValue(mockResponse(data));
+
+      const result = await updateStoryImageSource(storyId, imageSource);
+      expect(result).toEqual(data);
+    });
+
+    it("returns error on API error response", async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({ error: "Not found" }, false, 404)
+      );
+
+      const result = await updateStoryImageSource(storyId, imageSource);
+      expect(result).toEqual({ error: "Not found" });
+    });
+
+    it("returns fallback error when API error has no error field", async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse({}, false, 500));
+
+      const result = await updateStoryImageSource(storyId, imageSource);
+      expect(result).toEqual({ error: "Failed to update image source" });
+    });
+
+    it("returns network error when fetch throws", async () => {
+      vi.mocked(fetch).mockRejectedValue(new Error("Network failure"));
+
+      const result = await updateStoryImageSource(storyId, imageSource);
       expect(result).toEqual({ error: "Network error" });
     });
   });

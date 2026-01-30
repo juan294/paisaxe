@@ -17,6 +17,7 @@ import {
   uploadStoryImage,
   updateStoryStatus,
   searchContentImages,
+  updateStoryImageSource,
 } from "@/lib/admin-api";
 import {
   Link,
@@ -160,6 +161,31 @@ export function ImageEditorDialog({
         // For content images, use the URL (it's a local path that needs to be served)
         result = await updateStoryImageUrl(story.id, currentContentImage.url, imageSource || undefined);
       } else {
+        // Check if we can do a source-only update or if there's nothing to save
+        const hasRealImage = story.image && !isPlaceholderImage(story);
+        const sourceChanged = imageSource !== (story.imageSource || "");
+
+        if (hasRealImage) {
+          // Story already has a real image
+          if (sourceChanged && imageSource) {
+            // Source changed - save just the source
+            const sourceResult = await updateStoryImageSource(story.id, imageSource);
+            if (sourceResult.error) {
+              setError(sourceResult.error);
+            } else if (sourceResult.data) {
+              onUpdate(story.id, { imageSource: sourceResult.data.imageSource });
+              resetAndClose();
+            }
+            setIsLoading(false);
+            return;
+          } else {
+            // Nothing to save - just close the dialog
+            resetAndClose();
+            return;
+          }
+        }
+
+        // Story needs an image (placeholder or no image)
         setError("Please provide an image URL, upload a file, or select a content image");
         setIsLoading(false);
         return;

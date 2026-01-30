@@ -83,10 +83,17 @@ function hashString(str: string): number {
 
 /**
  * Check whether a story's image is a placeholder.
- * Looks at `imageSource` for the `unsplash-placeholder:` prefix.
+ * Must have BOTH:
+ * 1. Image URL from Unsplash (images.unsplash.com)
+ * 2. imageSource with the `unsplash-placeholder:` prefix
+ *
+ * This prevents showing the placeholder banner when a real image
+ * has been uploaded but the imageSource wasn't properly updated.
  */
-export function isPlaceholderImage(story: { imageSource?: string }): boolean {
-  return !!story.imageSource && story.imageSource.startsWith(PLACEHOLDER_PREFIX);
+export function isPlaceholderImage(story: { image?: string; imageSource?: string }): boolean {
+  const hasPlaceholderPrefix = !!story.imageSource && story.imageSource.startsWith(PLACEHOLDER_PREFIX);
+  const isUnsplashUrl = !!story.image && story.image.startsWith("https://images.unsplash.com/");
+  return hasPlaceholderPrefix && isUnsplashUrl;
 }
 
 /**

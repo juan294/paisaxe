@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
-import type { CurationStatus } from "@/types/admin";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -26,49 +25,48 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   try {
     const body = await request.json();
-    const { status } = body as { status: CurationStatus };
+    const { imageSource } = body;
 
-    // Validate status
-    if (status !== "needs_curation" && status !== "approved") {
+    if (typeof imageSource !== "string") {
       return NextResponse.json(
-        { error: "Invalid status. Must be 'needs_curation' or 'approved'" },
+        { error: "imageSource is required and must be a string" },
         { status: 400 }
       );
     }
 
     const supabase = createAdminClient();
 
-    // Update story curation status
+    // Update just the image_source field
     const { data, error } = await supabase
       .from("stories")
-      .update({ curation_status: status })
+      .update({ image_source: imageSource })
       .eq("id", id)
-      .select()
+      .select("id, image_source")
       .single();
 
     if (error) {
       console.error("Update error:", error);
       return NextResponse.json(
-        { error: "Failed to update story status" },
+        { error: "Failed to update image source" },
         { status: 500 }
       );
     }
 
     if (!data) {
-      return NextResponse.json(
-        { error: "Story not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Story not found" }, { status: 404 });
     }
 
-    // Revalidate the immersive page cache so approved stories appear immediately
+    // Revalidate the immersive page cache so attribution updates appear immediately
     revalidatePath("/immersive");
 
     return NextResponse.json({
-      data: { id: data.id, curationStatus: status },
+      data: {
+        id: data.id,
+        imageSource: data.image_source,
+      },
     });
   } catch (error) {
-    console.error("Admin status API error:", error);
+    console.error("Admin image source API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
