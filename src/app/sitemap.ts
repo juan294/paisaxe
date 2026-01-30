@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { getStoriesFromDB } from "@/lib/stories-data";
 
 function getSiteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.com";
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

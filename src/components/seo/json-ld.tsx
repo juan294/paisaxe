@@ -6,7 +6,7 @@ interface JsonLdProps {
 
 export function JsonLd({ type }: JsonLdProps) {
   const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.com";
+    process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
   const data =
     type === "website"
       ? getWebsiteData(siteUrl)
@@ -77,7 +77,7 @@ interface StoryJsonLdProps {
 }
 
 export function StoryJsonLd({ story }: StoryJsonLdProps) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
   const storyUrl = `${siteUrl}/immersive?story=${story.slug || story.id}`;
   const imageUrl = story.image.startsWith("http")
     ? story.image
@@ -171,7 +171,7 @@ interface BreadcrumbJsonLdProps {
 }
 
 export function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
 
   const data = {
     "@context": "https://schema.org",

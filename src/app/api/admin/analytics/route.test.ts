@@ -62,7 +62,7 @@ describe("GET /api/admin/analytics (PostHog)", () => {
       // 2. Unique visitors
       { results: [[567]] },
       // 3. Top pages
-      { results: [["https://paisaxe.com/", 500], ["https://paisaxe.com/immersive", 300]] },
+      { results: [["https://paisaxe.es/", 500], ["https://paisaxe.es/immersive", 300]] },
       // 4. Top referrers
       { results: [["https://google.com", 200], ["https://twitter.com", 50]] },
       // 5. Countries
@@ -88,7 +88,7 @@ describe("GET /api/admin/analytics (PostHog)", () => {
     expect(data.data.summary.totalPageviews).toBe(1234);
     expect(data.data.summary.uniqueVisitors).toBe(567);
     expect(data.data.topPages).toHaveLength(2);
-    expect(data.data.topPages[0].url).toBe("https://paisaxe.com/");
+    expect(data.data.topPages[0].url).toBe("https://paisaxe.es/");
     expect(data.data.topReferrers).toHaveLength(2);
     expect(data.data.countries).toHaveLength(2);
     expect(data.data.devices).toHaveLength(2);

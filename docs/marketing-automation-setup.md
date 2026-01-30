@@ -35,7 +35,7 @@ Before connecting any platform, you need:
 1. In your App settings, set:
    - **App permissions**: Read and Write
    - **Type of App**: Web App, Automated App or Bot
-   - **Callback URL**: `https://paisaxe.com/api/auth/callback/x`
+   - **Callback URL**: `https://paisaxe.es/api/auth/callback/x`
 
 2. Note down:
    - API Key
@@ -55,7 +55,7 @@ For Paisaxe's needs (1-7 posts/day), the free tier is sufficient initially.
 
 Use the API to save credentials:
 ```bash
-curl -X POST https://paisaxe.com/api/admin/marketing/accounts \
+curl -X POST https://paisaxe.es/api/admin/marketing/accounts \
   -H "Content-Type: application/json" \
   -H "Cookie: <your-admin-session-cookie>" \
   -d '{
@@ -121,7 +121,7 @@ curl -X GET "https://graph.facebook.com/v19.0/PAGE_ID?fields=instagram_business_
 ### 6. Save Credentials
 
 ```bash
-curl -X POST https://paisaxe.com/api/admin/marketing/accounts \
+curl -X POST https://paisaxe.es/api/admin/marketing/accounts \
   -H "Content-Type: application/json" \
   -H "Cookie: <your-admin-session-cookie>" \
   -d '{
@@ -154,7 +154,7 @@ curl -X POST https://paisaxe.com/api/admin/marketing/accounts \
 
 1. Go to [developers.pinterest.com](https://developers.pinterest.com)
 2. Create a new App
-3. Set Redirect URI: `https://paisaxe.com/api/auth/callback/pinterest`
+3. Set Redirect URI: `https://paisaxe.es/api/auth/callback/pinterest`
 
 ### 3. Request Access
 
@@ -181,7 +181,7 @@ curl -X POST https://api.pinterest.com/v5/oauth/token \
 ### 5. Save Credentials
 
 ```bash
-curl -X POST https://paisaxe.com/api/admin/marketing/accounts \
+curl -X POST https://paisaxe.es/api/admin/marketing/accounts \
   -H "Content-Type: application/json" \
   -H "Cookie: <your-admin-session-cookie>" \
   -d '{
@@ -211,7 +211,7 @@ TikTok's Content Posting API is newer and has strict requirements.
 ### 2. App Configuration
 
 1. Set App type: Web
-2. Add Redirect URI: `https://paisaxe.com/api/auth/callback/tiktok`
+2. Add Redirect URI: `https://paisaxe.es/api/auth/callback/tiktok`
 3. Request scopes:
    - `video.publish`
    - `video.upload`
@@ -238,7 +238,7 @@ curl -X POST https://open.tiktokapis.com/v2/oauth/token/ \
 ### 5. Save Credentials
 
 ```bash
-curl -X POST https://paisaxe.com/api/admin/marketing/accounts \
+curl -X POST https://paisaxe.es/api/admin/marketing/accounts \
   -H "Content-Type: application/json" \
   -H "Cookie: <your-admin-session-cookie>" \
   -d '{
@@ -292,13 +292,13 @@ Default schedules created by the migration:
 Modify schedules via the API:
 ```bash
 # Add new schedule
-curl -X POST https://paisaxe.com/api/admin/marketing/schedule \
+curl -X POST https://paisaxe.es/api/admin/marketing/schedule \
   -H "Content-Type: application/json" \
   -H "Cookie: <session>" \
   -d '{"platform": "x", "dayOfWeek": 2, "timeUtc": "14:00", "contentType": "photo_caption"}'
 
 # Update schedule
-curl -X PUT "https://paisaxe.com/api/admin/marketing/schedule?id=SCHEDULE_ID" \
+curl -X PUT "https://paisaxe.es/api/admin/marketing/schedule?id=SCHEDULE_ID" \
   -H "Content-Type: application/json" \
   -H "Cookie: <session>" \
   -d '{"isActive": false}'

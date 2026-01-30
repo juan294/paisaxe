@@ -104,7 +104,7 @@ Follow the Paisaxe brand voice but adapted for X:
 
 - Impressions (reach)
 - Engagement rate (replies, retweets, quotes)
-- Link clicks to paisaxe.com
+- Link clicks to paisaxe.es
 - Follower growth quality (travelers, not bots)
 - Conversation started (threads that take off)
 

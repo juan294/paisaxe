@@ -15,7 +15,7 @@ describe("JsonLd", () => {
     expect(data["@context"]).toBe("https://schema.org");
     expect(data["@type"]).toBe("WebSite");
     expect(data.name).toBe("Paisaxe");
-    expect(data.url).toBe("https://paisaxe.com");
+    expect(data.url).toBe("https://paisaxe.es");
     expect(data.description).toBeTruthy();
     expect(data.inLanguage).toBeDefined();
   });
@@ -380,7 +380,7 @@ describe("BreadcrumbJsonLd", () => {
     const data = JSON.parse(script!.textContent!);
 
     expect(data.itemListElement[0].item["@id"]).toBe(
-      "https://paisaxe.com/immersive"
+      "https://paisaxe.es/immersive"
     );
   });
 });

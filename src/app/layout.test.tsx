@@ -19,7 +19,7 @@ vi.mock("@/lib/i18n/detect-language", () => ({
   mapLanguageTag: (tag: string) => tag.startsWith("es") ? "es" : tag.startsWith("en") ? "en" : null,
 }));
 
-const SITE_URL = "https://paisaxe.com";
+const SITE_URL = "https://paisaxe.es";
 
 describe("RootLayout", () => {
   describe("metadata", () => {

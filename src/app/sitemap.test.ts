@@ -9,7 +9,7 @@ vi.mock("@/lib/stories-data", () => ({
 
 import sitemap from "./sitemap";
 
-const SITE_URL = "https://paisaxe.com";
+const SITE_URL = "https://paisaxe.es";
 
 describe("sitemap", () => {
   it("returns static pages plus story entries", async () => {

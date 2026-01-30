@@ -22,7 +22,7 @@ describe("FavoritesLayout", () => {
 
   it("exports canonical URL", () => {
     expect(metadata.alternates?.canonical).toBe(
-      "https://paisaxe.com/favorites"
+      "https://paisaxe.es/favorites"
     );
   });
 });

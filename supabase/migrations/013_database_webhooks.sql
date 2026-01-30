@@ -11,16 +11,18 @@
 --   2. Configure app settings (see below)
 --
 -- CONFIGURATION:
---   Set these via Supabase SQL Editor or Dashboard (Database > Settings):
+--   NOTE: Supabase restricts ALTER DATABASE commands. Configuration is now
+--   stored in the webhook_config table (see migration 025_webhook_config_table.sql).
 --
---   ALTER DATABASE postgres SET app.webhook_base_url = 'https://paisaxe.com';
---   ALTER DATABASE postgres SET app.webhook_secret = 'your-secret-here';
+--   View config:     SELECT * FROM webhook_config;
+--   Update base_url: UPDATE webhook_config SET value = 'https://paisaxe.es' WHERE key = 'base_url';
+--   Update secret:   UPDATE webhook_config SET value = 'your-secret' WHERE key = 'secret';
 --
---   The webhook_base_url should point to your Vercel deployment:
---     - Production: https://paisaxe.com
+--   The base_url should point to your Vercel deployment:
+--     - Production: https://paisaxe.es
 --     - Preview: https://your-branch.paisaxe.vercel.app
 --
---   The webhook_secret must match the WEBHOOK_SECRET env var on Vercel.
+--   The secret must match the WEBHOOK_SECRET env var on Vercel.
 --
 -- HOW IT WORKS:
 --   When a row is updated in the stories or feature_flags tables, a trigger

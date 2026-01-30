@@ -47,7 +47,7 @@ describe("robots", () => {
 
   it("includes sitemap URL with default fallback", () => {
     const result = robots();
-    expect(result.sitemap).toBe("https://paisaxe.com/sitemap.xml");
+    expect(result.sitemap).toBe("https://paisaxe.es/sitemap.xml");
   });
 
   describe("uses NEXT_PUBLIC_SITE_URL env var", () => {

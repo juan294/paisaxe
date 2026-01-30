@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     follow: false,
   },
   alternates: {
-    canonical: "https://paisaxe.com/favorites",
+    canonical: "https://paisaxe.es/favorites",
   },
 };
 

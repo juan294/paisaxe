@@ -52,7 +52,7 @@ async function checkSupabase(): Promise<SupabaseServiceStatus> {
   }
 }
 
-const STORAGE_LIMIT_MB = 500;
+const STORAGE_LIMIT_MB = 8192; // Supabase Pro tier: 8 GB
 const STORAGE_WARNING_THRESHOLD = 0.8; // 80%
 
 async function checkDatabaseSize(): Promise<

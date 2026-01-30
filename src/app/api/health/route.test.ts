@@ -162,8 +162,8 @@ describe("GET /api/health", () => {
 
     expect(data.services.database).toBeDefined();
     expect(data.services.database.size_mb).toBe(DB_SIZE_MB);
-    expect(data.services.database.limit_mb).toBe(500);
-    expect(data.services.database.usage_percent).toBeCloseTo(24.7, 1);
+    expect(data.services.database.limit_mb).toBe(8192); // Supabase Pro tier: 8 GB
+    expect(data.services.database.usage_percent).toBeCloseTo(1.5, 1); // 123.4 / 8192 * 100
   });
 
   it("should gracefully handle database size RPC error without breaking health check", async () => {
@@ -183,15 +183,15 @@ describe("GET /api/health", () => {
 
   it('should return status "degraded" when database usage exceeds 80%', async () => {
     mockSupabaseSuccess();
-    // 80% of 500 MB = 400 MB = 419,430,400 bytes
-    const highUsageBytes = 419430400;
+    // 80% of 8192 MB (Pro tier) = 6553.6 MB = 6,871,954,637 bytes
+    const highUsageBytes = 6871954637;
     mockDatabaseSize(highUsageBytes);
 
     const response = await GET();
     const data = await response.json();
 
     expect(data.status).toBe("degraded");
-    expect(data.services.database.size_mb).toBe(400);
+    expect(data.services.database.size_mb).toBe(6553.6);
     expect(data.services.database.usage_percent).toBe(80);
   });
 

@@ -71,7 +71,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       const { error: uploadError } = await supabase.storage
         .from("story-images")
         .upload(filename, file, {
-          cacheControl: "3600",
+          cacheControl: "31536000", // 1 year - Smart CDN auto-invalidates on change
           upsert: true,
         });
 
