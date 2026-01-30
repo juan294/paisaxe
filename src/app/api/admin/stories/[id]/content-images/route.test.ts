@@ -2,11 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "./route";
 
-// Mock dependencies - use vi.hoisted to ensure mockReadFile is available before hoisting
-const { mockReadFile } = vi.hoisted(() => ({
-  mockReadFile: vi.fn(),
-}));
-
 vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(),
 }));
@@ -15,79 +10,29 @@ vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
 
-vi.mock("fs/promises", () => {
-  const mock = {
-    readFile: mockReadFile,
-    writeFile: vi.fn(),
-    access: vi.fn(),
-    stat: vi.fn(),
-  };
-  return {
-    ...mock,
-    default: mock,
-  };
-});
-
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 
-const mockManifest = {
-  extractedAt: "2026-01-27T16:58:30.260Z",
-  totalImages: 10,
-  totalPdfs: 2,
-  images: [
-    {
-      filename: "test-pdf_page1_img_p0_1.png",
-      sourcePdf: "test-pdf.pdf",
-      pageNumber: 1,
-      width: 1200,
-      height: 800,
-      path: "test-pdf/test-pdf_page1_img_p0_1.png",
-      aspectRatio: 1.5,
-      type: "extracted",
-    },
-    {
-      filename: "test-pdf_page2_img_p1_1.png",
-      sourcePdf: "test-pdf.pdf",
-      pageNumber: 2,
-      width: 900,
-      height: 600,
-      path: "test-pdf/test-pdf_page2_img_p1_1.png",
-      aspectRatio: 1.5,
-      type: "extracted",
-    },
-    {
-      filename: "test-pdf_page3_full.png",
-      sourcePdf: "test-pdf.pdf",
-      pageNumber: 3,
-      width: 800,
-      height: 1000,
-      path: "test-pdf/test-pdf_page3_full.png",
-      aspectRatio: 0.8,
-      type: "rendered",
-    },
-    {
-      filename: "test-pdf_page5_img.png",
-      sourcePdf: "test-pdf.pdf",
-      pageNumber: 5,
-      width: 1000,
-      height: 700,
-      path: "test-pdf/test-pdf_page5_img.png",
-      aspectRatio: 1.43,
-      type: "extracted",
-    },
-    {
-      filename: "other-pdf_page1.png",
-      sourcePdf: "other-pdf.pdf",
-      pageNumber: 1,
-      width: 1000,
-      height: 700,
-      path: "other-pdf/other-pdf_page1.png",
-      aspectRatio: 1.43,
-      type: "extracted",
-    },
-  ],
-};
+const mockImages = [
+  {
+    path: "https://supabase.co/storage/v1/object/public/pdf-images/test-pdf/test-pdf_page1_img_p0_1.png",
+    caption: "Beautiful landscape",
+    source_pdf: "test-pdf.pdf",
+    page_number: 1,
+  },
+  {
+    path: "https://supabase.co/storage/v1/object/public/pdf-images/test-pdf/test-pdf_page2_img_p1_1.png",
+    caption: "Mountain view",
+    source_pdf: "test-pdf.pdf",
+    page_number: 2,
+  },
+  {
+    path: "https://supabase.co/storage/v1/object/public/pdf-images/test-pdf/test-pdf_page3_full.png",
+    caption: "City panorama",
+    source_pdf: "test-pdf.pdf",
+    page_number: 3,
+  },
+];
 
 // Helper to create mock Supabase client with configurable behavior
 function createMockSupabase(options: {
@@ -95,10 +40,21 @@ function createMockSupabase(options: {
   storyError?: { message: string } | null;
   chunks?: { page_number: number }[];
   chunksError?: { message: string } | null;
+  images?: typeof mockImages;
+  imagesError?: { message: string } | null;
 }) {
-  const { story, storyError, chunks = [], chunksError } = options;
+  const { story, storyError, chunks = [], chunksError, images = [], imagesError } = options;
 
-  // Mock for chunks query - ilike returns a thenable (Promise-like)
+  // Mock for images query
+  const imagesResult = Promise.resolve({
+    data: imagesError ? null : images,
+    error: imagesError || null,
+  });
+  const mockImagesIn = vi.fn().mockReturnValue(imagesResult);
+  const mockImagesEq = vi.fn().mockReturnValue({ in: mockImagesIn });
+  const mockImagesSelect = vi.fn().mockReturnValue({ eq: mockImagesEq });
+
+  // Mock for chunks query
   const chunksResult = Promise.resolve({
     data: chunksError ? null : chunks,
     error: chunksError || null,
@@ -107,7 +63,7 @@ function createMockSupabase(options: {
   const mockChunksEq = vi.fn().mockReturnValue({ ilike: mockChunksIlike });
   const mockChunksSelect = vi.fn().mockReturnValue({ eq: mockChunksEq });
 
-  // Mock for story query (with single)
+  // Mock for story query
   const mockStorySingle = vi.fn().mockResolvedValue({
     data: story,
     error: storyError || null,
@@ -121,6 +77,8 @@ function createMockSupabase(options: {
       return { select: mockStorySelect };
     } else if (table === "chunks") {
       return { select: mockChunksSelect };
+    } else if (table === "images") {
+      return { select: mockImagesSelect };
     }
     return { select: vi.fn() };
   });
@@ -152,7 +110,6 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
   describe("chunk-based filtering", () => {
     beforeEach(() => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-      mockReadFile.mockResolvedValue(JSON.stringify(mockManifest));
     });
 
     it("should only return images from pages where story title is mentioned", async () => {
@@ -162,6 +119,7 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
           { page_number: 1 },
           { page_number: 3 },
         ],
+        images: mockImages.filter(img => [1, 3].includes(img.page_number)),
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
 
@@ -170,32 +128,14 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      // Should only have images from pages 1 and 3
       expect(data.data.images).toHaveLength(2);
       expect(data.data.images.every((img: { pageNumber: number }) => [1, 3].includes(img.pageNumber))).toBe(true);
-    });
-
-    it("should search chunks using story title with case-insensitive matching", async () => {
-      const mockClient = createMockSupabase({
-        story: { id: "story-123", title: "Lagos de Covadonga", source_pdf: "test-pdf.pdf" },
-        chunks: [{ page_number: 2 }],
-      });
-      vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
-
-      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
-      const response = await GET(request, mockParams);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      // Should only have image from page 2
-      expect(data.data.images).toHaveLength(1);
-      expect(data.data.images[0].pageNumber).toBe(2);
     });
 
     it("should return empty array when no chunks mention the story", async () => {
       const mockClient = createMockSupabase({
         story: { id: "story-123", title: "Unknown Place", source_pdf: "test-pdf.pdf" },
-        chunks: [], // No matching chunks
+        chunks: [],
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
 
@@ -212,9 +152,10 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
         story: { id: "story-123", title: "Playa de Gulpiyuri", source_pdf: "test-pdf.pdf" },
         chunks: [
           { page_number: 1 },
-          { page_number: 1 }, // Same page mentioned in multiple chunks
+          { page_number: 1 },
           { page_number: 2 },
         ],
+        images: mockImages.filter(img => [1, 2].includes(img.page_number)),
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
 
@@ -223,7 +164,6 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      // Should have images from pages 1 and 2 (deduplicated)
       expect(data.data.images).toHaveLength(2);
     });
   });
@@ -231,7 +171,6 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
   describe("successful search", () => {
     beforeEach(() => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-      mockReadFile.mockResolvedValue(JSON.stringify(mockManifest));
     });
 
     it("should return images sorted by score (best first)", async () => {
@@ -242,6 +181,7 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
           { page_number: 2 },
           { page_number: 3 },
         ],
+        images: mockImages,
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
 
@@ -249,16 +189,18 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       const response = await GET(request, mockParams);
       const data = await response.json();
 
+      expect(response.status).toBe(200);
       // Scores should be in descending order
       for (let i = 1; i < data.data.images.length; i++) {
         expect(data.data.images[i - 1].score).toBeGreaterThanOrEqual(data.data.images[i].score);
       }
     });
 
-    it("should include resolution info in response", async () => {
+    it("should return Supabase Storage URLs for images", async () => {
       const mockClient = createMockSupabase({
         story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
         chunks: [{ page_number: 1 }],
+        images: [mockImages[0]],
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
 
@@ -266,18 +208,15 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       const response = await GET(request, mockParams);
       const data = await response.json();
 
-      const firstImage = data.data.images[0];
-      expect(firstImage).toHaveProperty("width");
-      expect(firstImage).toHaveProperty("height");
-      expect(firstImage).toHaveProperty("aspectRatio");
-      expect(firstImage.width).toBe(1200);
-      expect(firstImage.height).toBe(800);
+      expect(response.status).toBe(200);
+      expect(data.data.images[0].url).toContain("supabase.co/storage");
     });
 
-    it("should return API path for content images", async () => {
+    it("should include caption in response", async () => {
       const mockClient = createMockSupabase({
         story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
         chunks: [{ page_number: 1 }],
+        images: [mockImages[0]],
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
 
@@ -285,14 +224,15 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       const response = await GET(request, mockParams);
       const data = await response.json();
 
-      expect(data.data.images[0].url).toContain("/api/content-images/");
+      expect(response.status).toBe(200);
+      expect(data.data.images[0]).toHaveProperty("caption");
+      expect(data.data.images[0].caption).toBe("Beautiful landscape");
     });
   });
 
   describe("edge cases", () => {
     beforeEach(() => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-      mockReadFile.mockResolvedValue(JSON.stringify(mockManifest));
     });
 
     it("should return empty array when story has no source PDF", async () => {
@@ -309,10 +249,11 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       expect(data.data.images).toHaveLength(0);
     });
 
-    it("should return empty array when no images match the source PDF", async () => {
+    it("should return empty array when no images found in database", async () => {
       const mockClient = createMockSupabase({
-        story: { id: "story-123", title: "Test Story", source_pdf: "nonexistent.pdf" },
+        story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
         chunks: [{ page_number: 1 }],
+        images: [],
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
 
@@ -344,22 +285,6 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
     });
 
-    it("should return 500 when manifest file cannot be read", async () => {
-      const mockClient = createMockSupabase({
-        story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
-        chunks: [{ page_number: 1 }],
-      });
-      vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
-      mockReadFile.mockRejectedValue(new Error("File not found"));
-
-      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
-      const response = await GET(request, mockParams);
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data.error).toBe("Failed to read image manifest");
-    });
-
     it("should return 500 when story database query fails", async () => {
       const mockClient = createMockSupabase({
         story: null,
@@ -381,7 +306,6 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
         chunksError: { message: "Database error" },
       });
       vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
-      mockReadFile.mockResolvedValue(JSON.stringify(mockManifest));
 
       const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
       const response = await GET(request, mockParams);
@@ -389,6 +313,22 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe("Failed to search chunks");
+    });
+
+    it("should return 500 when images database query fails", async () => {
+      const mockClient = createMockSupabase({
+        story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
+        chunks: [{ page_number: 1 }],
+        imagesError: { message: "Database error" },
+      });
+      vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
+      const response = await GET(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to fetch images");
     });
   });
 });
