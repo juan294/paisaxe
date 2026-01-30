@@ -13,7 +13,7 @@ import { MarketingDashboard } from "@/components/admin/marketing-dashboard";
 import { AdminThemeProvider } from "@/components/admin/theme-provider";
 import { ThemeToggle } from "@/components/admin/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { fetchStories, bulkUpdateStoryStatus } from "@/lib/admin-api";
+import { fetchStories, bulkUpdateStoryStatus, bulkDeleteStories } from "@/lib/admin-api";
 import {
   RefreshCw,
   LogOut,
@@ -164,6 +164,32 @@ function AdminPageContent() {
             ? { ...story, curationStatus: "needs_curation" }
             : story
         )
+      );
+      setSelectedIds(new Set());
+    }
+
+    setIsBulkUpdating(false);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    // Confirm deletion
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${selectedIds.size} ${selectedIds.size === 1 ? "story" : "stories"}? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setIsBulkUpdating(true);
+
+    const result = await bulkDeleteStories(Array.from(selectedIds));
+
+    if (result.error) {
+      setError(result.error);
+    } else if (result.data) {
+      // Remove deleted stories from local state
+      setAllStories((prev) =>
+        prev.filter((story) => !selectedIds.has(story.id))
       );
       setSelectedIds(new Set());
     }
@@ -440,6 +466,7 @@ function AdminPageContent() {
         selectedCount={selectedIds.size}
         onMarkApproved={handleBulkMarkApproved}
         onMarkPending={handleBulkMarkPending}
+        onDelete={handleBulkDelete}
         onClearSelection={handleClearSelection}
         isLoading={isBulkUpdating}
       />

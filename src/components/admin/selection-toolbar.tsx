@@ -1,12 +1,13 @@
 "use client";
 
-import { CheckCircle2, Clock, X, Loader2 } from "lucide-react";
+import { CheckCircle2, Clock, X, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SelectionToolbarProps {
   selectedCount: number;
   onMarkApproved: () => void;
   onMarkPending: () => void;
+  onDelete: () => void;
   onClearSelection: () => void;
   isLoading?: boolean;
 }
@@ -15,6 +16,7 @@ export function SelectionToolbar({
   selectedCount,
   onMarkApproved,
   onMarkPending,
+  onDelete,
   onClearSelection,
   isLoading = false,
 }: SelectionToolbarProps) {
@@ -71,6 +73,23 @@ export function SelectionToolbar({
               <Clock className="h-4 w-4" />
             )}
             Mark Pending
+          </button>
+
+          <button
+            onClick={onDelete}
+            disabled={isLoading}
+            className={cn(
+              "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all",
+              "bg-[#a85454] text-white hover:bg-[#8b4444]",
+              "disabled:cursor-not-allowed disabled:opacity-50"
+            )}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Delete
           </button>
         </div>
       </div>
