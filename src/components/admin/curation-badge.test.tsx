@@ -65,9 +65,9 @@ describe("CurationBadge", () => {
       expect(container.firstChild).toHaveClass("bg-neutral-100");
     });
 
-    it("should have amber background tint for needs_curation in default variant", () => {
+    it("should have amber background for needs_curation in default variant", () => {
       const { container } = render(<CurationBadge status="needs_curation" />);
-      expect(container.firstChild).toHaveClass("bg-amber-500/10");
+      expect(container.firstChild).toHaveClass("bg-amber-200");
     });
   });
 });

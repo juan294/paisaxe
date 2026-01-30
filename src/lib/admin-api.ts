@@ -98,6 +98,34 @@ export async function uploadStoryImage(
 }
 
 /**
+ * Update story image source/attribution only (without changing the image URL)
+ */
+export async function updateStoryImageSource(
+  storyId: string,
+  imageSource: string
+): Promise<AdminApiResponse<{ id: string; imageSource: string }>> {
+  try {
+    const response = await fetch(`${API_BASE}/stories/${storyId}/image-source`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ imageSource }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to update image source" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error updating image source:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
  * Update story curation status
  */
 export async function updateStoryStatus(

@@ -38,7 +38,7 @@ export function CurationBadge({
         "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium",
         isApproved
           ? "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-          : "bg-amber-500/10 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+          : "bg-amber-200 text-neutral-800 dark:bg-amber-500/30 dark:text-amber-200",
         className
       )}
     >

@@ -17,12 +17,14 @@ const mockUpdateStoryImageUrl = vi.fn();
 const mockUploadStoryImage = vi.fn();
 const mockUpdateStoryStatus = vi.fn();
 const mockSearchContentImages = vi.fn();
+const mockUpdateStoryImageSource = vi.fn();
 
 vi.mock("@/lib/admin-api", () => ({
   updateStoryImageUrl: (...args: unknown[]) => mockUpdateStoryImageUrl(...args),
   uploadStoryImage: (...args: unknown[]) => mockUploadStoryImage(...args),
   updateStoryStatus: (...args: unknown[]) => mockUpdateStoryStatus(...args),
   searchContentImages: (...args: unknown[]) => mockSearchContentImages(...args),
+  updateStoryImageSource: (...args: unknown[]) => mockUpdateStoryImageSource(...args),
 }));
 
 // Mock lucide-react icons
@@ -329,8 +331,14 @@ describe("ImageEditorDialog", () => {
   });
 
   describe("Error handling", () => {
-    it("shows error when no image provided on save", async () => {
-      render(<ImageEditorDialog {...defaultProps} />);
+    it("shows error when no image provided on save for story without image", async () => {
+      // Story without an image (needs one)
+      const storyWithoutImage: AdminStory = {
+        ...mockStory,
+        image: "",
+      };
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithoutImage} />);
 
       // URL input is empty, no file selected - just click save
       await act(async () => {
@@ -734,6 +742,129 @@ describe("ImageEditorDialog", () => {
       const normalStory = { ...mockStory, imageSource: "Turismo de Asturias" };
       render(<ImageEditorDialog {...defaultProps} story={normalStory} />);
       expect(screen.queryByText(/placeholder image/i)).not.toBeInTheDocument();
+    });
+
+    it("does not show placeholder info when image URL is not from Unsplash even if imageSource has old prefix", () => {
+      // Edge case: image was replaced but imageSource in DB still has placeholder prefix
+      const storyWithMismatchedSource: AdminStory = {
+        ...mockStory,
+        image: "https://supabase.co/storage/story-images/real-photo.avif",
+        imageSource: `${PLACEHOLDER_PREFIX}Photo by Old Author on Unsplash`,
+      };
+      render(<ImageEditorDialog {...defaultProps} story={storyWithMismatchedSource} />);
+      expect(screen.queryByText(/placeholder image/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Source-only updates", () => {
+    const storyWithRealImage: AdminStory = {
+      ...mockStory,
+      image: "https://supabase.co/storage/story-images/real-photo.avif",
+      imageSource: undefined,
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("allows saving just imageSource when story already has a non-placeholder image", async () => {
+      mockUpdateStoryImageSource.mockResolvedValue({
+        data: { id: "story-1", imageSource: "Turismo Asturias" },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithRealImage} />);
+
+      // Enter just the source without selecting a new image
+      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
+
+      // Save should not require selecting a new image
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      // Should NOT show the "please provide an image" error
+      expect(screen.queryByText(/Please provide an image/)).not.toBeInTheDocument();
+      // Should have called updateStoryImageSource
+      expect(mockUpdateStoryImageSource).toHaveBeenCalledWith("story-1", "Turismo Asturias");
+    });
+
+    it("calls onUpdate and onClose on successful source-only save", async () => {
+      mockUpdateStoryImageSource.mockResolvedValue({
+        data: { id: "story-1", imageSource: "Turismo Asturias" },
+      });
+
+      const onClose = vi.fn();
+      const onUpdate = vi.fn();
+
+      render(<ImageEditorDialog story={storyWithRealImage} onClose={onClose} onUpdate={onUpdate} />);
+
+      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      expect(onUpdate).toHaveBeenCalledWith("story-1", { imageSource: "Turismo Asturias" });
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it("shows error when story has placeholder image and no new image selected", async () => {
+      const placeholderStory: AdminStory = {
+        ...mockStory,
+        image: "https://images.unsplash.com/photo-123?w=1920",
+        imageSource: `${PLACEHOLDER_PREFIX}Photo by Test Author on Unsplash`,
+      };
+
+      render(<ImageEditorDialog {...defaultProps} story={placeholderStory} />);
+
+      // Enter source but don't select new image
+      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      // Should show error because placeholder images need replacement
+      expect(screen.getByText(/Please provide an image/)).toBeInTheDocument();
+    });
+
+    it("closes dialog when nothing has changed for story with real image", async () => {
+      const storyWithSource: AdminStory = {
+        ...storyWithRealImage,
+        imageSource: "Existing Source",
+      };
+
+      const onClose = vi.fn();
+
+      render(<ImageEditorDialog story={storyWithSource} onClose={onClose} onUpdate={vi.fn()} />);
+
+      // Don't change anything, just click save
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      // Should close dialog without error since story already has real image
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it("shows error when source-only update API fails", async () => {
+      mockUpdateStoryImageSource.mockResolvedValue({
+        error: "Failed to update image source",
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithRealImage} />);
+
+      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      fireEvent.change(sourceInput, { target: { value: "Turismo Asturias" } });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      expect(screen.getByText("Failed to update image source")).toBeInTheDocument();
     });
   });
 

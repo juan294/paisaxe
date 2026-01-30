@@ -86,6 +86,11 @@ function AdminPageContent() {
         story.id === storyId ? { ...story, ...updates } : story
       )
     );
+    // Also update editingStory if it's the same story being edited
+    // This ensures the dialog reflects the latest state (e.g., curation badge)
+    setEditingStory((prev) =>
+      prev && prev.id === storyId ? { ...prev, ...updates } : prev
+    );
   };
 
   const handleToggleSelect = (storyId: string) => {

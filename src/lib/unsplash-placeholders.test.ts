@@ -65,17 +65,28 @@ describe("unsplash-placeholders", () => {
   });
 
   describe("isPlaceholderImage", () => {
-    it("should return true when imageSource starts with placeholder prefix", () => {
+    it("should return true when image is from Unsplash AND imageSource has placeholder prefix", () => {
       expect(
         isPlaceholderImage({
+          image: "https://images.unsplash.com/photo-123?w=1920",
           imageSource: "unsplash-placeholder:Photo by John on Unsplash",
         })
       ).toBe(true);
     });
 
-    it("should return false when imageSource does not start with prefix", () => {
+    it("should return false when imageSource has prefix but image is not from Unsplash", () => {
       expect(
         isPlaceholderImage({
+          image: "https://example.com/real-photo.jpg",
+          imageSource: "unsplash-placeholder:Photo by John on Unsplash",
+        })
+      ).toBe(false);
+    });
+
+    it("should return false when image is from Unsplash but imageSource does not have prefix", () => {
+      expect(
+        isPlaceholderImage({
+          image: "https://images.unsplash.com/photo-123?w=1920",
           imageSource: "Photo by John on Unsplash",
         })
       ).toBe(false);
@@ -92,6 +103,15 @@ describe("unsplash-placeholders", () => {
     it("should return false when imageSource is a regular attribution", () => {
       expect(
         isPlaceholderImage({ imageSource: "Turismo de Asturias" })
+      ).toBe(false);
+    });
+
+    it("should return false when image is from Supabase storage", () => {
+      expect(
+        isPlaceholderImage({
+          image: "https://supabase.co/storage/story-images/real-photo.avif",
+          imageSource: "Turismo de Asturias",
+        })
       ).toBe(false);
     });
   });

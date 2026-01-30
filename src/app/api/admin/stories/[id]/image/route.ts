@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import {
@@ -219,6 +220,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (!data) {
       return NextResponse.json({ error: "Story not found" }, { status: 404 });
     }
+
+    // Revalidate the immersive page cache so image updates appear immediately
+    revalidatePath("/immersive");
 
     return NextResponse.json({
       data: {
