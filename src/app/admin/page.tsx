@@ -26,6 +26,7 @@ import {
   Layers,
   ArrowUpRight,
 } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 import type { AdminStory, CurationStatus } from "@/types/admin";
 import { cn } from "@/lib/utils";
 
@@ -171,8 +172,8 @@ function AdminPageContent() {
       <div className="flex min-h-screen items-center justify-center bg-[#f5f3ee] dark:bg-[#1a1917] p-4">
         <div className="w-full max-w-sm">
           <div className="rounded-3xl bg-white p-8 shadow-sm dark:bg-[#252320]">
-            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#2d2a26] dark:bg-[#f5f3ee]">
-              <Layers className="h-7 w-7 text-[#f5f3ee] dark:text-[#2d2a26]" />
+            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#2d2a26] p-3 dark:bg-[#f5f3ee]">
+              <Logo className="text-[#f5f3ee] dark:text-[#2d2a26]" />
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
               Paisaxe Admin
@@ -246,8 +247,8 @@ function AdminPageContent() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2d2a26] dark:bg-[#f5f3ee]">
-              <Layers className="h-4 w-4 text-[#f5f3ee] dark:text-[#2d2a26]" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2d2a26] p-2 dark:bg-[#f5f3ee]">
+              <Logo className="text-[#f5f3ee] dark:text-[#2d2a26]" />
             </div>
             <span className="text-sm font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
               Paisaxe
