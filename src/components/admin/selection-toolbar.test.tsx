@@ -7,6 +7,7 @@ describe("SelectionToolbar", () => {
     selectedCount: 3,
     onMarkApproved: vi.fn(),
     onMarkPending: vi.fn(),
+    onDelete: vi.fn(),
     onClearSelection: vi.fn(),
   };
 
@@ -30,6 +31,11 @@ describe("SelectionToolbar", () => {
     expect(screen.getByRole("button", { name: /mark pending/i })).toBeInTheDocument();
   });
 
+  it("should render Delete button", () => {
+    render(<SelectionToolbar {...defaultProps} />);
+    expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument();
+  });
+
   it("should call onMarkApproved when clicking Mark Approved", () => {
     const onMarkApproved = vi.fn();
     render(<SelectionToolbar {...defaultProps} onMarkApproved={onMarkApproved} />);
@@ -44,6 +50,14 @@ describe("SelectionToolbar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /mark pending/i }));
     expect(onMarkPending).toHaveBeenCalledTimes(1);
+  });
+
+  it("should call onDelete when clicking Delete", () => {
+    const onDelete = vi.fn();
+    render(<SelectionToolbar {...defaultProps} onDelete={onDelete} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /delete/i }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
   it("should call onClearSelection when clicking X button", () => {
@@ -64,6 +78,7 @@ describe("SelectionToolbar", () => {
 
     expect(screen.getByRole("button", { name: /mark approved/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /mark pending/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /delete/i })).toBeDisabled();
   });
 
   it("should update count when selectedCount changes", () => {

@@ -182,6 +182,33 @@ export async function bulkUpdateStoryStatus(
 }
 
 /**
+ * Bulk delete stories
+ */
+export async function bulkDeleteStories(
+  storyIds: string[]
+): Promise<AdminApiResponse<{ deletedIds: string[] }>> {
+  try {
+    const response = await fetch(`${API_BASE}/stories/bulk-delete`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ storyIds }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to delete stories" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error bulk deleting stories:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
  * Fetch all feature flags
  */
 export async function fetchFeatureFlags(): Promise<AdminApiResponse<FeatureFlag[]>> {
