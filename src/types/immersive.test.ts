@@ -143,6 +143,8 @@ describe("immersive types", () => {
         best_months: null,
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",
+        source_type: null,
+        suggestion_id: null,
       };
 
       const story = rowToStory(row);
@@ -182,6 +184,8 @@ describe("immersive types", () => {
         best_months: null,
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",
+        source_type: null,
+        suggestion_id: null,
       };
 
       const story = rowToStory(row);

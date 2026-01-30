@@ -156,6 +156,33 @@ export const de: Translations = {
     you: 'Du',
   },
 
+  suggestions: {
+    sign_in_to_suggest: 'Anmelden, um einen Ort vorzuschlagen',
+    suggest_place: 'Einen Ort vorschlagen',
+    dialog_title: 'Einen Ort vorschlagen',
+    dialog_description: 'Teilen Sie einen Ort in Asturien, den Sie auf Paisaxe sehen möchten',
+    place_name_label: 'Ortsname',
+    place_name_placeholder: 'z.B. Strand von Gulpiyuri',
+    location_label: 'Region (optional)',
+    location_placeholder: 'Wählen Sie eine Region',
+    location_eastern: 'Ostasturien',
+    location_central: 'Zentralasturien',
+    location_western: 'Westasturien',
+    comment_label: 'Kommentar (optional)',
+    comment_placeholder: 'Warum gefällt Ihnen dieser Ort?',
+    characters: 'Zeichen',
+    cancel: 'Abbrechen',
+    submit: 'Vorschlag senden',
+    submitting: 'Wird gesendet...',
+    success_title: 'Danke!',
+    success_message: 'Wir haben Ihren Vorschlag erhalten',
+    error_not_signed_in: 'Sie müssen sich anmelden, um einen Vorschlag zu senden',
+    error_place_name_length: 'Der Ortsname muss zwischen 3 und 100 Zeichen haben',
+    error_rate_limit: 'Bitte warten Sie, bevor Sie einen weiteren Vorschlag senden',
+    error_generic: 'Fehler beim Senden. Bitte versuchen Sie es erneut.',
+    community_pick: 'Community-Vorschlag',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

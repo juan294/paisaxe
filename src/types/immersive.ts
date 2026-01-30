@@ -1,3 +1,5 @@
+export type StorySourceType = "curated" | "user_submitted";
+
 export interface Story {
   id: string;
   slug?: string;
@@ -17,6 +19,10 @@ export interface Story {
   createdAt?: string;
   bestMonths?: number[];
   metadata?: StoryMetadata;
+  /** Source type: curated (default) or user_submitted (from suggestions) */
+  sourceType?: StorySourceType;
+  /** ID of the suggestion this story was created from */
+  suggestionId?: string;
 }
 
 /** Localized text for a story in a specific language */
@@ -97,6 +103,8 @@ export interface StoryRow {
   best_months: number[] | null;
   created_at: string;
   updated_at: string;
+  source_type: string | null;
+  suggestion_id: string | null;
 }
 
 // Convert database row to Story interface
@@ -119,5 +127,7 @@ export function rowToStory(row: StoryRow): Story {
     createdAt: row.created_at,
     bestMonths: row.best_months || undefined,
     metadata: (row.metadata as StoryMetadata) || undefined,
+    sourceType: row.source_type ? (row.source_type as StorySourceType) : undefined,
+    suggestionId: row.suggestion_id || undefined,
   };
 }

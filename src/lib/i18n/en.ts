@@ -156,6 +156,33 @@ export const en: Translations = {
     you: 'You',
   },
 
+  suggestions: {
+    sign_in_to_suggest: 'Sign in to suggest a place',
+    suggest_place: 'Suggest a place',
+    dialog_title: 'Suggest a place',
+    dialog_description: 'Share a place in Asturias you would like to see on Paisaxe',
+    place_name_label: 'Place name',
+    place_name_placeholder: 'e.g., Gulpiyuri Beach',
+    location_label: 'Area (optional)',
+    location_placeholder: 'Select an area',
+    location_eastern: 'Eastern Asturias',
+    location_central: 'Central Asturias',
+    location_western: 'Western Asturias',
+    comment_label: 'Comment (optional)',
+    comment_placeholder: 'Why do you like this place?',
+    characters: 'characters',
+    cancel: 'Cancel',
+    submit: 'Submit suggestion',
+    submitting: 'Submitting...',
+    success_title: 'Thank you!',
+    success_message: 'We received your suggestion',
+    error_not_signed_in: 'You must sign in to submit a suggestion',
+    error_place_name_length: 'Place name must be between 3 and 100 characters',
+    error_rate_limit: 'Please wait before submitting another suggestion',
+    error_generic: 'Error submitting suggestion. Please try again.',
+    community_pick: 'Community Pick',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

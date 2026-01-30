@@ -156,6 +156,33 @@ export const pt: Translations = {
     you: 'Você',
   },
 
+  suggestions: {
+    sign_in_to_suggest: 'Inicie sessão para sugerir um lugar',
+    suggest_place: 'Sugerir um lugar',
+    dialog_title: 'Sugerir um lugar',
+    dialog_description: 'Partilhe um lugar nas Astúrias que gostaria de ver no Paisaxe',
+    place_name_label: 'Nome do lugar',
+    place_name_placeholder: 'ex. Praia de Gulpiyuri',
+    location_label: 'Zona (opcional)',
+    location_placeholder: 'Selecione uma zona',
+    location_eastern: 'Astúrias Oriental',
+    location_central: 'Astúrias Central',
+    location_western: 'Astúrias Ocidental',
+    comment_label: 'Comentário (opcional)',
+    comment_placeholder: 'Porque gosta deste lugar?',
+    characters: 'caracteres',
+    cancel: 'Cancelar',
+    submit: 'Enviar sugestão',
+    submitting: 'A enviar...',
+    success_title: 'Obrigado!',
+    success_message: 'Recebemos a sua sugestão',
+    error_not_signed_in: 'Tem de iniciar sessão para enviar uma sugestão',
+    error_place_name_length: 'O nome do lugar deve ter entre 3 e 100 caracteres',
+    error_rate_limit: 'Por favor aguarde antes de enviar outra sugestão',
+    error_generic: 'Erro ao enviar. Por favor tente novamente.',
+    community_pick: 'Sugestão da comunidade',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

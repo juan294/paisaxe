@@ -18,6 +18,8 @@ import { SurpriseMeButton } from "./surprise-me-button";
 import { FreshnessBadge } from "./freshness-badge";
 import { ShareButton } from "./share-button";
 import { LanguageSwitcher } from "./language-switcher";
+import { SuggestPlaceButton } from "./suggest-place-button";
+import { UserSubmittedBadge } from "./user-submitted-badge";
 import { getLabel } from "@/lib/asturianu";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
@@ -303,12 +305,17 @@ export function StoryViewer({
           showInfo ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 motion-reduce:translate-y-0"
         )}
       >
-        {/* Freshness badge */}
-        {isEnabled("story_freshness") && (
-          <div className="mb-2">
+        {/* Badges */}
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          {/* Freshness badge */}
+          {isEnabled("story_freshness") && (
             <FreshnessBadge createdAt={story.createdAt} storyId={story.id} />
-          </div>
-        )}
+          )}
+          {/* User-submitted badge */}
+          {story.sourceType === "user_submitted" && (
+            <UserSubmittedBadge />
+          )}
+        </div>
 
         <p className="text-white/70 text-sm md:text-base font-medium mb-2 tracking-wider uppercase">
           {ast && story.metadata?.asturianu_subtitle
@@ -444,6 +451,9 @@ export function StoryViewer({
 
         {/* Share button */}
         {isEnabled("story_sharing") && <ShareButton story={story} />}
+
+        {/* Suggest Place button */}
+        <SuggestPlaceButton />
 
         <BookmarkButton
           isFavorite={isFavorite(story.id)}
