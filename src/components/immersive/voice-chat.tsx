@@ -191,7 +191,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         {/* Sign-in prompt for voice access */}
         {needsSignIn && !useElevenLabs && (
           <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-lg bg-white/5 p-3 border border-white/10">
-            <p className="text-sm text-white/70">{t("voice.sign_in_prompt")}</p>
+            <p className="text-sm text-white/70">{t(`voice.sign_in_prompt_${story.category}`)}</p>
             <Button
               variant="ghost"
               size="sm"
