@@ -134,6 +134,7 @@ export const en: Translations = {
   voice: {
     try_voice: 'Talk',
     use_text: 'Type',
+    welcome_message: 'Hello! I\'m your guide for {title}. How can I help you?',
     sign_in_prompt: 'Sign in to talk with Pelayo',
     sign_in_prompt_nature: 'Sign in to discover this landscape',
     sign_in_prompt_cities: 'Sign in to explore this city',

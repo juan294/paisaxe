@@ -5,6 +5,7 @@ import { useConversation } from "@elevenlabs/react";
 import { Mic, MicOff, X, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { getLocalizedStory } from "@/lib/localize-story";
 import type { Story } from "@/types/immersive";
 
 interface Message {
@@ -109,7 +110,8 @@ export function VoiceChatElevenLabs({
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const localizedStory = getLocalizedStory(story, locale);
 
   // ElevenLabs conversation hook
   const conversation = useConversation({
@@ -117,7 +119,7 @@ export function VoiceChatElevenLabs({
       setError(null);
       addMessage(
         "assistant",
-        `Hola! Soy tu guía para ${story.title}. ¿En qué puedo ayudarte?`
+        t("voice.welcome_message").replace("{title}", localizedStory.title)
       );
     },
     onDisconnect: () => {

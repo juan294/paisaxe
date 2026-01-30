@@ -134,6 +134,7 @@ export const de: Translations = {
   voice: {
     try_voice: 'Sprechen',
     use_text: 'Schreiben',
+    welcome_message: 'Hallo! Ich bin Ihr Reiseführer für {title}. Wie kann ich Ihnen helfen?',
     sign_in_prompt: 'Melden Sie sich an, um mit Pelayo zu sprechen',
     sign_in_prompt_nature: 'Melden Sie sich an, um diese Landschaft zu entdecken',
     sign_in_prompt_cities: 'Melden Sie sich an, um diese Stadt zu erkunden',
