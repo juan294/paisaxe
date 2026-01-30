@@ -11,6 +11,10 @@ vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
 
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 // Mock image optimization
 vi.mock("@/lib/image-optimization", () => ({
   optimizeSingleImage: vi.fn().mockResolvedValue({

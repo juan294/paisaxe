@@ -11,6 +11,10 @@ vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
 
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 

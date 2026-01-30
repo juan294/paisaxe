@@ -126,6 +126,42 @@ const getDefaultProps = (overrides = {}) => ({
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+/**
+ * Helper to create a mock streaming response for the chat endpoint.
+ */
+function createStreamingResponse(message: string, images: unknown[] = []) {
+  const encoder = new TextEncoder();
+  const words = message.split(" ");
+  const events: Uint8Array[] = [];
+
+  for (let i = 0; i < words.length; i++) {
+    const word = i === 0 ? words[i] : " " + words[i];
+    const event = `data: ${JSON.stringify({ type: "text", content: word })}\n\n`;
+    events.push(encoder.encode(event));
+  }
+
+  const finalEvent = `data: ${JSON.stringify({ type: "done", images, sources: [] })}\n\n`;
+  events.push(encoder.encode(finalEvent));
+
+  let index = 0;
+  const stream = new ReadableStream({
+    pull(controller) {
+      if (index < events.length) {
+        controller.enqueue(events[index]);
+        index++;
+      } else {
+        controller.close();
+      }
+    },
+  });
+
+  return {
+    ok: true,
+    headers: new Headers({ "content-type": "text/event-stream" }),
+    body: stream,
+  };
+}
+
 // Mock localStorage
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -335,10 +371,7 @@ describe("Accessibility: VoiceChat", () => {
     });
 
     it("should announce new messages to screen readers", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: "AI response about the lakes" }),
-      });
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("AI response about the lakes"));
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 

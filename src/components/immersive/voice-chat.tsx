@@ -35,11 +35,22 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const [isLoading, setIsLoading] = useState(false);
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const [useElevenLabs, setUseElevenLabs] = useState(false);
+  const [hasSetDefaultMode, setHasSetDefaultMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
 
   // Check for ElevenLabs voice access
-  const { canUseVoice, needsSignIn, agentId } = useVisitorVoiceAccess();
+  const { canUseVoice, needsSignIn, agentId, isLoading: isVoiceAccessLoading } = useVisitorVoiceAccess();
+
+  // Set voice mode as default when user has access (only on first load)
+  useEffect(() => {
+    if (!isVoiceAccessLoading && !hasSetDefaultMode) {
+      if (canUseVoice && agentId) {
+        setUseElevenLabs(true);
+      }
+      setHasSetDefaultMode(true);
+    }
+  }, [isVoiceAccessLoading, canUseVoice, agentId, hasSetDefaultMode]);
 
   // Reset messages when story changes
   useEffect(() => {
@@ -94,8 +105,12 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
+    // Add empty assistant message that will be streamed into
+    const assistantIndex = messages.length + 1; // +1 for the user message we just added
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -106,23 +121,98 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
 
       if (!response.ok) throw new Error("Failed");
 
-      const data = await response.json();
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: data.message || t("chat.error_processing"),
-          images: data.images,
-        },
-      ]);
+      // Check if we got a non-streaming JSON response (e.g., for flagged content)
+      const contentType = response.headers.get("content-type");
+      if (contentType?.includes("application/json")) {
+        const data = await response.json();
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[assistantIndex] = {
+            role: "assistant",
+            content: data.message || t("chat.error_processing"),
+            images: data.images,
+          };
+          return updated;
+        });
+        return;
+      }
+
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No reader");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE events
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || ""; // Keep incomplete event in buffer
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const jsonStr = line.slice(6);
+            try {
+              const event = JSON.parse(jsonStr);
+
+              if (event.type === "text") {
+                // Append text chunk to the assistant message
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const current = updated[assistantIndex];
+                  updated[assistantIndex] = {
+                    ...current,
+                    content: current.content + event.content,
+                  };
+                  return updated;
+                });
+              } else if (event.type === "done") {
+                // Add images from final event
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  updated[assistantIndex] = {
+                    ...updated[assistantIndex],
+                    images: event.images,
+                  };
+                  return updated;
+                });
+              } else if (event.type === "error") {
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  updated[assistantIndex] = {
+                    role: "assistant",
+                    content: t("chat.error_generic"),
+                  };
+                  return updated;
+                });
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: t("chat.error_generic"),
-        },
-      ]);
+      setMessages((prev) => {
+        const updated = [...prev];
+        if (updated[assistantIndex]) {
+          updated[assistantIndex] = {
+            role: "assistant",
+            content: t("chat.error_generic"),
+          };
+        } else {
+          updated.push({
+            role: "assistant",
+            content: t("chat.error_generic"),
+          });
+        }
+        return updated;
+      });
     } finally {
       setIsLoading(false);
     }
@@ -280,7 +370,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                   )}
                 </div>
               ))}
-              {isLoading && (
+              {isLoading && messages[messages.length - 1]?.content === "" && (
                 <ChatMessageSkeleton />
               )}
               <div ref={messagesEndRef} />
