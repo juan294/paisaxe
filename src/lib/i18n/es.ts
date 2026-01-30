@@ -134,6 +134,7 @@ export const es: Translations = {
   voice: {
     try_voice: 'Hablar',
     use_text: 'Escribir',
+    welcome_message: 'Hola! Soy tu guía para {title}. ¿En qué puedo ayudarte?',
     sign_in_prompt: 'Inicia sesion para hablar con Pelayo',
     sign_in_prompt_nature: 'Inicia sesion para descubrir este paisaje',
     sign_in_prompt_cities: 'Inicia sesion para explorar esta ciudad',

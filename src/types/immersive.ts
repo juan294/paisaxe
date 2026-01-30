@@ -19,11 +19,23 @@ export interface Story {
   metadata?: StoryMetadata;
 }
 
+/** Localized text for a story in a specific language */
+export interface StoryTranslation {
+  title: string;
+  subtitle: string;
+  description: string;
+}
+
+/** Supported locales for story translations (matches Locale type from i18n) */
+export type StoryLocale = 'en' | 'fr' | 'de' | 'pt';
+
 export interface StoryMetadata {
   question_prompts?: string[];
   mood_tags?: string[];
   asturianu_title?: string;
   asturianu_subtitle?: string;
+  /** Translations for non-Spanish locales. Spanish is the default in title/subtitle/description fields */
+  translations?: Partial<Record<StoryLocale, StoryTranslation>>;
   [key: string]: unknown;
 }
 

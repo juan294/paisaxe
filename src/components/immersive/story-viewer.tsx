@@ -20,6 +20,7 @@ import { ShareButton } from "./share-button";
 import { LanguageSwitcher } from "./language-switcher";
 import { getLabel } from "@/lib/asturianu";
 import { useTranslation } from "@/lib/i18n";
+import { getLocalizedStory } from "@/lib/localize-story";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -65,7 +66,7 @@ export function StoryViewer({
   const [ambientMode, setAmbientMode] = useState(false);
 
   const { isEnabled } = useFeatureFlags();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
 
   const {
@@ -182,7 +183,10 @@ export function StoryViewer({
   // Asturianu labels
   const ast = isEnabled("asturianu_touches");
 
-  if (!story) return null;
+  // Get localized story text based on current locale (falls back to Spanish)
+  const localizedStory = story ? getLocalizedStory(story, locale) : null;
+
+  if (!story || !localizedStory) return null;
 
   // Question prompts from metadata
   const questionPrompts = story.metadata?.question_prompts || [];
@@ -200,7 +204,7 @@ export function StoryViewer({
       >
         {t("accessibility.story_counter")
           .replace("{current}", String(currentIndex + 1))
-          .replace("{total}", String(stories.length))}: {story.title} — {story.subtitle}
+          .replace("{total}", String(stories.length))}: {localizedStory.title} — {localizedStory.subtitle}
       </div>
 
       {/* Background Image with Ken Burns effect */}
@@ -309,15 +313,15 @@ export function StoryViewer({
         <p className="text-white/70 text-sm md:text-base font-medium mb-2 tracking-wider uppercase">
           {ast && story.metadata?.asturianu_subtitle
             ? story.metadata.asturianu_subtitle
-            : story.subtitle}
+            : localizedStory.subtitle}
         </p>
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
           {ast && story.metadata?.asturianu_title
             ? story.metadata.asturianu_title
-            : story.title}
+            : localizedStory.title}
         </h1>
         <p className="text-lg md:text-xl text-white/80 max-w-2xl leading-relaxed mb-2">
-          {story.description}
+          {localizedStory.description}
         </p>
 
         {/* Image source attribution */}

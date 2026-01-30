@@ -25,6 +25,8 @@
     "generate-stories": "tsx scripts/generate-stories.ts",
     "seed-images": "tsx scripts/seed-images.ts",
     "seed-images:clear": "tsx scripts/seed-images.ts --clear",
+    "seed-translations": "tsx scripts/seed-translations.ts",
+    "seed-translations:dry": "tsx scripts/seed-translations.ts --dry-run",
     "seed-all": "npm run seed-images && npm run seed-db",
     "seed-all:clear": "npm run seed-images:clear && npm run seed-db:clear",
     "setup-elevenlabs": "tsx scripts/setup-elevenlabs-agents.ts",

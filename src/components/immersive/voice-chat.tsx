@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { PrivacyNotice } from "./privacy-notice";
 import { ChatActions } from "./chat-actions";
 import { useTranslation } from "@/lib/i18n";
+import { getLocalizedStory } from "@/lib/localize-story";
 import { useVisitorVoiceAccess } from "@/hooks/use-visitor-voice-access";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -37,7 +38,8 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const [useElevenLabs, setUseElevenLabs] = useState(false);
   const [hasSetDefaultMode, setHasSetDefaultMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const localizedStory = getLocalizedStory(story, locale);
 
   // Check for ElevenLabs voice access
   const { canUseVoice, needsSignIn, agentId, isLoading: isVoiceAccessLoading } = useVisitorVoiceAccess();
@@ -115,7 +117,8 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userMessage,
-          context: `El usuario está viendo una imagen de: ${story.title} (${story.subtitle}). ${story.description}. Fuente: ${story.sourcePdf}.`,
+          context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
+          locale,
         }),
       });
 
@@ -224,7 +227,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     <div
       className="fixed inset-0 z-50 flex items-end justify-center p-4 md:items-center"
       role="dialog"
-      aria-label={t("accessibility.chat_dialog").replace("{title}", story.title)}
+      aria-label={t("accessibility.chat_dialog").replace("{title}", localizedStory.title)}
     >
       {/* Backdrop */}
       <div
@@ -237,8 +240,8 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         {/* Header with voice mode toggle */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <div className="flex-1">
-            <h2 className="font-semibold text-white">{story.title}</h2>
-            <p className="text-sm text-white/60">{story.subtitle}</p>
+            <h2 className="font-semibold text-white">{localizedStory.title}</h2>
+            <p className="text-sm text-white/60">{localizedStory.subtitle}</p>
           </div>
           <div className="flex items-center gap-2">
             {/* Voice mode toggle - only show when user can use voice */}
