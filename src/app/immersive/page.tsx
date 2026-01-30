@@ -46,7 +46,7 @@ function ImmersivePageContent() {
   // Generate a fresh seed on each page load (stored in ref for stability during re-renders)
   const shuffleSeed = useRef(Math.floor(Math.random() * 2147483647));
 
-  const { isEnabled } = useFeatureFlags();
+  const { isEnabled, isReady: flagsReady } = useFeatureFlags();
   const { t } = useTranslation();
   const { viewedIndices, markViewed } = useViewedStories();
   const searchParams = useSearchParams();
@@ -140,8 +140,9 @@ function ImmersivePageContent() {
     sessionStorage.setItem("paisaxe-mood-dismissed", "true");
   };
 
-  // Show mood overlay if enabled, not dismissed, and stories are loaded
-  const showMoodOverlay = isEnabled("mood_discovery") && !moodDismissed && !isLoading && allStories.length > 0;
+  // Show mood overlay if enabled, not dismissed, stories are loaded, and flags are ready
+  // We wait for flagsReady to prevent the overlay from popping in after page render
+  const showMoodOverlay = flagsReady && isEnabled("mood_discovery") && !moodDismissed && !isLoading && allStories.length > 0;
 
   if (isLoading) {
     return <StoryCardSkeleton />;

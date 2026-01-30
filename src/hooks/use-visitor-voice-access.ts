@@ -20,10 +20,10 @@ interface UseVisitorVoiceAccessResult {
 
 export function useVisitorVoiceAccess(): UseVisitorVoiceAccessResult {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const { flags, isLoading: isFlagsLoading, isEnabled } = useFeatureFlags();
+  const { flags, isReady: flagsReady, isEnabled } = useFeatureFlags();
 
   return useMemo(() => {
-    const isLoading = isAuthLoading || isFlagsLoading;
+    const isLoading = isAuthLoading || !flagsReady;
     const featureEnabled = isEnabled("visitor_voice_agent");
 
     // Find the visitor_voice_agent flag to get its config
@@ -62,5 +62,5 @@ export function useVisitorVoiceAccess(): UseVisitorVoiceAccessResult {
       userEmail,
       isLoading,
     };
-  }, [user, isAuthLoading, flags, isFlagsLoading, isEnabled]);
+  }, [user, isAuthLoading, flags, flagsReady, isEnabled]);
 }

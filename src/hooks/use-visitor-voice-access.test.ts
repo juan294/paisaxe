@@ -44,7 +44,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [makeVisitorVoiceFlag(false, { whitelisted_emails: [], agent_id: "agent-123" })],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => false,
       });
 
@@ -65,7 +65,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [makeVisitorVoiceFlag(true, { whitelisted_emails: ["test@example.com"], agent_id: "agent-123" })],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => true,
       });
 
@@ -84,7 +84,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [makeVisitorVoiceFlag(true, { whitelisted_emails: ["whitelisted@example.com"], agent_id: "agent-123" })],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => true,
       });
 
@@ -102,7 +102,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [makeVisitorVoiceFlag(true, { whitelisted_emails: ["whitelisted@example.com"], agent_id: "agent-123" })],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => true,
       });
 
@@ -121,7 +121,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [makeVisitorVoiceFlag(true, { whitelisted_emails: ["whitelisted@example.com"], agent_id: "" })],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => true,
       });
 
@@ -138,7 +138,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [makeVisitorVoiceFlag(true, { whitelisted_emails: ["whitelisted@example.com"], agent_id: "agent-123" })],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => true,
       });
 
@@ -157,7 +157,7 @@ describe("useVisitorVoiceAccess", () => {
           whitelisted_emails: ["user1@example.com", "user2@example.com", "user3@example.com"],
           agent_id: "agent-123"
         })],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => true,
       });
 
@@ -175,7 +175,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => false,
       });
 
@@ -184,14 +184,14 @@ describe("useVisitorVoiceAccess", () => {
       expect(result.current.isLoading).toBe(true);
     });
 
-    it("returns isLoading true when flags are loading", () => {
+    it("returns isLoading true when flags are not ready", () => {
       mockUseAuth.mockReturnValue({
         user: null,
         isLoading: false,
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [],
-        isLoading: true,
+        isReady: false,
         isEnabled: () => false,
       });
 
@@ -207,7 +207,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => false,
       });
 
@@ -225,7 +225,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [], // No flags
-        isLoading: false,
+        isReady: true,
         isEnabled: () => false,
       });
 
@@ -243,7 +243,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [makeVisitorVoiceFlag(true, { whitelisted_emails: [], agent_id: "agent-123" })],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => true,
       });
 
@@ -260,7 +260,7 @@ describe("useVisitorVoiceAccess", () => {
       });
       mockUseFeatureFlags.mockReturnValue({
         flags: [makeVisitorVoiceFlag(true, { whitelisted_emails: ["test@example.com"], agent_id: "agent-123" })],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => true,
       });
 
@@ -290,7 +290,7 @@ describe("useVisitorVoiceAccess", () => {
 
       mockUseFeatureFlags.mockReturnValue({
         flags: [badFlag],
-        isLoading: false,
+        isReady: true,
         isEnabled: () => true,
       });
 

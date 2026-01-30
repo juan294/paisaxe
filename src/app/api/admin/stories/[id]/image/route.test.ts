@@ -11,8 +11,46 @@ vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
 
+// Mock image optimization
+vi.mock("@/lib/image-optimization", () => ({
+  optimizeSingleImage: vi.fn().mockResolvedValue({
+    buffer: Buffer.from("optimized image"),
+    format: "avif",
+    blurDataUrl: "data:image/webp;base64,mockblur",
+  }),
+  validateImageBuffer: vi.fn().mockResolvedValue({
+    valid: true,
+    format: "jpeg",
+  }),
+  generateBlurPlaceholder: vi.fn().mockResolvedValue("data:image/webp;base64,mockblur"),
+}));
+
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { validateImageBuffer } from "@/lib/image-optimization";
+
+/**
+ * Create a mock File object with arrayBuffer() method for Node.js test environment.
+ * The native File object in jsdom doesn't have arrayBuffer() like browser File API.
+ */
+function createMockFile(content: string | Uint8Array, name: string, type: string): File {
+  const data = typeof content === "string" ? new TextEncoder().encode(content) : content;
+  const blob = new Blob([data as BlobPart], { type });
+
+  // Create a File-like object with arrayBuffer method
+  const file = new File([blob], name, { type });
+
+  // Create a proper ArrayBuffer from the Uint8Array data
+  const arrayBuffer = new ArrayBuffer(data.byteLength);
+  new Uint8Array(arrayBuffer).set(data);
+
+  // Manually add arrayBuffer method since jsdom File doesn't have it
+  (file as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = async (): Promise<ArrayBuffer> => {
+    return arrayBuffer;
+  };
+
+  return file;
+}
 
 describe("PUT /api/admin/stories/[id]/image", () => {
   const mockParams = { params: Promise.resolve({ id: "story-123" }) };
@@ -209,11 +247,11 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     const setupStorageMocks = (uploadError: { message: string } | null = null) => {
       const mockUpload = vi.fn().mockResolvedValue({ error: uploadError });
       const mockGetPublicUrl = vi.fn().mockReturnValue({
-        data: { publicUrl: "https://storage.example.com/story-123-12345.jpg" },
+        data: { publicUrl: "https://storage.example.com/story-123-12345.avif" },
       });
 
       const mockSingle = vi.fn().mockResolvedValue({
-        data: { id: "story-123", image_path: "https://storage.example.com/story-123-12345.jpg", image_source: null },
+        data: { id: "story-123", image_path: "https://storage.example.com/story-123-12345.avif", image_source: null },
         error: null,
       });
       const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
@@ -245,12 +283,12 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       return request;
     };
 
-    it("should upload file successfully", async () => {
+    it("should upload file successfully with optimization", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       const { mockUpload, mockGetPublicUrl } = setupStorageMocks();
 
       const formData = new FormData();
-      const mockFile = new File(["image content"], "test.jpg", { type: "image/jpeg" });
+      const mockFile = createMockFile("image content", "test.jpg", "image/jpeg");
       formData.append("file", mockFile);
 
       const request = createFormDataRequest(formData);
@@ -260,7 +298,10 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       expect(response.status).toBe(200);
       expect(mockUpload).toHaveBeenCalled();
       expect(mockGetPublicUrl).toHaveBeenCalled();
-      expect(data.data.image).toBe("https://storage.example.com/story-123-12345.jpg");
+      // Now outputs AVIF instead of original format
+      expect(data.data.image).toBe("https://storage.example.com/story-123-12345.avif");
+      // Should also have blur placeholder
+      expect(data.data.blurDataUrl).toBe("data:image/webp;base64,mockblur");
     });
 
     it("should return 400 when no file in FormData", async () => {
@@ -283,7 +324,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       setupStorageMocks();
 
       const formData = new FormData();
-      const mockFile = new File(["content"], "test.txt", { type: "text/plain" });
+      const mockFile = createMockFile("content", "test.txt", "text/plain");
       formData.append("file", mockFile);
 
       const request = createFormDataRequest(formData);
@@ -291,17 +332,18 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe("Invalid file type. Allowed: JPEG, PNG, WebP, GIF");
+      // Now includes AVIF in the allowed list
+      expect(data.error).toBe("Invalid file type. Allowed: JPEG, PNG, WebP, GIF, AVIF");
     });
 
-    it("should return 400 for oversized file", async () => {
+    it("should return 400 for oversized file (over 10MB)", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       setupStorageMocks();
 
       const formData = new FormData();
-      // Create a file > 5MB
-      const largeContent = new Uint8Array(6 * 1024 * 1024);
-      const mockFile = new File([largeContent], "large.jpg", { type: "image/jpeg" });
+      // Create a file > 10MB (the new limit)
+      const largeContent = new Uint8Array(11 * 1024 * 1024);
+      const mockFile = createMockFile(largeContent, "large.jpg", "image/jpeg");
       formData.append("file", mockFile);
 
       const request = createFormDataRequest(formData);
@@ -309,7 +351,30 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe("File too large. Maximum size is 5MB");
+      // New limit is 10MB
+      expect(data.error).toBe("File too large. Maximum size is 10MB");
+    });
+
+    it("should return 400 for invalid image data", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      setupStorageMocks();
+
+      // Mock validateImageBuffer to return invalid
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: false,
+        error: "Corrupt image data",
+      });
+
+      const formData = new FormData();
+      const mockFile = createMockFile("corrupt data", "test.jpg", "image/jpeg");
+      formData.append("file", mockFile);
+
+      const request = createFormDataRequest(formData);
+      const response = await PUT(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Corrupt image data");
     });
 
     it("should return 500 on storage upload error", async () => {
@@ -317,7 +382,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       setupStorageMocks({ message: "Storage error" });
 
       const formData = new FormData();
-      const mockFile = new File(["image content"], "test.jpg", { type: "image/jpeg" });
+      const mockFile = createMockFile("image content", "test.jpg", "image/jpeg");
       formData.append("file", mockFile);
 
       const request = createFormDataRequest(formData);
@@ -333,7 +398,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const { mockUpdate } = setupStorageMocks();
 
       const formData = new FormData();
-      const mockFile = new File(["image content"], "test.png", { type: "image/png" });
+      const mockFile = createMockFile("image content", "test.png", "image/png");
       formData.append("file", mockFile);
       formData.append("imageSource", "photographer-credit");
 

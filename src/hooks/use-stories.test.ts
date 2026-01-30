@@ -55,10 +55,39 @@ vi.mock("@/lib/stories-data", () => ({
   getStoriesFromDB: (...args: unknown[]) => mockGetStoriesFromDB(...args),
 }));
 
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
+    get _store() {
+      return store;
+    },
+  };
+})();
+
+Object.defineProperty(window, "localStorage", {
+  value: localStorageMock,
+  writable: true,
+});
+
 describe("useStories", () => {
   beforeEach(() => {
     vi.resetModules();
     mockGetStoriesFromDB.mockReset();
+    localStorageMock.clear();
+    localStorageMock.getItem.mockClear();
+    localStorageMock.setItem.mockClear();
+    localStorageMock.removeItem.mockClear();
     // Default: resolve with mock stories
     mockGetStoriesFromDB.mockResolvedValue(mockStories);
   });
@@ -408,10 +437,177 @@ describe("useStories", () => {
   });
 });
 
+describe("useStories localStorage persistence", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    mockGetStoriesFromDB.mockReset();
+    localStorageMock.clear();
+    localStorageMock.getItem.mockClear();
+    localStorageMock.setItem.mockClear();
+    localStorageMock.removeItem.mockClear();
+    mockGetStoriesFromDB.mockResolvedValue(mockStories);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("should persist stories to localStorage after fetch", async () => {
+    const { useStories } = await import("./use-stories");
+    const { result } = renderHook(() => useStories());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Check that localStorage.setItem was called
+    expect(localStorageMock.setItem).toHaveBeenCalled();
+    const setItemCalls = localStorageMock.setItem.mock.calls;
+    const storiesCall = setItemCalls.find(
+      (call: [string, string]) => call[0] === "paisaxe-stories-cache"
+    );
+    expect(storiesCall).toBeDefined();
+
+    // Parse the stored data and verify structure
+    const stored = JSON.parse(storiesCall![1]);
+    expect(stored.version).toBe(1);
+    expect(stored.data).toEqual(mockStories);
+    expect(stored.timestamp).toBeDefined();
+  });
+
+  it("should restore stories from localStorage on mount", async () => {
+    // Pre-populate localStorage with stories
+    const storedCache = {
+      version: 1,
+      data: mockStories,
+      timestamp: Date.now(),
+    };
+    localStorageMock.getItem.mockReturnValue(JSON.stringify(storedCache));
+
+    // Make DB fetch slow so we can verify localStorage is used first
+    mockGetStoriesFromDB.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(mockStories), 1000))
+    );
+
+    const { useStories } = await import("./use-stories");
+    const { result } = renderHook(() => useStories());
+
+    // Should immediately have stories from localStorage, not loading
+    expect(result.current.stories).toEqual(mockStories);
+    expect(result.current.isLoading).toBe(false);
+  });
+
+  it("should ignore localStorage cache with wrong version", async () => {
+    // Pre-populate localStorage with old version
+    const storedCache = {
+      version: 0, // Wrong version
+      data: [{ id: "old", title: "Old Story" }],
+      timestamp: Date.now(),
+    };
+    localStorageMock.getItem.mockReturnValue(JSON.stringify(storedCache));
+
+    const { useStories } = await import("./use-stories");
+    const { result } = renderHook(() => useStories());
+
+    // Should be loading (localStorage cache ignored due to version mismatch)
+    expect(result.current.isLoading).toBe(true);
+
+    // Should have removed invalid cache
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith("paisaxe-stories-cache");
+  });
+
+  it("should ignore localStorage cache older than 24 hours", async () => {
+    // Pre-populate localStorage with old cache (25 hours ago)
+    const storedCache = {
+      version: 1,
+      data: mockStories,
+      timestamp: Date.now() - 25 * 60 * 60 * 1000,
+    };
+    localStorageMock.getItem.mockReturnValue(JSON.stringify(storedCache));
+
+    const { useStories } = await import("./use-stories");
+    const { result } = renderHook(() => useStories());
+
+    // Should be loading (localStorage cache expired)
+    expect(result.current.isLoading).toBe(true);
+
+    // Should have removed expired cache
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith("paisaxe-stories-cache");
+  });
+
+  it("should handle invalid JSON in localStorage gracefully", async () => {
+    localStorageMock.getItem.mockReturnValue("not valid json");
+
+    const { useStories } = await import("./use-stories");
+    const { result } = renderHook(() => useStories());
+
+    // Should be loading (localStorage invalid)
+    expect(result.current.isLoading).toBe(true);
+
+    // Should have attempted to remove invalid cache
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith("paisaxe-stories-cache");
+  });
+
+  it("should handle localStorage errors gracefully", async () => {
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    localStorageMock.setItem.mockImplementation(() => {
+      throw new Error("localStorage full");
+    });
+
+    const { useStories } = await import("./use-stories");
+    const { result } = renderHook(() => useStories());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Should still have stories despite localStorage error
+    expect(result.current.stories).toEqual(mockStories);
+    expect(consoleSpy).toHaveBeenCalledWith("Failed to persist stories to localStorage");
+
+    consoleSpy.mockRestore();
+  });
+});
+
+describe("clearStoriesCache", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    mockGetStoriesFromDB.mockReset();
+    localStorageMock.clear();
+    localStorageMock.getItem.mockClear();
+    localStorageMock.setItem.mockClear();
+    localStorageMock.removeItem.mockClear();
+    mockGetStoriesFromDB.mockResolvedValue(mockStories);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("should clear both memory and localStorage cache", async () => {
+    const { useStories, clearStoriesCache } = await import("./use-stories");
+    const { result } = renderHook(() => useStories());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Clear the cache
+    clearStoriesCache();
+
+    // localStorage should be cleared
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith("paisaxe-stories-cache");
+  });
+});
+
 describe("prefetchStories", () => {
   beforeEach(() => {
     vi.resetModules();
     mockGetStoriesFromDB.mockReset();
+    localStorageMock.clear();
+    localStorageMock.getItem.mockClear();
+    localStorageMock.setItem.mockClear();
+    localStorageMock.removeItem.mockClear();
     mockGetStoriesFromDB.mockResolvedValue(mockStories);
   });
 
@@ -483,5 +679,20 @@ describe("prefetchStories", () => {
     });
 
     consoleSpy.mockRestore();
+  });
+
+  it("should persist to localStorage after prefetch", async () => {
+    const { prefetchStories } = await import("./use-stories");
+
+    prefetchStories();
+
+    await waitFor(() => {
+      expect(mockGetStoriesFromDB).toHaveBeenCalled();
+    });
+
+    // Wait for the persistence
+    await waitFor(() => {
+      expect(localStorageMock.setItem).toHaveBeenCalled();
+    });
   });
 });

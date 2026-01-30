@@ -1,14 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { FALLBACK_STORIES, getStoriesFromDB } from "@/lib/stories-data";
 import type { Story } from "@/types/immersive";
+
+// LocalStorage key for persistent cache
+const STORAGE_KEY = "paisaxe-stories-cache";
+const STORAGE_VERSION = 1; // Increment to invalidate old caches
 
 // Simple in-memory cache for stories
 interface StoriesCache {
   data: Story[] | null;
   timestamp: number;
   promise: Promise<Story[]> | null;
+}
+
+// LocalStorage cache structure
+interface PersistedCache {
+  version: number;
+  data: Story[];
+  timestamp: number;
 }
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -21,14 +32,97 @@ const cache: StoriesCache = {
 };
 
 /**
+ * Try to load stories from localStorage
+ * Returns null if no valid cache exists
+ */
+function loadFromStorage(): Story[] | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+
+    const parsed: PersistedCache = JSON.parse(stored);
+
+    // Check version compatibility
+    if (parsed.version !== STORAGE_VERSION) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    // Check if cache is too old (24 hours max for localStorage)
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+    if (Date.now() - parsed.timestamp > maxAge) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    return parsed.data;
+  } catch {
+    // Invalid JSON or other error - clear it
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Ignore storage errors
+    }
+    return null;
+  }
+}
+
+/**
+ * Save stories to localStorage
+ */
+function saveToStorage(data: Story[]): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    const toStore: PersistedCache = {
+      version: STORAGE_VERSION,
+      data,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
+  } catch {
+    // Storage full or other error - ignore
+    console.warn("Failed to persist stories to localStorage");
+  }
+}
+
+/**
+ * Initialize cache from localStorage if available
+ * Called once when module loads on client
+ */
+function initializeCache(): void {
+  if (cache.data) return; // Already initialized
+
+  const stored = loadFromStorage();
+  if (stored && stored.length > 0) {
+    cache.data = stored;
+    // Use stored timestamp but mark as slightly stale to trigger revalidation
+    cache.timestamp = Date.now() - CACHE_TTL + 30000; // Will revalidate in 30s
+  }
+}
+
+/**
  * Hook for fetching and caching stories data.
- * Implements stale-while-revalidate pattern:
+ *
+ * Implements stale-while-revalidate pattern with localStorage persistence:
+ * - On first load, tries to restore from localStorage (instant render)
  * - Returns cached data immediately if available
  * - Revalidates in background if cache is stale
  * - Deduplicates concurrent requests
+ * - Persists to localStorage for next visit
  */
 export function useStories() {
+  // Initialize cache from storage on first render
+  const initialized = useRef(false);
+  if (!initialized.current && typeof window !== "undefined") {
+    initializeCache();
+    initialized.current = true;
+  }
+
   const [stories, setStories] = useState<Story[]>(cache.data || FALLBACK_STORIES);
+  // If we have cached data (from localStorage or memory), don't show loading
   const [isLoading, setIsLoading] = useState(!cache.data);
   const [error, setError] = useState<Error | null>(null);
 
@@ -52,6 +146,10 @@ export function useStories() {
         cache.data = data;
         cache.timestamp = Date.now();
         cache.promise = null;
+
+        // Persist to localStorage for next visit
+        saveToStorage(data);
+
         return data;
       })
       .catch((err) => {
@@ -155,7 +253,25 @@ export function prefetchStories(): void {
       .then((data) => {
         cache.data = data;
         cache.timestamp = Date.now();
+        saveToStorage(data);
       })
       .catch(console.error);
+  }
+}
+
+/**
+ * Clear the stories cache (both memory and localStorage)
+ * Useful for debugging or forcing a fresh fetch
+ */
+export function clearStoriesCache(): void {
+  cache.data = null;
+  cache.timestamp = 0;
+  cache.promise = null;
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Ignore storage errors
+    }
   }
 }

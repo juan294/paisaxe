@@ -219,7 +219,7 @@ export function StoryViewer({
           className={cn("object-cover", zoomClass)}
           priority
           placeholder="blur"
-          blurDataURL={darkPlaceholder}
+          blurDataURL={story.blurDataUrl || darkPlaceholder}
           key={`${story.id}-${isAmbient ? "ambient" : autoPlay ? "auto" : "static"}`}
         />
         {/* Gradient overlays */}

@@ -36,7 +36,7 @@ describe("useFeatureFlags", () => {
     const { result } = renderHook(() => useFeatureFlags());
 
     expect(result.current.flags).toEqual([]);
-    expect(result.current.isLoading).toBe(true);
+    expect(result.current.isReady).toBe(false);
   });
 
   it("should fetch flags from /api/feature-flags", async () => {
@@ -50,7 +50,7 @@ describe("useFeatureFlags", () => {
     const { result } = renderHook(() => useFeatureFlags());
 
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.isReady).toBe(true);
     });
 
     expect(mockFetch).toHaveBeenCalledWith("/api/feature-flags");
@@ -71,7 +71,7 @@ describe("useFeatureFlags", () => {
     const { result } = renderHook(() => useFeatureFlags());
 
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.isReady).toBe(true);
     });
 
     expect(result.current.isEnabled("contextual_prompts")).toBe(true);
@@ -91,7 +91,7 @@ describe("useFeatureFlags", () => {
     const { result } = renderHook(() => useFeatureFlags());
 
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.isReady).toBe(true);
     });
 
     expect(result.current.isEnabled("related_stories")).toBe(false);
@@ -108,7 +108,7 @@ describe("useFeatureFlags", () => {
     const { result } = renderHook(() => useFeatureFlags());
 
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.isReady).toBe(true);
     });
 
     expect(result.current.isEnabled("surprise_me")).toBe(false);
@@ -121,7 +121,7 @@ describe("useFeatureFlags", () => {
     const { result } = renderHook(() => useFeatureFlags());
 
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.isReady).toBe(true);
     });
 
     expect(result.current.flags).toEqual([]);
@@ -139,10 +139,112 @@ describe("useFeatureFlags", () => {
     const { result } = renderHook(() => useFeatureFlags());
 
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.isReady).toBe(true);
     });
 
     expect(result.current.flags).toEqual([]);
     expect(result.current.isEnabled("contextual_prompts")).toBe(false);
+  });
+});
+
+describe("useFeatureFlags isReady state", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.resetModules();
+  });
+
+  it("should set isReady to false initially when no cache", async () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result } = renderHook(() => useFeatureFlags());
+
+    expect(result.current.isReady).toBe(false);
+  });
+
+  it("should set isReady to true after successful fetch", async () => {
+    const flags = [makeFlag("contextual_prompts", true)];
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: flags }),
+    });
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result } = renderHook(() => useFeatureFlags());
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+  });
+
+  it("should set isReady to true even after fetch error", async () => {
+    mockFetch.mockRejectedValue(new Error("Network error"));
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result } = renderHook(() => useFeatureFlags());
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+  });
+});
+
+describe("useFeatureFlags isEnabledWithDefault", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.resetModules();
+  });
+
+  it("should return default value while loading", async () => {
+    // Never-resolving fetch to stay in loading state
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result } = renderHook(() => useFeatureFlags());
+
+    // While loading, should return the default value
+    expect(result.current.isEnabledWithDefault("contextual_prompts", true)).toBe(true);
+    expect(result.current.isEnabledWithDefault("contextual_prompts", false)).toBe(false);
+    expect(result.current.isEnabledWithDefault("related_stories")).toBe(false); // default is false
+  });
+
+  it("should return actual flag value after loading", async () => {
+    const flags = [
+      makeFlag("contextual_prompts", true),
+      makeFlag("related_stories", false),
+    ];
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: flags }),
+    });
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result } = renderHook(() => useFeatureFlags());
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    // Should return actual flag value, ignoring the default
+    expect(result.current.isEnabledWithDefault("contextual_prompts", false)).toBe(true);
+    expect(result.current.isEnabledWithDefault("related_stories", true)).toBe(false);
+  });
+
+  it("should return false for unknown flag after loading (ignoring default)", async () => {
+    const flags = [makeFlag("contextual_prompts", true)];
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: flags }),
+    });
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result } = renderHook(() => useFeatureFlags());
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    // Unknown flag should return false after loading (not the default)
+    expect(result.current.isEnabledWithDefault("surprise_me", true)).toBe(false);
   });
 });
