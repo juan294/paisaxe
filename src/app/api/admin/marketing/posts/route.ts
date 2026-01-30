@@ -10,7 +10,7 @@ import {
   PLATFORM_LIMITS,
 } from "@/types/marketing";
 
-const VALID_PLATFORMS: MarketingPlatform[] = ["x", "instagram", "pinterest", "tiktok"];
+const VALID_PLATFORMS: MarketingPlatform[] = ["x", "instagram", "pinterest"];
 const VALID_STATUSES: PostStatus[] = ["draft", "scheduled", "posting", "posted", "failed"];
 
 /**

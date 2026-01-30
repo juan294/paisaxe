@@ -319,21 +319,18 @@ describe("PLATFORM_LIMITS", () => {
     expect(PLATFORM_LIMITS).toHaveProperty("x");
     expect(PLATFORM_LIMITS).toHaveProperty("instagram");
     expect(PLATFORM_LIMITS).toHaveProperty("pinterest");
-    expect(PLATFORM_LIMITS).toHaveProperty("tiktok");
   });
 
   it("has correct character limits", () => {
     expect(PLATFORM_LIMITS.x.maxLength).toBe(280);
     expect(PLATFORM_LIMITS.instagram.maxLength).toBe(2200);
     expect(PLATFORM_LIMITS.pinterest.maxLength).toBe(500);
-    expect(PLATFORM_LIMITS.tiktok.maxLength).toBe(2200);
   });
 
   it("has correct media limits", () => {
     expect(PLATFORM_LIMITS.x.maxMedia).toBe(4);
     expect(PLATFORM_LIMITS.instagram.maxMedia).toBe(10);
     expect(PLATFORM_LIMITS.pinterest.maxMedia).toBe(1);
-    expect(PLATFORM_LIMITS.tiktok.maxMedia).toBe(1);
   });
 });
 
@@ -342,14 +339,12 @@ describe("PLATFORM_HASHTAGS", () => {
     expect(PLATFORM_HASHTAGS).toHaveProperty("x");
     expect(PLATFORM_HASHTAGS).toHaveProperty("instagram");
     expect(PLATFORM_HASHTAGS).toHaveProperty("pinterest");
-    expect(PLATFORM_HASHTAGS).toHaveProperty("tiktok");
   });
 
   it("includes Asturias hashtags", () => {
     expect(PLATFORM_HASHTAGS.x.always).toContain("#Asturias");
     expect(PLATFORM_HASHTAGS.instagram.always).toContain("#Asturias");
     expect(PLATFORM_HASHTAGS.pinterest.always).toContain("#Asturias");
-    expect(PLATFORM_HASHTAGS.tiktok.always).toContain("#Asturias");
   });
 });
 

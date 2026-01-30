@@ -9,7 +9,7 @@ import {
   type ContentType,
 } from "@/types/marketing";
 
-const VALID_PLATFORMS: MarketingPlatform[] = ["x", "instagram", "pinterest", "tiktok"];
+const VALID_PLATFORMS: MarketingPlatform[] = ["x", "instagram", "pinterest"];
 const VALID_CONTENT_TYPES: (ContentType | "auto")[] = [
   "photo_caption",
   "reel_caption",

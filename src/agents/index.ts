@@ -1,7 +1,7 @@
 /**
  * Marketing Agent Configuration Registry
  *
- * Defines the four specialized marketing agents for Paisaxe,
+ * Defines the specialized marketing agents for Paisaxe,
  * each focused on a specific social media platform.
  */
 
@@ -109,30 +109,6 @@ export const MARKETING_AGENTS: Record<MarketingPlatform, AgentConfig> = {
     voice: {
       style: "Helpful, organized, practical",
       tone: "Informative and reliable",
-    },
-  },
-  tiktok: {
-    id: "tiko",
-    name: "Tiko",
-    platform: "tiktok",
-    personaFile: "src/agents/personas/tiko-tiktok-agent.md",
-    description: "TikTok marketing specialist - trend-aware, authentic short-form video",
-    capabilities: [
-      "Write video hooks and scripts",
-      "Suggest trending sounds",
-      "Plan video concepts",
-      "Create content series ideas",
-      "Advise on video structure",
-      "Adapt trends to Asturias content",
-    ],
-    limitations: [
-      "Cannot post directly to TikTok",
-      "Cannot access real-time analytics",
-      "Cannot edit videos",
-    ],
-    voice: {
-      style: "Energetic, authentic, trend-aware",
-      tone: "Enthusiastic but not forced",
     },
   },
 };
