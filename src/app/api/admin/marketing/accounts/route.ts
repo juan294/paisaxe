@@ -8,7 +8,7 @@ import {
   type MarketingPlatform,
 } from "@/types/marketing";
 
-const VALID_PLATFORMS: MarketingPlatform[] = ["x", "instagram", "pinterest", "tiktok"];
+const VALID_PLATFORMS: MarketingPlatform[] = ["x", "instagram", "pinterest"];
 
 /**
  * GET /api/admin/marketing/accounts

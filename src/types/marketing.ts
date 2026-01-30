@@ -2,14 +2,14 @@
  * Marketing Automation Types
  *
  * Types for the automated social media marketing system.
- * Supports X (Twitter), Instagram, Pinterest, and TikTok.
+ * Supports X (Twitter), Instagram, and Pinterest.
  */
 
 // =============================================================================
 // ENUMS & CONSTANTS
 // =============================================================================
 
-export type MarketingPlatform = "x" | "instagram" | "pinterest" | "tiktok";
+export type MarketingPlatform = "x" | "instagram" | "pinterest";
 
 export type PostStatus =
   | "draft"
@@ -50,7 +50,6 @@ export const PLATFORM_LIMITS: Record<
   x: { maxLength: 280, maxMedia: 4, maxHashtags: 5 },
   instagram: { maxLength: 2200, maxMedia: 10, maxHashtags: 30 },
   pinterest: { maxLength: 500, maxMedia: 1, maxHashtags: 20 },
-  tiktok: { maxLength: 2200, maxMedia: 1, maxHashtags: 10 },
 };
 
 // =============================================================================
@@ -491,9 +490,5 @@ export const PLATFORM_HASHTAGS: Record<
       "#SpanishFood",
       "#HikingSpain",
     ],
-  },
-  tiktok: {
-    always: ["#Asturias", "#Spain", "#TravelTok", "#HiddenEurope"],
-    location: ["#PicosDeEuropa", "#SpanishFood", "#HikingTikTok"],
   },
 };

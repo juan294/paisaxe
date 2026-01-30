@@ -43,27 +43,18 @@ const AGENTS: Agent[] = [
     description: "Pinterest specialist - SEO, evergreen content",
     voice: { style: "Helpful, organized", tone: "Informative and reliable" },
   },
-  {
-    id: "tiko",
-    name: "Tiko",
-    platform: "tiktok",
-    description: "TikTok specialist - trends, hooks, authenticity",
-    voice: { style: "Energetic, authentic", tone: "Enthusiastic" },
-  },
 ];
 
 const PLATFORM_COLORS: Record<MarketingPlatform, string> = {
   x: "bg-black dark:bg-white dark:text-black",
   instagram: "bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400",
   pinterest: "bg-red-600",
-  tiktok: "bg-black dark:bg-white dark:text-black",
 };
 
 const PLATFORM_ICONS: Record<MarketingPlatform, string> = {
   x: "𝕏",
   instagram: "📷",
   pinterest: "📌",
-  tiktok: "🎵",
 };
 
 export function AgentChat() {

@@ -135,7 +135,6 @@ function calculateStats(
     x: createEmptyPlatformStats(),
     instagram: createEmptyPlatformStats(),
     pinterest: createEmptyPlatformStats(),
-    tiktok: createEmptyPlatformStats(),
   };
 
   let totalPosts = 0;

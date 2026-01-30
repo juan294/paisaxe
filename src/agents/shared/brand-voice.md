@@ -136,7 +136,6 @@ While the core voice stays consistent, adapt for each platform:
 - **X**: Shorter, punchier, more conversational
 - **Instagram**: Visual-first, slightly longer captions okay
 - **Pinterest**: Descriptive, keyword-rich, evergreen
-- **TikTok**: Casual, trend-aware, hook-driven
 
 ## Example Transformations
 

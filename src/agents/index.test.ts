@@ -11,8 +11,8 @@ import type { MarketingPlatform } from "@/types/marketing";
 
 describe("Marketing Agents Configuration", () => {
   describe("MARKETING_AGENTS", () => {
-    it("should have agents for all four platforms", () => {
-      const platforms: MarketingPlatform[] = ["x", "instagram", "pinterest", "tiktok"];
+    it("should have agents for all platforms", () => {
+      const platforms: MarketingPlatform[] = ["x", "instagram", "pinterest"];
       for (const platform of platforms) {
         expect(MARKETING_AGENTS[platform]).toBeDefined();
       }
@@ -22,14 +22,12 @@ describe("Marketing Agents Configuration", () => {
       expect(MARKETING_AGENTS.x.id).toBe("xander");
       expect(MARKETING_AGENTS.instagram.id).toBe("iris");
       expect(MARKETING_AGENTS.pinterest.id).toBe("penny");
-      expect(MARKETING_AGENTS.tiktok.id).toBe("tiko");
     });
 
     it("should have correct agent names", () => {
       expect(MARKETING_AGENTS.x.name).toBe("Xander");
       expect(MARKETING_AGENTS.instagram.name).toBe("Iris");
       expect(MARKETING_AGENTS.pinterest.name).toBe("Penny");
-      expect(MARKETING_AGENTS.tiktok.name).toBe("Tiko");
     });
 
     it("should have persona files for each agent", () => {
@@ -85,7 +83,6 @@ describe("Marketing Agents Configuration", () => {
       expect(getAgentByPlatform("x").id).toBe("xander");
       expect(getAgentByPlatform("instagram").id).toBe("iris");
       expect(getAgentByPlatform("pinterest").id).toBe("penny");
-      expect(getAgentByPlatform("tiktok").id).toBe("tiko");
     });
   });
 
@@ -94,7 +91,6 @@ describe("Marketing Agents Configuration", () => {
       expect(getAgentById("xander")?.platform).toBe("x");
       expect(getAgentById("iris")?.platform).toBe("instagram");
       expect(getAgentById("penny")?.platform).toBe("pinterest");
-      expect(getAgentById("tiko")?.platform).toBe("tiktok");
     });
 
     it("should return undefined for invalid IDs", () => {
@@ -109,7 +105,6 @@ describe("Marketing Agents Configuration", () => {
       expect(isValidAgentId("xander")).toBe(true);
       expect(isValidAgentId("iris")).toBe(true);
       expect(isValidAgentId("penny")).toBe(true);
-      expect(isValidAgentId("tiko")).toBe(true);
     });
 
     it("should return false for invalid agent IDs", () => {
@@ -121,9 +116,9 @@ describe("Marketing Agents Configuration", () => {
   });
 
   describe("getAllAgents", () => {
-    it("should return array of all four agents", () => {
+    it("should return array of all agents", () => {
       const agents = getAllAgents();
-      expect(agents).toHaveLength(4);
+      expect(agents).toHaveLength(3);
     });
 
     it("should include all agent IDs", () => {
@@ -132,7 +127,6 @@ describe("Marketing Agents Configuration", () => {
       expect(ids).toContain("xander");
       expect(ids).toContain("iris");
       expect(ids).toContain("penny");
-      expect(ids).toContain("tiko");
     });
   });
 });

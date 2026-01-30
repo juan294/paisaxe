@@ -33,7 +33,6 @@ const PLATFORM_BADGES: Record<MarketingPlatform, string> = {
   x: "X",
   instagram: "IG",
   pinterest: "Pi",
-  tiktok: "Tk",
 };
 
 // Agent IDs are passed as props from the parent component
@@ -65,13 +64,6 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
       platform: "pinterest",
       description: "Pinterest specialist - SEO, evergreen content",
       elevenLabsAgentId: agentIds.penny,
-    },
-    {
-      id: "tiko",
-      name: "Tiko",
-      platform: "tiktok",
-      description: "TikTok specialist - trends, hooks, authenticity",
-      elevenLabsAgentId: agentIds.tiko,
     },
   ]);
 

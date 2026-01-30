@@ -191,12 +191,11 @@ describe("/api/admin/marketing/agent", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.agents).toHaveLength(4);
+      expect(data.agents).toHaveLength(3);
       expect(data.agents.map((a: { id: string }) => a.id)).toEqual([
         "xander",
         "iris",
         "penny",
-        "tiko",
       ]);
     });
   });
