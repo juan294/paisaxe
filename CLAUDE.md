@@ -622,6 +622,21 @@ Rules enforced by CI. Keep these in mind when developing:
 7. **Review Dependabot PRs** — Automated dependency update PRs arrive weekly. Review, test, and merge them regularly.
 8. **Database function security** — All SQL/PL/pgSQL functions must have an explicit `SET search_path` clause. Use `search_path = ''` with fully qualified table references (e.g., `public.chunks`) for security-definer functions. Functions using pgvector operators need `search_path = public, extensions`. Extensions should be installed in the `extensions` schema, not `public`.
 
+## Agent Autonomy
+
+**Before asking the user to perform any manual step, exhaust all available tools first.**
+
+This project has CLI tools and MCP servers available that can perform most tasks autonomously. Before telling the user "go to the Supabase dashboard and..." or "run this command manually", check whether you can do it yourself:
+
+1. **Supabase CLI** (`supabase`) — Run migrations, deploy Edge Functions, manage config, inspect database state. Use `supabase db push`, `supabase functions deploy`, `supabase migration list`, etc.
+2. **GitHub CLI** (`gh`) — Create PRs, view issues, check workflow runs, manage releases. Use `gh pr create`, `gh run list`, `gh issue view`, etc.
+3. **Vercel CLI** (`vercel`) — Check deployments, inspect env vars, view logs.
+4. **MCP servers** — Check what MCP tools are available in the current session. These may provide direct access to services like Supabase, GitHub, or other APIs without needing CLI.
+5. **Bash** — Run any npm scripts, git commands, curl requests, or other shell operations.
+6. **SQL via Supabase CLI** — Run queries directly with `supabase db execute` or connect to the database.
+
+**The rule is simple**: If a tool or CLI can do it, use it. Only ask the user to intervene when the task genuinely requires manual action (e.g., clicking through a third-party OAuth consent screen, approving a billing change, or accessing a UI that has no CLI/API equivalent).
+
 ## Content Categories (from PDFs)
 
 - City guides: Oviedo, Gijón, Avilés
