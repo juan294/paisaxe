@@ -1,0 +1,38 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "paisaxe.com"
+        }
+      ],
+      "destination": "https://paisaxe.es/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.paisaxe.com"
+        }
+      ],
+      "destination": "https://paisaxe.es/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.paisaxe.es"
+        }
+      ],
+      "destination": "https://paisaxe.es/:path*",
+      "permanent": true
+    }
+  ]
+}
