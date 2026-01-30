@@ -299,5 +299,7 @@ export function storyToRow(story: Story, order: number = 0): Omit<StoryRow, "id"
     related_stories: story.relatedStories || null,
     metadata: {},
     best_months: story.bestMonths || null,
+    source_type: story.sourceType || null,
+    suggestion_id: story.suggestionId || null,
   };
 }

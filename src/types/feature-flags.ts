@@ -11,7 +11,8 @@ export type FeatureFlagKey =
   | "story_freshness"
   | "autoplay_button"
   | "visitor_voice_agent"
-  | "maintenance_mode";
+  | "maintenance_mode"
+  | "user_story_suggestions";
 
 export interface VisitorVoiceConfig {
   whitelisted_emails: string[];

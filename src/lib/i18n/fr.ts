@@ -156,6 +156,33 @@ export const fr: Translations = {
     you: 'Vous',
   },
 
+  suggestions: {
+    sign_in_to_suggest: 'Connectez-vous pour suggérer un lieu',
+    suggest_place: 'Suggérer un lieu',
+    dialog_title: 'Suggérer un lieu',
+    dialog_description: 'Partagez un lieu des Asturies que vous aimeriez voir sur Paisaxe',
+    place_name_label: 'Nom du lieu',
+    place_name_placeholder: 'ex. Plage de Gulpiyuri',
+    location_label: 'Zone (optionnel)',
+    location_placeholder: 'Sélectionnez une zone',
+    location_eastern: 'Asturies orientales',
+    location_central: 'Asturies centrales',
+    location_western: 'Asturies occidentales',
+    comment_label: 'Commentaire (optionnel)',
+    comment_placeholder: 'Pourquoi aimez-vous ce lieu ?',
+    characters: 'caractères',
+    cancel: 'Annuler',
+    submit: 'Envoyer la suggestion',
+    submitting: 'Envoi en cours...',
+    success_title: 'Merci !',
+    success_message: 'Nous avons reçu votre suggestion',
+    error_not_signed_in: 'Vous devez vous connecter pour envoyer une suggestion',
+    error_place_name_length: 'Le nom du lieu doit contenir entre 3 et 100 caractères',
+    error_rate_limit: 'Veuillez attendre avant d\'envoyer une autre suggestion',
+    error_generic: 'Erreur lors de l\'envoi. Veuillez réessayer.',
+    community_pick: 'Suggestion communauté',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
