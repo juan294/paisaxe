@@ -31,14 +31,12 @@ const PLATFORM_BADGES: Record<MarketingPlatform, string> = {
   x: "X",
   instagram: "IG",
   pinterest: "Pi",
-  tiktok: "Tk",
 };
 
 const PLATFORM_NAMES: Record<MarketingPlatform, string> = {
   x: "X (Twitter)",
   instagram: "Instagram",
   pinterest: "Pinterest",
-  tiktok: "TikTok",
 };
 
 // Credential fields for each platform
@@ -62,12 +60,6 @@ const PLATFORM_CREDENTIALS: Record<
     { key: "refreshToken", label: "Refresh Token", placeholder: "Your refresh token", required: false },
     { key: "clientId", label: "App ID", placeholder: "Pinterest App ID", required: false },
     { key: "clientSecret", label: "App Secret", placeholder: "Pinterest App Secret", required: false },
-  ],
-  tiktok: [
-    { key: "accessToken", label: "Access Token", placeholder: "Your TikTok access token", required: true },
-    { key: "refreshToken", label: "Refresh Token", placeholder: "Your refresh token", required: false },
-    { key: "clientId", label: "Client Key", placeholder: "TikTok Client Key", required: false },
-    { key: "clientSecret", label: "Client Secret", placeholder: "TikTok Client Secret", required: false },
   ],
 };
 
@@ -179,8 +171,8 @@ export function MarketingDashboard() {
         <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
           01 — Connected Accounts
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {(["x", "instagram", "pinterest", "tiktok"] as MarketingPlatform[]).map(
+        <div className="grid gap-4 sm:grid-cols-3">
+          {(["x", "instagram", "pinterest"] as MarketingPlatform[]).map(
             (platform) => {
               const account = data.accounts.find((a) => a.platform === platform);
               return (
@@ -203,10 +195,10 @@ export function MarketingDashboard() {
           02 — Performance Overview
         </h2>
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard number="01" value={data.stats.totalPosts} label="Total Posts" />
-          <StatCard number="02" value={data.stats.postsThisWeek} label="This Week" />
-          <StatCard number="03" value={data.upcomingPosts.length} label="Scheduled" />
-          <StatCard number="04" value={data.stats.failedPosts} label="Failed" isError={data.stats.failedPosts > 0} />
+          <StatCard number="01" value={data.stats.totalPosts} label="Total Posts" color="blue" />
+          <StatCard number="02" value={data.stats.postsThisWeek} label="This Week" color="emerald" />
+          <StatCard number="03" value={data.upcomingPosts.length} label="Scheduled" color="amber" />
+          <StatCard number="04" value={data.stats.failedPosts} label="Failed" color="rose" isError={data.stats.failedPosts > 0} />
         </div>
       </section>
 
@@ -684,24 +676,39 @@ function PostRow({ post, index }: { post: MarketingPost; index: number }) {
   );
 }
 
-// Stat Card Component (Swiss Minimal style)
+// Stat Card Component (Swiss Minimal style with color accents)
+const statColorClasses = {
+  blue: "text-blue-600 dark:text-blue-400",
+  emerald: "text-emerald-600 dark:text-emerald-400",
+  amber: "text-amber-600 dark:text-amber-400",
+  rose: "text-rose-600 dark:text-rose-400",
+};
+
 function StatCard({
   number,
   value,
   label,
+  color,
   isError = false,
 }: {
   number: string;
   value: number;
   label: string;
+  color?: "blue" | "emerald" | "amber" | "rose";
   isError?: boolean;
 }) {
+  const colorClass = isError && value > 0
+    ? "text-red-500"
+    : color
+      ? statColorClasses[color]
+      : "text-stone-900 dark:text-stone-100";
+
   return (
     <div>
       <p className="font-mono text-xs tabular-nums text-stone-300">{number}</p>
       <p className={cn(
         "mt-2 text-5xl font-extralight tabular-nums tracking-tighter",
-        isError && value > 0 ? "text-red-500" : "text-stone-900 dark:text-stone-100"
+        colorClass
       )}>
         {value.toLocaleString()}
       </p>
