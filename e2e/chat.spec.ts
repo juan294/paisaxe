@@ -12,14 +12,19 @@ test.describe("Chat panel", () => {
       })
     );
 
-    // Mock chat API
-    await page.route("**/api/chat", (route) =>
-      route.fulfill({
+    // Mock streaming chat API with SSE response
+    await page.route("**/api/chat/stream", (route) => {
+      // Build SSE response with text chunk and done event
+      const textEvent = `data: ${JSON.stringify({ type: "text", content: MOCK_CHAT_RESPONSE.message })}\n\n`;
+      const doneEvent = `data: ${JSON.stringify({ type: "done", images: MOCK_CHAT_RESPONSE.images, sources: MOCK_CHAT_RESPONSE.sources })}\n\n`;
+      const sseBody = textEvent + doneEvent;
+
+      return route.fulfill({
         status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_CHAT_RESPONSE),
-      })
-    );
+        contentType: "text/event-stream",
+        body: sseBody,
+      });
+    });
 
     await page.goto("/immersive");
     await expect(page.locator("h1")).toBeVisible();
