@@ -1,83 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { readFile } from "fs/promises";
-import path from "path";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
-}
-
-interface ManifestImage {
-  filename: string;
-  sourcePdf: string;
-  pageNumber: number;
-  width: number;
-  height: number;
-  path: string;
-  aspectRatio?: number;
-  type?: "extracted" | "rendered";
-}
-
-interface Manifest {
-  extractedAt: string;
-  totalImages: number;
-  totalPdfs: number;
-  images: ManifestImage[];
 }
 
 interface ContentImage {
   filename: string;
   sourcePdf: string;
   pageNumber: number;
-  width: number;
-  height: number;
-  aspectRatio: number;
-  type: string;
   url: string;
   score: number;
+  caption: string | null;
 }
 
 /**
  * Score an image for hero suitability. Higher is better.
- * This matches the logic in scripts/map-story-images.ts
  */
-function scoreImage(img: ManifestImage): number {
+function scoreImage(pageNumber: number, url: string): number {
   let score = 0;
 
-  // Prefer extracted (embedded photography) over page renders (includes text/chrome)
-  if (img.type === "extracted") {
-    score += 100;
-  }
-
   // Prefer early pages (cover photos, hero images)
-  if (img.pageNumber <= 1) {
+  if (pageNumber <= 1) {
     score += 50;
-  } else if (img.pageNumber <= 3) {
+  } else if (pageNumber <= 3) {
     score += 30;
-  } else if (img.pageNumber <= 5) {
+  } else if (pageNumber <= 5) {
     score += 10;
   }
 
-  // Prefer landscape orientation (better for immersive view)
-  if (img.width > img.height) {
-    score += 20;
-  }
-
-  // Prefer larger images (more detail)
-  const area = img.width * img.height;
-  score += Math.min(area / 10000, 50); // Cap at 50 points for size
-
-  // Prefer wider images
-  if (img.width >= 1200) {
-    score += 15;
-  } else if (img.width >= 800) {
-    score += 10;
+  // Prefer extracted images (embedded photography) over page renders
+  if (url.includes("_img_")) {
+    score += 100;
   }
 
   return score;
 }
 
+/**
+ * GET /api/admin/stories/[id]/content-images
+ *
+ * Returns images from Supabase Storage that are related to the story's source PDF.
+ * Images are scored and sorted by suitability for use as hero images.
+ */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   // Validate admin auth
   const auth = await validateAdminAuth();
@@ -158,48 +124,42 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    // Read manifest file
-    let manifest: Manifest;
-    try {
-      const manifestPath = path.join(process.cwd(), "content", "images", "manifest.json");
-      const manifestContent = await readFile(manifestPath, "utf-8");
-      manifest = JSON.parse(manifestContent);
-    } catch {
-      console.error("Error reading manifest file");
+    // Query images from database that match the source PDF and relevant pages
+    const { data: images, error: imagesError } = await supabase
+      .from("images")
+      .select("path, caption, source_pdf, page_number")
+      .eq("source_pdf", story.source_pdf)
+      .in("page_number", Array.from(relevantPages));
+
+    if (imagesError) {
+      console.error("Error fetching images:", imagesError);
       return NextResponse.json(
-        { error: "Failed to read image manifest" },
+        { error: "Failed to fetch images" },
         { status: 500 }
       );
     }
 
-    // Find images matching the source PDF AND relevant pages
-    const sourcePdf = story.source_pdf;
-    const pdfBaseName = sourcePdf.replace(".pdf", "");
-
-    const matchingImages = manifest.images.filter((img) => {
-      // Check PDF match
-      const pdfMatches = img.sourcePdf === sourcePdf ||
-        img.sourcePdf.replace(".pdf", "") === pdfBaseName;
-
-      if (!pdfMatches) return false;
-
-      // Check page match - only include images from pages where story is mentioned
-      return relevantPages.has(img.pageNumber);
-    });
+    if (!images || images.length === 0) {
+      return NextResponse.json({
+        data: { images: [], total: 0 }
+      });
+    }
 
     // Score and sort images
-    const scoredImages: ContentImage[] = matchingImages
-      .map((img) => ({
-        filename: img.filename,
-        sourcePdf: img.sourcePdf,
-        pageNumber: img.pageNumber,
-        width: img.width,
-        height: img.height,
-        aspectRatio: img.aspectRatio || img.width / img.height,
-        type: img.type || "unknown",
-        url: `/api/content-images/${img.path}`,
-        score: scoreImage(img),
-      }))
+    const scoredImages: ContentImage[] = images
+      .map((img) => {
+        // Extract filename from URL
+        const filename = img.path.split("/").pop() || "";
+
+        return {
+          filename,
+          sourcePdf: img.source_pdf,
+          pageNumber: img.page_number,
+          url: img.path, // Already a full Supabase Storage URL
+          score: scoreImage(img.page_number, img.path),
+          caption: img.caption,
+        };
+      })
       .sort((a, b) => b.score - a.score);
 
     return NextResponse.json({
