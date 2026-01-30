@@ -1,103 +1,413 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { proxy } from "./proxy";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { proxy, shouldBypassMaintenanceMode } from "./proxy";
 import { NextRequest } from "next/server";
+
+// Mock global fetch for database checks
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 describe("CORS proxy", () => {
   beforeEach(() => {
     vi.stubEnv("NODE_ENV", "production");
+    process.env.MAINTENANCE_MODE = "false";
+    mockFetch.mockReset();
   });
 
-  it("should allow requests from paisaxe.com", () => {
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  it("should allow requests from paisaxe.com", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat", {
       headers: { origin: "https://paisaxe.com" },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://paisaxe.com");
   });
 
-  it("should allow requests from www.paisaxe.com", () => {
+  it("should allow requests from www.paisaxe.com", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat", {
       headers: { origin: "https://www.paisaxe.com" },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://www.paisaxe.com");
   });
 
-  it("should allow requests from paisaxe.es", () => {
+  it("should allow requests from paisaxe.es", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat", {
       headers: { origin: "https://paisaxe.es" },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://paisaxe.es");
   });
 
-  it("should allow requests from www.paisaxe.es", () => {
+  it("should allow requests from www.paisaxe.es", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat", {
       headers: { origin: "https://www.paisaxe.es" },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://www.paisaxe.es");
   });
 
-  it("should not add CORS headers for unknown origins", () => {
+  it("should not add CORS headers for unknown origins", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat", {
       headers: { origin: "https://evil.com" },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
-  it("should handle OPTIONS preflight with 204 for allowed origins", () => {
+  it("should handle OPTIONS preflight with 204 for allowed origins", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat", {
       method: "OPTIONS",
       headers: { origin: "https://paisaxe.com" },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.status).toBe(204);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://paisaxe.com");
     expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
   });
 
-  it("should handle OPTIONS preflight without CORS for unknown origins", () => {
+  it("should handle OPTIONS preflight without CORS for unknown origins", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat", {
       method: "OPTIONS",
       headers: { origin: "https://evil.com" },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.status).toBe(204);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
-  it("should pass through same-origin requests without CORS headers", () => {
+  it("should pass through same-origin requests without CORS headers", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat");
     // No origin header (same-origin)
 
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 });
 
 describe("CORS proxy - development", () => {
-  it("should not allow localhost in production", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  it("should not allow localhost in production", async () => {
     // Note: The ALLOWED_ORIGINS array is built at module load time.
     // Since NODE_ENV defaults to "test" in vitest (not "development"),
     // localhost won't be in the list. This test verifies the production behavior
     // by testing that localhost is NOT allowed when not in development.
     vi.stubEnv("NODE_ENV", "production");
+    process.env.MAINTENANCE_MODE = "false";
 
     const request = new NextRequest("http://localhost:3000/api/chat", {
       headers: { origin: "http://localhost:3000" },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
     // In production, localhost should not be allowed
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+});
+
+describe("Maintenance mode", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  describe("when MAINTENANCE_MODE env var is false", () => {
+    beforeEach(() => {
+      process.env.MAINTENANCE_MODE = "false";
+    });
+
+    it("allows all requests through", async () => {
+      const request = new NextRequest("http://localhost:3000/");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows /immersive route", async () => {
+      const request = new NextRequest("http://localhost:3000/immersive");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+  });
+
+  describe("when MAINTENANCE_MODE env var is true", () => {
+    beforeEach(() => {
+      process.env.MAINTENANCE_MODE = "true";
+    });
+
+    it("redirects root path to /coming-soon", async () => {
+      const request = new NextRequest("http://localhost:3000/");
+      const response = await proxy(request);
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe(
+        "http://localhost:3000/coming-soon"
+      );
+    });
+
+    it("redirects /immersive to /coming-soon", async () => {
+      const request = new NextRequest("http://localhost:3000/immersive");
+      const response = await proxy(request);
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe(
+        "http://localhost:3000/coming-soon"
+      );
+    });
+
+    it("allows /admin routes through", async () => {
+      const request = new NextRequest("http://localhost:3000/admin/dashboard");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows /api routes through", async () => {
+      const request = new NextRequest("http://localhost:3000/api/health");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows /auth routes through", async () => {
+      const request = new NextRequest("http://localhost:3000/auth/callback");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows /coming-soon page through", async () => {
+      const request = new NextRequest("http://localhost:3000/coming-soon");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows /_next routes through", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/_next/static/chunks/main.js"
+      );
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows favicon through", async () => {
+      const request = new NextRequest("http://localhost:3000/favicon.ico");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows static image files through", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/images/stories/test.png"
+      );
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows robots.txt through", async () => {
+      const request = new NextRequest("http://localhost:3000/robots.txt");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows sitemap.xml through", async () => {
+      const request = new NextRequest("http://localhost:3000/sitemap.xml");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows manifest.json through", async () => {
+      const request = new NextRequest("http://localhost:3000/manifest.json");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows icon files through", async () => {
+      const request = new NextRequest("http://localhost:3000/icon-192.png");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows apple-touch-icon through", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/apple-touch-icon.png"
+      );
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+  });
+
+  describe("when MAINTENANCE_MODE env var is not set (database flag)", () => {
+    beforeEach(() => {
+      delete process.env.MAINTENANCE_MODE;
+      // Set up Supabase env vars for database check
+      process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-key";
+    });
+
+    afterEach(() => {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    });
+
+    it("allows requests when database flag is false", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([{ enabled: false }]),
+      });
+
+      const request = new NextRequest("http://localhost:3000/");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("redirects when database flag is true", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([{ enabled: true }]),
+      });
+
+      const request = new NextRequest("http://localhost:3000/");
+      const response = await proxy(request);
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe(
+        "http://localhost:3000/coming-soon"
+      );
+    });
+
+    it("allows requests when database query fails", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      });
+
+      const request = new NextRequest("http://localhost:3000/");
+      const response = await proxy(request);
+
+      // Should default to off when database fails
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows requests when flag not found in database", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
+
+      const request = new NextRequest("http://localhost:3000/");
+      const response = await proxy(request);
+
+      // Should default to off when flag not found
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows requests when fetch throws error", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      const request = new NextRequest("http://localhost:3000/");
+      const response = await proxy(request);
+
+      // Should default to off when fetch fails
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("still bypasses /admin routes even when database flag is true", async () => {
+      // No need to mock fetch - bypass routes don't check the flag
+
+      const request = new NextRequest("http://localhost:3000/admin/dashboard");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+      // Should not have made a fetch call since /admin bypasses
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("without Supabase configuration", () => {
+    beforeEach(() => {
+      delete process.env.MAINTENANCE_MODE;
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    });
+
+    it("allows requests when Supabase is not configured", async () => {
+      const request = new NextRequest("http://localhost:3000/");
+      const response = await proxy(request);
+
+      // Should default to off when no Supabase config
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("shouldBypassMaintenanceMode", () => {
+  it("returns true for /admin routes", () => {
+    expect(shouldBypassMaintenanceMode("/admin")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/admin/dashboard")).toBe(true);
+  });
+
+  it("returns true for /api routes", () => {
+    expect(shouldBypassMaintenanceMode("/api")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/api/health")).toBe(true);
+  });
+
+  it("returns true for /auth routes", () => {
+    expect(shouldBypassMaintenanceMode("/auth")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/auth/callback")).toBe(true);
+  });
+
+  it("returns true for /coming-soon", () => {
+    expect(shouldBypassMaintenanceMode("/coming-soon")).toBe(true);
+  });
+
+  it("returns true for /_next routes", () => {
+    expect(shouldBypassMaintenanceMode("/_next/static/main.js")).toBe(true);
+  });
+
+  it("returns true for static assets", () => {
+    expect(shouldBypassMaintenanceMode("/favicon.ico")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/icon.svg")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/image.png")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/robots.txt")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/sitemap.xml")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/manifest.json")).toBe(true);
+  });
+
+  it("returns false for visitor routes", () => {
+    expect(shouldBypassMaintenanceMode("/")).toBe(false);
+    expect(shouldBypassMaintenanceMode("/immersive")).toBe(false);
+    expect(shouldBypassMaintenanceMode("/some-page")).toBe(false);
   });
 });
