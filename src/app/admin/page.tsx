@@ -25,8 +25,10 @@ import {
   Clock,
   Layers,
   ArrowUpRight,
+  Search,
 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
+import { Input } from "@/components/ui/input";
 import type { AdminStory, CurationStatus } from "@/types/admin";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +40,7 @@ function AdminPageContent() {
 
   const [allStories, setAllStories] = useState<AdminStory[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [editingStory, setEditingStory] = useState<AdminStory | null>(null);
@@ -70,8 +73,21 @@ function AdminPageContent() {
 
   // Filter stories client-side for display
   const filteredStories = allStories.filter((story) => {
-    if (filter === "all") return true;
-    return story.curationStatus === filter;
+    // Status filter
+    if (filter !== "all" && story.curationStatus !== filter) return false;
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        story.title.toLowerCase().includes(query) ||
+        story.subtitle.toLowerCase().includes(query) ||
+        story.description.toLowerCase().includes(query) ||
+        story.category.toLowerCase().includes(query)
+      );
+    }
+
+    return true;
   });
 
   const handleLogout = async () => {
@@ -344,6 +360,20 @@ function AdminPageContent() {
                 label="With Images"
                 variant="default"
               />
+            </div>
+
+            {/* Search input */}
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a39e98]" />
+                <Input
+                  type="text"
+                  placeholder="Search stories..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-11 rounded-xl border-none bg-white pl-10 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:bg-[#252320] dark:text-[#f5f3ee]"
+                />
+              </div>
             </div>
           </>
         )}

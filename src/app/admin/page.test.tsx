@@ -142,6 +142,9 @@ vi.mock("lucide-react", () => ({
   Sun: (props: Record<string, unknown>) => (
     <span data-testid="icon-sun" {...props} />
   ),
+  Search: (props: Record<string, unknown>) => (
+    <span data-testid="icon-search" {...props} />
+  ),
 }));
 
 // Mock theme components
@@ -157,9 +160,9 @@ const mockStories: AdminStory[] = [
   {
     id: "story-1",
     slug: "story-one",
-    title: "Story One",
-    subtitle: "Subtitle 1",
-    description: "Description 1",
+    title: "Picos de Europa",
+    subtitle: "Mountain paradise",
+    description: "Beautiful mountain range in northern Spain",
     image: "https://example.com/img1.jpg",
     category: "nature" as AdminStory["category"],
     displayOrder: 1,
@@ -170,9 +173,9 @@ const mockStories: AdminStory[] = [
   {
     id: "story-2",
     slug: "story-two",
-    title: "Story Two",
-    subtitle: "Subtitle 2",
-    description: "Description 2",
+    title: "Gijón Beach",
+    subtitle: "Coastal charm",
+    description: "A vibrant coastal city with amazing beaches",
     image: "https://example.com/img2.jpg",
     category: "cities" as AdminStory["category"],
     displayOrder: 2,
@@ -183,11 +186,11 @@ const mockStories: AdminStory[] = [
   {
     id: "story-3",
     slug: "story-three",
-    title: "Story Three",
-    subtitle: "Subtitle 3",
-    description: "Description 3",
+    title: "Asturian Cider",
+    subtitle: "Local tradition",
+    description: "Traditional sidra culture and cider houses",
     image: "",
-    category: "nature" as AdminStory["category"],
+    category: "gastronomy" as AdminStory["category"],
     displayOrder: 3,
     curationStatus: "needs_curation",
     createdAt: "2024-01-03",
@@ -314,9 +317,9 @@ describe("AdminPage", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
-        expect(screen.getByText("Story One")).toBeInTheDocument();
-        expect(screen.getByText("Story Two")).toBeInTheDocument();
-        expect(screen.getByText("Story Three")).toBeInTheDocument();
+        expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
+        expect(screen.getByText("Gijón Beach")).toBeInTheDocument();
+        expect(screen.getByText("Asturian Cider")).toBeInTheDocument();
       });
     });
 
@@ -493,6 +496,183 @@ describe("AdminPage", () => {
         expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
         expect(screen.getByTestId("story-story-2")).toBeInTheDocument();
         expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
+      });
+    });
+
+    describe("Search functionality", () => {
+      it("shows search input on stories tab", async () => {
+        render(<AdminPage />);
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        expect(screen.getByPlaceholderText("Search stories...")).toBeInTheDocument();
+      });
+
+      it("filters stories by title", async () => {
+        render(<AdminPage />);
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        const searchInput = screen.getByPlaceholderText("Search stories...");
+
+        await act(async () => {
+          fireEvent.change(searchInput, { target: { value: "Picos" } });
+        });
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
+          expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
+          expect(screen.queryByTestId("story-story-3")).not.toBeInTheDocument();
+        });
+      });
+
+      it("filters stories by subtitle (case-insensitive)", async () => {
+        render(<AdminPage />);
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        const searchInput = screen.getByPlaceholderText("Search stories...");
+
+        await act(async () => {
+          fireEvent.change(searchInput, { target: { value: "COASTAL" } });
+        });
+
+        await waitFor(() => {
+          expect(screen.queryByTestId("story-story-1")).not.toBeInTheDocument();
+          expect(screen.getByTestId("story-story-2")).toBeInTheDocument();
+          expect(screen.queryByTestId("story-story-3")).not.toBeInTheDocument();
+        });
+      });
+
+      it("filters stories by description", async () => {
+        render(<AdminPage />);
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        const searchInput = screen.getByPlaceholderText("Search stories...");
+
+        await act(async () => {
+          fireEvent.change(searchInput, { target: { value: "sidra" } });
+        });
+
+        await waitFor(() => {
+          expect(screen.queryByTestId("story-story-1")).not.toBeInTheDocument();
+          expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
+          expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
+        });
+      });
+
+      it("filters stories by category", async () => {
+        render(<AdminPage />);
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        const searchInput = screen.getByPlaceholderText("Search stories...");
+
+        await act(async () => {
+          fireEvent.change(searchInput, { target: { value: "gastronomy" } });
+        });
+
+        await waitFor(() => {
+          expect(screen.queryByTestId("story-story-1")).not.toBeInTheDocument();
+          expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
+          expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
+        });
+      });
+
+      it("combines search with status filter", async () => {
+        render(<AdminPage />);
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        // First filter by "Pending" status
+        const pendingCard = screen.getAllByRole("button").find(btn =>
+          btn.classList.contains("rounded-2xl") && btn.textContent?.includes("Pending")
+        );
+        await act(async () => {
+          fireEvent.click(pendingCard!);
+        });
+
+        // Should show story-1 (Picos) and story-3 (Cider), both pending
+        await waitFor(() => {
+          expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
+          expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
+          expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
+        });
+
+        // Now also search for "Picos"
+        const searchInput = screen.getByPlaceholderText("Search stories...");
+        await act(async () => {
+          fireEvent.change(searchInput, { target: { value: "Picos" } });
+        });
+
+        // Should only show story-1 (pending AND matches search)
+        await waitFor(() => {
+          expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
+          expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
+          expect(screen.queryByTestId("story-story-3")).not.toBeInTheDocument();
+        });
+      });
+
+      it("shows all stories when search is cleared", async () => {
+        render(<AdminPage />);
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        const searchInput = screen.getByPlaceholderText("Search stories...");
+
+        // Search for something
+        await act(async () => {
+          fireEvent.change(searchInput, { target: { value: "Picos" } });
+        });
+
+        await waitFor(() => {
+          expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
+        });
+
+        // Clear the search
+        await act(async () => {
+          fireEvent.change(searchInput, { target: { value: "" } });
+        });
+
+        // All stories should be visible again
+        await waitFor(() => {
+          expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
+          expect(screen.getByTestId("story-story-2")).toBeInTheDocument();
+          expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
+        });
+      });
+
+      it("shows 'No stories match this filter' when search has no results", async () => {
+        render(<AdminPage />);
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        const searchInput = screen.getByPlaceholderText("Search stories...");
+
+        await act(async () => {
+          fireEvent.change(searchInput, { target: { value: "xyznonexistent" } });
+        });
+
+        await waitFor(() => {
+          expect(screen.getByText("No stories match this filter")).toBeInTheDocument();
+        });
       });
     });
   });
