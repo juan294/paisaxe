@@ -23,8 +23,143 @@ function isAllowedOrigin(origin: string | null): boolean {
   return ALLOWED_ORIGINS.includes(origin);
 }
 
-export function proxy(request: NextRequest) {
+/**
+ * Routes that bypass maintenance mode.
+ * Used by shouldBypassMaintenanceMode() to determine if a request
+ * should be allowed through when maintenance mode is enabled.
+ */
+const MAINTENANCE_BYPASS_PREFIXES = [
+  "/admin",        // Admin panel
+  "/api",          // API routes (health checks, webhooks)
+  "/auth",         // OAuth callbacks for admin sign-in
+  "/coming-soon",  // The coming soon page itself
+  "/_next",        // Next.js internals
+];
+
+/**
+ * Static asset patterns that bypass maintenance mode.
+ */
+const MAINTENANCE_BYPASS_PATTERNS = [
+  /^\/favicon/,
+  /^\/icon/,
+  /^\/apple-touch-icon/,
+  /^\/manifest\.json$/,
+  /^\/robots\.txt$/,
+  /^\/sitemap\.xml$/,
+  /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot)$/,
+];
+
+/**
+ * Check if a pathname should bypass maintenance mode.
+ * Exported for testing.
+ */
+export function shouldBypassMaintenanceMode(pathname: string): boolean {
+  return (
+    MAINTENANCE_BYPASS_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
+    MAINTENANCE_BYPASS_PATTERNS.some((pattern) => pattern.test(pathname))
+  );
+}
+
+/**
+ * Check if maintenance mode is enabled.
+ * Priority: ENV var override > Database flag
+ *
+ * - If MAINTENANCE_MODE env var is "true", maintenance is always on
+ * - If MAINTENANCE_MODE env var is "false", check database flag
+ * - If env var is not set, check database flag
+ */
+async function isMaintenanceModeEnabled(): Promise<boolean> {
+  // ENV var "true" is an override - always enable maintenance
+  if (process.env.MAINTENANCE_MODE === "true") {
+    return true;
+  }
+
+  // ENV var "false" disables maintenance regardless of database
+  // This allows quick override without touching database
+  if (process.env.MAINTENANCE_MODE === "false") {
+    return false;
+  }
+
+  // No env var set - check database
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      // No Supabase config - default to off
+      return false;
+    }
+
+    // Fetch maintenance_mode flag directly from Supabase REST API
+    // Using fetch with cache for Edge runtime compatibility
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/feature_flags?flag_key=eq.maintenance_mode&select=enabled`,
+      {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        // Cache for 30 seconds to avoid hitting Supabase on every request
+        next: { revalidate: 30 },
+      }
+    );
+
+    if (!response.ok) {
+      console.error("Failed to fetch maintenance mode flag:", response.status);
+      return false;
+    }
+
+    const data = await response.json();
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0].enabled === true;
+    }
+
+    // Flag not found in database - default to off
+    return false;
+  } catch (error) {
+    console.error("Error checking maintenance mode:", error);
+    // On error, default to off to avoid blocking users
+    return false;
+  }
+}
+
+/**
+ * Handle maintenance mode redirect.
+ * Returns a redirect response if maintenance mode is enabled and
+ * the route should not bypass it. Returns null otherwise.
+ */
+async function handleMaintenanceMode(request: NextRequest): Promise<NextResponse | null> {
+  const { pathname } = request.nextUrl;
+
+  // Check bypass routes first (fast path)
+  if (shouldBypassMaintenanceMode(pathname)) {
+    return null;
+  }
+
+  // Check if maintenance mode is enabled
+  const maintenanceEnabled = await isMaintenanceModeEnabled();
+
+  if (!maintenanceEnabled) {
+    return null;
+  }
+
+  // Redirect to coming soon page
+  return NextResponse.redirect(new URL("/coming-soon", request.url));
+}
+
+/**
+ * Handle CORS for API routes.
+ * Returns a response with CORS headers for preflight requests,
+ * or null to continue with normal processing.
+ */
+function handleCORS(request: NextRequest): NextResponse | null {
   const origin = request.headers.get("origin");
+  const { pathname } = request.nextUrl;
+
+  // Only apply CORS handling to API routes
+  if (!pathname.startsWith("/api")) {
+    return null;
+  }
 
   // Handle preflight requests
   if (request.method === "OPTIONS") {
@@ -41,21 +176,53 @@ export function proxy(request: NextRequest) {
     return new NextResponse(null, { status: 204 });
   }
 
-  // For actual requests
-  const response = NextResponse.next();
+  return null;
+}
 
-  // Only add CORS headers if origin is allowed
-  if (isAllowedOrigin(origin)) {
+/**
+ * Add CORS headers to a response for API routes.
+ */
+function addCORSHeaders(request: NextRequest, response: NextResponse): void {
+  const origin = request.headers.get("origin");
+  const { pathname } = request.nextUrl;
+
+  // Only add CORS headers to API routes with allowed origins
+  if (pathname.startsWith("/api") && isAllowedOrigin(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin!);
     response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     response.headers.set("Access-Control-Allow-Headers", "Content-Type");
   }
+}
 
-  // Same-origin requests (no Origin header) pass through unchanged
+export async function proxy(request: NextRequest) {
+  // 1. Check maintenance mode first (applies to all routes)
+  const maintenanceResponse = await handleMaintenanceMode(request);
+  if (maintenanceResponse) {
+    return maintenanceResponse;
+  }
+
+  // 2. Handle CORS preflight for API routes
+  const corsResponse = handleCORS(request);
+  if (corsResponse) {
+    return corsResponse;
+  }
+
+  // 3. Continue with request, adding CORS headers if needed
+  const response = NextResponse.next();
+  addCORSHeaders(request, response);
 
   return response;
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  // Match all routes for maintenance mode handling
+  // (CORS is only applied to /api/* routes within the proxy function)
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     */
+    "/((?!_next/static|_next/image).*)",
+  ],
 };

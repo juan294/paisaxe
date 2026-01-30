@@ -10,7 +10,8 @@ export type FeatureFlagKey =
   | "ambient_discovery"
   | "story_freshness"
   | "autoplay_button"
-  | "visitor_voice_agent";
+  | "visitor_voice_agent"
+  | "maintenance_mode";
 
 export interface VisitorVoiceConfig {
   whitelisted_emails: string[];
