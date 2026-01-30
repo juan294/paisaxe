@@ -107,10 +107,10 @@ export function AnalyticsDashboard() {
         <>
           {/* Large Stats */}
           <section className="grid grid-cols-2 gap-16 lg:grid-cols-4">
-            <StatCard value={data.summary.totalPageviews} label="Pageviews" />
-            <StatCard value={data.summary.uniqueVisitors} label="Visitors" />
-            <StatCard value={data.summary.totalSessions} label="Sessions" />
-            <StatCard value={`${data.summary.bounceRate}%`} label="Bounce Rate" />
+            <StatCard value={data.summary.totalPageviews} label="Pageviews" color="blue" />
+            <StatCard value={data.summary.uniqueVisitors} label="Visitors" color="emerald" />
+            <StatCard value={data.summary.totalSessions} label="Sessions" color="amber" />
+            <StatCard value={`${data.summary.bounceRate}%`} label="Bounce Rate" color="rose" />
           </section>
 
           {/* Time Series Chart */}
@@ -267,13 +267,22 @@ function formatUrl(url: string): string {
 interface StatCardProps {
   value: number | string;
   label: string;
+  color?: "blue" | "emerald" | "amber" | "rose";
 }
 
-function StatCard({ value, label }: StatCardProps) {
+const statColorClasses = {
+  blue: "text-blue-600 dark:text-blue-400",
+  emerald: "text-emerald-600 dark:text-emerald-400",
+  amber: "text-amber-600 dark:text-amber-400",
+  rose: "text-rose-600 dark:text-rose-400",
+};
+
+function StatCard({ value, label, color }: StatCardProps) {
   const displayValue = typeof value === "number" ? value.toLocaleString() : value;
+  const colorClass = color ? statColorClasses[color] : "text-stone-900 dark:text-stone-100";
   return (
     <div>
-      <p className="text-6xl font-extralight tabular-nums tracking-tighter text-stone-900 dark:text-stone-100 lg:text-8xl">
+      <p className={`text-6xl font-extralight tabular-nums tracking-tighter lg:text-8xl ${colorClass}`}>
         {displayValue}
       </p>
       <p className="mt-4 font-mono text-xs uppercase tracking-widest text-stone-400">{label}</p>
@@ -333,11 +342,11 @@ function TimeSeriesChart({ data }: TimeSeriesChartProps) {
           />
         ))}
 
-        {/* Pageviews line (solid) */}
-        <path d={pageviewsPath} fill="none" stroke="#78716c" strokeWidth={2} />
+        {/* Pageviews line (solid blue) */}
+        <path d={pageviewsPath} fill="none" stroke="#3b82f6" strokeWidth={2.5} />
 
-        {/* Visitors line (dashed) */}
-        <path d={visitorsPath} fill="none" stroke="#a8a29e" strokeWidth={2} strokeDasharray="4 4" />
+        {/* Visitors line (emerald) */}
+        <path d={visitorsPath} fill="none" stroke="#10b981" strokeWidth={2.5} />
 
         {/* Data points for pageviews */}
         {data.map((d, i) => (
@@ -345,8 +354,8 @@ function TimeSeriesChart({ data }: TimeSeriesChartProps) {
             key={`pv-${i}`}
             cx={padding.left + i * xStep}
             cy={padding.top + chartHeight - (d.pageviews / maxValue) * chartHeight}
-            r={3}
-            fill="#78716c"
+            r={4}
+            fill="#3b82f6"
           />
         ))}
 
@@ -356,8 +365,8 @@ function TimeSeriesChart({ data }: TimeSeriesChartProps) {
             key={`v-${i}`}
             cx={padding.left + i * xStep}
             cy={padding.top + chartHeight - (d.visitors / maxValue) * chartHeight}
-            r={3}
-            fill="#a8a29e"
+            r={4}
+            fill="#10b981"
           />
         ))}
 
@@ -389,14 +398,14 @@ function TimeSeriesChart({ data }: TimeSeriesChartProps) {
       </svg>
 
       {/* Legend */}
-      <div className="mt-4 flex items-center gap-6 font-mono text-xs text-stone-400">
+      <div className="mt-4 flex items-center gap-6 font-mono text-xs">
         <div className="flex items-center gap-2">
-          <div className="h-0.5 w-4 bg-stone-500" />
-          <span>Pageviews</span>
+          <div className="h-1 w-4 rounded-full bg-blue-500" />
+          <span className="text-blue-600 dark:text-blue-400">Pageviews</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-0.5 w-4 border-t-2 border-dashed border-stone-400" />
-          <span>Visitors</span>
+          <div className="h-1 w-4 rounded-full bg-emerald-500" />
+          <span className="text-emerald-600 dark:text-emerald-400">Visitors</span>
         </div>
       </div>
     </div>
@@ -450,13 +459,13 @@ function DataTable<T>({
         <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
           {items.map((item, idx) => (
             <tr key={idx}>
-              <td className="py-3 font-mono text-sm tabular-nums text-stone-300">
+              <td className="py-3 font-mono text-sm tabular-nums text-stone-400">
                 {String(idx + 1).padStart(2, '0')}
               </td>
               <td className="py-3 text-sm capitalize text-stone-700 dark:text-stone-300">
                 {renderItem(item)}
               </td>
-              <td className="py-3 text-right font-mono text-sm tabular-nums text-stone-900 dark:text-stone-100">
+              <td className="py-3 text-right font-mono text-sm font-medium tabular-nums text-sky-600 dark:text-sky-400">
                 {getCount(item).toLocaleString()}
               </td>
             </tr>
@@ -490,13 +499,13 @@ function UTMTable({ items }: UTMTableProps) {
       <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
         {items.map((item, idx) => (
           <tr key={idx}>
-            <td className="py-3 font-mono text-sm tabular-nums text-stone-300">
+            <td className="py-3 font-mono text-sm tabular-nums text-stone-400">
               {String(idx + 1).padStart(2, '0')}
             </td>
             <td className="py-3 text-sm text-stone-700 dark:text-stone-300">{item.source}</td>
             <td className="py-3 text-sm text-stone-700 dark:text-stone-300">{item.medium}</td>
             <td className="py-3 text-sm text-stone-700 dark:text-stone-300">{item.campaign}</td>
-            <td className="py-3 text-right font-mono text-sm tabular-nums text-stone-900 dark:text-stone-100">
+            <td className="py-3 text-right font-mono text-sm font-medium tabular-nums text-sky-600 dark:text-sky-400">
               {item.count.toLocaleString()}
             </td>
           </tr>
@@ -523,15 +532,15 @@ function NewVsReturningBar({ newVisitors, returningVisitors }: NewVsReturningBar
   return (
     <div className="space-y-4">
       {/* Bar */}
-      <div className="flex h-8 overflow-hidden rounded-sm">
+      <div className="flex h-10 overflow-hidden rounded">
         <div
-          className="flex items-center justify-center bg-stone-700 text-xs font-medium text-white transition-all dark:bg-stone-500"
+          className="flex items-center justify-center bg-violet-500 text-xs font-medium text-white transition-all dark:bg-violet-400"
           style={{ width: `${newPercent}%` }}
         >
           {newPercent > 10 && `${newPercent}%`}
         </div>
         <div
-          className="flex items-center justify-center bg-stone-300 text-xs font-medium text-stone-700 transition-all dark:bg-stone-700 dark:text-stone-300"
+          className="flex items-center justify-center bg-teal-500 text-xs font-medium text-white transition-all dark:bg-teal-400"
           style={{ width: `${returningPercent}%` }}
         >
           {returningPercent > 10 && `${returningPercent}%`}
@@ -539,14 +548,14 @@ function NewVsReturningBar({ newVisitors, returningVisitors }: NewVsReturningBar
       </div>
 
       {/* Labels */}
-      <div className="flex justify-between font-mono text-xs text-stone-400">
+      <div className="flex justify-between font-mono text-xs">
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-sm bg-stone-700 dark:bg-stone-500" />
-          <span>New: {newVisitors.toLocaleString()}</span>
+          <div className="h-3 w-3 rounded bg-violet-500 dark:bg-violet-400" />
+          <span className="text-violet-600 dark:text-violet-400">New: {newVisitors.toLocaleString()}</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-sm bg-stone-300 dark:bg-stone-700" />
-          <span>Returning: {returningVisitors.toLocaleString()}</span>
+          <div className="h-3 w-3 rounded bg-teal-500 dark:bg-teal-400" />
+          <span className="text-teal-600 dark:text-teal-400">Returning: {returningVisitors.toLocaleString()}</span>
         </div>
       </div>
     </div>

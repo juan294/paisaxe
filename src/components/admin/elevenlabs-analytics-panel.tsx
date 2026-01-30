@@ -82,13 +82,21 @@ export function ElevenLabsAnalyticsPanel() {
 
       {/* Active Calls Widget */}
       {data && (
-        <div className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-4 py-2 dark:bg-stone-800">
+        <div className={`inline-flex items-center gap-3 rounded-full px-4 py-2 ${
+          data.activeCalls > 0
+            ? "bg-emerald-50 dark:bg-emerald-900/20"
+            : "bg-stone-100 dark:bg-stone-800"
+        }`}>
           <span
-            className={`h-2 w-2 rounded-full ${
+            className={`h-2.5 w-2.5 rounded-full ${
               data.activeCalls > 0 ? "animate-pulse bg-emerald-500" : "bg-stone-400"
             }`}
           />
-          <span className="font-mono text-sm text-stone-700 dark:text-stone-300">
+          <span className={`font-mono text-sm font-medium ${
+            data.activeCalls > 0
+              ? "text-emerald-700 dark:text-emerald-400"
+              : "text-stone-500 dark:text-stone-400"
+          }`}>
             Active calls: {data.activeCalls}
           </span>
         </div>
@@ -121,35 +129,40 @@ export function ElevenLabsAnalyticsPanel() {
               value={data.summary.totalConversations}
               label="Total Conversations"
               icon={<MessageSquare className="h-4 w-4" />}
+              color="blue"
             />
             <StatCard
               value={data.summary.completedConversations}
               label="Completed"
               icon={<Mic className="h-4 w-4" />}
+              color="emerald"
             />
             <StatCard
               value={data.summary.failedConversations}
               label="Failed"
               icon={<AlertCircle className="h-4 w-4" />}
-              highlight={data.summary.failedConversations > 0 ? "warning" : undefined}
+              color={data.summary.failedConversations > 0 ? "rose" : "stone"}
             />
             <StatCard
               value={data.summary.totalMinutesUsed}
               label="Minutes Used"
               suffix="min"
               icon={<Clock className="h-4 w-4" />}
+              color="violet"
             />
             <StatCard
               value={data.summary.averageCallDuration}
               label="Avg Duration"
               suffix="sec"
               icon={<Clock className="h-4 w-4" />}
+              color="amber"
             />
             <StatCard
               value={data.summary.averageRating ?? "—"}
               label="Avg Rating"
               suffix={data.summary.averageRating ? "/5" : ""}
               icon={<Star className="h-4 w-4" />}
+              color="yellow"
             />
           </section>
 
@@ -236,23 +249,49 @@ interface StatCardProps {
   label: string;
   suffix?: string;
   icon: React.ReactNode;
-  highlight?: "warning";
+  color?: "blue" | "emerald" | "amber" | "rose" | "violet" | "yellow" | "stone";
 }
 
-function StatCard({ value, label, suffix, icon, highlight }: StatCardProps) {
+const statColorClasses: Record<string, { value: string; icon: string }> = {
+  blue: {
+    value: "text-blue-600 dark:text-blue-400",
+    icon: "text-blue-500 dark:text-blue-400",
+  },
+  emerald: {
+    value: "text-emerald-600 dark:text-emerald-400",
+    icon: "text-emerald-500 dark:text-emerald-400",
+  },
+  amber: {
+    value: "text-amber-600 dark:text-amber-400",
+    icon: "text-amber-500 dark:text-amber-400",
+  },
+  rose: {
+    value: "text-rose-600 dark:text-rose-400",
+    icon: "text-rose-500 dark:text-rose-400",
+  },
+  violet: {
+    value: "text-violet-600 dark:text-violet-400",
+    icon: "text-violet-500 dark:text-violet-400",
+  },
+  yellow: {
+    value: "text-yellow-600 dark:text-yellow-400",
+    icon: "text-yellow-500 dark:text-yellow-400",
+  },
+  stone: {
+    value: "text-stone-500 dark:text-stone-400",
+    icon: "text-stone-400",
+  },
+};
+
+function StatCard({ value, label, suffix, icon, color = "stone" }: StatCardProps) {
+  const colors = statColorClasses[color] || statColorClasses.stone;
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 text-stone-400">
+      <div className={`flex items-center gap-2 ${colors.icon}`}>
         {icon}
-        <span className="font-mono text-xs uppercase tracking-widest">{label}</span>
+        <span className="font-mono text-xs uppercase tracking-widest text-stone-400">{label}</span>
       </div>
-      <p
-        className={`text-3xl font-extralight tabular-nums tracking-tight ${
-          highlight === "warning"
-            ? "text-amber-600 dark:text-amber-400"
-            : "text-stone-900 dark:text-stone-100"
-        }`}
-      >
+      <p className={`text-3xl font-extralight tabular-nums tracking-tight ${colors.value}`}>
         {typeof value === "number" ? value.toLocaleString() : value}
         {suffix && <span className="ml-1 text-lg text-stone-400">{suffix}</span>}
       </p>
@@ -311,18 +350,18 @@ function BreakdownTable<T>({
         <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
           {items.map((item, idx) => (
             <tr key={idx}>
-              <td className="py-2 font-mono text-sm tabular-nums text-stone-300">
+              <td className="py-2 font-mono text-sm tabular-nums text-stone-400">
                 {String(idx + 1).padStart(2, "0")}
               </td>
               <td className="py-2 text-sm capitalize text-stone-700 dark:text-stone-300">
                 {renderItem(item)}
               </td>
               {getSecondary && (
-                <td className="py-2 text-right font-mono text-xs tabular-nums text-stone-400">
+                <td className="py-2 text-right font-mono text-xs tabular-nums text-violet-500 dark:text-violet-400">
                   {getSecondary(item)}
                 </td>
               )}
-              <td className="py-2 text-right font-mono text-sm tabular-nums text-stone-900 dark:text-stone-100">
+              <td className="py-2 text-right font-mono text-sm font-medium tabular-nums text-sky-600 dark:text-sky-400">
                 {getCount(item).toLocaleString()}
               </td>
             </tr>
@@ -373,18 +412,18 @@ function RecentConversationsTable({ number, conversations }: RecentConversations
               </td>
               <td className="py-2">
                 <span
-                  className={`inline-block rounded-full px-2 py-0.5 font-mono text-xs ${
+                  className={`inline-block rounded-full px-2 py-0.5 font-mono text-xs font-medium ${
                     conv.status === "done"
                       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                       : conv.status === "failed"
-                      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
                       : "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400"
                   }`}
                 >
                   {formatStatus(conv.status)}
                 </span>
               </td>
-              <td className="py-2 text-right font-mono text-sm tabular-nums text-stone-700 dark:text-stone-300">
+              <td className="py-2 text-right font-mono text-sm font-medium tabular-nums text-amber-600 dark:text-amber-400">
                 {conv.call_duration_secs ? `${conv.call_duration_secs}s` : "—"}
               </td>
             </tr>
