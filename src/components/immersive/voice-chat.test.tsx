@@ -15,15 +15,18 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
+// Mutable mock state for useVisitorVoiceAccess
+const mockVoiceAccess = {
+  canUseVoice: false,
+  needsSignIn: false,
+  agentId: "",
+  userEmail: null as string | null,
+  isLoading: false,
+};
+
 // Mock useVisitorVoiceAccess hook
 vi.mock("@/hooks/use-visitor-voice-access", () => ({
-  useVisitorVoiceAccess: () => ({
-    canUseVoice: false,
-    needsSignIn: false,
-    agentId: null,
-    userEmail: null,
-    isLoading: false,
-  }),
+  useVisitorVoiceAccess: () => mockVoiceAccess,
 }));
 
 // Mock Supabase browser client
@@ -35,9 +38,58 @@ vi.mock("@/lib/supabase-browser", () => ({
   }),
 }));
 
+// Mock VoiceChatElevenLabs component (to avoid navigator.mediaDevices issues in tests)
+vi.mock("./voice-chat-elevenlabs", () => ({
+  VoiceChatElevenLabs: ({ story }: { story: { title: string } }) => (
+    <div data-testid="elevenlabs-voice-chat">
+      Voice chat active for {story.title}
+    </div>
+  ),
+}));
+
 // Mock fetch
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
+
+/**
+ * Helper to create a mock streaming response.
+ * Simulates SSE events for the streaming chat endpoint.
+ */
+function createStreamingResponse(message: string, images: unknown[] = []) {
+  const encoder = new TextEncoder();
+
+  // Create SSE events for each word (simulating streaming)
+  const words = message.split(" ");
+  const events: Uint8Array[] = [];
+
+  for (let i = 0; i < words.length; i++) {
+    const word = i === 0 ? words[i] : " " + words[i];
+    const event = `data: ${JSON.stringify({ type: "text", content: word })}\n\n`;
+    events.push(encoder.encode(event));
+  }
+
+  // Final event with images
+  const finalEvent = `data: ${JSON.stringify({ type: "done", images, sources: [] })}\n\n`;
+  events.push(encoder.encode(finalEvent));
+
+  let index = 0;
+  const stream = new ReadableStream({
+    pull(controller) {
+      if (index < events.length) {
+        controller.enqueue(events[index]);
+        index++;
+      } else {
+        controller.close();
+      }
+    },
+  });
+
+  return {
+    ok: true,
+    headers: new Headers({ "content-type": "text/event-stream" }),
+    body: stream,
+  };
+}
 
 const mockStory: Story = {
   id: "story-1",
@@ -61,10 +113,20 @@ const localStorageMock = (() => {
 })();
 Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
+// Helper to reset mock voice access state
+const resetMockVoiceAccess = () => {
+  mockVoiceAccess.canUseVoice = false;
+  mockVoiceAccess.needsSignIn = false;
+  mockVoiceAccess.agentId = "";
+  mockVoiceAccess.userEmail = null;
+  mockVoiceAccess.isLoading = false;
+};
+
 describe("VoiceChat", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     localStorageMock.clear();
+    resetMockVoiceAccess();
   });
 
   afterEach(() => {
@@ -165,10 +227,7 @@ describe("VoiceChat", () => {
 
   describe("message sending", () => {
     it("should send message on form submit", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: "Response from AI" }),
-      });
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Response from AI"));
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -181,7 +240,7 @@ describe("VoiceChat", () => {
       }
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith("/api/chat", {
+        expect(mockFetch).toHaveBeenCalledWith("/api/chat/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: expect.stringContaining("Tell me about the lakes"),
@@ -190,10 +249,7 @@ describe("VoiceChat", () => {
     });
 
     it("should display user message after sending", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: "Response from AI" }),
-      });
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Response from AI"));
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -211,10 +267,7 @@ describe("VoiceChat", () => {
     });
 
     it("should display assistant response", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: "This is the AI response" }),
-      });
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("This is the AI response"));
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -258,10 +311,7 @@ describe("VoiceChat", () => {
 
       // Resolve and wait for state update to complete
       await act(async () => {
-        resolvePromise!({
-          ok: true,
-          json: async () => ({ message: "Done" }),
-        });
+        resolvePromise!(createStreamingResponse("Done"));
       });
     });
 
@@ -287,10 +337,21 @@ describe("VoiceChat", () => {
       });
     });
 
-    it("should display fallback message when response has no message", async () => {
+    it("should display fallback message when streaming returns error event", async () => {
+      // Create an error stream response
+      const encoder = new TextEncoder();
+      const errorEvent = `data: ${JSON.stringify({ type: "error", message: "Error" })}\n\n`;
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(errorEvent));
+          controller.close();
+        },
+      });
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({}),
+        headers: new Headers({ "content-type": "text/event-stream" }),
+        body: stream,
       });
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
@@ -305,7 +366,7 @@ describe("VoiceChat", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText("Lo siento, no pude procesar tu pregunta.")
+          screen.getByText("Lo siento, hubo un error. Intenta de nuevo.")
         ).toBeInTheDocument();
       });
     });
@@ -338,10 +399,7 @@ describe("VoiceChat", () => {
     });
 
     it("should clear input after sending message", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: "Response" }),
-      });
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Response"));
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -359,10 +417,7 @@ describe("VoiceChat", () => {
     });
 
     it("should include story context in API request", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: "Response" }),
-      });
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Response"));
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -385,10 +440,7 @@ describe("VoiceChat", () => {
 
   describe("story change", () => {
     it("should reset messages when story changes", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: "First response" }),
-      });
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("First response"));
 
       const { rerender } = render(
         <VoiceChat story={mockStory} open={true} onClose={() => {}} />
@@ -472,10 +524,7 @@ describe("VoiceChat", () => {
 
       // Resolve and wait for state update to complete
       await act(async () => {
-        resolvePromise!({
-          ok: true,
-          json: async () => ({ message: "Done" }),
-        });
+        resolvePromise!(createStreamingResponse("Done"));
       });
     });
   });
@@ -504,10 +553,7 @@ describe("VoiceChat", () => {
 
   describe("message styling", () => {
     it("should style user messages differently from assistant messages", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ message: "AI response" }),
-      });
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("AI response"));
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -572,20 +618,16 @@ describe("VoiceChat", () => {
 
   describe("chat response images", () => {
     it("should display images from chat response", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          message: "Here are some beautiful lakes.",
-          images: [
-            {
-              id: "img-1",
-              path: "https://example.supabase.co/storage/v1/images/lagos.jpg",
-              caption: "Lagos de Covadonga at sunset",
-              sourcePdf: "nature-guide.pdf",
-            },
-          ],
-        }),
-      });
+      mockFetch.mockResolvedValueOnce(
+        createStreamingResponse("Here are some beautiful lakes.", [
+          {
+            id: "img-1",
+            path: "https://example.supabase.co/storage/v1/images/lagos.jpg",
+            caption: "Lagos de Covadonga at sunset",
+            sourcePdf: "nature-guide.pdf",
+          },
+        ])
+      );
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -605,20 +647,16 @@ describe("VoiceChat", () => {
     });
 
     it("should display image caption when available", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          message: "Beautiful place.",
-          images: [
-            {
-              id: "img-1",
-              path: "https://example.supabase.co/storage/v1/images/lagos.jpg",
-              caption: "Picos de Europa mountain view",
-              sourcePdf: "nature-guide.pdf",
-            },
-          ],
-        }),
-      });
+      mockFetch.mockResolvedValueOnce(
+        createStreamingResponse("Beautiful place.", [
+          {
+            id: "img-1",
+            path: "https://example.supabase.co/storage/v1/images/lagos.jpg",
+            caption: "Picos de Europa mountain view",
+            sourcePdf: "nature-guide.pdf",
+          },
+        ])
+      );
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -636,20 +674,16 @@ describe("VoiceChat", () => {
     });
 
     it("should display source attribution for images", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          message: "A lovely area.",
-          images: [
-            {
-              id: "img-1",
-              path: "https://example.supabase.co/storage/v1/images/test.jpg",
-              caption: "Test image",
-              sourcePdf: "hiking-guide.pdf",
-            },
-          ],
-        }),
-      });
+      mockFetch.mockResolvedValueOnce(
+        createStreamingResponse("A lovely area.", [
+          {
+            id: "img-1",
+            path: "https://example.supabase.co/storage/v1/images/test.jpg",
+            caption: "Test image",
+            sourcePdf: "hiking-guide.pdf",
+          },
+        ])
+      );
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -667,26 +701,22 @@ describe("VoiceChat", () => {
     });
 
     it("should display multiple images from chat response", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          message: "Here are several views.",
-          images: [
-            {
-              id: "img-1",
-              path: "https://example.supabase.co/storage/v1/images/img1.jpg",
-              caption: "First image",
-              sourcePdf: "guide-1.pdf",
-            },
-            {
-              id: "img-2",
-              path: "https://example.supabase.co/storage/v1/images/img2.jpg",
-              caption: "Second image",
-              sourcePdf: "guide-2.pdf",
-            },
-          ],
-        }),
-      });
+      mockFetch.mockResolvedValueOnce(
+        createStreamingResponse("Here are several views.", [
+          {
+            id: "img-1",
+            path: "https://example.supabase.co/storage/v1/images/img1.jpg",
+            caption: "First image",
+            sourcePdf: "guide-1.pdf",
+          },
+          {
+            id: "img-2",
+            path: "https://example.supabase.co/storage/v1/images/img2.jpg",
+            caption: "Second image",
+            sourcePdf: "guide-2.pdf",
+          },
+        ])
+      );
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -707,12 +737,7 @@ describe("VoiceChat", () => {
     });
 
     it("should handle response with no images gracefully", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          message: "No images for this response.",
-        }),
-      });
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("No images for this response."));
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -731,13 +756,7 @@ describe("VoiceChat", () => {
     });
 
     it("should handle response with empty images array gracefully", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          message: "Empty images array.",
-          images: [],
-        }),
-      });
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Empty images array.", []));
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -756,19 +775,15 @@ describe("VoiceChat", () => {
     });
 
     it("should use fallback alt text when image has no caption", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          message: "Image without caption.",
-          images: [
-            {
-              id: "img-1",
-              path: "https://example.supabase.co/storage/v1/images/no-caption.jpg",
-              sourcePdf: "guide.pdf",
-            },
-          ],
-        }),
-      });
+      mockFetch.mockResolvedValueOnce(
+        createStreamingResponse("Image without caption.", [
+          {
+            id: "img-1",
+            path: "https://example.supabase.co/storage/v1/images/no-caption.jpg",
+            sourcePdf: "guide.pdf",
+          },
+        ])
+      );
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
@@ -787,6 +802,71 @@ describe("VoiceChat", () => {
         expect(img.getAttribute("alt")).toBeTruthy();
         expect(img.getAttribute("alt")).not.toBe("");
       });
+    });
+  });
+});
+
+// Separate test suite with voice access enabled
+describe("VoiceChat with voice access", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    localStorageMock.clear();
+    // Enable voice access for these tests
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.needsSignIn = false;
+    mockVoiceAccess.agentId = "test-agent-id";
+    mockVoiceAccess.userEmail = "user@example.com";
+    mockVoiceAccess.isLoading = false;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    resetMockVoiceAccess();
+  });
+
+  it("should default to voice mode when user has voice access", async () => {
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    // When voice is active by default, the ElevenLabs voice chat should be rendered
+    await waitFor(() => {
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+    });
+
+    // The toggle button should show keyboard icon (to switch TO text)
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      const toggleButton = buttons.find((btn) => {
+        const svg = btn.querySelector("svg");
+        return svg?.classList.contains("lucide-keyboard");
+      });
+      expect(toggleButton).toBeInTheDocument();
+    });
+  });
+
+  it("should allow switching to text mode when voice is default", async () => {
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    // Verify voice mode is active by default
+    await waitFor(() => {
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+    });
+
+    // Click the toggle to switch to text mode
+    const buttons = screen.getAllByRole("button");
+    const toggleButton = buttons.find((btn) => {
+      const svg = btn.querySelector("svg");
+      return svg?.classList.contains("lucide-keyboard");
+    });
+
+    expect(toggleButton).toBeInTheDocument();
+    if (toggleButton) {
+      fireEvent.click(toggleButton);
+    }
+
+    // Now voice chat should be gone and text input should appear
+    await waitFor(() => {
+      expect(screen.queryByTestId("elevenlabs-voice-chat")).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Escribe tu pregunta...")).toBeInTheDocument();
     });
   });
 });

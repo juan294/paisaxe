@@ -235,6 +235,22 @@ describe("ChatActions", () => {
       expect(directionsButton).toHaveAttribute("target", "_blank");
       expect(directionsButton).toHaveAttribute("rel", "noopener noreferrer");
     });
+
+    it("shows only one directions button even when multiple addresses detected", () => {
+      const messages: Message[] = [
+        {
+          role: "assistant",
+          content:
+            "Desde allí tienes rutas de senderismo preciosas, como la subida a Calle Mayor, 5, Oviedo o simplemente dar un paseo por Plaza del Fontán, Oviedo.",
+        },
+      ];
+
+      render(<ChatActions messages={messages} />);
+
+      // Should only show ONE directions button
+      const directionsButtons = screen.getAllByRole("link", { name: /cómo llegar/i });
+      expect(directionsButtons).toHaveLength(1);
+    });
   });
 
   describe("combined scenarios", () => {

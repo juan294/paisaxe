@@ -6,6 +6,124 @@ interface AnthropicMessage {
   content: string;
 }
 
+/**
+ * Stream text chunks from the Anthropic API using curl.
+ * Yields chunks of text as they arrive from the streaming API.
+ */
+export async function* streamAnthropicAPI(
+  system: string,
+  messages: AnthropicMessage[],
+  model: string,
+  maxTokens: number
+): AsyncGenerator<string, void, unknown> {
+  const { spawn } = await import("node:child_process");
+
+  const body = JSON.stringify({
+    model,
+    max_tokens: maxTokens,
+    system,
+    messages,
+    stream: true,
+  });
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+
+  const curlProcess = spawn("curl", [
+    "-s",
+    "-S",
+    "-N", // Disable buffering for streaming
+    "-X", "POST",
+    "https://api.anthropic.com/v1/messages",
+    "-H", "Content-Type: application/json",
+    "-H", `x-api-key: ${apiKey}`,
+    "-H", "anthropic-version: 2023-06-01",
+    "-d", body,
+  ]);
+
+  let buffer = "";
+
+  // Create an async iterator from the stdout stream
+  const chunks: string[] = [];
+  let resolveNext: (() => void) | null = null;
+  let done = false;
+  let error: Error | null = null;
+
+  curlProcess.stdout.on("data", (data: Buffer) => {
+    buffer += data.toString();
+
+    // Process complete SSE lines
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const jsonStr = line.slice(6);
+        if (jsonStr === "[DONE]") continue;
+
+        try {
+          const event = JSON.parse(jsonStr);
+
+          // Handle content_block_delta events (streaming text)
+          if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
+            chunks.push(event.delta.text);
+            if (resolveNext) {
+              resolveNext();
+              resolveNext = null;
+            }
+          }
+
+          // Handle error events
+          if (event.type === "error") {
+            error = new Error(event.error?.message || "Streaming error");
+          }
+        } catch {
+          // Ignore parse errors for incomplete JSON
+        }
+      }
+    }
+  });
+
+  curlProcess.stderr.on("data", (data: Buffer) => {
+    console.error("[Claude Streaming] curl stderr:", data.toString());
+  });
+
+  curlProcess.on("close", () => {
+    done = true;
+    if (resolveNext) {
+      resolveNext();
+      resolveNext = null;
+    }
+  });
+
+  curlProcess.on("error", (err) => {
+    error = err;
+    done = true;
+    if (resolveNext) {
+      resolveNext();
+      resolveNext = null;
+    }
+  });
+
+  // Yield chunks as they arrive
+  while (true) {
+    if (error) throw error;
+
+    while (chunks.length > 0) {
+      yield chunks.shift()!;
+    }
+
+    if (done) break;
+
+    // Wait for more data
+    await new Promise<void>((resolve) => {
+      resolveNext = resolve;
+      // Also resolve after a short timeout to check for completion
+      setTimeout(resolve, 100);
+    });
+  }
+}
+
 // Retry configuration for intermittent network failures
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 500;
@@ -151,12 +269,10 @@ const ASTURIANU_PROMPT_ADDITION = `
 - Ejemplos: "ye" (es), "guapu" (bonito), "prestoso" (agradable), "facer" (hacer), "prau" (prado)
 - No fuerces el uso excesivo, solo añade toques sutiles que enriquezcan la experiencia`;
 
-export async function generateChatResponse(
-  userMessage: string,
-  context: Chunk[],
-  asturianEnabled: boolean = false
-): Promise<string> {
-  // Build context but limit to MAX_CONTEXT_LENGTH to avoid payload size issues
+/**
+ * Build the context text from chunks with length limiting.
+ */
+function buildContextText(context: Chunk[]): string {
   let contextText = "";
   for (let i = 0; i < context.length && contextText.length < MAX_CONTEXT_LENGTH; i++) {
     const chunk = context[i];
@@ -172,6 +288,15 @@ export async function generateChatResponse(
       break;
     }
   }
+  return contextText;
+}
+
+export async function generateChatResponse(
+  userMessage: string,
+  context: Chunk[],
+  asturianEnabled: boolean = false
+): Promise<string> {
+  const contextText = buildContextText(context);
 
   const userContent = contextText
     ? `<context>\n${contextText}\n</context>\n\n<user_question>\n${userMessage}\n</user_question>`
@@ -193,6 +318,32 @@ export async function generateChatResponse(
   );
   const text = textBlock?.text;
   return sanitizeOutput(text);
+}
+
+/**
+ * Stream a chat response, yielding text chunks as they arrive.
+ */
+export async function* streamChatResponse(
+  userMessage: string,
+  context: Chunk[],
+  asturianEnabled: boolean = false
+): AsyncGenerator<string, void, unknown> {
+  const contextText = buildContextText(context);
+
+  const userContent = contextText
+    ? `<context>\n${contextText}\n</context>\n\n<user_question>\n${userMessage}\n</user_question>`
+    : `<user_question>\n${userMessage}\n</user_question>`;
+
+  const systemPrompt = asturianEnabled
+    ? SYSTEM_PROMPT + ASTURIANU_PROMPT_ADDITION
+    : SYSTEM_PROMPT;
+
+  yield* streamAnthropicAPI(
+    systemPrompt,
+    [{ role: "user", content: userContent }],
+    "claude-sonnet-4-20250514",
+    1024
+  );
 }
 
 const MAX_OUTPUT_LENGTH = 2000;

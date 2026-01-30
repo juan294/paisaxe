@@ -102,17 +102,17 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
           </Tooltip>
         ))}
 
-        {/* Directions buttons */}
-        {actions.addresses.map((address, index) => (
-          <Tooltip key={`address-${index}`}>
+        {/* Directions button - only show first/primary address */}
+        {actions.addresses.length > 0 && (
+          <Tooltip>
             <TooltipTrigger asChild>
               <a
-                href={address.mapsUrl}
+                href={actions.addresses[0].mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`${t("chat.directions")} - ${address.text}`}
+                aria-label={`${t("chat.directions")} - ${actions.addresses[0].text}`}
                 className={iconButtonClass}
-                style={{ animationDelay: `${(actions.phones.length + index) * 50}ms` }}
+                style={{ animationDelay: `${actions.phones.length * 50}ms` }}
               >
                 <MapPin className="h-4 w-4" />
               </a>
@@ -121,7 +121,7 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
               {t("chat.directions")}
             </TooltipContent>
           </Tooltip>
-        ))}
+        )}
 
         {/* Copy conversation button - always visible when messages exist */}
         <Tooltip>
@@ -130,7 +130,7 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
               onClick={handleCopy}
               aria-label={t("chat.copy_conversation")}
               className={iconButtonClass}
-              style={{ animationDelay: `${(actions.phones.length + actions.addresses.length) * 50}ms` }}
+              style={{ animationDelay: `${(actions.phones.length + (actions.addresses.length > 0 ? 1 : 0)) * 50}ms` }}
             >
               {copied ? (
                 <Check className="h-4 w-4" />
