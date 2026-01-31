@@ -331,7 +331,12 @@ paisaxe/
 ├── content/
 │   └── pdfs/                   # Source PDF files
 ├── scripts/
+│   ├── lib/
+│   │   └── agent-utils.sh      # Shared agent utilities (flag checks, logging)
 │   ├── coverage-agent.sh       # Nightly coverage analysis (launchd)
+│   ├── security-agent.sh       # Weekly security scans (launchd)
+│   ├── docs-freshness-agent.sh # Weekly docs staleness check (launchd)
+│   ├── performance-agent.sh    # Weekly performance analysis (launchd)
 │   ├── process-pdfs.ts         # PDF text extraction
 │   └── seed-database.ts        # Generate embeddings and populate DB
 ├── supabase/
@@ -590,17 +595,89 @@ See `supabase/functions/README.md` for full setup instructions.
 
 ## Automated Agents
 
-### Coverage Agent (Nightly via launchd)
+Local agents run via macOS launchd and are controllable via feature flags in the admin panel (System category). Each agent checks the `automated_agents` master toggle and its own flag before running.
 
-`scripts/coverage-agent.sh` runs nightly at 2:00 AM via macOS launchd (`com.paisaxe.coverage-agent` in `~/Library/LaunchAgents/`). Unlike cron, launchd runs missed jobs when the Mac wakes from sleep. Uses Claude CLI to analyze test coverage and update `docs/coverage-report.md`. Logs written to `logs/`.
+### Feature Flag Control
 
-### Security Audit (Weekly Cron)
+| Flag Key | Label | Default |
+|----------|-------|---------|
+| `automated_agents` | Automated Agents (Master) | Enabled |
+| `coverage_agent_enabled` | Coverage Agent | Enabled |
+| `security_agent_enabled` | Security Agent | Disabled |
+| `docs_freshness_agent_enabled` | Docs Freshness Agent | Disabled |
+| `performance_agent_enabled` | Performance Agent | Disabled |
 
-`security.yml` runs `npm audit` weekly on Mondays at 08:00 UTC via GitHub Actions.
+Disable the master toggle to stop all agents. Individual flags control each agent independently.
 
-### Secret Scanning (Daily Cron)
+### Agent Scripts
 
-`gitleaks.yml` scans the full git history daily at 04:00 UTC via GitHub Actions.
+| Agent | Script | Schedule | Output |
+|-------|--------|----------|--------|
+| Coverage | `scripts/coverage-agent.sh` | Daily 2:00 AM | `docs/coverage-report.md` |
+| Security | `scripts/security-agent.sh` | Weekly Monday 9:00 AM | `docs/security-report.md` |
+| Docs Freshness | `scripts/docs-freshness-agent.sh` | Weekly Sunday 6:00 AM | `docs/docs-freshness-report.md` |
+| Performance | `scripts/performance-agent.sh` | Weekly Saturday 10:00 AM | `docs/performance-report.md` |
+
+Shared utilities in `scripts/lib/agent-utils.sh` provide feature flag checking, logging, and startup logic.
+
+### Launchd Plists
+
+Located in `~/Library/LaunchAgents/`:
+- `com.paisaxe.coverage-agent.plist`
+- `com.paisaxe.security-agent.plist`
+- `com.paisaxe.docs-freshness-agent.plist`
+- `com.paisaxe.performance-agent.plist`
+
+Load/unload agents:
+```bash
+# Load an agent
+launchctl load ~/Library/LaunchAgents/com.paisaxe.security-agent.plist
+
+# Unload an agent
+launchctl unload ~/Library/LaunchAgents/com.paisaxe.security-agent.plist
+
+# Run immediately (for testing)
+launchctl start com.paisaxe.security-agent
+```
+
+Unlike cron, launchd runs missed jobs when the Mac wakes from sleep. Logs written to `logs/`.
+
+### Coverage Agent
+
+Runs nightly at 2:00 AM. Uses Claude CLI to analyze test coverage and write missing tests. Updates `docs/coverage-report.md` with coverage stats.
+
+### Security Agent
+
+Runs weekly on Monday at 9:00 AM. Performs:
+- `npm audit` for vulnerability scanning
+- `license-checker` for license summary
+- Copyleft license detection (GPL, AGPL, LGPL)
+- Outdated package report
+
+### Docs Freshness Agent
+
+Runs weekly on Sunday at 6:00 AM. Checks for:
+- Source files modified since CLAUDE.md was updated
+- New migrations needing documentation
+- Potentially undocumented API routes
+- Undocumented feature flags
+- Documentation file ages
+
+### Performance Agent
+
+Runs weekly on Saturday at 10:00 AM. Performs:
+- Production build and bundle size analysis
+- Lighthouse scores (if CLI installed)
+- Core Web Vitals extraction
+- Dependency counts
+- Disk usage analysis
+
+### GitHub Actions Workflows
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| `security.yml` | Push/PR + weekly Monday 08:00 UTC | `npm audit --audit-level=critical` |
+| `gitleaks.yml` | Push/PR + daily 04:00 UTC | Scans for secrets in git history |
 
 ## Development Guardrails
 

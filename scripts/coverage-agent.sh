@@ -11,7 +11,19 @@ DOC_FILE="$PROJECT_DIR/docs/coverage-report.md"
 
 mkdir -p "$LOG_DIR"
 
-echo "=== Coverage Agent started at $(date) ===" | tee "$LOG_FILE"
+# Source shared utilities and check feature flags
+source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
+
+# Check if agent is enabled via feature flags
+log_info "=== Coverage Agent starting ===" | tee -a "$LOG_FILE"
+log_info "Checking feature flags..." | tee -a "$LOG_FILE"
+if ! check_agent_enabled "coverage_agent_enabled"; then
+  log_info "=== Coverage Agent disabled by feature flag — exiting gracefully ===" | tee -a "$LOG_FILE"
+  exit 0
+fi
+log_success "Feature flags enabled — proceeding with Coverage Agent" | tee -a "$LOG_FILE"
+
+echo "=== Coverage Agent started at $(date) ===" | tee -a "$LOG_FILE"
 
 cd "$PROJECT_DIR"
 
