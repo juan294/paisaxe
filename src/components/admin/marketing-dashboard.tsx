@@ -18,6 +18,10 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  Copy,
+  Check,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import type {
   MarketingDashboardSummary,
@@ -336,6 +340,14 @@ export function MarketingDashboard() {
           06 — Marketing Agents
         </h2>
         <VoiceAgentChat agentIds={ELEVENLABS_AGENT_IDS} />
+      </section>
+
+      {/* Content Drafts */}
+      <section>
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+          07 — Content Drafts
+        </h2>
+        <DraftsPanel onDraftPosted={loadData} />
       </section>
 
       {/* Setup Instructions */}
@@ -781,5 +793,304 @@ function StatCard({
       </p>
       <p className="mt-2 font-mono text-xs uppercase tracking-widest text-stone-400">{label}</p>
     </div>
+  );
+}
+
+// Drafts Panel Component
+function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
+  const [drafts, setDrafts] = useState<MarketingPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  const loadDrafts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/admin/marketing/posts?status=draft");
+      const result = await response.json();
+      if (response.ok) {
+        setDrafts(result.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to load drafts:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDrafts();
+  }, [loadDrafts]);
+
+  const handleCopy = async (content: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (error) {
+      console.error("Failed to copy:", error);
+    }
+  };
+
+  const handleMarkAsPosted = async (postId: string) => {
+    try {
+      const response = await fetch(
+        `/api/admin/marketing/posts?id=${postId}&action=mark-posted`,
+        { method: "PATCH" }
+      );
+      if (response.ok) {
+        loadDrafts();
+        onDraftPosted();
+      }
+    } catch (error) {
+      console.error("Failed to mark as posted:", error);
+    }
+  };
+
+  const handleDelete = async (postId: string) => {
+    if (!confirm("Delete this draft?")) return;
+    try {
+      const response = await fetch(`/api/admin/marketing/posts?id=${postId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        loadDrafts();
+      }
+    } catch (error) {
+      console.error("Failed to delete draft:", error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center">
+        <RefreshCw className="h-5 w-5 animate-spin text-stone-300" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header with create button */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-stone-500">
+          {drafts.length === 0
+            ? "No drafts yet. Chat with the marketing agents to create content."
+            : `${drafts.length} draft${drafts.length === 1 ? "" : "s"} ready to post`}
+        </p>
+        <button
+          onClick={() => setShowCreateDialog(true)}
+          className="flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 dark:hover:text-stone-100"
+        >
+          <Plus className="h-3 w-3" />
+          New Draft
+        </button>
+      </div>
+
+      {/* Drafts list */}
+      {drafts.length > 0 && (
+        <div className="divide-y divide-stone-100 border border-stone-200 dark:divide-stone-800 dark:border-stone-800">
+          {drafts.map((draft) => (
+            <div key={draft.id} className="p-4">
+              <div className="flex items-start gap-3">
+                {/* Platform badge */}
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border border-stone-200 font-mono text-xs font-medium text-stone-600 dark:border-stone-700 dark:text-stone-400">
+                  {PLATFORM_BADGES[draft.platform]}
+                </div>
+
+                {/* Content */}
+                <div className="min-w-0 flex-1">
+                  <p className="whitespace-pre-wrap text-sm text-stone-700 dark:text-stone-300">
+                    {draft.content}
+                  </p>
+                  {draft.hashtags.length > 0 && (
+                    <p className="mt-2 text-xs text-stone-400">
+                      {draft.hashtags.join(" ")}
+                    </p>
+                  )}
+                  <p className="mt-2 font-mono text-[10px] text-stone-300">
+                    Created {new Date(draft.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => handleCopy(draft.content, draft.id)}
+                    className="flex h-8 w-8 items-center justify-center text-stone-400 transition-colors hover:text-stone-600"
+                    title="Copy content"
+                  >
+                    {copiedId === draft.id ? (
+                      <Check className="h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleMarkAsPosted(draft.id)}
+                    className="flex h-8 items-center gap-1 rounded px-2 font-mono text-[10px] uppercase tracking-widest text-emerald-600 transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                    title="Mark as posted"
+                  >
+                    Posted
+                  </button>
+                  <button
+                    onClick={() => handleDelete(draft.id)}
+                    className="flex h-8 w-8 items-center justify-center text-stone-300 transition-colors hover:text-red-500"
+                    title="Delete draft"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create Draft Dialog */}
+      <CreateDraftDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onCreated={() => {
+          setShowCreateDialog(false);
+          loadDrafts();
+        }}
+      />
+    </div>
+  );
+}
+
+// Create Draft Dialog
+function CreateDraftDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [platform, setPlatform] = useState<MarketingPlatform>("x");
+  const [content, setContent] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const maxLength = platform === "x" ? 280 : platform === "instagram" ? 2200 : 500;
+
+  const handleSave = async () => {
+    if (!content.trim()) {
+      setError("Content is required");
+      return;
+    }
+
+    setIsSaving(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/admin/marketing/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform, content: content.trim() }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to create draft");
+      }
+
+      setContent("");
+      onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="max-w-md border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+        <DialogHeader>
+          <DialogTitle className="text-stone-900 dark:text-stone-100">
+            Create Draft
+          </DialogTitle>
+          <DialogDescription className="font-mono text-xs text-stone-500">
+            Create a new content draft for manual posting
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-4 space-y-4">
+          {/* Platform selector */}
+          <div>
+            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-stone-400">
+              Platform
+            </label>
+            <div className="flex gap-2">
+              {(["x", "instagram", "pinterest"] as MarketingPlatform[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPlatform(p)}
+                  className={cn(
+                    "flex h-10 w-10 items-center justify-center border font-mono text-xs font-medium transition-colors",
+                    platform === p
+                      ? "border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100"
+                      : "border-stone-200 text-stone-400 hover:border-stone-400 dark:border-stone-700"
+                  )}
+                >
+                  {PLATFORM_BADGES[p]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Content */}
+          <div>
+            <label className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-widest text-stone-400">
+              Content
+              <span className={cn(
+                "normal-case",
+                content.length > maxLength ? "text-red-500" : ""
+              )}>
+                {content.length}/{maxLength}
+              </span>
+            </label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder={`Write your ${PLATFORM_NAMES[platform]} post...`}
+              rows={5}
+              className="w-full resize-none border border-stone-200 bg-transparent px-3 py-2 text-sm text-stone-900 placeholder-stone-300 outline-none transition-colors focus:border-stone-400 dark:border-stone-700 dark:text-stone-100"
+            />
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="flex items-center gap-2 font-mono text-xs text-red-600">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-3 border-t border-stone-200 pt-4 dark:border-stone-800">
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              className="flex-1 font-mono text-xs uppercase tracking-widest text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || content.length > maxLength}
+              className="flex-1 bg-stone-900 font-mono text-xs uppercase tracking-widest text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200"
+            >
+              {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Save Draft"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
