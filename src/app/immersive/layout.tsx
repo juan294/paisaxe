@@ -1,37 +1,46 @@
+/**
+ * Immersive page layout with tourist destination metadata.
+ *
+ * LOCATION-SPECIFIC: This file contains location-specific metadata.
+ * When replicating, the LOCATION_CONFIG import will automatically
+ * provide correct values if you've updated src/config/location.ts
+ */
+
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/seo/json-ld";
+import { LOCATION_CONFIG } from "@/config/location";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
+// LOCATION-SPECIFIC: Site URL from config
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
 
-const title = "Explora Asturias | Paisaxe";
-const description =
-  "Descubre Asturias a través de historias visuales inmersivas. Paisajes, rutas, gastronomía y cultura del norte de España.";
+// LOCATION-SPECIFIC: Title and description
+const title = `Explora ${LOCATION_CONFIG.name} | ${LOCATION_CONFIG.siteName}`;
+const description = LOCATION_CONFIG.seo.description;
 
 export const metadata: Metadata = {
   title,
   description,
   openGraph: {
     title,
-    description:
-      "Descubre Asturias a través de historias visuales inmersivas. Paisajes, rutas, gastronomía y cultura.",
+    description: LOCATION_CONFIG.seo.description,
     url: `${SITE_URL}/immersive`,
-    siteName: "Paisaxe",
+    siteName: LOCATION_CONFIG.siteName,
     type: "website",
-    locale: "es_ES",
+    locale: LOCATION_CONFIG.seo.locale,
     images: [
       {
+        // LOCATION-SPECIFIC: Default OG image
         url: `${SITE_URL}/images/stories/lagos-covadonga.png`,
         width: 1200,
         height: 630,
-        alt: "Explora Asturias - Paisaxe",
+        alt: `Explora ${LOCATION_CONFIG.name} - ${LOCATION_CONFIG.siteName}`,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     title,
-    description:
-      "Descubre Asturias a través de historias visuales inmersivas. Paisajes, rutas, gastronomía y cultura.",
+    description: LOCATION_CONFIG.seo.description,
     images: [`${SITE_URL}/images/stories/lagos-covadonga.png`],
   },
   alternates: {

@@ -1,8 +1,17 @@
+/**
+ * Root layout for the application.
+ *
+ * LOCATION-SPECIFIC: This file contains location-specific metadata.
+ * When replicating, the LOCATION_CONFIG import will automatically
+ * provide correct values if you've updated src/config/location.ts
+ */
+
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { JsonLd } from "@/components/seo/json-ld";
+import { LOCATION_CONFIG } from "@/config/location";
 import { Providers } from "./providers";
 import { PostHogPageView } from "@/components/posthog-provider";
 import "./globals.css";
@@ -12,11 +21,12 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
+// LOCATION-SPECIFIC: Site URL from config
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
 
-const title = "Paisaxe | Descubre Asturias";
-const description =
-  "Tu guía personal para explorar Asturias. Descubre paisajes, rutas, gastronomía y cultura. Your personal guide to explore Asturias.";
+// LOCATION-SPECIFIC: Title and description from config
+const title = `${LOCATION_CONFIG.siteName} | Descubre ${LOCATION_CONFIG.name}`;
+const description = LOCATION_CONFIG.seo.description;
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",
@@ -29,22 +39,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title,
   description,
+  // LOCATION-SPECIFIC: Keywords from config
   keywords: [
-    "Paisaxe",
-    "Asturias",
-    "turismo",
-    "tourism",
-    "Spain",
-    "travel",
-    "sidra",
-    "naturaleza",
-    "Picos de Europa",
-    "Oviedo",
-    "Gijón",
+    LOCATION_CONFIG.siteName,
+    ...LOCATION_CONFIG.seo.keywords,
   ],
-  authors: [{ name: "Paisaxe" }],
-  creator: "Paisaxe",
-  publisher: "Paisaxe",
+  authors: [{ name: LOCATION_CONFIG.siteName }],
+  creator: LOCATION_CONFIG.siteName,
+  publisher: LOCATION_CONFIG.siteName,
   formatDetection: {
     email: false,
     address: false,
@@ -63,26 +65,27 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   openGraph: {
     title,
-    description:
-      "Descubre Asturias a través de historias visuales inmersivas. Paisajes, gastronomía, cultura y naturaleza del norte de España.",
+    // LOCATION-SPECIFIC: OpenGraph description
+    description: LOCATION_CONFIG.seo.description,
     url: SITE_URL,
-    siteName: "Paisaxe",
+    siteName: LOCATION_CONFIG.siteName,
     type: "website",
-    locale: "es_ES",
+    locale: LOCATION_CONFIG.seo.locale,
     images: [
       {
+        // LOCATION-SPECIFIC: Default OG image
         url: `${SITE_URL}/images/stories/lagos-covadonga.png`,
         width: 1200,
         height: 630,
-        alt: "Lagos de Covadonga, Asturias - Paisaxe",
+        alt: `Lagos de Covadonga, ${LOCATION_CONFIG.name} - ${LOCATION_CONFIG.siteName}`,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     title,
-    description:
-      "Descubre Asturias a través de historias visuales inmersivas. Paisajes, gastronomía, cultura y naturaleza.",
+    // LOCATION-SPECIFIC: Twitter description
+    description: LOCATION_CONFIG.seo.description,
     images: [`${SITE_URL}/images/stories/lagos-covadonga.png`],
   },
   alternates: {
@@ -111,7 +114,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang={LOCATION_CONFIG.primaryLanguage} suppressHydrationWarning>
       <head>
         {/* Font preconnects */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

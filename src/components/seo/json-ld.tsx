@@ -1,4 +1,13 @@
+/**
+ * JSON-LD structured data components for SEO.
+ *
+ * LOCATION-SPECIFIC: This file contains location-specific structured data.
+ * When replicating, the LOCATION_CONFIG import will automatically
+ * provide correct values if you've updated src/config/location.ts
+ */
+
 import type { Story, StoryLocation } from "@/types/immersive";
+import { LOCATION_CONFIG, getRegionCoordinates } from "@/config/location";
 
 interface JsonLdProps {
   type: "website" | "tourist-destination";
@@ -6,7 +15,7 @@ interface JsonLdProps {
 
 export function JsonLd({ type }: JsonLdProps) {
   const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
+    process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
   const data =
     type === "website"
       ? getWebsiteData(siteUrl)
@@ -22,14 +31,14 @@ export function JsonLd({ type }: JsonLdProps) {
 }
 
 function getWebsiteData(siteUrl: string) {
+  // LOCATION-SPECIFIC: Site identity from config
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "Paisaxe",
+    name: LOCATION_CONFIG.siteName,
     url: siteUrl,
-    description:
-      "Tu guía personal para explorar Asturias. Descubre paisajes, rutas, gastronomía y cultura.",
-    inLanguage: ["es", "en"],
+    description: LOCATION_CONFIG.seo.description,
+    inLanguage: [LOCATION_CONFIG.primaryLanguage, "en"],
     potentialAction: {
       "@type": "SearchAction",
       target: `${siteUrl}/immersive?story={search_term_string}`,
@@ -39,17 +48,17 @@ function getWebsiteData(siteUrl: string) {
 }
 
 function getTouristDestinationData(siteUrl: string) {
+  // LOCATION-SPECIFIC: Destination data from config
   return {
     "@context": "https://schema.org",
     "@type": "TouristDestination",
-    name: "Asturias",
-    description:
-      "Descubre Asturias: paisajes, rutas de senderismo, gastronomía, cultura y actividades en el norte de España.",
+    name: LOCATION_CONFIG.name,
+    description: LOCATION_CONFIG.seo.description,
     url: `${siteUrl}/immersive`,
     geo: {
       "@type": "GeoCoordinates",
-      latitude: 43.3614,
-      longitude: -5.8593,
+      latitude: LOCATION_CONFIG.center.lat,
+      longitude: LOCATION_CONFIG.center.lng,
     },
     touristType: [
       "Nature lovers",
@@ -59,34 +68,28 @@ function getTouristDestinationData(siteUrl: string) {
       "Families",
     ],
     containedInPlace: {
-      "@type": "Country",
-      name: "España",
+      "@type": LOCATION_CONFIG.containedIn.type,
+      name: LOCATION_CONFIG.containedIn.name,
     },
   };
 }
 
-// Geo coordinates for Asturias regions
-const LOCATION_COORDINATES: Record<StoryLocation, { lat: number; lng: number }> = {
-  eastern: { lat: 43.35, lng: -4.85 },   // Cangas de Onís area
-  central: { lat: 43.36, lng: -5.85 },   // Oviedo/Gijón area
-  western: { lat: 43.54, lng: -6.55 },   // Cudillero/Luarca area
-};
+// LOCATION-SPECIFIC: Geo coordinates for regions
+// These are now imported from location config via getRegionCoordinates()
 
 interface StoryJsonLdProps {
   story: Story;
 }
 
 export function StoryJsonLd({ story }: StoryJsonLdProps) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
   const storyUrl = `${siteUrl}/immersive?story=${story.slug || story.id}`;
   const imageUrl = story.image.startsWith("http")
     ? story.image
     : `${siteUrl}${story.image}`;
 
-  // Get geo coordinates based on location, default to central Asturias
-  const coords = story.location
-    ? LOCATION_COORDINATES[story.location]
-    : LOCATION_COORDINATES.central;
+  // LOCATION-SPECIFIC: Get geo coordinates based on region
+  const coords = getRegionCoordinates(story.location as StoryLocation | undefined);
 
   // Food stories get Restaurant schema, everything else gets TouristAttraction
   const schemaType = story.category === "food" ? "Restaurant" : "TouristAttraction";
@@ -105,12 +108,13 @@ export function StoryJsonLd({ story }: StoryJsonLdProps) {
     },
     isPartOf: {
       "@type": "WebSite",
-      name: "Paisaxe",
+      name: LOCATION_CONFIG.siteName,
       url: siteUrl,
     },
+    // LOCATION-SPECIFIC: Containing place
     containedInPlace: {
       "@type": "AdministrativeArea",
-      name: "Asturias, España",
+      name: `${LOCATION_CONFIG.name}, ${LOCATION_CONFIG.containedIn.name}`,
     },
   };
 
@@ -123,7 +127,8 @@ export function StoryJsonLd({ story }: StoryJsonLdProps) {
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             ...baseData,
-            servesCuisine: "Asturian",
+            // LOCATION-SPECIFIC: Cuisine style
+            servesCuisine: LOCATION_CONFIG.categories.cuisineStyle,
             priceRange: "$$",
           }),
         }}
@@ -171,7 +176,7 @@ interface BreadcrumbJsonLdProps {
 }
 
 export function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
 
   const data = {
     "@context": "https://schema.org",

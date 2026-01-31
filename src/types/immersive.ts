@@ -1,3 +1,13 @@
+/**
+ * Types for immersive story viewing experience.
+ *
+ * LOCATION-SPECIFIC: This file contains location-specific type definitions.
+ * When replicating, update:
+ * - StoryLocation type (region IDs)
+ * - LOCATION_LABELS (region display names)
+ * - CATEGORY_LABELS (if categories differ)
+ */
+
 export type StorySourceType = "curated" | "user_submitted";
 
 export interface Story {
@@ -52,6 +62,16 @@ export type StoryCategory =
   | "culture"
   | "activities";
 
+// =============================================================================
+// LOCATION-SPECIFIC: Region definitions
+// =============================================================================
+
+/**
+ * Story location/region type.
+ *
+ * LOCATION-SPECIFIC: These region IDs must match the keys in LOCATION_CONFIG.regions
+ * When replicating, update to match your location's regions.
+ */
 export type StoryLocation =
   | "eastern"   // Eastern Asturias (Llanes, Cangas de Onís, Picos de Europa)
   | "central"   // Central Asturias (Oviedo, Gijón, Avilés)
@@ -62,6 +82,14 @@ export type StoryDuration =
   | "weekend"   // 2-3 days
   | "week";     // Week-long exploration
 
+// =============================================================================
+// LOCATION-SPECIFIC: Display labels (Spanish defaults)
+// =============================================================================
+
+/**
+ * Category labels for display in UI.
+ * Not strictly location-specific, but may vary by location.
+ */
 export const CATEGORY_LABELS: Record<StoryCategory, string> = {
   nature: "Naturaleza",
   cities: "Ciudades",
@@ -70,6 +98,12 @@ export const CATEGORY_LABELS: Record<StoryCategory, string> = {
   activities: "Actividades",
 };
 
+/**
+ * Location/region labels for display in UI.
+ *
+ * LOCATION-SPECIFIC: Update these labels for your location's regions.
+ * These are the Spanish labels; translations are in src/lib/i18n/*.ts
+ */
 export const LOCATION_LABELS: Record<StoryLocation, string> = {
   eastern: "Asturias Oriental",
   central: "Asturias Central",
@@ -81,6 +115,10 @@ export const DURATION_LABELS: Record<StoryDuration, string> = {
   weekend: "Fin de semana",
   week: "Una semana",
 };
+
+// =============================================================================
+// Database types (not location-specific)
+// =============================================================================
 
 // Database row type (snake_case from Supabase)
 export interface StoryRow {

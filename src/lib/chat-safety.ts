@@ -34,23 +34,31 @@ const INJECTION_PATTERNS: RegExp[] = [
   /disregard\s+(your|the|all|previous)/i,
 ];
 
-/** Keywords indicating Asturias tourism relevance */
+/**
+ * Keywords indicating tourism relevance for this location.
+ *
+ * LOCATION-SPECIFIC: Replace all keywords with your location's:
+ * - Place names (cities, landmarks, regions)
+ * - Local food and drinks
+ * - Activities and attractions
+ * - Cultural terms
+ */
 const ASTURIAS_KEYWORDS: string[] = [
-  // Places
+  // LOCATION-SPECIFIC: Place names
   "asturias", "oviedo", "gijón", "gijon", "avilés", "aviles",
   "covadonga", "picos", "europa", "lagos", "cangas", "onís", "onis",
   "llanes", "ribadesella", "cudillero", "luarca", "tapia", "navia",
-  // Food & drink
+  // LOCATION-SPECIFIC: Food & drink
   "sidra", "cider", "fabada", "cachopo", "cabrales", "queso", "cheese",
   "sidrería", "sidreria", "espicha", "culín", "culin",
-  // Activities
+  // LOCATION-SPECIFIC: Activities and landmarks
   "senda", "cares", "ruta", "route", "hiking", "senderismo", "playa", "beach",
   "surf", "camino", "santiago", "prerrománico", "preromanico", "naranco",
-  // Tourism
+  // General tourism (not location-specific)
   "restaurante", "restaurant", "hotel", "hostel", "albergue",
   "visitar", "visit", "turismo", "tourism", "tourist",
   "viajar", "travel", "viaje", "trip", "vacaciones", "vacation", "holiday",
-  // Culture
+  // LOCATION-SPECIFIC: Cultural terms
   "asturiano", "asturian", "bable", "gaita", "hórreo", "horreo",
 ];
 

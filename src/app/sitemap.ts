@@ -1,8 +1,10 @@
 import type { MetadataRoute } from "next";
 import { getStoriesFromDB } from "@/lib/stories-data";
+import { LOCATION_CONFIG } from "@/config/location";
 
+// LOCATION-SPECIFIC: Fallback domain from config
 function getSiteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
+  return process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

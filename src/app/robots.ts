@@ -1,7 +1,9 @@
 import type { MetadataRoute } from "next";
+import { LOCATION_CONFIG } from "@/config/location";
 
+// LOCATION-SPECIFIC: Fallback domain from config
 function getSiteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL || "https://paisaxe.es";
+  return process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
 }
 
 export default function robots(): MetadataRoute.Robots {

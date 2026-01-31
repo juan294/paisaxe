@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { LOCATION_CONFIG } from "@/config/location";
 
-const ALLOWED_ORIGINS = [
-  "https://paisaxe.es",
-  "https://www.paisaxe.es",
-  "https://paisaxe.com",
-  "https://www.paisaxe.com",
-];
+// LOCATION-SPECIFIC: Build allowed origins from config domains
+const ALLOWED_ORIGINS: string[] = [];
+
+// Add primary domain
+ALLOWED_ORIGINS.push(`https://${LOCATION_CONFIG.domain}`);
+ALLOWED_ORIGINS.push(`https://www.${LOCATION_CONFIG.domain}`);
+
+// Add alternate domain if configured
+if (LOCATION_CONFIG.alternateDomain) {
+  ALLOWED_ORIGINS.push(`https://${LOCATION_CONFIG.alternateDomain}`);
+  ALLOWED_ORIGINS.push(`https://www.${LOCATION_CONFIG.alternateDomain}`);
+}
 
 // Allow localhost in development
 if (process.env.NODE_ENV === "development") {

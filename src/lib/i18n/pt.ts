@@ -1,3 +1,16 @@
+/**
+ * Portuguese translations.
+ *
+ * LOCATION-SPECIFIC: This file contains location-specific text.
+ * When replicating, update:
+ * - stories.locations.* (region names)
+ * - suggestions.location_* (region names)
+ * - chat.image_alt (location name in alt text)
+ * - chat.privacy_notice (location name)
+ * - voice.* (persona name references)
+ * - favorites.empty_description (location name)
+ */
+
 import type { Translations } from './types';
 
 export const pt: Translations = {
