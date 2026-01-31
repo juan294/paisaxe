@@ -45,10 +45,10 @@ const PLATFORM_CREDENTIALS: Record<
   { key: string; label: string; placeholder: string; required: boolean }[]
 > = {
   x: [
-    { key: "apiKey", label: "API Key", placeholder: "Your X API Key", required: true },
-    { key: "apiSecret", label: "API Secret", placeholder: "Your X API Secret", required: true },
+    { key: "apiKey", label: "Consumer Key", placeholder: "Your X Consumer Key", required: true },
+    { key: "apiSecret", label: "Consumer Secret", placeholder: "Your X Consumer Secret", required: true },
     { key: "accessToken", label: "Access Token", placeholder: "Your Access Token", required: true },
-    { key: "refreshToken", label: "Access Token Secret", placeholder: "Your Access Token Secret", required: false },
+    { key: "refreshToken", label: "Access Token Secret", placeholder: "Your Access Token Secret", required: true },
   ],
   instagram: [
     { key: "accessToken", label: "Long-Lived Access Token", placeholder: "Your Instagram access token", required: true },
