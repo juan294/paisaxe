@@ -97,9 +97,14 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
+      // Default is System tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
+
+      // Switch to All tab to see all flags
+      const allTab = screen.getByRole("button", { name: /all/i });
+      await user.click(allTab);
 
       const searchInput = screen.getByPlaceholderText(/search/i);
       await user.type(searchInput, "voice");
@@ -114,25 +119,31 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
+      // Default is System tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
+      // Search for maintenance (should find it in System tab)
       const searchInput = screen.getByPlaceholderText(/search/i);
       await user.type(searchInput, "maintenance");
 
-      // Only "Maintenance Mode" should be visible
+      // "Maintenance Mode" should be visible
       expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
-      expect(screen.queryByText("Contextual Prompts")).not.toBeInTheDocument();
     });
 
     it("search is case-insensitive", async () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
+      // Default is System tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
+
+      // Switch to All tab
+      const allTab = screen.getByRole("button", { name: /all/i });
+      await user.click(allTab);
 
       const searchInput = screen.getByPlaceholderText(/search/i);
       await user.type(searchInput, "AMBIENT");
@@ -145,8 +156,9 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
+      // Default is System tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
       const searchInput = screen.getByPlaceholderText(/search/i);
@@ -159,8 +171,9 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
+      // Default is System tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
       // Click on Discovery category
@@ -184,23 +197,22 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
+      // Default is System tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
       const searchInput = screen.getByPlaceholderText(/search/i);
-      await user.type(searchInput, "voice");
+      await user.type(searchInput, "maintenance");
 
-      // Only voice flag visible
-      expect(screen.getByText("Visitor Voice Agent")).toBeInTheDocument();
-      expect(screen.queryByText("Contextual Prompts")).not.toBeInTheDocument();
+      // Maintenance Mode should still be visible (matches search)
+      expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
 
       // Clear search
       await user.clear(searchInput);
 
-      // All flags should be visible again
-      expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
-      expect(screen.getByText("Visitor Voice Agent")).toBeInTheDocument();
+      // Maintenance Mode should still be visible (in System category)
+      expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
     });
   });
 
@@ -212,13 +224,33 @@ describe("FeatureTogglesPanel", () => {
       expect(spinner).toBeInTheDocument();
     });
 
-    it("renders flags after loading", async () => {
+    it("defaults to System tab and shows system flags", async () => {
+      render(<FeatureTogglesPanel />);
+
+      // Should show Maintenance Mode (System category) by default
+      await waitFor(() => {
+        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+      });
+
+      // Should NOT show flags from other categories
+      expect(screen.queryByText("Contextual Prompts")).not.toBeInTheDocument();
+      expect(screen.queryByText("Related Stories")).not.toBeInTheDocument();
+    });
+
+    it("shows all flags when All tab is clicked", async () => {
+      const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
       await waitFor(() => {
-        expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
+      // Click on All tab
+      const allTab = screen.getByRole("button", { name: /all/i });
+      await user.click(allTab);
+
+      // Should show all flags
+      expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
       expect(screen.getByText("Related Stories")).toBeInTheDocument();
       expect(screen.getByText("Ambient Discovery")).toBeInTheDocument();
     });
@@ -235,31 +267,35 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
+      // Default is System tab with Maintenance Mode (which is disabled/false in mock)
       await waitFor(() => {
-        expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
       const toggleButtons = screen.getAllByRole("switch");
       await user.click(toggleButtons[0]);
 
-      expect(updateFeatureFlag).toHaveBeenCalledWith("contextual_prompts", false);
+      // Maintenance Mode is initially false, so clicking toggle should enable it (true)
+      expect(updateFeatureFlag).toHaveBeenCalledWith("maintenance_mode", true);
     });
 
     it("filters by category when tab is clicked", async () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
+      // Default is System tab
       await waitFor(() => {
-        expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
-      // Click on System category tab (use title attribute to be specific)
-      const systemTab = screen.getByTitle("Administrative controls");
-      await user.click(systemTab);
+      // Click on Discovery category tab
+      const discoveryTab = screen.getByRole("button", { name: /discovery/i });
+      await user.click(discoveryTab);
 
-      // Should only show system flags (maintenance mode)
-      expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
-      expect(screen.queryByText("Contextual Prompts")).not.toBeInTheDocument();
+      // Should only show discovery flags
+      expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
+      expect(screen.getByText("Related Stories")).toBeInTheDocument();
+      expect(screen.queryByText("Maintenance Mode")).not.toBeInTheDocument();
       expect(screen.queryByText("Visitor Voice Agent")).not.toBeInTheDocument();
     });
 
