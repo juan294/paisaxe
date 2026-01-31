@@ -6,6 +6,110 @@ Detailed documentation for database maintenance, monitoring, webhooks, and autom
 
 `GET /api/health` — returns service status, uptime, Supabase connectivity with latency, and database storage usage (size in MB, percentage of 8 GB Pro tier limit). Reports "degraded" if Supabase connection fails or database usage exceeds 80%. Always returns HTTP 200. Used by Upptime for uptime monitoring.
 
+## Pre-Launch Checklist
+
+Run this checklist before every production release. Invoke with: "Run the pre-launch checklist from operations.md"
+
+### 1. Code Quality Gates
+
+Run all quality checks in parallel:
+
+```bash
+npm run test           # All tests must pass
+npm run typecheck      # No TypeScript errors
+npm run lint           # No linting errors
+npm run build          # Production build succeeds
+```
+
+**Expected results:**
+- Tests: All passing (currently ~2000 tests)
+- TypeScript: Exit code 0, no output
+- Lint: Exit code 0, no output
+- Build: "Generating static pages" completes successfully
+
+### 2. Health Endpoint
+
+```bash
+curl -s https://paisaxe.es/api/health | jq
+```
+
+**Verify:**
+- `status`: "healthy"
+- `services.supabase.status`: "connected"
+- `services.supabase.latency_ms`: < 1000ms
+- `services.database.usage_percent`: < 80%
+
+### 3. Core Endpoints
+
+```bash
+# Main pages (307 = maintenance mode redirect, 200 = live)
+curl -s https://paisaxe.es/ -o /dev/null -w "%{http_code}"
+curl -s https://paisaxe.es/immersive -o /dev/null -w "%{http_code}"
+
+# Chat API (should return streaming response)
+curl -s https://paisaxe.es/api/chat/stream -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"message":"hello"}'
+
+# Feature flags API
+curl -s https://paisaxe.es/api/feature-flags | jq '.data | length'
+```
+
+### 4. SEO & Discoverability
+
+```bash
+# Sitemap lists published stories
+curl -s https://paisaxe.es/sitemap.xml | head -50
+
+# robots.txt properly configured
+curl -s https://paisaxe.es/robots.txt
+```
+
+**Verify sitemap includes:**
+- `/` and `/immersive` routes
+- Published story URLs (`/immersive?story=...`)
+
+### 5. Git Status
+
+```bash
+# Check for unpushed commits on develop
+git log main..develop --oneline
+
+# Verify branches are in sync for release
+git diff develop main --stat
+```
+
+**For release:** `develop` and `main` should be in sync (no diff).
+
+### 6. Feature Flags Review
+
+Check critical flags at https://paisaxe.es/api/feature-flags:
+
+| Flag | Pre-Launch | Post-Launch |
+|------|------------|-------------|
+| `maintenance_mode` | enabled | **disabled** |
+| `ambient_discovery` | enabled | enabled |
+| `autoplay_button` | enabled | enabled |
+| `story_sharing` | enabled | enabled |
+
+### 7. Go Live
+
+1. Open admin panel: https://paisaxe.es/admin
+2. Navigate to Feature Flags → Behavior category
+3. **Disable `maintenance_mode`**
+4. Verify site is accessible without redirect
+
+### Quick Reference
+
+| Check | Command | Success |
+|-------|---------|---------|
+| Tests | `npm run test` | All pass |
+| Types | `npm run typecheck` | No errors |
+| Lint | `npm run lint` | No errors |
+| Build | `npm run build` | Completes |
+| Health | `curl .../api/health` | status: healthy |
+| Site | `curl -w "%{http_code}" .../` | 200 (after launch) |
+
 ## Upptime Status Page
 
 - **Repo**: https://github.com/juan294/paisaxe-upptime
