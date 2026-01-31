@@ -129,8 +129,65 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * PATCH /api/admin/marketing/accounts?platform=x&action=pause|resume
+ * Toggle account active state without clearing credentials
+ */
+export async function PATCH(request: NextRequest) {
+  const auth = await validateAdminAuth();
+  if (!auth.valid) {
+    return auth.error;
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const platform = searchParams.get("platform") as MarketingPlatform | null;
+    const action = searchParams.get("action") as "pause" | "resume" | null;
+
+    if (!platform || !VALID_PLATFORMS.includes(platform)) {
+      return NextResponse.json(
+        { error: "Valid platform query parameter required" },
+        { status: 400 }
+      );
+    }
+
+    if (!action || !["pause", "resume"].includes(action)) {
+      return NextResponse.json(
+        { error: "Valid action query parameter required (pause or resume)" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createAdminClient();
+
+    const { data, error } = await supabase
+      .from("marketing_accounts")
+      .update({ is_active: action === "resume" })
+      .eq("platform", platform)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error toggling marketing account:", error);
+      return NextResponse.json(
+        { error: "Failed to update account" },
+        { status: 500 }
+      );
+    }
+
+    const account = rowToMarketingAccountPublic(data as MarketingAccountRow);
+    return NextResponse.json({ data: account });
+  } catch (error) {
+    console.error("Marketing accounts PATCH error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * DELETE /api/admin/marketing/accounts?platform=x
- * Deactivate a marketing account
+ * Permanently disconnect account and clear credentials
  */
 export async function DELETE(request: NextRequest) {
   const auth = await validateAdminAuth();
@@ -151,19 +208,19 @@ export async function DELETE(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Soft delete - just deactivate
+    // Full disconnect - deactivate AND clear credentials
     const { error } = await supabase
       .from("marketing_accounts")
       .update({
         is_active: false,
-        credentials: null, // Clear credentials on deactivation
+        credentials: null,
       })
       .eq("platform", platform);
 
     if (error) {
-      console.error("Error deactivating marketing account:", error);
+      console.error("Error disconnecting marketing account:", error);
       return NextResponse.json(
-        { error: "Failed to deactivate account" },
+        { error: "Failed to disconnect account" },
         { status: 500 }
       );
     }

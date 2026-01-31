@@ -77,6 +77,8 @@ export interface MarketingAccountPublic {
   accountName: string;
   accountHandle: string | null;
   isActive: boolean;
+  /** Whether credentials are stored (without exposing them) */
+  hasCredentials: boolean;
   lastSyncAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -268,6 +270,7 @@ export function rowToMarketingAccountPublic(
     accountName: row.account_name,
     accountHandle: row.account_handle,
     isActive: row.is_active,
+    hasCredentials: row.credentials !== null && Object.keys(row.credentials).length > 0,
     lastSyncAt: row.last_sync_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

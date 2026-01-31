@@ -100,25 +100,52 @@ export function MarketingDashboard() {
     loadData();
   };
 
-  const handleToggleAccount = async (platform: MarketingPlatform, currentlyActive: boolean) => {
+  const handleToggleAccount = async (platform: MarketingPlatform, currentlyActive: boolean, hasCredentials: boolean) => {
     try {
       if (currentlyActive) {
-        // Deactivate (pause) the account
-        const response = await fetch(`/api/admin/marketing/accounts?platform=${platform}`, {
-          method: "DELETE",
+        // Pause the account (keep credentials)
+        const response = await fetch(`/api/admin/marketing/accounts?platform=${platform}&action=pause`, {
+          method: "PATCH",
         });
         if (!response.ok) {
           const result = await response.json();
           throw new Error(result.error || "Failed to pause account");
         }
+      } else if (hasCredentials) {
+        // Resume the account (credentials still exist)
+        const response = await fetch(`/api/admin/marketing/accounts?platform=${platform}&action=resume`, {
+          method: "PATCH",
+        });
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error || "Failed to resume account");
+        }
       } else {
-        // Can't reactivate from here - need to reconfigure
+        // No credentials - need to configure
         setConfiguringPlatform(platform);
         return;
       }
       loadData();
     } catch (err) {
       console.error("Toggle account error:", err);
+    }
+  };
+
+  const handleDisconnectAccount = async (platform: MarketingPlatform) => {
+    if (!confirm(`Disconnect ${PLATFORM_NAMES[platform]}? This will clear all stored credentials.`)) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/admin/marketing/accounts?platform=${platform}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Failed to disconnect account");
+      }
+      loadData();
+    } catch (err) {
+      console.error("Disconnect account error:", err);
     }
   };
 
@@ -181,7 +208,8 @@ export function MarketingDashboard() {
                   platform={platform}
                   account={account}
                   onConfigure={() => setConfiguringPlatform(platform)}
-                  onToggle={() => handleToggleAccount(platform, account?.isActive ?? false)}
+                  onToggle={() => handleToggleAccount(platform, account?.isActive ?? false, account?.hasCredentials ?? false)}
+                  onDisconnect={() => handleDisconnectAccount(platform)}
                 />
               );
             }
@@ -339,31 +367,40 @@ function AccountCard({
   account,
   onConfigure,
   onToggle,
+  onDisconnect,
 }: {
   platform: MarketingPlatform;
   account: MarketingAccountPublic | undefined;
   onConfigure: () => void;
   onToggle: () => void;
+  onDisconnect: () => void;
 }) {
-  const isConnected = account?.isActive;
+  const isActive = account?.isActive;
+  const hasCredentials = account?.hasCredentials;
+  const isPaused = !isActive && hasCredentials;
+  const isNotConfigured = !account || !hasCredentials;
 
   return (
     <div
       className={cn(
         "group relative border border-stone-200 p-4 transition-all dark:border-stone-800",
-        isConnected
+        isActive
           ? "bg-stone-50 dark:bg-stone-900/50"
-          : "cursor-pointer hover:border-stone-400 dark:hover:border-stone-600"
+          : isPaused
+            ? "bg-amber-50/50 dark:bg-amber-900/10"
+            : "cursor-pointer hover:border-stone-400 dark:hover:border-stone-600"
       )}
-      onClick={!isConnected ? onConfigure : undefined}
+      onClick={isNotConfigured ? onConfigure : undefined}
     >
       <div className="flex items-center gap-3">
         <div
           className={cn(
             "flex h-8 w-8 items-center justify-center border font-mono text-xs font-medium",
-            isConnected
+            isActive
               ? "border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100"
-              : "border-stone-300 text-stone-400 dark:border-stone-700"
+              : isPaused
+                ? "border-amber-600 text-amber-600 dark:border-amber-400 dark:text-amber-400"
+                : "border-stone-300 text-stone-400 dark:border-stone-700"
           )}
         >
           {PLATFORM_BADGES[platform]}
@@ -372,7 +409,7 @@ function AccountCard({
           <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
             {PLATFORM_NAMES[platform]}
           </p>
-          {isConnected && account?.accountHandle ? (
+          {account?.accountHandle ? (
             <p className="truncate font-mono text-xs text-stone-500">
               {account.accountHandle}
             </p>
@@ -380,20 +417,25 @@ function AccountCard({
             <p className="font-mono text-xs text-stone-400">Click to connect</p>
           )}
         </div>
-        {isConnected ? (
+        {isActive ? (
           <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-emerald-600">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             Active
           </span>
+        ) : isPaused ? (
+          <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-amber-600">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            Paused
+          </span>
         ) : (
           <span className="font-mono text-[10px] uppercase tracking-widest text-stone-300">
-            Inactive
+            Not Connected
           </span>
         )}
       </div>
 
-      {/* Action buttons for connected accounts */}
-      {isConnected && (
+      {/* Action buttons for active accounts */}
+      {isActive && (
         <div className="mt-3 flex items-center gap-2 border-t border-stone-200 pt-3 dark:border-stone-700">
           <button
             onClick={(e) => {
@@ -409,10 +451,35 @@ function AccountCard({
               e.stopPropagation();
               onToggle();
             }}
-            className="font-mono text-[10px] uppercase tracking-widest text-red-500 transition-colors hover:text-red-700"
-            title="Pause this account"
+            className="font-mono text-[10px] uppercase tracking-widest text-amber-600 transition-colors hover:text-amber-700"
+            title="Pause posting (keeps credentials)"
           >
             Pause
+          </button>
+        </div>
+      )}
+
+      {/* Action buttons for paused accounts */}
+      {isPaused && (
+        <div className="mt-3 flex items-center gap-2 border-t border-stone-200 pt-3 dark:border-stone-700">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="flex-1 font-mono text-[10px] uppercase tracking-widest text-emerald-600 transition-colors hover:text-emerald-700"
+          >
+            Resume
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDisconnect();
+            }}
+            className="font-mono text-[10px] uppercase tracking-widest text-red-500 transition-colors hover:text-red-700"
+            title="Disconnect and clear credentials"
+          >
+            Disconnect
           </button>
         </div>
       )}

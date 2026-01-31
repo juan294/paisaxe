@@ -20,6 +20,8 @@ describe("GET /api/admin/marketing/dashboard", () => {
       platform: "x",
       account_name: "Paisaxe",
       account_handle: "@paisaxe",
+      credentials: { accessToken: "test-token" },
+      platform_user_id: null,
       is_active: true,
       last_sync_at: "2025-01-15T10:00:00.000Z",
       created_at: "2025-01-01T00:00:00.000Z",
