@@ -1,3 +1,16 @@
+/**
+ * Spanish (default) translations.
+ *
+ * LOCATION-SPECIFIC: This file contains location-specific text.
+ * When replicating, update:
+ * - stories.locations.* (region names)
+ * - suggestions.location_* (region names)
+ * - chat.image_alt (location name in alt text)
+ * - chat.privacy_notice (location name)
+ * - voice.* (persona name references)
+ * - favorites.empty_description (location name)
+ */
+
 import type { Translations } from './types';
 
 export const es: Translations = {
@@ -14,8 +27,10 @@ export const es: Translations = {
     speech_hint: 'Puedes usar el microfono para hablar',
     error_processing: 'Lo siento, no pude procesar tu pregunta.',
     error_generic: 'Lo siento, hubo un error. Intenta de nuevo.',
+    // LOCATION-SPECIFIC: Location name in alt text
     image_alt: 'Imagen relacionada de Asturias',
     source: 'Fuente',
+    // LOCATION-SPECIFIC: Location name in privacy notice
     privacy_notice: 'Tus preguntas se procesan con inteligencia artificial para darte la mejor respuesta sobre Asturias. No guardamos tus conversaciones.',
     understood: 'Entendido',
     call: 'Llamar',
@@ -47,6 +62,7 @@ export const es: Translations = {
       culture: 'Cultura',
       activities: 'Actividades',
     },
+    // LOCATION-SPECIFIC: Region names
     locations: {
       eastern: 'Asturias Oriental',
       central: 'Asturias Central',
@@ -85,6 +101,7 @@ export const es: Translations = {
     local_only_description: 'Si borras los datos del navegador o cambias de dispositivo, los perderas.',
     sync_with_google: 'Sincronizar con Google',
     empty_title: 'No tienes guardados todavia',
+    // LOCATION-SPECIFIC: Location name
     empty_description: 'Explora las historias de Asturias y guarda las que mas te gusten para verlas despues.',
     explore: 'Explorar historias',
     loading_more: 'Cargando mas...',
@@ -131,6 +148,7 @@ export const es: Translations = {
     show_all: 'Mostrar todo',
   },
 
+  // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
     try_voice: 'Hablar',
     use_text: 'Escribir',
@@ -160,11 +178,13 @@ export const es: Translations = {
     sign_in_to_suggest: 'Inicia sesion para sugerir un lugar',
     suggest_place: 'Sugerir un lugar',
     dialog_title: 'Sugerir un lugar',
+    // LOCATION-SPECIFIC: Location and site name
     dialog_description: 'Comparte un lugar de Asturias que te gustaria ver en Paisaxe',
     place_name_label: 'Nombre del lugar',
     place_name_placeholder: 'ej. Playa de Gulpiyuri',
     location_label: 'Zona (opcional)',
     location_placeholder: 'Selecciona una zona',
+    // LOCATION-SPECIFIC: Region names
     location_eastern: 'Asturias Oriental',
     location_central: 'Asturias Central',
     location_western: 'Asturias Occidental',

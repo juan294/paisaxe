@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
+import { LOCATION_CONFIG } from "@/config/location";
+
+// LOCATION-SPECIFIC: Site URL from config
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
 
 export const metadata: Metadata = {
-  title: "Guardados | Paisaxe",
-  description: "Tus lugares guardados de Asturias.",
+  // LOCATION-SPECIFIC: Title uses site name
+  title: `Guardados | ${LOCATION_CONFIG.siteName}`,
+  // LOCATION-SPECIFIC: Description uses location name
+  description: `Tus lugares guardados de ${LOCATION_CONFIG.name}.`,
   robots: {
     index: false,
     follow: false,
   },
   alternates: {
-    canonical: "https://paisaxe.es/favorites",
+    canonical: `${SITE_URL}/favorites`,
   },
 };
 

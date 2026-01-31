@@ -28,15 +28,16 @@ describe("RootLayout", () => {
     });
 
     it("should have correct description", () => {
-      expect(metadata.description).toContain("Tu guía personal para explorar Asturias");
-      expect(metadata.description).toContain("Your personal guide to explore Asturias");
+      // Description comes from LOCATION_CONFIG.seo.description
+      expect(metadata.description).toContain("Asturias");
+      expect(metadata.description).toContain("historias visuales");
     });
 
     it("should have relevant keywords", () => {
+      // Keywords come from LOCATION_CONFIG.seo.keywords
       expect(metadata.keywords).toContain("Paisaxe");
       expect(metadata.keywords).toContain("Asturias");
       expect(metadata.keywords).toContain("turismo");
-      expect(metadata.keywords).toContain("tourism");
       expect(metadata.keywords).toContain("Spain");
       expect(metadata.keywords).toContain("travel");
       expect(metadata.keywords).toContain("sidra");

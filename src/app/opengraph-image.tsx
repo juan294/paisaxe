@@ -1,11 +1,20 @@
+/**
+ * Default OpenGraph image for social sharing.
+ *
+ * LOCATION-SPECIFIC: This file contains location-specific branding.
+ * When replicating, update the tagline in LOCATION_CONFIG or modify this file directly.
+ */
+
 import { ImageResponse } from "next/og";
 import {
   OG_IMAGE_SIZE,
   OG_IMAGE_CONTENT_TYPE,
   OG_COLORS,
 } from "@/lib/og-image-helpers";
+import { LOCATION_CONFIG } from "@/config/location";
 
-export const alt = "Paisaxe — Mira. Pregunta. Explora.";
+// LOCATION-SPECIFIC: Alt text uses site name and tagline
+export const alt = `${LOCATION_CONFIG.siteName} — ${LOCATION_CONFIG.tagline}`;
 export const size = OG_IMAGE_SIZE;
 export const contentType = OG_IMAGE_CONTENT_TYPE;
 export const runtime = "edge";
@@ -36,7 +45,7 @@ export default async function Image() {
           }}
         />
 
-        {/* Title */}
+        {/* LOCATION-SPECIFIC: Site name */}
         <div
           style={{
             fontSize: 72,
@@ -46,10 +55,10 @@ export default async function Image() {
             display: "flex",
           }}
         >
-          Paisaxe
+          {LOCATION_CONFIG.siteName}
         </div>
 
-        {/* Tagline */}
+        {/* LOCATION-SPECIFIC: Tagline */}
         <div
           style={{
             fontSize: 28,
@@ -59,7 +68,7 @@ export default async function Image() {
             display: "flex",
           }}
         >
-          Mira. Pregunta. Explora.
+          {LOCATION_CONFIG.tagline}
         </div>
       </div>
     ),
