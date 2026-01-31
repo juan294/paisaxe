@@ -20,7 +20,9 @@ describe("GET /api/admin/marketing/dashboard", () => {
       platform: "x",
       account_name: "Paisaxe",
       account_handle: "@paisaxe",
-      credentials: { accessToken: "test-token" },
+      // Encrypted format - the actual encrypted value doesn't matter for public API tests
+      // since credentials are never exposed, only hasCredentials boolean is computed
+      credentials: { encrypted: "encrypted-credentials-string" },
       platform_user_id: null,
       is_active: true,
       last_sync_at: "2025-01-15T10:00:00.000Z",

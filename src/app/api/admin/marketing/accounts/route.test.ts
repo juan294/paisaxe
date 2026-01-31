@@ -11,6 +11,11 @@ vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
 
+vi.mock("@/lib/encryption", () => ({
+  encryptJson: vi.fn((data) => `encrypted:${JSON.stringify(data)}`),
+  isEncryptionConfigured: vi.fn(() => true),
+}));
+
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 
@@ -20,7 +25,8 @@ describe("Marketing Accounts API", () => {
     platform: "x",
     account_name: "Paisaxe",
     account_handle: "@paisaxe",
-    credentials: { accessToken: "secret" },
+    // Use encrypted format (actual encryption is mocked)
+    credentials: { encrypted: "encrypted-credentials" },
     platform_user_id: "12345",
     is_active: true,
     last_sync_at: "2025-01-15T10:00:00.000Z",

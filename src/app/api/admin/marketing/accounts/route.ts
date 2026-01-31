@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { encryptJson, isEncryptionConfigured } from "@/lib/encryption";
 import {
   rowToMarketingAccountPublic,
   type MarketingAccountRow,
@@ -88,9 +89,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Verify encryption is configured
+    if (!isEncryptionConfigured()) {
+      console.error("Encryption not configured - CREDENTIALS_ENCRYPTION_KEY missing");
+      return NextResponse.json(
+        { error: "Server encryption not configured. Contact administrator." },
+        { status: 500 }
+      );
+    }
+
+    // Encrypt credentials before storing
+    const encryptedCredentials = encryptJson(body.credentials);
+
     const supabase = createAdminClient();
 
     // Upsert account (unique constraint on platform)
+    // Store encrypted credentials as a JSON object with the encrypted string
     const { data, error } = await supabase
       .from("marketing_accounts")
       .upsert(
@@ -98,7 +112,7 @@ export async function POST(request: NextRequest) {
           platform: body.platform,
           account_name: body.accountName,
           account_handle: body.accountHandle || null,
-          credentials: body.credentials,
+          credentials: { encrypted: encryptedCredentials },
           is_active: true,
           last_sync_at: new Date().toISOString(),
         },
