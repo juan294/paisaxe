@@ -208,7 +208,7 @@ export function VoiceChatElevenLabs({
     <div className="flex flex-col h-full">
       {/* Permission Warning */}
       {hasPermission === false && (
-        <div className="mx-4 mt-4 flex items-center gap-2 rounded-lg bg-amber-500/20 p-3 text-sm text-amber-200">
+        <div className="mx-4 mt-4 flex items-center gap-2 rounded-lg bg-red-500/20 p-3 text-sm text-red-200">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <p>{t("voice.no_permission")}</p>
         </div>

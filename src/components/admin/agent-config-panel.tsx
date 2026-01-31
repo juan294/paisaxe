@@ -143,16 +143,16 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
       {/* Schedule Info */}
       <div className="flex items-center gap-8 text-sm">
         <div>
-          <span className="font-mono text-xs uppercase tracking-widest text-stone-400">
+          <span className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
             Schedule
           </span>
-          <p className="mt-1 text-stone-600 dark:text-stone-300">{scheduleInfo}</p>
+          <p className="mt-1 text-[#6b6560] dark:text-[#a39e98]">{scheduleInfo}</p>
         </div>
         <div>
-          <span className="font-mono text-xs uppercase tracking-widest text-stone-400">
+          <span className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
             Output
           </span>
-          <p className="mt-1 font-mono text-xs text-stone-600 dark:text-stone-300">
+          <p className="mt-1 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
             {outputFile}
           </p>
         </div>
@@ -163,14 +163,14 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
         <div className="flex items-center justify-between">
           <label
             htmlFor={`prompt-${flag.flagKey}`}
-            className="block font-mono text-xs uppercase tracking-widest text-stone-400"
+            className="block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]"
           >
             Agent Prompt
           </label>
           <button
             type="button"
             onClick={handleReset}
-            className="flex items-center gap-1 text-xs text-stone-400 transition-colors hover:text-stone-600 dark:hover:text-stone-300"
+            className="flex items-center gap-1 text-xs text-[#6b6560] transition-colors hover:text-[#6b6560] dark:text-[#a39e98] dark:hover:text-[#a39e98]"
             title="Reset to default prompt"
           >
             <RotateCcw className="h-3 w-3" />
@@ -185,10 +185,10 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
             setSaved(false);
           }}
           rows={12}
-          className="w-full resize-y border border-stone-200 bg-transparent px-4 py-3 font-mono text-xs leading-relaxed text-stone-900 placeholder-stone-400 focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:text-stone-100"
+          className="w-full resize-y border border-[#e5e3de] bg-transparent px-4 py-3 font-mono text-xs leading-relaxed text-[#2d2a26] placeholder-[#a39e98] focus:border-[#c9a55c] focus:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
           placeholder="Enter the prompt/instructions for this agent..."
         />
-        <p className="text-xs text-stone-400">
+        <p className="text-xs text-[#6b6560] dark:text-[#a39e98]">
           This prompt is passed to Claude when the agent runs. Modify it to change the agent&apos;s behavior.
         </p>
       </div>
@@ -210,8 +210,8 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
           className={cn(
             "flex items-center gap-2 border px-6 py-2 font-mono text-xs uppercase tracking-widest transition-all",
             isSaving || !hasChanges
-              ? "cursor-not-allowed border-stone-200 text-stone-300 dark:border-stone-700 dark:text-stone-600"
-              : "border-stone-900 text-stone-900 hover:bg-stone-900 hover:text-white dark:border-stone-100 dark:text-stone-100 dark:hover:bg-stone-100 dark:hover:text-stone-900"
+              ? "cursor-not-allowed border-[#e5e3de] text-[#a39e98] dark:border-[#3d3a36] dark:text-[#6b6560]"
+              : "border-[#2d2a26] text-[#2d2a26] hover:bg-[#2d2a26] hover:text-white dark:border-[#f5f3ee] dark:text-[#f5f3ee] dark:hover:bg-[#f5f3ee] dark:hover:text-[#2d2a26]"
           )}
         >
           {isSaving ? (
@@ -229,7 +229,7 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
           </span>
         )}
         {!hasChanges && !saved && (
-          <span className="text-xs text-stone-400">No changes to save</span>
+          <span className="text-xs text-[#6b6560] dark:text-[#a39e98]">No changes to save</span>
         )}
       </div>
     </div>

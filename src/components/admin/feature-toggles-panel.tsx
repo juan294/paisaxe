@@ -226,7 +226,7 @@ export function FeatureTogglesPanel() {
   if (isLoading && flags.length === 0) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-stone-300" />
+        <RefreshCw className="h-5 w-5 animate-spin text-[#a39e98]" />
       </div>
     );
   }
@@ -234,21 +234,21 @@ export function FeatureTogglesPanel() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <header className="flex items-end justify-between border-b border-stone-200 pb-6 dark:border-stone-800">
+      <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">Admin / Settings</p>
-          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-stone-900 dark:text-stone-100">
+          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Admin / Settings</p>
+          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
             Feature Toggles
           </h1>
         </div>
         <div className="flex items-center gap-6">
-          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
             {enabledByCategory.all.enabled}/{enabledByCategory.all.total} Active
           </p>
           <button
             onClick={loadFlags}
             disabled={isLoading}
-            className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 disabled:opacity-50 dark:hover:text-stone-100"
+            className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
           >
             {isLoading ? "Loading..." : "Refresh"}
           </button>
@@ -256,7 +256,7 @@ export function FeatureTogglesPanel() {
       </header>
 
       {error && (
-        <div className="flex items-center gap-3 font-mono text-xs text-red-600">
+        <div className="flex items-center gap-3 font-mono text-xs text-red-600 dark:text-red-400">
           <AlertCircle className="h-4 w-4" />
           {error}
         </div>
@@ -266,13 +266,13 @@ export function FeatureTogglesPanel() {
       <div className="flex flex-wrap items-center gap-4">
         {/* Search Input */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a39e98]" />
           <input
             type="text"
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-10 w-64 rounded-lg border border-stone-200 bg-white pl-10 pr-4 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-stone-500 dark:focus:ring-stone-500"
+            className="h-11 w-64 rounded-xl border-none bg-white pl-10 pr-4 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus:outline-none focus:ring-1 focus:ring-[#c9a55c] dark:bg-[#252320] dark:text-[#f5f3ee]"
           />
         </div>
 
@@ -281,18 +281,18 @@ export function FeatureTogglesPanel() {
         <button
           onClick={() => setActiveCategory("all")}
           className={cn(
-            "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+            "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
             activeCategory === "all"
-              ? "bg-stone-900 text-stone-100 dark:bg-stone-100 dark:text-stone-900"
-              : "text-stone-500 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800"
+              ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
+              : "text-[#6b6560] hover:bg-white dark:text-[#a39e98] dark:hover:bg-[#252320]"
           )}
         >
           All
           <span className={cn(
             "rounded-full px-2 py-0.5 text-xs tabular-nums",
             activeCategory === "all"
-              ? "bg-stone-700 text-stone-300 dark:bg-stone-300 dark:text-stone-700"
-              : "bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300"
+              ? "bg-[#1a1917] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
+              : "bg-[#e5e3de] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
           )}>
             {enabledByCategory.all.enabled}/{enabledByCategory.all.total}
           </span>
@@ -303,10 +303,10 @@ export function FeatureTogglesPanel() {
             key={category.key}
             onClick={() => setActiveCategory(category.key)}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+              "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
               activeCategory === category.key
-                ? "bg-stone-900 text-stone-100 dark:bg-stone-100 dark:text-stone-900"
-                : "text-stone-500 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800"
+                ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
+                : "text-[#6b6560] hover:bg-white dark:text-[#a39e98] dark:hover:bg-[#252320]"
             )}
             title={category.description}
           >
@@ -315,8 +315,8 @@ export function FeatureTogglesPanel() {
             <span className={cn(
               "rounded-full px-2 py-0.5 text-xs tabular-nums",
               activeCategory === category.key
-                ? "bg-stone-700 text-stone-300 dark:bg-stone-300 dark:text-stone-700"
-                : "bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300"
+                ? "bg-[#1a1917] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
+                : "bg-[#e5e3de] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
             )}>
               {enabledByCategory[category.key].enabled}/{enabledByCategory[category.key].total}
             </span>
@@ -327,53 +327,53 @@ export function FeatureTogglesPanel() {
 
       {/* Category Description */}
       {activeCategory !== "all" && (
-        <p className="text-sm text-stone-500 dark:text-stone-400">
+        <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
           {CATEGORIES.find((c) => c.key === activeCategory)?.description}
         </p>
       )}
 
       {/* Flags Table */}
       {filteredFlags.length === 0 ? (
-        <div className="flex min-h-[200px] items-center justify-center rounded-2xl bg-white dark:bg-stone-900">
-          <p className="text-sm text-stone-500">
+        <div className="flex min-h-[200px] items-center justify-center rounded-2xl bg-white dark:bg-[#252320]">
+          <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
             {searchQuery ? "No flags match your search" : "No flags in this category"}
           </p>
         </div>
       ) : (
         <table className="w-full">
           <thead>
-            <tr className="border-b border-stone-200 text-left dark:border-stone-800">
-              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">#</th>
-              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Feature</th>
-              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Description</th>
-              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Status</th>
-              <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Toggle</th>
+            <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
+              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">#</th>
+              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Feature</th>
+              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Description</th>
+              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Status</th>
+              <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Toggle</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+          <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
             {filteredFlags.map((flag, idx) => (
               <tr key={flag.flagKey} className="group">
                 <td
                   colSpan={5}
-                  className={cn("p-0", flag.enabled && "bg-stone-50 dark:bg-stone-900/50")}
+                  className={cn("p-0", flag.enabled && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}
                 >
                   {/* Main row content */}
                   <div className="flex items-center py-5">
-                    <div className="w-12 font-mono text-sm tabular-nums text-stone-300">
+                    <div className="w-12 font-mono text-sm tabular-nums text-[#a39e98]">
                       {String(idx + 1).padStart(2, "0")}
                     </div>
-                    <div className="flex-1 text-sm font-medium text-stone-900 dark:text-stone-100">
+                    <div className="flex-1 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
                       <div className="flex items-center gap-2">
                         {flag.label}
                         {activeCategory === "all" && (
-                          <span className="rounded bg-stone-100 px-1.5 py-0.5 text-xs font-normal text-stone-500 dark:bg-stone-800 dark:text-stone-400">
+                          <span className="rounded bg-[#f5f3ee] px-1.5 py-0.5 text-xs font-normal text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]">
                             {CATEGORIES.find((c) => c.key === FLAG_CATEGORIES[flag.flagKey])?.label}
                           </span>
                         )}
                         {isConfigurable(flag.flagKey) && (
                           <button
                             onClick={() => toggleExpanded(flag.flagKey)}
-                            className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-normal text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-800 dark:hover:text-stone-300"
+                            className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-normal text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36] dark:hover:text-[#a39e98]"
                             aria-label={`Configure ${flag.label}`}
                             aria-expanded={expandedKey === flag.flagKey}
                           >
@@ -388,17 +388,17 @@ export function FeatureTogglesPanel() {
                         )}
                       </div>
                     </div>
-                    <div className="flex-1 text-sm text-stone-500">
+                    <div className="flex-1 text-sm text-[#6b6560] dark:text-[#a39e98]">
                       {flag.description || "—"}
                     </div>
                     <div className="w-24">
                       {flag.enabled ? (
-                        <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-stone-900 dark:text-stone-100">
+                        <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-[#2d2a26] dark:text-[#f5f3ee]">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                           On
                         </span>
                       ) : (
-                        <span className="font-mono text-xs uppercase tracking-widest text-stone-300">
+                        <span className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
                           Off
                         </span>
                       )}
@@ -410,8 +410,8 @@ export function FeatureTogglesPanel() {
                         className={cn(
                           "relative h-6 w-11 rounded-full transition-colors",
                           flag.enabled
-                            ? "bg-stone-900 dark:bg-stone-100"
-                            : "bg-stone-200 dark:bg-stone-800",
+                            ? "bg-[#2d2a26] dark:bg-[#f5f3ee]"
+                            : "bg-[#e5e3de] dark:bg-[#3d3a36]",
                           updatingKey === flag.flagKey && "cursor-wait opacity-50"
                         )}
                         role="switch"
@@ -422,8 +422,8 @@ export function FeatureTogglesPanel() {
                           className={cn(
                             "absolute top-0.5 h-5 w-5 rounded-full transition-all",
                             flag.enabled
-                              ? "left-[22px] bg-white dark:bg-stone-900"
-                              : "left-0.5 bg-white dark:bg-stone-600"
+                              ? "left-[22px] bg-white dark:bg-[#2d2a26]"
+                              : "left-0.5 bg-white dark:bg-[#6b6560]"
                           )}
                         />
                       </button>
@@ -432,7 +432,7 @@ export function FeatureTogglesPanel() {
 
                   {/* Expandable config panel */}
                   {expandedKey === flag.flagKey && flag.flagKey === "visitor_voice_agent" && (
-                    <div className="border-t border-stone-100 px-12 pb-6 dark:border-stone-800">
+                    <div className="border-t border-[#f5f3ee] px-12 pb-6 dark:border-[#3d3a36]">
                       <VisitorVoiceConfigPanel
                         flag={flag}
                         onUpdate={handleFlagUpdate}
@@ -440,7 +440,7 @@ export function FeatureTogglesPanel() {
                     </div>
                   )}
                   {expandedKey === flag.flagKey && flag.flagKey.endsWith("_agent_enabled") && (
-                    <div className="border-t border-stone-100 px-12 pb-6 dark:border-stone-800">
+                    <div className="border-t border-[#f5f3ee] px-12 pb-6 dark:border-[#3d3a36]">
                       <AgentConfigPanel
                         flag={flag}
                         onUpdate={handleFlagUpdate}
@@ -448,7 +448,7 @@ export function FeatureTogglesPanel() {
                     </div>
                   )}
                   {expandedKey === flag.flagKey && flag.flagKey === "maintenance_mode" && (
-                    <div className="border-t border-stone-100 px-12 pb-6 dark:border-stone-800">
+                    <div className="border-t border-[#f5f3ee] px-12 pb-6 dark:border-[#3d3a36]">
                       <MaintenanceConfigPanel
                         flag={flag}
                         onUpdate={handleFlagUpdate}
@@ -462,7 +462,7 @@ export function FeatureTogglesPanel() {
         </table>
       )}
 
-      <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+      <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
         Changes propagate to all visitors within 1 minute
       </p>
     </div>

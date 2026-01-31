@@ -214,11 +214,11 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
   const voiceConfigured = !!selectedAgent.elevenLabsAgentId;
 
   return (
-    <div className="border border-stone-200 p-6 dark:border-stone-800">
+    <div className="border border-[#e5e3de] p-6 dark:border-[#3d3a36]">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between border-b border-stone-200 pb-4 dark:border-stone-800">
+      <div className="mb-6 flex items-center justify-between border-b border-[#e5e3de] pb-4 dark:border-[#3d3a36]">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+          <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
             {isTextMode ? "Text Mode" : "Voice Mode"}
           </p>
         </div>
@@ -226,7 +226,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
         {/* Mode Toggle */}
         <button
           onClick={() => setIsTextMode(!isTextMode)}
-          className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 dark:hover:text-stone-100"
+          className="font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
         >
           {isTextMode ? "Switch to Voice" : "Switch to Text"}
         </button>
@@ -242,8 +242,8 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
             className={cn(
               "flex items-center gap-2 whitespace-nowrap border px-4 py-2 transition-all",
               selectedAgent.id === agent.id
-                ? "border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900"
-                : "border-stone-200 text-stone-600 hover:border-stone-400 dark:border-stone-700 dark:text-stone-400 dark:hover:border-stone-500",
+                ? "border-[#2d2a26] bg-[#2d2a26] text-white dark:border-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
+                : "border-[#e5e3de] text-[#6b6560] hover:border-[#a39e98] dark:border-[#4d4944] dark:text-[#a39e98] dark:hover:border-[#6b6560]",
               isConnected && "cursor-not-allowed opacity-50"
             )}
           >
@@ -278,15 +278,15 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
           )}
 
           {/* Call Controls */}
-          <div className="flex items-center gap-6 border border-stone-200 p-6 dark:border-stone-800">
+          <div className="flex items-center gap-6 border border-[#e5e3de] p-6 dark:border-[#3d3a36]">
             {/* Agent Avatar */}
             <div className="relative">
               <div
                 className={cn(
                   "flex h-16 w-16 items-center justify-center border-2 font-mono text-xl font-medium transition-all",
                   isConnected
-                    ? "border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100"
-                    : "border-stone-300 text-stone-400",
+                    ? "border-[#2d2a26] text-[#2d2a26] dark:border-[#f5f3ee] dark:text-[#f5f3ee]"
+                    : "border-[#a39e98] text-[#a39e98]",
                   isConnected && isSpeaking && "animate-pulse"
                 )}
               >
@@ -300,10 +300,10 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
             {/* Status & Controls */}
             <div className="flex flex-col items-start gap-3">
               <div>
-                <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
+                <p className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
                   {selectedAgent.name}
                 </p>
-                <p className="font-mono text-xs text-stone-400">
+                <p className="font-mono text-xs text-[#a39e98]">
                   {isConnected
                     ? isSpeaking
                       ? "Speaking..."
@@ -320,8 +320,8 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
                     className={cn(
                       "flex items-center gap-2 border px-4 py-2 font-mono text-xs uppercase tracking-widest transition-all",
                       voiceConfigured && hasPermission !== false
-                        ? "border-stone-900 text-stone-900 hover:bg-stone-900 hover:text-white dark:border-stone-100 dark:text-stone-100 dark:hover:bg-stone-100 dark:hover:text-stone-900"
-                        : "cursor-not-allowed border-stone-200 text-stone-300"
+                        ? "border-[#2d2a26] text-[#2d2a26] hover:bg-[#2d2a26] hover:text-white dark:border-[#f5f3ee] dark:text-[#f5f3ee] dark:hover:bg-[#f5f3ee] dark:hover:text-[#2d2a26]"
+                        : "cursor-not-allowed border-[#e5e3de] text-[#a39e98]"
                     )}
                   >
                     <Phone className="h-3 w-3" />
@@ -335,7 +335,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
                         "flex h-8 w-8 items-center justify-center border transition-all",
                         isMuted
                           ? "border-red-500 bg-red-500 text-white"
-                          : "border-stone-200 text-stone-500 hover:border-stone-400 dark:border-stone-700"
+                          : "border-[#e5e3de] text-[#6b6560] hover:border-[#a39e98] dark:border-[#4d4944]"
                       )}
                     >
                       {isMuted ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
@@ -365,21 +365,21 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
       )}
 
       {/* Messages / Transcript */}
-      <div className="mb-4 h-[250px] overflow-y-auto border border-stone-200 p-4 dark:border-stone-800">
+      <div className="mb-4 h-[250px] overflow-y-auto border border-[#e5e3de] p-4 dark:border-[#3d3a36]">
         {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <p className="text-center font-mono text-xs text-stone-400">
+            <p className="text-center font-mono text-xs text-[#a39e98]">
               {isTextMode ? (
                 <>
                   Start a conversation with {selectedAgent.name}
                   <br />
-                  <span className="text-stone-300">Type your message below</span>
+                  <span className="text-[#a39e98]">Type your message below</span>
                 </>
               ) : (
                 <>
                   Click &quot;Start Call&quot; to begin
                   <br />
-                  <span className="text-stone-300">Or switch to text mode</span>
+                  <span className="text-[#a39e98]">Or switch to text mode</span>
                 </>
               )}
             </p>
@@ -398,8 +398,8 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
                   className={cn(
                     "flex h-6 w-6 flex-shrink-0 items-center justify-center border font-mono text-[9px] font-medium",
                     message.role === "user"
-                      ? "border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100"
-                      : "border-stone-400 text-stone-500"
+                      ? "border-[#2d2a26] text-[#2d2a26] dark:border-[#f5f3ee] dark:text-[#f5f3ee]"
+                      : "border-[#a39e98] text-[#6b6560]"
                   )}
                 >
                   {message.role === "user" ? "U" : PLATFORM_BADGES[selectedAgent.platform]}
@@ -408,8 +408,8 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
                   className={cn(
                     "max-w-[80%] border px-3 py-2 text-sm",
                     message.role === "user"
-                      ? "border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900"
-                      : "border-stone-200 text-stone-700 dark:border-stone-700 dark:text-stone-300"
+                      ? "border-[#2d2a26] bg-[#2d2a26] text-white dark:border-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
+                      : "border-[#e5e3de] text-[#4d4944] dark:border-[#4d4944] dark:text-[#a39e98]"
                   )}
                 >
                   <p className="whitespace-pre-wrap">{message.content}</p>
@@ -418,12 +418,12 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
             ))}
             {isTextLoading && (
               <div className="flex gap-3">
-                <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center border border-stone-400 font-mono text-[9px] font-medium text-stone-500">
+                <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center border border-[#a39e98] font-mono text-[9px] font-medium text-[#6b6560]">
                   {PLATFORM_BADGES[selectedAgent.platform]}
                 </div>
-                <div className="flex items-center gap-2 border border-stone-200 px-3 py-2 dark:border-stone-700">
-                  <Loader2 className="h-3 w-3 animate-spin text-stone-400" />
-                  <span className="font-mono text-xs text-stone-400">Thinking...</span>
+                <div className="flex items-center gap-2 border border-[#e5e3de] px-3 py-2 dark:border-[#4d4944]">
+                  <Loader2 className="h-3 w-3 animate-spin text-[#a39e98]" />
+                  <span className="font-mono text-xs text-[#a39e98]">Thinking...</span>
                 </div>
               </div>
             )}
@@ -443,7 +443,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
               ? "Type while on call..."
               : `Message ${selectedAgent.name}...`
           }
-          className="flex-1 border border-stone-200 bg-transparent px-4 py-3 text-sm text-stone-900 placeholder-stone-400 focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:text-stone-100"
+          className="flex-1 border border-[#e5e3de] bg-transparent px-4 py-3 text-sm text-[#2d2a26] placeholder-[#a39e98] focus:border-[#a39e98] focus:outline-none focus:ring-1 focus:ring-[#c9a55c] dark:border-[#4d4944] dark:text-[#f5f3ee]"
           disabled={isTextLoading}
         />
         <button
@@ -452,8 +452,8 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
           className={cn(
             "flex h-12 w-12 items-center justify-center border transition-all",
             textInput.trim() && !isTextLoading
-              ? "border-stone-900 bg-stone-900 text-white hover:bg-stone-800 dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900"
-              : "border-stone-200 text-stone-300 dark:border-stone-700"
+              ? "border-[#2d2a26] bg-[#2d2a26] text-white hover:bg-[#3d3a36] dark:border-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
+              : "border-[#e5e3de] text-[#a39e98] dark:border-[#4d4944]"
           )}
         >
           {isTextLoading ? (
@@ -465,7 +465,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
       </form>
 
       {/* Help Text */}
-      <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-widest text-stone-400">
+      <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-widest text-[#a39e98]">
         {isTextMode
           ? "Voice mode available above"
           : "Text input always available"}

@@ -320,15 +320,15 @@ export function ImageEditorDialog({
   return (
     <>
       <Dialog open={!!story} onOpenChange={resetAndClose}>
-        <DialogContent hideCloseButton className="max-w-xl gap-0 overflow-hidden rounded-2xl border-white/50 bg-white/80 p-0 shadow-xl shadow-black/10 backdrop-blur-xl">
+        <DialogContent hideCloseButton className="max-w-xl gap-0 overflow-hidden rounded-2xl border-[#e5e3de] bg-white p-0 shadow-xl dark:border-[#3d3a36] dark:bg-[#252320]">
           {/* Header */}
-          <DialogHeader className="border-b border-slate-100/80 px-5 py-4">
+          <DialogHeader className="border-b border-[#e5e3de] px-5 py-4 dark:border-[#3d3a36]">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <DialogTitle className="text-sm font-semibold text-slate-900">
+                <DialogTitle className="text-sm font-semibold text-[#2d2a26]">
                   {story.title}
                 </DialogTitle>
-                <DialogDescription className="text-xs text-slate-500">
+                <DialogDescription className="text-xs text-[#6b6560]">
                   Update hero image
                 </DialogDescription>
               </div>
@@ -347,7 +347,7 @@ export function ImageEditorDialog({
             )}
 
             {/* Current/Preview Image */}
-            <div className="relative mb-5 aspect-video overflow-hidden rounded-xl bg-slate-100 shadow-sm">
+            <div className="relative mb-5 aspect-video overflow-hidden rounded-xl bg-[#f5f3ee] shadow-sm">
               {currentPreview ? (
                 <>
                   <Image
@@ -371,7 +371,7 @@ export function ImageEditorDialog({
                   )}
                 </>
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-400">
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-[#a39e98]">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm">
                     <ImagePlus className="h-6 w-6" />
                   </div>
@@ -381,13 +381,13 @@ export function ImageEditorDialog({
             </div>
 
             {/* Tabs */}
-            <div className="mb-4 flex gap-1 rounded-xl bg-slate-100/80 p-1 backdrop-blur-sm">
+            <div className="mb-4 flex gap-1 rounded-xl bg-[#f5f3ee]/80 p-1 backdrop-blur-sm">
               <button
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
                   activeTab === "content"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-white text-[#2d2a26] shadow-sm"
+                    : "text-[#6b6560] hover:text-[#2d2a26]"
                 )}
                 onClick={() => {
                   setActiveTab("content");
@@ -402,8 +402,8 @@ export function ImageEditorDialog({
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
                   activeTab === "url"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-white text-[#2d2a26] shadow-sm"
+                    : "text-[#6b6560] hover:text-[#2d2a26]"
                 )}
                 onClick={() => {
                   setActiveTab("url");
@@ -417,8 +417,8 @@ export function ImageEditorDialog({
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
                   activeTab === "upload"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-white text-[#2d2a26] shadow-sm"
+                    : "text-[#6b6560] hover:text-[#2d2a26]"
                 )}
                 onClick={() => {
                   setActiveTab("upload");
@@ -439,7 +439,7 @@ export function ImageEditorDialog({
                   placeholder="https://example.com/image.jpg"
                   value={imageUrl}
                   onChange={(e) => handleUrlChange(e.target.value)}
-                  className="h-10 rounded-xl border-slate-200/80 bg-white/80 text-sm text-slate-900 shadow-sm backdrop-blur-sm placeholder:text-slate-400 focus:border-blue-300 focus:ring-blue-200"
+                  className="h-11 rounded-xl border-none bg-[#f5f3ee] text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:bg-[#2d2a26] dark:text-[#f5f3ee]"
                 />
               ) : activeTab === "content" ? (
                 <div className="space-y-3">
@@ -447,7 +447,7 @@ export function ImageEditorDialog({
                   <button
                     onClick={handleSearchContent}
                     disabled={isSearchingContent || !story?.sourcePdf}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200/80 bg-white/80 px-4 py-3 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#e5e3de]/80 bg-white/80 px-4 py-3 text-sm font-medium text-[#4d4944] shadow-sm backdrop-blur-sm transition-all hover:bg-[#f5f3ee] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isSearchingContent ? (
                       <>
@@ -464,41 +464,41 @@ export function ImageEditorDialog({
 
                   {/* No source PDF warning */}
                   {!story?.sourcePdf && (
-                    <p className="text-center text-xs text-slate-500">
+                    <p className="text-center text-xs text-[#6b6560]">
                       This story has no source PDF linked.
                     </p>
                   )}
 
                   {/* Content search results */}
                   {contentSearched && (
-                    <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm backdrop-blur-sm">
+                    <div className="rounded-xl border border-[#e5e3de]/80 bg-white/80 p-3 shadow-sm backdrop-blur-sm">
                       {contentImages.length === 0 ? (
-                        <p className="text-center text-xs text-slate-500">
+                        <p className="text-center text-xs text-[#6b6560]">
                           No images found in the PDF content.
                         </p>
                       ) : (
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-slate-600">
+                            <span className="text-xs font-medium text-[#6b6560]">
                               {contentImageIndex + 1} of {contentImages.length} images
                             </span>
                             <div className="flex gap-1">
                               <button
                                 onClick={() => handleContentImageNav("prev")}
-                                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                                className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560]"
                               >
                                 <ChevronLeft className="h-4 w-4" />
                               </button>
                               <button
                                 onClick={() => handleContentImageNav("next")}
-                                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                                className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560]"
                               >
                                 <ChevronRight className="h-4 w-4" />
                               </button>
                             </div>
                           </div>
                           {currentContentImage && (
-                            <div className="flex items-center justify-between text-[10px] text-slate-500">
+                            <div className="flex items-center justify-between text-[10px] text-[#6b6560]">
                               <span>
                                 {currentContentImage.width} × {currentContentImage.height}px
                               </span>
@@ -523,21 +523,21 @@ export function ImageEditorDialog({
                   />
 
                   {selectedFile ? (
-                    <div className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm">
+                    <div className="flex items-center justify-between rounded-xl border border-[#e5e3de]/80 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm">
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 shadow-sm">
                           <ImagePlus className="h-4 w-4 text-white" />
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-slate-900">{selectedFile.name}</p>
-                          <p className="text-[10px] text-slate-500">
+                          <p className="text-xs font-medium text-[#2d2a26]">{selectedFile.name}</p>
+                          <p className="text-[10px] text-[#6b6560]">
                             {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                           </p>
                         </div>
                       </div>
                       <button
                         onClick={clearUpload}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560]"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -553,17 +553,17 @@ export function ImageEditorDialog({
                         "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-8 transition-all",
                         isDragging
                           ? "border-blue-400 bg-blue-50/50"
-                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/50"
+                          : "border-[#e5e3de] hover:border-[#a39e98] hover:bg-[#f5f3ee]/50"
                       )}
                     >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
-                        <ImagePlus className="h-5 w-5 text-slate-400" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f5f3ee]">
+                        <ImagePlus className="h-5 w-5 text-[#a39e98]" />
                       </div>
                       <div className="text-center">
-                        <p className="text-xs font-medium text-slate-600">
+                        <p className="text-xs font-medium text-[#6b6560]">
                           {isDragging ? "Drop here" : "Click or drag"}
                         </p>
-                        <p className="mt-0.5 text-[10px] text-slate-400">
+                        <p className="mt-0.5 text-[10px] text-[#a39e98]">
                           JPEG, PNG, WebP, GIF · Max 5MB
                         </p>
                       </div>
@@ -574,7 +574,7 @@ export function ImageEditorDialog({
 
               {/* Image Source / Attribution */}
               <div className="pt-2">
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                <label className="mb-1.5 block text-xs font-medium text-[#6b6560]">
                   Image Source / Attribution
                 </label>
                 <Input
@@ -582,9 +582,9 @@ export function ImageEditorDialog({
                   placeholder="e.g., Photo by Juan on Unsplash"
                   value={imageSource}
                   onChange={(e) => setImageSource(e.target.value)}
-                  className="h-10 rounded-xl border-slate-200/80 bg-white/80 text-sm text-slate-900 shadow-sm backdrop-blur-sm placeholder:text-slate-400 focus:border-blue-300 focus:ring-blue-200"
+                  className="h-11 rounded-xl border-none bg-[#f5f3ee] text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:bg-[#2d2a26] dark:text-[#f5f3ee]"
                 />
-                <p className="mt-1.5 text-[10px] text-slate-400">
+                <p className="mt-1.5 text-[10px] text-[#a39e98]">
                   Will be displayed below the image in stories
                 </p>
               </div>
@@ -599,7 +599,7 @@ export function ImageEditorDialog({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between border-t border-slate-100/80 px-5 py-4">
+          <div className="flex items-center justify-between border-t border-[#e5e3de] px-5 py-4 dark:border-[#3d3a36]">
             <div>
               {story.curationStatus === "needs_curation" ? (
                 <button
@@ -627,7 +627,7 @@ export function ImageEditorDialog({
                 size="sm"
                 onClick={resetAndClose}
                 disabled={isLoading}
-                className="h-9 rounded-xl px-4 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                className="h-9 rounded-xl px-4 text-xs text-[#6b6560] hover:bg-[#f5f3ee] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:bg-[#2d2a26] dark:hover:text-[#f5f3ee]"
               >
                 Cancel
               </Button>
@@ -635,7 +635,7 @@ export function ImageEditorDialog({
                 size="sm"
                 onClick={handleSave}
                 disabled={isLoading}
-                className="h-9 rounded-xl bg-slate-900 px-4 text-xs font-medium text-white shadow-lg shadow-slate-900/25 transition-all hover:bg-slate-800 hover:shadow-xl"
+                className="h-9 rounded-xl bg-[#2d2a26] px-4 text-xs font-medium text-[#f5f3ee] shadow-lg transition-all hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
               >
                 {isLoading ? (
                   <>
