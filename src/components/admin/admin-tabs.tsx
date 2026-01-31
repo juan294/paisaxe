@@ -23,7 +23,7 @@ export function AdminTabs({ activeTab, onTabChange }: AdminTabsProps) {
       className="flex items-center gap-8 border-b border-stone-200 dark:border-stone-800"
       role="tablist"
     >
-      {TABS.map((tab) => (
+      {TABS.map((tab, index) => (
         <button
           key={tab.value}
           role="tab"
@@ -40,6 +40,9 @@ export function AdminTabs({ activeTab, onTabChange }: AdminTabsProps) {
             {tab.number}
           </span>
           {tab.label}
+          <kbd className="inline-flex items-center justify-center rounded bg-stone-100 px-1.5 py-0.5 font-sans text-[10px] font-medium text-stone-400 dark:bg-stone-800 dark:text-stone-500">
+            ⌘{index + 1}
+          </kbd>
           {activeTab === tab.value && (
             <span className="absolute bottom-0 left-0 h-px w-full bg-stone-900 dark:bg-stone-100" />
           )}
