@@ -151,3 +151,81 @@ write_report_header() {
 
 EOF
 }
+
+# Get the prompt for an agent from its feature flag config
+# Usage: get_agent_prompt "agent_flag_key"
+# Outputs: The prompt string, or empty if not found
+get_agent_prompt() {
+  local agent_flag="$1"
+  local response
+  local prompt
+
+  # Fetch feature flags from API
+  response=$(curl -s --max-time 10 "$FEATURE_FLAGS_URL" 2>/dev/null)
+  if [[ -z "$response" ]]; then
+    log_error "Failed to fetch feature flags from $FEATURE_FLAGS_URL" >&2
+    return 1
+  fi
+
+  # Parse the response using Python (more reliable with multiline strings)
+  # Falls back to jq if Python is not available
+  if command -v python3 &>/dev/null; then
+    prompt=$(AGENT_FLAG="$agent_flag" python3 -c "
+import sys, json, os
+flag_key = os.environ.get('AGENT_FLAG', '')
+try:
+    data = json.load(sys.stdin)
+    for flag in data.get('data', []):
+        if flag.get('flagKey') == flag_key:
+            config = flag.get('config', {})
+            prompt = config.get('prompt', '')
+            if prompt:
+                print(prompt)
+                break
+except Exception as e:
+    pass
+" <<< "$response" 2>/dev/null)
+  elif command -v jq &>/dev/null; then
+    prompt=$(echo "$response" | jq -r --arg key "$agent_flag" '.data[] | select(.flagKey == $key) | .config.prompt // empty' 2>/dev/null | head -1)
+  else
+    log_error "Either python3 or jq is required but neither is installed" >&2
+    return 1
+  fi
+
+  if [[ -n "$prompt" ]]; then
+    echo "$prompt"
+    return 0
+  else
+    log_warn "No prompt found in config for '$agent_flag'" >&2
+    return 1
+  fi
+}
+
+# Get a config value for an agent from its feature flag config
+# Usage: get_agent_config "agent_flag_key" "config_key"
+# Outputs: The config value, or empty if not found
+get_agent_config() {
+  local agent_flag="$1"
+  local config_key="$2"
+  local response
+  local value
+
+  # Fetch feature flags from API
+  response=$(curl -s --max-time 10 "$FEATURE_FLAGS_URL" 2>/dev/null) || {
+    log_error "Failed to fetch feature flags from $FEATURE_FLAGS_URL"
+    return 1
+  }
+
+  # Parse the response and extract the config value
+  value=$(echo "$response" | jq -r --arg key "$agent_flag" --arg ckey "$config_key" '.data[] | select(.flagKey == $key) | .config[$ckey] // empty' 2>/dev/null | head -1) || {
+    log_error "Failed to parse feature flags response"
+    return 1
+  }
+
+  if [[ -n "$value" ]]; then
+    echo "$value"
+    return 0
+  else
+    return 1
+  fi
+}

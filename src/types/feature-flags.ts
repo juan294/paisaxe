@@ -24,6 +24,12 @@ export interface VisitorVoiceConfig {
   agent_id: string;
 }
 
+export interface AgentConfig {
+  prompt: string;
+  schedule_description?: string;
+  output_file?: string;
+}
+
 export type Environment = "development" | "production";
 
 export interface FeatureFlag {
