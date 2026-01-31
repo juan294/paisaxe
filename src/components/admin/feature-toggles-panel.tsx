@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import { VisitorVoiceConfigPanel } from "./visitor-voice-config-panel";
 import { AgentConfigPanel } from "./agent-config-panel";
+import { MaintenanceConfigPanel } from "./maintenance-config-panel";
 
 // Feature flag categories
 type FlagCategory = "discovery" | "experience" | "social" | "voice" | "system";
@@ -98,6 +99,7 @@ const CONFIGURABLE_FLAGS = [
   "security_agent_enabled",
   "docs_freshness_agent_enabled",
   "performance_agent_enabled",
+  "maintenance_mode",
 ];
 
 export function FeatureTogglesPanel() {
@@ -440,6 +442,14 @@ export function FeatureTogglesPanel() {
                   {expandedKey === flag.flagKey && flag.flagKey.endsWith("_agent_enabled") && (
                     <div className="border-t border-stone-100 px-12 pb-6 dark:border-stone-800">
                       <AgentConfigPanel
+                        flag={flag}
+                        onUpdate={handleFlagUpdate}
+                      />
+                    </div>
+                  )}
+                  {expandedKey === flag.flagKey && flag.flagKey === "maintenance_mode" && (
+                    <div className="border-t border-stone-100 px-12 pb-6 dark:border-stone-800">
+                      <MaintenanceConfigPanel
                         flag={flag}
                         onUpdate={handleFlagUpdate}
                       />

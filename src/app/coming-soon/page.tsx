@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Logo } from "@/components/ui/logo";
+import { supabase } from "@/lib/supabase";
+import { getEnvironment } from "@/lib/environment";
+import type { MaintenanceConfig } from "@/types/feature-flags";
 
 export const metadata: Metadata = {
   title: "Paisaxe | Próximamente",
@@ -10,7 +13,41 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ComingSoonPage() {
+// Default config if none is set
+const DEFAULT_CONFIG: MaintenanceConfig = {
+  title: "Próximamente",
+  message: "",
+  show_tagline: true,
+};
+
+async function getMaintenanceConfig(): Promise<MaintenanceConfig> {
+  try {
+    const environment = getEnvironment();
+    const { data, error } = await supabase
+      .from("feature_flags")
+      .select("config")
+      .eq("flag_key", "maintenance_mode")
+      .eq("environment", environment)
+      .single();
+
+    if (error || !data?.config) {
+      return DEFAULT_CONFIG;
+    }
+
+    const config = data.config as Partial<MaintenanceConfig>;
+    return {
+      title: config.title ?? DEFAULT_CONFIG.title,
+      message: config.message ?? DEFAULT_CONFIG.message,
+      show_tagline: config.show_tagline ?? DEFAULT_CONFIG.show_tagline,
+    };
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
+export default async function ComingSoonPage() {
+  const config = await getMaintenanceConfig();
+
   return (
     <main className="relative min-h-screen bg-[#030303] overflow-hidden">
       {/* Animated gradient background */}
@@ -40,22 +77,31 @@ export default function ComingSoonPage() {
         </h1>
 
         {/* Tagline */}
-        <p className="text-lg md:text-xl text-white/60 tracking-widest uppercase mb-16 opacity-0 animate-fade-in-up-delay-2">
-          Look. Ask. Explore.
-        </p>
+        {config.show_tagline && (
+          <p className="text-lg md:text-xl text-white/60 tracking-widest uppercase mb-16 opacity-0 animate-fade-in-up-delay-2">
+            Look. Ask. Explore.
+          </p>
+        )}
 
-        {/* Coming Soon */}
-        <div className="opacity-0 animate-fade-in-up-delay-3">
+        {/* Coming Soon / Maintenance Message */}
+        <div className={`opacity-0 ${config.show_tagline ? 'animate-fade-in-up-delay-3' : 'animate-fade-in-up-delay-2 mt-12'}`}>
           <div className="relative">
             {/* Glassmorphism card */}
             <div className="px-10 py-5 rounded-full bg-white/[0.03] backdrop-blur-sm border border-white/10 shadow-2xl">
               <span className="text-sm md:text-base tracking-[0.3em] uppercase text-white/80">
-                Próximamente
+                {config.title}
               </span>
             </div>
             {/* Subtle glow effect */}
             <div className="absolute inset-0 -z-10 blur-2xl opacity-30 bg-gradient-to-r from-blue-500/20 via-white/10 to-emerald-500/20 rounded-full" />
           </div>
+
+          {/* Additional message */}
+          {config.message && (
+            <p className="mt-6 text-center text-sm text-white/50 max-w-md">
+              {config.message}
+            </p>
+          )}
         </div>
       </div>
     </main>

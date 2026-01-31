@@ -30,6 +30,12 @@ export interface AgentConfig {
   output_file?: string;
 }
 
+export interface MaintenanceConfig {
+  title: string;
+  message: string;
+  show_tagline: boolean;
+}
+
 export type Environment = "development" | "production";
 
 export interface FeatureFlag {
