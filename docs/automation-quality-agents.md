@@ -1,38 +1,34 @@
-# Phase 8: Automation & Quality Agents
+# Automation & Quality Agents
 
-> Comprehensive guide to the automation, security, and quality infrastructure added to Paisaxe.
+> Comprehensive guide to the automation, security, and quality infrastructure for Paisaxe.
 > Designed to be replicable by other teams on any Next.js + GitHub + Vercel + Supabase stack.
 
-**Date**: January 27, 2026
-**Scope**: 11 tools across security, CI/CD, performance, monitoring, and code quality
+**Last Updated**: January 31, 2026
+**Scope**: CI/CD workflows, local agents, security measures, monitoring, and admin controls
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Security & Supply Chain](#security--supply-chain)
-3. [Performance & Accessibility](#performance--accessibility)
-4. [Code Quality](#code-quality)
-5. [Monitoring & Observability](#monitoring--observability)
-6. [Database Maintenance](#database-maintenance)
-7. [Deployment](#deployment)
-8. [Configuration Reference](#configuration-reference)
-9. [Replication Guide](#replication-guide)
+2. [Local Automated Agents](#local-automated-agents)
+3. [Admin Panel Controls](#admin-panel-controls)
+4. [CI/CD Workflows](#cicd-workflows)
+5. [Security & Supply Chain](#security--supply-chain)
+6. [Performance & Accessibility](#performance--accessibility)
+7. [Code Quality](#code-quality)
+8. [Monitoring & Observability](#monitoring--observability)
+9. [Database Maintenance](#database-maintenance)
+10. [Configuration Reference](#configuration-reference)
 
 ---
 
 ## Overview
 
-### What We Built
-
-A fully automated quality and security pipeline that runs with zero human intervention. Every push, every PR, and every night, automated agents verify that the codebase stays secure, performant, and clean.
-
 ### Architecture
 
 ```
-Push/PR to GitHub
-  |
+GitHub Actions (Push/PR)
   +-- ci.yml .............. Lint, Typecheck, Tests, Build
   +-- e2e.yml ............. Playwright E2E tests
   +-- gitleaks.yml ........ Secret scanning
@@ -43,11 +39,19 @@ Push/PR to GitHub
   +-- claude-review.yml ... AI-powered code review
   +-- security.yml ........ npm audit (also weekly cron)
 
-Scheduled (Cron)
+GitHub Actions (Scheduled)
   +-- gitleaks.yml ........ Daily 04:00 UTC - full history scan
   +-- security.yml ........ Weekly Monday 08:00 UTC - npm audit
-  +-- coverage-agent.sh ... Nightly 02:00 CET - coverage analysis (local)
-  +-- pg_cron ............. Database VACUUM/ANALYZE (Supabase)
+
+Local Agents (macOS launchd)
+  +-- coverage-agent ...... Daily 02:00 AM - test coverage analysis
+  +-- security-agent ...... Weekly Monday 09:00 AM - npm audit + licenses
+  +-- docs-freshness-agent  Weekly Sunday 06:00 AM - stale docs detection
+  +-- performance-agent ... Weekly Saturday 10:00 AM - Lighthouse + bundles
+
+Database (pg_cron)
+  +-- vacuum-analyze ...... Weekly - database maintenance
+  +-- keep-alive .......... Every 3 days - prevent idle shutdown
 
 External Monitoring
   +-- Upptime ............. Every 5 minutes - site & API health
@@ -56,434 +60,417 @@ External Monitoring
 
 ### Cost
 
-All free. Every tool uses either:
+All free or included in existing services:
 - GitHub Actions (free for public repos, generous free tier for private)
 - Open-source tools (Gitleaks, Knip, Lighthouse, license-checker)
-- Free tiers of paid services (Vercel, Supabase, Upptime via GitHub Pages)
-- Services already paid for (Anthropic API for Claude reviews)
+- Free tiers (Vercel, Supabase, Upptime via GitHub Pages)
+- Local agents run on your Mac (no cloud cost)
+- Anthropic API (for Claude reviews and coverage agent)
+
+---
+
+## Local Automated Agents
+
+Four agents run locally via macOS launchd, controlled via feature flags in the admin panel.
+
+### Agent Overview
+
+| Agent | Script | Schedule | Output | Default |
+|-------|--------|----------|--------|---------|
+| Coverage | `scripts/coverage-agent.sh` | Daily 2:00 AM | `docs/agents/coverage-report.md` | Enabled |
+| Security | `scripts/security-agent.sh` | Mon 9:00 AM | `docs/agents/security-report.md` | Disabled |
+| Docs Freshness | `scripts/docs-freshness-agent.sh` | Sun 6:00 AM | `docs/agents/docs-freshness-report.md` | Disabled |
+| Performance | `scripts/performance-agent.sh` | Sat 10:00 AM | `docs/agents/performance-report.md` | Disabled |
+
+### Feature Flag Control
+
+Agents check feature flags before running. Control them via the **production admin panel** (paisaxe.es/admin → Toggles → System category).
+
+| Flag | Purpose |
+|------|---------|
+| `automated_agents` | Master kill switch — disables ALL agents |
+| `coverage_agent_enabled` | Enable/disable coverage agent |
+| `security_agent_enabled` | Enable/disable security agent |
+| `docs_freshness_agent_enabled` | Enable/disable docs freshness agent |
+| `performance_agent_enabled` | Enable/disable performance agent |
+
+**Important**: Local agents fetch flags from the **production** API (`paisaxe.es/api/feature-flags`), not localhost. This allows control even when the dev server isn't running.
+
+### Launchd Plists
+
+Located in `~/Library/LaunchAgents/`:
+
+```
+com.paisaxe.coverage-agent.plist
+com.paisaxe.security-agent.plist
+com.paisaxe.docs-freshness-agent.plist
+com.paisaxe.performance-agent.plist
+```
+
+**Manage agents**:
+```bash
+# Load an agent (enable scheduling)
+launchctl load ~/Library/LaunchAgents/com.paisaxe.coverage-agent.plist
+
+# Unload an agent (disable scheduling)
+launchctl unload ~/Library/LaunchAgents/com.paisaxe.coverage-agent.plist
+
+# Run immediately (for testing)
+launchctl start com.paisaxe.coverage-agent
+
+# List loaded agents
+launchctl list | grep paisaxe
+```
+
+Unlike cron, launchd runs missed jobs when the Mac wakes from sleep.
+
+### Shared Utilities
+
+`scripts/lib/agent-utils.sh` provides:
+- `check_feature_flag "flag_key"` — Check if a flag is enabled
+- `check_agent_enabled "agent_flag"` — Check master + individual flag
+- `get_agent_prompt "agent_flag"` — Fetch prompt from config
+- Logging functions: `log_info`, `log_success`, `log_warn`, `log_error`
+- `write_report_header "Title" "output.md"` — Standard report header
+
+### Agent Details
+
+#### Coverage Agent
+
+Runs nightly at 2:00 AM. Uses Claude CLI to:
+1. Run test coverage analysis
+2. Identify files below 100% coverage
+3. Write missing tests
+4. Update `docs/agents/coverage-report.md`
+
+**Prompt**: Configurable via admin panel. Default focuses on pragmatic test coverage.
+
+#### Security Agent
+
+Runs weekly on Monday at 9:00 AM. Performs:
+- `npm audit` — vulnerability scanning
+- `license-checker` — license summary
+- Copyleft detection (GPL, AGPL, LGPL)
+- Outdated package report
+
+Output: `docs/agents/security-report.md`
+
+#### Docs Freshness Agent
+
+Runs weekly on Sunday at 6:00 AM. Checks:
+- Files modified since CLAUDE.md was updated
+- New migrations needing documentation
+- Undocumented API routes
+- Undocumented feature flags
+- Documentation file ages
+
+Output: `docs/agents/docs-freshness-report.md`
+
+#### Performance Agent
+
+Runs weekly on Saturday at 10:00 AM. Analyzes:
+- Production build output
+- Bundle sizes in `.next/static`
+- Lighthouse scores (if CLI installed)
+- Core Web Vitals
+- Dependency counts
+
+Output: `docs/agents/performance-report.md`
+
+---
+
+## Admin Panel Controls
+
+### Agent Configuration
+
+Each agent has a **Configure** button in the admin panel (Toggles → System category) that allows:
+
+1. **Editing the prompt** — Change agent behavior without code changes
+2. **Viewing schedule** — See when the agent runs
+3. **Viewing output file** — See where reports are written
+4. **Reset to default** — Restore the original prompt
+
+Changes take effect on the next agent run.
+
+### Maintenance Mode
+
+The `maintenance_mode` flag also has a Configure button to customize:
+- **Title** — Main message (default: "Próximamente")
+- **Message** — Optional additional text
+- **Show Tagline** — Toggle "Look. Ask. Explore."
+
+Preview shows exactly how the coming-soon page will look.
+
+### Voice Agent
+
+The `visitor_voice_agent` flag has configuration for:
+- ElevenLabs Agent ID
+- Whitelisted emails for access
+
+---
+
+## CI/CD Workflows
+
+### Core CI (`ci.yml`)
+
+Runs on every push and PR to `develop` or `main`.
+
+| Job | Description |
+|-----|-------------|
+| lint-and-typecheck | `npm run typecheck` + `npm run lint` |
+| test | `npm run test` (Vitest) |
+| build | `npm run build` (production build) |
+
+All jobs must pass before merging.
+
+### E2E Tests (`e2e.yml`)
+
+Playwright E2E tests run against a built app on push/PR to `develop` and `main`.
+
+### PR Workflows (Informational)
+
+These run on PRs but don't block merges:
+
+| Workflow | Purpose |
+|----------|---------|
+| `lighthouse.yml` | Performance & accessibility scores |
+| `bundle-size.yml` | JS bundle size report as PR comment |
+| `knip.yml` | Dead code detection report |
+| `claude-review.yml` | AI-powered code review |
 
 ---
 
 ## Security & Supply Chain
 
-### 1. Dependabot (Automated Dependency Updates)
-
-**File**: `.github/dependabot.yml`
-
-Dependabot opens PRs weekly when dependencies have newer versions. It groups related updates to reduce PR noise.
-
-**What it monitors**:
-- npm production dependencies
-- npm dev and type dependencies
-- GitHub Actions versions
-
-**Configuration highlights**:
-- Weekly schedule (Mondays)
-- Max 10 open PRs at a time
-- Two groups: `production` and `dev-and-types`
-- Targets the `develop` branch
-
-**How to handle Dependabot PRs**:
-1. Review the changelog linked in the PR
-2. CI runs automatically (including license check)
-3. Merge if all checks pass
-4. If a breaking change, fix locally then push to the Dependabot branch
-
-### 2. Gitleaks (Secret Scanning)
+### Gitleaks (Secret Scanning)
 
 **File**: `.github/workflows/gitleaks.yml`
-
-Scans the entire git history for accidentally committed secrets (API keys, passwords, tokens, private keys).
 
 **Triggers**:
 - Every push to `develop` or `main`
 - Every PR targeting `develop` or `main`
-- Daily at 04:00 UTC (cron) to catch secrets in any branch
+- Daily at 04:00 UTC (cron)
 
-**What it detects**:
-- API keys (AWS, GCP, Anthropic, Stripe, etc.)
-- Private keys (RSA, SSH, PGP)
-- Database connection strings
-- OAuth tokens and secrets
-- Generic high-entropy strings that look like secrets
+**Detects**: API keys, private keys, database strings, OAuth tokens, high-entropy secrets.
 
 **If it fires**:
-1. Remove the secret from the code
-2. Rotate the exposed credential immediately (it's in git history forever)
-3. Add the file to `.gitignore` if appropriate
-4. Consider using `git filter-branch` or BFG Repo-Cleaner to purge from history
+1. Remove the secret from code
+2. **Rotate the credential immediately** (it's in git history)
+3. Consider purging from history with BFG Repo-Cleaner
 
-### 3. License Compliance Check
+### License Compliance
 
 **File**: `.github/workflows/license-check.yml`
 
-Blocks merging of PRs that introduce dependencies with copyleft or restrictive licenses.
-
-**Blocked licenses**: GPL-2.0, GPL-3.0, AGPL-1.0, AGPL-3.0, EUPL-1.1, EUPL-1.2, SSPL-1.0, BSL-1.1, CPAL-1.0, OSL-3.0, CPOL-1.02
+**Blocked licenses**: GPL-2.0, GPL-3.0, AGPL-1.0, AGPL-3.0, EUPL, SSPL, BSL, CPAL, OSL, CPOL
 
 **Allowed licenses**: MIT, Apache-2.0, BSD (all variants), ISC, 0BSD, Unlicense, CC0
-
-**How it works**: Uses `license-checker` to scan all production dependencies and fails if any match the blocked list.
 
 **Local check**:
 ```bash
 npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"
 ```
 
-### 4. Security Audit (Pre-existing)
+### Security Audit
 
 **File**: `.github/workflows/security.yml`
 
-Runs `npm audit --audit-level=critical` on every push/PR and weekly on Mondays. Catches known vulnerabilities in dependencies.
+Runs `npm audit --audit-level=critical` on every push/PR and weekly on Mondays.
+
+### Dependabot
+
+**File**: `.github/dependabot.yml`
+
+Opens PRs weekly for:
+- npm production dependencies
+- npm dev/type dependencies
+- GitHub Actions versions
 
 ---
 
 ## Performance & Accessibility
 
-### 5. Lighthouse CI
+### Lighthouse CI
 
 **Files**: `.github/workflows/lighthouse.yml` + `lighthouserc.json`
 
-Runs Google Lighthouse on every PR to catch performance and accessibility regressions before they reach production.
+Runs on every PR against `http://localhost:3000/immersive`.
 
-**How it works**:
-1. Builds the app with `npm run build`
-2. Starts the production server with `npm run start`
-3. Runs 3 Lighthouse audits against `http://localhost:3000/immersive`
-4. Compares results against configured thresholds
-5. Uploads results as build artifacts (14-day retention)
+**Thresholds**:
 
-**Thresholds** (defined in `lighthouserc.json`):
+| Category | Minimum |
+|----------|---------|
+| Performance | 60% |
+| Accessibility | 80% |
 
-| Category | Error Threshold | Warn Threshold |
-|----------|----------------|----------------|
-| Performance | < 60% | - |
-| Accessibility | < 80% | - |
-| Best Practices | - | < 80% |
-| SEO | - | < 80% |
+**Core Web Vitals Budgets**:
 
-**Core Web Vitals budgets**:
+| Metric | Maximum |
+|--------|---------|
+| FCP | 3000ms |
+| LCP | 4000ms |
+| CLS | 0.25 |
+| TBT | 500ms |
 
-| Metric | Max Value |
-|--------|-----------|
-| First Contentful Paint (FCP) | 3000ms |
-| Largest Contentful Paint (LCP) | 4000ms |
-| Cumulative Layout Shift (CLS) | 0.25 |
-| Total Blocking Time (TBT) | 500ms |
-
-**Configuration**: Desktop preset with 3 runs for stable median scores. Adjust thresholds in `lighthouserc.json` as the site improves.
-
-### 6. Bundle Size Analysis
+### Bundle Size
 
 **File**: `.github/workflows/bundle-size.yml`
 
-Reports JavaScript bundle sizes on every PR as a comment, making size regressions visible before merge.
+Posts PR comment with:
+- `.next/static/` size
+- `.next/server/` size
+- Top 20 largest JS bundles
 
-**What it reports**:
-- `.next/static/` size (client-side JS, CSS)
-- `.next/server/` size (server components)
-- Total size
-- Top 20 largest JS bundles by file
+### Vercel Speed Insights
 
-**How it works**:
-1. Builds the app with `npm run build`
-2. Measures directory sizes with `du`
-3. Lists the 20 largest `.js` files in `.next/`
-4. Posts (or updates) a PR comment with the report
-5. Also writes to GitHub Step Summary
-
-**No hard limits** — this is informational. Watch for unexpected jumps between PRs.
-
-### 7. Vercel Speed Insights (Real User Monitoring)
-
-**Integration**: `@vercel/speed-insights/next` in `src/app/layout.tsx`
-
-Collects real Core Web Vitals data from production users. Unlike Lighthouse (synthetic, lab data), Speed Insights shows how real visitors experience the site.
-
-**Metrics tracked**: LCP, FID, CLS, FCP, TTFB
-
-**Setup**: Code integration is done. Enable in Vercel Dashboard > Project > Speed Insights.
+Real User Monitoring for Core Web Vitals in production. View in Vercel Dashboard.
 
 ---
 
 ## Code Quality
 
-### 8. Knip (Dead Code Detection)
+### Knip (Dead Code)
 
 **Files**: `.github/workflows/knip.yml` + `knip.json`
 
-Detects unused exports, unused dependencies, and unreferenced files. Runs on every PR in report mode (informational, does not block merges).
-
-**What it finds**:
-- Unused exported functions, types, and variables
-- Unused `dependencies` and `devDependencies` in package.json
-- Files not imported by anything
-- Unused configuration entries
-
-**Configuration** (`knip.json`):
-- Entry points follow Next.js App Router conventions (page, layout, route, loading, error, etc.)
-- Vitest plugin picks up test files
-- Path aliases configured (`@/*` maps to `./src/*`)
-- Test files are excluded from dead code analysis
+Detects:
+- Unused exports
+- Unused dependencies
+- Unreferenced files
 
 **Local check**:
 ```bash
-npx knip                    # Full report
-npx knip --dependencies     # Only unused dependencies
+npx knip
 ```
 
-### 9. Claude Code Review (AI PR Reviews)
+### Claude Code Review
 
 **File**: `.github/workflows/claude-review.yml`
 
-Automated AI code review on every PR using Claude. Also responds to `@claude` mentions in PR comments for on-demand analysis.
+AI code review on every PR. Also responds to `@claude` mentions.
 
-**How it works**:
-- Triggered on PR open/sync and `@claude` mentions in PR comments
-- Skips Dependabot and Renovate PRs (automated dependency updates)
-- Uses `anthropics/claude-code-action@v1` with `claude-sonnet-4-20250514`
-- Posts review comments directly on the PR
-
-**Requirements**: `ANTHROPIC_API_KEY` must be set as a GitHub repository secret.
-
-**What it reviews**:
-- Code correctness and potential bugs
-- Security concerns
-- Performance implications
-- Style and best practices
-- Test coverage gaps
+**Requires**: `ANTHROPIC_API_KEY` GitHub secret.
 
 ---
 
 ## Monitoring & Observability
 
-### 10. Health Check Endpoint
-
-**File**: `src/app/api/health/route.ts` (9 tests in `route.test.ts`)
-
-A dedicated endpoint for uptime monitoring that reports application and service health.
+### Health Check Endpoint
 
 **Endpoint**: `GET /api/health`
 
-**Response format**:
+Returns:
 ```json
 {
   "status": "healthy",
-  "timestamp": "2026-01-27T10:00:00.000Z",
+  "timestamp": "2026-01-31T10:00:00.000Z",
   "version": "1.0.0",
   "uptime": 3600,
   "services": {
-    "supabase": {
-      "status": "connected",
-      "latency": 45
-    }
-  }
+    "supabase": { "status": "connected", "latency": 45 }
+  },
+  "database": { "size_mb": 150, "usage_percent": 1.8 }
 }
 ```
 
-**Design decisions**:
-- Always returns HTTP 200 (so monitoring tools don't get confused by error codes)
-- Reports "healthy" or "degraded" in the response body
-- Measures Supabase latency by querying the `chunks` table
-- Sets `Cache-Control: no-store, max-age=0` to prevent caching
-- Handles Supabase connection failures gracefully (reports degraded, doesn't crash)
+Always returns HTTP 200. Reports "degraded" in body if issues detected.
 
-### 11. Upptime Status Page
+### Upptime Status Page
 
 **Repo**: https://github.com/juan294/paisaxe-upptime
-**Status page**: https://juan294.github.io/paisaxe-upptime/
+**Page**: https://juan294.github.io/paisaxe-upptime/
 
-A separate GitHub repository that monitors site availability using GitHub Actions and displays results on a GitHub Pages status page.
+Monitors every 5 minutes:
+- `paisaxe.es` — main site
+- `paisaxe.es/api/health` — API health
 
-**Monitors**:
-- `paisaxe.es` — main site (every 5 minutes)
-- `paisaxe.es/api/health` — API health endpoint (every 5 minutes)
-
-**Features**:
-- Automatic GitHub Issues when downtime is detected
-- Response time graphs
-- Historical uptime percentage
-- Public status page for transparency
-
-**Architecture**: Upptime runs entirely on GitHub infrastructure — Actions for monitoring, Issues for incidents, Pages for the status site. No external services needed.
+Auto-creates GitHub Issues on downtime.
 
 ---
 
 ## Database Maintenance
 
-### pg_cron (Automated Maintenance)
+### pg_cron Jobs
 
-**Migration**: `supabase/migrations/011_pg_cron_maintenance.sql`
+| Job | Schedule | Purpose |
+|-----|----------|---------|
+| `vacuum-analyze-chunks` | Sundays 3:00 AM UTC | Reclaim dead tuples, update stats |
+| `analyze-main-tables` | Daily 4:00 AM UTC | Keep query planner fresh |
+| `cleanup-cron-history` | Sundays 5:00 AM UTC | Delete old cron logs |
+| `keep-alive` | Every 3 days | Prevent idle database shutdown |
+| `edge-keep-alive` | Every 3 days | Call keep-alive Edge Function |
 
-Scheduled database maintenance jobs running on Supabase via the pg_cron extension.
-
-**Prerequisites**: pg_cron must be enabled in Supabase Dashboard (Database > Extensions).
-
-**Scheduled jobs**:
-
-| Job | Schedule | SQL | Purpose |
-|-----|----------|-----|---------|
-| `vacuum-analyze-chunks` | Sundays 3:00 AM UTC | `VACUUM ANALYZE public.chunks` | Reclaim dead tuples and update planner stats for the vector embeddings table |
-| `analyze-main-tables` | Daily 4:00 AM UTC | `ANALYZE public.chunks; ANALYZE public.images; ANALYZE public.stories` | Keep query planner statistics fresh |
-| `cleanup-cron-history` | Sundays 5:00 AM UTC | `DELETE FROM cron.job_run_details WHERE end_time < now() - interval '30 days'` | Prevent cron history from growing unbounded |
-| `vacuum-analyze-analytics` | Sundays 3:30 AM UTC | `VACUUM ANALYZE public.analytics_events` | Maintain insert/query performance on analytics |
-
-**Why this matters**: PostgreSQL's autovacuum handles basic maintenance, but for tables with vector embeddings (1024 dimensions), explicit VACUUM ANALYZE ensures the query planner has accurate statistics for similarity searches. Without it, vector search performance degrades over time.
-
-**Verification**:
+**Verify jobs**:
 ```sql
 SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;
-SELECT * FROM cron.job_run_details ORDER BY end_time DESC LIMIT 10;
 ```
 
----
+### Database Webhooks
 
-## Deployment
+Webhooks fire on row changes to invalidate caches:
 
-### Vercel Setup
-
-**Project**: `thecreativetoken/paisaxe`
-
-**Configuration**:
-- Framework: Next.js (auto-detected)
-- Production branch: `main`
-- Preview branches: all others (including `develop`)
-- Node.js: 24.x
-
-**Domains**:
-- `paisaxe.es` + `www.paisaxe.es`
-- `paisaxe.es` + `www.paisaxe.es` (pending domain registration)
-
-**Environment variables**: All 9 variables configured for production and preview environments. Sensitive keys (API keys, secrets) are marked as sensitive in Vercel.
-
-**Git integration**: Connected to `juan294/paisaxe` on GitHub. Pushes to `main` trigger production deployments. Pushes to any other branch create preview deployments with unique URLs.
+| Table | Event | Effect |
+|-------|-------|--------|
+| `stories` | UPDATE | Revalidates `/immersive`, `/sitemap.xml` |
+| `feature_flags` | UPDATE | Revalidates `/api/feature-flags` |
 
 ---
 
 ## Configuration Reference
 
-### Files Added in Phase 8
+### Agent Output Files
 
-| File | Purpose |
-|------|---------|
-| `.github/dependabot.yml` | Dependabot v2 configuration |
-| `.github/workflows/gitleaks.yml` | Secret scanning workflow |
-| `.github/workflows/license-check.yml` | License compliance workflow |
-| `.github/workflows/lighthouse.yml` | Lighthouse CI workflow |
-| `.github/workflows/bundle-size.yml` | Bundle size reporting workflow |
-| `.github/workflows/knip.yml` | Dead code detection workflow |
-| `.github/workflows/claude-review.yml` | AI code review workflow |
-| `.github/upptime/.upptimerc.yml` | Upptime reference config |
-| `lighthouserc.json` | Lighthouse CI thresholds and settings |
-| `knip.json` | Knip dead code detection config |
-| `src/app/api/health/route.ts` | Health check API endpoint |
-| `src/app/api/health/route.test.ts` | Health check tests (9 tests) |
-| `supabase/migrations/011_pg_cron_maintenance.sql` | pg_cron maintenance jobs |
+All agent reports go to `docs/agents/`:
 
-### Files Modified in Phase 8
+```
+docs/agents/
+├── coverage-report.md
+├── security-report.md
+├── docs-freshness-report.md
+└── performance-report.md
+```
 
-| File | Change |
-|------|--------|
-| `src/app/layout.tsx` | Added `<SpeedInsights />` component |
-| `package.json` | Added `@vercel/speed-insights` and `knip` |
-| `CLAUDE.md` | Added CI/CD, deployment, monitoring, guardrails sections |
+### Feature Flags (System Category)
 
-### GitHub Secrets Required
+| Flag Key | Label | Default |
+|----------|-------|---------|
+| `automated_agents` | Automated Agents (Master) | Enabled |
+| `coverage_agent_enabled` | Coverage Agent | Enabled |
+| `security_agent_enabled` | Security Agent | Disabled |
+| `docs_freshness_agent_enabled` | Docs Freshness Agent | Disabled |
+| `performance_agent_enabled` | Performance Agent | Disabled |
+| `maintenance_mode` | Maintenance Mode | Disabled |
+
+### GitHub Secrets
 
 | Secret | Used By |
 |--------|---------|
-| `ANTHROPIC_API_KEY` | `claude-review.yml` |
-| `GITHUB_TOKEN` | `gitleaks.yml` (auto-provided) |
+| `ANTHROPIC_API_KEY` | `claude-review.yml`, coverage agent |
+| `GITHUB_TOKEN` | All workflows (auto-provided) |
 
-### Vercel Environment Variables
+### Key Files
 
-All set for `production` and `preview`:
-- `ANTHROPIC_API_KEY`
-- `VOYAGE_API_KEY`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_KEY`
-- `ADMIN_SECRET_KEY`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `NEXT_PUBLIC_SITE_URL`
+| File | Purpose |
+|------|---------|
+| `scripts/lib/agent-utils.sh` | Shared agent utilities |
+| `scripts/coverage-agent.sh` | Coverage agent script |
+| `scripts/security-agent.sh` | Security agent script |
+| `scripts/docs-freshness-agent.sh` | Docs freshness agent script |
+| `scripts/performance-agent.sh` | Performance agent script |
+| `.github/workflows/*.yml` | CI/CD workflows |
+| `lighthouserc.json` | Lighthouse thresholds |
+| `knip.json` | Dead code detection config |
+| `src/app/api/health/route.ts` | Health check endpoint |
+| `src/components/admin/agent-config-panel.tsx` | Agent config UI |
+| `src/components/admin/maintenance-config-panel.tsx` | Maintenance config UI |
 
----
+### Launchd Plists
 
-## Replication Guide
+Located in `~/Library/LaunchAgents/`:
 
-To replicate this setup in another Next.js + GitHub + Vercel + Supabase project:
-
-### Step 1: Copy Workflow Files
-
-Copy these files into your `.github/` directory:
-- `dependabot.yml`
-- `workflows/gitleaks.yml`
-- `workflows/license-check.yml`
-- `workflows/lighthouse.yml`
-- `workflows/bundle-size.yml`
-- `workflows/knip.yml`
-- `workflows/claude-review.yml`
-
-### Step 2: Copy Config Files
-
-Copy to your project root:
-- `lighthouserc.json` — update the URL to match your app's main page
-- `knip.json` — update entry points to match your framework conventions
-
-### Step 3: Install Dependencies
-
-```bash
-npm install @vercel/speed-insights    # production dependency
-npm install -D knip                    # dev dependency
-```
-
-### Step 4: Add Health Check Endpoint
-
-Create `src/app/api/health/route.ts` with a GET handler that:
-- Returns JSON with status, timestamp, version, uptime
-- Checks connectivity to your database
-- Always returns HTTP 200 (reports status in the body)
-- Sets `Cache-Control: no-store`
-
-### Step 5: Add Speed Insights
-
-In your root layout, add:
-```tsx
-import { SpeedInsights } from "@vercel/speed-insights/next";
-// Inside the layout JSX:
-<SpeedInsights />
-```
-
-### Step 6: Set Up Upptime
-
-1. Create a new repo from https://github.com/upptime/upptime
-2. Replace `.upptimerc.yml` with your site's URLs
-3. Set Actions permissions to read/write (Settings > Actions > General)
-4. Enable GitHub Pages (Settings > Pages > Source: GitHub Actions)
-
-### Step 7: Set Up pg_cron (Supabase)
-
-1. Enable pg_cron in Supabase Dashboard (Database > Extensions)
-2. Run your migration SQL to schedule maintenance jobs
-3. Adjust schedules and tables to match your schema
-
-### Step 8: Configure Secrets
-
-- GitHub: Add `ANTHROPIC_API_KEY` as a repository secret
-- Vercel: Add all environment variables for production and preview
-
-### Step 9: Link Vercel
-
-```bash
-vercel login
-vercel link
-vercel git connect <your-github-repo-url>
-```
-
-### Step 10: Verify
-
-- Push a commit and verify all workflows run
-- Open a PR and check for Lighthouse, bundle size, knip, and Claude review comments
-- Check your Upptime status page
-- Verify pg_cron jobs: `SELECT * FROM cron.job;`
+| Plist | Agent |
+|-------|-------|
+| `com.paisaxe.coverage-agent.plist` | Coverage Agent |
+| `com.paisaxe.security-agent.plist` | Security Agent |
+| `com.paisaxe.docs-freshness-agent.plist` | Docs Freshness Agent |
+| `com.paisaxe.performance-agent.plist` | Performance Agent |
