@@ -197,6 +197,7 @@ Local agents run via macOS launchd and are controllable via feature flags in the
 | `security_agent_enabled` | Security Agent | Disabled |
 | `docs_freshness_agent_enabled` | Docs Freshness Agent | Disabled |
 | `performance_agent_enabled` | Performance Agent | Disabled |
+| `qa_agent_enabled` | QA Agent | Disabled |
 
 Disable the master toggle to stop all agents. Individual flags control each agent independently.
 
@@ -208,6 +209,7 @@ Disable the master toggle to stop all agents. Individual flags control each agen
 | Security | `scripts/security-agent.sh` | Weekly Monday 9:00 AM | `docs/agents/security-report.md` |
 | Docs Freshness | `scripts/docs-freshness-agent.sh` | Weekly Sunday 6:00 AM | `docs/agents/docs-freshness-report.md` |
 | Performance | `scripts/performance-agent.sh` | Weekly Saturday 10:00 AM | `docs/agents/performance-report.md` |
+| QA | `scripts/qa-agent.sh` | Weekly Sunday 8:00 AM | `docs/agents/qa-report.md` |
 
 Shared utilities in `scripts/lib/agent-utils.sh` provide feature flag checking, logging, and startup logic.
 
@@ -218,6 +220,7 @@ Located in `~/Library/LaunchAgents/`:
 - `com.paisaxe.security-agent.plist`
 - `com.paisaxe.docs-freshness-agent.plist`
 - `com.paisaxe.performance-agent.plist`
+- `com.paisaxe.qa-agent.plist`
 
 Load/unload agents:
 ```bash
@@ -239,6 +242,7 @@ Unlike cron, launchd runs missed jobs when the Mac wakes from sleep. Logs writte
 - **Security Agent**: Runs weekly. Performs `npm audit`, license checking, copyleft detection, and outdated package reports.
 - **Docs Freshness Agent**: Runs weekly. Checks for stale docs, new migrations needing documentation, undocumented API routes and feature flags.
 - **Performance Agent**: Runs weekly. Analyzes bundle sizes, Lighthouse scores, Core Web Vitals, dependency counts, and disk usage.
+- **QA Agent**: Runs weekly. Automated LLM testing for RAG quality, safety, content boundaries, and response quality. Budget-conscious sampling (configurable via `testsPerCategory` in feature flag config). See `docs/testbed.md` for full test catalog.
 
 ## CI/CD Workflows
 
