@@ -56,13 +56,18 @@ export const PLATFORM_LIMITS: Record<
 // APP TYPES (camelCase for application use)
 // =============================================================================
 
+/** Encrypted credentials wrapper - credentials are stored encrypted in the database */
+export interface EncryptedCredentials {
+  encrypted: string;
+}
+
 export interface MarketingAccount {
   id: string;
   platform: MarketingPlatform;
   accountName: string;
   accountHandle: string | null;
-  /** OAuth tokens - NEVER expose to client */
-  credentials: MarketingCredentials | null;
+  /** OAuth tokens - stored encrypted in DB, decrypt with getDecryptedCredentials() when needed */
+  credentials: MarketingCredentials | EncryptedCredentials | null;
   platformUserId: string | null;
   isActive: boolean;
   lastSyncAt: string | null;
@@ -174,7 +179,8 @@ export interface MarketingAccountRow {
   platform: string;
   account_name: string;
   account_handle: string | null;
-  credentials: MarketingCredentials | null;
+  /** Credentials can be encrypted or plain (legacy). Always store encrypted going forward. */
+  credentials: MarketingCredentials | EncryptedCredentials | null;
   platform_user_id: string | null;
   is_active: boolean;
   last_sync_at: string | null;
@@ -264,13 +270,19 @@ export function rowToMarketingAccount(
 export function rowToMarketingAccountPublic(
   row: MarketingAccountRow
 ): MarketingAccountPublic {
+  // Check for credentials - handles both encrypted format { encrypted: "..." }
+  // and legacy plain format { accessToken: "..." }
+  const hasCredentials = row.credentials !== null &&
+    (('encrypted' in row.credentials && typeof row.credentials.encrypted === 'string') ||
+     ('accessToken' in row.credentials && typeof row.credentials.accessToken === 'string'));
+
   return {
     id: row.id,
     platform: row.platform as MarketingPlatform,
     accountName: row.account_name,
     accountHandle: row.account_handle,
     isActive: row.is_active,
-    hasCredentials: row.credentials !== null && Object.keys(row.credentials).length > 0,
+    hasCredentials,
     lastSyncAt: row.last_sync_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
