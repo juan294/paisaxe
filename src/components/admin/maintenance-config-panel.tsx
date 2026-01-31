@@ -139,7 +139,7 @@ export function MaintenanceConfigPanel({
             Show Tagline
           </span>
           <p className="mt-1 text-xs text-[#6b6560] dark:text-[#a39e98]">
-            Display &quot;Look. Ask. Explore.&quot; on the page
+            Display &quot;Look. Ask. Discover.&quot; on the page
           </p>
         </div>
         <button
@@ -182,7 +182,7 @@ export function MaintenanceConfigPanel({
           )}
           {showTagline && (
             <p className="mt-4 text-xs tracking-widest uppercase text-white/30">
-              Look. Ask. Explore.
+              Look. Ask. Discover.
             </p>
           )}
         </div>

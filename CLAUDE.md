@@ -1,6 +1,6 @@
 # Paisaxe
 
-**Look. Ask. Explore.** — An immersive tourism experience for Asturias, Spain.
+**Look. Ask. Discover.** — An immersive tourism experience for Asturias, Spain.
 
 For project vision and voice guidelines, see @docs/project/project-charter.md.
 For operations (monitoring, pg_cron, webhooks, agents), see @docs/operations/operations.md.

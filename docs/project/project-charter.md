@@ -1,6 +1,6 @@
 # Paisaxe Project Charter
 
-**Look. Ask. Explore.**
+**Look. Ask. Discover.**
 
 This charter is the north star for all design and implementation decisions.
 
@@ -100,6 +100,6 @@ A year from now, if Paisaxe is working:
 
 ## Tagline
 
-**"Look. Ask. Explore."**
+**"Look. Ask. Discover."**
 
 *Other candidates considered: "Talk to the landscape", "See it. Ask it. Go.", "Where beauty answers back", "The view that talks back"*
