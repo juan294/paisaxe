@@ -314,7 +314,6 @@ paisaxe/
 │   ├── hooks/
 │   │   ├── use-admin-role.ts              # Client-side admin role check (RBAC)
 │   │   ├── use-realtime-feature-flags.ts  # Live feature flag sync via Realtime
-│   │   ├── use-realtime-stories.ts        # Live story update notifications
 │   │   └── use-visitor-voice-access.ts    # Voice agent feature flag check
 │   ├── lib/
 │   │   ├── supabase.ts         # Supabase client
@@ -337,8 +336,7 @@ paisaxe/
 │   └── seed-database.ts        # Generate embeddings and populate DB
 ├── supabase/
 │   ├── functions/              # Supabase Edge Functions (Deno)
-│   │   ├── keep-alive/         # Prevents free-tier auto-pause
-│   │   └── cleanup-analytics/  # Deletes old analytics events
+│   │   └── keep-alive/         # Database activity for monitoring
 │   └── migrations/             # Database schema (including pg_cron)
 ├── .github/
 │   ├── workflows/              # 9 CI/CD workflows (see CI/CD section)
@@ -455,12 +453,11 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 
 ### Voice Agents (ElevenLabs)
 ElevenLabs Conversational AI powers interactive voice guides for immersive storytelling:
-- **Pelayo** - Default visitor guide for story exploration
+- **Four agents available**: Xander, Iris, Penny, Tiko (configured in `src/config/elevenlabs-agents.ts`)
 - WebSocket-based real-time voice streaming
 - Automatic speech recognition + text-to-speech
 - Conversation transcript displayed alongside voice UI
 - Gated by `visitor_voice_agent` feature flag (toggle in admin panel)
-- Agent IDs configured in `src/config/elevenlabs-agents.ts`
 - Admin analytics dashboard shows conversation metrics, agent usage, and active calls
 
 ## Code Style
@@ -553,10 +550,8 @@ Automated maintenance jobs run on Supabase via pg_cron:
 | `vacuum-analyze-chunks` | Sundays 3:00 AM UTC | 011 | VACUUM ANALYZE on chunks table |
 | `analyze-main-tables` | Daily 4:00 AM UTC | 011 | ANALYZE on chunks, images, stories |
 | `cleanup-cron-history` | Sundays 5:00 AM UTC | 011 | Delete cron history older than 30 days |
-| `vacuum-analyze-analytics` | Sundays 3:30 AM UTC | 011 | VACUUM ANALYZE on analytics_events |
-| `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Legacy job (not needed on Pro tier, kept as safeguard) |
+| `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Database activity safeguard |
 | `edge-keep-alive` | Every 3 days 12:00 PM UTC | 014 | Call keep-alive Edge Function via pg_net |
-| `edge-cleanup-analytics` | 1st of month 2:00 AM UTC | 014 | Call cleanup Edge Function via pg_net |
 
 Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
 
@@ -573,25 +568,23 @@ Setup: Configure `app.webhook_base_url` and `app.webhook_secret` in Supabase SQL
 
 ## Supabase Realtime
 
-Realtime subscriptions provide live updates to browser sessions (free tier: 200 concurrent connections, 2M messages/month).
+Realtime subscriptions provide live updates to browser sessions (200 concurrent connections, 2M messages/month included).
 
 | Subscription | Module | Purpose |
 |-------------|--------|---------|
 | Feature flags | `src/hooks/use-realtime-feature-flags.ts` | Live flag sync when admin toggles |
-| Stories | `src/hooks/use-realtime-stories.ts` | Notify when admin updates story |
 
-Utilities in `src/lib/realtime.ts` provide generic `subscribeToTable()` and specific `subscribeToFeatureFlags()` / `subscribeToStories()` helpers.
+Utilities in `src/lib/realtime.ts` provide generic `subscribeToTable()` and specific `subscribeToFeatureFlags()` helpers.
 
 ## Supabase Edge Functions
 
-Deno-based Edge Functions in `supabase/functions/` (free tier: 500K invocations/month). Scheduled via pg_cron + pg_net.
+Deno-based Edge Functions in `supabase/functions/` (500K invocations/month included). Scheduled via pg_cron + pg_net.
 
 | Function | Purpose | Schedule |
 |----------|---------|----------|
-| `keep-alive` | Queries active stories to prevent auto-pause | Every 3 days |
-| `cleanup-analytics` | Deletes analytics events older than 90 days | Monthly |
+| `keep-alive` | Queries active stories to generate database activity | Every 3 days |
 
-Deploy: `supabase functions deploy keep-alive && supabase functions deploy cleanup-analytics`
+Deploy: `supabase functions deploy keep-alive`
 
 See `supabase/functions/README.md` for full setup instructions.
 

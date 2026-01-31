@@ -319,9 +319,9 @@ Both produce 1200x630 PNG images. The root image cascades to child routes that d
 
 ## Infrastructure
 
-**Health check** (`GET /api/health`) — Returns service status (healthy/degraded), uptime, app version, Supabase connectivity with latency, and database storage usage. Reports "degraded" if Supabase connection fails or database usage exceeds 80% of the 500 MB free-tier limit. Always returns HTTP 200 to work with uptime monitors. Monitored every 5 minutes by [Upptime](https://juan294.github.io/paisaxe-upptime/).
+**Health check** (`GET /api/health`) — Returns service status (healthy/degraded), uptime, app version, Supabase connectivity with latency, and database storage usage. Reports "degraded" if Supabase connection fails or database usage exceeds 80% of the 8 GB Pro tier limit. Always returns HTTP 200 to work with uptime monitors. Monitored every 5 minutes by [Upptime](https://juan294.github.io/paisaxe-upptime/).
 
-**Database size monitoring** — The health endpoint reports `database.size_mb`, `database.limit_mb` (500), and `database.usage_percent`. This is critical for the Supabase free tier where pgvector embeddings can grow storage quickly.
+**Database size monitoring** — The health endpoint reports `database.size_mb`, `database.limit_mb` (8192), and `database.usage_percent`. Useful for tracking storage growth as content expands.
 
 **Rate limiting** — In-memory rate limiting protects the analytics API (60 requests per 60 seconds per IP) and the chat API. Returns 429 with a `Retry-After` header when exceeded.
 
@@ -333,13 +333,21 @@ Both produce 1200x630 PNG images. The root image cascades to child routes that d
 
 **Code splitting** — The voice chat component is dynamically imported, reducing the initial bundle by ~15 KB.
 
-### Supabase Free Tier Optimization
+### Supabase Pro Tier
 
-Paisaxe runs on the Supabase free tier ($0/month) and takes advantage of every available feature:
+Paisaxe runs on Supabase Pro ($25/month) with generous resource limits:
 
-**Keep-alive system** — The free tier auto-pauses projects after 7 days of inactivity. Two redundant keep-alive mechanisms prevent this:
+**Included resources**:
+- 8 GB database storage
+- 100K monthly active users (MAUs)
+- 100 GB file storage
+- 200 concurrent Realtime connections
+- 2M Realtime messages/month
+- 500K Edge Function invocations/month
+
+**Keep-alive system** — Although the Pro tier doesn't auto-pause, redundant keep-alive mechanisms are retained as a safeguard:
 1. A pg_cron job runs `SELECT 1` every 3 days (migration 012)
-2. A Supabase Edge Function is called every 3 days via pg_cron + pg_net, querying active stories count (migration 014)
+2. A Supabase Edge Function is called every 3 days via pg_cron + pg_net (migration 014)
 
 Additionally, Upptime pings the health endpoint every 5 minutes, which queries the database.
 
@@ -353,8 +361,8 @@ Webhook payloads include the table name, operation type, and changed record. Aut
 - Feature flags: When an admin toggles a flag, all active browser sessions pick up the change instantly via `useRealtimeFeatureFlags` hook
 - Story updates: When an admin changes a story's curation status or image, `useRealtimeStories` hook notifies the UI
 
-**Edge Functions** — One Deno-based Edge Function (free: 500K invocations/month):
-- `keep-alive`: Queries active stories to generate database activity and prevent auto-pause
+**Edge Functions** — Deno-based Edge Functions (500K invocations/month included):
+- `keep-alive`: Queries active stories to generate database activity
 
 Scheduled via pg_cron + pg_net and deployed with `supabase functions deploy keep-alive`.
 
@@ -368,9 +376,9 @@ Scheduled via pg_cron + pg_net and deployed with `supabase functions deploy keep
 | Row Level Security | Active | All tables, user-scoped favorites |
 | Auth (Google OAuth) | Active | Visitor accounts, favorites sync |
 | Storage | Active | Admin story images |
-| pg_cron | Active | 5 scheduled jobs |
+| pg_cron | Active | 5 scheduled jobs (maintenance + keep-alive) |
 | pg_net + Webhooks | Active | Cache invalidation triggers |
-| Realtime | Active | Feature flags + story update sync |
+| Realtime | Active | Feature flag sync |
 | Edge Functions | Active | Keep-alive |
 | Full-text search (GIN) | Active | Spanish keyword search fallback |
 
