@@ -6,7 +6,7 @@ import { useAdminRole } from "@/hooks/use-admin-role";
 import { StoryGrid } from "@/components/admin/story-grid";
 import { ImageEditorDialog } from "@/components/admin/image-editor-dialog";
 import { SelectionToolbar } from "@/components/admin/selection-toolbar";
-import { AdminTabs, type AdminTab } from "@/components/admin/admin-tabs";
+import { AdminTabs, TABS, type AdminTab } from "@/components/admin/admin-tabs";
 import { FeatureTogglesPanel } from "@/components/admin/feature-toggles-panel";
 import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
 import { MarketingDashboard } from "@/components/admin/marketing-dashboard";
@@ -71,6 +71,26 @@ function AdminPageContent() {
       loadStories();
     }
   }, [isAdmin, loadStories, activeTab]);
+
+  // Keyboard shortcuts: Cmd+1 through Cmd+5 to switch tabs
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle Cmd/Ctrl + number keys
+      if (!e.metaKey && !e.ctrlKey) return;
+
+      const keyNum = parseInt(e.key);
+      if (keyNum >= 1 && keyNum <= TABS.length) {
+        e.preventDefault();
+        const tab = TABS[keyNum - 1];
+        if (tab) {
+          setActiveTab(tab.value);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Filter stories client-side for display
   const filteredStories = allStories.filter((story) => {
@@ -442,10 +462,6 @@ function AdminPageContent() {
           </>
         )}
 
-        {activeTab === "suggestions" && (
-          <SuggestionsPanel />
-        )}
-
         {activeTab === "toggles" && (
           <FeatureTogglesPanel />
         )}
@@ -456,6 +472,10 @@ function AdminPageContent() {
 
         {activeTab === "marketing" && (
           <MarketingDashboard />
+        )}
+
+        {activeTab === "suggestions" && (
+          <SuggestionsPanel />
         )}
       </main>
 
