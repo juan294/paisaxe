@@ -1,4 +1,4 @@
-# Paisaxe - Look. Ask. Explore.
+# Paisaxe - Look. Ask. Discover.
 
 [![CI](https://github.com/juan294/paisaxe/actions/workflows/ci.yml/badge.svg)](https://github.com/juan294/paisaxe/actions/workflows/ci.yml)
 [![E2E Tests](https://github.com/juan294/paisaxe/actions/workflows/e2e.yml/badge.svg)](https://github.com/juan294/paisaxe/actions/workflows/e2e.yml)

@@ -308,7 +308,7 @@ Each section displays up to 10 entries sorted by count, with a visual bar chart 
 
 | Route | Content |
 |-------|---------|
-| `/opengraph-image` (root) | Dark gradient with "Paisaxe" title and "Mira. Pregunta. Explora." tagline |
+| `/opengraph-image` (root) | Dark gradient with "Paisaxe" title and "Mira. Pregunta. Descubre." tagline |
 | `/story/[slug]/opengraph-image` | Dark gradient with category badge, story title, subtitle, and Paisaxe branding |
 
 Both produce 1200x630 PNG images. The root image cascades to child routes that don't define their own. Story pages use their own dynamic image.

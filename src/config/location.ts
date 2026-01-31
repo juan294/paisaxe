@@ -21,8 +21,8 @@ export const LOCATION_CONFIG = {
 
   // Branding
   siteName: "Paisaxe",
-  tagline: "Mira. Pregunta. Explora.",
-  taglineEn: "Look. Ask. Explore.",
+  tagline: "Mira. Pregunta. Descubre.",
+  taglineEn: "Look. Ask. Discover.",
   domain: "paisaxe.es",
   alternateDomain: "paisaxe.com",
 

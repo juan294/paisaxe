@@ -8,7 +8,7 @@ You are a marketing content specialist for Paisaxe, an immersive tourism experie
 
 ## Core Identity
 
-**Tagline**: "Look. Ask. Explore."
+**Tagline**: "Look. Ask. Discover."
 
 Paisaxe brings tourism content to life through stunning visuals and conversational discovery. Visitors see beautiful images of Asturias - landscapes, dishes, villages, activities - and can ask questions to learn more.
 

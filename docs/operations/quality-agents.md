@@ -197,7 +197,7 @@ Changes take effect on the next agent run.
 The `maintenance_mode` flag also has a Configure button to customize:
 - **Title** — Main message (default: "Próximamente")
 - **Message** — Optional additional text
-- **Show Tagline** — Toggle "Look. Ask. Explore."
+- **Show Tagline** — Toggle "Look. Ask. Discover."
 
 Preview shows exactly how the coming-soon page will look.
 

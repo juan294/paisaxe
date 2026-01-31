@@ -6,7 +6,7 @@ import type { MaintenanceConfig } from "@/types/feature-flags";
 
 export const metadata: Metadata = {
   title: "Paisaxe | Próximamente",
-  description: "Paisaxe llegará pronto. Look. Ask. Explore.",
+  description: "Paisaxe llegará pronto. Look. Ask. Discover.",
   robots: {
     index: false,
     follow: false,
@@ -79,7 +79,7 @@ export default async function ComingSoonPage() {
         {/* Tagline */}
         {config.show_tagline && (
           <p className="text-lg md:text-xl text-white/60 tracking-widest uppercase mb-16 opacity-0 animate-fade-in-up-delay-2">
-            Look. Ask. Explore.
+            Look. Ask. Discover.
           </p>
         )}
 

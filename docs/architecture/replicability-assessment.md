@@ -35,7 +35,7 @@ This document catalogs everything that would need to change and recommends archi
 |------|---------|
 | `src/app/layout.tsx` | Title: "Paisaxe \| Descubre Asturias", keywords, OG description |
 | `src/app/immersive/layout.tsx` | Title: "Explora Asturias \| Paisaxe" |
-| `src/app/opengraph-image.tsx` | Spanish tagline: "Mira. Pregunta. Explora." |
+| `src/app/opengraph-image.tsx` | Spanish tagline: "Mira. Pregunta. Descubre." |
 | `public/manifest.json` | App name: "Paisaxe - Descubre Asturias" |
 
 ### 3. Internationalization (i18n)
@@ -125,7 +125,7 @@ export const LOCATION_CONFIG = {
   name: "Asturias",
   country: "Spain",
   domains: ["paisaxe.es", "paisaxe.com"],
-  tagline: "Mira. Pregunta. Explora.",
+  tagline: "Mira. Pregunta. Descubre.",
 
   regions: [
     { id: "eastern", name: { es: "Asturias Oriental", en: "Eastern Asturias" }, geo: { lat: 43.35, lng: -4.85 } },
@@ -204,7 +204,7 @@ Add environment variables for key brand elements:
 ```env
 # .env.local
 NEXT_PUBLIC_SITE_NAME=Paisaxe
-NEXT_PUBLIC_SITE_TAGLINE="Mira. Pregunta. Explora."
+NEXT_PUBLIC_SITE_TAGLINE="Mira. Pregunta. Descubre."
 NEXT_PUBLIC_LOCATION_NAME=Asturias
 NEXT_PUBLIC_LOCATION_COUNTRY=Spain
 ```

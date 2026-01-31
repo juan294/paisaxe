@@ -32,7 +32,7 @@ Every idea was evaluated against the 4 core values:
 ## Detailed Descriptions
 
 ### 1. Contextual Question Prompts
-Show 2-3 story-specific suggested questions near the chat button ("What's the best time to visit?", "What should I eat nearby?", "Tell me a local legend about this place"). Dramatically lowers the barrier to using the AI chat -- the "Ask" in "Look. Ask. Explore."
+Show 2-3 story-specific suggested questions near the chat button ("What's the best time to visit?", "What should I eat nearby?", "Tell me a local legend about this place"). Dramatically lowers the barrier to using the AI chat -- the "Ask" in "Look. Ask. Discover."
 
 - **Values**: Discovery (pulls users deeper), Simplicity (no new feature, better activation of existing one), Respect (suggestions not demands), Personal (guide offering to tell you more)
 - **Complexity**: 2/5 -- Add prompt arrays per story (in `metadata` JSON), render chip buttons in story viewer, wire to open chat with pre-filled text
