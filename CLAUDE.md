@@ -613,10 +613,10 @@ Disable the master toggle to stop all agents. Individual flags control each agen
 
 | Agent | Script | Schedule | Output |
 |-------|--------|----------|--------|
-| Coverage | `scripts/coverage-agent.sh` | Daily 2:00 AM | `docs/coverage-report.md` |
-| Security | `scripts/security-agent.sh` | Weekly Monday 9:00 AM | `docs/security-report.md` |
-| Docs Freshness | `scripts/docs-freshness-agent.sh` | Weekly Sunday 6:00 AM | `docs/docs-freshness-report.md` |
-| Performance | `scripts/performance-agent.sh` | Weekly Saturday 10:00 AM | `docs/performance-report.md` |
+| Coverage | `scripts/coverage-agent.sh` | Daily 2:00 AM | `docs/agents/coverage-report.md` |
+| Security | `scripts/security-agent.sh` | Weekly Monday 9:00 AM | `docs/agents/security-report.md` |
+| Docs Freshness | `scripts/docs-freshness-agent.sh` | Weekly Sunday 6:00 AM | `docs/agents/docs-freshness-report.md` |
+| Performance | `scripts/performance-agent.sh` | Weekly Saturday 10:00 AM | `docs/agents/performance-report.md` |
 
 Shared utilities in `scripts/lib/agent-utils.sh` provide feature flag checking, logging, and startup logic.
 

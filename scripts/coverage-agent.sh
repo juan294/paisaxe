@@ -7,7 +7,7 @@ PROJECT_DIR="/Users/juan/Documents/GenAI_Projects/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/coverage-agent-$(date +%Y-%m-%d).log"
-DOC_FILE="$PROJECT_DIR/docs/coverage-report.md"
+DOC_FILE="$PROJECT_DIR/docs/agents/coverage-report.md"
 
 mkdir -p "$LOG_DIR"
 

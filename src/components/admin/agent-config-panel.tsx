@@ -18,7 +18,7 @@ STEPS:
    b. Write or update tests to cover the missing lines.
    c. Run the specific test file to confirm it passes.
 4. After writing all tests, run the full suite: npx vitest run --coverage 2>&1
-5. Update docs/coverage-report.md with a coverage summary.
+5. Update docs/agents/coverage-report.md with a coverage summary.
 
 RULES:
 - Do NOT modify source code, only test files.
@@ -34,7 +34,7 @@ STEPS:
 2. Run license-checker to verify no copyleft licenses
 3. Check for outdated packages with known vulnerabilities
 4. Review any high or critical severity issues
-5. Update docs/security-report.md with findings and recommendations
+5. Update docs/agents/security-report.md with findings and recommendations
 
 FOCUS AREAS:
 - Critical and high severity vulnerabilities
@@ -49,7 +49,7 @@ STEPS:
 2. Find files modified since docs were last updated
 3. Check for undocumented API routes
 4. Check for undocumented feature flags
-5. Update docs/docs-freshness-report.md with findings
+5. Update docs/agents/docs-freshness-report.md with findings
 
 CHECK FOR:
 - New migrations not documented
@@ -64,7 +64,7 @@ STEPS:
 2. Analyze bundle sizes in .next/static
 3. Run Lighthouse if available
 4. Check dependency counts
-5. Update docs/performance-report.md with metrics
+5. Update docs/agents/performance-report.md with metrics
 
 TRACK:
 - Total JS bundle size
@@ -81,10 +81,10 @@ const SCHEDULE_INFO: Record<string, string> = {
 };
 
 const OUTPUT_FILES: Record<string, string> = {
-  coverage_agent_enabled: "docs/coverage-report.md",
-  security_agent_enabled: "docs/security-report.md",
-  docs_freshness_agent_enabled: "docs/docs-freshness-report.md",
-  performance_agent_enabled: "docs/performance-report.md",
+  coverage_agent_enabled: "docs/agents/coverage-report.md",
+  security_agent_enabled: "docs/agents/security-report.md",
+  docs_freshness_agent_enabled: "docs/agents/docs-freshness-report.md",
+  performance_agent_enabled: "docs/agents/performance-report.md",
 };
 
 interface AgentConfigPanelProps {

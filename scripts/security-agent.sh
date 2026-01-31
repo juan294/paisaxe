@@ -6,7 +6,7 @@ set -euo pipefail
 PROJECT_DIR="/Users/juan/Documents/GenAI_Projects/paisaxe"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/security-agent-$(date +%Y-%m-%d).log"
-REPORT_FILE="$PROJECT_DIR/docs/security-report.md"
+REPORT_FILE="$PROJECT_DIR/docs/agents/security-report.md"
 
 mkdir -p "$LOG_DIR"
 
