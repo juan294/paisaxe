@@ -1,0 +1,186 @@
+# Paisaxe Operations Guide
+
+Detailed documentation for database maintenance, monitoring, webhooks, and automated agents.
+
+## Health Check Endpoint
+
+`GET /api/health` — returns service status, uptime, Supabase connectivity with latency, and database storage usage (size in MB, percentage of 8 GB Pro tier limit). Reports "degraded" if Supabase connection fails or database usage exceeds 80%. Always returns HTTP 200. Used by Upptime for uptime monitoring.
+
+## Upptime Status Page
+
+- **Repo**: https://github.com/juan294/paisaxe-upptime
+- **Status page**: https://juan294.github.io/paisaxe-upptime/
+- **Monitors**: `paisaxe.es` and `paisaxe.es/api/health` every 5 minutes
+- Opens GitHub Issues automatically on detected downtime
+- Reference config kept in `.github/upptime/.upptimerc.yml`
+
+## Vercel Speed Insights
+
+Real User Monitoring (RUM) for Core Web Vitals in production. View data in the Vercel Dashboard under Speed Insights.
+
+## Database Maintenance (pg_cron)
+
+Automated maintenance jobs run on Supabase via pg_cron:
+
+| Job | Schedule | Migration | Description |
+|-----|----------|-----------|-------------|
+| `vacuum-analyze-chunks` | Sundays 3:00 AM UTC | 011 | VACUUM ANALYZE on chunks table |
+| `analyze-main-tables` | Daily 4:00 AM UTC | 011 | ANALYZE on chunks, images, stories |
+| `cleanup-cron-history` | Sundays 5:00 AM UTC | 011 | Delete cron history older than 30 days |
+| `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Database activity safeguard |
+| `edge-keep-alive` | Every 3 days 12:00 PM UTC | 014 | Call keep-alive Edge Function via pg_net |
+
+Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
+
+## Database Webhooks (pg_net)
+
+Database webhooks fire HTTP requests when rows change, using the `pg_net` extension (migration `013_database_webhooks.sql`). Webhooks call `POST /api/webhooks/supabase` on the Next.js app to trigger cache invalidation.
+
+| Table | Event | Effect |
+|-------|-------|--------|
+| `stories` | UPDATE | Revalidates `/immersive` and `/sitemap.xml` |
+| `feature_flags` | UPDATE | Revalidates `/api/feature-flags` |
+
+Setup: Configure `app.webhook_base_url` and `app.webhook_secret` in Supabase SQL Editor.
+
+Webhook configuration is stored in the `webhook_config` table (Supabase restricts `ALTER DATABASE` commands):
+```sql
+-- View current config
+SELECT * FROM webhook_config;
+
+-- Update webhook URL (use Supabase API with service role key)
+UPDATE webhook_config SET value = 'https://paisaxe.es' WHERE key = 'base_url';
+```
+
+## Supabase Realtime
+
+Realtime subscriptions provide live updates to browser sessions (200 concurrent connections, 2M messages/month included).
+
+| Subscription | Module | Purpose |
+|-------------|--------|---------|
+| Feature flags | `src/hooks/use-realtime-feature-flags.ts` | Live flag sync when admin toggles |
+
+Utilities in `src/lib/realtime.ts` provide generic `subscribeToTable()` and specific `subscribeToFeatureFlags()` helpers.
+
+## Supabase Edge Functions
+
+Deno-based Edge Functions in `supabase/functions/` (500K invocations/month included). Scheduled via pg_cron + pg_net.
+
+| Function | Purpose | Schedule |
+|----------|---------|----------|
+| `keep-alive` | Queries active stories to generate database activity | Every 3 days |
+
+Deploy: `supabase functions deploy keep-alive`
+
+Edge Function settings are configured in the Supabase database:
+```sql
+ALTER DATABASE postgres SET app.supabase_functions_url = 'https://YOUR_PROJECT_REF.supabase.co/functions/v1';
+ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
+```
+
+See `supabase/functions/README.md` for full setup instructions.
+
+## Automated Agents
+
+Local agents run via macOS launchd and are controllable via feature flags in the admin panel (System category). Each agent checks the `automated_agents` master toggle and its own flag before running.
+
+### Feature Flag Control
+
+| Flag Key | Label | Default |
+|----------|-------|---------:|
+| `automated_agents` | Automated Agents (Master) | Enabled |
+| `coverage_agent_enabled` | Coverage Agent | Enabled |
+| `security_agent_enabled` | Security Agent | Disabled |
+| `docs_freshness_agent_enabled` | Docs Freshness Agent | Disabled |
+| `performance_agent_enabled` | Performance Agent | Disabled |
+
+Disable the master toggle to stop all agents. Individual flags control each agent independently.
+
+### Agent Scripts
+
+| Agent | Script | Schedule | Output |
+|-------|--------|----------|--------|
+| Coverage | `scripts/coverage-agent.sh` | Daily 2:00 AM | `docs/agents/coverage-report.md` |
+| Security | `scripts/security-agent.sh` | Weekly Monday 9:00 AM | `docs/agents/security-report.md` |
+| Docs Freshness | `scripts/docs-freshness-agent.sh` | Weekly Sunday 6:00 AM | `docs/agents/docs-freshness-report.md` |
+| Performance | `scripts/performance-agent.sh` | Weekly Saturday 10:00 AM | `docs/agents/performance-report.md` |
+
+Shared utilities in `scripts/lib/agent-utils.sh` provide feature flag checking, logging, and startup logic.
+
+### Launchd Plists
+
+Located in `~/Library/LaunchAgents/`:
+- `com.paisaxe.coverage-agent.plist`
+- `com.paisaxe.security-agent.plist`
+- `com.paisaxe.docs-freshness-agent.plist`
+- `com.paisaxe.performance-agent.plist`
+
+Load/unload agents:
+```bash
+# Load an agent
+launchctl load ~/Library/LaunchAgents/com.paisaxe.security-agent.plist
+
+# Unload an agent
+launchctl unload ~/Library/LaunchAgents/com.paisaxe.security-agent.plist
+
+# Run immediately (for testing)
+launchctl start com.paisaxe.security-agent
+```
+
+Unlike cron, launchd runs missed jobs when the Mac wakes from sleep. Logs written to `logs/`.
+
+### Agent Descriptions
+
+- **Coverage Agent**: Runs nightly. Uses Claude CLI to analyze test coverage and write missing tests. Updates `docs/agents/coverage-report.md`.
+- **Security Agent**: Runs weekly. Performs `npm audit`, license checking, copyleft detection, and outdated package reports.
+- **Docs Freshness Agent**: Runs weekly. Checks for stale docs, new migrations needing documentation, undocumented API routes and feature flags.
+- **Performance Agent**: Runs weekly. Analyzes bundle sizes, Lighthouse scores, Core Web Vitals, dependency counts, and disk usage.
+
+## CI/CD Workflows
+
+Automated quality checks run on every push and pull request to `develop` and `main`.
+
+### Core CI (`ci.yml`)
+
+| Job | Description |
+|-----|-------------|
+| **lint-and-typecheck** | Runs `npm run typecheck` and `npm run lint` |
+| **test** | Runs `npm run test` |
+| **build** | Verifies production build with `npm run build` |
+
+### E2E Tests (`e2e.yml`)
+
+Playwright E2E tests run against a built app on push/PR to `develop` and `main`.
+
+### Quality & Security Workflows
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| **Security Audit** (`security.yml`) | Push/PR + weekly Monday 08:00 UTC | `npm audit --audit-level=critical` |
+| **Gitleaks** (`gitleaks.yml`) | Push/PR + daily 04:00 UTC | Scans for secrets in git history |
+| **License Check** (`license-check.yml`) | PRs only | Blocks copyleft/GPL dependencies |
+| **Lighthouse CI** (`lighthouse.yml`) | PRs only | Performance & accessibility auditing |
+| **Bundle Size** (`bundle-size.yml`) | PRs only | Reports JS bundle sizes as PR comment |
+| **Knip** (`knip.yml`) | PRs only | Dead code & unused dependency detection |
+| **Claude Review** (`claude-review.yml`) | PRs + `@claude` in PR comments | AI-powered code review |
+
+### Dependency Management
+
+**Dependabot** (`.github/dependabot.yml`) opens PRs weekly for npm and GitHub Actions dependencies.
+
+### Fixing CI Failures
+
+1. **Typecheck failures**: Run `npm run typecheck` locally, fix type errors
+2. **Lint failures**: Run `npm run lint` locally, fix or run `npm run lint -- --fix`
+3. **Test failures**: Run `npm run test` locally, fix failing tests
+4. **Build failures**: Run `npm run build` locally, check for build-time errors
+5. **E2E failures**: Run `npm run test:e2e` locally, inspect `playwright-report/` for traces
+6. **License failures**: Run `npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"` to identify problematic deps
+7. **Gitleaks failures**: Remove the detected secret from code and rotate the exposed credential
+
+### Notes
+
+- Build jobs use dummy env vars (APIs not called during build)
+- Vercel deployment is handled separately via Vercel's GitHub integration
+- Database migrations should be validated locally before pushing
+- Claude Review requires `ANTHROPIC_API_KEY` as a GitHub repository secret
