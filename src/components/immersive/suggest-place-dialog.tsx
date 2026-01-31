@@ -120,7 +120,7 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-md bg-black/90 border-white/10 text-white backdrop-blur-xl"
+        className="sm:max-w-md bg-white/10 border-white/20 text-white backdrop-blur-xl rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <DialogHeader>
