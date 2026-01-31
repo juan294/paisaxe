@@ -13,6 +13,7 @@ import {
   Users,
   Mic,
   Cog,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
@@ -94,6 +95,7 @@ export function FeatureTogglesPanel() {
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<FlagCategory | "all">("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const loadFlags = useCallback(async () => {
     setIsLoading(true);
@@ -184,13 +186,28 @@ export function FeatureTogglesPanel() {
     return counts;
   }, [flags]);
 
-  // Filter flags based on active category
+  // Filter flags based on active category and search query
   const filteredFlags = useMemo(() => {
-    if (activeCategory === "all") {
-      return flags;
+    let result = activeCategory === "all" ? flags : flagsByCategory[activeCategory];
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((flag) => {
+        const categoryLabel = CATEGORIES.find(
+          (c) => c.key === FLAG_CATEGORIES[flag.flagKey]
+        )?.label.toLowerCase();
+
+        return (
+          flag.label.toLowerCase().includes(query) ||
+          (flag.description?.toLowerCase().includes(query) ?? false) ||
+          (categoryLabel?.includes(query) ?? false)
+        );
+      });
     }
-    return flagsByCategory[activeCategory];
-  }, [flags, flagsByCategory, activeCategory]);
+
+    return result;
+  }, [flags, flagsByCategory, activeCategory, searchQuery]);
 
   if (isLoading && flags.length === 0) {
     return (
@@ -231,8 +248,22 @@ export function FeatureTogglesPanel() {
         </div>
       )}
 
-      {/* Category Tabs */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Search and Category Tabs */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-10 w-64 rounded-lg border border-stone-200 bg-white pl-10 pr-4 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-stone-500 dark:focus:ring-stone-500"
+          />
+        </div>
+
+        {/* Category Tabs */}
+        <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setActiveCategory("all")}
           className={cn(
@@ -277,6 +308,7 @@ export function FeatureTogglesPanel() {
             </span>
           </button>
         ))}
+        </div>
       </div>
 
       {/* Category Description */}
@@ -289,7 +321,9 @@ export function FeatureTogglesPanel() {
       {/* Flags Table */}
       {filteredFlags.length === 0 ? (
         <div className="flex min-h-[200px] items-center justify-center rounded-2xl bg-white dark:bg-stone-900">
-          <p className="text-sm text-stone-500">No flags in this category</p>
+          <p className="text-sm text-stone-500">
+            {searchQuery ? "No flags match your search" : "No flags in this category"}
+          </p>
         </div>
       ) : (
         <table className="w-full">
