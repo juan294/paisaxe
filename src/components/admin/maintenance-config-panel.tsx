@@ -78,14 +78,14 @@ export function MaintenanceConfigPanel({
         <div className="flex items-center justify-between">
           <label
             htmlFor="maintenance-title"
-            className="block font-mono text-xs uppercase tracking-widest text-stone-400"
+            className="block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]"
           >
             Display Title
           </label>
           <button
             type="button"
             onClick={handleReset}
-            className="flex items-center gap-1 text-xs text-stone-400 transition-colors hover:text-stone-600 dark:hover:text-stone-300"
+            className="flex items-center gap-1 text-xs text-[#6b6560] dark:text-[#a39e98] transition-colors hover:text-[#6b6560] dark:hover:text-[#a39e98]"
             title="Reset to defaults"
           >
             <RotateCcw className="h-3 w-3" />
@@ -101,9 +101,9 @@ export function MaintenanceConfigPanel({
             setSaved(false);
           }}
           placeholder="Próximamente"
-          className="w-full border border-stone-200 bg-transparent px-4 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:text-stone-100"
+          className="w-full border border-[#e5e3de] bg-transparent px-4 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] focus:border-[#c9a55c] focus:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
         />
-        <p className="text-xs text-stone-400">
+        <p className="text-xs text-[#6b6560] dark:text-[#a39e98]">
           The main text shown on the maintenance page (e.g., &quot;Próximamente&quot;, &quot;We&apos;ll be back soon&quot;)
         </p>
       </div>
@@ -112,7 +112,7 @@ export function MaintenanceConfigPanel({
       <div className="space-y-2">
         <label
           htmlFor="maintenance-message"
-          className="block font-mono text-xs uppercase tracking-widest text-stone-400"
+          className="block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]"
         >
           Additional Message (optional)
         </label>
@@ -125,9 +125,9 @@ export function MaintenanceConfigPanel({
           }}
           rows={3}
           placeholder="Under maintenance. Check back soon!"
-          className="w-full resize-y border border-stone-200 bg-transparent px-4 py-3 text-sm leading-relaxed text-stone-900 placeholder-stone-400 focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:text-stone-100"
+          className="w-full resize-y border border-[#e5e3de] bg-transparent px-4 py-3 text-sm leading-relaxed text-[#2d2a26] placeholder-[#a39e98] focus:border-[#c9a55c] focus:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
         />
-        <p className="text-xs text-stone-400">
+        <p className="text-xs text-[#6b6560] dark:text-[#a39e98]">
           Optional additional message displayed below the title
         </p>
       </div>
@@ -135,10 +135,10 @@ export function MaintenanceConfigPanel({
       {/* Show Tagline Toggle */}
       <div className="flex items-center justify-between">
         <div>
-          <span className="block font-mono text-xs uppercase tracking-widest text-stone-400">
+          <span className="block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
             Show Tagline
           </span>
-          <p className="mt-1 text-xs text-stone-400">
+          <p className="mt-1 text-xs text-[#6b6560] dark:text-[#a39e98]">
             Display &quot;Look. Ask. Explore.&quot; on the page
           </p>
         </div>
@@ -151,8 +151,8 @@ export function MaintenanceConfigPanel({
           className={cn(
             "relative h-6 w-11 rounded-full transition-colors",
             showTagline
-              ? "bg-stone-900 dark:bg-stone-100"
-              : "bg-stone-200 dark:bg-stone-800"
+              ? "bg-[#2d2a26] dark:bg-[#f5f3ee]"
+              : "bg-[#e5e3de] dark:bg-[#3d3a36]"
           )}
           role="switch"
           aria-checked={showTagline}
@@ -161,8 +161,8 @@ export function MaintenanceConfigPanel({
             className={cn(
               "absolute top-0.5 h-5 w-5 rounded-full transition-all",
               showTagline
-                ? "left-[22px] bg-white dark:bg-stone-900"
-                : "left-0.5 bg-white dark:bg-stone-600"
+                ? "left-[22px] bg-white dark:bg-[#2d2a26]"
+                : "left-0.5 bg-white dark:bg-[#6b6560]"
             )}
           />
         </button>
@@ -170,7 +170,7 @@ export function MaintenanceConfigPanel({
 
       {/* Preview */}
       <div className="space-y-2">
-        <span className="block font-mono text-xs uppercase tracking-widest text-stone-400">
+        <span className="block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
           Preview
         </span>
         <div className="rounded-lg bg-[#030303] p-8 text-center">
@@ -205,8 +205,8 @@ export function MaintenanceConfigPanel({
           className={cn(
             "flex items-center gap-2 border px-6 py-2 font-mono text-xs uppercase tracking-widest transition-all",
             isSaving || !hasChanges
-              ? "cursor-not-allowed border-stone-200 text-stone-300 dark:border-stone-700 dark:text-stone-600"
-              : "border-stone-900 text-stone-900 hover:bg-stone-900 hover:text-white dark:border-stone-100 dark:text-stone-100 dark:hover:bg-stone-100 dark:hover:text-stone-900"
+              ? "cursor-not-allowed border-[#e5e3de] text-[#a39e98] dark:border-[#3d3a36] dark:text-[#6b6560]"
+              : "border-[#2d2a26] text-[#2d2a26] hover:bg-[#2d2a26] hover:text-white dark:border-[#f5f3ee] dark:text-[#f5f3ee] dark:hover:bg-[#f5f3ee] dark:hover:text-[#2d2a26]"
           )}
         >
           {isSaving ? (
@@ -224,7 +224,7 @@ export function MaintenanceConfigPanel({
           </span>
         )}
         {!hasChanges && !saved && (
-          <span className="text-xs text-stone-400">No changes to save</span>
+          <span className="text-xs text-[#6b6560] dark:text-[#a39e98]">No changes to save</span>
         )}
       </div>
     </div>

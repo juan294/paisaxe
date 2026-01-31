@@ -30,7 +30,7 @@ export function QuestionPrompts({ prompts, storyId: _storyId, onSelectPrompt }: 
             "text-white/80 hover:text-white",
             "transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100",
             "border border-white/10",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-1 focus-visible:ring-offset-black"
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
           )}
         >
           {prompt}

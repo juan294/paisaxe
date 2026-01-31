@@ -156,7 +156,7 @@ export function MarketingDashboard() {
   if (isLoading && !data) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-stone-300" />
+        <RefreshCw className="h-5 w-5 animate-spin text-[#a39e98]" />
       </div>
     );
   }
@@ -168,7 +168,7 @@ export function MarketingDashboard() {
         <p className="font-mono text-xs text-red-600">{error}</p>
         <button
           onClick={loadData}
-          className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 dark:hover:text-stone-100"
+          className="font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
         >
           Retry
         </button>
@@ -181,17 +181,17 @@ export function MarketingDashboard() {
   return (
     <div className="space-y-16">
       {/* Header */}
-      <header className="flex items-end justify-between border-b border-stone-200 pb-6 dark:border-stone-800">
+      <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">Admin / Marketing</p>
-          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-stone-900 dark:text-stone-100">
+          <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">Admin / Marketing</p>
+          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
             Marketing Automation
           </h1>
         </div>
         <button
           onClick={loadData}
           disabled={isLoading}
-          className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 disabled:opacity-50 dark:hover:text-stone-100"
+          className="font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:hover:text-[#f5f3ee]"
         >
           {isLoading ? "Loading..." : "Refresh"}
         </button>
@@ -199,7 +199,7 @@ export function MarketingDashboard() {
 
       {/* Connected Accounts */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
           01 — Connected Accounts
         </h2>
         <div className="grid gap-4 sm:grid-cols-3">
@@ -223,7 +223,7 @@ export function MarketingDashboard() {
 
       {/* Stats Overview */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
           02 — Performance Overview
         </h2>
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -238,24 +238,24 @@ export function MarketingDashboard() {
       <div className="grid gap-16 lg:grid-cols-2">
         {/* Upcoming Posts */}
         <section>
-          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
             03 — Upcoming Posts
           </h2>
           {data.upcomingPosts.length === 0 ? (
-            <p className="py-8 text-center font-mono text-xs text-stone-300">
+            <p className="py-8 text-center font-mono text-xs text-[#a39e98]">
               No scheduled posts
             </p>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-stone-200 text-left dark:border-stone-800">
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">#</th>
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Platform</th>
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Content</th>
-                  <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Scheduled</th>
+                <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Platform</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Content</th>
+                  <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">Scheduled</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+              <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
                 {data.upcomingPosts.slice(0, 5).map((post, idx) => (
                   <PostRow key={post.id} post={post} index={idx} />
                 ))}
@@ -266,24 +266,24 @@ export function MarketingDashboard() {
 
         {/* Recent Posts */}
         <section>
-          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+          <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
             04 — Recent Posts
           </h2>
           {data.recentPosts.length === 0 ? (
-            <p className="py-8 text-center font-mono text-xs text-stone-300">
+            <p className="py-8 text-center font-mono text-xs text-[#a39e98]">
               No posts yet
             </p>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-stone-200 text-left dark:border-stone-800">
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">#</th>
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Platform</th>
-                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Content</th>
-                  <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Status</th>
+                <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Platform</th>
+                  <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Content</th>
+                  <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+              <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
                 {data.recentPosts.slice(0, 5).map((post, idx) => (
                   <PostRow key={post.id} post={post} index={idx} />
                 ))}
@@ -295,36 +295,36 @@ export function MarketingDashboard() {
 
       {/* Posting Schedule */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
           05 — Posting Schedule
         </h2>
         {data.schedules.length === 0 ? (
-          <p className="py-8 text-center font-mono text-xs text-stone-300">
+          <p className="py-8 text-center font-mono text-xs text-[#a39e98]">
             No schedules configured
           </p>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-stone-200 text-left dark:border-stone-800">
-                <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Platform</th>
-                <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Day</th>
-                <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Time (UTC)</th>
+              <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
+                <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Platform</th>
+                <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Day</th>
+                <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">Time (UTC)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+            <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
               {data.schedules
                 .filter((s) => s.isActive)
                 .map((schedule) => (
                   <tr key={schedule.id}>
                     <td className="py-3">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-stone-200 font-mono text-[10px] font-medium text-stone-600 dark:border-stone-700 dark:text-stone-400">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-[#e5e3de] font-mono text-[10px] font-medium text-[#6b6560] dark:border-[#4d4944] dark:text-[#a39e98]">
                         {PLATFORM_BADGES[schedule.platform]}
                       </span>
                     </td>
-                    <td className="py-3 text-sm text-stone-700 dark:text-stone-300">
+                    <td className="py-3 text-sm text-[#4d4944] dark:text-[#a39e98]">
                       {schedule.dayOfWeek !== null ? DAY_NAMES[schedule.dayOfWeek] : "Daily"}
                     </td>
-                    <td className="py-3 text-right font-mono text-sm tabular-nums text-stone-900 dark:text-stone-100">
+                    <td className="py-3 text-right font-mono text-sm tabular-nums text-[#2d2a26] dark:text-[#f5f3ee]">
                       {schedule.timeUtc}
                     </td>
                   </tr>
@@ -336,7 +336,7 @@ export function MarketingDashboard() {
 
       {/* Marketing Agents Chat */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
           06 — Marketing Agents
         </h2>
         <VoiceAgentChat agentIds={ELEVENLABS_AGENT_IDS} />
@@ -344,7 +344,7 @@ export function MarketingDashboard() {
 
       {/* Content Drafts */}
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
           07 — Content Drafts
         </h2>
         <DraftsPanel onDraftPosted={loadData} />
@@ -352,11 +352,11 @@ export function MarketingDashboard() {
 
       {/* Setup Instructions */}
       {data.accounts.length === 0 && (
-        <section className="border-t border-stone-200 pt-8 text-center dark:border-stone-800">
-          <p className="text-lg font-extralight text-stone-400">
+        <section className="border-t border-[#e5e3de] pt-8 text-center dark:border-[#3d3a36]">
+          <p className="text-lg font-extralight text-[#a39e98]">
             No accounts connected
           </p>
-          <p className="mt-2 font-mono text-xs uppercase tracking-widest text-stone-300">
+          <p className="mt-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
             Click on any platform above to connect your social media accounts
           </p>
         </section>
@@ -395,12 +395,12 @@ function AccountCard({
   return (
     <div
       className={cn(
-        "group relative border border-stone-200 p-4 transition-all dark:border-stone-800",
+        "group relative border border-[#e5e3de] p-4 transition-all dark:border-[#3d3a36]",
         isActive
-          ? "bg-stone-50 dark:bg-stone-900/50"
+          ? "bg-[#f5f3ee] dark:bg-[#252320]/50"
           : isPaused
             ? "bg-amber-50/50 dark:bg-amber-900/10"
-            : "cursor-pointer hover:border-stone-400 dark:hover:border-stone-600"
+            : "cursor-pointer hover:border-[#a39e98] dark:hover:border-[#6b6560]"
       )}
       onClick={isNotConfigured ? onConfigure : undefined}
     >
@@ -409,24 +409,24 @@ function AccountCard({
           className={cn(
             "flex h-8 w-8 items-center justify-center border font-mono text-xs font-medium",
             isActive
-              ? "border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100"
+              ? "border-[#2d2a26] text-[#2d2a26] dark:border-[#f5f3ee] dark:text-[#f5f3ee]"
               : isPaused
                 ? "border-amber-600 text-amber-600 dark:border-amber-400 dark:text-amber-400"
-                : "border-stone-300 text-stone-400 dark:border-stone-700"
+                : "border-[#a39e98] text-[#a39e98] dark:border-[#4d4944]"
           )}
         >
           {PLATFORM_BADGES[platform]}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
+          <p className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
             {PLATFORM_NAMES[platform]}
           </p>
           {account?.accountHandle ? (
-            <p className="truncate font-mono text-xs text-stone-500">
+            <p className="truncate font-mono text-xs text-[#6b6560]">
               {account.accountHandle}
             </p>
           ) : (
-            <p className="font-mono text-xs text-stone-400">Click to connect</p>
+            <p className="font-mono text-xs text-[#a39e98]">Click to connect</p>
           )}
         </div>
         {isActive ? (
@@ -440,7 +440,7 @@ function AccountCard({
             Paused
           </span>
         ) : (
-          <span className="font-mono text-[10px] uppercase tracking-widest text-stone-300">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-[#a39e98]">
             Not Connected
           </span>
         )}
@@ -448,13 +448,13 @@ function AccountCard({
 
       {/* Action buttons for active accounts */}
       {isActive && (
-        <div className="mt-3 flex items-center gap-2 border-t border-stone-200 pt-3 dark:border-stone-700">
+        <div className="mt-3 flex items-center gap-2 border-t border-[#e5e3de] pt-3 dark:border-[#4d4944]">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onConfigure();
             }}
-            className="flex-1 font-mono text-[10px] uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 dark:hover:text-stone-100"
+            className="flex-1 font-mono text-[10px] uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
           >
             Configure
           </button>
@@ -473,7 +473,7 @@ function AccountCard({
 
       {/* Action buttons for paused accounts */}
       {isPaused && (
-        <div className="mt-3 flex items-center gap-2 border-t border-stone-200 pt-3 dark:border-stone-700">
+        <div className="mt-3 flex items-center gap-2 border-t border-[#e5e3de] pt-3 dark:border-[#4d4944]">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -576,15 +576,15 @@ function AccountConfigDialog({
 
   return (
     <Dialog open={!!platform} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+      <DialogContent className="max-w-md border-[#e5e3de] bg-white dark:border-[#3d3a36] dark:bg-[#252320]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3 text-stone-900 dark:text-stone-100">
-            <div className="flex h-8 w-8 items-center justify-center border border-stone-900 font-mono text-xs font-medium dark:border-stone-100">
+          <DialogTitle className="flex items-center gap-3 text-[#2d2a26] dark:text-[#f5f3ee]">
+            <div className="flex h-8 w-8 items-center justify-center border border-[#2d2a26] font-mono text-xs font-medium dark:border-[#f5f3ee]">
               {PLATFORM_BADGES[platform]}
             </div>
             {existingAccount ? "Configure" : "Connect"} {PLATFORM_NAMES[platform]}
           </DialogTitle>
-          <DialogDescription className="font-mono text-xs text-stone-500">
+          <DialogDescription className="font-mono text-xs text-[#6b6560]">
             Enter your API credentials to enable automated posting
           </DialogDescription>
         </DialogHeader>
@@ -592,7 +592,7 @@ function AccountConfigDialog({
         <div className="mt-6 space-y-4">
           {/* Account Name */}
           <div>
-            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-stone-400">
+            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               Account Name
             </label>
             <input
@@ -600,13 +600,13 @@ function AccountConfigDialog({
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
               placeholder="Paisaxe"
-              className="w-full border border-stone-200 bg-transparent px-3 py-2 text-sm text-stone-900 placeholder-stone-300 outline-none transition-colors focus:border-stone-400 dark:border-stone-700 dark:text-stone-100"
+              className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
             />
           </div>
 
           {/* Account Handle */}
           <div>
-            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-stone-400">
+            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               Handle / Username
             </label>
             <input
@@ -614,18 +614,18 @@ function AccountConfigDialog({
               value={accountHandle}
               onChange={(e) => setAccountHandle(e.target.value)}
               placeholder="@paisaxe"
-              className="w-full border border-stone-200 bg-transparent px-3 py-2 text-sm text-stone-900 placeholder-stone-300 outline-none transition-colors focus:border-stone-400 dark:border-stone-700 dark:text-stone-100"
+              className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
             />
           </div>
 
           {/* Credential Fields */}
-          <div className="space-y-3 border-t border-stone-200 pt-4 dark:border-stone-800">
-            <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+          <div className="space-y-3 border-t border-[#e5e3de] pt-4 dark:border-[#3d3a36]">
+            <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               API Credentials
             </p>
             {credentialFields.map((field) => (
               <div key={field.key}>
-                <label className="mb-2 flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-stone-400">
+                <label className="mb-2 flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
                   {field.label}
                   {field.required && <span className="text-red-500">*</span>}
                 </label>
@@ -637,14 +637,14 @@ function AccountConfigDialog({
                       setCredentials((prev) => ({ ...prev, [field.key]: e.target.value }))
                     }
                     placeholder={field.placeholder}
-                    className="w-full border border-stone-200 bg-transparent px-3 py-2 pr-10 text-sm text-stone-900 placeholder-stone-300 outline-none transition-colors focus:border-stone-400 dark:border-stone-700 dark:text-stone-100"
+                    className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 pr-10 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
                   />
                   <button
                     type="button"
                     onClick={() =>
                       setShowSecrets((prev) => ({ ...prev, [field.key]: !prev[field.key] }))
                     }
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#a39e98] hover:text-[#6b6560]"
                   >
                     {showSecrets[field.key] ? (
                       <EyeOff className="h-4 w-4" />
@@ -666,18 +666,18 @@ function AccountConfigDialog({
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-3 border-t border-stone-200 pt-4 dark:border-stone-800">
+          <div className="flex items-center gap-3 border-t border-[#e5e3de] pt-4 dark:border-[#3d3a36]">
             <Button
               variant="ghost"
               onClick={onClose}
-              className="flex-1 font-mono text-xs uppercase tracking-widest text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+              className="flex-1 font-mono text-xs uppercase tracking-widest text-[#a39e98] hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 bg-stone-900 font-mono text-xs uppercase tracking-widest text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200"
+              className="flex-1 bg-[#2d2a26] font-mono text-xs uppercase tracking-widest text-white hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
             >
               {isSaving ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -697,7 +697,7 @@ function AccountConfigDialog({
 // Post Row Component (for table layout)
 function PostRow({ post, index }: { post: MarketingPost; index: number }) {
   const statusStyles = {
-    draft: "text-stone-400",
+    draft: "text-[#a39e98]",
     scheduled: "text-amber-600",
     posting: "text-blue-600",
     posted: "text-emerald-600",
@@ -717,22 +717,22 @@ function PostRow({ post, index }: { post: MarketingPost; index: number }) {
 
   return (
     <tr>
-      <td className="py-3 font-mono text-sm tabular-nums text-stone-300">
+      <td className="py-3 font-mono text-sm tabular-nums text-[#a39e98]">
         {String(index + 1).padStart(2, '0')}
       </td>
       <td className="py-3">
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-stone-200 font-mono text-[10px] font-medium text-stone-600 dark:border-stone-700 dark:text-stone-400">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-[#e5e3de] font-mono text-[10px] font-medium text-[#6b6560] dark:border-[#4d4944] dark:text-[#a39e98]">
           {PLATFORM_BADGES[post.platform]}
         </span>
       </td>
       <td className="max-w-xs py-3">
-        <p className="truncate text-sm text-stone-700 dark:text-stone-300">
+        <p className="truncate text-sm text-[#4d4944] dark:text-[#a39e98]">
           {post.content}
         </p>
       </td>
       <td className="py-3 text-right">
         {post.status === "scheduled" && post.scheduledFor ? (
-          <span className="font-mono text-xs text-stone-500">
+          <span className="font-mono text-xs text-[#6b6560]">
             {formatDate(post.scheduledFor)}
           </span>
         ) : (
@@ -745,7 +745,7 @@ function PostRow({ post, index }: { post: MarketingPost; index: number }) {
             href={post.postUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-2 inline-block text-stone-400 hover:text-stone-600"
+            className="ml-2 inline-block text-[#a39e98] hover:text-[#6b6560]"
           >
             <ExternalLink className="h-3 w-3" />
           </a>
@@ -780,18 +780,18 @@ function StatCard({
     ? "text-red-500"
     : color
       ? statColorClasses[color]
-      : "text-stone-900 dark:text-stone-100";
+      : "text-[#2d2a26] dark:text-[#f5f3ee]";
 
   return (
     <div>
-      <p className="font-mono text-xs tabular-nums text-stone-300">{number}</p>
+      <p className="font-mono text-xs tabular-nums text-[#a39e98]">{number}</p>
       <p className={cn(
         "mt-2 text-5xl font-extralight tabular-nums tracking-tighter",
         colorClass
       )}>
         {value.toLocaleString()}
       </p>
-      <p className="mt-2 font-mono text-xs uppercase tracking-widest text-stone-400">{label}</p>
+      <p className="mt-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">{label}</p>
     </div>
   );
 }
@@ -864,7 +864,7 @@ function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
   if (isLoading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-stone-300" />
+        <RefreshCw className="h-5 w-5 animate-spin text-[#a39e98]" />
       </div>
     );
   }
@@ -873,14 +873,14 @@ function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
     <div className="space-y-4">
       {/* Header with create button */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-stone-500">
+        <p className="text-sm text-[#6b6560]">
           {drafts.length === 0
             ? "No drafts yet. Chat with the marketing agents to create content."
             : `${drafts.length} draft${drafts.length === 1 ? "" : "s"} ready to post`}
         </p>
         <button
           onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 dark:hover:text-stone-100"
+          className="flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
         >
           <Plus className="h-3 w-3" />
           New Draft
@@ -889,26 +889,26 @@ function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
 
       {/* Drafts list */}
       {drafts.length > 0 && (
-        <div className="divide-y divide-stone-100 border border-stone-200 dark:divide-stone-800 dark:border-stone-800">
+        <div className="divide-y divide-[#f5f3ee] border border-[#e5e3de] dark:divide-[#3d3a36] dark:border-[#3d3a36]">
           {drafts.map((draft) => (
             <div key={draft.id} className="p-4">
               <div className="flex items-start gap-3">
                 {/* Platform badge */}
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border border-stone-200 font-mono text-xs font-medium text-stone-600 dark:border-stone-700 dark:text-stone-400">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center border border-[#e5e3de] font-mono text-xs font-medium text-[#6b6560] dark:border-[#4d4944] dark:text-[#a39e98]">
                   {PLATFORM_BADGES[draft.platform]}
                 </div>
 
                 {/* Content */}
                 <div className="min-w-0 flex-1">
-                  <p className="whitespace-pre-wrap text-sm text-stone-700 dark:text-stone-300">
+                  <p className="whitespace-pre-wrap text-sm text-[#4d4944] dark:text-[#a39e98]">
                     {draft.content}
                   </p>
                   {draft.hashtags.length > 0 && (
-                    <p className="mt-2 text-xs text-stone-400">
+                    <p className="mt-2 text-xs text-[#a39e98]">
                       {draft.hashtags.join(" ")}
                     </p>
                   )}
-                  <p className="mt-2 font-mono text-[10px] text-stone-300">
+                  <p className="mt-2 font-mono text-[10px] text-[#a39e98]">
                     Created {new Date(draft.createdAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -917,7 +917,7 @@ function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
                 <div className="flex flex-shrink-0 items-center gap-1">
                   <button
                     onClick={() => handleCopy(draft.content, draft.id)}
-                    className="flex h-8 w-8 items-center justify-center text-stone-400 transition-colors hover:text-stone-600"
+                    className="flex h-8 w-8 items-center justify-center text-[#a39e98] transition-colors hover:text-[#6b6560]"
                     title="Copy content"
                   >
                     {copiedId === draft.id ? (
@@ -935,7 +935,7 @@ function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
                   </button>
                   <button
                     onClick={() => handleDelete(draft.id)}
-                    className="flex h-8 w-8 items-center justify-center text-stone-300 transition-colors hover:text-red-500"
+                    className="flex h-8 w-8 items-center justify-center text-[#a39e98] transition-colors hover:text-red-500"
                     title="Delete draft"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -1010,12 +1010,12 @@ function CreateDraftDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-md border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+      <DialogContent className="max-w-md border-[#e5e3de] bg-white dark:border-[#3d3a36] dark:bg-[#252320]">
         <DialogHeader>
-          <DialogTitle className="text-stone-900 dark:text-stone-100">
+          <DialogTitle className="text-[#2d2a26] dark:text-[#f5f3ee]">
             Create Draft
           </DialogTitle>
-          <DialogDescription className="font-mono text-xs text-stone-500">
+          <DialogDescription className="font-mono text-xs text-[#6b6560]">
             Create a new content draft for manual posting
           </DialogDescription>
         </DialogHeader>
@@ -1023,7 +1023,7 @@ function CreateDraftDialog({
         <div className="mt-4 space-y-4">
           {/* Platform selector */}
           <div>
-            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-stone-400">
+            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               Platform
             </label>
             <div className="flex gap-2">
@@ -1034,8 +1034,8 @@ function CreateDraftDialog({
                   className={cn(
                     "flex h-10 w-10 items-center justify-center border font-mono text-xs font-medium transition-colors",
                     platform === p
-                      ? "border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100"
-                      : "border-stone-200 text-stone-400 hover:border-stone-400 dark:border-stone-700"
+                      ? "border-[#2d2a26] text-[#2d2a26] dark:border-[#f5f3ee] dark:text-[#f5f3ee]"
+                      : "border-[#e5e3de] text-[#a39e98] hover:border-[#a39e98] dark:border-[#4d4944]"
                   )}
                 >
                   {PLATFORM_BADGES[p]}
@@ -1046,7 +1046,7 @@ function CreateDraftDialog({
 
           {/* Content */}
           <div>
-            <label className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-widest text-stone-400">
+            <label className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               Content
               <span className={cn(
                 "normal-case",
@@ -1060,7 +1060,7 @@ function CreateDraftDialog({
               onChange={(e) => setContent(e.target.value)}
               placeholder={`Write your ${PLATFORM_NAMES[platform]} post...`}
               rows={5}
-              className="w-full resize-none border border-stone-200 bg-transparent px-3 py-2 text-sm text-stone-900 placeholder-stone-300 outline-none transition-colors focus:border-stone-400 dark:border-stone-700 dark:text-stone-100"
+              className="w-full resize-none border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
             />
           </div>
 
@@ -1073,18 +1073,18 @@ function CreateDraftDialog({
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-3 border-t border-stone-200 pt-4 dark:border-stone-800">
+          <div className="flex items-center gap-3 border-t border-[#e5e3de] pt-4 dark:border-[#3d3a36]">
             <Button
               variant="ghost"
               onClick={onClose}
-              className="flex-1 font-mono text-xs uppercase tracking-widest text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+              className="flex-1 font-mono text-xs uppercase tracking-widest text-[#a39e98] hover:text-[#2d2a26] dark:hover:text-[#f5f3ee]"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving || content.length > maxLength}
-              className="flex-1 bg-stone-900 font-mono text-xs uppercase tracking-widest text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200"
+              className="flex-1 bg-[#2d2a26] font-mono text-xs uppercase tracking-widest text-white hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
             >
               {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Save Draft"}
             </Button>
