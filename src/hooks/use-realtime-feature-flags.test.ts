@@ -17,6 +17,7 @@ function makeFlag(key: string, enabled: boolean): FeatureFlag {
     label: key,
     description: null,
     config: {},
+    environment: "development",
     createdAt: "2025-01-01T00:00:00Z",
     updatedAt: "2025-01-01T00:00:00Z",
   };
@@ -30,6 +31,7 @@ function makeFlagRow(key: string, enabled: boolean): FeatureFlagRow {
     label: key,
     description: null,
     config: {},
+    environment: "development",
     created_at: "2025-01-01T00:00:00Z",
     updated_at: "2025-06-01T00:00:00Z",
   };
@@ -134,6 +136,7 @@ describe("useRealtimeFeatureFlags", () => {
       label: "surprise_me",
       description: null,
       config: {},
+      environment: "development",
       createdAt: "2025-01-01T00:00:00Z",
       updatedAt: "2025-06-15T12:00:00Z",
     });

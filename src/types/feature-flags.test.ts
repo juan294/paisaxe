@@ -9,6 +9,7 @@ describe("rowToFeatureFlag", () => {
     label: "Seasonal Surfacing",
     description: "Boost stories based on current season",
     config: { weight: 1.5 },
+    environment: "development",
     created_at: "2025-01-01T00:00:00.000Z",
     updated_at: "2025-01-10T12:00:00.000Z",
   };
