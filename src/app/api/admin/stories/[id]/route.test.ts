@@ -1,0 +1,238 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
+import { PATCH } from "./route";
+
+// Mock dependencies
+vi.mock("@/lib/supabase", () => ({
+  createAdminClient: vi.fn(),
+}));
+
+vi.mock("@/lib/admin-auth", () => ({
+  validateAdminAuth: vi.fn(),
+}));
+
+import { createAdminClient } from "@/lib/supabase";
+import { validateAdminAuth } from "@/lib/admin-auth";
+
+describe("PATCH /api/admin/stories/[id]", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should return 401 when auth fails", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: false,
+      error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Updated Title" }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("should return 400 when category is invalid", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ category: "invalid" }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Invalid category");
+  });
+
+  it("should return 400 when location is invalid", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ location: "invalid" }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Invalid location");
+  });
+
+  it("should return 400 when duration is invalid", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ duration: "invalid" }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Invalid duration");
+  });
+
+  it("should return 409 when new slug conflicts with existing story", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockNeq = vi.fn().mockReturnValue({
+      single: vi.fn().mockResolvedValue({
+        data: { id: "other-story", slug: "existing-slug" },
+        error: null,
+      }),
+    });
+    const mockEq = vi.fn().mockReturnValue({ neq: mockNeq });
+    const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ slug: "existing-slug" }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.error).toBe("A story with this slug already exists");
+  });
+
+  it("should update story with valid data", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              id: "story-1",
+              slug: "updated-story",
+              title: "Updated Story",
+              subtitle: "New subtitle",
+              description: "New description",
+              category: "nature",
+              location: "central",
+              duration: "weekend",
+              source_pdf: "guide.pdf",
+              updated_at: "2024-01-01T00:00:00Z",
+            },
+            error: null,
+          }),
+        }),
+      }),
+    });
+
+    const mockNeq = vi.fn().mockReturnValue({
+      single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+    });
+    const mockEq = vi.fn().mockReturnValue({ neq: mockNeq });
+    const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "stories") {
+        return { select: mockSelect, update: mockUpdate };
+      }
+      return { select: mockSelect };
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({
+        title: "Updated Story",
+        slug: "updated-story",
+        subtitle: "New subtitle",
+        description: "New description",
+        category: "nature",
+        location: "central",
+        duration: "weekend",
+        sourcePdf: "guide.pdf",
+      }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.title).toBe("Updated Story");
+    expect(data.data.slug).toBe("updated-story");
+    expect(data.data.category).toBe("nature");
+    expect(data.data.location).toBe("central");
+    expect(data.data.duration).toBe("weekend");
+  });
+
+  it("should allow clearing optional fields with null", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              id: "story-1",
+              slug: "story",
+              title: "Story",
+              subtitle: null,
+              description: null,
+              category: "nature",
+              location: null,
+              duration: null,
+              source_pdf: null,
+              updated_at: "2024-01-01T00:00:00Z",
+            },
+            error: null,
+          }),
+        }),
+      }),
+    });
+
+    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({
+        location: null,
+        duration: null,
+      }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.location).toBeNull();
+    expect(data.data.duration).toBeNull();
+  });
+
+  it("should return 500 when update fails", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: null,
+            error: { message: "Update failed" },
+          }),
+        }),
+      }),
+    });
+
+    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Updated" }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to update story");
+  });
+});
