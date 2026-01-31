@@ -83,6 +83,11 @@ const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
   visitor_voice_agent: "voice",
   // System - admin controls
   maintenance_mode: "system",
+  automated_agents: "system",
+  coverage_agent_enabled: "system",
+  security_agent_enabled: "system",
+  docs_freshness_agent_enabled: "system",
+  performance_agent_enabled: "system",
 };
 
 // Flags that have configurable settings
