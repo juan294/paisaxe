@@ -84,3 +84,56 @@ export interface ContentImagesResponse {
   images: ContentImage[];
   total: number;
 }
+
+// Story creation types
+export interface CreateStoryRequest {
+  title: string;
+  slug?: string;
+  subtitle?: string;
+  description?: string;
+  category: StoryCategory;
+  location?: StoryLocation;
+  duration?: StoryDuration;
+  sourcePdf?: string;
+  bestMonths?: number[];
+  metadata?: Record<string, unknown>;
+  displayOrder?: number;
+  sourceType?: "curated" | "user_submitted";
+  suggestionId?: string;
+}
+
+export interface CreateStoryResponse {
+  id: string;
+  slug: string;
+  title: string;
+  category: StoryCategory;
+  displayOrder: number;
+  curationStatus: CurationStatus;
+  createdAt: string;
+}
+
+export interface UpdateStoryRequest {
+  title?: string;
+  slug?: string;
+  subtitle?: string;
+  description?: string;
+  category?: StoryCategory;
+  location?: StoryLocation | null;
+  duration?: StoryDuration | null;
+  sourcePdf?: string | null;
+  bestMonths?: number[] | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface UpdateStoryResponse {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  category: StoryCategory;
+  location: StoryLocation | null;
+  duration: StoryDuration | null;
+  sourcePdf: string | null;
+  updatedAt: string;
+}

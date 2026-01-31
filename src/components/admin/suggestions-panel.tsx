@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { fetchSuggestions, updateSuggestion, deleteSuggestion } from "@/lib/admin-api";
+import { CreateStoryDialog } from "./create-story-dialog";
 import {
   RefreshCw,
   AlertCircle,
@@ -20,6 +21,7 @@ import {
   AtSign,
 } from "lucide-react";
 import type { AdminStorySuggestion, SuggestionStatus } from "@/types/suggestions";
+import type { CreateStoryResponse } from "@/types/admin";
 
 const STATUS_LABELS: Record<SuggestionStatus, string> = {
   pending: "Pending",
@@ -65,6 +67,7 @@ export function SuggestionsPanel() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
+  const [convertingSuggestion, setConvertingSuggestion] = useState<AdminStorySuggestion | null>(null);
 
   const loadSuggestions = useCallback(async () => {
     setIsLoading(true);
@@ -133,6 +136,24 @@ export function SuggestionsPanel() {
 
   const toggleExpanded = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
+  };
+
+  const handleConvertToStory = (suggestion: AdminStorySuggestion) => {
+    setConvertingSuggestion(suggestion);
+  };
+
+  const handleStoryCreated = (story: CreateStoryResponse) => {
+    // Update the suggestion status in local state
+    if (convertingSuggestion) {
+      setSuggestions((prev) =>
+        prev.map((s) =>
+          s.id === convertingSuggestion.id
+            ? { ...s, status: "converted" as SuggestionStatus, convertedStoryId: story.id }
+            : s
+        )
+      );
+    }
+    setConvertingSuggestion(null);
   };
 
   // Count suggestions by status (from all suggestions, not filtered)
@@ -391,7 +412,7 @@ export function SuggestionsPanel() {
 
                     {suggestion.status !== "converted" && (
                       <button
-                        onClick={() => handleStatusChange(suggestion.id, "converted")}
+                        onClick={() => handleConvertToStory(suggestion)}
                         disabled={updatingId === suggestion.id}
                         className={cn(
                           "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
@@ -429,6 +450,14 @@ export function SuggestionsPanel() {
       <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
         Suggestions from logged-in visitors
       </p>
+
+      {/* Create Story Dialog for conversions */}
+      <CreateStoryDialog
+        open={!!convertingSuggestion}
+        onOpenChange={(open) => !open && setConvertingSuggestion(null)}
+        onCreated={handleStoryCreated}
+        suggestion={convertingSuggestion}
+      />
     </div>
   );
 }

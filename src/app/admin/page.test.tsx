@@ -106,6 +106,14 @@ vi.mock("@/components/admin/analytics-dashboard", () => ({
   AnalyticsDashboard: () => <div data-testid="analytics-dashboard">Analytics</div>,
 }));
 
+vi.mock("@/components/admin/create-story-dialog", () => ({
+  CreateStoryDialog: () => <div data-testid="create-story-dialog">Create Story Dialog</div>,
+}));
+
+vi.mock("@/components/admin/story-editor-dialog", () => ({
+  StoryEditorDialog: () => <div data-testid="story-editor-dialog">Story Editor Dialog</div>,
+}));
+
 // Mock lucide-react icons
 vi.mock("lucide-react", () => ({
   RefreshCw: ({ className, ...props }: Record<string, unknown>) => (
@@ -144,6 +152,9 @@ vi.mock("lucide-react", () => ({
   ),
   Search: (props: Record<string, unknown>) => (
     <span data-testid="icon-search" {...props} />
+  ),
+  Plus: (props: Record<string, unknown>) => (
+    <span data-testid="icon-plus" {...props} />
   ),
 }));
 

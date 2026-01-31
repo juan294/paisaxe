@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdminRole } from "@/hooks/use-admin-role";
 import { StoryGrid } from "@/components/admin/story-grid";
-import { ImageEditorDialog } from "@/components/admin/image-editor-dialog";
+import { StoryEditorDialog } from "@/components/admin/story-editor-dialog";
+import { CreateStoryDialog } from "@/components/admin/create-story-dialog";
 import { SelectionToolbar } from "@/components/admin/selection-toolbar";
 import { AdminTabs, TABS, type AdminTab } from "@/components/admin/admin-tabs";
 import { FeatureTogglesPanel } from "@/components/admin/feature-toggles-panel";
@@ -27,10 +28,11 @@ import {
   Layers,
   ArrowUpRight,
   Search,
+  Plus,
 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { Input } from "@/components/ui/input";
-import type { AdminStory, CurationStatus } from "@/types/admin";
+import type { AdminStory, CurationStatus, CreateStoryResponse } from "@/types/admin";
 import { cn } from "@/lib/utils";
 
 type FilterType = "all" | CurationStatus;
@@ -48,6 +50,7 @@ function AdminPageContent() {
   const [activeTab, setActiveTab] = useState<AdminTab>("stories");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Always fetch ALL stories - filter client-side for display
   const loadStories = useCallback(async () => {
@@ -190,6 +193,11 @@ function AdminPageContent() {
     }
 
     setIsBulkUpdating(false);
+  };
+
+  const handleStoryCreated = (_story: CreateStoryResponse) => {
+    // Reload stories to get the full story data
+    loadStories();
   };
 
   const handleBulkDelete = async () => {
@@ -409,9 +417,9 @@ function AdminPageContent() {
               />
             </div>
 
-            {/* Search input */}
-            <div className="mb-6">
-              <div className="relative max-w-md">
+            {/* Search input and Create button */}
+            <div className="mb-6 flex items-center gap-4">
+              <div className="relative max-w-md flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a39e98]" />
                 <Input
                   type="text"
@@ -421,6 +429,13 @@ function AdminPageContent() {
                   className="h-11 rounded-xl border-none bg-white pl-10 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:bg-[#252320] dark:text-[#f5f3ee]"
                 />
               </div>
+              <Button
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="h-11 rounded-xl bg-[#2d2a26] text-sm font-medium text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create Story
+              </Button>
             </div>
           </>
         )}
@@ -479,11 +494,18 @@ function AdminPageContent() {
         )}
       </main>
 
-      {/* Image Editor Dialog */}
-      <ImageEditorDialog
+      {/* Story Editor Dialog */}
+      <StoryEditorDialog
         story={editingStory}
         onClose={() => setEditingStory(null)}
         onUpdate={handleStoryUpdate}
+      />
+
+      {/* Create Story Dialog */}
+      <CreateStoryDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onCreated={handleStoryCreated}
       />
 
       {/* Selection Toolbar */}

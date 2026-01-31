@@ -1,4 +1,13 @@
-import type { AdminStory, CurationStatus, AdminApiResponse, ContentImagesResponse } from "@/types/admin";
+import type {
+  AdminStory,
+  CurationStatus,
+  AdminApiResponse,
+  ContentImagesResponse,
+  CreateStoryRequest,
+  CreateStoryResponse,
+  UpdateStoryRequest,
+  UpdateStoryResponse,
+} from "@/types/admin";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import type { AnalyticsDashboardData } from "@/types/analytics";
 import type { ElevenLabsAnalyticsDashboardData } from "@/types/elevenlabs-analytics";
@@ -10,6 +19,61 @@ const API_BASE = "/api/admin";
  * Client-side API helpers for admin panel.
  * Auth is handled via session cookies automatically.
  */
+
+/**
+ * Create a new story
+ */
+export async function createStory(
+  data: CreateStoryRequest
+): Promise<AdminApiResponse<CreateStoryResponse>> {
+  try {
+    const response = await fetch(`${API_BASE}/stories`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to create story" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error creating story:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Update an existing story's fields
+ */
+export async function updateStory(
+  storyId: string,
+  data: UpdateStoryRequest
+): Promise<AdminApiResponse<UpdateStoryResponse>> {
+  try {
+    const response = await fetch(`${API_BASE}/stories/${storyId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to update story" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error updating story:", error);
+    return { error: "Network error" };
+  }
+}
 
 /**
  * Fetch all stories with optional filter
