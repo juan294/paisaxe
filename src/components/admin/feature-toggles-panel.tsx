@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import { VisitorVoiceConfigPanel } from "./visitor-voice-config-panel";
+import { AgentConfigPanel } from "./agent-config-panel";
 
 // Feature flag categories
 type FlagCategory = "discovery" | "experience" | "social" | "voice" | "system";
@@ -91,7 +92,13 @@ const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
 };
 
 // Flags that have configurable settings
-const CONFIGURABLE_FLAGS = ["visitor_voice_agent"];
+const CONFIGURABLE_FLAGS = [
+  "visitor_voice_agent",
+  "coverage_agent_enabled",
+  "security_agent_enabled",
+  "docs_freshness_agent_enabled",
+  "performance_agent_enabled",
+];
 
 export function FeatureTogglesPanel() {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
@@ -425,6 +432,14 @@ export function FeatureTogglesPanel() {
                   {expandedKey === flag.flagKey && flag.flagKey === "visitor_voice_agent" && (
                     <div className="border-t border-stone-100 px-12 pb-6 dark:border-stone-800">
                       <VisitorVoiceConfigPanel
+                        flag={flag}
+                        onUpdate={handleFlagUpdate}
+                      />
+                    </div>
+                  )}
+                  {expandedKey === flag.flagKey && flag.flagKey.endsWith("_agent_enabled") && (
+                    <div className="border-t border-stone-100 px-12 pb-6 dark:border-stone-800">
+                      <AgentConfigPanel
                         flag={flag}
                         onUpdate={handleFlagUpdate}
                       />
