@@ -102,6 +102,11 @@ async function isMaintenanceModeEnabled(): Promise<boolean> {
     // Using fetch with cache for Edge runtime compatibility
     // Filter by current environment so localhost maintenance mode doesn't affect production
     const environment = getEnvironment();
+
+    // In development, don't cache so changes take effect immediately
+    // In production, cache for 30 seconds to reduce database hits
+    const isDev = environment === "development";
+
     const response = await fetch(
       `${supabaseUrl}/rest/v1/feature_flags?flag_key=eq.maintenance_mode&environment=eq.${environment}&select=enabled`,
       {
@@ -109,8 +114,10 @@ async function isMaintenanceModeEnabled(): Promise<boolean> {
           apikey: supabaseKey,
           Authorization: `Bearer ${supabaseKey}`,
         },
-        // Cache for 30 seconds to avoid hitting Supabase on every request
-        next: { revalidate: 30 },
+        ...(isDev
+          ? { cache: "no-store" as const }
+          : { next: { revalidate: 30 } }
+        ),
       }
     );
 
