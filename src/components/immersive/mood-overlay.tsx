@@ -31,10 +31,10 @@ export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" />
 
       {/* Content */}
-      <div className="relative max-w-md w-full text-center animate-in fade-in zoom-in-95 duration-300 motion-reduce:animate-none" role="dialog" aria-label={t("mood.title")}>
+      <div className="relative max-w-md w-full text-center rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-300 motion-reduce:animate-none" role="dialog" aria-label={t("mood.title")}>
         {/* Dismiss button */}
         <button
           onClick={handleDismiss}

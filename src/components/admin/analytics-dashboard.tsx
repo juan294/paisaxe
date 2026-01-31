@@ -52,15 +52,15 @@ export function AnalyticsDashboard() {
   return (
     <div className="space-y-16">
       {/* Header */}
-      <header className="flex items-end justify-between border-b border-stone-200 pb-6 dark:border-stone-800">
+      <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">Admin / Analytics</p>
-          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-stone-900 dark:text-stone-100">
+          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Admin / Analytics</p>
+          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
             Visitor Data
           </h1>
         </div>
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-mono text-xs text-stone-400">
+          <div className="flex items-center gap-2 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
             <input
               type="date"
               value={dateRange.from}
@@ -78,7 +78,7 @@ export function AnalyticsDashboard() {
           <button
             onClick={loadData}
             disabled={isLoading}
-            className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 disabled:opacity-50 dark:hover:text-stone-100"
+            className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:hover:text-[#f5f3ee]"
           >
             {isLoading ? "Loading..." : "Refresh"}
           </button>
@@ -94,12 +94,12 @@ export function AnalyticsDashboard() {
 
       {isLoading && !data ? (
         <div className="flex min-h-[300px] items-center justify-center">
-          <RefreshCw className="h-5 w-5 animate-spin text-stone-300" />
+          <RefreshCw className="h-5 w-5 animate-spin text-[#a39e98]" />
         </div>
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[300px] flex-col items-center justify-center gap-4">
-          <p className="text-2xl font-extralight text-stone-300">No data yet</p>
-          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+          <p className="text-2xl font-extralight text-[#a39e98]">No data yet</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
             Visitor data will appear here once browsing begins
           </p>
         </div>
@@ -116,7 +116,7 @@ export function AnalyticsDashboard() {
           {/* Time Series Chart */}
           {data.timeSeries.length > 0 && (
             <section>
-              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
                 Traffic Over Time
               </h2>
               <TimeSeriesChart data={data.timeSeries} />
@@ -144,7 +144,7 @@ export function AnalyticsDashboard() {
           {/* UTM Campaigns */}
           {data.utmCampaigns.length > 0 && (
             <section>
-              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+              <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
                 03 — UTM Campaigns
               </h2>
               <UTMTable items={data.utmCampaigns} />
@@ -224,7 +224,7 @@ export function AnalyticsDashboard() {
 
           {/* New vs Returning */}
           <section>
-            <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+            <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
               12 — New vs Returning Visitors
             </h2>
             <NewVsReturningBar
@@ -236,7 +236,7 @@ export function AnalyticsDashboard() {
       ) : null}
 
       {/* ElevenLabs Voice Agent Analytics */}
-      <div className="mt-16 border-t border-stone-200 pt-16 dark:border-stone-800">
+      <div className="mt-16 border-t border-[#e5e3de] pt-16 dark:border-[#3d3a36]">
         <ElevenLabsAnalyticsPanel />
       </div>
     </div>
@@ -279,13 +279,13 @@ const statColorClasses = {
 
 function StatCard({ value, label, color }: StatCardProps) {
   const displayValue = typeof value === "number" ? value.toLocaleString() : value;
-  const colorClass = color ? statColorClasses[color] : "text-stone-900 dark:text-stone-100";
+  const colorClass = color ? statColorClasses[color] : "text-[#2d2a26] dark:text-[#f5f3ee]";
   return (
     <div>
       <p className={`text-6xl font-extralight tabular-nums tracking-tighter lg:text-8xl ${colorClass}`}>
         {displayValue}
       </p>
-      <p className="mt-4 font-mono text-xs uppercase tracking-widest text-stone-400">{label}</p>
+      <p className="mt-4 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">{label}</p>
     </div>
   );
 }
@@ -381,7 +381,7 @@ function TimeSeriesChart({ data }: TimeSeriesChartProps) {
               x={padding.left + i * xStep}
               y={height - 8}
               textAnchor="middle"
-              className="fill-stone-400 font-mono text-[10px]"
+              className="fill-[#a39e98] font-mono text-[10px]"
             >
               {formatDateShort(d.date)}
             </text>
@@ -389,10 +389,10 @@ function TimeSeriesChart({ data }: TimeSeriesChartProps) {
         })}
 
         {/* Y-axis labels */}
-        <text x={padding.left - 10} y={padding.top + 4} textAnchor="end" className="fill-stone-400 font-mono text-[10px]">
+        <text x={padding.left - 10} y={padding.top + 4} textAnchor="end" className="fill-[#a39e98] font-mono text-[10px]">
           {maxValue.toLocaleString()}
         </text>
-        <text x={padding.left - 10} y={padding.top + chartHeight + 4} textAnchor="end" className="fill-stone-400 font-mono text-[10px]">
+        <text x={padding.left - 10} y={padding.top + chartHeight + 4} textAnchor="end" className="fill-[#a39e98] font-mono text-[10px]">
           0
         </text>
       </svg>
@@ -435,34 +435,34 @@ function DataTable<T>({
   if (items.length === 0) {
     return (
       <section>
-        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+        <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
           {number} — {title}
         </h2>
-        <p className="py-8 text-center font-mono text-xs text-stone-300">No data available</p>
+        <p className="py-8 text-center font-mono text-xs text-[#a39e98]">No data available</p>
       </section>
     );
   }
 
   return (
     <section>
-      <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-stone-400">
+      <h2 className="mb-6 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
         {number} — {title}
       </h2>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-stone-200 text-left dark:border-stone-800">
-            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">#</th>
-            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Name</th>
-            <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Count</th>
+          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
+            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">#</th>
+            <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Name</th>
+            <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Count</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
           {items.map((item, idx) => (
             <tr key={idx}>
-              <td className="py-3 font-mono text-sm tabular-nums text-stone-400">
+              <td className="py-3 font-mono text-sm tabular-nums text-[#6b6560] dark:text-[#a39e98]">
                 {String(idx + 1).padStart(2, '0')}
               </td>
-              <td className="py-3 text-sm capitalize text-stone-700 dark:text-stone-300">
+              <td className="py-3 text-sm capitalize text-[#4d4944] dark:text-[#a39e98]">
                 {renderItem(item)}
               </td>
               <td className="py-3 text-right font-mono text-sm font-medium tabular-nums text-sky-600 dark:text-sky-400">
@@ -482,29 +482,29 @@ interface UTMTableProps {
 
 function UTMTable({ items }: UTMTableProps) {
   if (items.length === 0) {
-    return <p className="py-8 text-center font-mono text-xs text-stone-300">No UTM data available</p>;
+    return <p className="py-8 text-center font-mono text-xs text-[#a39e98]">No UTM data available</p>;
   }
 
   return (
     <table className="w-full">
       <thead>
-        <tr className="border-b border-stone-200 text-left dark:border-stone-800">
-          <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">#</th>
-          <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Source</th>
-          <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Medium</th>
-          <th className="pb-3 font-mono text-xs uppercase tracking-widest text-stone-400">Campaign</th>
-          <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-stone-400">Count</th>
+        <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
+          <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">#</th>
+          <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Source</th>
+          <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Medium</th>
+          <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Campaign</th>
+          <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Count</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+      <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
         {items.map((item, idx) => (
           <tr key={idx}>
-            <td className="py-3 font-mono text-sm tabular-nums text-stone-400">
+            <td className="py-3 font-mono text-sm tabular-nums text-[#6b6560] dark:text-[#a39e98]">
               {String(idx + 1).padStart(2, '0')}
             </td>
-            <td className="py-3 text-sm text-stone-700 dark:text-stone-300">{item.source}</td>
-            <td className="py-3 text-sm text-stone-700 dark:text-stone-300">{item.medium}</td>
-            <td className="py-3 text-sm text-stone-700 dark:text-stone-300">{item.campaign}</td>
+            <td className="py-3 text-sm text-[#4d4944] dark:text-[#a39e98]">{item.source}</td>
+            <td className="py-3 text-sm text-[#4d4944] dark:text-[#a39e98]">{item.medium}</td>
+            <td className="py-3 text-sm text-[#4d4944] dark:text-[#a39e98]">{item.campaign}</td>
             <td className="py-3 text-right font-mono text-sm font-medium tabular-nums text-sky-600 dark:text-sky-400">
               {item.count.toLocaleString()}
             </td>
@@ -523,7 +523,7 @@ interface NewVsReturningBarProps {
 function NewVsReturningBar({ newVisitors, returningVisitors }: NewVsReturningBarProps) {
   const total = newVisitors + returningVisitors;
   if (total === 0) {
-    return <p className="py-8 text-center font-mono text-xs text-stone-300">No visitor data available</p>;
+    return <p className="py-8 text-center font-mono text-xs text-[#a39e98]">No visitor data available</p>;
   }
 
   const newPercent = Math.round((newVisitors / total) * 100);
