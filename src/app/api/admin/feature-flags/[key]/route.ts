@@ -3,6 +3,7 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 import { createAdminClient } from "@/lib/supabase";
 import type { FeatureFlagRow } from "@/types/feature-flags";
 import { rowToFeatureFlag } from "@/types/feature-flags";
+import { getEnvironment } from "@/lib/environment";
 
 export async function PUT(
   request: NextRequest,
@@ -55,10 +56,13 @@ export async function PUT(
     }
 
     const adminClient = createAdminClient();
+    const environment = getEnvironment();
+
     const { data, error } = await adminClient
       .from("feature_flags")
       .update(updateData)
       .eq("flag_key", key)
+      .eq("environment", environment)
       .select()
       .single();
 

@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import type { FeatureFlagRow } from "@/types/feature-flags";
 import { rowToFeatureFlag } from "@/types/feature-flags";
+import { getEnvironment } from "@/lib/environment";
 
 export async function GET() {
   try {
+    const environment = getEnvironment();
+
     const { data, error } = await supabase
       .from("feature_flags")
       .select("*")
+      .eq("environment", environment)
       .order("flag_key", { ascending: true });
 
     if (error) {

@@ -26,6 +26,7 @@ function makeVisitorVoiceFlag(
     label: "Visitor Voice Agent",
     description: "Enable voice for whitelisted visitors",
     config,
+    environment: "development",
     createdAt: "2025-01-01T00:00:00Z",
     updatedAt: "2025-01-01T00:00:00Z",
   };
@@ -284,6 +285,7 @@ describe("useVisitorVoiceAccess", () => {
         label: "Visitor Voice Agent",
         description: null,
         config: {}, // Missing required fields
+        environment: "development",
         createdAt: "2025-01-01T00:00:00Z",
         updatedAt: "2025-01-01T00:00:00Z",
       };
