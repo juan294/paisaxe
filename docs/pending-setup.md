@@ -2,61 +2,41 @@
 
 Tasks to complete once the domain (paisaxe.com / paisaxe.es) is fully configured and DNS has propagated.
 
-**Status**: Waiting on domain finalization.
+**Status**: Domain is live. Most items completed. See checklist below.
+
+---
+
+## Checklist
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Add WEBHOOK_SECRET to Vercel | COMPLETED (2026-01-31) |
+| 2 | Configure Supabase Database Webhook Settings | COMPLETED |
+| 3 | Configure Supabase Edge Function Settings | NEEDS VERIFICATION |
+| 4 | Deploy Edge Functions | COMPLETED (2026-01-31) |
+| 5 | Verify Database Migrations | COMPLETED |
+| 6 | Update NEXT_PUBLIC_SITE_URL on Vercel | COMPLETED (24h ago) |
+| 7 | Add ELEVENLABS_API_KEY to Vercel | COMPLETED (2026-01-31) |
+| 8 | Trigger redeployment | PENDING |
+| 9 | Verify Everything Works | PENDING |
 
 ---
 
 ## 1. Add WEBHOOK_SECRET to Vercel
 
-The webhook receiver API needs this secret to validate incoming requests from Supabase.
-
-```bash
-# Add to both Production and Preview
-vercel env add WEBHOOK_SECRET production
-vercel env add WEBHOOK_SECRET preview
-```
-
-Use the same value as in `.env.local`: `(see .env.local WEBHOOK_SECRET)`
-
-After adding, trigger a redeployment so the new env var takes effect.
+**COMPLETED** - Added to both Production and Preview environments on 2026-01-31.
 
 ---
 
 ## 2. Configure Supabase Database Webhook Settings
 
-Webhook settings are stored in the `webhook_config` table (Supabase restricts ALTER DATABASE commands).
-
-**View current config:**
-```sql
-SELECT * FROM webhook_config;
-```
-
-**Update via Supabase API (using service role key):**
-```bash
-# Update base_url
-curl -X PATCH \
-  "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/webhook_config?key=eq.base_url" \
-  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"value": "https://paisaxe.es"}'
-
-# Update secret
-curl -X PATCH \
-  "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/webhook_config?key=eq.secret" \
-  -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-  -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"value": "YOUR_WEBHOOK_SECRET"}'
-```
-
-**✓ COMPLETED**: Webhook config is set to `https://paisaxe.es` with the correct secret.
+**COMPLETED** - Webhook config is set to `https://paisaxe.es` with the correct secret.
 
 ---
 
 ## 3. Configure Supabase Edge Function Settings
 
-Run these SQL commands to enable pg_cron to call the Edge Functions:
+**NEEDS VERIFICATION** - These SQL commands should be run in the Supabase SQL Editor to enable pg_cron to call the Edge Functions:
 
 ```sql
 -- Set the Edge Functions base URL
@@ -70,20 +50,19 @@ ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
 To get the service role key:
 1. Go to https://supabase.com/dashboard/project/axoishtlumlswzhegseq/settings/api
 2. Copy the `service_role` key (the secret one, not the anon key)
-3. Paste it in the SQL command above
+3. Run the SQL command above
+
+**Note**: This may already be configured. The Edge Function will fail silently if not set up.
 
 ---
 
 ## 4. Deploy Edge Functions
 
-Deploy the two Supabase Edge Functions:
+**COMPLETED** - Deployed on 2026-01-31.
 
-```bash
-supabase functions deploy keep-alive
-supabase functions deploy cleanup-analytics
-```
+Only `keep-alive` is deployed. The `cleanup-analytics` Edge Function was removed as part of the PostHog migration (analytics are now handled by PostHog).
 
-Verify they're deployed:
+Verify deployment:
 ```bash
 supabase functions list
 ```
@@ -92,55 +71,54 @@ supabase functions list
 
 ## 5. Verify Database Migrations
 
-Migrations 012–015 have already been applied via `supabase db push`. Verify they are in place:
+**COMPLETED** - All migrations applied. The following cron jobs should be active:
 
-```sql
--- Check all migrations are applied
-SELECT * FROM supabase_migrations.schema_migrations ORDER BY version;
+| Job | Status |
+|-----|--------|
+| `analyze-main-tables` | Active |
+| `cleanup-cron-history` | Active |
+| `edge-keep-alive` | Active |
+| `keep-alive` | Active |
+| `vacuum-analyze-chunks` | Active |
 
--- Verify cron jobs are registered (expect 7)
-SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;
-```
-
-Expected cron jobs (7 total):
-- `analyze-main-tables`
-- `cleanup-cron-history`
-- `edge-cleanup-analytics`
-- `edge-keep-alive`
-- `keep-alive`
-- `vacuum-analyze-analytics`
-- `vacuum-analyze-chunks`
-
-Migrations applied:
-- `012_keep_alive_cron.sql` — Keep-alive cron job + get_database_size() function
-- `013_database_webhooks.sql` — pg_net extension + webhook triggers on stories and feature_flags
-- `014_edge_function_schedules.sql` — pg_cron schedules for Edge Functions
-- `015_security_advisor_fixes.sql` — Function search_path hardening, move vector to extensions schema, tighten analytics RLS
+**Note**: The `vacuum-analyze-analytics` and `edge-cleanup-analytics` jobs were removed as part of the PostHog migration.
 
 ---
 
 ## 6. Update NEXT_PUBLIC_SITE_URL on Vercel
 
-Once the domain is finalized, update the production site URL:
-
-```bash
-vercel env rm NEXT_PUBLIC_SITE_URL production
-vercel env add NEXT_PUBLIC_SITE_URL production
-# Enter: https://paisaxe.es (or https://paisaxe.es)
-```
+**COMPLETED** - Set 24 hours ago to production URL.
 
 ---
 
-## 7. Verify Everything Works
+## 7. Add ELEVENLABS_API_KEY to Vercel
+
+**COMPLETED** - Added to both Production and Preview environments on 2026-01-31.
+
+---
+
+## 8. Trigger Redeployment
+
+**PENDING** - After adding new environment variables, trigger a redeployment:
+
+```bash
+vercel --prod
+```
+
+Or push any commit to `main` to trigger automatic deployment.
+
+---
+
+## 9. Verify Everything Works
 
 After completing all steps above:
 
 1. **Health check**: Visit `https://paisaxe.es/api/health` - should show `"healthy"` with database size info
 2. **Webhooks**: Toggle a feature flag in the admin panel, then check if the cache is invalidated (the flag change should reflect immediately)
 3. **Realtime**: Open two browser tabs on the immersive page. Toggle a feature flag in the admin panel. Both tabs should reflect the change without refreshing
-4. **Edge Functions**: Check the Supabase Dashboard > Edge Functions to see invocation logs
-5. **Cron jobs**: Wait 3 days and verify the keep-alive job ran: `SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;`
-6. **Security Advisor**: Check [Security Advisor](https://supabase.com/dashboard/project/axoishtlumlswzhegseq/advisors/security) — should show only 1 warning ("Leaked Password Protection Disabled", which requires a paid Pro plan and can be ignored)
+4. **Voice agents**: Test the voice chat feature (requires `visitor_voice_agent` feature flag enabled)
+5. **Edge Functions**: Check the Supabase Dashboard > Edge Functions to see invocation logs
+6. **Cron jobs**: Wait 3 days and verify the keep-alive job ran: `SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;`
 
 ---
 
@@ -152,9 +130,9 @@ After completing all steps above:
 | Supabase dashboard | https://supabase.com/dashboard/project/axoishtlumlswzhegseq |
 | Supabase SQL Editor | https://supabase.com/dashboard/project/axoishtlumlswzhegseq/sql |
 | Vercel project | `thecreativetoken/paisaxe` |
-| Vercel preview URL | https://paisaxe-oe4tox6sq-thecreativetoken.vercel.app |
-| WEBHOOK_SECRET | `(see .env.local WEBHOOK_SECRET)` |
+| Production URL | https://paisaxe.es |
+| Edge Functions | https://supabase.com/dashboard/project/axoishtlumlswzhegseq/functions |
 
 ---
 
-*Delete this file once all tasks are completed.*
+*This file can be archived once all tasks are verified as working.*
