@@ -21,6 +21,7 @@ function makeMockFlag(config: {
     label: "Visitor Voice Agent",
     description: "Enable voice for whitelisted visitors",
     config,
+    environment: "development",
     createdAt: "2025-01-01T00:00:00Z",
     updatedAt: "2025-01-01T00:00:00Z",
   };
@@ -273,6 +274,7 @@ describe("VisitorVoiceConfigPanel", () => {
         label: "Visitor Voice Agent",
         description: null,
         config: {},
+        environment: "development",
         createdAt: "2025-01-01T00:00:00Z",
         updatedAt: "2025-01-01T00:00:00Z",
       };

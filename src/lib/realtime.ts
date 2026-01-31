@@ -2,6 +2,7 @@ import { createSupabaseBrowserClient } from "./supabase-browser";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import type { FeatureFlagRow } from "@/types/feature-flags";
 import type { StoryRow } from "@/types/immersive";
+import { getEnvironment } from "./environment";
 
 type PostgresChangeEvent = "INSERT" | "UPDATE" | "DELETE" | "*";
 
@@ -53,7 +54,8 @@ export function subscribeToTable(
  * Subscribe to feature flag updates via Supabase Realtime.
  *
  * When a flag is toggled in the admin panel, the callback receives
- * the updated database row immediately.
+ * the updated database row immediately. Only receives updates for
+ * the current environment (development or production).
  *
  * @param callback - Called with the updated FeatureFlagRow
  * @returns Cleanup function to remove the subscription
@@ -61,13 +63,22 @@ export function subscribeToTable(
 export function subscribeToFeatureFlags(
   callback: (row: FeatureFlagRow) => void
 ): () => void {
+  const environment = getEnvironment();
+
   return subscribeToTable(
     "feature_flags",
     (payload) => {
       const newRow = payload.new as FeatureFlagRow;
-      callback(newRow);
+      // Only process updates for the current environment
+      if (newRow.environment === environment) {
+        callback(newRow);
+      }
     },
-    { event: "UPDATE" }
+    {
+      event: "UPDATE",
+      // Filter at database level for the current environment
+      filter: `environment=eq.${environment}`,
+    }
   );
 }
 

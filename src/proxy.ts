@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LOCATION_CONFIG } from "@/config/location";
+import { getEnvironment } from "@/lib/environment";
 
 // LOCATION-SPECIFIC: Build allowed origins from config domains
 const ALLOWED_ORIGINS: string[] = [];
@@ -99,8 +100,10 @@ async function isMaintenanceModeEnabled(): Promise<boolean> {
 
     // Fetch maintenance_mode flag directly from Supabase REST API
     // Using fetch with cache for Edge runtime compatibility
+    // Filter by current environment so localhost maintenance mode doesn't affect production
+    const environment = getEnvironment();
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/feature_flags?flag_key=eq.maintenance_mode&select=enabled`,
+      `${supabaseUrl}/rest/v1/feature_flags?flag_key=eq.maintenance_mode&environment=eq.${environment}&select=enabled`,
       {
         headers: {
           apikey: supabaseKey,

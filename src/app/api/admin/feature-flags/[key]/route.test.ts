@@ -11,8 +11,13 @@ vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
 
+vi.mock("@/lib/environment", () => ({
+  getEnvironment: vi.fn(() => "development"),
+}));
+
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { getEnvironment } from "@/lib/environment";
 
 describe("PUT /api/admin/feature-flags/[key]", () => {
   const mockParams = { params: Promise.resolve({ key: "contextual_prompts" }) };
@@ -24,6 +29,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
     label: "Contextual Prompts",
     description: "Enable contextual prompts",
     config: {},
+    environment: "development",
     created_at: "2025-01-01T00:00:00Z",
     updated_at: "2025-01-15T00:00:00Z",
   };
@@ -49,11 +55,13 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
   it("should update flag and return updated flag on success", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    vi.mocked(getEnvironment).mockReturnValue("development");
 
     const mockSingle = vi.fn().mockResolvedValue({ data: mockUpdatedRow, error: null });
     const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
-    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockEqEnv = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEqKey = vi.fn().mockReturnValue({ eq: mockEqEnv });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqKey });
     const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
 
     vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
@@ -70,9 +78,38 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
     expect(data.data.flagKey).toBe("contextual_prompts");
     expect(data.data.enabled).toBe(true);
     expect(data.data.label).toBe("Contextual Prompts");
+    expect(data.data.environment).toBe("development");
     expect(mockFrom).toHaveBeenCalledWith("feature_flags");
     expect(mockUpdate).toHaveBeenCalledWith({ enabled: true });
-    expect(mockEq).toHaveBeenCalledWith("flag_key", "contextual_prompts");
+    expect(mockEqKey).toHaveBeenCalledWith("flag_key", "contextual_prompts");
+    expect(mockEqEnv).toHaveBeenCalledWith("environment", "development");
+  });
+
+  it("should update flag for current environment only", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    vi.mocked(getEnvironment).mockReturnValue("production");
+
+    const productionRow = { ...mockUpdatedRow, environment: "production" };
+    const mockSingle = vi.fn().mockResolvedValue({ data: productionRow, error: null });
+    const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+    const mockEqEnv = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEqKey = vi.fn().mockReturnValue({ eq: mockEqEnv });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqKey });
+    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+      method: "PUT",
+      body: JSON.stringify({ enabled: true }),
+    });
+
+    const response = await PUT(request, mockParams);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockEqEnv).toHaveBeenCalledWith("environment", "production");
+    expect(data.data.environment).toBe("production");
   });
 
   it("should return 400 if enabled is not a boolean (invalid type)", async () => {
@@ -111,8 +148,9 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
     const disabledRow = { ...mockUpdatedRow, enabled: false };
     const mockSingle = vi.fn().mockResolvedValue({ data: disabledRow, error: null });
     const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
-    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockEqEnv = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEqKey = vi.fn().mockReturnValue({ eq: mockEqEnv });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqKey });
     const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
 
     vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
@@ -135,8 +173,9 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
     const mockSingle = vi.fn().mockResolvedValue({ data: null, error: null });
     const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
-    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockEqEnv = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEqKey = vi.fn().mockReturnValue({ eq: mockEqEnv });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqKey });
     const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
 
     vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
@@ -161,8 +200,9 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
       error: { message: "Database error" },
     });
     const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
-    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockEqEnv = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEqKey = vi.fn().mockReturnValue({ eq: mockEqEnv });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqKey });
     const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
 
     vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
@@ -205,6 +245,7 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
       label: "Visitor Voice Agent",
       description: "Enable voice for whitelisted visitors",
       config: { whitelisted_emails: ["test@example.com"], agent_id: "agent-123" },
+      environment: "development",
       created_at: "2025-01-01T00:00:00Z",
       updated_at: "2025-01-15T00:00:00Z",
     };
@@ -216,8 +257,9 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
       const mockSingle = vi.fn().mockResolvedValue({ data: mockVisitorVoiceRow, error: null });
       const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockEqEnv = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqKey = vi.fn().mockReturnValue({ eq: mockEqEnv });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqKey });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
 
       vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
@@ -241,8 +283,9 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
       const updatedRow = { ...mockVisitorVoiceRow, enabled: false };
       const mockSingle = vi.fn().mockResolvedValue({ data: updatedRow, error: null });
       const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockEqEnv = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockEqKey = vi.fn().mockReturnValue({ eq: mockEqEnv });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqKey });
       const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
 
       vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);

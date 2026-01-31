@@ -5,6 +5,11 @@ vi.mock("./supabase-browser", () => ({
   createSupabaseBrowserClient: vi.fn(),
 }));
 
+// Mock the environment module
+vi.mock("./environment", () => ({
+  getEnvironment: vi.fn(() => "development"),
+}));
+
 import { createSupabaseBrowserClient } from "./supabase-browser";
 
 // Helper to create a mock channel that tracks calls
@@ -140,7 +145,7 @@ describe("realtime", () => {
   });
 
   describe("subscribeToFeatureFlags", () => {
-    it("should subscribe to the feature_flags table for UPDATE events", async () => {
+    it("should subscribe to the feature_flags table for UPDATE events with environment filter", async () => {
       const { subscribeToFeatureFlags } = await import("./realtime");
       const callback = vi.fn();
 
@@ -153,6 +158,7 @@ describe("realtime", () => {
           event: "UPDATE",
           schema: "public",
           table: "feature_flags",
+          filter: "environment=eq.development", // Environment filter
         }),
         expect.any(Function)
       );
@@ -175,6 +181,7 @@ describe("realtime", () => {
           label: "Surprise Me",
           description: null,
           config: {},
+          environment: "development", // Must match mocked getEnvironment()
           created_at: "2025-01-01T00:00:00Z",
           updated_at: "2025-06-01T00:00:00Z",
         },
@@ -184,6 +191,34 @@ describe("realtime", () => {
       onCallback(payload);
 
       expect(callback).toHaveBeenCalledWith(payload.new);
+    });
+
+    it("should not call callback for different environment", async () => {
+      const { subscribeToFeatureFlags } = await import("./realtime");
+      const callback = vi.fn();
+
+      subscribeToFeatureFlags(callback);
+
+      const onCallback = mockChannel.on.mock.calls[0][2];
+      const payload = {
+        eventType: "UPDATE",
+        new: {
+          id: "abc",
+          flag_key: "surprise_me",
+          enabled: true,
+          label: "Surprise Me",
+          description: null,
+          config: {},
+          environment: "production", // Different from mocked "development"
+          created_at: "2025-01-01T00:00:00Z",
+          updated_at: "2025-06-01T00:00:00Z",
+        },
+        old: {},
+      };
+
+      onCallback(payload);
+
+      expect(callback).not.toHaveBeenCalled();
     });
 
     it("should return a cleanup function", async () => {
