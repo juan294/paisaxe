@@ -43,18 +43,18 @@ export function ElevenLabsAnalyticsPanel() {
   return (
     <div className="space-y-12">
       {/* Header */}
-      <header className="border-b border-stone-200 pb-6 dark:border-stone-800">
+      <header className="border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
         <div className="flex items-end justify-between">
           <div>
-            <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+            <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               Voice Agents
             </p>
-            <h2 className="mt-2 text-2xl font-extralight tracking-tight text-stone-900 dark:text-stone-100">
+            <h2 className="mt-2 text-2xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
               ElevenLabs Analytics
             </h2>
           </div>
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 font-mono text-xs text-stone-400">
+            <div className="flex items-center gap-2 font-mono text-xs text-[#a39e98]">
               <input
                 type="date"
                 value={dateRange.from}
@@ -72,7 +72,7 @@ export function ElevenLabsAnalyticsPanel() {
             <button
               onClick={loadData}
               disabled={isLoading}
-              className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 disabled:opacity-50 dark:hover:text-stone-100"
+              className="font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:hover:text-[#f5f3ee]"
             >
               {isLoading ? "Loading..." : "Refresh"}
             </button>
@@ -85,17 +85,17 @@ export function ElevenLabsAnalyticsPanel() {
         <div className={`inline-flex items-center gap-3 rounded-full px-4 py-2 ${
           data.activeCalls > 0
             ? "bg-emerald-50 dark:bg-emerald-900/20"
-            : "bg-stone-100 dark:bg-stone-800"
+            : "bg-[#f5f3ee] dark:bg-[#3d3a36]"
         }`}>
           <span
             className={`h-2.5 w-2.5 rounded-full ${
-              data.activeCalls > 0 ? "animate-pulse bg-emerald-500" : "bg-stone-400"
+              data.activeCalls > 0 ? "animate-pulse bg-emerald-500" : "bg-[#a39e98]"
             }`}
           />
           <span className={`font-mono text-sm font-medium ${
             data.activeCalls > 0
               ? "text-emerald-700 dark:text-emerald-400"
-              : "text-stone-500 dark:text-stone-400"
+              : "text-[#6b6560] dark:text-[#a39e98]"
           }`}>
             Active calls: {data.activeCalls}
           </span>
@@ -111,13 +111,13 @@ export function ElevenLabsAnalyticsPanel() {
 
       {isLoading && !data ? (
         <div className="flex min-h-[200px] items-center justify-center">
-          <RefreshCw className="h-5 w-5 animate-spin text-stone-300" />
+          <RefreshCw className="h-5 w-5 animate-spin text-[#a39e98]" />
         </div>
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[200px] flex-col items-center justify-center gap-4">
-          <Mic className="h-8 w-8 text-stone-200" />
-          <p className="text-xl font-extralight text-stone-300">No conversations yet</p>
-          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+          <Mic className="h-8 w-8 text-[#e5e3de]" />
+          <p className="text-xl font-extralight text-[#a39e98]">No conversations yet</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
             Voice agent data will appear here once conversations begin
           </p>
         </div>
@@ -278,8 +278,8 @@ const statColorClasses: Record<string, { value: string; icon: string }> = {
     icon: "text-yellow-500 dark:text-yellow-400",
   },
   stone: {
-    value: "text-stone-500 dark:text-stone-400",
-    icon: "text-stone-400",
+    value: "text-[#6b6560] dark:text-[#a39e98]",
+    icon: "text-[#a39e98]",
   },
 };
 
@@ -289,11 +289,11 @@ function StatCard({ value, label, suffix, icon, color = "stone" }: StatCardProps
     <div className="space-y-2">
       <div className={`flex items-center gap-2 ${colors.icon}`}>
         {icon}
-        <span className="font-mono text-xs uppercase tracking-widest text-stone-400">{label}</span>
+        <span className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">{label}</span>
       </div>
       <p className={`text-3xl font-extralight tabular-nums tracking-tight ${colors.value}`}>
         {typeof value === "number" ? value.toLocaleString() : value}
-        {suffix && <span className="ml-1 text-lg text-stone-400">{suffix}</span>}
+        {suffix && <span className="ml-1 text-lg text-[#a39e98]">{suffix}</span>}
       </p>
     </div>
   );
@@ -319,41 +319,41 @@ function BreakdownTable<T>({
   if (items.length === 0) {
     return (
       <section>
-        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-stone-400">
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
           {number} — {title}
         </h3>
-        <p className="py-6 text-center font-mono text-xs text-stone-300">No data available</p>
+        <p className="py-6 text-center font-mono text-xs text-[#a39e98]">No data available</p>
       </section>
     );
   }
 
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-stone-400">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
         {number} — {title}
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-stone-200 text-left dark:border-stone-800">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-stone-400">#</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-stone-400">Name</th>
+          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Name</th>
             {getSecondary && (
-              <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-stone-400">
+              <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
                 Time
               </th>
             )}
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-stone-400">
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               Count
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
           {items.map((item, idx) => (
             <tr key={idx}>
-              <td className="py-2 font-mono text-sm tabular-nums text-stone-400">
+              <td className="py-2 font-mono text-sm tabular-nums text-[#a39e98]">
                 {String(idx + 1).padStart(2, "0")}
               </td>
-              <td className="py-2 text-sm capitalize text-stone-700 dark:text-stone-300">
+              <td className="py-2 text-sm capitalize text-[#4d4944] dark:text-[#a39e98]">
                 {renderItem(item)}
               </td>
               {getSecondary && (
@@ -381,33 +381,33 @@ function RecentConversationsTable({ number, conversations }: RecentConversations
   if (conversations.length === 0) {
     return (
       <section>
-        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-stone-400">
+        <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
           {number} — Recent Conversations
         </h3>
-        <p className="py-6 text-center font-mono text-xs text-stone-300">No conversations yet</p>
+        <p className="py-6 text-center font-mono text-xs text-[#a39e98]">No conversations yet</p>
       </section>
     );
   }
 
   return (
     <section>
-      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-stone-400">
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
         {number} — Recent Conversations
       </h3>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-stone-200 text-left dark:border-stone-800">
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-stone-400">Time</th>
-            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-stone-400">Status</th>
-            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-stone-400">
+          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Time</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Status</th>
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               Duration
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
           {conversations.map((conv) => (
             <tr key={conv.conversation_id}>
-              <td className="py-2 font-mono text-xs tabular-nums text-stone-500">
+              <td className="py-2 font-mono text-xs tabular-nums text-[#6b6560]">
                 {formatTime(conv.start_time_unix)}
               </td>
               <td className="py-2">
@@ -417,7 +417,7 @@ function RecentConversationsTable({ number, conversations }: RecentConversations
                       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                       : conv.status === "failed"
                       ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
-                      : "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400"
+                      : "bg-[#f5f3ee] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
                   }`}
                 >
                   {formatStatus(conv.status)}

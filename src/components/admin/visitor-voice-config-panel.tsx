@@ -76,12 +76,12 @@ export function VisitorVoiceConfigPanel({
   };
 
   return (
-    <div className="space-y-6 border-t border-stone-200 pt-6 dark:border-stone-800">
+    <div className="space-y-6 border-t border-[#e5e3de] pt-6 dark:border-[#3d3a36]">
       {/* Agent ID */}
       <div className="space-y-2">
         <label
           htmlFor="agent-id"
-          className="block font-mono text-xs uppercase tracking-widest text-stone-400"
+          className="block font-mono text-xs uppercase tracking-widest text-[#a39e98]"
         >
           ElevenLabs Agent ID
         </label>
@@ -91,13 +91,13 @@ export function VisitorVoiceConfigPanel({
           value={agentId}
           onChange={(e) => setAgentId(e.target.value)}
           placeholder="Enter agent ID from ElevenLabs dashboard"
-          className="w-full border border-stone-200 bg-transparent px-4 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:text-stone-100"
+          className="w-full border border-[#e5e3de] bg-transparent px-4 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] focus:border-[#a39e98] focus:outline-none focus:ring-1 focus:ring-[#c9a55c] dark:border-[#3d3a36] dark:text-[#f5f3ee]"
         />
       </div>
 
       {/* Whitelisted Emails */}
       <div className="space-y-3">
-        <label className="block font-mono text-xs uppercase tracking-widest text-stone-400">
+        <label className="block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
           Whitelisted Emails
         </label>
 
@@ -109,12 +109,12 @@ export function VisitorVoiceConfigPanel({
             onChange={(e) => setNewEmail(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="user@example.com"
-            className="flex-1 border border-stone-200 bg-transparent px-4 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:text-stone-100"
+            className="flex-1 border border-[#e5e3de] bg-transparent px-4 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] focus:border-[#a39e98] focus:outline-none focus:ring-1 focus:ring-[#c9a55c] dark:border-[#3d3a36] dark:text-[#f5f3ee]"
           />
           <button
             type="button"
             onClick={handleAddEmail}
-            className="flex items-center gap-1 border border-stone-200 px-4 py-2 font-mono text-xs uppercase tracking-widest text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-900 dark:border-stone-700 dark:text-stone-400 dark:hover:border-stone-500 dark:hover:text-stone-100"
+            className="flex items-center gap-1 border border-[#e5e3de] px-4 py-2 font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:border-[#a39e98] hover:text-[#2d2a26] dark:border-[#3d3a36] dark:text-[#a39e98] dark:hover:border-[#6b6560] dark:hover:text-[#f5f3ee]"
           >
             <Plus className="h-3 w-3" />
             Add
@@ -123,7 +123,7 @@ export function VisitorVoiceConfigPanel({
 
         {/* Email list */}
         {emails.length === 0 ? (
-          <p className="text-sm text-stone-400">
+          <p className="text-sm text-[#a39e98]">
             No whitelisted emails. Add emails to grant voice access.
           </p>
         ) : (
@@ -131,16 +131,16 @@ export function VisitorVoiceConfigPanel({
             {emails.map((email) => (
               <li
                 key={email}
-                className="flex items-center justify-between border border-stone-100 px-3 py-2 dark:border-stone-800"
+                className="flex items-center justify-between border border-[#f5f3ee] px-3 py-2 dark:border-[#3d3a36]"
               >
-                <span className="text-sm text-stone-700 dark:text-stone-300">
+                <span className="text-sm text-[#4d4944] dark:text-[#a39e98]">
                   {email}
                 </span>
                 <button
                   type="button"
                   onClick={() => handleRemoveEmail(email)}
                   aria-label={`Remove ${email}`}
-                  className="text-stone-400 transition-colors hover:text-red-500"
+                  className="text-[#a39e98] transition-colors hover:text-red-500"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -166,8 +166,8 @@ export function VisitorVoiceConfigPanel({
         className={cn(
           "flex items-center gap-2 border px-6 py-2 font-mono text-xs uppercase tracking-widest transition-all",
           isSaving
-            ? "cursor-wait border-stone-200 text-stone-300"
-            : "border-stone-900 text-stone-900 hover:bg-stone-900 hover:text-white dark:border-stone-100 dark:text-stone-100 dark:hover:bg-stone-100 dark:hover:text-stone-900"
+            ? "cursor-wait border-[#e5e3de] text-[#a39e98]"
+            : "border-[#2d2a26] text-[#2d2a26] hover:bg-[#2d2a26] hover:text-white dark:border-[#f5f3ee] dark:text-[#f5f3ee] dark:hover:bg-[#f5f3ee] dark:hover:text-[#2d2a26]"
         )}
       >
         {isSaving ? (

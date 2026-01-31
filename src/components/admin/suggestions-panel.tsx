@@ -47,9 +47,9 @@ const STATUS_COLORS: Record<SuggestionStatus, { bg: string; text: string; dot: s
     dot: "bg-emerald-500",
   },
   rejected: {
-    bg: "bg-stone-100 dark:bg-stone-800",
-    text: "text-stone-500 dark:text-stone-400",
-    dot: "bg-stone-400",
+    bg: "bg-[#f5f3ee] dark:bg-[#3d3a36]",
+    text: "text-[#6b6560] dark:text-[#a39e98]",
+    dot: "bg-[#a39e98]",
   },
 };
 
@@ -172,7 +172,7 @@ export function SuggestionsPanel() {
   if (isLoading && suggestions.length === 0) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-stone-300" />
+        <RefreshCw className="h-5 w-5 animate-spin text-[#a39e98]" />
       </div>
     );
   }
@@ -180,21 +180,21 @@ export function SuggestionsPanel() {
   return (
     <div className="space-y-16">
       {/* Header */}
-      <header className="flex items-end justify-between border-b border-stone-200 pb-6 dark:border-stone-800">
+      <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">Admin / Content</p>
-          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-stone-900 dark:text-stone-100">
+          <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">Admin / Content</p>
+          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
             Story Suggestions
           </h1>
         </div>
         <div className="flex items-center gap-6">
-          <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+          <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
             {suggestions.length} Total
           </p>
           <button
             onClick={loadSuggestions}
             disabled={isLoading}
-            className="font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 disabled:opacity-50 dark:hover:text-stone-100"
+            className="font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:hover:text-[#f5f3ee]"
           >
             {isLoading ? "Loading..." : "Refresh"}
           </button>
@@ -215,8 +215,8 @@ export function SuggestionsPanel() {
           className={cn(
             "px-4 py-2 rounded-lg font-mono text-xs uppercase tracking-widest transition-colors",
             filterStatus === null
-              ? "bg-stone-900 text-stone-100 dark:bg-stone-100 dark:text-stone-900"
-              : "text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+              ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
+              : "text-[#a39e98] hover:bg-[#f5f3ee] dark:hover:bg-[#3d3a36]"
           )}
         >
           All ({suggestions.length})
@@ -228,8 +228,8 @@ export function SuggestionsPanel() {
             className={cn(
               "px-4 py-2 rounded-lg font-mono text-xs uppercase tracking-widest transition-colors flex items-center gap-2",
               filterStatus === status
-                ? "bg-stone-900 text-stone-100 dark:bg-stone-100 dark:text-stone-900"
-                : "text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+                ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
+                : "text-[#a39e98] hover:bg-[#f5f3ee] dark:hover:bg-[#3d3a36]"
             )}
           >
             <span className={cn("h-1.5 w-1.5 rounded-full", STATUS_COLORS[status].dot)} />
@@ -240,11 +240,11 @@ export function SuggestionsPanel() {
 
       {/* Suggestions List */}
       {filteredSuggestions.length === 0 ? (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white dark:bg-stone-900">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-stone-100 dark:bg-stone-800">
-            <Lightbulb className="h-8 w-8 text-stone-400" />
+        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl bg-white dark:bg-[#2d2a26]">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5f3ee] dark:bg-[#3d3a36]">
+            <Lightbulb className="h-8 w-8 text-[#a39e98]" />
           </div>
-          <p className="mt-4 text-sm font-medium text-stone-500">
+          <p className="mt-4 text-sm font-medium text-[#6b6560]">
             {filterStatus ? `No ${filterStatus} suggestions` : "No suggestions yet"}
           </p>
         </div>
@@ -254,8 +254,8 @@ export function SuggestionsPanel() {
             <div
               key={suggestion.id}
               className={cn(
-                "rounded-2xl bg-white p-5 transition-all dark:bg-stone-900",
-                expandedId === suggestion.id && "ring-1 ring-stone-200 dark:ring-stone-700"
+                "rounded-2xl bg-white p-5 transition-all dark:bg-[#2d2a26]",
+                expandedId === suggestion.id && "ring-1 ring-[#e5e3de] dark:ring-[#4d4944]"
               )}
             >
               {/* Main Row */}
@@ -263,7 +263,7 @@ export function SuggestionsPanel() {
                 {/* Expand Button */}
                 <button
                   onClick={() => toggleExpanded(suggestion.id)}
-                  className="mt-1 flex h-6 w-6 items-center justify-center rounded text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-800"
+                  className="mt-1 flex h-6 w-6 items-center justify-center rounded text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
                   aria-label={expandedId === suggestion.id ? "Collapse" : "Expand"}
                 >
                   {expandedId === suggestion.id ? (
@@ -277,15 +277,15 @@ export function SuggestionsPanel() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-medium text-stone-900 dark:text-stone-100">
+                      <h3 className="text-lg font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
                         {suggestion.placeName}
                       </h3>
                       {suggestion.comment && (
-                        <p className="mt-1 text-sm text-stone-500 line-clamp-1">
+                        <p className="mt-1 text-sm text-[#6b6560] line-clamp-1">
                           {suggestion.comment}
                         </p>
                       )}
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-stone-400">
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#a39e98]">
                         <span className="flex items-center gap-1">
                           <User className="h-3 w-3" />
                           {suggestion.userEmail || "Unknown user"}
@@ -326,15 +326,15 @@ export function SuggestionsPanel() {
 
               {/* Expanded Details */}
               {expandedId === suggestion.id && (
-                <div className="mt-5 border-t border-stone-100 pt-5 dark:border-stone-800">
+                <div className="mt-5 border-t border-[#f5f3ee] pt-5 dark:border-[#3d3a36]">
                   {/* Full Comment */}
                   {suggestion.comment && (
                     <div className="mb-4">
-                      <label className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-widest text-stone-400">
+                      <label className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-widest text-[#a39e98]">
                         <MessageSquare className="h-3 w-3" />
                         Comment
                       </label>
-                      <p className="text-sm text-stone-600 dark:text-stone-300">
+                      <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
                         {suggestion.comment}
                       </p>
                     </div>
@@ -343,11 +343,11 @@ export function SuggestionsPanel() {
                   {/* Attribution */}
                   {suggestion.attribution && (
                     <div className="mb-4">
-                      <label className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-widest text-stone-400">
+                      <label className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-widest text-[#a39e98]">
                         <AtSign className="h-3 w-3" />
                         Credit As
                       </label>
-                      <p className="text-sm text-stone-600 dark:text-stone-300">
+                      <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
                         {suggestion.attribution}
                       </p>
                     </div>
@@ -355,7 +355,7 @@ export function SuggestionsPanel() {
 
                   {/* Admin Notes */}
                   <div className="mb-4">
-                    <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-stone-400">
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-[#a39e98]">
                       Admin Notes
                     </label>
                     <textarea
@@ -365,12 +365,12 @@ export function SuggestionsPanel() {
                       }
                       placeholder="Add internal notes..."
                       rows={3}
-                      className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                      className="w-full rounded-lg border border-[#e5e3de] bg-[#f5f3ee] px-3 py-2 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus:border-[#a39e98] focus:outline-none dark:border-[#4d4944] dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
                     />
                     <button
                       onClick={() => handleSaveNotes(suggestion.id)}
                       disabled={updatingId === suggestion.id}
-                      className="mt-2 font-mono text-xs uppercase tracking-widest text-stone-400 transition-colors hover:text-stone-900 disabled:opacity-50 dark:hover:text-stone-100"
+                      className="mt-2 font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:hover:text-[#f5f3ee]"
                     >
                       {updatingId === suggestion.id ? "Saving..." : "Save Notes"}
                     </button>
@@ -400,8 +400,8 @@ export function SuggestionsPanel() {
                         disabled={updatingId === suggestion.id}
                         className={cn(
                           "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
-                          "bg-stone-100 text-stone-600 hover:bg-stone-200",
-                          "dark:bg-stone-800 dark:text-stone-400 dark:hover:bg-stone-700",
+                          "bg-[#f5f3ee] text-[#6b6560] hover:bg-[#e5e3de]",
+                          "dark:bg-[#3d3a36] dark:text-[#a39e98] dark:hover:bg-[#4d4944]",
                           "disabled:opacity-50"
                         )}
                       >
@@ -447,7 +447,7 @@ export function SuggestionsPanel() {
         </div>
       )}
 
-      <p className="font-mono text-xs uppercase tracking-widest text-stone-400">
+      <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
         Suggestions from logged-in visitors
       </p>
 

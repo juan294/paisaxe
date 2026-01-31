@@ -20,7 +20,7 @@ export const TABS: { value: AdminTab; label: string; number: string }[] = [
 export function AdminTabs({ activeTab, onTabChange }: AdminTabsProps) {
   return (
     <nav
-      className="flex items-center gap-8 border-b border-stone-200 dark:border-stone-800"
+      className="flex items-center gap-8 border-b border-[#e5e3de] dark:border-[#3d3a36]"
       role="tablist"
     >
       {TABS.map((tab, index) => (
@@ -32,19 +32,19 @@ export function AdminTabs({ activeTab, onTabChange }: AdminTabsProps) {
           className={cn(
             "group relative flex items-center gap-2 pb-4 font-mono text-xs uppercase tracking-widest transition-colors",
             activeTab === tab.value
-              ? "text-stone-900 dark:text-stone-100"
-              : "text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              ? "text-[#2d2a26] dark:text-[#f5f3ee]"
+              : "text-[#a39e98] hover:text-[#6b6560] dark:hover:text-[#a39e98]"
           )}
         >
-          <span className="tabular-nums text-stone-300 group-hover:text-stone-400 dark:text-stone-600">
+          <span className="tabular-nums text-[#a39e98] group-hover:text-[#a39e98] dark:text-[#6b6560]">
             {tab.number}
           </span>
           {tab.label}
-          <kbd className="inline-flex items-center justify-center rounded bg-stone-100 px-1.5 py-0.5 font-sans text-[10px] font-medium text-stone-400 dark:bg-stone-800 dark:text-stone-500">
+          <kbd className="inline-flex items-center justify-center rounded bg-[#f5f3ee] px-1.5 py-0.5 font-sans text-[10px] font-medium text-[#a39e98] dark:bg-[#3d3a36] dark:text-[#6b6560]">
             ⌘{index + 1}
           </kbd>
           {activeTab === tab.value && (
-            <span className="absolute bottom-0 left-0 h-px w-full bg-stone-900 dark:bg-stone-100" />
+            <span className="absolute bottom-0 left-0 h-px w-full bg-[#2d2a26] dark:bg-[#f5f3ee]" />
           )}
         </button>
       ))}
