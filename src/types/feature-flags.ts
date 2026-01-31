@@ -19,6 +19,8 @@ export interface VisitorVoiceConfig {
   agent_id: string;
 }
 
+export type Environment = "development" | "production";
+
 export interface FeatureFlag {
   id: string;
   flagKey: FeatureFlagKey;
@@ -26,6 +28,7 @@ export interface FeatureFlag {
   label: string;
   description: string | null;
   config: Record<string, unknown>;
+  environment: Environment;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,6 +40,7 @@ export interface FeatureFlagRow {
   label: string;
   description: string | null;
   config: Record<string, unknown>;
+  environment: Environment;
   created_at: string;
   updated_at: string;
 }
@@ -49,6 +53,7 @@ export function rowToFeatureFlag(row: FeatureFlagRow): FeatureFlag {
     label: row.label,
     description: row.description,
     config: row.config || {},
+    environment: row.environment,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
