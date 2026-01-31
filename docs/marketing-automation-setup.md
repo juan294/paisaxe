@@ -45,11 +45,11 @@ Before connecting any platform, you need:
 
 ### 3. API Tier
 
-- **Free tier**: 1,500 posts/month (50/day), basic endpoints
-- **Basic tier ($100/month)**: 10,000 posts/month, more endpoints
-- **Pro tier ($5,000/month)**: Unlimited posts
+- **Free tier**: Read-only access, cannot post via API
+- **Basic tier ($100/month)**: 1,500 posts/month, posting enabled
+- **Pro tier ($5,000/month)**: 10,000+ posts/month
 
-For Paisaxe's needs (1-7 posts/day), the free tier is sufficient initially.
+**Note:** Posting via API requires at least Basic tier. The free tier only allows reading posts and user info. For manual posting workflow (recommended to start), no paid tier is needed.
 
 ### 4. Save Credentials
 
@@ -198,63 +198,6 @@ curl -X POST https://paisaxe.es/api/admin/marketing/accounts \
 
 ---
 
-## TikTok Setup
-
-TikTok's Content Posting API is newer and has strict requirements.
-
-### 1. Create TikTok For Developers Account
-
-1. Go to [developers.tiktok.com](https://developers.tiktok.com)
-2. Register for a developer account
-3. Create a new App
-
-### 2. App Configuration
-
-1. Set App type: Web
-2. Add Redirect URI: `https://paisaxe.es/api/auth/callback/tiktok`
-3. Request scopes:
-   - `video.publish`
-   - `video.upload`
-
-### 3. App Review
-
-TikTok requires app review before you can use publishing APIs. Submit your app for review with:
-- App description
-- Use case explanation
-- Privacy policy URL
-
-### 4. OAuth Flow
-
-```bash
-# 1. Redirect to authorization:
-https://www.tiktok.com/auth/authorize/?client_key=YOUR_CLIENT_KEY&response_type=code&scope=video.publish,video.upload&redirect_uri=YOUR_REDIRECT_URI
-
-# 2. Exchange code for token:
-curl -X POST https://open.tiktokapis.com/v2/oauth/token/ \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "client_key=YOUR_CLIENT_KEY&client_secret=YOUR_CLIENT_SECRET&code=AUTH_CODE&grant_type=authorization_code&redirect_uri=YOUR_REDIRECT_URI"
-```
-
-### 5. Save Credentials
-
-```bash
-curl -X POST https://paisaxe.es/api/admin/marketing/accounts \
-  -H "Content-Type: application/json" \
-  -H "Cookie: <your-admin-session-cookie>" \
-  -d '{
-    "platform": "tiktok",
-    "accountName": "Paisaxe",
-    "credentials": {
-      "accessToken": "your-access-token",
-      "refreshToken": "your-refresh-token",
-      "clientId": "your-client-key",
-      "clientSecret": "your-client-secret"
-    }
-  }'
-```
-
----
-
 ## Database Migration
 
 Run the marketing automation migration:
@@ -335,7 +278,6 @@ The AI agents follow the Paisaxe voice guidelines from CLAUDE.md:
 | X | #Asturias, #Spain | #Oviedo, #Gijón, #PicosDeEuropa |
 | Instagram | #Asturias, #NorthernSpain, #ParaisoNatural, #VisitAsturias | + regional tags |
 | Pinterest | #Asturias, #SpainTravel, #TravelSpain, #NorthernSpain | + topic tags |
-| TikTok | #Asturias, #Spain, #TravelTok | + trending tags |
 
 ---
 
@@ -374,7 +316,6 @@ Access the marketing dashboard at `/admin` and click the "Marketing" tab to see:
 | X | 280 chars | 4 | 1 |
 | Instagram | 2,200 chars | 10 (carousel) | 1 (Reel) |
 | Pinterest | 500 chars | 1 | 1 |
-| TikTok | 2,200 chars | N/A | 1 |
 
 ---
 
