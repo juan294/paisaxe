@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { fetchFeatureFlags, updateFeatureFlag } from "@/lib/admin-api";
 import {
   RefreshCw,
   AlertCircle,
-  ChevronDown,
-  ChevronRight,
   Settings,
   Compass,
   Sparkles,
@@ -14,6 +12,7 @@ import {
   Mic,
   Cog,
   Search,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
@@ -90,6 +89,7 @@ const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
   security_agent_enabled: "system",
   docs_freshness_agent_enabled: "system",
   performance_agent_enabled: "system",
+  qa_agent_enabled: "system",
 };
 
 // Flags that have configurable settings
@@ -99,8 +99,18 @@ const CONFIGURABLE_FLAGS = [
   "security_agent_enabled",
   "docs_freshness_agent_enabled",
   "performance_agent_enabled",
+  "qa_agent_enabled",
   "maintenance_mode",
 ];
+
+// Map agent flag keys to their report files
+const AGENT_REPORT_FILES: Record<string, string> = {
+  coverage_agent_enabled: "coverage-report.md",
+  security_agent_enabled: "security-report.md",
+  docs_freshness_agent_enabled: "docs-freshness-report.md",
+  performance_agent_enabled: "performance-report.md",
+  qa_agent_enabled: "qa-report.md",
+};
 
 export function FeatureTogglesPanel() {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
@@ -110,6 +120,7 @@ export function FeatureTogglesPanel() {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<FlagCategory | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [agentLastRuns, setAgentLastRuns] = useState<Record<string, string>>({});
 
   const loadFlags = useCallback(async () => {
     setIsLoading(true);
@@ -124,9 +135,22 @@ export function FeatureTogglesPanel() {
     setIsLoading(false);
   }, []);
 
+  const loadAgentLastRuns = useCallback(async () => {
+    try {
+      const response = await fetch("/api/admin/agent-reports");
+      if (response.ok) {
+        const data = await response.json();
+        setAgentLastRuns(data.lastRuns || {});
+      }
+    } catch {
+      // Silently fail - last run times are optional
+    }
+  }, []);
+
   useEffect(() => {
     loadFlags();
-  }, [loadFlags]);
+    loadAgentLastRuns();
+  }, [loadFlags, loadAgentLastRuns]);
 
   const handleToggle = async (flag: FeatureFlag) => {
     setUpdatingKey(flag.flagKey);
@@ -153,6 +177,24 @@ export function FeatureTogglesPanel() {
   };
 
   const isConfigurable = (flagKey: string) => CONFIGURABLE_FLAGS.includes(flagKey);
+  const isAgent = (flagKey: string) => flagKey in AGENT_REPORT_FILES;
+
+  // Format relative time for last run
+  const formatLastRun = (isoDate: string): string => {
+    const date = new Date(isoDate);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
 
   // Group flags by category
   const flagsByCategory = useMemo(() => {
@@ -278,26 +320,6 @@ export function FeatureTogglesPanel() {
 
         {/* Category Tabs */}
         <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setActiveCategory("all")}
-          className={cn(
-            "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
-            activeCategory === "all"
-              ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
-              : "text-[#6b6560] hover:bg-white dark:text-[#a39e98] dark:hover:bg-[#252320]"
-          )}
-        >
-          All
-          <span className={cn(
-            "rounded-full px-2 py-0.5 text-xs tabular-nums",
-            activeCategory === "all"
-              ? "bg-[#1a1917] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
-              : "bg-[#e5e3de] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
-          )}>
-            {enabledByCategory.all.enabled}/{enabledByCategory.all.total}
-          </span>
-        </button>
-
         {CATEGORIES.map((category) => (
           <button
             key={category.key}
@@ -322,6 +344,25 @@ export function FeatureTogglesPanel() {
             </span>
           </button>
         ))}
+        <button
+          onClick={() => setActiveCategory("all")}
+          className={cn(
+            "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
+            activeCategory === "all"
+              ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
+              : "text-[#6b6560] hover:bg-white dark:text-[#a39e98] dark:hover:bg-[#252320]"
+          )}
+        >
+          All
+          <span className={cn(
+            "rounded-full px-2 py-0.5 text-xs tabular-nums",
+            activeCategory === "all"
+              ? "bg-[#1a1917] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
+              : "bg-[#e5e3de] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
+          )}>
+            {enabledByCategory.all.enabled}/{enabledByCategory.all.total}
+          </span>
+        </button>
         </div>
       </div>
 
@@ -340,123 +381,121 @@ export function FeatureTogglesPanel() {
           </p>
         </div>
       ) : (
-        <table className="w-full">
+        <table className="w-full table-fixed">
           <thead>
             <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
-              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">#</th>
-              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Feature</th>
+              <th className="w-12 pb-3 text-center font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">#</th>
+              <th className="w-[240px] pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+                {activeCategory === "system" ? "Agent" : "Feature"}
+              </th>
               <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Description</th>
-              <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Status</th>
-              <th className="pb-3 text-right font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Toggle</th>
+              <th className="w-24 pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Last Run</th>
+              <th className="w-20 pb-3 text-center font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Status</th>
+              <th className="w-16 pb-3 text-center font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Toggle</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
             {filteredFlags.map((flag, idx) => (
-              <tr key={flag.flagKey} className="group">
-                <td
-                  colSpan={5}
-                  className={cn("p-0", flag.enabled && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}
-                >
-                  {/* Main row content */}
-                  <div className="flex items-center py-5">
-                    <div className="w-12 font-mono text-sm tabular-nums text-[#a39e98]">
-                      {String(idx + 1).padStart(2, "0")}
-                    </div>
-                    <div className="flex-1 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
-                      <div className="flex items-center gap-2">
-                        {flag.label}
-                        {activeCategory === "all" && (
-                          <span className="rounded bg-[#f5f3ee] px-1.5 py-0.5 text-xs font-normal text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]">
-                            {CATEGORIES.find((c) => c.key === FLAG_CATEGORIES[flag.flagKey])?.label}
-                          </span>
-                        )}
-                        {isConfigurable(flag.flagKey) && (
-                          <button
-                            onClick={() => toggleExpanded(flag.flagKey)}
-                            className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-normal text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36] dark:hover:text-[#a39e98]"
-                            aria-label={`Configure ${flag.label}`}
-                            aria-expanded={expandedKey === flag.flagKey}
-                          >
-                            <Settings className="h-3 w-3" />
-                            Configure
-                            {expandedKey === flag.flagKey ? (
-                              <ChevronDown className="h-3 w-3" />
-                            ) : (
-                              <ChevronRight className="h-3 w-3" />
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex-1 text-sm text-[#6b6560] dark:text-[#a39e98]">
-                      {flag.description || "—"}
-                    </div>
-                    <div className="w-24">
-                      {flag.enabled ? (
-                        <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-[#2d2a26] dark:text-[#f5f3ee]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          On
-                        </span>
-                      ) : (
-                        <span className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
-                          Off
-                        </span>
+              <Fragment key={flag.flagKey}>
+                <tr className={cn("group", flag.enabled && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
+                  <td className="py-5 text-center align-top font-mono text-sm tabular-nums text-[#a39e98]">
+                    {String(idx + 1).padStart(2, "0")}
+                  </td>
+                  <td className="py-5 align-top">
+                    <div className="flex items-center gap-2 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                      {flag.label}
+                      {isConfigurable(flag.flagKey) && (
+                        <button
+                          onClick={() => toggleExpanded(flag.flagKey)}
+                          className="inline-flex items-center gap-1 rounded p-1 text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36] dark:hover:text-[#a39e98]"
+                          aria-label={`Configure ${flag.label}`}
+                          aria-expanded={expandedKey === flag.flagKey}
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                        </button>
                       )}
                     </div>
-                    <div className="w-16 text-right">
-                      <button
-                        onClick={() => handleToggle(flag)}
-                        disabled={updatingKey === flag.flagKey}
-                        className={cn(
-                          "relative h-6 w-11 rounded-full transition-colors",
-                          flag.enabled
-                            ? "bg-[#2d2a26] dark:bg-[#f5f3ee]"
-                            : "bg-[#e5e3de] dark:bg-[#3d3a36]",
-                          updatingKey === flag.flagKey && "cursor-wait opacity-50"
-                        )}
-                        role="switch"
-                        aria-checked={flag.enabled}
-                        aria-label={`Toggle ${flag.label}`}
+                  </td>
+                  <td className="py-5 pr-4 align-top text-sm text-[#6b6560] dark:text-[#a39e98]">
+                    {flag.description || "—"}
+                  </td>
+                  <td className="py-5 align-top">
+                    {isAgent(flag.flagKey) && agentLastRuns[flag.flagKey] ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-xs text-[#a39e98]"
+                        title={new Date(agentLastRuns[flag.flagKey]).toLocaleString()}
                       >
-                        <span
-                          className={cn(
-                            "absolute top-0.5 h-5 w-5 rounded-full transition-all",
-                            flag.enabled
-                              ? "left-[22px] bg-white dark:bg-[#2d2a26]"
-                              : "left-0.5 bg-white dark:bg-[#6b6560]"
-                          )}
+                        <Clock className="h-3 w-3" />
+                        {formatLastRun(agentLastRuns[flag.flagKey])}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[#a39e98]">—</span>
+                    )}
+                  </td>
+                  <td className="py-5 text-center align-top">
+                    {flag.enabled ? (
+                      <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-[#2d2a26] dark:text-[#f5f3ee]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        On
+                      </span>
+                    ) : (
+                      <span className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                        Off
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-5 text-center align-top">
+                    <button
+                      onClick={() => handleToggle(flag)}
+                      disabled={updatingKey === flag.flagKey}
+                      className={cn(
+                        "relative h-6 w-11 rounded-full transition-colors",
+                        flag.enabled
+                          ? "bg-[#2d2a26] dark:bg-[#f5f3ee]"
+                          : "bg-[#e5e3de] dark:bg-[#3d3a36]",
+                        updatingKey === flag.flagKey && "cursor-wait opacity-50"
+                      )}
+                      role="switch"
+                      aria-checked={flag.enabled}
+                      aria-label={`Toggle ${flag.label}`}
+                    >
+                      <span
+                        className={cn(
+                          "absolute top-0.5 h-5 w-5 rounded-full transition-all",
+                          flag.enabled
+                            ? "left-[22px] bg-white dark:bg-[#2d2a26]"
+                            : "left-0.5 bg-white dark:bg-[#6b6560]"
+                        )}
+                      />
+                    </button>
+                  </td>
+                </tr>
+                {/* Expandable config panel row */}
+                {expandedKey === flag.flagKey && (
+                  <tr className={cn(flag.enabled && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
+                    <td colSpan={6} className="px-12 pb-6">
+                      {flag.flagKey === "visitor_voice_agent" && (
+                        <VisitorVoiceConfigPanel
+                          flag={flag}
+                          onUpdate={handleFlagUpdate}
                         />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Expandable config panel */}
-                  {expandedKey === flag.flagKey && flag.flagKey === "visitor_voice_agent" && (
-                    <div className="border-t border-[#f5f3ee] px-12 pb-6 dark:border-[#3d3a36]">
-                      <VisitorVoiceConfigPanel
-                        flag={flag}
-                        onUpdate={handleFlagUpdate}
-                      />
-                    </div>
-                  )}
-                  {expandedKey === flag.flagKey && flag.flagKey.endsWith("_agent_enabled") && (
-                    <div className="border-t border-[#f5f3ee] px-12 pb-6 dark:border-[#3d3a36]">
-                      <AgentConfigPanel
-                        flag={flag}
-                        onUpdate={handleFlagUpdate}
-                      />
-                    </div>
-                  )}
-                  {expandedKey === flag.flagKey && flag.flagKey === "maintenance_mode" && (
-                    <div className="border-t border-[#f5f3ee] px-12 pb-6 dark:border-[#3d3a36]">
-                      <MaintenanceConfigPanel
-                        flag={flag}
-                        onUpdate={handleFlagUpdate}
-                      />
-                    </div>
-                  )}
-                </td>
-              </tr>
+                      )}
+                      {flag.flagKey.endsWith("_agent_enabled") && (
+                        <AgentConfigPanel
+                          flag={flag}
+                          onUpdate={handleFlagUpdate}
+                        />
+                      )}
+                      {flag.flagKey === "maintenance_mode" && (
+                        <MaintenanceConfigPanel
+                          flag={flag}
+                          onUpdate={handleFlagUpdate}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>

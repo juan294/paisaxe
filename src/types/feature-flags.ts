@@ -17,7 +17,8 @@ export type FeatureFlagKey =
   | "coverage_agent_enabled"
   | "security_agent_enabled"
   | "docs_freshness_agent_enabled"
-  | "performance_agent_enabled";
+  | "performance_agent_enabled"
+  | "qa_agent_enabled";
 
 export interface VisitorVoiceConfig {
   whitelisted_emails: string[];
