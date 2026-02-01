@@ -108,6 +108,18 @@ LEMONSQUEEZY_STORE_ID=   # Revenue analytics (optional)
 - Server: `validateAdminAuth()` checks cookies
 - Client: `useAdminRole()` hook
 
+### Proxy (NOT Middleware)
+**IMPORTANT: This project uses `src/proxy.ts`, NOT `middleware.ts`.**
+
+Next.js 16 introduced `proxy.ts` as the recommended replacement for middleware. You cannot have both files - the build will fail if both exist.
+
+All request interception logic goes in `proxy.ts`:
+- Maintenance mode redirects
+- CORS handling for API routes
+- Auth session refresh (via Supabase `getUser()`)
+
+**Never create a `middleware.ts` file in this project.**
+
 ## Database Schema
 
 Core tables (see `supabase/migrations/` for full DDL):
