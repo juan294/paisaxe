@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Docs Freshness Agent — Runs weekly on Sunday at 6:00 AM via launchd (com.paisaxe.docs-freshness-agent)
-# Checks for stale documentation, outputs to docs/docs-freshness-report.md
+# Checks for stale documentation, updates CLAUDE.md, outputs to docs/agents/docs-freshness-report.md
 set -euo pipefail
 
 PROJECT_DIR="/Users/juan/Documents/GenAI_Projects/paisaxe"
+CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/docs-freshness-agent-$(date +%Y-%m-%d).log"
 REPORT_FILE="$PROJECT_DIR/docs/agents/docs-freshness-report.md"
 CLAUDE_MD="$PROJECT_DIR/CLAUDE.md"
+GAPS_FILE="$PROJECT_DIR/.docs-gaps.tmp"
 
 mkdir -p "$LOG_DIR"
 
@@ -176,6 +178,80 @@ for doc in docs/*.md CLAUDE.md README.md; do
     echo "| $doc | $DOC_MTIME |" >> "$REPORT_FILE"
   fi
 done
+
+# Collect gaps into a temp file for Claude to process
+log_info "Collecting documentation gaps for Claude..." | tee -a "$LOG_FILE"
+{
+  echo "UNDOCUMENTED_API_ROUTES:"
+  echo "$UNDOCUMENTED_ROUTES"
+  echo ""
+  echo "UNDOCUMENTED_FEATURE_FLAGS:"
+  echo "$UNDOCUMENTED_FLAGS"
+} > "$GAPS_FILE"
+
+# Only invoke Claude if there are actual gaps to fix
+if [[ -n "$UNDOCUMENTED_ROUTES" ]] || [[ -n "$UNDOCUMENTED_FLAGS" ]]; then
+  log_info "Documentation gaps found — invoking Claude to update CLAUDE.md..." | tee -a "$LOG_FILE"
+
+  # Fetch the prompt from the feature flag config
+  AGENT_PROMPT=$(get_agent_prompt "docs_freshness_agent_enabled" 2>/dev/null) || {
+    log_warn "Could not fetch prompt from config, using default" | tee -a "$LOG_FILE"
+    AGENT_PROMPT="You are the Paisaxe Docs Freshness Agent. Your job is to keep documentation accurate and complete.
+
+STEPS:
+1. Read CLAUDE.md and docs/project/features.md to understand current documentation structure
+2. Review the gaps provided (undocumented API routes, feature flags)
+3. For undocumented feature flags:
+   - Add them to the Feature Flags Reference table in docs/project/features.md
+   - Include a brief description of what each flag controls
+   - Read the source code to understand the flag's purpose
+4. For API routes: Only document if they are meant for external consumption (most are internal)
+5. Update docs/agents/docs-freshness-report.md with a 'Changes Made This Run' section listing what was added
+
+RULES:
+- Documentation is safe to update autonomously - the user will review via git diff
+- Keep descriptions concise (1 line per item)
+- Follow the existing documentation style and formatting
+- Do NOT delete or restructure existing content
+- Do NOT document internal implementation details
+- Commit nothing. The user will review and commit manually."
+  }
+
+  # Capture docs state before (check both CLAUDE.md and features.md)
+  FEATURES_MD="$PROJECT_DIR/docs/project/features.md"
+  DOCS_STATE_BEFORE=$(cat "$CLAUDE_MD" "$FEATURES_MD" 2>/dev/null | md5 -q)
+
+  # Run Claude to update documentation
+  "$CLAUDE_BIN" -p \
+    --allowedTools 'Read,Edit,Glob,Grep' \
+    >> "$LOG_FILE" 2>&1 <<PROMPT
+$AGENT_PROMPT
+
+Additional context:
+- Project directory: $PROJECT_DIR
+- CLAUDE.md location: $CLAUDE_MD
+- Features doc: $FEATURES_MD
+- Gaps file: $GAPS_FILE
+- Report file: $REPORT_FILE
+- Date: $(date '+%Y-%m-%d')
+
+Contents of gaps file:
+$(cat "$GAPS_FILE")
+PROMPT
+
+  # Check if any documentation was modified
+  DOCS_STATE_AFTER=$(cat "$CLAUDE_MD" "$FEATURES_MD" 2>/dev/null | md5 -q)
+  if [[ "$DOCS_STATE_BEFORE" != "$DOCS_STATE_AFTER" ]]; then
+    log_success "Claude updated documentation" | tee -a "$LOG_FILE"
+  else
+    log_info "No documentation changes made" | tee -a "$LOG_FILE"
+  fi
+
+  # Cleanup temp file
+  rm -f "$GAPS_FILE"
+else
+  log_info "No documentation gaps found — skipping Claude invocation" | tee -a "$LOG_FILE"
+fi
 
 {
   echo ""
