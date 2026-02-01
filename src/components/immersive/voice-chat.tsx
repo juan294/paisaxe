@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { Story } from "@/types/immersive";
 import { ImageResult } from "@/types";
 import { cn } from "@/lib/utils";
-import { X, Send, AudioLines, LogIn, Keyboard, Sparkles } from "lucide-react";
+import { X, Send, AudioLines, Keyboard, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { ChatMessageSkeleton } from "./skeleton-chat-message";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
-import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 interface VoiceChatProps {
   story: Story;
@@ -46,7 +45,6 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   // Check for voice access (whitelisted OR paid)
   const {
     canUseVoice,
-    needsSignIn,
     needsPurchase,
     agentId,
     expiresAt,
@@ -97,15 +95,6 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     setPrivacyAcknowledged(true);
     localStorage.setItem("paisaxe-privacy-acknowledged", "true");
   }, []);
-
-  const handleSignIn = async () => {
-    const supabase = createSupabaseBrowserClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}`;
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-  };
 
   const handleVoiceFallback = useCallback(() => {
     setUseElevenLabs(false);
@@ -304,23 +293,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
           <PrivacyNotice onDismiss={handlePrivacyDismiss} />
         )}
 
-        {/* Sign-in prompt for voice access */}
-        {needsSignIn && !useElevenLabs && (
-          <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-lg bg-white/5 p-3 border border-white/10">
-            <p className="text-sm text-white/70">{t(`voice.sign_in_prompt_${story.category}`)}</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignIn}
-              className="text-white hover:bg-white/10 text-xs gap-1.5 shrink-0"
-            >
-              <LogIn className="h-3.5 w-3.5" />
-              {t("voice.sign_in")}
-            </Button>
-          </div>
-        )}
-
-        {/* Expiry warning banner for users with < 6 hours remaining */}
+        {/* Expiry warning for users with < 6 hours remaining */}
         {canUseVoice && hoursUntilExpiry !== null && hoursUntilExpiry < 6 && expiresAt && (
           <div className="mx-4 mt-4 flex items-center gap-3 rounded-lg bg-amber-500/10 p-3 border border-amber-500/20">
             <p className="text-xs text-amber-200">
