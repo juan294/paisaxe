@@ -2,7 +2,10 @@
 /**
  * ElevenLabs Agents Setup Script
  *
- * Creates the 4 marketing agents in ElevenLabs and outputs their agent IDs.
+ * Creates the 4 voice agents in ElevenLabs and outputs their agent IDs:
+ * - Pelayo: Primary tourism guide for immersive stories
+ * - Xander, Iris, Penny: Marketing agents for social media
+ *
  * Run this once after setting up your ELEVENLABS_API_KEY.
  *
  * Usage: npx ts-node scripts/setup-elevenlabs-agents.ts
@@ -35,6 +38,60 @@ interface AgentConfig {
 }
 
 const AGENTS: AgentConfig[] = [
+  {
+    id: "pelayo",
+    name: "Paisaxe - Pelayo (Tourism Guide)",
+    displayName: "Pelayo",
+    platform: "tourism",
+    voiceDescription: "warm male, knowledgeable, conversational, Spanish",
+    greeting:
+      "¡Hola! Soy Pelayo, tu guía de Asturias. Estoy aquí para contarte historias de esta tierra verde y ayudarte a descubrir sus rincones especiales. ¿Qué te gustaría saber sobre este lugar?",
+    systemPrompt: `# IDENTITY
+You are Pelayo, a warm and knowledgeable tourism guide for Paisaxe, an immersive experience showcasing Asturias, Spain. You are named after King Pelayo, the legendary figure who began the Reconquista from these mountains.
+
+# PERSONALITY
+- Warm and curious, like a local friend sharing favorite spots
+- You speak from personal experience using "I" perspective
+- Slightly poetic but never pretentious
+- Enthusiastic about hidden details and sensory experiences
+- Respectful of Asturian culture and traditions
+
+# VOICE STYLE
+- Keep responses conversational and natural for voice
+- Use short sentences. Pause naturally with punctuation.
+- Describe sensory details: the sound of rain on hórreos, the smell of sidra pouring, the green of the Picos
+- Ask follow-up questions to keep engagement
+
+# EXPERTISE
+You know deeply about:
+- Asturian geography: Picos de Europa, Lagos de Covadonga, coastal cliffs
+- Cities: Oviedo, Gijón, Avilés, Cangas de Onís
+- Culture: pre-Romanesque churches, bagpipe (gaita) music, festivals
+- Gastronomy: sidra (cider culture), fabada, cachopo, Cabrales cheese
+- Camino de Santiago routes through Asturias
+- Outdoor activities: hiking, surfing, caving
+
+# GUARDRAILS
+- Never invent specific prices, hours, or contact details - say "I'd recommend checking the official site"
+- Stay focused on Asturias tourism - redirect off-topic questions gently
+- If unsure about a fact, say so rather than fabricate
+- Keep responses under 150 words for natural voice delivery
+
+# LANGUAGE
+- Default to Spanish when the user speaks Spanish
+- Switch to English if the user speaks English
+- You may include occasional Asturian words (sidrina, cuélebre, xana) with brief explanation
+
+# BANNED PHRASES
+Avoid tourism clichés:
+- "hidden gem"
+- "off the beaten path"
+- "bucket list"
+- "picture perfect"
+- "breathtaking views"
+
+Instead, be specific and sensory.`,
+  },
   {
     id: "xander",
     name: "Paisaxe - Xander (X)",
@@ -153,55 +210,15 @@ WHAT YOU HELP WITH:
 
 Always stay in character as Penny and focus on Pinterest content.`,
   },
-  {
-    id: "tiko",
-    name: "Paisaxe - Tiko (TikTok)",
-    displayName: "Tiko",
-    platform: "tiktok",
-    voiceDescription: "energetic young male, authentic, enthusiastic",
-    greeting:
-      "Yo! I'm Tiko, your TikTok specialist for Paisaxe. Ready to create some viral-worthy content? Let's talk hooks, trends, and authentic storytelling!",
-    systemPrompt: `You are Tiko, the TikTok marketing specialist for Paisaxe, an immersive tourism experience for Asturias, Spain.
-
-PERSONALITY:
-- Energetic but not forced
-- Trend-aware without being desperate
-- Authentic over polished
-- Slightly irreverent, never corporate
-- Curious and enthusiastic
-
-EXPERTISE:
-- Hook writing (first 1-2 seconds critical)
-- Trending sounds and formats
-- Video structure (hook, setup, payoff, CTA)
-- Authenticity beats production value
-- 15-60 seconds optimal length
-- Watch time and completion rate optimization
-
-BRAND VOICE:
-- Most casual of all platforms
-- First person, personal perspective
-- Light humor welcome
-- Trending language when natural
-- Enthusiasm is okay (but not fake)
-
-WHAT YOU HELP WITH:
-- Video hooks and scripts
-- Trending sound suggestions
-- Video concepts and series ideas
-- Adapting trends to Asturias content
-- Content calendar for consistency
-
-Always stay in character as Tiko and focus on TikTok content.`,
-  },
 ];
 
 // Voice IDs from ElevenLabs library (available in free tier)
+// Note: For Pelayo, use a Spanish-speaking male voice from the ElevenLabs library
 const VOICE_SUGGESTIONS = {
+  pelayo: "onwK4e9ZLuTAKqWW03F9", // Daniel - Deep, Warm, Storyteller (Spanish compatible)
   xander: "CwhRBWXzGAHq8TQ4Fs17", // Roger - Laid-Back, Casual, Resonant
   iris: "EXAVITQu4vr4xnSDxMaL", // Sarah - Mature, Reassuring, Confident
   penny: "Xb7hH8MSUJpSbSDYk0k2", // Alice - Clear, Engaging Educator
-  tiko: "TX3LPaxmHKxFdv7VOQHJ", // Liam - Energetic, Social Media Creator
 };
 
 async function listAvailableVoices(): Promise<void> {
@@ -233,31 +250,43 @@ async function createAgent(config: AgentConfig): Promise<string | null> {
   const voiceId =
     VOICE_SUGGESTIONS[config.id as keyof typeof VOICE_SUGGESTIONS];
 
+  // Pelayo uses different configuration optimized for tourism storytelling
+  const isPelayo = config.id === "pelayo";
+
   const agentConfig = {
     name: config.name,
     conversation_config: {
       agent: {
         first_message: config.greeting,
-        language: "en",
+        language: isPelayo ? "es" : "en", // Spanish primary for Pelayo
         prompt: {
           prompt: config.systemPrompt,
-          llm: "gpt-4o-mini", // Cost-effective for free tier
-          temperature: 0.7,
-          max_tokens: 500,
+          // Pelayo uses Gemini 2.5 Flash for best latency/quality balance
+          llm: isPelayo ? "gemini-2.5-flash" : "gpt-4o-mini",
+          // Temperature 0.65 for warmth with accuracy, 0.7 for marketing agents
+          temperature: isPelayo ? 0.65 : 0.7,
+          // 250 tokens for conversational brevity (Pelayo), 500 for marketing
+          max_tokens: isPelayo ? 250 : 500,
         },
       },
       tts: {
-        model_id: "eleven_turbo_v2", // Required for English conversational agents
+        // eleven_turbo_v2_5 for best multilingual Spanish support
+        model_id: isPelayo ? "eleven_turbo_v2_5" : "eleven_turbo_v2",
         voice_id: voiceId,
-        stability: 0.5,
-        similarity_boost: 0.75,
+        // Slightly lower stability for Spanish expressiveness
+        stability: isPelayo ? 0.50 : 0.5,
+        // Higher similarity for Spanish phonetic clarity
+        similarity_boost: isPelayo ? 0.75 : 0.75,
       },
       turn: {
-        turn_timeout: 10.0,
-        silence_end_call_timeout: 30.0,
+        // Slightly longer timeout for thoughtful tourism questions
+        turn_timeout: isPelayo ? 12.0 : 10.0,
+        // Don't rush users away during exploration
+        silence_end_call_timeout: isPelayo ? 45.0 : 30.0,
       },
       conversation: {
-        max_duration_seconds: 300, // 5 minutes max per call
+        // Longer sessions for Pelayo (premium guide), 5 min for marketing
+        max_duration_seconds: isPelayo ? 600 : 300,
       },
     },
     platform_settings: {
@@ -310,13 +339,20 @@ async function saveAgentIds(
  * ElevenLabs Agent IDs
  * Auto-generated by scripts/setup-elevenlabs-agents.ts
  * Do not edit manually.
+ *
+ * LOCATION-SPECIFIC: These agent IDs are specific to this Paisaxe instance.
+ * When replicating, you must create new ElevenLabs voice agents and update
+ * these IDs. See REPLICATION.md for instructions.
  */
 
+// LOCATION-SPECIFIC: Replace these agent IDs with your own ElevenLabs agents
 export const ELEVENLABS_AGENT_IDS = {
+  // Tourism guide for immersive stories (primary voice agent)
+  pelayo: "${agentIds.pelayo || ""}",
+  // Marketing agents for social media content
   xander: "${agentIds.xander || ""}",
   iris: "${agentIds.iris || ""}",
   penny: "${agentIds.penny || ""}",
-  tiko: "${agentIds.tiko || ""}",
 } as const;
 
 export type ElevenLabsAgentId = keyof typeof ELEVENLABS_AGENT_IDS;
@@ -350,9 +386,11 @@ export function getElevenLabsAgentId(agentId: string): string | undefined {
 }
 
 async function main(): Promise<void> {
-  console.log("🎙️  ElevenLabs Marketing Agents Setup\n");
-  console.log("This script will create 4 voice agents in your ElevenLabs account.");
-  console.log("Make sure ELEVENLABS_API_KEY is set in .env.local\n");
+  console.log("🎙️  ElevenLabs Voice Agents Setup\n");
+  console.log("This script will create 4 voice agents in your ElevenLabs account:");
+  console.log("  - Pelayo: Tourism guide for immersive stories (Spanish/English)");
+  console.log("  - Xander, Iris, Penny: Marketing agents for social media");
+  console.log("\nMake sure ELEVENLABS_API_KEY is set in .env.local\n");
 
   await listAvailableVoices();
 

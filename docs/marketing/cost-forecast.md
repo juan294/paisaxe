@@ -58,6 +58,12 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 - **Burst pricing**: Available to handle 3x concurrency at 2x per-minute cost
 - **Note**: LLM costs currently absorbed by ElevenLabs (may change)
 
+**Current Pelayo Configuration**:
+- LLM: Gemini 2.5 Flash (optimal cost/latency)
+- RAG Knowledge Base: 7 curated PDFs (city guides, Camino, culture, family)
+- Languages: Spanish (primary) + English, German, French, Portuguese
+- Max conversation: 10 minutes
+
 ### PostHog (Analytics)
 - **Free Tier**: 1M events/month, 5K session recordings, 1M feature flag requests
 - **After Free Tier**:

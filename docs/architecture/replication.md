@@ -277,12 +277,52 @@ WEBHOOK_SECRET=your_webhook_secret
 
 ## Step 10: Voice Agents (Optional)
 
-If using ElevenLabs voice:
+If using ElevenLabs voice for a premium voice guide feature:
+
+### Prerequisites
 
 1. **Subscribe to at least Starter tier ($5/mo)** - Free tier is non-commercial only
-2. Create new voice agents in ElevenLabs console
-3. Configure agents with your location's knowledge
-4. Update `src/config/elevenlabs-agents.ts` with new agent IDs
+2. Create a new voice agent in ElevenLabs console
+
+### Agent Configuration
+
+Configure your tourism guide agent with these recommended settings:
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| **LLM** | Gemini 2.5 Flash | Best latency/quality balance |
+| **Temperature** | 0.65 | Warmth with accuracy |
+| **Max Tokens** | 250 | Conversational brevity |
+| **TTS Model** | eleven_turbo_v2_5 | Best multilingual support |
+| **Stability** | 0.50 | Allows expressiveness |
+| **Similarity** | 0.75 | Clear phonetics |
+| **Max Duration** | 600 seconds | 10 minutes |
+
+### RAG Knowledge Base
+
+For specialized local knowledge, upload your tourism PDFs to ElevenLabs Knowledge Base:
+
+1. Enable versioning (for rollback capability)
+2. Upload curated PDFs (city guides, activities, culture)
+3. Enable RAG with these settings:
+   - Embedding model: **Multilingual optimized**
+   - Character limit: **15000**
+   - Chunk limit: **5**
+   - Vector distance limit: **0.40** (stricter matching)
+4. Enable **Language detection** and **End conversation** tools
+
+### Update Code
+
+Update `src/config/elevenlabs-agents.ts` with your new agent ID:
+
+```typescript
+export const ELEVENLABS_AGENT_IDS = {
+  pelayo: "your_agent_id_here",  // Rename to your guide's name
+  // ... other agents
+} as const;
+```
+
+See `docs/operations/elevenlabs-pelayo-config.md` for the complete Paisaxe configuration reference.
 
 > **Important**: The ElevenLabs free tier cannot be used for commercial/production sites. See `docs/marketing/cost-forecast.md` for pricing details and upgrade triggers.
 

@@ -3,7 +3,7 @@
 A living document tracking implemented features and future development plans.
 
 **Domain**: paisaxe.es
-**Last Updated**: January 28, 2026
+**Last Updated**: February 1, 2026
 
 ---
 
@@ -37,7 +37,7 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Languages | Auto-detect UI language |
 | AI Role | Information assistant + local expert (accurate with personality) |
 | Voice Input | Essential |
-| Voice Output (TTS) | Future feature |
+| Voice Output (TTS) | :white_check_mark: ElevenLabs Pelayo agent (paid feature) |
 | User Accounts | Optional SSO for favorites only |
 | Map View | Not needed |
 | Trip Planner | Not needed |
@@ -335,6 +335,7 @@ Automated agents and scheduled workflows to guarantee code quality, security, an
 - [x] Code quality: Knip dead code detection + Claude AI PR reviews
 - [x] Database: pg_cron maintenance jobs scheduled (VACUUM, ANALYZE)
 - [x] Availability: Upptime config prepared (separate repo setup required)
+- [x] Voice agent: ElevenLabs Pelayo configured with RAG knowledge base
 
 ---
 
@@ -349,6 +350,36 @@ Automated agents and scheduled workflows to guarantee code quality, security, an
 | `009_analytics_events.sql` | Custom analytics events | :white_check_mark: |
 | `010_story_metadata_extensions.sql` | Extended metadata for visitor features | :white_check_mark: |
 | `011_pg_cron_maintenance.sql` | Scheduled VACUUM/ANALYZE via pg_cron | :white_check_mark: |
+
+---
+
+## Phase 9: Voice Agent Enhancements :calendar:
+
+Premium voice conversations with Pelayo (ElevenLabs). Currently configured with RAG knowledge base from curated Asturias PDFs.
+
+### Current Implementation :white_check_mark:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Pelayo Voice Agent | :white_check_mark: | ElevenLabs agent with Gemini 2.5 Flash |
+| Multilingual Support | :white_check_mark: | Spanish primary + English, German, French, Portuguese |
+| RAG Knowledge Base | :white_check_mark: | Curated PDFs: city guides, Camino, culture, family activities |
+| Language Detection | :white_check_mark: | Auto-detect visitor language |
+| Visitor Access Control | :white_check_mark: | Feature flag + email whitelist gating |
+
+### Future: MCP Tool Integrations :calendar:
+
+Extend Pelayo's capabilities with real-time data via MCP (Model Context Protocol) servers.
+
+| Tool | Value Add | Priority |
+|------|-----------|----------|
+| Weather API | "It's raining in Oviedo today - perfect for the museums" | High |
+| Events/Calendar | "There's a sidra festival this weekend in Gijón" | High |
+| Real-time Hours | Check if attractions are currently open | Medium |
+| Booking Integration | Help reserve tours or restaurants | Medium |
+| Maps/Directions | Provide routing between locations | Low |
+
+These integrations would differentiate Pelayo from generic AI assistants and add significant value to the paid voice feature.
 
 ---
 
@@ -376,4 +407,5 @@ Automated agents and scheduled workflows to guarantee code quality, security, an
 | v0.7.0 | Jan 2026 | Internationalization (ES/EN language switcher, browser detection, full UI translation) |
 | v0.8.0 | Jan 2026 | Automation & quality agents (security, performance, availability, AI review) |
 | v0.9.0 | Jan 2026 | Polish (skeleton UI, a11y, SEO, error boundaries) |
+| v0.10.0 | Feb 2026 | Voice agent (ElevenLabs Pelayo with RAG knowledge base) |
 | v1.0.0 | - | Production release |
