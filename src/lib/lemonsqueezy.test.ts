@@ -28,7 +28,7 @@ describe("lemonsqueezy", () => {
       expect(url).toContain("https://paisaxe.lemonsqueezy.com/checkout/buy/123456");
       expect(url).toContain("checkout%5Bemail%5D=test%40example.com");
       expect(url).toContain("checkout%5Bcustom%5D%5Buser_id%5D=user-123");
-      expect(url).toContain("checkout%5Bsuccess_url%5D=https%3A%2F%2Fpaisaxe.es%2Fpricing%2Fsuccess");
+      expect(url).toContain("checkout%5Bredirect_url%5D=https%3A%2F%2Fpaisaxe.es%2Fpricing%2Fsuccess");
     });
 
     it("should throw error when config is missing", () => {
