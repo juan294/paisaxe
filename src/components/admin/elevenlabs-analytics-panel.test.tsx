@@ -231,10 +231,8 @@ describe("ElevenLabsAnalyticsPanel", () => {
     render(<ElevenLabsAnalyticsPanel />);
 
     await waitFor(() => {
-      expect(screen.getByText("ElevenLabs Analytics")).toBeInTheDocument();
+      expect(screen.getByText("Voice Analytics")).toBeInTheDocument();
     });
-
-    expect(screen.getByText("Voice Agents")).toBeInTheDocument();
   });
 
   it("displays active calls widget", async () => {

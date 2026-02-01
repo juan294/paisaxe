@@ -49,17 +49,12 @@ export function VisitorsAnalyticsPanel() {
   }, [loadData]);
 
   return (
-    <div className="space-y-16">
-      {/* Header */}
-      <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
-            Admin / Analytics / Visitors
-          </p>
-          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
-            Visitor Data
-          </h1>
-        </div>
+    <div className="space-y-12">
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+          Visitor Data
+        </h2>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
             <input
@@ -84,7 +79,7 @@ export function VisitorsAnalyticsPanel() {
             {isLoading ? "Loading..." : "Refresh"}
           </button>
         </div>
-      </header>
+      </div>
 
       {error && (
         <div className="flex items-center gap-3 font-mono text-xs text-red-600">

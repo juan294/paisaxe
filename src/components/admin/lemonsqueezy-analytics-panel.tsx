@@ -52,16 +52,11 @@ export function LemonSqueezyAnalyticsPanel() {
 
   return (
     <div className="space-y-12">
-      {/* Header */}
-      <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
-            Admin / Analytics / Revenue
-          </p>
-          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
-            Revenue Data
-          </h1>
-        </div>
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+          Revenue Data
+        </h2>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
             <input
@@ -86,7 +81,7 @@ export function LemonSqueezyAnalyticsPanel() {
             {isLoading ? "Loading..." : "Refresh"}
           </button>
         </div>
-      </header>
+      </div>
 
       {warning && (
         <div className="flex items-center gap-3 rounded-xl bg-amber-50 px-4 py-3 font-mono text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">

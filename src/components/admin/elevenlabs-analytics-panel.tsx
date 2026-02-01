@@ -42,43 +42,36 @@ export function ElevenLabsAnalyticsPanel() {
 
   return (
     <div className="space-y-12">
-      {/* Header */}
-      <header className="border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
-              Voice Agents
-            </p>
-            <h2 className="mt-2 text-2xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
-              ElevenLabs Analytics
-            </h2>
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+          Voice Analytics
+        </h2>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
+            <input
+              type="date"
+              value={dateRange.from}
+              onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
+              className="bg-transparent outline-none"
+            />
+            <span>—</span>
+            <input
+              type="date"
+              value={dateRange.to}
+              onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
+              className="bg-transparent outline-none"
+            />
           </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 font-mono text-xs text-[#a39e98]">
-              <input
-                type="date"
-                value={dateRange.from}
-                onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
-                className="bg-transparent outline-none"
-              />
-              <span>—</span>
-              <input
-                type="date"
-                value={dateRange.to}
-                onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
-                className="bg-transparent outline-none"
-              />
-            </div>
-            <button
-              onClick={loadData}
-              disabled={isLoading}
-              className="font-mono text-xs uppercase tracking-widest text-[#a39e98] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:hover:text-[#f5f3ee]"
-            >
-              {isLoading ? "Loading..." : "Refresh"}
-            </button>
-          </div>
+          <button
+            onClick={loadData}
+            disabled={isLoading}
+            className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+          >
+            {isLoading ? "Loading..." : "Refresh"}
+          </button>
         </div>
-      </header>
+      </div>
 
       {/* Active Calls Widget */}
       {data && (
