@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "NODE_OPTIONS='--disable-warning=ExperimentalWarning' next dev",
     "build": "NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build",
+    "build:analyze": "ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build",
     "start": "NODE_OPTIONS='--disable-warning=ExperimentalWarning' next start",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
@@ -66,6 +67,7 @@
     "voyageai": "^0.1.0"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.1.6",
     "@next/eslint-plugin-next": "^16.1.4",
     "@playwright/test": "^1.58.0",
     "@tailwindcss/postcss": "^4.0.0",
