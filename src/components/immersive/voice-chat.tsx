@@ -13,8 +13,9 @@ import { PrivacyNotice } from "./privacy-notice";
 import { ChatActions } from "./chat-actions";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
-import { useVisitorVoiceAccess } from "@/hooks/use-visitor-voice-access";
+import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
+import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 interface VoiceChatProps {
@@ -41,8 +42,16 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const { t, locale } = useTranslation();
   const localizedStory = getLocalizedStory(story, locale);
 
-  // Check for ElevenLabs voice access
-  const { canUseVoice, needsSignIn, agentId, isLoading: isVoiceAccessLoading } = useVisitorVoiceAccess();
+  // Check for voice access (whitelisted OR paid)
+  const {
+    canUseVoice,
+    needsSignIn,
+    needsPurchase,
+    agentId,
+    expiresAt,
+    hoursUntilExpiry,
+    isLoading: isVoiceAccessLoading
+  } = useVoiceAccess();
 
   // Set voice mode as default when user has access (only on first load)
   useEffect(() => {
@@ -297,6 +306,15 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
           </div>
         )}
 
+        {/* Expiry warning banner for users with < 6 hours remaining */}
+        {canUseVoice && hoursUntilExpiry !== null && hoursUntilExpiry < 6 && expiresAt && (
+          <div className="mx-4 mt-4 flex items-center gap-3 rounded-lg bg-amber-500/10 p-3 border border-amber-500/20">
+            <p className="text-xs text-amber-200">
+              Your voice pass expires in {Math.ceil(hoursUntilExpiry)}h ({expiresAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+            </p>
+          </div>
+        )}
+
         {/* ElevenLabs Voice Chat or Text Chat */}
         {useElevenLabs && canUseVoice && agentId ? (
           <VoiceChatElevenLabs
@@ -304,6 +322,9 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             agentId={agentId}
             onFallbackToText={handleVoiceFallback}
           />
+        ) : useElevenLabs && needsPurchase ? (
+          /* Show purchase CTA when user wants voice but needs to pay */
+          <VoicePurchaseCTA />
         ) : (
           <>
             {/* Messages */}

@@ -206,6 +206,30 @@ export const en: Translations = {
     attribution_hint: 'If published, we\'ll credit you this way. Leave empty to stay anonymous.',
   },
 
+  premium: {
+    voice_locked: 'Voice chat is a premium feature',
+    get_day_pass: 'Get Day Pass',
+    voice_title: 'Talk to Your Guide',
+    voice_description: 'Have natural voice conversations with AI guides who know everything about Asturias.',
+    feature_24h: '24 hours of unlimited conversations',
+    feature_unlimited: 'All voice guides included',
+    per_day: '/ day',
+    sign_in_to_purchase: 'Sign in to purchase',
+    secure_payment: 'Secure payment via Lemon Squeezy',
+    success_title: 'You\'re all set!',
+    success_subtitle: 'Your Day Pass is now active',
+    success_expires: 'Your access is valid until',
+    success_cta: 'Start Talking',
+    pricing_title: 'Voice Conversations',
+    pricing_subtitle: 'Talk naturally with AI guides who know every corner of Asturias',
+    pricing_cta: 'Get Day Pass',
+    faq_title: 'Questions?',
+    faq_what_included: 'What\'s included?',
+    faq_what_included_answer: 'Unlimited voice conversations with all AI guides for 24 hours.',
+    faq_how_long: 'How long does it last?',
+    faq_how_long_answer: '24 hours from purchase. Perfect for a day of trip planning or exploring.',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

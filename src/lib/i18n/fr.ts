@@ -199,6 +199,30 @@ export const fr: Translations = {
     attribution_hint: 'Si publié, nous vous créditerons ainsi. Laissez vide pour rester anonyme.',
   },
 
+  premium: {
+    voice_locked: 'Le chat vocal est une fonction premium',
+    get_day_pass: 'Obtenir un Pass Jour',
+    voice_title: 'Parlez a Votre Guide',
+    voice_description: 'Ayez des conversations vocales naturelles avec des guides IA qui connaissent tout sur les Asturies.',
+    feature_24h: '24 heures de conversations illimitees',
+    feature_unlimited: 'Tous les guides vocaux inclus',
+    per_day: '/ jour',
+    sign_in_to_purchase: 'Connectez-vous pour acheter',
+    secure_payment: 'Paiement securise via Lemon Squeezy',
+    success_title: 'C\'est pret !',
+    success_subtitle: 'Votre Pass Jour est maintenant actif',
+    success_expires: 'Votre acces est valide jusqu\'a',
+    success_cta: 'Commencer a Parler',
+    pricing_title: 'Conversations Vocales',
+    pricing_subtitle: 'Parlez naturellement avec des guides IA qui connaissent chaque coin des Asturies',
+    pricing_cta: 'Obtenir un Pass Jour',
+    faq_title: 'Questions ?',
+    faq_what_included: 'Qu\'est-ce qui est inclus ?',
+    faq_what_included_answer: 'Conversations vocales illimitees avec tous les guides IA pendant 24 heures.',
+    faq_how_long: 'Combien de temps ca dure ?',
+    faq_how_long_answer: '24 heures a partir de l\'achat. Parfait pour planifier une journee de voyage ou explorer.',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

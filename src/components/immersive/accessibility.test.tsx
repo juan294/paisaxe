@@ -47,15 +47,29 @@ vi.mock("@/hooks/use-reduced-motion", () => ({
   useReducedMotion: () => mockUseReducedMotion(),
 }));
 
-// Mock useVisitorVoiceAccess hook
-vi.mock("@/hooks/use-visitor-voice-access", () => ({
-  useVisitorVoiceAccess: () => ({
+// Mock useVoiceAccess hook
+vi.mock("@/hooks/use-voice-access", () => ({
+  useVoiceAccess: () => ({
     canUseVoice: false,
     needsSignIn: false,
-    agentId: null,
-    userEmail: null,
+    needsPurchase: false,
+    agentId: "",
+    expiresAt: null,
+    hoursUntilExpiry: null,
     isLoading: false,
+    isWhitelisted: false,
+    hasAccess: false,
+    refresh: vi.fn(),
   }),
+}));
+
+// Mock VoicePurchaseCTA component
+vi.mock("@/components/premium/voice-purchase-cta", () => ({
+  VoicePurchaseCTA: () => (
+    <div data-testid="voice-purchase-cta">
+      Purchase voice access
+    </div>
+  ),
 }));
 
 // Mock next/image
