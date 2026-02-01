@@ -6,11 +6,57 @@ interface AnthropicMessage {
   content: string;
 }
 
+// Use curl in development/test (Turbopack ECONNRESET workaround), SDK in production
+// Production is the only environment where Turbopack is not used
+const USE_CURL = process.env.NODE_ENV !== "production";
+
 /**
- * Stream text chunks from the Anthropic API using curl.
- * Yields chunks of text as they arrive from the streaming API.
+ * Stream text chunks from the Anthropic API.
+ * Uses curl in development (Turbopack workaround), SDK in production.
  */
 export async function* streamAnthropicAPI(
+  system: string,
+  messages: AnthropicMessage[],
+  model: string,
+  maxTokens: number
+): AsyncGenerator<string, void, unknown> {
+  if (USE_CURL) {
+    yield* streamWithCurl(system, messages, model, maxTokens);
+  } else {
+    yield* streamWithSDK(system, messages, model, maxTokens);
+  }
+}
+
+/**
+ * Stream using the Anthropic SDK (production).
+ */
+async function* streamWithSDK(
+  system: string,
+  messages: AnthropicMessage[],
+  model: string,
+  maxTokens: number
+): AsyncGenerator<string, void, unknown> {
+  const { default: AnthropicSDK } = await import("@anthropic-ai/sdk");
+  const client = new AnthropicSDK();
+
+  const stream = await client.messages.stream({
+    model,
+    max_tokens: maxTokens,
+    system,
+    messages,
+  });
+
+  for await (const event of stream) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      yield event.delta.text;
+    }
+  }
+}
+
+/**
+ * Stream using curl subprocess (development - Turbopack workaround).
+ */
+async function* streamWithCurl(
   system: string,
   messages: AnthropicMessage[],
   model: string,
@@ -128,16 +174,52 @@ export async function* streamAnthropicAPI(
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 500;
 
+/**
+ * Call the Anthropic API.
+ * Uses curl in development (Turbopack workaround), SDK in production.
+ */
 export async function callAnthropicAPI(
   system: string,
   messages: AnthropicMessage[],
   model: string,
   maxTokens: number
 ): Promise<Anthropic.Message> {
-  // Use curl subprocess to call the Anthropic API. The Turbopack dev server
-  // corrupts Node.js HTTPS for api.anthropic.com (ECONNRESET) — even in
-  // child node processes. Using curl bypasses Node's networking entirely.
-  // We also retry on transient failures (curl exit codes 56, 7, 28).
+  if (USE_CURL) {
+    return callWithCurl(system, messages, model, maxTokens);
+  } else {
+    return callWithSDK(system, messages, model, maxTokens);
+  }
+}
+
+/**
+ * Call using the Anthropic SDK (production).
+ */
+async function callWithSDK(
+  system: string,
+  messages: AnthropicMessage[],
+  model: string,
+  maxTokens: number
+): Promise<Anthropic.Message> {
+  const { default: AnthropicSDK } = await import("@anthropic-ai/sdk");
+  const client = new AnthropicSDK();
+
+  return client.messages.create({
+    model,
+    max_tokens: maxTokens,
+    system,
+    messages,
+  });
+}
+
+/**
+ * Call using curl subprocess (development - Turbopack workaround).
+ */
+async function callWithCurl(
+  system: string,
+  messages: AnthropicMessage[],
+  model: string,
+  maxTokens: number
+): Promise<Anthropic.Message> {
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const { setTimeout: sleep } = await import("node:timers/promises");
