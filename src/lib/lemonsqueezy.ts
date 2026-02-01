@@ -47,8 +47,8 @@ export interface LemonSqueezyOrderWebhook {
 export function createDayPassCheckoutUrl(
   options: LemonSqueezyCheckoutOptions
 ): string {
-  const storeId = process.env.LEMONSQUEEZY_STORE_ID;
-  const variantId = process.env.LEMONSQUEEZY_DAY_PASS_VARIANT_ID;
+  const storeId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID;
+  const variantId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID;
 
   if (!storeId || !variantId) {
     throw new Error("Lemon Squeezy configuration missing");
@@ -164,7 +164,7 @@ export function parseOrderWebhook(
 export function getPurchaseTypeFromVariant(
   variantId: number
 ): "day_pass" | null {
-  const dayPassVariantId = process.env.LEMONSQUEEZY_DAY_PASS_VARIANT_ID;
+  const dayPassVariantId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID;
 
   if (dayPassVariantId && variantId === parseInt(dayPassVariantId, 10)) {
     return "day_pass";
@@ -204,7 +204,7 @@ export function formatPrice(cents: number, currency: string): string {
  */
 export function isLemonSqueezyConfigured(): boolean {
   return !!(
-    process.env.LEMONSQUEEZY_STORE_ID &&
-    process.env.LEMONSQUEEZY_DAY_PASS_VARIANT_ID
+    process.env.NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID &&
+    process.env.NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID
   );
 }

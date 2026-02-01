@@ -16,8 +16,8 @@ describe("lemonsqueezy", () => {
 
   describe("createDayPassCheckoutUrl", () => {
     it("should create a checkout URL with all parameters", () => {
-      vi.stubEnv("LEMONSQUEEZY_STORE_ID", "paisaxe");
-      vi.stubEnv("LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "123456");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID", "paisaxe");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "123456");
 
       const url = createDayPassCheckoutUrl({
         userId: "user-123",
@@ -32,8 +32,8 @@ describe("lemonsqueezy", () => {
     });
 
     it("should throw error when config is missing", () => {
-      vi.stubEnv("LEMONSQUEEZY_STORE_ID", "");
-      vi.stubEnv("LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID", "");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "");
 
       expect(() =>
         createDayPassCheckoutUrl({
@@ -149,17 +149,17 @@ describe("lemonsqueezy", () => {
 
   describe("getPurchaseTypeFromVariant", () => {
     it("should return day_pass for matching variant ID", () => {
-      vi.stubEnv("LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "123456");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "123456");
       expect(getPurchaseTypeFromVariant(123456)).toBe("day_pass");
     });
 
     it("should return null for non-matching variant ID", () => {
-      vi.stubEnv("LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "123456");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "123456");
       expect(getPurchaseTypeFromVariant(999999)).toBe(null);
     });
 
     it("should return null when env is not set", () => {
-      vi.stubEnv("LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "");
       expect(getPurchaseTypeFromVariant(123456)).toBe(null);
     });
   });
@@ -178,20 +178,20 @@ describe("lemonsqueezy", () => {
 
   describe("isLemonSqueezyConfigured", () => {
     it("should return true when all config is present", () => {
-      vi.stubEnv("LEMONSQUEEZY_STORE_ID", "paisaxe");
-      vi.stubEnv("LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "123456");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID", "paisaxe");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "123456");
       expect(isLemonSqueezyConfigured()).toBe(true);
     });
 
     it("should return false when store ID is missing", () => {
-      vi.stubEnv("LEMONSQUEEZY_STORE_ID", "");
-      vi.stubEnv("LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "123456");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID", "");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "123456");
       expect(isLemonSqueezyConfigured()).toBe(false);
     });
 
     it("should return false when variant ID is missing", () => {
-      vi.stubEnv("LEMONSQUEEZY_STORE_ID", "paisaxe");
-      vi.stubEnv("LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID", "paisaxe");
+      vi.stubEnv("NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID", "");
       expect(isLemonSqueezyConfigured()).toBe(false);
     });
   });

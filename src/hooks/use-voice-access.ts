@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVisitorVoiceAccess } from "@/hooks/use-visitor-voice-access";
+import { ELEVENLABS_AGENT_IDS } from "@/config/elevenlabs-agents";
 import type { VoiceAccessResponse } from "@/app/api/voice-access/route";
 
 interface UseVoiceAccessResult {
@@ -99,6 +100,9 @@ export function useVoiceAccess(): UseVoiceAccessResult {
     // Needs purchase: signed in, not whitelisted, no paid access
     const needsPurchase = !!user && !isWhitelisted && !hasPaidAccess;
 
+    // Get agentId - use feature flag config first, fallback to Pelayo for paid users
+    const agentId = visitorAccess.agentId || (hasPaidAccess ? ELEVENLABS_AGENT_IDS.pelayo : "");
+
     return {
       hasAccess: hasPaidAccess,
       isWhitelisted,
@@ -107,7 +111,7 @@ export function useVoiceAccess(): UseVoiceAccessResult {
       needsPurchase,
       expiresAt,
       hoursUntilExpiry,
-      agentId: visitorAccess.agentId,
+      agentId,
       isLoading,
       refresh: fetchPaidAccess,
     };
