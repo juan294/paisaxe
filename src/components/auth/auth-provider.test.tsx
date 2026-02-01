@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 
 // --- Supabase mocks ---
 const mockGetSession = vi.fn();
+const mockGetUser = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 const mockSignInWithOAuth = vi.fn();
 const mockSignOut = vi.fn();
@@ -15,6 +16,7 @@ vi.mock("@/lib/supabase-browser", () => ({
   createSupabaseBrowserClient: () => ({
     auth: {
       getSession: mockGetSession,
+      getUser: mockGetUser,
       onAuthStateChange: mockOnAuthStateChange,
       signInWithOAuth: mockSignInWithOAuth,
       signOut: mockSignOut,
@@ -58,6 +60,10 @@ const mockSession = {
 function setupDefaultMocks() {
   mockGetSession.mockResolvedValue({
     data: { session: mockSession },
+    error: null,
+  });
+  mockGetUser.mockResolvedValue({
+    data: { user: mockSupabaseUser },
     error: null,
   });
   mockOnAuthStateChange.mockReturnValue({
@@ -134,17 +140,41 @@ describe("AuthProvider", () => {
     // User should remain null on error
     expect(screen.getByTestId("user").textContent).toBe("none");
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Error getting session:",
+      "Error initializing auth:",
       expect.any(Error)
     );
 
     consoleSpy.mockRestore();
   });
 
+  it("handles getUser returning invalid session (clears auth state)", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: "invalid_grant: Token is expired" },
+    });
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("false");
+    });
+
+    // User should be null when getUser fails
+    expect(screen.getByTestId("user").textContent).toBe("none");
+  });
+
   it("auth state changes via onAuthStateChange callback", async () => {
     // Start with no session so initial state is "none"
     mockGetSession.mockResolvedValue({
       data: { session: null },
+      error: null,
+    });
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
       error: null,
     });
 

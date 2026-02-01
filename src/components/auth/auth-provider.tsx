@@ -26,20 +26,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const supabase = createSupabaseBrowserClient();
 
   useEffect(() => {
-    // Get initial session
-    const getSession = async () => {
+    // Get initial session using getUser() to validate with server
+    // This ensures client and server auth state stay in sync
+    const initializeAuth = async () => {
       try {
+        // First get the session (needed for the session object)
         const { data: { session: currentSession } } = await supabase.auth.getSession();
-        setSession(currentSession);
-        setUser(mapSupabaseUser(currentSession?.user ?? null));
+
+        // Then validate with server - this also refreshes expired tokens
+        const { data: { user: validatedUser }, error } = await supabase.auth.getUser();
+
+        if (error || !validatedUser) {
+          // Session invalid or expired - clear state
+          setSession(null);
+          setUser(null);
+        } else {
+          setSession(currentSession);
+          setUser(mapSupabaseUser(validatedUser));
+        }
       } catch (error) {
-        console.error("Error getting session:", error);
+        console.error("Error initializing auth:", error);
+        setSession(null);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    getSession();
+    initializeAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
