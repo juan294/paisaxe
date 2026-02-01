@@ -90,6 +90,7 @@ const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
   docs_freshness_agent_enabled: "system",
   performance_agent_enabled: "system",
   qa_agent_enabled: "system",
+  localization_agent_enabled: "system",
 };
 
 // Flags that have configurable settings
@@ -100,6 +101,7 @@ const CONFIGURABLE_FLAGS = [
   "docs_freshness_agent_enabled",
   "performance_agent_enabled",
   "qa_agent_enabled",
+  "localization_agent_enabled",
   "maintenance_mode",
 ];
 
@@ -110,6 +112,7 @@ const AGENT_REPORT_FILES: Record<string, string> = {
   docs_freshness_agent_enabled: "docs-freshness-report.md",
   performance_agent_enabled: "performance-report.md",
   qa_agent_enabled: "qa-report.md",
+  localization_agent_enabled: "localization-report.md",
 };
 
 export function FeatureTogglesPanel() {
