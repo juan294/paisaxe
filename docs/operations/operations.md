@@ -198,6 +198,7 @@ Local agents run via macOS launchd and are controllable via feature flags in the
 | `docs_freshness_agent_enabled` | Docs Freshness Agent | Disabled |
 | `performance_agent_enabled` | Performance Agent | Disabled |
 | `qa_agent_enabled` | QA Agent | Disabled |
+| `localization_agent_enabled` | Localization Agent | Disabled |
 
 Disable the master toggle to stop all agents. Individual flags control each agent independently.
 
@@ -210,6 +211,7 @@ Disable the master toggle to stop all agents. Individual flags control each agen
 | Docs Freshness | `scripts/docs-freshness-agent.sh` | Weekly Sunday 6:00 AM | `docs/agents/docs-freshness-report.md` |
 | Performance | `scripts/performance-agent.sh` | Weekly Saturday 10:00 AM | `docs/agents/performance-report.md` |
 | QA | `scripts/qa-agent.sh` | Weekly Sunday 8:00 AM | `docs/agents/qa-report.md` |
+| Localization | `scripts/localization-agent.sh` | Weekly Sunday 7:00 AM | `docs/agents/localization-report.md` |
 
 Shared utilities in `scripts/lib/agent-utils.sh` provide feature flag checking, logging, and startup logic.
 
@@ -221,6 +223,7 @@ Located in `~/Library/LaunchAgents/`:
 - `com.paisaxe.docs-freshness-agent.plist`
 - `com.paisaxe.performance-agent.plist`
 - `com.paisaxe.qa-agent.plist`
+- `com.paisaxe.localization-agent.plist`
 
 Load/unload agents:
 ```bash
@@ -243,6 +246,7 @@ Unlike cron, launchd runs missed jobs when the Mac wakes from sleep. Logs writte
 - **Docs Freshness Agent**: Runs weekly. Checks for stale docs, new migrations needing documentation, undocumented API routes and feature flags.
 - **Performance Agent**: Runs weekly. Analyzes bundle sizes, Lighthouse scores, Core Web Vitals, dependency counts, and disk usage.
 - **QA Agent**: Runs weekly. Automated LLM testing for RAG quality, safety, content boundaries, and response quality. Budget-conscious sampling (configurable via `testsPerCategory` in feature flag config). See `docs/testbed.md` for full test catalog.
+- **Localization Agent**: Runs weekly. Ensures 100% translation coverage across all 5 locales (es, en, fr, de, pt). Detects missing UI strings and story translations, then auto-fills gaps. Spanish is source of truth.
 
 ## CI/CD Workflows
 

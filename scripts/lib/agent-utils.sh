@@ -37,7 +37,16 @@ log_error() {
 }
 
 # Configuration
-FEATURE_FLAGS_URL="${FEATURE_FLAGS_URL:-https://paisaxe.es/api/feature-flags}"
+# Auto-detect local dev server for development testing
+# Falls back to production if localhost is not running
+if [[ -z "${FEATURE_FLAGS_URL:-}" ]]; then
+  if curl -s --max-time 2 "http://localhost:3000/api/health" >/dev/null 2>&1; then
+    FEATURE_FLAGS_URL="http://localhost:3000/api/feature-flags"
+    log_info "Using local dev server for feature flags"
+  else
+    FEATURE_FLAGS_URL="https://paisaxe.es/api/feature-flags"
+  fi
+fi
 
 # Check if a feature flag is enabled
 # Usage: check_feature_flag "flag_key"
