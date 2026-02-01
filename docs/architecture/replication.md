@@ -20,7 +20,7 @@ Paisaxe is designed with replicability in mind. Location-specific content is mar
 | **Vercel** | Hosting & deployment | Free tier available |
 | **Anthropic** | Claude API for chat | Pay-as-you-go |
 | **Voyage AI** | Embeddings & reranking | 200M free tokens/month |
-| **ElevenLabs** | Voice agents (optional) | Free tier available |
+| **ElevenLabs** | Voice agents (optional) | Starter $5/mo (commercial license required) |
 | **PostHog** | Analytics (optional) | Free tier available |
 | **Domain** | Your site domain | ~$10-15/year |
 
@@ -279,9 +279,12 @@ WEBHOOK_SECRET=your_webhook_secret
 
 If using ElevenLabs voice:
 
-1. Create new voice agents in ElevenLabs console
-2. Configure agents with your location's knowledge
-3. Update `src/config/elevenlabs-agents.ts` with new agent IDs
+1. **Subscribe to at least Starter tier ($5/mo)** - Free tier is non-commercial only
+2. Create new voice agents in ElevenLabs console
+3. Configure agents with your location's knowledge
+4. Update `src/config/elevenlabs-agents.ts` with new agent IDs
+
+> **Important**: The ElevenLabs free tier cannot be used for commercial/production sites. See `docs/marketing/cost-forecast.md` for pricing details and upgrade triggers.
 
 ---
 

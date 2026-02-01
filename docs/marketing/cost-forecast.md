@@ -1,7 +1,10 @@
 # Paisaxe Cost Forecast
 
 **Created**: 2026-01-31
+**Updated**: 2026-02-01
 **Purpose**: Estimate monthly operational costs across three traffic scenarios
+
+> **Current Status**: ElevenLabs upgraded to Starter tier ($5/mo) on 2026-02-01 for commercial license compliance.
 
 ---
 
@@ -13,7 +16,7 @@
 | **Vercel** | Hosting, Edge Functions, CDN | Pro ($20/mo) |
 | **Claude API (Anthropic)** | Chat responses | Pay-as-you-go |
 | **Voyage AI** | Embeddings + Reranking | Pay-as-you-go |
-| **ElevenLabs** | Voice agents | Creator/Pro |
+| **ElevenLabs** | Voice agents | Starter ($5/mo) |
 | **PostHog** | Analytics | Free/Pay-as-you-go |
 
 ---
@@ -47,11 +50,13 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
   - Reranking (rerank-2.5): ~$0.15 per million tokens
 
 ### ElevenLabs (Conversational AI)
-- **Free**: ~15 minutes of Conversational AI/month
-- **Creator ($11/mo)**: 250 minutes included, $0.10/min overage
-- **Pro ($49/mo)**: 1,100 minutes included, $0.08/min overage
-- **Scale ($165/mo)**: 3,600 minutes included
-- **Note**: LLM costs (10-30% extra) are currently absorbed by ElevenLabs
+- **Free**: ~15 minutes/month (non-commercial use only)
+- **Starter ($5/mo)**: 30,000 credits (~30-45 min agents), 3 concurrent, commercial license ✓
+- **Creator ($22/mo)**: 100,000 credits (~100-150 min), 5 concurrent, $0.10/min overage
+- **Pro ($99/mo)**: 500,000 credits (~500 min), 10 concurrent, $0.08/min overage
+- **Scale ($330/mo)**: 2M credits (~2,000 min), 15 concurrent
+- **Burst pricing**: Available to handle 3x concurrency at 2x per-minute cost
+- **Note**: LLM costs currently absorbed by ElevenLabs (may change)
 
 ### PostHog (Analytics)
 - **Free Tier**: 1M events/month, 5K session recordings, 1M feature flag requests
@@ -100,14 +105,16 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 | Vercel Pro | Base plan (1 member) | $20.00 |
 | Claude API | 100 chats × 2.5K tokens = 250K tokens ≈ $1 | $1.00 |
 | Voyage AI | Within free tier (200M tokens) | $0.00 |
-| ElevenLabs | 20 × 3 min = 60 min (Free tier has ~15min, need Creator) | $11.00 |
+| ElevenLabs | 20 × 3 min = 60 min (Starter ~45 min included, may need upgrade) | $5.00 |
 | PostHog | 2K events (within 1M free) | $0.00 |
-| **TOTAL** | | **$57.00/mo** |
+| **TOTAL** | | **$51.00/mo** |
 
 ### Recommended Budget Limits
-- ElevenLabs: Set at Creator tier ($11/mo)
+- ElevenLabs: Start with Starter ($5/mo), upgrade to Creator ($22/mo) if exceeding ~40 min
 - Voyage AI: No limit needed (free tier sufficient)
 - Claude API: Set alert at $10/mo
+
+> **Note**: If voice agent usage consistently exceeds 40 minutes/month, upgrade to Creator tier.
 
 ---
 
@@ -130,12 +137,12 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 | Vercel Pro | Base plan (bandwidth under limits) | $20.00 |
 | Claude API | 1,500 × 2.5K = 3.75M tokens | $15.00 |
 | Voyage AI | Still within free tier | $0.00 |
-| ElevenLabs | 300 × 3 min = 900 min (Pro includes 1,100) | $49.00 |
+| ElevenLabs | 300 × 3 min = 900 min (Pro ~500 min + overage ~$32) | $131.00 |
 | PostHog | 20K events (within 1M free) | $0.00 |
-| **TOTAL** | | **$109.00/mo** |
+| **TOTAL** | | **$191.00/mo** |
 
 ### Recommended Budget Limits
-- ElevenLabs: Pro tier ($49/mo) with cap enabled
+- ElevenLabs: Pro tier ($99/mo) with overage cap at $150/mo total
 - Claude API: Set alert at $50/mo, hard cap at $100/mo
 - Voyage AI: No limit needed yet
 
@@ -160,12 +167,12 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 | Vercel Pro | Base + potential bandwidth overage | $30.00 |
 | Claude API | 15K × 2.5K = 37.5M tokens | $150.00 |
 | Voyage AI | Reranking may exceed free tier (~$5) | $5.00 |
-| ElevenLabs | 3K × 3 min = 9,000 min (Scale + overage) | $330.00 |
+| ElevenLabs | 3K × 3 min = 9,000 min (Scale ~2,000 min + 7,000 min overage @ $0.08) | $890.00 |
 | PostHog | 200K events (within 1M free) | $0.00 |
-| **TOTAL** | | **$550.00/mo** |
+| **TOTAL** | | **$1,110.00/mo** |
 
 ### Recommended Budget Limits
-- ElevenLabs: Scale tier ($165/mo) + $200 overage buffer = $365 cap
+- ElevenLabs: Scale tier ($330/mo) + overage buffer = $1,000 cap; consider Enterprise
 - Claude API: Hard cap at $200/mo
 - Voyage AI: Alert at $20/mo
 - Supabase: Enable spend cap, alert at $50/mo
@@ -178,7 +185,7 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 
 | Service | How to Set Limit | Recommended Limit |
 |---------|------------------|-------------------|
-| **ElevenLabs** | Dashboard → Billing → Usage Limits | $100/mo (start), $400/mo (max) |
+| **ElevenLabs** | Dashboard → Billing → Usage Limits | $25/mo (start on Starter), $150/mo (Pro), $500/mo (Scale) |
 | **Voyage AI** | Dashboard → Settings → Spending Limits | $50/mo |
 | **Claude API (Anthropic)** | Console → Usage Limits → Set monthly limit | $100/mo (start), $250/mo (max) |
 | **Supabase** | Dashboard → Billing → Enable Spend Cap | Default ON (Pro tier) |
@@ -220,6 +227,11 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 3. **Monitor conversation length** - encourage concise interactions
 4. **Consider text fallback** when approaching limits
 
+**Upgrade triggers**:
+- Starter → Creator: Using >30 min/month OR seeing concurrent errors (3 concurrent limit)
+- Creator → Pro: Using >100 min/month OR need 10+ concurrent connections
+- Pro → Scale: Using >500 min/month OR sustained high traffic
+
 ### Voyage AI
 1. **Cache embeddings** for frequently accessed content (already done in DB)
 2. **Batch embedding requests** (already implemented)
@@ -250,9 +262,9 @@ Set up alerts for:
 
 | Scenario | Monthly Visitors | Monthly Cost | Key Driver |
 |----------|------------------|--------------|------------|
-| **Low** (Soft Launch) | 500 | ~$57 | Base infrastructure |
-| **Medium** (Growing) | 5,000 | ~$109 | Voice agents |
-| **High** (Viral) | 50,000 | ~$550 | Voice agents + Claude |
+| **Low** (Soft Launch) | 500 | ~$51 | Base infrastructure |
+| **Medium** (Growing) | 5,000 | ~$191 | Voice agents |
+| **High** (Viral) | 50,000 | ~$1,110 | Voice agents (overage) |
 
 **The voice agent (ElevenLabs) is the most expensive variable cost.** Consider gating it behind authentication or limiting availability if costs need to be controlled.
 
