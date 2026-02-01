@@ -354,12 +354,14 @@ export async function updateFeatureFlagConfig(
  */
 export async function fetchAnalytics(
   from?: string,
-  to?: string
+  to?: string,
+  includeLocalhost?: boolean
 ): Promise<AdminApiResponse<AnalyticsDashboardData>> {
   try {
     const url = new URL(`${API_BASE}/analytics`, window.location.origin);
     if (from) url.searchParams.set("from", from);
     if (to) url.searchParams.set("to", to);
+    if (includeLocalhost) url.searchParams.set("includeLocalhost", "true");
 
     const response = await fetch(url.toString());
 

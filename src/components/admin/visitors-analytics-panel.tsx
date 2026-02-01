@@ -23,6 +23,7 @@ export function VisitorsAnalyticsPanel() {
   const [data, setData] = useState<AnalyticsDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [includeLocalhost, setIncludeLocalhost] = useState(false);
   const [dateRange, setDateRange] = useState({
     from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     to: new Date().toISOString().split("T")[0],
@@ -35,14 +36,14 @@ export function VisitorsAnalyticsPanel() {
     const fromISO = new Date(dateRange.from).toISOString();
     const toISO = new Date(dateRange.to + "T23:59:59").toISOString();
 
-    const result = await fetchAnalytics(fromISO, toISO);
+    const result = await fetchAnalytics(fromISO, toISO, includeLocalhost);
     if (result.error) {
       setError(result.error);
     } else if (result.data) {
       setData(result.data);
     }
     setIsLoading(false);
-  }, [dateRange]);
+  }, [dateRange, includeLocalhost]);
 
   useEffect(() => {
     loadData();
@@ -56,6 +57,29 @@ export function VisitorsAnalyticsPanel() {
           Visitor Data
         </h2>
         <div className="flex items-center gap-6">
+          {/* Localhost toggle */}
+          <label className="flex cursor-pointer items-center gap-2">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+              Dev
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={includeLocalhost}
+              onClick={() => setIncludeLocalhost((prev) => !prev)}
+              className={`relative h-5 w-9 rounded-full transition-colors ${
+                includeLocalhost
+                  ? "bg-amber-500"
+                  : "bg-[#d5d3ce] dark:bg-[#4d4944]"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                  includeLocalhost ? "translate-x-4" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </label>
           <div className="flex items-center gap-2 font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
             <input
               type="date"
