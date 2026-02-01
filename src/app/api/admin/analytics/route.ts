@@ -109,6 +109,10 @@ export async function GET(request: NextRequest) {
     const from = formatForHogQL(fromParam);
     const to = formatForHogQL(toParam);
 
+    // Filter out localhost/development data from analytics
+    // This ensures the dashboard only shows production traffic
+    const excludeLocalhost = "AND properties.$current_url NOT LIKE '%localhost%'";
+
     // Run all queries in parallel
     const [
       pageviewsResult,
@@ -132,25 +136,25 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       // 1. Total pageviews
       queryPostHog(
-        `SELECT count() FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}'`,
+        `SELECT count() FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost}`,
         projectId,
         apiKey
       ),
       // 2. Unique visitors
       queryPostHog(
-        `SELECT count(DISTINCT distinct_id) FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}'`,
+        `SELECT count(DISTINCT distinct_id) FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost}`,
         projectId,
         apiKey
       ),
       // 3. Total sessions
       queryPostHog(
-        `SELECT count(DISTINCT properties.$session_id) FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}'`,
+        `SELECT count(DISTINCT properties.$session_id) FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost}`,
         projectId,
         apiKey
       ),
       // 4. Avg pages per session (fetch both counts to calculate)
       queryPostHog(
-        `SELECT count() as pageviews, count(DISTINCT properties.$session_id) as sessions FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}'`,
+        `SELECT count() as pageviews, count(DISTINCT properties.$session_id) as sessions FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost}`,
         projectId,
         apiKey
       ),
@@ -162,7 +166,7 @@ export async function GET(request: NextRequest) {
         FROM (
           SELECT properties.$session_id as session_id, count() as c
           FROM events
-          WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND session_id IS NOT NULL
+          WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND session_id IS NOT NULL ${excludeLocalhost}
           GROUP BY session_id
         )`,
         projectId,
@@ -175,7 +179,7 @@ export async function GET(request: NextRequest) {
           count() as pageviews,
           count(DISTINCT distinct_id) as visitors
         FROM events
-        WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}'
+        WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost}
         GROUP BY date
         ORDER BY date ASC`,
         projectId,
@@ -183,19 +187,19 @@ export async function GET(request: NextRequest) {
       ),
       // 7. Top pages
       queryPostHog(
-        `SELECT properties.$current_url as url, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' GROUP BY url ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$current_url as url, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost} GROUP BY url ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
       // 8. Top referrers
       queryPostHog(
-        `SELECT properties.$referrer as referrer, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$referrer as referrer, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost} AND referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
       // 9. Countries
       queryPostHog(
-        `SELECT properties.$geoip_country_name as country, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND country IS NOT NULL GROUP BY country ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$geoip_country_name as country, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost} AND country IS NOT NULL GROUP BY country ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
@@ -206,7 +210,7 @@ export async function GET(request: NextRequest) {
           properties.$geoip_country_name as country,
           count() as count
         FROM events
-        WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND city IS NOT NULL
+        WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost} AND city IS NOT NULL
         GROUP BY city, country
         ORDER BY count DESC
         LIMIT 10`,
@@ -215,19 +219,19 @@ export async function GET(request: NextRequest) {
       ),
       // 11. Devices
       queryPostHog(
-        `SELECT properties.$device_type as device, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND device IS NOT NULL GROUP BY device ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$device_type as device, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost} AND device IS NOT NULL GROUP BY device ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
       // 12. Browsers
       queryPostHog(
-        `SELECT properties.$browser as browser, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND browser IS NOT NULL GROUP BY browser ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$browser as browser, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost} AND browser IS NOT NULL GROUP BY browser ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
       // 13. Operating systems
       queryPostHog(
-        `SELECT properties.$os as os, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND os IS NOT NULL GROUP BY os ORDER BY count DESC LIMIT 10`,
+        `SELECT properties.$os as os, count() as count FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost} AND os IS NOT NULL GROUP BY os ORDER BY count DESC LIMIT 10`,
         projectId,
         apiKey
       ),
@@ -238,7 +242,7 @@ export async function GET(request: NextRequest) {
           properties.$viewport_height as height,
           count() as count
         FROM events
-        WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND width IS NOT NULL AND height IS NOT NULL
+        WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost} AND width IS NOT NULL AND height IS NOT NULL
         GROUP BY width, height
         ORDER BY count DESC
         LIMIT 10`,
@@ -253,7 +257,7 @@ export async function GET(request: NextRequest) {
             properties.$session_id as session_id,
             argMin(properties.$pathname, timestamp) as page
           FROM events
-          WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND session_id IS NOT NULL
+          WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost} AND session_id IS NOT NULL
           GROUP BY session_id
         )
         GROUP BY page
@@ -270,7 +274,7 @@ export async function GET(request: NextRequest) {
             properties.$session_id as session_id,
             argMax(properties.$pathname, timestamp) as page
           FROM events
-          WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' AND session_id IS NOT NULL
+          WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost} AND session_id IS NOT NULL
           GROUP BY session_id
         )
         GROUP BY page
@@ -287,7 +291,7 @@ export async function GET(request: NextRequest) {
           properties.utm_campaign as campaign,
           count() as count
         FROM events
-        WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}'
+        WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost}
           AND (source IS NOT NULL OR medium IS NOT NULL OR campaign IS NOT NULL)
         GROUP BY source, medium, campaign
         ORDER BY count DESC
@@ -305,8 +309,8 @@ export async function GET(request: NextRequest) {
             distinct_id,
             if(min(timestamp) >= '${from}', 1, 0) as is_new
           FROM events
-          WHERE event = '$pageview' AND distinct_id IN (
-            SELECT DISTINCT distinct_id FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}'
+          WHERE event = '$pageview' ${excludeLocalhost} AND distinct_id IN (
+            SELECT DISTINCT distinct_id FROM events WHERE event = '$pageview' AND timestamp >= '${from}' AND timestamp <= '${to}' ${excludeLocalhost}
           )
           GROUP BY distinct_id
         )`,
