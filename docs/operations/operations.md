@@ -292,3 +292,38 @@ Playwright E2E tests run against a built app on push/PR to `develop` and `main`.
 - Vercel deployment is handled separately via Vercel's GitHub integration
 - Database migrations should be validated locally before pushing
 - Claude Review requires `ANTHROPIC_API_KEY` as a GitHub repository secret
+
+## ElevenLabs Voice Agents
+
+Voice agents for the Paisaxe experience, configured in `src/config/elevenlabs-agents.ts`.
+
+### Agents
+
+| Agent | Purpose | Language | Config |
+|-------|---------|----------|--------|
+| **Pelayo** | Tourism guide for immersive stories | Spanish/English | [Detailed config](./elevenlabs-pelayo-config.md) |
+| Xander | X/Twitter marketing | English | Marketing prompt |
+| Iris | Instagram marketing | English | Marketing prompt |
+| Penny | Pinterest marketing | English | Marketing prompt |
+
+### Visitor Voice Access
+
+Controlled by the `visitor_voice_agent` feature flag in admin panel:
+
+1. Enable the feature flag
+2. Set the ElevenLabs Agent ID (Pelayo's ID)
+3. Whitelist specific user emails
+4. Users must sign in with Google OAuth to access voice
+
+### Setup Script
+
+```bash
+# Create all voice agents in ElevenLabs
+npx ts-node scripts/setup-elevenlabs-agents.ts
+```
+
+Requires `ELEVENLABS_API_KEY` in `.env.local`.
+
+### Console Configuration
+
+For manual ElevenLabs console configuration, see [elevenlabs-pelayo-config.md](./elevenlabs-pelayo-config.md).

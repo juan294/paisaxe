@@ -78,9 +78,9 @@ Visitors can ask questions about the current story by tapping "Ask about this" o
 
 **Text input** — A text field with a send button at the bottom of the chat panel. Messages are limited to 1000 characters.
 
-**Voice input** — A microphone button activates the Web Speech API (when the browser supports it). Speech is transcribed to text and sent automatically. The interface shows a "Listening..." state while recording. Language defaults to Spanish (es-ES).
+**Voice input (Web Speech API)** — A microphone button activates the Web Speech API (when the browser supports it). Speech is transcribed to text and sent automatically. The interface shows a "Listening..." state while recording. Language defaults to Spanish (es-ES).
 
-**How it works under the hood:**
+**How text chat works under the hood:**
 
 1. The user's question is sent to `POST /api/chat` along with the current story context.
 2. The server generates an embedding of the question via Voyage AI.
@@ -88,6 +88,34 @@ Visitors can ask questions about the current story by tapping "Ask about this" o
 4. The matched chunks are passed as context to the Claude API.
 5. Claude generates a response, which may include references to source PDFs.
 6. Related images from the database are returned alongside the response, displayed inline with captions and source attribution.
+
+### Premium Voice Agent (Pelayo)
+
+A premium, paid voice conversation feature using ElevenLabs Conversational AI. Gated by the `visitor_voice_agent` feature flag with email whitelist.
+
+**Voice persona** — Pelayo, a warm and knowledgeable tourism guide named after King Pelayo. Speaks Spanish by default with auto-detection for English, German, French, and Portuguese.
+
+**Configuration:**
+- LLM: Gemini 2.5 Flash (low latency, strong multilingual)
+- TTS: eleven_turbo_v2_5 with Ignacio voice
+- Temperature: 0.65 (warmth with accuracy)
+- Max tokens: 250 (conversational brevity)
+- Max duration: 10 minutes per conversation
+
+**RAG Knowledge Base** — Pelayo has access to curated Asturias tourism content via ElevenLabs RAG:
+- City guides (Oviedo, Gijón, Avilés)
+- Camino de Santiago planner
+- Culture guide
+- Family activities guide
+- Asturias story guide
+
+RAG settings: Multilingual embeddings, 5 chunks max, 15K character limit, 0.40 distance threshold.
+
+**System tools enabled:**
+- Language detection (auto-detect visitor's language)
+- End conversation (graceful goodbyes)
+
+See `docs/operations/elevenlabs-pelayo-config.md` for full configuration details.
 
 **Suggested questions** — Up to three contextual question prompts appear below the story description (e.g., "Can I visit in winter?", "Best time to hike here?"). These are populated from each story's `question_prompts` metadata. Controlled by the `contextual_prompts` feature flag.
 

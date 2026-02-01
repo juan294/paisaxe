@@ -10,10 +10,12 @@
 
 // LOCATION-SPECIFIC: Replace these agent IDs with your own ElevenLabs agents
 export const ELEVENLABS_AGENT_IDS = {
+  // Tourism guide for immersive stories (primary voice agent)
+  pelayo: "agent_3101kg5bvnf4f1r94f0cav0v9y61",
+  // Marketing agents for social media content
   xander: "agent_5901kg4wgebce0abca4ssyav3684",
   iris: "agent_1301kg4wggmvfwgbx91h7sn2xsbh",
   penny: "agent_1601kg4wghnzewc9aqpkf4r2fkfw",
-  tiko: "agent_9401kg4wgjprfc7rjs7j4xfz11pv",
 } as const;
 
 export type ElevenLabsAgentId = keyof typeof ELEVENLABS_AGENT_IDS;

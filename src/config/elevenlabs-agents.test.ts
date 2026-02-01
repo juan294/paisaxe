@@ -8,10 +8,10 @@ import {
 describe("ElevenLabs Agent Configuration", () => {
   describe("ELEVENLABS_AGENT_IDS", () => {
     it("should have entries for all four agents", () => {
+      expect(ELEVENLABS_AGENT_IDS).toHaveProperty("pelayo");
       expect(ELEVENLABS_AGENT_IDS).toHaveProperty("xander");
       expect(ELEVENLABS_AGENT_IDS).toHaveProperty("iris");
       expect(ELEVENLABS_AGENT_IDS).toHaveProperty("penny");
-      expect(ELEVENLABS_AGENT_IDS).toHaveProperty("tiko");
     });
 
     it("should have string values for all agents", () => {
@@ -52,10 +52,10 @@ describe("ElevenLabs Agent Configuration", () => {
 
     it("should accept valid agent ID keys", () => {
       // Should not throw for valid keys
+      expect(() => getElevenLabsAgentId("pelayo")).not.toThrow();
       expect(() => getElevenLabsAgentId("xander")).not.toThrow();
       expect(() => getElevenLabsAgentId("iris")).not.toThrow();
       expect(() => getElevenLabsAgentId("penny")).not.toThrow();
-      expect(() => getElevenLabsAgentId("tiko")).not.toThrow();
     });
   });
 });
