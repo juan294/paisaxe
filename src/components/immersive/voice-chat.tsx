@@ -5,7 +5,8 @@ import ReactMarkdown from "react-markdown";
 import { Story } from "@/types/immersive";
 import { ImageResult } from "@/types";
 import { cn } from "@/lib/utils";
-import { X, Send, AudioLines, LogIn, Keyboard } from "lucide-react";
+import { X, Send, AudioLines, LogIn, Keyboard, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { ChatMessageSkeleton } from "./skeleton-chat-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -275,6 +276,16 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                 )}
                 {useElevenLabs ? t("voice.use_text") : t("voice.try_voice")}
               </Button>
+            )}
+            {/* Subtle upgrade prompt for signed-in users without voice access */}
+            {!isInitializing && needsPurchase && (
+              <Link
+                href="/pricing"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-amber-300/80 hover:text-amber-200 transition-colors"
+              >
+                <Sparkles className="h-3 w-3" />
+                <span>{t("voice.try_voice")}</span>
+              </Link>
             )}
             <Button
               variant="ghost"
