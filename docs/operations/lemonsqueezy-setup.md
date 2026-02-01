@@ -34,6 +34,10 @@ Lemon Squeezy has two separate environments:
 
 ## Environment Variables
 
+**CRITICAL**: Webhooks always send **numeric** variant IDs, even in test mode. You need both:
+- `NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID` - UUID for checkout URLs (from Share button)
+- `LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC` - Numeric ID for webhook matching (from "Copy variant ID")
+
 ### Test Mode (Development)
 
 ```bash
@@ -42,6 +46,8 @@ NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID=paisaxe
 NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID=bf128a3b-c4a4-4f19-a0eb-5ad346492538
 NEXT_PUBLIC_LEMONSQUEEZY_TEST_MODE=true
 LEMONSQUEEZY_WEBHOOK_SECRET=<your-test-webhook-secret>
+# Server-side: numeric ID for webhook matching (from "Copy variant ID")
+LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC=1267701
 ```
 
 ### Live Mode (Production)
@@ -50,6 +56,7 @@ LEMONSQUEEZY_WEBHOOK_SECRET=<your-test-webhook-secret>
 # Vercel environment variables
 NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID=paisaxe
 NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID=<live-uuid-from-share-button>
+LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC=<live-numeric-id>
 # No TEST_MODE variable (or set to false)
 LEMONSQUEEZY_WEBHOOK_SECRET=<your-live-webhook-secret>
 ```
@@ -104,6 +111,11 @@ Use these for testing (Test Mode only):
 ### Payment Succeeds but Voice Not Enabled
 - **Cause**: Webhook secret mismatch or database error
 - **Fix**: Check webhook secret matches, check Supabase logs
+
+### Webhook Returns 400 "Unknown product variant"
+- **Cause**: Missing `LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC` env var
+- **Fix**: Add the numeric variant ID (from "Copy variant ID" menu) to server env vars
+- **Note**: Webhooks ALWAYS send numeric IDs, even in test mode. The UUID is only for checkout URLs.
 
 ## Going Live Checklist
 
