@@ -206,6 +206,30 @@ export const es: Translations = {
     attribution_hint: 'Si se publica, te daremos credito asi. Dejalo vacio para anonimo.',
   },
 
+  premium: {
+    voice_locked: 'El chat de voz es una funcion premium',
+    get_day_pass: 'Obtener Pase Diario',
+    voice_title: 'Habla con Tu Guia',
+    voice_description: 'Ten conversaciones de voz naturales con guias de IA que saben todo sobre Asturias.',
+    feature_24h: '24 horas de conversaciones ilimitadas',
+    feature_unlimited: 'Todos los guias de voz incluidos',
+    per_day: '/ dia',
+    sign_in_to_purchase: 'Inicia sesion para comprar',
+    secure_payment: 'Pago seguro via Lemon Squeezy',
+    success_title: 'Listo!',
+    success_subtitle: 'Tu Pase Diario ya esta activo',
+    success_expires: 'Tu acceso es valido hasta',
+    success_cta: 'Empezar a Hablar',
+    pricing_title: 'Conversaciones de Voz',
+    pricing_subtitle: 'Habla naturalmente con guias de IA que conocen cada rincon de Asturias',
+    pricing_cta: 'Obtener Pase Diario',
+    faq_title: 'Preguntas?',
+    faq_what_included: 'Que incluye?',
+    faq_what_included_answer: 'Conversaciones de voz ilimitadas con todos los guias de IA durante 24 horas.',
+    faq_how_long: 'Cuanto dura?',
+    faq_how_long_answer: '24 horas desde la compra. Perfecto para planear un dia de viaje o explorar.',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

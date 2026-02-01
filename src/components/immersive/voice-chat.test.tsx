@@ -15,18 +15,23 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-// Mutable mock state for useVisitorVoiceAccess
+// Mutable mock state for useVoiceAccess
 const mockVoiceAccess = {
   canUseVoice: false,
   needsSignIn: false,
+  needsPurchase: false,
   agentId: "",
-  userEmail: null as string | null,
+  expiresAt: null as Date | null,
+  hoursUntilExpiry: null as number | null,
   isLoading: false,
+  isWhitelisted: false,
+  hasAccess: false,
+  refresh: vi.fn(),
 };
 
-// Mock useVisitorVoiceAccess hook
-vi.mock("@/hooks/use-visitor-voice-access", () => ({
-  useVisitorVoiceAccess: () => mockVoiceAccess,
+// Mock useVoiceAccess hook
+vi.mock("@/hooks/use-voice-access", () => ({
+  useVoiceAccess: () => mockVoiceAccess,
 }));
 
 // Mock Supabase browser client
@@ -113,13 +118,26 @@ const localStorageMock = (() => {
 })();
 Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
+// Mock VoicePurchaseCTA component
+vi.mock("@/components/premium/voice-purchase-cta", () => ({
+  VoicePurchaseCTA: () => (
+    <div data-testid="voice-purchase-cta">
+      Purchase voice access
+    </div>
+  ),
+}));
+
 // Helper to reset mock voice access state
 const resetMockVoiceAccess = () => {
   mockVoiceAccess.canUseVoice = false;
   mockVoiceAccess.needsSignIn = false;
+  mockVoiceAccess.needsPurchase = false;
   mockVoiceAccess.agentId = "";
-  mockVoiceAccess.userEmail = null;
+  mockVoiceAccess.expiresAt = null;
+  mockVoiceAccess.hoursUntilExpiry = null;
   mockVoiceAccess.isLoading = false;
+  mockVoiceAccess.isWhitelisted = false;
+  mockVoiceAccess.hasAccess = false;
 };
 
 describe("VoiceChat", () => {
@@ -814,9 +832,13 @@ describe("VoiceChat with voice access", () => {
     // Enable voice access for these tests
     mockVoiceAccess.canUseVoice = true;
     mockVoiceAccess.needsSignIn = false;
+    mockVoiceAccess.needsPurchase = false;
     mockVoiceAccess.agentId = "test-agent-id";
-    mockVoiceAccess.userEmail = "user@example.com";
+    mockVoiceAccess.expiresAt = null;
+    mockVoiceAccess.hoursUntilExpiry = null;
     mockVoiceAccess.isLoading = false;
+    mockVoiceAccess.isWhitelisted = true;
+    mockVoiceAccess.hasAccess = true;
   });
 
   afterEach(() => {

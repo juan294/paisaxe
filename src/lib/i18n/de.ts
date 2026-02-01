@@ -199,6 +199,30 @@ export const de: Translations = {
     attribution_hint: 'Bei Veröffentlichung werden wir Sie so nennen. Leer lassen für anonym.',
   },
 
+  premium: {
+    voice_locked: 'Sprachchat ist eine Premium-Funktion',
+    get_day_pass: 'Tagespass Holen',
+    voice_title: 'Sprich mit Deinem Guide',
+    voice_description: 'Fuhre naturliche Sprachgesprache mit KI-Guides, die alles uber Asturien wissen.',
+    feature_24h: '24 Stunden unbegrenzte Gesprache',
+    feature_unlimited: 'Alle Sprachguides inklusive',
+    per_day: '/ Tag',
+    sign_in_to_purchase: 'Anmelden zum Kaufen',
+    secure_payment: 'Sichere Zahlung uber Lemon Squeezy',
+    success_title: 'Alles bereit!',
+    success_subtitle: 'Dein Tagespass ist jetzt aktiv',
+    success_expires: 'Dein Zugang ist gultig bis',
+    success_cta: 'Jetzt Sprechen',
+    pricing_title: 'Sprachgesprache',
+    pricing_subtitle: 'Sprich naturlich mit KI-Guides, die jeden Winkel Asturiens kennen',
+    pricing_cta: 'Tagespass Holen',
+    faq_title: 'Fragen?',
+    faq_what_included: 'Was ist inbegriffen?',
+    faq_what_included_answer: 'Unbegrenzte Sprachgesprache mit allen KI-Guides fur 24 Stunden.',
+    faq_how_long: 'Wie lange gilt es?',
+    faq_how_long_answer: '24 Stunden ab Kauf. Perfekt fur einen Tag Reiseplanung oder Erkundung.',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
