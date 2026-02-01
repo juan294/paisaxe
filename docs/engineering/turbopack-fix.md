@@ -156,23 +156,78 @@ export async function POST(request: NextRequest) {
 
 ## Known Limitations of the Fix
 
-1. **curl must be available**: The system must have `curl` installed. This is standard on macOS, Linux, and Vercel's Node.js runtime. Windows dev environments may need WSL or curl for Windows.
+1. **curl only available locally**: The system must have `curl` installed. This is standard on macOS and Linux. **Important**: Vercel's serverless runtime does NOT have `curl` — see "Production Fix" section below.
 
-2. **API key in process args**: The API key is passed as a command-line argument to curl, which is visible in `ps` output. This is acceptable for a dev-only workaround and for Vercel (where the process environment is isolated). If this is a concern, the body could be passed via stdin (`-d @-`) and the key via a temp file.
+2. **API key in process args**: The API key is passed as a command-line argument to curl, which is visible in `ps` output. This is acceptable for a dev-only workaround. If this is a concern, the body could be passed via stdin (`-d @-`) and the key via a temp file.
 
 3. **Subprocess overhead**: Each API call spawns a curl process. The overhead (~10-50ms) is negligible compared to the LLM response time (~1-3 seconds).
 
-4. **No streaming support**: The curl approach receives the full response at once. If streaming responses are needed in the future, this would need to be reworked (e.g., `spawn` with stdout streaming instead of `execFile`).
+4. **Streaming support**: The curl approach now supports streaming via `spawn` with stdout piping (implemented in `streamWithCurl`).
+
+## Production Fix (February 2026)
+
+### Problem Discovered
+
+The original curl-based fix worked in development but **broke production**. Vercel's serverless Node.js runtime does NOT include the `curl` binary. The chat endpoint returned empty responses:
+
+```json
+{"type":"done","images":[],"sources":[]}
+```
+
+### Root Cause
+
+The assumption in the original fix that "curl is available on Vercel's Node.js runtime" was incorrect. When `spawn("curl", [...])` runs on Vercel, it silently fails because there's no `curl` binary.
+
+### Solution: Conditional SDK/curl
+
+Since Turbopack only runs in development (Vercel production uses webpack), we use a conditional approach:
+
+```typescript
+// src/lib/claude.ts
+const USE_CURL = process.env.NODE_ENV !== "production";
+```
+
+- **Development** (`NODE_ENV=development`): Uses curl subprocess (Turbopack workaround)
+- **Test** (`NODE_ENV=test`): Uses curl subprocess (tests mock `child_process`)
+- **Production** (`NODE_ENV=production`): Uses Anthropic SDK directly (no Turbopack, SDK works fine)
+
+### Implementation
+
+**`src/lib/claude.ts`** now has two code paths:
+
+```typescript
+export async function callAnthropicAPI(...) {
+  if (USE_CURL) {
+    return callWithCurl(...);  // Development: curl subprocess
+  } else {
+    return callWithSDK(...);   // Production: @anthropic-ai/sdk
+  }
+}
+
+export async function* streamAnthropicAPI(...) {
+  if (USE_CURL) {
+    yield* streamWithCurl(...);  // Development: curl with spawn
+  } else {
+    yield* streamWithSDK(...);   // Production: SDK streaming
+  }
+}
+```
+
+### Verification
+
+1. **Local development**: Chat works via curl (`npm run dev`)
+2. **Tests**: Pass via mocked curl (`npm test`)
+3. **Production**: Chat works via SDK (Vercel deployment)
 
 ## When to Revisit
 
-- **Next.js / Turbopack update**: If a future Next.js version fixes the HTTPS corruption, revert to using the SDK directly. Test by changing `callAnthropicAPI` back to the SDK and running `npm run dev` with multiple consecutive chat requests.
+- **Next.js / Turbopack update**: If a future Next.js version fixes the HTTPS corruption, revert to using the SDK directly. Test by changing `USE_CURL` to `false` and running `npm run dev` with multiple consecutive chat requests.
 
-- **Node.js update**: The issue may be related to Node.js v23.x (experimental). If upgrading to Node.js 22 LTS or 24+, test if the SDK works directly.
+- **Node.js update**: The issue may be related to Node.js v23.x (experimental). If upgrading to Node.js 22 LTS or 24+, test if the SDK works directly in development.
 
 - **Webpack dev mode**: Running `next dev --turbo=false` (webpack mode) may bypass the issue entirely. This wasn't tested because Turbopack provides faster dev builds.
 
-- **Vercel production**: The fix works in production, but the SDK approach would also work there (no Turbopack in production). If the curl overhead is ever a concern, a conditional approach (`process.env.NODE_ENV === 'development' ? curl : sdk`) could be used.
+- ~~**Vercel production**: The fix works in production, but the SDK approach would also work there (no Turbopack in production). If the curl overhead is ever a concern, a conditional approach could be used.~~ **DONE** — Implemented in February 2026. See "Production Fix" section above.
 
 ## Reproduction Steps
 
