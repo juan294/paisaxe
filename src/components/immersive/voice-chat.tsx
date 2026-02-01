@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { Story } from "@/types/immersive";
 import { ImageResult } from "@/types";
 import { cn } from "@/lib/utils";
-import { X, Send, AudioLines, Keyboard, Sparkles } from "lucide-react";
+import { X, Send, AudioLines, Keyboard } from "lucide-react";
 import Link from "next/link";
 import { ChatMessageSkeleton } from "./skeleton-chat-message";
 import { Button } from "@/components/ui/button";
@@ -266,14 +266,14 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                 {useElevenLabs ? t("voice.use_text") : t("voice.try_voice")}
               </Button>
             )}
-            {/* Subtle upgrade prompt for signed-in users without voice access */}
-            {!isInitializing && needsPurchase && (
+            {/* Upgrade prompt for users without voice access (signed in or not) */}
+            {!isInitializing && !canUseVoice && (
               <Link
                 href="/pricing"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-amber-300/80 hover:text-amber-200 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-400 border border-green-500/50 rounded-full hover:bg-green-500/10 hover:border-green-400 transition-colors"
               >
-                <Sparkles className="h-3 w-3" />
-                <span>{t("voice.try_voice")}</span>
+                <AudioLines className="h-3.5 w-3.5" />
+                <span>{t("voice.upgrade_cta")}</span>
               </Link>
             )}
             <Button
@@ -400,7 +400,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             {/* Input */}
             <form
               onSubmit={handleSubmit}
-              className="p-4 border-t border-white/10 flex gap-2"
+              className="p-4 border-t border-white/10 flex gap-2 items-center"
             >
               <Input
                 value={inputValue}
@@ -408,13 +408,13 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                 placeholder={t("chat.placeholder")}
                 aria-label={t("chat.placeholder")}
                 disabled={isLoading}
-                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                className="flex-1 h-10 bg-white/10 border-white/20 text-white placeholder:text-white/40"
               />
               <Button
                 type="submit"
                 disabled={isLoading || !inputValue.trim()}
                 aria-label={t("accessibility.send_message")}
-                className="bg-white text-gray-900 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                className="h-10 w-10 bg-white text-gray-900 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
               >
                 <Send className="h-4 w-4" />
               </Button>
