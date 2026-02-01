@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import { LOCATION_CONFIG } from "@/config/location";
 import { getEnvironment } from "@/lib/environment";
 
@@ -41,6 +42,8 @@ const MAINTENANCE_BYPASS_PREFIXES = [
   "/api",          // API routes (health checks, webhooks)
   "/auth",         // OAuth callbacks for admin sign-in
   "/coming-soon",  // The coming soon page itself
+  "/pricing",      // Purchase flow (includes /pricing/success)
+  "/immersive",    // Main app (for testing purchase flow)
   "/_next",        // Next.js internals
 ];
 
@@ -211,6 +214,58 @@ function addCORSHeaders(request: NextRequest, response: NextResponse): void {
   }
 }
 
+/**
+ * Refresh Supabase auth session if expired.
+ * This ensures the client and server auth states stay in sync.
+ * Returns a response with updated cookies if session was refreshed.
+ */
+async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Skip if Supabase not configured
+  if (!supabaseUrl || !supabaseKey) {
+    return response;
+  }
+
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    });
+
+    // This will refresh the session if expired and update cookies
+    await supabase.auth.getUser();
+  } catch (error) {
+    // Log but don't fail the request if session refresh fails
+    console.error("Error refreshing auth session:", error);
+  }
+
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   // 1. Check maintenance mode first (applies to all routes)
   const maintenanceResponse = await handleMaintenanceMode(request);
@@ -224,8 +279,10 @@ export async function proxy(request: NextRequest) {
     return corsResponse;
   }
 
-  // 3. Continue with request, adding CORS headers if needed
-  const response = NextResponse.next();
+  // 3. Refresh auth session if needed (handles expired tokens)
+  const response = await refreshAuthSession(request);
+
+  // 4. Add CORS headers if needed
   addCORSHeaders(request, response);
 
   return response;

@@ -165,14 +165,18 @@ describe("Maintenance mode", () => {
       );
     });
 
-    it("redirects /immersive to /coming-soon", async () => {
+    it("allows /immersive routes through (purchase flow testing)", async () => {
       const request = new NextRequest("http://localhost:3000/immersive");
       const response = await proxy(request);
 
-      expect(response.status).toBe(307);
-      expect(response.headers.get("location")).toBe(
-        "http://localhost:3000/coming-soon"
-      );
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    });
+
+    it("allows /pricing routes through (purchase flow)", async () => {
+      const request = new NextRequest("http://localhost:3000/pricing");
+      const response = await proxy(request);
+
+      expect(response.headers.get("x-middleware-next")).toBeTruthy();
     });
 
     it("allows /admin routes through", async () => {
@@ -405,9 +409,15 @@ describe("shouldBypassMaintenanceMode", () => {
     expect(shouldBypassMaintenanceMode("/manifest.json")).toBe(true);
   });
 
-  it("returns false for visitor routes", () => {
+  it("returns false for visitor routes not in bypass list", () => {
     expect(shouldBypassMaintenanceMode("/")).toBe(false);
-    expect(shouldBypassMaintenanceMode("/immersive")).toBe(false);
     expect(shouldBypassMaintenanceMode("/some-page")).toBe(false);
+    expect(shouldBypassMaintenanceMode("/story/123")).toBe(false);
+  });
+
+  it("returns true for /immersive and /pricing (purchase flow bypass)", () => {
+    expect(shouldBypassMaintenanceMode("/immersive")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/pricing")).toBe(true);
+    expect(shouldBypassMaintenanceMode("/pricing/success")).toBe(true);
   });
 });
