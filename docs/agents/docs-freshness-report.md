@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-01-31 18:09:16
+> Auto-generated on 2026-02-01 07:14:35
 
 ## CLAUDE.md Status
 
@@ -12,21 +12,12 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
-src/components/admin/admin-tabs.tsx
-src/components/admin/agent-config-panel.tsx
-src/components/admin/analytics-dashboard.tsx
-src/components/admin/elevenlabs-analytics-panel.tsx
+src/app/api/admin/agent-reports/route.ts
+src/app/coming-soon/page.tsx
+src/components/admin/feature-toggles-panel.test.tsx
 src/components/admin/feature-toggles-panel.tsx
-src/components/admin/image-editor-dialog.tsx
 src/components/admin/maintenance-config-panel.tsx
-src/components/admin/marketing-dashboard.tsx
-src/components/admin/suggestions-panel.tsx
-src/components/admin/visitor-voice-config-panel.tsx
-src/components/admin/voice-agent-chat.tsx
-src/components/immersive/mood-overlay.tsx
-src/components/immersive/privacy-notice.tsx
-src/components/immersive/question-prompts.tsx
-src/components/immersive/voice-chat-elevenlabs.tsx
+src/config/location.ts
 src/tests/qa/llm-quality.test.ts
 src/types/feature-flags.ts
 ```
@@ -35,11 +26,13 @@ src/types/feature-flags.ts
 
 ```
 supabase/migrations/035_qa_agent_flag.sql
+supabase/migrations/036_docs_freshness_autonomous.sql
 ```
 
 ### Scripts
 
 ```
+scripts/docs-freshness-agent.sh
 scripts/qa-agent.sh
 ```
 
@@ -50,6 +43,7 @@ scripts/qa-agent.sh
 These API routes may not be documented in CLAUDE.md:
 
 ```
+admin/agent-reports
 admin/analytics
 admin/elevenlabs-analytics
 admin/feature-flags/[key]
@@ -109,28 +103,42 @@ user_story_suggestions
 
 | File | Last Modified |
 |------|--------------|
-| docs/PROJECT_CHARTER.md | 2026-01-31 |
-| docs/REPLICATION.md | 2026-01-31 |
-| docs/automation-quality-agents.md | 2026-01-31 |
-| docs/cost-forecast.md | 2026-01-31 |
-| docs/features.md | 2026-01-31 |
-| docs/icon-generation.md | 2026-01-29 |
-| docs/lcp-optimization.md | 2026-01-30 |
-| docs/marketing-automation-setup.md | 2026-01-31 |
-| docs/marketing-seo-implementation.md | 2026-01-30 |
-| docs/migration-2026-01-major-deps.md | 2026-01-28 |
-| docs/operations.md | 2026-01-31 |
-| docs/pending-setup.md | 2026-01-31 |
-| docs/posthog-analytics-migration.md | 2026-01-28 |
-| docs/pre-launch-audit.md | 2026-01-29 |
-| docs/replicability-assessment.md | 2026-01-31 |
-| docs/social-marketing-implementation.md | 2026-01-31 |
-| docs/testbed.md | 2026-01-31 |
-| docs/testing-guide.md | 2026-01-27 |
-| docs/turbopack-econnreset-fix.md | 2026-01-28 |
-| docs/visitor-experience-improvements.md | 2026-01-27 |
 | CLAUDE.md | 2026-01-31 |
-| README.md | 2026-01-29 |
+| README.md | 2026-01-31 |
+
+---
+
+## Changes Made This Run (2026-02-01)
+
+### Feature Flags Added to `docs/project/features.md`
+
+Reorganized Feature Flags Reference into categorized sections and added 9 previously undocumented flags:
+
+**Experience Flags:**
+- `autoplay_button` — Play/pause button for auto-play in story viewer
+
+**Social Flags:**
+- `user_story_suggestions` — "Suggest a Place" button for visitor submissions
+
+**Voice Flags:**
+- `visitor_voice_agent` — Voice agent access (whitelisted emails only)
+
+**System Flags:**
+- `maintenance_mode` — Shows maintenance page instead of the main app
+- `automated_agents` — Master toggle for all automated CI/CD agents
+- `coverage_agent_enabled` — Coverage agent (runs daily at 2:00 AM)
+- `security_agent_enabled` — Security agent (runs weekly on Monday)
+- `docs_freshness_agent_enabled` — Docs freshness agent (runs weekly on Sunday)
+- `performance_agent_enabled` — Performance agent (runs weekly on Saturday)
+- `qa_agent_enabled` — QA agent for LLM response quality testing
+
+### API Routes Not Documented
+
+The following API routes were identified but intentionally **not documented** as they are internal admin/system routes:
+- All `admin/*` routes — Internal admin panel APIs
+- `chat`, `chat/stream` — Internal chat flow APIs (already described in features.md)
+- `favorites`, `feature-flags`, `suggestions` — Internal data APIs
+- `webhooks/supabase` — Internal webhook endpoint (already described in features.md)
 
 ---
 

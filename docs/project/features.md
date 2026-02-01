@@ -388,9 +388,12 @@ Scheduled via pg_cron + pg_net and deployed with `supabase functions deploy keep
 
 All flags are managed from the admin panel and take effect within approximately 1 minute of toggling.
 
+### Experience Flags
+
 | Flag | Controls |
 |------|----------|
 | `ambient_discovery` | Ambient mode (slow auto-play with cinematic transitions) |
+| `autoplay_button` | Play/pause button for auto-play in story viewer |
 | `mood_discovery` | Mood overlay on first visit |
 | `randomized_order` | Session-based story shuffle |
 | `seasonal_surfacing` | Boost stories matching the current month |
@@ -400,3 +403,27 @@ All flags are managed from the admin panel and take effect within approximately 
 | `related_stories` | Related stories carousel |
 | `contextual_prompts` | Suggested question prompts below story description |
 | `asturianu_touches` | Asturian language labels and titles |
+
+### Social Flags
+
+| Flag | Controls |
+|------|----------|
+| `user_story_suggestions` | "Suggest a Place" button for visitor submissions |
+
+### Voice Flags
+
+| Flag | Controls |
+|------|----------|
+| `visitor_voice_agent` | Voice agent access (whitelisted emails only) |
+
+### System Flags
+
+| Flag | Controls |
+|------|----------|
+| `maintenance_mode` | Shows maintenance page instead of the main app |
+| `automated_agents` | Master toggle for all automated CI/CD agents |
+| `coverage_agent_enabled` | Coverage agent (runs daily at 2:00 AM) |
+| `security_agent_enabled` | Security agent (runs weekly on Monday) |
+| `docs_freshness_agent_enabled` | Docs freshness agent (runs weekly on Sunday) |
+| `performance_agent_enabled` | Performance agent (runs weekly on Saturday) |
+| `qa_agent_enabled` | QA agent for LLM response quality testing |
