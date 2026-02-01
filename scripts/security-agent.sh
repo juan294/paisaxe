@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Security Agent — Runs weekly on Monday at 9:00 AM via launchd (com.paisaxe.security-agent)
-# Performs npm audit and license checks, outputs to docs/security-report.md
+# Performs npm audit, license checks, analyzes vulnerabilities, and provides remediation guidance
 set -euo pipefail
 
 PROJECT_DIR="/Users/juan/Documents/GenAI_Projects/paisaxe"
+CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/security-agent-$(date +%Y-%m-%d).log"
 REPORT_FILE="$PROJECT_DIR/docs/agents/security-report.md"
+METRICS_FILE="$PROJECT_DIR/.security-metrics.tmp"
 
 mkdir -p "$LOG_DIR"
 
@@ -24,88 +26,121 @@ log_success "Feature flags enabled — proceeding with Security Agent" | tee -a 
 
 cd "$PROJECT_DIR"
 
-# Initialize report
-write_report_header "Security Report" "$REPORT_FILE"
-
-# Run npm audit
+# Collect security metrics
 log_info "Running npm audit..." | tee -a "$LOG_FILE"
+AUDIT_OUTPUT=$(npm audit --json 2>/dev/null || true)
+AUDIT_TEXT=$(npm audit 2>&1 || true)
 
-{
-  echo "## Vulnerability Scan"
-  echo ""
-  echo "\`\`\`"
-} >> "$REPORT_FILE"
+# Parse vulnerability counts
+CRITICAL=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.critical // 0' 2>/dev/null || echo "0")
+HIGH=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.high // 0' 2>/dev/null || echo "0")
+MODERATE=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.moderate // 0' 2>/dev/null || echo "0")
+LOW=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.low // 0' 2>/dev/null || echo "0")
+TOTAL_VULNS=$((CRITICAL + HIGH + MODERATE + LOW))
 
-npm audit --audit-level=moderate 2>&1 >> "$REPORT_FILE" || {
-  log_warn "npm audit found vulnerabilities" | tee -a "$LOG_FILE"
-}
-
-{
-  echo "\`\`\`"
-  echo ""
-} >> "$REPORT_FILE"
+log_info "Found $TOTAL_VULNS vulnerabilities (critical: $CRITICAL, high: $HIGH, moderate: $MODERATE, low: $LOW)" | tee -a "$LOG_FILE"
 
 # Run license check
 log_info "Running license check..." | tee -a "$LOG_FILE"
-
-{
-  echo "## License Summary"
-  echo ""
-  echo "\`\`\`"
-} >> "$REPORT_FILE"
-
-npx license-checker --production --summary 2>&1 >> "$REPORT_FILE" || {
-  log_warn "license-checker encountered issues" | tee -a "$LOG_FILE"
-}
-
-{
-  echo "\`\`\`"
-  echo ""
-} >> "$REPORT_FILE"
+LICENSE_SUMMARY=$(npx license-checker --production --summary 2>&1 || true)
+LICENSE_FULL=$(npx license-checker --production --json 2>/dev/null || echo "{}")
 
 # Check for copyleft licenses
-log_info "Checking for copyleft licenses..." | tee -a "$LOG_FILE"
+COPYLEFT_CHECK=$(npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0;LGPL-2.0;LGPL-2.1;LGPL-3.0" 2>&1) && COPYLEFT_FOUND="false" || COPYLEFT_FOUND="true"
 
+# Check for outdated packages
+log_info "Checking for outdated packages..." | tee -a "$LOG_FILE"
+OUTDATED_OUTPUT=$(npm outdated --json 2>/dev/null || echo "{}")
+OUTDATED_COUNT=$(echo "$OUTDATED_OUTPUT" | jq 'keys | length' 2>/dev/null || echo "0")
+
+# Check for packages with security updates available
+SECURITY_UPDATES=$(echo "$AUDIT_OUTPUT" | jq -r '.vulnerabilities | to_entries | map(select(.value.fixAvailable == true)) | length' 2>/dev/null || echo "0")
+
+# Write metrics to temp file for Claude
 {
-  echo "## Copyleft License Check"
+  echo "SECURITY METRICS ($(date '+%Y-%m-%d'))"
+  echo "======================================="
   echo ""
-} >> "$REPORT_FILE"
+  echo "VULNERABILITY SUMMARY:"
+  echo "- Critical: $CRITICAL"
+  echo "- High: $HIGH"
+  echo "- Moderate: $MODERATE"
+  echo "- Low: $LOW"
+  echo "- Total: $TOTAL_VULNS"
+  echo "- Fixable via npm audit fix: $SECURITY_UPDATES"
+  echo ""
+  echo "NPM AUDIT OUTPUT:"
+  echo "$AUDIT_TEXT"
+  echo ""
+  echo "LICENSE SUMMARY:"
+  echo "$LICENSE_SUMMARY"
+  echo ""
+  echo "COPYLEFT LICENSES FOUND: $COPYLEFT_FOUND"
+  if [[ "$COPYLEFT_FOUND" == "true" ]]; then
+    echo "Copyleft details:"
+    echo "$COPYLEFT_CHECK"
+  fi
+  echo ""
+  echo "OUTDATED PACKAGES: $OUTDATED_COUNT"
+  echo "$OUTDATED_OUTPUT" | jq -r 'to_entries | .[] | "\(.key): \(.value.current) -> \(.value.latest)"' 2>/dev/null || true
+  echo ""
+} > "$METRICS_FILE"
 
-COPYLEFT_OUTPUT=$(npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0;LGPL-2.0;LGPL-2.1;LGPL-3.0" 2>&1) && {
-  echo "No copyleft licenses found." >> "$REPORT_FILE"
-  log_success "No copyleft licenses detected" | tee -a "$LOG_FILE"
-} || {
-  echo "**WARNING: Copyleft licenses detected!**" >> "$REPORT_FILE"
-  echo "" >> "$REPORT_FILE"
-  echo "\`\`\`" >> "$REPORT_FILE"
-  echo "$COPYLEFT_OUTPUT" >> "$REPORT_FILE"
-  echo "\`\`\`" >> "$REPORT_FILE"
-  log_warn "Copyleft licenses detected — review required" | tee -a "$LOG_FILE"
+log_info "Metrics collected, invoking Claude for analysis..." | tee -a "$LOG_FILE"
+
+# Fetch the prompt from the feature flag config
+AGENT_PROMPT=$(get_agent_prompt "security_agent_enabled" 2>/dev/null) || {
+  log_warn "Could not fetch prompt from config, using default" | tee -a "$LOG_FILE"
+  AGENT_PROMPT="You are the Paisaxe Security Agent. Your job is to analyze security vulnerabilities and provide actionable remediation guidance.
+
+STEPS:
+1. Review the vulnerability scan results
+2. Assess the severity and exploitability of each vulnerability
+3. Check license compliance (no copyleft in production)
+4. Identify outdated packages with security implications
+5. Write a comprehensive report to docs/agents/security-report.md
+
+ANALYSIS FOCUS:
+- Critical/High vulnerabilities: What's the attack vector? Is it exploitable in our context?
+- Dependency chains: Which of our direct deps bring in vulnerable transitive deps?
+- Fixable issues: What can be fixed with npm audit fix vs manual intervention?
+- License risks: Any copyleft or problematic licenses?
+
+REPORT STRUCTURE:
+1. Health status (green/yellow/red based on critical/high vulns)
+2. Executive summary (1-2 sentences)
+3. Vulnerability table with severity, package, and fix status
+4. Prioritized remediation steps
+5. License compliance status
+6. Outdated packages with security implications
+
+RULES:
+- Be specific about attack vectors and exploitability
+- Prioritize by actual risk, not just severity score
+- Include exact commands for fixes where possible
+- Note if vulnerabilities are in dev-only dependencies (lower risk)
+- Distinguish between fixable and unfixable issues"
 }
 
-# Add outdated packages info
-log_info "Checking for outdated packages..." | tee -a "$LOG_FILE"
+# Run Claude to analyze and write report
+"$CLAUDE_BIN" -p \
+  --allowedTools 'Read,Edit,Write,Glob,Grep' \
+  >> "$LOG_FILE" 2>&1 <<PROMPT
+$AGENT_PROMPT
 
-{
-  echo ""
-  echo "## Outdated Packages"
-  echo ""
-  echo "\`\`\`"
-} >> "$REPORT_FILE"
+Additional context:
+- Project directory: $PROJECT_DIR
+- Report file: $REPORT_FILE
+- Date: $(date '+%Y-%m-%d')
 
-npm outdated 2>&1 >> "$REPORT_FILE" || true
+Security metrics:
+$(cat "$METRICS_FILE")
+PROMPT
 
-{
-  echo "\`\`\`"
-  echo ""
-} >> "$REPORT_FILE"
+log_success "Claude analysis complete" | tee -a "$LOG_FILE"
 
-# Summary
-{
-  echo "---"
-  echo ""
-  echo "*Report generated by Security Agent*"
-} >> "$REPORT_FILE"
+# Cleanup
+rm -f "$METRICS_FILE"
 
 log_success "Security report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== Security Agent finished ===" | tee -a "$LOG_FILE"
