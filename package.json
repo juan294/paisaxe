@@ -17,7 +17,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
-    "test:qa": "vitest run src/tests/qa --reporter=verbose",
+    "test:qa": "vitest run --config vitest.config.qa.ts --reporter=verbose",
     "process-pdfs": "tsx scripts/process-pdfs.ts",
     "seed-db": "tsx scripts/seed-database.ts",
     "seed-db:clear": "tsx scripts/seed-database.ts --clear",
