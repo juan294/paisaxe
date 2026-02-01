@@ -70,9 +70,9 @@ export function createDayPassCheckoutUrl(
   // Custom data to identify the user in webhooks
   params.set("checkout[custom][user_id]", options.userId);
 
-  // Success redirect URL
+  // Redirect URL after successful purchase
   if (options.successUrl) {
-    params.set("checkout[success_url]", options.successUrl);
+    params.set("checkout[redirect_url]", options.successUrl);
   }
 
   // Disable marketing opt-in by default
