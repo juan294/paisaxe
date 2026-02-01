@@ -5,7 +5,7 @@ import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
 import { createDayPassCheckoutUrl, isLemonSqueezyConfigured } from "@/lib/lemonsqueezy";
 import Link from "next/link";
-import { ArrowLeft, Mic, Clock, Sparkles, Check, HelpCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, Mic, Clock, Check, RefreshCw } from "lucide-react";
 
 export default function PricingPage() {
   const { user, session, signInWithGoogle } = useAuth();
@@ -14,7 +14,7 @@ export default function PricingPage() {
 
   const handlePurchase = () => {
     if (!user || !session) {
-      signInWithGoogle();
+      signInWithGoogle("/pricing");
       return;
     }
 
@@ -37,8 +37,7 @@ export default function PricingPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
-        <p className="mt-3 text-sm text-neutral-500">{t("common.loading")}</p>
+        <RefreshCw className="h-5 w-5 animate-spin text-neutral-500" />
       </div>
     );
   }
@@ -46,62 +45,52 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-neutral-950">
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-neutral-800 bg-neutral-900/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/immersive"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-white"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </div>
+      <header className="sticky top-0 z-40 bg-neutral-950/80 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+          <Link
+            href="/immersive"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
-        {/* Hero Section */}
+      <main className="mx-auto max-w-md px-6 py-16">
+        {/* Hero */}
         <div className="text-center mb-12">
-          {/* Icon */}
-          <div className="relative inline-block mb-6">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-500/20 to-yellow-500/20 flex items-center justify-center">
-              <Mic className="h-12 w-12 text-amber-400" />
-            </div>
-            <div className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-black" />
-            </div>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-6">
+            <Mic className="h-7 w-7 text-green-500" />
           </div>
-
-          <h1 className="text-3xl font-bold text-white mb-3">
+          <h1 className="text-2xl font-semibold text-white tracking-tight mb-2">
             {t("premium.pricing_title")}
           </h1>
-          <p className="text-lg text-white/70 max-w-md mx-auto">
+          <p className="text-neutral-400">
             {t("premium.pricing_subtitle")}
           </p>
         </div>
 
         {/* Already has access */}
         {canUseVoice && (
-          <div className="mb-8 p-6 rounded-2xl bg-green-500/10 border border-green-500/20">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                <Check className="h-5 w-5 text-green-400" />
+          <div className="mb-8 p-5 rounded-xl bg-green-500/5 border border-green-500/10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
+                <Check className="h-4 w-4 text-green-500" />
               </div>
               <div>
-                <p className="font-semibold text-green-400">
+                <p className="font-medium text-green-500">
                   {isWhitelisted ? "Premium Access" : t("premium.success_subtitle")}
                 </p>
                 {expiresAt && (
-                  <p className="text-sm text-green-400/70">
-                    {t("premium.success_expires")}{" "}
-                    {expiresAt.toLocaleString()}
+                  <p className="text-xs text-green-500/60">
+                    {t("premium.success_expires")} {expiresAt.toLocaleString()}
                   </p>
                 )}
               </div>
             </div>
             <Link
               href="/immersive"
-              className="inline-flex items-center justify-center w-full px-6 py-3 bg-green-500 text-black font-semibold rounded-full hover:bg-green-400 transition-all"
+              className="inline-flex items-center justify-center w-full px-5 py-2.5 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors"
             >
               {t("premium.success_cta")}
             </Link>
@@ -110,86 +99,67 @@ export default function PricingPage() {
 
         {/* Pricing Card */}
         {!canUseVoice && (
-          <div className="bg-gradient-to-br from-neutral-900 to-neutral-950 rounded-3xl border border-neutral-800 overflow-hidden">
-            {/* Header */}
-            <div className="p-8 text-center border-b border-neutral-800">
-              <p className="text-sm font-medium text-amber-400 uppercase tracking-wider mb-2">
-                Day Pass
+          <div className="rounded-xl border border-neutral-800 overflow-hidden">
+            {/* Price */}
+            <div className="p-6 text-center border-b border-neutral-800">
+              <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-3">
+                Voice Pass · 24h
               </p>
-              <div className="flex items-baseline justify-center gap-2">
-                <span className="text-5xl font-bold text-white">€1.99</span>
-                <span className="text-white/60">{t("premium.per_day")}</span>
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-4xl font-semibold text-white">€1.99</span>
               </div>
             </div>
 
             {/* Features */}
-            <div className="p-8 space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                  <Clock className="h-5 w-5 text-amber-400" />
-                </div>
-                <div>
-                  <p className="font-medium text-white">
-                    {t("premium.feature_24h")}
-                  </p>
-                  <p className="text-sm text-white/60">
-                    Perfect for trip planning
-                  </p>
-                </div>
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <Clock className="h-4 w-4 text-neutral-500 flex-shrink-0" />
+                <span className="text-sm text-neutral-300">
+                  {t("premium.feature_24h")}
+                </span>
               </div>
-
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                  <Mic className="h-5 w-5 text-amber-400" />
-                </div>
-                <div>
-                  <p className="font-medium text-white">
-                    {t("premium.feature_unlimited")}
-                  </p>
-                  <p className="text-sm text-white/60">
-                    Pelayo and all AI guides
-                  </p>
-                </div>
+              <div className="flex items-center gap-3">
+                <Mic className="h-4 w-4 text-neutral-500 flex-shrink-0" />
+                <span className="text-sm text-neutral-300">
+                  {t("premium.feature_unlimited")}
+                </span>
               </div>
             </div>
 
             {/* CTA */}
-            <div className="p-8 pt-0">
+            <div className="p-6 pt-2">
               <button
                 onClick={handlePurchase}
-                className="w-full px-6 py-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-semibold rounded-full hover:from-amber-400 hover:to-yellow-400 transition-all shadow-lg shadow-amber-500/25 text-lg"
+                className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors"
               >
                 {user ? t("premium.pricing_cta") : t("premium.sign_in_to_purchase")}
               </button>
-              <p className="mt-4 text-center text-sm text-white/50">
+              <p className="mt-3 text-center text-xs text-neutral-500">
                 {t("premium.secure_payment")}
               </p>
             </div>
           </div>
         )}
 
-        {/* FAQ Section */}
-        <div className="mt-12 pt-8 border-t border-neutral-800">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-white mb-6">
-            <HelpCircle className="h-5 w-5 text-amber-400" />
+        {/* FAQ */}
+        <div className="mt-12 pt-8 border-t border-neutral-800/50">
+          <h2 className="text-sm font-medium text-neutral-400 mb-6">
             {t("premium.faq_title")}
           </h2>
-
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div>
-              <h3 className="font-medium text-white mb-1">
+              <h3 className="text-sm text-white mb-1">
                 {t("premium.faq_what_included")}
               </h3>
-              <p className="text-white/60 text-sm">
+              <p className="text-xs text-neutral-500">
                 {t("premium.faq_what_included_answer")}
               </p>
             </div>
-
             <div>
-              <h3 className="font-medium text-white mb-1">
+              <h3 className="text-sm text-white mb-1">
                 {t("premium.faq_how_long")}
               </h3>
-              <p className="text-white/60 text-sm">
+              <p className="text-xs text-neutral-500">
                 {t("premium.faq_how_long_answer")}
               </p>
             </div>
