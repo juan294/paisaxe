@@ -166,13 +166,25 @@ export function parseOrderWebhook(
 
 /**
  * Get the purchase type from a Lemon Squeezy variant ID.
+ *
+ * Note: Webhooks always send numeric variant IDs, even in test mode.
+ * The LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC env var should contain
+ * the numeric ID (from "Copy variant ID" in dashboard).
  */
 export function getPurchaseTypeFromVariant(
   variantId: number
 ): "day_pass" | null {
-  const dayPassVariantId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID;
+  // Server-side numeric variant ID for webhook matching
+  const numericVariantId = process.env.LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC;
 
-  if (dayPassVariantId && variantId === parseInt(dayPassVariantId, 10)) {
+  if (numericVariantId && variantId === parseInt(numericVariantId, 10)) {
+    return "day_pass";
+  }
+
+  // Fallback to public variant ID (works for live mode with numeric IDs)
+  const publicVariantId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID;
+
+  if (publicVariantId && variantId === parseInt(publicVariantId, 10)) {
     return "day_pass";
   }
 
