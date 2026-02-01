@@ -48,6 +48,22 @@ vi.mock("@/hooks/use-reduced-motion", () => ({
   useReducedMotion: () => false,
 }));
 
+// Mock useVoiceAccess - return non-loading state for tests
+vi.mock("@/hooks/use-voice-access", () => ({
+  useVoiceAccess: () => ({
+    hasAccess: false,
+    isWhitelisted: false,
+    canUseVoice: false,
+    needsSignIn: false,
+    needsPurchase: false,
+    expiresAt: null,
+    hoursUntilExpiry: null,
+    agentId: "",
+    isLoading: false,
+    refresh: vi.fn(),
+  }),
+}));
+
 // Wrapper component for tests
 const TestWrapper = ({ children }: { children: ReactNode }) => (
   <AuthProvider>{children}</AuthProvider>
