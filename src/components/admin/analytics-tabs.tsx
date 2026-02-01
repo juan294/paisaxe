@@ -67,8 +67,18 @@ export function AnalyticsTabs({ activeTab, onTabChange, children }: AnalyticsTab
 
   return (
     <div className="space-y-8">
-      {/* Sub-tab navigation */}
-      <nav className="flex items-center gap-2" role="tablist" aria-label="Analytics sections">
+      {/* Header */}
+      <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Admin / Analytics</p>
+          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+            Analytics
+          </h1>
+        </div>
+      </header>
+
+      {/* Tab navigation */}
+      <nav className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Analytics sections">
         {SUB_TABS.map((tab) => (
           <button
             key={tab.value}
@@ -76,32 +86,22 @@ export function AnalyticsTabs({ activeTab, onTabChange, children }: AnalyticsTab
             aria-selected={activeTab === tab.value}
             onClick={() => onTabChange(tab.value)}
             className={cn(
-              "group flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all",
+              "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
               activeTab === tab.value
                 ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
-                : "bg-white text-[#6b6560] hover:bg-[#f5f3ee] dark:bg-[#252320] dark:text-[#a39e98] dark:hover:bg-[#3d3a36]"
+                : "text-[#6b6560] hover:bg-white dark:text-[#a39e98] dark:hover:bg-[#252320]"
             )}
           >
-            <span
-              className={cn(
-                activeTab === tab.value
-                  ? "text-[#a39e98] dark:text-[#6b6560]"
-                  : "text-[#a39e98] group-hover:text-[#6b6560] dark:text-[#6b6560] dark:group-hover:text-[#a39e98]"
-              )}
-            >
-              {tab.icon}
-            </span>
+            {tab.icon}
             {tab.label}
-            <kbd
-              className={cn(
-                "hidden sm:inline-flex items-center justify-center rounded px-1.5 py-0.5 font-mono text-[10px]",
-                activeTab === tab.value
-                  ? "bg-[#3d3a36] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
-                  : "bg-[#f5f3ee] text-[#a39e98] dark:bg-[#3d3a36] dark:text-[#6b6560]"
-              )}
-            >
+            <span className={cn(
+              "rounded-full px-2 py-0.5 text-xs",
+              activeTab === tab.value
+                ? "bg-[#1a1917] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
+                : "bg-[#e5e3de] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
+            )}>
               {tab.shortcut.toUpperCase()}
-            </kbd>
+            </span>
           </button>
         ))}
       </nav>
