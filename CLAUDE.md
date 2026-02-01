@@ -19,6 +19,7 @@ For operations (monitoring, pg_cron, webhooks, agents), see @docs/operations/ope
 | Embeddings | Voyage AI (voyage-3, 512 dims) |
 | Reranking | Voyage AI (rerank-2.5) |
 | Voice | ElevenLabs Conversational AI |
+| Payments | Lemon Squeezy |
 | Testing | Vitest + Playwright |
 | Deployment | Vercel |
 
@@ -79,6 +80,9 @@ GOOGLE_CLIENT_SECRET=
 
 WEBHOOK_SECRET=          # Supabase webhooks
 NEXT_PUBLIC_SITE_URL=
+
+LEMONSQUEEZY_API_KEY=    # Revenue analytics (optional)
+LEMONSQUEEZY_STORE_ID=   # Revenue analytics (optional)
 ```
 
 ## Architecture Decisions

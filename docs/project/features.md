@@ -21,6 +21,9 @@ A complete catalog of everything Paisaxe can do, organized by audience.
   - [Image Management](#image-management)
   - [Feature Flags](#feature-flags)
   - [Analytics Dashboard](#analytics-dashboard)
+    - [Visitors Analytics](#visitors-analytics)
+    - [Revenue Analytics](#revenue-analytics)
+    - [Voice Analytics](#voice-analytics)
 - [SEO & Social](#seo--social)
 - [Infrastructure](#infrastructure)
 - [Feature Flags Reference](#feature-flags-reference)
@@ -196,7 +199,15 @@ All UI labels, buttons, hints, error messages, empty states, and filter names ar
 
 ## Admin Panel
 
-The admin panel is accessible at `/admin`. It has three tabs: Stories, Feature Toggles, and Analytics.
+The admin panel is accessible at `/admin`. It has five main tabs:
+
+| Tab | Shortcut | Purpose |
+|-----|----------|---------|
+| Stories | `Cmd+1` | Manage story content and images |
+| Toggles | `Cmd+2` | Control feature flags |
+| Analytics | `Cmd+3` | View visitor, revenue, and voice metrics |
+| Marketing | `Cmd+4` | Social media automation |
+| Suggestions | `Cmd+5` | Review visitor-submitted place suggestions |
 
 ### Access & Authentication
 
@@ -270,29 +281,99 @@ See [Feature Flags Reference](#feature-flags-reference) below for the full list.
 
 ### Analytics Dashboard
 
-The Analytics tab provides usage metrics powered by PostHog (EU Cloud), displayed for a configurable date range (default: last 7 days).
+The Analytics tab organizes metrics into three sub-tabs, each focused on a specific data source. Switch between sub-tabs using the pill buttons or keyboard shortcuts (`v`, `r`, `e`).
+
+| Sub-tab | Shortcut | Data Source | Default Date Range |
+|---------|----------|-------------|-------------------|
+| Visitors | `v` | PostHog | Last 7 days |
+| Revenue | `r` | Lemon Squeezy | Last 30 days |
+| Voice | `e` | ElevenLabs | Last 30 days |
+
+Each sub-tab loads data lazily—API calls are only made when a tab becomes active.
+
+#### Visitors Analytics
+
+Visitor metrics powered by PostHog (EU Cloud).
 
 **Summary cards:**
 
 | Metric | Description |
 |--------|-------------|
-| Total Pageviews | All pageview events in the date range |
-| Unique Visitors | Count of distinct visitor identifiers |
+| Pageviews | All pageview events in the date range |
+| Visitors | Count of distinct visitor identifiers |
+| Sessions | Number of browsing sessions |
+| Bounce Rate | Percentage of single-page visits |
 
 **Breakdown sections:**
 
 | Section | Description |
 |---------|-------------|
-| Top Pages | Most visited URLs with pageview counts and visual bars |
+| Traffic Over Time | Line chart showing pageviews and visitors by day |
+| Top Pages | Most visited URLs with pageview counts |
 | Top Referrers | Traffic sources showing where visitors come from |
-| Countries | Geographic distribution of visitors |
-| Devices | Device type breakdown (Desktop, Mobile, Tablet) |
-
-Each section displays up to 10 entries sorted by count, with a visual bar chart for easy comparison.
-
-**Date range picker** — Two date inputs (from/to) to narrow the analytics window.
+| UTM Campaigns | Campaign tracking breakdown (source, medium, campaign) |
+| Countries & Cities | Geographic distribution of visitors |
+| Devices & Browsers | Device type and browser breakdown |
+| Operating Systems | OS distribution |
+| Screen Sizes | Viewport dimensions |
+| Entry & Exit Pages | Where visitors start and end sessions |
+| New vs Returning | Ratio of new to returning visitors |
 
 **PostHog integration** — Analytics are collected via PostHog in cookieless mode (no cookies, memory-only persistence) with a reverse proxy through `/a/` to avoid ad blockers. The admin dashboard queries PostHog's HogQL API to fetch aggregated metrics.
+
+#### Revenue Analytics
+
+Revenue metrics from Lemon Squeezy, the payment processor for pay-per-use voice chat credits.
+
+**Summary cards:**
+
+| Metric | Description |
+|--------|-------------|
+| Total Revenue | All-time revenue from the store |
+| 30-Day Revenue | Revenue in the last 30 days |
+| Total Orders | All-time order count |
+| Avg Order Value | Average revenue per order |
+
+**Revenue chart** — Bar chart showing daily revenue over the selected date range.
+
+**Breakdown sections:**
+
+| Section | Description |
+|---------|-------------|
+| Revenue by Product | Product breakdown with order count and revenue |
+| Recent Orders | Last 20 orders with status badges (Paid, Pending, Refunded) |
+
+**Configuration** — Requires `LEMONSQUEEZY_API_KEY` and optionally `LEMONSQUEEZY_STORE_ID` environment variables. If not configured, shows a warning with a link to the Lemon Squeezy API settings.
+
+**External link** — A button at the bottom opens the full Lemon Squeezy dashboard for detailed reports.
+
+#### Voice Analytics
+
+Voice agent metrics from ElevenLabs Conversational AI.
+
+**Active calls indicator** — Shows real-time count of ongoing voice conversations (green pulse when calls are active).
+
+**Summary cards:**
+
+| Metric | Description |
+|--------|-------------|
+| Total Conversations | All voice conversations in the date range |
+| Completed | Successfully finished conversations |
+| Failed | Conversations that ended in error |
+| Minutes Used | Total voice minutes consumed |
+| Avg Duration | Average conversation length in seconds |
+| Avg Rating | Average user rating (if collected) |
+
+**Breakdown sections:**
+
+| Section | Description |
+|---------|-------------|
+| By Agent | Conversation count and minutes by voice agent (Pelayo, etc.) |
+| By Language | Detected language distribution |
+| By Status | Conversation outcome breakdown |
+| Recent Conversations | Last 10 conversations with timestamp, status, and duration |
+
+**Configuration** — Requires `ELEVENLABS_API_KEY` environment variable. Only shows data for agents with names starting with "Paisaxe".
 
 ---
 
