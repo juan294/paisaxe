@@ -58,3 +58,4 @@ logs/
 # Supabase local
 supabase/.temp/
 .claude/
+.performance-history.json
