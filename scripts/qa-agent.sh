@@ -39,10 +39,10 @@ export QA_TESTS_PER_CATEGORY="$TESTS_PER_CATEGORY"
 TEST_OUTPUT=$(npm run test:qa 2>&1) || TEST_EXIT_CODE=$?
 TEST_EXIT_CODE=${TEST_EXIT_CODE:-0}
 
-# Parse test results
-TOTAL_TESTS=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ passed|[0-9]+ failed' | awk '{sum += $1} END {print sum}' || echo "0")
-PASSED_TESTS=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ passed' | awk '{print $1}' || echo "0")
-FAILED_TESTS=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ failed' | awk '{print $1}' || echo "0")
+# Parse test results from vitest output
+PASSED_TESTS=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}' || echo "0")
+FAILED_TESTS=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}' || echo "0")
+TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS))
 
 # Calculate pass rate
 if [[ $TOTAL_TESTS -gt 0 ]]; then
