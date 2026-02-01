@@ -63,6 +63,9 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     }
   }, [isVoiceAccessLoading, canUseVoice, agentId, hasSetDefaultMode]);
 
+  // Don't render content until we've determined the default mode
+  const isInitializing = isVoiceAccessLoading || !hasSetDefaultMode;
+
   // Reset messages when story changes
   useEffect(() => {
     setMessages([]);
@@ -253,8 +256,8 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             <p className="text-sm text-white/60">{localizedStory.subtitle}</p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Voice mode toggle - only show when user can use voice */}
-            {canUseVoice && agentId && (
+            {/* Voice mode toggle - only show when user can use voice and not initializing */}
+            {!isInitializing && canUseVoice && agentId && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -316,7 +319,14 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         )}
 
         {/* ElevenLabs Voice Chat or Text Chat */}
-        {useElevenLabs && canUseVoice && agentId ? (
+        {isInitializing ? (
+          /* Show loading while determining voice access */
+          <div className="h-64 flex items-center justify-center">
+            <div className="animate-pulse text-white/50 text-sm">
+              {t("common.loading")}
+            </div>
+          </div>
+        ) : useElevenLabs && canUseVoice && agentId ? (
           <VoiceChatElevenLabs
             story={story}
             agentId={agentId}
