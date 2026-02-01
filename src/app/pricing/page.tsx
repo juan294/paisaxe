@@ -5,7 +5,7 @@ import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
 import { createDayPassCheckoutUrl, isLemonSqueezyConfigured } from "@/lib/lemonsqueezy";
 import Link from "next/link";
-import { ArrowLeft, Mic, Clock, Check, RefreshCw } from "lucide-react";
+import { ArrowLeft, Clock, Check, RefreshCw, AudioLines } from "lucide-react";
 
 export default function PricingPage() {
   const { user, session, signInWithGoogle } = useAuth();
@@ -59,8 +59,20 @@ export default function PricingPage() {
       <main className="mx-auto max-w-md px-6 py-16">
         {/* Hero */}
         <div className="text-center mb-12">
+          {/* Animated sound bars */}
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-6">
-            <Mic className="h-7 w-7 text-green-500" />
+            <div className="flex items-center justify-center gap-[3px]">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="w-[3px] rounded-full bg-green-500 animate-soundbar"
+                  style={{
+                    height: [12, 18, 24, 18, 12][i],
+                    animationDelay: `${i * 100}ms`,
+                  }}
+                />
+              ))}
+            </div>
           </div>
           <h1 className="text-2xl font-semibold text-white tracking-tight mb-2">
             {t("premium.pricing_title")}
@@ -119,7 +131,7 @@ export default function PricingPage() {
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <Mic className="h-4 w-4 text-neutral-500 flex-shrink-0" />
+                <AudioLines className="h-4 w-4 text-neutral-500 flex-shrink-0" />
                 <span className="text-sm text-neutral-300">
                   {t("premium.feature_unlimited")}
                 </span>

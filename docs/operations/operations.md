@@ -293,6 +293,18 @@ Playwright E2E tests run against a built app on push/PR to `develop` and `main`.
 - Database migrations should be validated locally before pushing
 - Claude Review requires `ANTHROPIC_API_KEY` as a GitHub repository secret
 
+## Lemon Squeezy Payments
+
+Voice Pass purchases (24h voice access for €1.99) processed via Lemon Squeezy.
+
+**CRITICAL**: Test mode and Live mode use different variant ID formats:
+- **Test Mode**: UUID format (e.g., `bf128a3b-c4a4-4f19-a0eb-5ad346492538`)
+- **Live Mode**: Numeric format (e.g., `1267701`)
+
+Get the correct variant ID from the **Share button** in Lemon Squeezy dashboard, NOT from "Copy variant ID".
+
+See [lemonsqueezy-setup.md](./lemonsqueezy-setup.md) for complete setup guide, webhook configuration, and troubleshooting.
+
 ## ElevenLabs Voice Agents
 
 Voice agents for the Paisaxe experience, configured in `src/config/elevenlabs-agents.ts`.

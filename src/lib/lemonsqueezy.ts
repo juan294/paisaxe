@@ -49,6 +49,7 @@ export function createDayPassCheckoutUrl(
 ): string {
   const storeId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID;
   const variantId = process.env.NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID;
+  const testMode = process.env.NEXT_PUBLIC_LEMONSQUEEZY_TEST_MODE === "true";
 
   if (!storeId || !variantId) {
     throw new Error("Lemon Squeezy configuration missing");
@@ -57,6 +58,11 @@ export function createDayPassCheckoutUrl(
   const baseUrl = `https://${storeId}.lemonsqueezy.com/checkout/buy/${variantId}`;
 
   const params = new URLSearchParams();
+
+  // Enable test mode if configured
+  if (testMode) {
+    params.set("test_mode", "true");
+  }
 
   // Pre-fill email
   params.set("checkout[email]", options.userEmail);
