@@ -23,6 +23,7 @@ export interface AdminStory {
   duration?: StoryDuration;
   displayOrder: number;
   curationStatus: CurationStatus;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -43,6 +44,7 @@ export function rowToAdminStory(row: AdminStoryRow): AdminStory {
     duration: row.duration ? (row.duration as StoryDuration) : undefined,
     displayOrder: row.display_order,
     curationStatus: row.curation_status,
+    metadata: row.metadata || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -135,5 +137,6 @@ export interface UpdateStoryResponse {
   location: StoryLocation | null;
   duration: StoryDuration | null;
   sourcePdf: string | null;
+  metadata: Record<string, unknown> | null;
   updatedAt: string;
 }
