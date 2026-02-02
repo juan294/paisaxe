@@ -122,6 +122,8 @@ export const es: Translations = {
     next_story: 'Historia siguiente',
     play_stories: 'Reproducir historias',
     pause_stories: 'Pausar historias',
+    play_short: 'Play',
+    pause_short: 'Pausa',
     story_counter: 'Historia {current} de {total}',
     chat_dialog: 'Chat sobre {title}',
     close_chat: 'Cerrar chat',
@@ -181,6 +183,7 @@ export const es: Translations = {
   suggestions: {
     sign_in_to_suggest: 'Inicia sesion para sugerir un lugar',
     suggest_place: 'Sugerir un lugar',
+    suggest_short: 'Sugerir',
     dialog_title: 'Sugerir un lugar',
     // LOCATION-SPECIFIC: Location and site name
     dialog_description: 'Comparte un lugar de Asturias que te gustaria ver en Paisaxe',

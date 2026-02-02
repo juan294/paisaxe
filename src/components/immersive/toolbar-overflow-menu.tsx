@@ -63,7 +63,7 @@ export function ToolbarOverflowMenu({ children }: ToolbarOverflowMenuProps) {
       {isOpen && (
         <div
           className={cn(
-            "absolute right-0 top-full mt-2 min-w-[160px] rounded-lg bg-black/90 backdrop-blur-md border border-white/10 shadow-xl py-2 z-50",
+            "absolute right-0 top-full mt-2 min-w-[140px] rounded-xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl py-2 z-50",
             "animate-in fade-in-0 slide-in-from-top-2 duration-200"
           )}
           onClick={(e) => e.stopPropagation()}

@@ -479,7 +479,7 @@ export function StoryViewer({
           {isEnabled("autoplay_button") && (
             <ToolbarOverflowItem
               icon={autoPlay ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
+              label={autoPlay ? t("accessibility.pause_short") : t("accessibility.play_short")}
               onClick={() => {
                 if (isEnabled("ambient_discovery")) {
                   toggleAmbient();
@@ -531,7 +531,7 @@ export function StoryViewer({
           )}
           <ToolbarOverflowItem
             icon={<Lightbulb className="h-4 w-4" />}
-            label={t("suggestions.suggest_place")}
+            label={t("suggestions.suggest_short")}
             onClick={() => {
               // Trigger suggest place dialog - need to use a global event or ref
               document.querySelector<HTMLButtonElement>('[data-suggest-place-trigger]')?.click();
@@ -551,10 +551,10 @@ export function StoryViewer({
         <AuthButton />
       </nav>
 
-      {/* Keyboard hints */}
+      {/* Keyboard hints - hidden on mobile */}
       <div
         className={cn(
-          "absolute bottom-4 right-4 z-20 text-white/40 text-xs transition-opacity duration-500 motion-reduce:transition-none",
+          "hidden md:block absolute bottom-4 right-4 z-20 text-white/40 text-xs transition-opacity duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100" : "opacity-0"
         )}
         aria-hidden="true"

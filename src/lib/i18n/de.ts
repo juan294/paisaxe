@@ -118,6 +118,8 @@ export const de: Translations = {
     next_story: 'Nächste Geschichte',
     play_stories: 'Geschichten abspielen',
     pause_stories: 'Geschichten pausieren',
+    play_short: 'Play',
+    pause_short: 'Pause',
     story_counter: 'Geschichte {current} von {total}',
     chat_dialog: 'Chat über {title}',
     close_chat: 'Chat schließen',
@@ -176,6 +178,7 @@ export const de: Translations = {
   suggestions: {
     sign_in_to_suggest: 'Anmelden, um einen Ort vorzuschlagen',
     suggest_place: 'Einen Ort vorschlagen',
+    suggest_short: 'Vorschlag',
     dialog_title: 'Einen Ort vorschlagen',
     dialog_description: 'Teilen Sie einen Ort in Asturien, den Sie auf Paisaxe sehen möchten',
     place_name_label: 'Ortsname',
