@@ -119,6 +119,12 @@ See `docs/operations/elevenlabs-pelayo-config.md` for full configuration details
 
 **Suggested questions** — Up to three contextual question prompts appear below the story description (e.g., "Can I visit in winter?", "Best time to hike here?"). These are populated from each story's `question_prompts` metadata. Controlled by the `contextual_prompts` feature flag.
 
+> **⚠️ Known limitation (roadmap):** When a paying customer clicks a question prompt chip, the chat modal opens in voice mode by default (Pelayo). However, the selected question is not currently passed to the ElevenLabs voice agent—so Pelayo doesn't know what the user wanted to ask. Two potential solutions:
+> 1. Open text chat mode instead of voice mode when a prompt chip is clicked
+> 2. Pass the question text to Pelayo via the ElevenLabs conversation context so he can answer it directly
+>
+> Until this is resolved, the `contextual_prompts` feature flag should remain disabled for production.
+
 **Privacy notice** — The first time a visitor opens the chat, a dismissible notice explains that questions are processed with AI and conversations are not stored. The dismissal is persisted in localStorage.
 
 **Rate limiting** — The chat API enforces per-IP rate limits to prevent abuse.
