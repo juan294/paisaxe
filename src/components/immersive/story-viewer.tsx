@@ -382,16 +382,16 @@ export function StoryViewer({
         </div>
       </article>
 
-      {/* Navigation arrows */}
+      {/* Navigation arrows - invisible tap zones on mobile, visible buttons on desktop */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           goToPrev();
         }}
         aria-label={t("accessibility.previous_story")}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+        className="absolute left-0 top-0 h-full w-20 z-20 flex items-center justify-start pl-4 md:left-4 md:top-1/2 md:h-auto md:w-auto md:-translate-y-1/2 md:p-3 md:rounded-full md:bg-white/10 md:hover:bg-white/20 md:backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
       >
-        <ChevronLeft className="h-8 w-8 text-white" />
+        <ChevronLeft className="h-8 w-8 text-white hidden md:block" />
       </button>
 
       <button
@@ -400,9 +400,9 @@ export function StoryViewer({
           goToNext();
         }}
         aria-label={t("accessibility.next_story")}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+        className="absolute right-0 top-0 h-full w-20 z-20 flex items-center justify-end pr-4 md:right-4 md:top-1/2 md:h-auto md:w-auto md:-translate-y-1/2 md:p-3 md:rounded-full md:bg-white/10 md:hover:bg-white/20 md:backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
       >
-        <ChevronRight className="h-8 w-8 text-white" />
+        <ChevronRight className="h-8 w-8 text-white hidden md:block" />
       </button>
 
       {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}
