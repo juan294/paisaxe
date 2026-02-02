@@ -156,8 +156,24 @@ Current production headers are well-configured:
 | X-Frame-Options | DENY | Clickjacking protection |
 | Referrer-Policy | strict-origin-when-cross-origin | Balanced privacy/functionality |
 | Permissions-Policy | camera=(), geolocation=(), microphone=(self) | Restricts powerful features |
+| Content-Security-Policy | See below | XSS defense-in-depth |
 
-**Recommendation:** Add `Content-Security-Policy` header for defense-in-depth against XSS.
+### CSP Configuration
+
+Added in `next.config.ts`:
+
+```
+default-src 'self';
+script-src 'self' 'unsafe-inline' 'unsafe-eval';
+style-src 'self' 'unsafe-inline';
+img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://picsum.photos;
+font-src 'self' data:;
+connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://*.elevenlabs.io;
+media-src 'self' blob:;
+frame-ancestors 'none';
+base-uri 'self';
+form-action 'self';
+```
 
 ---
 
