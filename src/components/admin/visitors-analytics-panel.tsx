@@ -19,15 +19,28 @@ import type {
   UTMBreakdown,
 } from "@/types/analytics";
 
+// Storage key for persisting dev toggle preference
+const DEV_TOGGLE_KEY = "admin:visitors:includeLocalhost";
+
+function getStoredDevToggle(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(DEV_TOGGLE_KEY) === "true";
+}
+
 export function VisitorsAnalyticsPanel() {
   const [data, setData] = useState<AnalyticsDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [includeLocalhost, setIncludeLocalhost] = useState(false);
+  const [includeLocalhost, setIncludeLocalhost] = useState(getStoredDevToggle);
   const [dateRange, setDateRange] = useState({
     from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     to: new Date().toISOString().split("T")[0],
   });
+
+  // Persist dev toggle preference to localStorage
+  useEffect(() => {
+    localStorage.setItem(DEV_TOGGLE_KEY, String(includeLocalhost));
+  }, [includeLocalhost]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
