@@ -43,6 +43,7 @@ export function SuggestPlaceButton({ className }: SuggestPlaceButtonProps) {
           e.stopPropagation();
           signInWithGoogle();
         }}
+        data-suggest-place-trigger
         className={cn(
           "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
           className
@@ -63,6 +64,7 @@ export function SuggestPlaceButton({ className }: SuggestPlaceButtonProps) {
           e.stopPropagation();
           setIsDialogOpen(true);
         }}
+        data-suggest-place-trigger
         className={cn(
           "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
           className

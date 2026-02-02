@@ -92,6 +92,8 @@ export const fr: Translations = {
     saved: 'Enregistrés',
     save: 'Enregistrer',
     title: 'Enregistrés',
+    your_stories: 'Vos Histoires',
+    sign_in_to_save: 'Connectez-vous pour enregistrer',
     place_singular: 'lieu',
     place_plural: 'lieux',
     local_only: 'Vos enregistrements sont uniquement sur cet appareil',
