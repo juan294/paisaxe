@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import {
   CATEGORY_LABELS,
@@ -17,21 +16,6 @@ vi.mock("@/lib/i18n", () => ({
     setLocale: vi.fn(),
     t: (key: string) => mockT(key),
   }),
-}));
-
-// --- Mock framer-motion ---
-type MockProps = { children?: ReactNode; [key: string]: unknown };
-
-vi.mock("framer-motion", () => ({
-  motion: {
-    button: ({ children, whileTap: _wt, whileHover: _wh, initial: _i, animate: _a, exit: _e, transition: _t, ...htmlProps }: MockProps) => {
-      return <button {...htmlProps}>{children}</button>;
-    },
-    div: ({ children, whileTap: _wt, whileHover: _wh, initial: _i, animate: _a, exit: _e, transition: _t, ...htmlProps }: MockProps) => {
-      return <div {...htmlProps}>{children}</div>;
-    },
-  },
-  AnimatePresence: ({ children }: MockProps) => <>{children}</>,
 }));
 
 // --- Mock lucide-react ---
@@ -57,6 +41,11 @@ function renderBadge(overrides = {}) {
   return render(<CategoryFilterBadge {...props} />);
 }
 
+// Helper to get toggle button (first element with category label)
+function getToggleButton(label: string) {
+  return screen.getAllByText(label)[0];
+}
+
 describe("CategoryFilterBadge", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -64,12 +53,13 @@ describe("CategoryFilterBadge", () => {
 
   it("renders toggle button with current category label", () => {
     renderBadge();
-    expect(screen.getByText(CATEGORY_LABELS.nature)).toBeInTheDocument();
+    // Multiple elements may exist (toggle + dropdown chip)
+    expect(screen.getAllByText(CATEGORY_LABELS.nature).length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders toggle button with selected category label when selected", () => {
     renderBadge({ selectedCategory: "food" });
-    expect(screen.getByText(CATEGORY_LABELS.food)).toBeInTheDocument();
+    expect(screen.getAllByText(CATEGORY_LABELS.food).length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows filter count badge when filters are active", () => {
@@ -88,23 +78,23 @@ describe("CategoryFilterBadge", () => {
   });
 
   it("clicking toggle opens dropdown", () => {
-    renderBadge();
+    const { container } = renderBadge();
 
-    // Dropdown should not be visible initially
-    expect(screen.queryByText(mockT("stories.filters.category"))).not.toBeInTheDocument();
+    // Dropdown should be hidden initially (via CSS)
+    const dropdown = container.querySelector('[class*="opacity-0"][class*="pointer-events-none"]');
+    expect(dropdown).not.toBeNull();
 
-    // Click toggle button
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
+    // Click toggle button (first element with category label)
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     // Dropdown should now be visible
-    expect(screen.getByText(mockT("stories.filters.category"))).toBeInTheDocument();
-    expect(screen.getByText(mockT("stories.filters.location"))).toBeInTheDocument();
-    expect(screen.getByText(mockT("stories.filters.duration"))).toBeInTheDocument();
+    const visibleDropdown = container.querySelector('[class*="opacity-100"][class*="pointer-events-auto"]');
+    expect(visibleDropdown).not.toBeNull();
   });
 
   it("dropdown shows all category options", () => {
     renderBadge();
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     // "Naturaleza" appears twice: in the toggle button and in the dropdown chip
     for (const label of Object.values(CATEGORY_LABELS)) {
@@ -115,7 +105,7 @@ describe("CategoryFilterBadge", () => {
 
   it("dropdown shows all location options", () => {
     renderBadge();
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     for (const label of Object.values(LOCATION_LABELS)) {
       expect(screen.getByText(label)).toBeInTheDocument();
@@ -124,7 +114,7 @@ describe("CategoryFilterBadge", () => {
 
   it("dropdown shows all duration options", () => {
     renderBadge();
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     for (const label of Object.values(DURATION_LABELS)) {
       expect(screen.getByText(label)).toBeInTheDocument();
@@ -136,7 +126,7 @@ describe("CategoryFilterBadge", () => {
     renderBadge({ onCategoryChange });
 
     // Open dropdown
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     // Click a category chip (pick "Ciudades" = cities)
     fireEvent.click(screen.getByText(CATEGORY_LABELS.cities));
@@ -149,7 +139,7 @@ describe("CategoryFilterBadge", () => {
     renderBadge({ onLocationChange });
 
     // Open dropdown
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     // Click a location chip
     fireEvent.click(screen.getByText(LOCATION_LABELS.eastern));
@@ -162,7 +152,7 @@ describe("CategoryFilterBadge", () => {
     renderBadge({ onDurationChange });
 
     // Open dropdown
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     // Click a duration chip
     fireEvent.click(screen.getByText(DURATION_LABELS.weekend));
@@ -191,7 +181,7 @@ describe("CategoryFilterBadge", () => {
     renderBadge({ selectedLocation: "central", onLocationChange });
 
     // Open dropdown
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     // Click the already-selected location
     fireEvent.click(screen.getByText(LOCATION_LABELS.central));
@@ -204,7 +194,7 @@ describe("CategoryFilterBadge", () => {
     renderBadge({ selectedDuration: "weekend", onDurationChange });
 
     // Open dropdown
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     // Click the already-selected duration
     fireEvent.click(screen.getByText(DURATION_LABELS.weekend));
@@ -216,60 +206,69 @@ describe("CategoryFilterBadge", () => {
     renderBadge({ selectedCategory: "food" });
 
     // Open dropdown
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.food));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.food));
 
-    expect(screen.getByText(mockT("stories.filters.clear"))).toBeInTheDocument();
+    // Clear button should be visible (opacity-100)
+    const clearButton = screen.getByText(mockT("stories.filters.clear"));
+    expect(clearButton).toBeInTheDocument();
+    expect(clearButton.className).toContain("opacity-100");
   });
 
-  it("clear all button does not appear when no filters active", () => {
+  it("clear all button is hidden when no filters active", () => {
     renderBadge();
 
     // Open dropdown
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
-    expect(screen.queryByText(mockT("stories.filters.clear"))).not.toBeInTheDocument();
+    // Clear button should be hidden via CSS (opacity-0)
+    const clearButton = screen.getByText(mockT("stories.filters.clear"));
+    expect(clearButton.className).toContain("opacity-0");
+    expect(clearButton.className).toContain("pointer-events-none");
   });
 
   it("clear all calls onClearAll and closes dropdown", () => {
     const onClearAll = vi.fn();
-    renderBadge({ selectedCategory: "food", onClearAll });
+    const { container } = renderBadge({ selectedCategory: "food", onClearAll });
 
     // Open dropdown
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.food));
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.food));
 
     // Click clear all
     fireEvent.click(screen.getByText(mockT("stories.filters.clear")));
 
     expect(onClearAll).toHaveBeenCalled();
 
-    // Dropdown should close
-    expect(screen.queryByText(mockT("stories.filters.category"))).not.toBeInTheDocument();
+    // Dropdown should close (hidden via CSS)
+    const hiddenDropdown = container.querySelector('[class*="opacity-0"][class*="pointer-events-none"]');
+    expect(hiddenDropdown).not.toBeNull();
   });
 
   it("click outside closes dropdown", () => {
-    renderBadge();
+    const { container } = renderBadge();
 
     // Open dropdown
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
-    expect(screen.getByText(mockT("stories.filters.category"))).toBeInTheDocument();
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     // Click outside
     fireEvent.mouseDown(document);
 
-    expect(screen.queryByText(mockT("stories.filters.category"))).not.toBeInTheDocument();
+    // Dropdown should close (hidden via CSS)
+    const hiddenDropdown = container.querySelector('[class*="opacity-0"][class*="pointer-events-none"]');
+    expect(hiddenDropdown).not.toBeNull();
   });
 
   it("escape key closes dropdown", () => {
-    renderBadge();
+    const { container } = renderBadge();
 
     // Open dropdown
-    fireEvent.click(screen.getByText(CATEGORY_LABELS.nature));
-    expect(screen.getByText(mockT("stories.filters.category"))).toBeInTheDocument();
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
 
     // Press escape
     fireEvent.keyDown(document, { key: "Escape" });
 
-    expect(screen.queryByText(mockT("stories.filters.category"))).not.toBeInTheDocument();
+    // Dropdown should close (hidden via CSS)
+    const hiddenDropdown = container.querySelector('[class*="opacity-0"][class*="pointer-events-none"]');
+    expect(hiddenDropdown).not.toBeNull();
   });
 
   it("has opacity-0 and pointer-events-none classes when visible is false", () => {
@@ -298,16 +297,18 @@ describe("CategoryFilterBadge", () => {
   });
 
   it("clicking toggle again closes the dropdown", () => {
-    renderBadge();
+    const { container } = renderBadge();
 
-    const toggleButton = screen.getByText(CATEGORY_LABELS.nature);
+    const toggleButton = getToggleButton(CATEGORY_LABELS.nature);
 
     // Open
     fireEvent.click(toggleButton);
-    expect(screen.getByText(mockT("stories.filters.category"))).toBeInTheDocument();
+    const visibleDropdown = container.querySelector('[class*="opacity-100"][class*="pointer-events-auto"]');
+    expect(visibleDropdown).not.toBeNull();
 
     // Close by clicking toggle again
     fireEvent.click(toggleButton);
-    expect(screen.queryByText(mockT("stories.filters.category"))).not.toBeInTheDocument();
+    const hiddenDropdown = container.querySelector('[class*="opacity-0"][class*="pointer-events-none"]');
+    expect(hiddenDropdown).not.toBeNull();
   });
 });

@@ -10,26 +10,37 @@ interface UseFavoritesReturn {
   isFavorite: (storyId: string) => boolean;
   toggleFavorite: (storyId: string) => void;
   isLoading: boolean;
+  /** True if user is not logged in and cannot save favorites */
+  requiresAuth: boolean;
 }
 
 export function useFavorites(): UseFavoritesReturn {
-  const { user, session } = useAuth();
+  const { user, session, isLoading: authLoading } = useAuth();
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load favorites from localStorage on mount
+  // Only load favorites from localStorage if user is logged in
+  // Anonymous users should not have local favorites anymore
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setFavorites(Array.isArray(parsed) ? parsed : []);
-      } catch {
-        setFavorites([]);
+    if (authLoading) return;
+
+    // Only load favorites for authenticated users
+    if (user) {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setFavorites(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          setFavorites([]);
+        }
       }
+    } else {
+      // Clear favorites for anonymous users
+      setFavorites([]);
     }
     setIsLoading(false);
-  }, []);
+  }, [user, authLoading]);
 
   // Sync with cloud when user logs in
   useEffect(() => {
@@ -89,6 +100,11 @@ export function useFavorites(): UseFavoritesReturn {
 
   const toggleFavorite = useCallback(
     async (storyId: string) => {
+      // Require auth to save favorites
+      if (!user || !session) {
+        return;
+      }
+
       const isCurrentlyFavorite = favorites.includes(storyId);
       const newFavorites = isCurrentlyFavorite
         ? favorites.filter((id) => id !== storyId)
@@ -98,29 +114,27 @@ export function useFavorites(): UseFavoritesReturn {
       setFavorites(newFavorites);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newFavorites));
 
-      // Sync to cloud if logged in
-      if (user && session) {
-        try {
-          if (isCurrentlyFavorite) {
-            await fetch(`/api/favorites?storyId=${storyId}`, {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${session.access_token}`,
-              },
-            });
-          } else {
-            await fetch("/api/favorites", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${session.access_token}`,
-              },
-              body: JSON.stringify({ storyIds: [storyId] }),
-            });
-          }
-        } catch (error) {
-          console.error("Error syncing favorite to cloud:", error);
+      // Sync to cloud
+      try {
+        if (isCurrentlyFavorite) {
+          await fetch(`/api/favorites?storyId=${storyId}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+        } else {
+          await fetch("/api/favorites", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ storyIds: [storyId] }),
+          });
         }
+      } catch (error) {
+        console.error("Error syncing favorite to cloud:", error);
       }
     },
     [favorites, user, session]
@@ -131,5 +145,6 @@ export function useFavorites(): UseFavoritesReturn {
     isFavorite,
     toggleFavorite,
     isLoading,
+    requiresAuth: !user,
   };
 }

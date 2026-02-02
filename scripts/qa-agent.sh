@@ -9,11 +9,24 @@ LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/qa-agent-$(date +%Y-%m-%d).log"
 REPORT_FILE="$PROJECT_DIR/docs/agents/qa-report.md"
 METRICS_FILE="$PROJECT_DIR/.qa-metrics.tmp"
+SERVER_PID=""
+SERVER_LOG="$LOG_DIR/qa-agent-server.log"
 
 mkdir -p "$LOG_DIR"
 
 # Source shared utilities and check feature flags
 source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
+
+# Cleanup function to ensure server is stopped on exit
+cleanup() {
+  if [[ -n "$SERVER_PID" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
+    log_info "Stopping dev server (PID: $SERVER_PID)..." | tee -a "$LOG_FILE"
+    kill "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+  fi
+  rm -f "$METRICS_FILE"
+}
+trap cleanup EXIT
 
 # Check if agent is enabled via feature flags
 log_info "=== QA Agent starting ===" | tee -a "$LOG_FILE"
@@ -29,6 +42,34 @@ cd "$PROJECT_DIR"
 # Get configuration from feature flag
 TESTS_PER_CATEGORY=$(get_agent_config "qa_agent_enabled" "testsPerCategory" || echo "3")
 log_info "Running $TESTS_PER_CATEGORY tests per category" | tee -a "$LOG_FILE"
+
+# Check if server is already running
+if curl -s --max-time 2 "http://localhost:3000/api/health" > /dev/null 2>&1; then
+  log_info "Dev server already running on port 3000" | tee -a "$LOG_FILE"
+else
+  log_info "Starting Next.js dev server..." | tee -a "$LOG_FILE"
+
+  # Start the server in the background
+  npm run dev > "$SERVER_LOG" 2>&1 &
+  SERVER_PID=$!
+
+  # Wait for server to be ready (max 120 seconds)
+  MAX_WAIT=120
+  WAITED=0
+  while ! curl -s --max-time 2 "http://localhost:3000/api/health" > /dev/null 2>&1; do
+    if [[ $WAITED -ge $MAX_WAIT ]]; then
+      log_error "Server failed to start within ${MAX_WAIT}s" | tee -a "$LOG_FILE"
+      exit 1
+    fi
+    sleep 2
+    WAITED=$((WAITED + 2))
+    if [[ $((WAITED % 10)) -eq 0 ]]; then
+      log_info "Waiting for server... (${WAITED}s)" | tee -a "$LOG_FILE"
+    fi
+  done
+
+  log_success "Dev server ready (took ${WAITED}s)" | tee -a "$LOG_FILE"
+fi
 
 # Run the automated test suite and capture output
 log_info "Running automated QA tests..." | tee -a "$LOG_FILE"
@@ -137,8 +178,6 @@ PROMPT
 
 log_success "Claude analysis complete" | tee -a "$LOG_FILE"
 
-# Cleanup
-rm -f "$METRICS_FILE"
-
+# Cleanup handled by trap
 log_success "QA report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== QA Agent finished ===" | tee -a "$LOG_FILE"

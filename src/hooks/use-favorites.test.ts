@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 
 // Mutable auth mock reference
-const mockAuthReturn: { user: Record<string, unknown> | null; session: Record<string, unknown> | null } = {
+const mockAuthReturn: {
+  user: Record<string, unknown> | null;
+  session: Record<string, unknown> | null;
+  isLoading: boolean;
+} = {
   user: null,
   session: null,
+  isLoading: false,
 };
 
 // Mock useAuth hook with mutable return
@@ -48,6 +53,7 @@ describe("useFavorites", () => {
     );
     mockAuthReturn.user = null;
     mockAuthReturn.session = null;
+    mockAuthReturn.isLoading = false;
     mockFetch.mockReset();
   });
 
@@ -62,7 +68,35 @@ describe("useFavorites", () => {
       expect(result.current.favorites).toEqual([]);
     });
 
-    it("should load favorites from localStorage on mount", async () => {
+    it("should load favorites from localStorage on mount for logged-in users", async () => {
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
+      localStorageMock.getItem.mockReturnValue(
+        JSON.stringify(["story-1", "story-2"])
+      );
+
+      // Mock the cloud sync GET to return same favorites
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          return { ok: true, json: async () => ["story-1", "story-2"] };
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.favorites).toEqual(["story-1", "story-2"]);
+    });
+
+    it("should not load favorites for anonymous users", async () => {
+      mockAuthReturn.user = null;
+      mockAuthReturn.session = null;
+
       localStorageMock.getItem.mockReturnValue(
         JSON.stringify(["story-1", "story-2"])
       );
@@ -73,7 +107,10 @@ describe("useFavorites", () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.favorites).toEqual(["story-1", "story-2"]);
+      // Anonymous users should have empty favorites
+      expect(result.current.favorites).toEqual([]);
+      // And should indicate auth is required
+      expect(result.current.requiresAuth).toBe(true);
     });
 
     it("should handle invalid JSON in localStorage gracefully", async () => {
@@ -104,8 +141,18 @@ describe("useFavorites", () => {
   });
 
   describe("isFavorite", () => {
-    it("should return true for favorited stories", async () => {
+    it("should return true for favorited stories (logged-in user)", async () => {
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
       localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
+
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          return { ok: true, json: async () => ["story-1"] };
+        }
+        return { ok: true, json: async () => ({}) };
+      });
 
       const { result } = renderHook(() => useFavorites());
 
@@ -114,6 +161,22 @@ describe("useFavorites", () => {
       });
 
       expect(result.current.isFavorite("story-1")).toBe(true);
+      expect(result.current.isFavorite("story-2")).toBe(false);
+    });
+
+    it("should always return false for anonymous users", async () => {
+      mockAuthReturn.user = null;
+      mockAuthReturn.session = null;
+
+      localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.isFavorite("story-1")).toBe(false);
       expect(result.current.isFavorite("story-2")).toBe(false);
     });
   });
@@ -133,8 +196,11 @@ describe("useFavorites", () => {
     });
   });
 
-  describe("toggleFavorite", () => {
-    it("should add a story to favorites and save to localStorage", async () => {
+  describe("toggleFavorite (anonymous users)", () => {
+    it("should do nothing for anonymous users", async () => {
+      mockAuthReturn.user = null;
+      mockAuthReturn.session = null;
+
       const { result } = renderHook(() => useFavorites());
 
       await waitFor(() => {
@@ -145,37 +211,11 @@ describe("useFavorites", () => {
         await result.current.toggleFavorite("story-1");
       });
 
-      expect(result.current.favorites).toEqual(["story-1"]);
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "paisaxe_favorites",
-        JSON.stringify(["story-1"])
-      );
+      // Should still be empty - anonymous users can't save favorites
+      expect(result.current.favorites).toEqual([]);
+      // localStorage should NOT have been updated
+      expect(localStorageMock.setItem).not.toHaveBeenCalled();
     });
-
-    it("should remove a story from favorites", async () => {
-      localStorageMock.getItem.mockReturnValue(
-        JSON.stringify(["story-1", "story-2"])
-      );
-
-      const { result } = renderHook(() => useFavorites());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      expect(result.current.favorites).toEqual(["story-1", "story-2"]);
-
-      await act(async () => {
-        await result.current.toggleFavorite("story-1");
-      });
-
-      expect(result.current.favorites).toEqual(["story-2"]);
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "paisaxe_favorites",
-        JSON.stringify(["story-2"])
-      );
-    });
-
   });
 
   describe("cloud sync on toggleFavorite (logged in)", () => {

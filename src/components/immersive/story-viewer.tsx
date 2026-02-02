@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Play, Pause, Bookmark } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Pause, Bookmark, Share2, Shuffle, Lightbulb } from "lucide-react";
 import { BookmarkButton } from "./bookmark-button";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import { AuthButton } from "@/components/auth/auth-button";
 import { useFavorites } from "@/hooks/use-favorites";
+import { useAuth } from "@/hooks/use-auth";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { getRelatedStories } from "@/lib/related-stories";
@@ -20,6 +21,7 @@ import { ShareButton } from "./share-button";
 import { LanguageSwitcher } from "./language-switcher";
 import { SuggestPlaceButton } from "./suggest-place-button";
 import { UserSubmittedBadge } from "./user-submitted-badge";
+import { ToolbarOverflowMenu, ToolbarOverflowItem } from "./toolbar-overflow-menu";
 import { getLabel } from "@/lib/asturianu";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
@@ -74,7 +76,10 @@ export function StoryViewer({
   const {
     isFavorite,
     toggleFavorite,
+    requiresAuth,
   } = useFavorites();
+
+  const { signInWithGoogle } = useAuth();
 
   const story = stories[currentIndex];
   const prefetchedUrls = useRef<Set<string>>(new Set());
@@ -195,7 +200,7 @@ export function StoryViewer({
 
   return (
     <main
-      className="relative h-screen w-screen overflow-hidden bg-black cursor-pointer"
+      className="relative h-dvh w-screen overflow-hidden bg-black cursor-pointer"
       onClick={() => setShowInfo((prev) => !prev)}
     >
       {/* Screen reader announcement for story changes */}
@@ -301,7 +306,7 @@ export function StoryViewer({
       {/* Main content */}
       <article
         className={cn(
-          "absolute bottom-0 left-0 right-0 p-8 md:p-12 z-10 transition-all duration-500 motion-reduce:transition-none",
+          "absolute bottom-0 left-0 right-0 p-8 pb-[max(2rem,env(safe-area-inset-bottom))] md:p-12 z-10 transition-all duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 motion-reduce:translate-y-0"
         )}
       >
@@ -361,14 +366,27 @@ export function StoryViewer({
           >
             {ast ? getLabel("ask_about", true) : t("stories.ask_about")}
           </button>
-          <a
-            href="/favorites"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (requiresAuth) {
+                signInWithGoogle();
+              } else {
+                toggleFavorite(story.id);
+              }
+            }}
             className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
           >
-            <Bookmark className="h-5 w-5" />
-            <span>{ast ? getLabel("saved", true) : t("favorites.saved")}</span>
-          </a>
+            <Bookmark className={cn("h-5 w-5", isFavorite(story.id) && "fill-current")} />
+            <span>
+              {requiresAuth
+                ? t("favorites.sign_in_to_save")
+                : isFavorite(story.id)
+                  ? (ast ? getLabel("saved", true) : t("favorites.saved"))
+                  : (ast ? getLabel("save", true) : t("favorites.save"))
+              }
+            </span>
+          </button>
         </div>
       </article>
 
@@ -396,11 +414,12 @@ export function StoryViewer({
       </button>
 
       {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}
-      <nav aria-label="Story controls" className="absolute top-16 right-6 z-20 flex items-center gap-3">
-        {/* Language Switcher */}
+      <nav aria-label="Story controls" className="absolute top-16 right-4 md:right-6 z-20 flex items-center gap-2 md:gap-3 max-w-[calc(100%-8rem)]">
+        {/* Language Switcher - always visible */}
         <LanguageSwitcher />
 
-        {/* Ambient / Auto-play toggle */}
+        {/* Desktop: Show all controls inline */}
+        {/* Ambient / Auto-play toggle - hidden on mobile */}
         {isEnabled("autoplay_button") && (
           isEnabled("ambient_discovery") ? (
             <button
@@ -409,7 +428,7 @@ export function StoryViewer({
                 toggleAmbient();
               }}
               className={cn(
-                "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+                "hidden md:flex p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
                 ambientMode && "ring-1 ring-white/30"
               )}
               aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
@@ -428,7 +447,7 @@ export function StoryViewer({
                 setAutoPlay((prev) => !prev);
               }}
               aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              className="hidden md:flex p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
             >
               {autoPlay ? (
                 <Pause className="h-5 w-5 text-white" />
@@ -439,26 +458,101 @@ export function StoryViewer({
           )
         )}
 
-        {/* Surprise Me button */}
+        {/* Surprise Me button - hidden on mobile */}
         {isEnabled("surprise_me") && viewedIndices && (
-          <SurpriseMeButton
-            totalStories={stories.length}
-            currentIndex={currentIndex}
-            viewedIndices={viewedIndices}
-            onJumpTo={onIndexChange}
-          />
+          <div className="hidden md:block">
+            <SurpriseMeButton
+              totalStories={stories.length}
+              currentIndex={currentIndex}
+              viewedIndices={viewedIndices}
+              onJumpTo={onIndexChange}
+            />
+          </div>
         )}
 
-        {/* Share button */}
-        {isEnabled("story_sharing") && <ShareButton story={story} />}
+        {/* Share button - hidden on mobile */}
+        {isEnabled("story_sharing") && (
+          <div className="hidden md:block">
+            <ShareButton story={story} />
+          </div>
+        )}
 
-        {/* Suggest Place button */}
-        <SuggestPlaceButton />
+        {/* Suggest Place button - hidden on mobile */}
+        <div className="hidden md:block">
+          <SuggestPlaceButton />
+        </div>
 
+        {/* Mobile overflow menu */}
+        <ToolbarOverflowMenu>
+          {isEnabled("autoplay_button") && (
+            <ToolbarOverflowItem
+              icon={autoPlay ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
+              onClick={() => {
+                if (isEnabled("ambient_discovery")) {
+                  toggleAmbient();
+                } else {
+                  setAutoPlay((prev) => !prev);
+                }
+              }}
+              active={autoPlay}
+            />
+          )}
+          {isEnabled("surprise_me") && viewedIndices && (
+            <ToolbarOverflowItem
+              icon={<Shuffle className="h-4 w-4" />}
+              label={t("stories.surprise")}
+              onClick={() => {
+                // Find a random unviewed story
+                const unviewed = Array.from({ length: stories.length }, (_, i) => i)
+                  .filter((i) => !viewedIndices.has(i) && i !== currentIndex);
+                if (unviewed.length > 0) {
+                  const randomIndex = unviewed[Math.floor(Math.random() * unviewed.length)];
+                  onIndexChange(randomIndex);
+                } else {
+                  // All viewed, pick random
+                  const randomIndex = Math.floor(Math.random() * stories.length);
+                  if (randomIndex !== currentIndex) {
+                    onIndexChange(randomIndex);
+                  }
+                }
+              }}
+            />
+          )}
+          {isEnabled("story_sharing") && (
+            <ToolbarOverflowItem
+              icon={<Share2 className="h-4 w-4" />}
+              label={t("share.share")}
+              onClick={() => {
+                const shareUrl = `${window.location.origin}/stories/${story.id}`;
+                if (navigator.share) {
+                  navigator.share({
+                    title: localizedStory.title,
+                    text: localizedStory.description,
+                    url: shareUrl,
+                  });
+                } else {
+                  navigator.clipboard.writeText(shareUrl);
+                }
+              }}
+            />
+          )}
+          <ToolbarOverflowItem
+            icon={<Lightbulb className="h-4 w-4" />}
+            label={t("suggestions.suggest_place")}
+            onClick={() => {
+              // Trigger suggest place dialog - need to use a global event or ref
+              document.querySelector<HTMLButtonElement>('[data-suggest-place-trigger]')?.click();
+            }}
+          />
+        </ToolbarOverflowMenu>
+
+        {/* Bookmark - always visible */}
         <BookmarkButton
           isFavorite={isFavorite(story.id)}
           onToggle={() => toggleFavorite(story.id)}
         />
+        {/* Auth - always visible */}
         <AuthButton />
       </nav>
 

@@ -92,6 +92,8 @@ export const pt: Translations = {
     saved: 'Guardados',
     save: 'Guardar',
     title: 'Guardados',
+    your_stories: 'As Suas Histórias',
+    sign_in_to_save: 'Inicie sessão para guardar',
     place_singular: 'lugar',
     place_plural: 'lugares',
     local_only: 'Os seus guardados estão apenas neste dispositivo',

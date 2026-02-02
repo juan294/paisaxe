@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { LanguageSwitcher } from "./language-switcher";
 
 // Mock the useTranslation hook
@@ -14,19 +14,6 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-// Mock framer-motion to avoid animation issues in tests
-vi.mock("framer-motion", () => ({
-  motion: {
-    button: ({ children, ...props }: React.HTMLAttributes<HTMLButtonElement>) => (
-      <button {...props}>{children}</button>
-    ),
-    div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-      <div {...props}>{children}</div>
-    ),
-  },
-  AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
 describe("LanguageSwitcher", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,41 +26,46 @@ describe("LanguageSwitcher", () => {
       render(<LanguageSwitcher />);
 
       // Toggle button should show active language
-      expect(screen.getByRole("button", { name: /ES/i })).toBeInTheDocument();
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      expect(toggleButton).toBeInTheDocument();
+      expect(within(toggleButton).getByText("ES")).toBeInTheDocument();
 
-      // Other languages should not be visible initially
-      expect(screen.queryByRole("button", { name: "EN" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "FR" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "DE" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "PT" })).not.toBeInTheDocument();
+      // Dropdown is hidden via CSS (opacity-0, pointer-events-none)
+      // The buttons exist in DOM but are not visible/clickable
+      const allButtons = screen.getAllByRole("button");
+      expect(allButtons).toHaveLength(6); // 1 toggle + 5 language options (hidden)
     });
 
     it("should show FR when locale is fr", () => {
       mockLocale = "fr";
       render(<LanguageSwitcher />);
 
-      expect(screen.getByRole("button", { name: /FR/i })).toBeInTheDocument();
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      expect(within(toggleButton).getByText("FR")).toBeInTheDocument();
     });
 
     it("should show EN when locale is en", () => {
       mockLocale = "en";
       render(<LanguageSwitcher />);
 
-      expect(screen.getByRole("button", { name: /EN/i })).toBeInTheDocument();
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      expect(within(toggleButton).getByText("EN")).toBeInTheDocument();
     });
 
     it("should show DE when locale is de", () => {
       mockLocale = "de";
       render(<LanguageSwitcher />);
 
-      expect(screen.getByRole("button", { name: /DE/i })).toBeInTheDocument();
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      expect(within(toggleButton).getByText("DE")).toBeInTheDocument();
     });
 
     it("should show PT when locale is pt", () => {
       mockLocale = "pt";
       render(<LanguageSwitcher />);
 
-      expect(screen.getByRole("button", { name: /PT/i })).toBeInTheDocument();
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      expect(within(toggleButton).getByText("PT")).toBeInTheDocument();
     });
   });
 
@@ -83,15 +75,12 @@ describe("LanguageSwitcher", () => {
       render(<LanguageSwitcher />);
 
       // Click to expand
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
 
-      // All language options should now be visible (ES has 2 buttons: toggle + dropdown)
+      // All language options should now be visible
       const allButtons = screen.getAllByRole("button");
       expect(allButtons).toHaveLength(6); // 1 toggle + 5 language options
-      expect(screen.getByRole("button", { name: "EN" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "FR" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "DE" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "PT" })).toBeInTheDocument();
     });
 
     it("should highlight the current language in the dropdown", () => {
@@ -99,14 +88,15 @@ describe("LanguageSwitcher", () => {
       render(<LanguageSwitcher />);
 
       // Click to expand
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
 
       // ES button in dropdown should have selected styling (there are 2 ES buttons, get all)
-      const esButtons = screen.getAllByRole("button", { name: /ES/i });
-      // The dropdown button (second one) should have selected styling
-      const dropdownEsButton = esButtons[1];
-      expect(dropdownEsButton.className).toContain("bg-white");
-      expect(dropdownEsButton.className).toContain("text-black");
+      const esButtons = screen.getAllByRole("button", { name: /^ES$/i });
+      // The dropdown button (one without aria-expanded) should have selected styling
+      const dropdownEsButton = esButtons.find(btn => !btn.hasAttribute("aria-expanded"));
+      expect(dropdownEsButton?.className).toContain("bg-white");
+      expect(dropdownEsButton?.className).toContain("text-black");
     });
 
     it("should call setLocale when a different language is clicked", () => {
@@ -114,10 +104,12 @@ describe("LanguageSwitcher", () => {
       render(<LanguageSwitcher />);
 
       // Click to expand
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
 
-      // Click EN
-      fireEvent.click(screen.getByRole("button", { name: "EN" }));
+      // Click EN (the dropdown button, not the toggle)
+      const enButton = screen.getByRole("button", { name: "EN" });
+      fireEvent.click(enButton);
 
       expect(mockSetLocale).toHaveBeenCalledWith("en");
     });
@@ -126,7 +118,8 @@ describe("LanguageSwitcher", () => {
       mockLocale = "es";
       render(<LanguageSwitcher />);
 
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
       fireEvent.click(screen.getByRole("button", { name: "FR" }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("fr");
@@ -136,7 +129,8 @@ describe("LanguageSwitcher", () => {
       mockLocale = "es";
       render(<LanguageSwitcher />);
 
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
       fireEvent.click(screen.getByRole("button", { name: "DE" }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("de");
@@ -146,7 +140,8 @@ describe("LanguageSwitcher", () => {
       mockLocale = "es";
       render(<LanguageSwitcher />);
 
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
       fireEvent.click(screen.getByRole("button", { name: "PT" }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("pt");
@@ -156,8 +151,13 @@ describe("LanguageSwitcher", () => {
       mockLocale = "en";
       render(<LanguageSwitcher />);
 
-      fireEvent.click(screen.getByRole("button", { name: /EN/i }));
-      fireEvent.click(screen.getByRole("button", { name: "ES" }));
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      // Find ES dropdown button (not the toggle)
+      const esButtons = screen.getAllByRole("button", { name: /^ES$/i });
+      const dropdownEsButton = esButtons.find(btn => !btn.hasAttribute("aria-expanded"));
+      fireEvent.click(dropdownEsButton!);
 
       expect(mockSetLocale).toHaveBeenCalledWith("es");
     });
@@ -173,14 +173,20 @@ describe("LanguageSwitcher", () => {
       );
 
       // Open the dropdown
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
-      expect(screen.getByRole("button", { name: "EN" })).toBeInTheDocument();
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      // Dropdown should be visible (check for visible class on dropdown panel)
+      const groupContainer = screen.getByRole("group");
+      const dropdownPanel = groupContainer.querySelector('[class*="opacity-100"]');
+      expect(dropdownPanel).not.toBeNull();
 
       // Click outside
       fireEvent.mouseDown(screen.getByTestId("outside"));
 
-      // Dropdown should close
-      expect(screen.queryByRole("button", { name: "EN" })).not.toBeInTheDocument();
+      // Dropdown should be hidden via CSS
+      const hiddenDropdown = groupContainer.querySelector('[class*="opacity-0"][class*="pointer-events-none"]');
+      expect(hiddenDropdown).not.toBeNull();
     });
 
     it("should close when pressing Escape", () => {
@@ -188,14 +194,16 @@ describe("LanguageSwitcher", () => {
       render(<LanguageSwitcher />);
 
       // Open the dropdown
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
-      expect(screen.getByRole("button", { name: "EN" })).toBeInTheDocument();
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
 
       // Press Escape
       fireEvent.keyDown(document, { key: "Escape" });
 
-      // Dropdown should close
-      expect(screen.queryByRole("button", { name: "EN" })).not.toBeInTheDocument();
+      // Dropdown should be hidden via CSS
+      const groupContainer = screen.getByRole("group");
+      const hiddenDropdown = groupContainer.querySelector('[class*="opacity-0"][class*="pointer-events-none"]');
+      expect(hiddenDropdown).not.toBeNull();
     });
 
     it("should close when a language is selected", () => {
@@ -203,14 +211,16 @@ describe("LanguageSwitcher", () => {
       render(<LanguageSwitcher />);
 
       // Open the dropdown
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
-      expect(screen.getByRole("button", { name: "EN" })).toBeInTheDocument();
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
 
       // Select a language
       fireEvent.click(screen.getByRole("button", { name: "EN" }));
 
-      // Dropdown should close
-      expect(screen.queryByRole("button", { name: "FR" })).not.toBeInTheDocument();
+      // Dropdown should be hidden via CSS
+      const groupContainer = screen.getByRole("group");
+      const hiddenDropdown = groupContainer.querySelector('[class*="opacity-0"][class*="pointer-events-none"]');
+      expect(hiddenDropdown).not.toBeNull();
     });
   });
 
@@ -223,7 +233,8 @@ describe("LanguageSwitcher", () => {
         </div>
       );
 
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
 
       expect(parentHandler).not.toHaveBeenCalled();
     });
@@ -236,7 +247,8 @@ describe("LanguageSwitcher", () => {
         </div>
       );
 
-      fireEvent.click(screen.getByRole("button", { name: /ES/i }));
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
       fireEvent.click(screen.getByRole("button", { name: "EN" }));
 
       expect(parentHandler).not.toHaveBeenCalled();
@@ -256,7 +268,7 @@ describe("LanguageSwitcher", () => {
     it("should indicate expanded state", () => {
       render(<LanguageSwitcher />);
 
-      const toggleButton = screen.getByRole("button", { name: /ES/i });
+      const toggleButton = screen.getByRole("button", { expanded: false });
 
       // Initially collapsed
       expect(toggleButton).toHaveAttribute("aria-expanded", "false");
