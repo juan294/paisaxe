@@ -238,9 +238,11 @@ describe("StoryViewer", () => {
     it("should wrap to last story when pressing prev on first story", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
+      // Find prev button by position class (left-0 on mobile)
       const prevButton = screen.getAllByRole("button").find(
-        (btn) => btn.classList.contains("left-4")
+        (btn) => btn.classList.contains("left-0")
       );
+      expect(prevButton).toBeDefined();
       expect(prevButton).not.toBeDisabled();
 
       if (prevButton) {
@@ -255,9 +257,11 @@ describe("StoryViewer", () => {
     it("should wrap to first story when pressing next on last story", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 2 })} />);
 
+      // Find next button by position class (right-0 on mobile)
       const nextButton = screen.getAllByRole("button").find(
-        (btn) => btn.classList.contains("right-4") && btn.classList.contains("top-1/2")
+        (btn) => btn.classList.contains("right-0")
       );
+      expect(nextButton).toBeDefined();
       expect(nextButton).not.toBeDisabled();
 
       if (nextButton) {
