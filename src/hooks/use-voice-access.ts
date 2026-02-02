@@ -37,10 +37,12 @@ export function useVoiceAccess(): UseVoiceAccessResult {
     null
   );
   const [isFetchingAccess, setIsFetchingAccess] = useState(false);
+  const [hasCheckedPaidAccess, setHasCheckedPaidAccess] = useState(false);
 
   const fetchPaidAccess = useCallback(async () => {
     if (!user || !session?.access_token) {
       setPaidAccess(null);
+      setHasCheckedPaidAccess(true); // Mark as checked even when no user
       return;
     }
 
@@ -64,8 +66,14 @@ export function useVoiceAccess(): UseVoiceAccessResult {
       setPaidAccess(null);
     } finally {
       setIsFetchingAccess(false);
+      setHasCheckedPaidAccess(true);
     }
   }, [user, session?.access_token]);
+
+  // Reset checked state when user changes (before fetching)
+  useEffect(() => {
+    setHasCheckedPaidAccess(false);
+  }, [user?.id]);
 
   // Fetch paid access when user changes
   useEffect(() => {
@@ -73,7 +81,10 @@ export function useVoiceAccess(): UseVoiceAccessResult {
   }, [fetchPaidAccess]);
 
   return useMemo(() => {
-    const isLoading = isAuthLoading || visitorAccess.isLoading || isFetchingAccess;
+    // Loading if: auth loading, visitor check loading, fetching, OR
+    // user exists but we haven't checked their paid access yet
+    const needsPaidAccessCheck = !!user && !hasCheckedPaidAccess;
+    const isLoading = isAuthLoading || visitorAccess.isLoading || isFetchingAccess || needsPaidAccessCheck;
 
     // Check whitelist access from visitor voice access hook
     const isWhitelisted = visitorAccess.canUseVoice;
@@ -120,6 +131,7 @@ export function useVoiceAccess(): UseVoiceAccessResult {
     visitorAccess,
     paidAccess,
     isFetchingAccess,
+    hasCheckedPaidAccess,
     user,
     fetchPaidAccess,
   ]);
