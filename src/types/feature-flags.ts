@@ -19,7 +19,8 @@ export type FeatureFlagKey =
   | "docs_freshness_agent_enabled"
   | "performance_agent_enabled"
   | "qa_agent_enabled"
-  | "localization_agent_enabled";
+  | "localization_agent_enabled"
+  | "fullscreen_button";
 
 export interface VisitorVoiceConfig {
   whitelisted_emails: string[];
