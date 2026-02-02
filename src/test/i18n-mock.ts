@@ -67,6 +67,9 @@ export const mockTranslations: Record<string, string> = {
 
   // Favorites
   "favorites.title": "Guardados",
+  "favorites.bookmarks": "Guardados",
+  "favorites.your_stories": "Tus Historias",
+  "favorites.sign_in_to_save": "Inicia sesión para guardar",
   "favorites.save": "Guardar",
   "favorites.saved": "Guardado",
   "favorites.add": "Agregar a favoritos",

@@ -32,6 +32,15 @@ vi.mock("@/lib/supabase-browser", () => ({
   }),
 }));
 
+// Mock next/navigation
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+}));
+
 // Mock feature flags - enable autoplay_button for accessibility tests
 vi.mock("@/hooks/use-feature-flags", () => ({
   useFeatureFlags: () => ({

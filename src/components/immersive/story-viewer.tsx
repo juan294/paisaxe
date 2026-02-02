@@ -547,10 +547,11 @@ export function StoryViewer({
           />
         </ToolbarOverflowMenu>
 
-        {/* Bookmark - always visible */}
+        {/* Bookmark - always visible, navigates to /favorites */}
         <BookmarkButton
-          isFavorite={isFavorite(story.id)}
-          onToggle={() => toggleFavorite(story.id)}
+          isNavigationMode
+          requiresAuth={requiresAuth}
+          onAuthRequired={signInWithGoogle}
         />
         {/* Auth - always visible */}
         <AuthButton />

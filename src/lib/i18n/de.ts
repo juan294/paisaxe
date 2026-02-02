@@ -92,6 +92,7 @@ export const de: Translations = {
     saved: 'Gespeichert',
     save: 'Speichern',
     title: 'Gespeichert',
+    bookmarks: 'Lesezeichen',
     your_stories: 'Ihre Geschichten',
     sign_in_to_save: 'Anmelden zum Speichern',
     place_singular: 'Ort',
