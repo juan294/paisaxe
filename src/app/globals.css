@@ -91,6 +91,29 @@
   .desktop-pointer-only {
     display: none !important;
   }
+
+  /* Reset navigation buttons to full-height invisible tap zones on touch devices */
+  /* Overrides md: styles that create small visible circles */
+  .touch-nav-reset {
+    position: absolute !important;
+    top: 0 !important;
+    height: 100% !important;
+    width: 5rem !important;
+    transform: none !important;
+    padding: 1rem !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+  .touch-nav-reset:hover {
+    background: transparent !important;
+  }
+  .touch-nav-reset.touch-nav-left {
+    left: 0 !important;
+  }
+  .touch-nav-reset.touch-nav-right {
+    right: 0 !important;
+  }
 }
 
 /* Accessibility: reduced motion support */
