@@ -183,13 +183,16 @@ npm install -D pdf-parse pdfjs-dist
 |----------|--------|---------|--------|--------|
 | 1 | Remove framer-motion, use CSS | ~150 KB | Low | ✅ Done |
 | 2 | Lazy-load PostHog | ~100 KB | Medium | ✅ Done |
-| 3 | Move PDF deps to devDependencies | 0 KB (clarity) | Trivial | Pending |
+| 3 | Move PDF deps to devDependencies | 0 KB (clarity) | Trivial | ✅ Done |
 
 **Completed optimizations:**
 - **framer-motion removed** (2026-02-02): Replaced with CSS animations and Tailwind classes in `language-switcher.tsx` and `category-filter-badge.tsx`. Estimated savings: ~150 KB.
 - **PostHog lazy-loaded** (2026-02-02): Moved from static import to dynamic import in `useEffect`. PostHog now loads after hydration, removing ~100 KB from the critical path. The app renders immediately while PostHog loads in the background.
+- **PDF deps moved to devDependencies** (2026-02-02): `pdfjs-dist` and `pdf-parse` are only used in build scripts (`scripts/process-pdfs.ts`, `scripts/extract-images.ts`), not in the client bundle. Moving to devDependencies clarifies their purpose.
 
 **Estimated total savings: ~250 KB** (should bring bundle under budget at ~2,410 KB)
+
+**All performance optimizations complete.**
 
 ---
 
