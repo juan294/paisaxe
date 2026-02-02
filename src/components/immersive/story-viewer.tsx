@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Play, Pause, Bookmark, Share2, Shuffle, Lightbulb } from "lucide-react";
@@ -73,13 +74,10 @@ export function StoryViewer({
   const { t, locale } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
 
-  const {
-    isFavorite,
-    toggleFavorite,
-    requiresAuth,
-  } = useFavorites();
+  const { requiresAuth } = useFavorites();
 
   const { signInWithGoogle } = useAuth();
+  const router = useRouter();
 
   const story = stories[currentIndex];
   const prefetchedUrls = useRef<Set<string>>(new Set());
@@ -372,20 +370,13 @@ export function StoryViewer({
               if (requiresAuth) {
                 signInWithGoogle();
               } else {
-                toggleFavorite(story.id);
+                router.push("/favorites");
               }
             }}
             className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
           >
-            <Bookmark className={cn("h-5 w-5", isFavorite(story.id) && "fill-current")} />
-            <span>
-              {requiresAuth
-                ? t("favorites.sign_in_to_save")
-                : isFavorite(story.id)
-                  ? (ast ? getLabel("saved", true) : t("favorites.saved"))
-                  : (ast ? getLabel("save", true) : t("favorites.save"))
-              }
-            </span>
+            <Bookmark className="h-5 w-5" />
+            <span>{ast ? getLabel("bookmarks", true) : t("favorites.bookmarks")}</span>
           </button>
         </div>
       </article>
