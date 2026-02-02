@@ -56,6 +56,24 @@ OUTDATED_COUNT=$(echo "$OUTDATED_OUTPUT" | jq 'keys | length' 2>/dev/null || ech
 # Check for packages with security updates available
 SECURITY_UPDATES=$(echo "$AUDIT_OUTPUT" | jq -r '.vulnerabilities | to_entries | map(select(.value.fixAvailable == true)) | length' 2>/dev/null || echo "0")
 
+# Check CI/CD security automation
+log_info "Checking CI/CD security automation..." | tee -a "$LOG_FILE"
+DEPENDABOT_EXISTS=$([[ -f ".github/dependabot.yml" || -f ".github/dependabot.yaml" ]] && echo "true" || echo "false")
+RENOVATE_EXISTS=$([[ -f "renovate.json" || -f ".github/renovate.json" || -f "renovate.json5" ]] && echo "true" || echo "false")
+GITLEAKS_IN_CI=$(grep -rql "gitleaks" .github/workflows/ 2>/dev/null && echo "true" || echo "false")
+NPM_AUDIT_IN_CI=$(grep -rqlE "npm audit|npm run audit" .github/workflows/ 2>/dev/null && echo "true" || echo "false")
+
+# Get named packages for flagged licenses (not just counts)
+log_info "Identifying flagged license packages..." | tee -a "$LOG_FILE"
+FLAGGED_LICENSES=$(npx license-checker --production --csv 2>/dev/null | grep -iE "MPL|LGPL|GPL|UNLICENSED|Unknown" | head -20 || echo "none")
+
+# Check security headers (if server is running)
+log_info "Checking security headers..." | tee -a "$LOG_FILE"
+SECURITY_HEADERS="Server not running - skipped"
+if curl -s --max-time 2 "http://localhost:3000/api/health" > /dev/null 2>&1; then
+  SECURITY_HEADERS=$(curl -sI "http://localhost:3000" 2>/dev/null | grep -iE "^(content-security-policy|x-frame-options|x-content-type-options|strict-transport-security|referrer-policy|permissions-policy):" || echo "No security headers found")
+fi
+
 # Write metrics to temp file for Claude
 {
   echo "SECURITY METRICS ($(date '+%Y-%m-%d'))"
@@ -84,6 +102,18 @@ SECURITY_UPDATES=$(echo "$AUDIT_OUTPUT" | jq -r '.vulnerabilities | to_entries |
   echo "OUTDATED PACKAGES: $OUTDATED_COUNT"
   echo "$OUTDATED_OUTPUT" | jq -r 'to_entries | .[] | "\(.key): \(.value.current) -> \(.value.latest)"' 2>/dev/null || true
   echo ""
+  echo "CI/CD SECURITY AUTOMATION:"
+  echo "- Dependabot configured: $DEPENDABOT_EXISTS"
+  echo "- Renovate configured: $RENOVATE_EXISTS"
+  echo "- Gitleaks in CI: $GITLEAKS_IN_CI"
+  echo "- npm audit in CI: $NPM_AUDIT_IN_CI"
+  echo ""
+  echo "FLAGGED LICENSE PACKAGES (MPL/LGPL/GPL/UNLICENSED):"
+  echo "$FLAGGED_LICENSES"
+  echo ""
+  echo "SECURITY HEADERS:"
+  echo "$SECURITY_HEADERS"
+  echo ""
 } > "$METRICS_FILE"
 
 log_info "Metrics collected, invoking Claude for analysis..." | tee -a "$LOG_FILE"
@@ -96,30 +126,43 @@ AGENT_PROMPT=$(get_agent_prompt "security_agent_enabled" 2>/dev/null) || {
 STEPS:
 1. Review the vulnerability scan results
 2. Assess the severity and exploitability of each vulnerability
-3. Check license compliance (no copyleft in production)
-4. Identify outdated packages with security implications
-5. Write a comprehensive report to docs/agents/security-report.md
+3. Check license compliance — list package names for any flagged licenses
+4. Review CI/CD security automation status
+5. Check security headers configuration
+6. Identify outdated packages with security implications
+7. Write a comprehensive report to docs/agents/security-report.md
 
 ANALYSIS FOCUS:
-- Critical/High vulnerabilities: What's the attack vector? Is it exploitable in our context?
+- Exploitability first: Lead with whether vulnerabilities are actually exploitable in this codebase
+- Critical/High vulnerabilities: What's the attack vector? Read the affected code to assess real risk
 - Dependency chains: Which of our direct deps bring in vulnerable transitive deps?
 - Fixable issues: What can be fixed with npm audit fix vs manual intervention?
-- License risks: Any copyleft or problematic licenses?
+- License risks: Name the specific packages with MPL/LGPL/GPL/UNLICENSED licenses
+- Security headers: Are CSP, HSTS, X-Frame-Options, X-Content-Type-Options configured?
+- CI/CD gaps: Is automated security scanning in place?
 
 REPORT STRUCTURE:
-1. Health status (green/yellow/red based on critical/high vulns)
-2. Executive summary (1-2 sentences)
-3. Vulnerability table with severity, package, and fix status
-4. Prioritized remediation steps
-5. License compliance status
-6. Outdated packages with security implications
+1. Health status (green/yellow/red) — base on EXPLOITABLE vulnerabilities, not raw counts
+2. Executive summary — lead with exploitability: 'X advisories detected, Y exploitable' not 'X vulnerabilities found'
+3. Vulnerability table with: Severity, Package, Advisory (GHSA + CVE if available), Attack Vector, Fixable, Risk Assessment
+4. Detailed exploitability analysis for high/critical issues
+5. Prioritized remediation steps
+6. License compliance — list actual package names, not just license types
+7. Security headers status
+8. CI/CD automation status (Dependabot, Renovate, Gitleaks, npm audit in pipelines)
+9. Outdated packages with security implications
+
+CVE CROSS-REFERENCE:
+- When listing vulnerabilities, include both GHSA and CVE identifiers where available
+- CVE format: CVE-YYYY-NNNNN (look up from GHSA advisory if not in npm audit output)
 
 RULES:
-- Be specific about attack vectors and exploitability
-- Prioritize by actual risk, not just severity score
+- Exploitability trumps severity: A non-exploitable critical is less urgent than an exploitable moderate
+- Be specific about attack vectors and why they do/don't apply to this codebase
 - Include exact commands for fixes where possible
 - Note if vulnerabilities are in dev-only dependencies (lower risk)
-- Distinguish between fixable and unfixable issues"
+- Distinguish between fixable and unfixable issues
+- Name packages explicitly — 'argon2 uses LGPL-3.0' not 'LGPL-3.0: 1 package'"
 }
 
 # Run Claude to analyze and write report
