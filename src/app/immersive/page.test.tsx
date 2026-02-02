@@ -32,6 +32,11 @@ vi.mock("@/lib/supabase-browser", () => ({
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
 }));
 
 // Mock feature flags - all disabled by default

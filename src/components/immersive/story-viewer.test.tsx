@@ -44,6 +44,15 @@ vi.mock("@/hooks/use-reduced-motion", () => ({
   useReducedMotion: () => false,
 }));
 
+// Mock next/navigation
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+}));
+
 // Wrapper component for tests
 const TestWrapper = ({ children }: { children: ReactNode }) => (
   <AuthProvider>{children}</AuthProvider>

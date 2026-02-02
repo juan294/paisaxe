@@ -95,6 +95,7 @@ export const en: Translations = {
     saved: 'Saved',
     save: 'Save',
     title: 'Saved',
+    bookmarks: 'Bookmarks',
     your_stories: 'Your Stories',
     sign_in_to_save: 'Sign in to save',
     place_singular: 'place',
