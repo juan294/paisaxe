@@ -539,8 +539,8 @@ export function StoryViewer({
           />
         </ToolbarOverflowMenu>
 
-        {/* Fullscreen - shows on iOS/iPadOS and desktop */}
-        <FullscreenButton />
+        {/* Fullscreen - shows on iOS/iPadOS and desktop when enabled */}
+        {isEnabled("fullscreen_button") && <FullscreenButton />}
         {/* Bookmark - always visible, navigates to /favorites */}
         <BookmarkButton
           isNavigationMode

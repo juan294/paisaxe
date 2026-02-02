@@ -77,6 +77,7 @@ const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
   ambient_discovery: "experience",
   autoplay_button: "experience",
   asturianu_touches: "experience",
+  fullscreen_button: "experience",
   // Social - community features
   story_sharing: "social",
   user_story_suggestions: "social",
