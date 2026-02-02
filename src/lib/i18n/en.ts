@@ -234,6 +234,17 @@ export const en: Translations = {
     faq_how_long_answer: '24 hours from purchase. Perfect for a day of trip planning or exploring.',
   },
 
+  fullscreen: {
+    toggle: 'Fullscreen',
+    install_title: 'Get the Full Experience',
+    install_description: 'Add Paisaxe to your home screen for a fullscreen, app-like experience.',
+    step_tap: 'Tap the',
+    step_share: 'share button',
+    step_add_home: 'Select "Add to Home Screen"',
+    step_open: 'Open Paisaxe from your home screen',
+    got_it: 'Got it',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
