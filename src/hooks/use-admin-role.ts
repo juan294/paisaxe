@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
@@ -14,12 +14,22 @@ export function useAdminRole(): UseAdminRoleResult {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRoleLoading, setIsRoleLoading] = useState(true);
 
+  // Track which user ID we've already checked to avoid redundant re-fetches
+  // when Supabase fires auth events on tab visibility change
+  const checkedUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (isAuthLoading) return;
 
     if (!user) {
       setIsAdmin(false);
       setIsRoleLoading(false);
+      checkedUserIdRef.current = null;
+      return;
+    }
+
+    // Skip re-checking if we already verified this user's role
+    if (checkedUserIdRef.current === user.id) {
       return;
     }
 
@@ -38,6 +48,8 @@ export function useAdminRole(): UseAdminRoleResult {
         } else {
           setIsAdmin(data.role === "admin");
         }
+        // Mark this user as checked
+        checkedUserIdRef.current = user.id;
       } catch {
         setIsAdmin(false);
       } finally {
