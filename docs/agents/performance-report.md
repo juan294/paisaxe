@@ -179,13 +179,16 @@ npm install -D pdf-parse pdfjs-dist
 
 ## Action Plan
 
-| Priority | Action | Savings | Effort |
-|----------|--------|---------|--------|
-| 1 | Remove framer-motion, use CSS | ~150 KB | Low |
-| 2 | Lazy-load PostHog | ~100 KB | Medium |
-| 3 | Move PDF deps to devDependencies | 0 KB (clarity) | Trivial |
+| Priority | Action | Savings | Effort | Status |
+|----------|--------|---------|--------|--------|
+| 1 | Remove framer-motion, use CSS | ~150 KB | Low | ✅ Done |
+| 2 | Lazy-load PostHog | ~100 KB | Medium | Pending |
+| 3 | Move PDF deps to devDependencies | 0 KB (clarity) | Trivial | Pending |
 
-**Total potential savings: ~250 KB** (would bring bundle under budget at ~2,410 KB)
+**Completed optimizations:**
+- **framer-motion removed** (2026-02-02): Replaced with CSS animations and Tailwind classes in `language-switcher.tsx` and `category-filter-badge.tsx`. Estimated savings: ~150 KB.
+
+**Remaining potential savings: ~100 KB** (would bring bundle under budget at ~2,510 KB)
 
 ---
 
