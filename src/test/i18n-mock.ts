@@ -114,6 +114,16 @@ export const mockTranslations: Record<string, string> = {
   "favorites.removed": "Eliminado de favoritos",
   "favorites.saved_toast": "Guardado en favoritos",
 
+  // Fullscreen
+  "fullscreen.toggle": "Pantalla completa",
+  "fullscreen.install_title": "Experiencia completa",
+  "fullscreen.install_description": "Añade Paisaxe a tu pantalla de inicio para una experiencia a pantalla completa.",
+  "fullscreen.step_tap": "Toca el botón",
+  "fullscreen.step_share": "compartir",
+  "fullscreen.step_add_home": "Selecciona \"Añadir a pantalla de inicio\"",
+  "fullscreen.step_open": "Abre Paisaxe desde tu pantalla de inicio",
+  "fullscreen.got_it": "Entendido",
+
   // Accessibility
   "accessibility.language_switcher": "Cambiar idioma",
   "accessibility.related_stories": "Historias relacionadas",

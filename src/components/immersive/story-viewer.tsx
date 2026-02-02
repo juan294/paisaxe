@@ -23,6 +23,7 @@ import { LanguageSwitcher } from "./language-switcher";
 import { SuggestPlaceButton } from "./suggest-place-button";
 import { UserSubmittedBadge } from "./user-submitted-badge";
 import { ToolbarOverflowMenu, ToolbarOverflowItem } from "./toolbar-overflow-menu";
+import { FullscreenButton } from "./fullscreen-button";
 import { getLabel } from "@/lib/asturianu";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
@@ -538,6 +539,8 @@ export function StoryViewer({
           />
         </ToolbarOverflowMenu>
 
+        {/* Fullscreen - shows on iOS/iPadOS and desktop */}
+        <FullscreenButton />
         {/* Bookmark - always visible, navigates to /favorites */}
         <BookmarkButton
           isNavigationMode

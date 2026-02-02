@@ -38,6 +38,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title,
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: LOCATION_CONFIG.siteName,
+  },
   description,
   // LOCATION-SPECIFIC: Keywords from config
   keywords: [
