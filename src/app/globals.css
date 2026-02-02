@@ -85,6 +85,14 @@
   animation: ambient-zoom 30s ease-in-out forwards;
 }
 
+/* Desktop pointer utilities - hide on touch-only devices (phones, tablets) */
+/* Uses pointer: coarse (touch screens) and hover: none (can't hover) to detect touch devices */
+@media (pointer: coarse), (hover: none) {
+  .desktop-pointer-only {
+    display: none !important;
+  }
+}
+
 /* Accessibility: reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   .animate-slow-zoom,
