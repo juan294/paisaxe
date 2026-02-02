@@ -114,7 +114,7 @@ export async function PATCH(
       .from("stories")
       .update(updateData)
       .eq("id", id)
-      .select("id, slug, title, subtitle, description, category, location, duration, source_pdf, updated_at")
+      .select("id, slug, title, subtitle, description, category, location, duration, source_pdf, metadata, updated_at")
       .single();
 
     if (updateError) {
@@ -143,6 +143,7 @@ export async function PATCH(
         location: updatedStory.location as StoryLocation | null,
         duration: updatedStory.duration as StoryDuration | null,
         sourcePdf: updatedStory.source_pdf,
+        metadata: updatedStory.metadata as Record<string, unknown> | null,
         updatedAt: updatedStory.updated_at,
       },
     });

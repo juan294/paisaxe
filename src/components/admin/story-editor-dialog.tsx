@@ -43,6 +43,9 @@ import {
   X,
   FileText,
   Image as ImageIcon,
+  MessageCircleQuestion,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import type { AdminStory, CurationStatus, ContentImage } from "@/types/admin";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
@@ -112,6 +115,7 @@ export function StoryEditorDialog({
   const [location, setLocation] = useState<StoryLocation | "">("");
   const [duration, setDuration] = useState<StoryDuration | "">("");
   const [sourcePdf, setSourcePdf] = useState("");
+  const [questionPrompts, setQuestionPrompts] = useState<string[]>([]);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
 
   // Image form state
@@ -147,8 +151,9 @@ export function StoryEditorDialog({
       setLocation(story.location || "");
       setDuration(story.duration || "");
       setSourcePdf(story.sourcePdf || "");
+      setQuestionPrompts((story.metadata?.question_prompts as string[]) || []);
       setImageSource(story.imageSource || "");
-      setShowOptionalFields(!!(story.location || story.duration || story.sourcePdf));
+      setShowOptionalFields(!!(story.location || story.duration || story.sourcePdf || (story.metadata?.question_prompts as string[])?.length));
       setHasDetailsChanges(false);
       setHasImageChanges(false);
       setPreviewUrl(null);
@@ -162,6 +167,10 @@ export function StoryEditorDialog({
   // Track details changes
   useEffect(() => {
     if (!story) return;
+    const originalPrompts = (story.metadata?.question_prompts as string[]) || [];
+    const promptsChanged =
+      questionPrompts.length !== originalPrompts.length ||
+      questionPrompts.some((p, i) => p !== originalPrompts[i]);
     const changed =
       title !== story.title ||
       slug !== story.slug ||
@@ -170,9 +179,10 @@ export function StoryEditorDialog({
       category !== story.category ||
       location !== (story.location || "") ||
       duration !== (story.duration || "") ||
-      sourcePdf !== (story.sourcePdf || "");
+      sourcePdf !== (story.sourcePdf || "") ||
+      promptsChanged;
     setHasDetailsChanges(changed);
-  }, [story, title, slug, subtitle, description, category, location, duration, sourcePdf]);
+  }, [story, title, slug, subtitle, description, category, location, duration, sourcePdf, questionPrompts]);
 
   // Track image changes
   useEffect(() => {
@@ -331,6 +341,13 @@ export function StoryEditorDialog({
     try {
       // Save details if changed
       if (hasDetailsChanges) {
+        // Build metadata with question_prompts
+        const filteredPrompts = questionPrompts.filter(p => p.trim());
+        const updatedMetadata = {
+          ...(story.metadata || {}),
+          question_prompts: filteredPrompts.length > 0 ? filteredPrompts : undefined,
+        };
+
         const detailsResult = await updateStory(story.id, {
           title: title.trim(),
           slug: slug.trim(),
@@ -340,6 +357,7 @@ export function StoryEditorDialog({
           location: location ? (location as StoryLocation) : null,
           duration: duration ? (duration as StoryDuration) : null,
           sourcePdf: sourcePdf.trim() || null,
+          metadata: updatedMetadata,
         });
 
         if (detailsResult.error) {
@@ -358,6 +376,7 @@ export function StoryEditorDialog({
             location: detailsResult.data.location || undefined,
             duration: detailsResult.data.duration || undefined,
             sourcePdf: detailsResult.data.sourcePdf || undefined,
+            metadata: detailsResult.data.metadata || undefined,
           });
         }
       }
@@ -456,6 +475,7 @@ export function StoryEditorDialog({
     setLocation("");
     setDuration("");
     setSourcePdf("");
+    setQuestionPrompts([]);
     setImageUrl("");
     setImageSource("");
     setPreviewUrl(null);
@@ -687,6 +707,60 @@ export function StoryEditorDialog({
                         placeholder="guide.pdf"
                         className="bg-white dark:bg-[#252320]"
                       />
+                    </div>
+
+                    {/* Question Prompts */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-1.5 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                          <MessageCircleQuestion className="h-4 w-4" />
+                          Question Prompts
+                        </Label>
+                        <button
+                          type="button"
+                          onClick={() => setQuestionPrompts([...questionPrompts, ""])}
+                          disabled={questionPrompts.length >= 5}
+                          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[#6b6560] transition-colors hover:bg-[#e5e3de] disabled:opacity-50 dark:text-[#a39e98] dark:hover:bg-[#3d3a36]"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-[#a39e98]">
+                        Clickable suggestions shown below stories (requires feature flag)
+                      </p>
+                      {questionPrompts.length === 0 ? (
+                        <div className="flex items-center justify-center rounded-lg border border-dashed border-[#e5e3de] py-4 dark:border-[#3d3a36]">
+                          <p className="text-xs text-[#a39e98]">No prompts added</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {questionPrompts.map((prompt, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <Input
+                                value={prompt}
+                                onChange={(e) => {
+                                  const updated = [...questionPrompts];
+                                  updated[index] = e.target.value;
+                                  setQuestionPrompts(updated);
+                                }}
+                                placeholder={`e.g., ¿Cuándo se construyó?`}
+                                className="flex-1 bg-white text-sm dark:bg-[#252320]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = questionPrompts.filter((_, i) => i !== index);
+                                  setQuestionPrompts(updated);
+                                }}
+                                className="flex h-9 w-9 items-center justify-center rounded-md text-[#a39e98] transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
