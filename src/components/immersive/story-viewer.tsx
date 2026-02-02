@@ -470,9 +470,11 @@ export function StoryViewer({
         )}
 
         {/* Suggest Place button - hidden on mobile */}
-        <div className="hidden md:block">
-          <SuggestPlaceButton />
-        </div>
+        {isEnabled("user_story_suggestions") && (
+          <div className="hidden md:block">
+            <SuggestPlaceButton />
+          </div>
+        )}
 
         {/* Mobile overflow menu */}
         <ToolbarOverflowMenu>
@@ -529,14 +531,16 @@ export function StoryViewer({
               }}
             />
           )}
-          <ToolbarOverflowItem
-            icon={<Lightbulb className="h-4 w-4" />}
-            label={t("suggestions.suggest_short")}
-            onClick={() => {
-              // Trigger suggest place dialog - need to use a global event or ref
-              document.querySelector<HTMLButtonElement>('[data-suggest-place-trigger]')?.click();
-            }}
-          />
+          {isEnabled("user_story_suggestions") && (
+            <ToolbarOverflowItem
+              icon={<Lightbulb className="h-4 w-4" />}
+              label={t("suggestions.suggest_short")}
+              onClick={() => {
+                // Trigger suggest place dialog - need to use a global event or ref
+                document.querySelector<HTMLButtonElement>('[data-suggest-place-trigger]')?.click();
+              }}
+            />
+          )}
         </ToolbarOverflowMenu>
 
         {/* Fullscreen - shows on iOS/iPadOS and desktop when enabled */}
