@@ -238,7 +238,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
       />
 
       {/* Chat panel */}
-      <div className="relative w-full max-w-lg bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden animate-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
+      <div className="relative z-10 w-full max-w-lg bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden animate-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none">
         {/* Header with voice mode toggle */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <div className="flex-1">
