@@ -176,6 +176,11 @@ export function VoiceChatElevenLabs({
       await conversation.startSession({
         agentId,
         connectionType: "websocket",
+        dynamicVariables: {
+          story_title: localizedStory.title,
+          story_subtitle: localizedStory.subtitle,
+          story_description: localizedStory.description,
+        },
       });
     } catch (err) {
       console.error("Failed to start voice conversation:", err);

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1200" fill="none">
+  <!-- Background -->
+  <rect width="1600" height="1200" fill="#0a0a0a"/>
+
+  <!-- Subtle gradient overlay -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#22c55e" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#0a0a0a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="800" cy="600" rx="600" ry="450" fill="url(#glow)"/>
+
+  <!-- Mountain logo (scaled and centered) -->
+  <g transform="translate(600, 350)">
+    <path d="M100 300L200 100L300 300" stroke="#22c55e" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path d="M136 250L200 138L264 250" stroke="#86efac" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="200" cy="88" r="18" fill="#22c55e"/>
+  </g>
+
+  <!-- Audio waveform bars around the logo -->
+  <g transform="translate(800, 600)">
+    <!-- Left side bars -->
+    <rect x="-320" y="-40" width="12" height="80" rx="6" fill="#22c55e" opacity="0.6"/>
+    <rect x="-290" y="-60" width="12" height="120" rx="6" fill="#22c55e" opacity="0.7"/>
+    <rect x="-260" y="-30" width="12" height="60" rx="6" fill="#22c55e" opacity="0.5"/>
+
+    <!-- Right side bars -->
+    <rect x="248" y="-30" width="12" height="60" rx="6" fill="#22c55e" opacity="0.5"/>
+    <rect x="278" y="-60" width="12" height="120" rx="6" fill="#22c55e" opacity="0.7"/>
+    <rect x="308" y="-40" width="12" height="80" rx="6" fill="#22c55e" opacity="0.6"/>
+  </g>
+
+  <!-- "24h" text badge -->
+  <g transform="translate(800, 820)">
+    <rect x="-60" y="-30" width="120" height="60" rx="30" fill="#22c55e"/>
+    <text x="0" y="10" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#0a0a0a" text-anchor="middle">24h</text>
+  </g>
+
+  <!-- "Voice Pass" text -->
+  <text x="800" y="920" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="600" fill="#ffffff" text-anchor="middle" opacity="0.9">Voice Pass</text>
+</svg>

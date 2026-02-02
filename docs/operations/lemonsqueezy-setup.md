@@ -34,6 +34,10 @@ Lemon Squeezy has two separate environments:
 
 ## Environment Variables
 
+**CRITICAL**: Webhooks always send **numeric** variant IDs, even in test mode. You need both:
+- `NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID` - UUID for checkout URLs (from Share button)
+- `LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC` - Numeric ID for webhook matching (from "Copy variant ID")
+
 ### Test Mode (Development)
 
 ```bash
@@ -42,6 +46,8 @@ NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID=paisaxe
 NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID=bf128a3b-c4a4-4f19-a0eb-5ad346492538
 NEXT_PUBLIC_LEMONSQUEEZY_TEST_MODE=true
 LEMONSQUEEZY_WEBHOOK_SECRET=<your-test-webhook-secret>
+# Server-side: numeric ID for webhook matching (from "Copy variant ID")
+LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC=1267701
 ```
 
 ### Live Mode (Production)
@@ -50,6 +56,7 @@ LEMONSQUEEZY_WEBHOOK_SECRET=<your-test-webhook-secret>
 # Vercel environment variables
 NEXT_PUBLIC_LEMONSQUEEZY_STORE_ID=paisaxe
 NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID=<live-uuid-from-share-button>
+LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC=<live-numeric-id>
 # No TEST_MODE variable (or set to false)
 LEMONSQUEEZY_WEBHOOK_SECRET=<your-live-webhook-secret>
 ```
@@ -105,13 +112,53 @@ Use these for testing (Test Mode only):
 - **Cause**: Webhook secret mismatch or database error
 - **Fix**: Check webhook secret matches, check Supabase logs
 
+### Webhook Returns 400 "Unknown product variant"
+- **Cause**: Missing `LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC` env var
+- **Fix**: Add the numeric variant ID (from "Copy variant ID" menu) to server env vars
+- **Note**: Webhooks ALWAYS send numeric IDs, even in test mode. The UUID is only for checkout URLs.
+
 ## Going Live Checklist
 
+### Prerequisites
 - [ ] Account verified by Lemon Squeezy
 - [ ] Product copied to Live Mode (use "Copy to Live Mode" in product menu)
-- [ ] Get new variant ID from Share button in Live Mode
-- [ ] Update Vercel env vars with live variant ID
-- [ ] Create live webhook in Lemon Squeezy
-- [ ] Update Vercel env vars with live webhook secret
-- [ ] Remove `NEXT_PUBLIC_LEMONSQUEEZY_TEST_MODE` from production
+
+### Get Live Mode IDs
+1. Switch to **Live Mode** in Lemon Squeezy dashboard (toggle at bottom left)
+2. Go to Store → Products → Voice Pass · 24h
+3. Click **Share** → copy UUID from checkout URL (for `NEXT_PUBLIC_*`)
+4. Click **⋯ menu** → "Copy variant ID" → copy numeric ID (for `LEMONSQUEEZY_*_NUMERIC`)
+
+### Create Live Webhook
+1. Go to Settings → Webhooks (in Live Mode)
+2. Create webhook: `https://paisaxe.es/api/webhooks/lemonsqueezy`
+3. Select event: `order_created`
+4. Copy the signing secret
+
+### Update Vercel Environment Variables
+
+```bash
+# Remove test mode flag
+vercel env rm NEXT_PUBLIC_LEMONSQUEEZY_TEST_MODE production -y
+
+# Update checkout URL variant ID (UUID from Share button)
+vercel env rm NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID production -y
+echo "<live-uuid-from-share-button>" | vercel env add NEXT_PUBLIC_LEMONSQUEEZY_DAY_PASS_VARIANT_ID production
+
+# Update webhook variant ID (numeric from Copy variant ID)
+vercel env rm LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC production -y
+echo "<live-numeric-id>" | vercel env add LEMONSQUEEZY_DAY_PASS_VARIANT_ID_NUMERIC production
+
+# Update webhook secret
+vercel env rm LEMONSQUEEZY_WEBHOOK_SECRET production -y
+echo "<live-webhook-secret>" | vercel env add LEMONSQUEEZY_WEBHOOK_SECRET production
+
+# Deploy with new env vars
+vercel --prod
+```
+
+### Verify
 - [ ] Test a real purchase (can refund after)
+- [ ] Verify webhook receives 200 response
+- [ ] Verify `voice_purchases` entry created in database
+- [ ] Verify voice features enabled for user

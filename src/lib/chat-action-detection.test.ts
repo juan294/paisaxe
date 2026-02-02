@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   detectPhoneNumbers,
   detectAddresses,
+  detectPlaceNames,
   detectChatActions,
 } from "./chat-action-detection";
 
@@ -208,6 +209,113 @@ describe("chat-action-detection", () => {
     });
   });
 
+  describe("detectPlaceNames", () => {
+    it("detects Lagos de Covadonga", () => {
+      const text = "Puedes visitar los Lagos de Covadonga, son espectaculares.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe("Lagos de Covadonga");
+      expect(result[0].mapsUrl).toContain("google.com/maps");
+    });
+
+    it("detects Basilica de Covadonga", () => {
+      const text = "La Basílica de Covadonga es un lugar de peregrinación.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe("Basílica de Covadonga");
+    });
+
+    it("detects Picos de Europa", () => {
+      const text = "Los Picos de Europa ofrecen rutas de senderismo increíbles.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe("Picos de Europa");
+    });
+
+    it("detects Ruta del Cares", () => {
+      const text = "Te recomiendo hacer la Ruta del Cares, es impresionante.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe("Ruta del Cares");
+    });
+
+    it("detects Playa de Gulpiyuri", () => {
+      const text = "La Playa de Gulpiyuri es una playa interior única.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe("Playa de Gulpiyuri");
+    });
+
+    it("detects Catedral de Oviedo", () => {
+      const text = "La Catedral de Oviedo es impresionante.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe("Catedral de Oviedo");
+    });
+
+    it("detects Santa María del Naranco", () => {
+      const text = "Santa María del Naranco es arte prerrománico asturiano.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe("Santa María del Naranco");
+    });
+
+    it("detects multiple landmarks in one text", () => {
+      const text = "Desde Cangas de Onís puedes ir a los Lagos de Covadonga y luego hacer la Ruta del Cares.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(3);
+      expect(result.map((r) => r.text)).toContain("Cangas de Onís");
+      expect(result.map((r) => r.text)).toContain("Lagos de Covadonga");
+      expect(result.map((r) => r.text)).toContain("Ruta del Cares");
+    });
+
+    it("detects landmarks case-insensitively", () => {
+      const text = "Los lagos de covadonga son preciosos.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text.toLowerCase()).toBe("lagos de covadonga");
+    });
+
+    it("returns empty array when no landmarks found", () => {
+      const text = "Asturias tiene una gastronomía excepcional.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toEqual([]);
+    });
+
+    it("deduplicates repeated landmarks", () => {
+      const text = "Los Lagos de Covadonga son bonitos. Los Lagos de Covadonga están en Picos.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+    });
+
+    it("detects Bufones de Pría", () => {
+      const text = "Los Bufones de Pría lanzan agua cuando hay marejada.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe("Bufones de Pría");
+    });
+
+    it("detects Playa de Rodiles", () => {
+      const text = "La Playa de Rodiles es perfecta para surfear.";
+      const result = detectPlaceNames(text);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe("Playa de Rodiles");
+    });
+  });
+
   describe("detectChatActions", () => {
     it("returns phones and addresses when both present", () => {
       const text =
@@ -263,6 +371,25 @@ describe("chat-action-detection", () => {
 
       expect(result.phones).toHaveLength(2);
       expect(result.addresses).toHaveLength(2);
+      expect(result.hasActions).toBe(true);
+    });
+
+    it("detects landmarks in addition to addresses", () => {
+      const text = "Te recomiendo visitar los Lagos de Covadonga. Quedan cerca de Cangas de Onís.";
+      const result = detectChatActions(text);
+
+      expect(result.addresses).toHaveLength(2);
+      expect(result.addresses.map((a) => a.text)).toContain("Lagos de Covadonga");
+      expect(result.addresses.map((a) => a.text)).toContain("Cangas de Onís");
+      expect(result.hasActions).toBe(true);
+    });
+
+    it("merges landmarks with street addresses without duplicates", () => {
+      const text = "La Catedral de Oviedo está en Plaza Alfonso II, Oviedo.";
+      const result = detectChatActions(text);
+
+      // Should have both the landmark and the address
+      expect(result.addresses.length).toBeGreaterThanOrEqual(1);
       expect(result.hasActions).toBe(true);
     });
   });
