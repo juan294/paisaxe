@@ -49,8 +49,8 @@ test.describe("Chat panel", () => {
     const chatPanel = page.locator(".fixed.inset-0.z-50");
     await expect(chatPanel).toBeVisible();
 
-    // Dismiss privacy notice if shown
-    const privacyButton = page.locator("button").filter({ hasText: /entend|accept|ok/i });
+    // Dismiss privacy notice if shown (must be inside chat panel)
+    const privacyButton = chatPanel.locator("button").filter({ hasText: /entend|understood|ok/i });
     if (await privacyButton.isVisible({ timeout: 1000 }).catch(() => false)) {
       await privacyButton.click();
     }
