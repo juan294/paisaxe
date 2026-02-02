@@ -109,6 +109,179 @@ export function detectPhoneNumbers(text: string): PhoneMatch[] {
 }
 
 /**
+ * Generate a Google Maps search URL for an address
+ */
+function generateMapsUrl(address: string): string {
+  const query = encodeURIComponent(address);
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
+/**
+ * Curated list of Asturian landmarks and places for detection
+ *
+ * These are popular locations that may appear in chat messages
+ * but don't follow formal Spanish address patterns.
+ */
+const ASTURIAN_LANDMARKS = [
+  // Natural landmarks
+  "Lagos de Covadonga",
+  "Picos de Europa",
+  "Ruta del Cares",
+  "Playa de Gulpiyuri",
+  "Playa de Rodiles",
+  "Playa de Torimbia",
+  "Playa de Ballota",
+  "Playa de Cuevas del Mar",
+  "Playa del Silencio",
+  "Playa de San Lorenzo",
+  "Bufones de Pría",
+  "Naranjo de Bulnes",
+  "Picu Urriellu",
+  "Senda del Oso",
+  "Parque Natural de Somiedo",
+  "Parque Natural de Redes",
+  "Cabo Peñas",
+  "Mirador del Fito",
+  "Cascadas de Oneta",
+  "Bosque de Muniellos",
+  "Desfiladero de los Beyos",
+  "Desfiladero de la Hermida",
+
+  // Religious and historical
+  "Basílica de Covadonga",
+  "Basilica de Covadonga",
+  "Santa Cueva de Covadonga",
+  "Catedral de Oviedo",
+  "Catedral de San Salvador",
+  "Santa María del Naranco",
+  "San Miguel de Lillo",
+  "San Julián de los Prados",
+  "Santullano",
+  "Cámara Santa",
+  "Monasterio de San Pedro de Villanueva",
+  "Monasterio de Valdediós",
+
+  // Cities and towns
+  "Oviedo",
+  "Gijón",
+  "Avilés",
+  "Cangas de Onís",
+  "Llanes",
+  "Ribadesella",
+  "Luarca",
+  "Cudillero",
+  "Lastres",
+  "Tazones",
+  "Covadonga",
+  "Arriondas",
+  "Pola de Somiedo",
+  "Taramundi",
+  "Villaviciosa",
+
+  // Museums and cultural sites
+  "Museo del Jurásico",
+  "MUJA",
+  "Centro Niemeyer",
+  "Laboral Ciudad de la Cultura",
+  "Acuario de Gijón",
+  "Jardín Botánico de Gijón",
+
+  // Gastronomy locations
+  "Mercado El Fontán",
+  "Puerto de Cudillero",
+  "Puerto de Lastres",
+  "Puerto de Tazones",
+
+  // Camino de Santiago
+  "Camino Primitivo",
+  "Camino del Norte",
+  "Camino de la Costa",
+];
+
+/**
+ * Detect Asturian landmark and place names in text
+ *
+ * Looks for known landmarks like "Lagos de Covadonga", "Picos de Europa", etc.
+ * that don't follow formal address patterns but should still show a Maps button.
+ */
+export function detectPlaceNames(text: string): AddressMatch[] {
+  const lowerText = text.toLowerCase();
+
+  // Find all matches with their positions
+  interface MatchCandidate {
+    text: string;
+    start: number;
+    end: number;
+  }
+
+  const candidates: MatchCandidate[] = [];
+
+  // Sort landmarks by length descending so longer matches are found first
+  const sortedLandmarks = [...ASTURIAN_LANDMARKS].sort(
+    (a, b) => b.length - a.length
+  );
+
+  for (const landmark of sortedLandmarks) {
+    const lowerLandmark = landmark.toLowerCase();
+
+    // Find all occurrences of this landmark in the text (case-insensitive)
+    let searchStart = 0;
+    while (true) {
+      const index = lowerText.indexOf(lowerLandmark, searchStart);
+      if (index === -1) break;
+
+      // Extract the actual text as it appears in the original
+      const actualText = text.slice(index, index + landmark.length);
+
+      candidates.push({
+        text: actualText,
+        start: index,
+        end: index + landmark.length,
+      });
+
+      searchStart = index + 1;
+    }
+  }
+
+  // Sort by start position, then by length (longest first)
+  candidates.sort((a, b) => a.start - b.start || b.text.length - a.text.length);
+
+  // Remove overlapping matches (keep the longer one)
+  const matches: AddressMatch[] = [];
+  const seen = new Set<string>();
+  const usedRanges: Array<{ start: number; end: number }> = [];
+
+  for (const candidate of candidates) {
+    // Check if this candidate overlaps with any already-added match
+    const overlaps = usedRanges.some(
+      (range) =>
+        (candidate.start >= range.start && candidate.start < range.end) ||
+        (candidate.end > range.start && candidate.end <= range.end) ||
+        (candidate.start <= range.start && candidate.end >= range.end)
+    );
+
+    if (overlaps) continue;
+
+    const normalized = candidate.text.toLowerCase();
+
+    // Always mark this range as used (even for duplicate text)
+    // This prevents shorter landmarks within this range from being detected
+    usedRanges.push({ start: candidate.start, end: candidate.end });
+
+    // Skip if we've already added this text to results
+    if (seen.has(normalized)) continue;
+
+    seen.add(normalized);
+    matches.push({
+      text: candidate.text,
+      mapsUrl: generateMapsUrl(candidate.text + ", Asturias, Spain"),
+    });
+  }
+
+  return matches;
+}
+
+/**
  * Detect Spanish addresses in text
  *
  * Looks for common address patterns:
@@ -229,26 +402,46 @@ export function detectAddresses(text: string): AddressMatch[] {
 }
 
 /**
- * Generate a Google Maps search URL for an address
- */
-function generateMapsUrl(address: string): string {
-  const query = encodeURIComponent(address);
-  return `https://www.google.com/maps/search/?api=1&query=${query}`;
-}
-
-/**
  * Detect all actionable content in a chat message
  *
- * Combines phone and address detection into a single result
+ * Combines phone, address, and landmark detection into a single result
  * that can be used to render action buttons.
  */
 export function detectChatActions(text: string): ChatActionsResult {
   const phones = detectPhoneNumbers(text);
   const addresses = detectAddresses(text);
+  const places = detectPlaceNames(text);
+
+  // Merge addresses and places, deduplicating by normalized text
+  const seenTexts = new Set<string>();
+  const allAddresses: AddressMatch[] = [];
+
+  // Add street addresses first (they're more specific)
+  for (const addr of addresses) {
+    const normalized = addr.text.toLowerCase();
+    if (!seenTexts.has(normalized)) {
+      seenTexts.add(normalized);
+      allAddresses.push(addr);
+    }
+  }
+
+  // Add place names that weren't already found as addresses
+  for (const place of places) {
+    const normalized = place.text.toLowerCase();
+    // Check if this place is already covered by an address
+    const alreadyCovered = allAddresses.some((addr) =>
+      addr.text.toLowerCase().includes(normalized) ||
+      normalized.includes(addr.text.toLowerCase())
+    );
+    if (!alreadyCovered && !seenTexts.has(normalized)) {
+      seenTexts.add(normalized);
+      allAddresses.push(place);
+    }
+  }
 
   return {
     phones,
-    addresses,
-    hasActions: phones.length > 0 || addresses.length > 0,
+    addresses: allAddresses,
+    hasActions: phones.length > 0 || allAddresses.length > 0,
   };
 }
