@@ -53,7 +53,7 @@ RULES:
 
 # Run the coverage agent via Claude CLI in non-interactive mode
 "$CLAUDE_BIN" -p \
-  --allowedTools 'Read,Write,Edit,Bash(npx vitest*),Bash(ls *),Bash(find *),Glob,Grep' \
+  --allowedTools 'Read,Write,Edit,Bash(npx vitest*),Bash(npm run typecheck*),Bash(ls *),Bash(find *),Glob,Grep' \
   >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT
 

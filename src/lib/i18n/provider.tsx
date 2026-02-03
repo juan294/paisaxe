@@ -14,11 +14,12 @@ import { en } from './en';
 import { fr } from './fr';
 import { de } from './de';
 import { pt } from './pt';
+import { ast } from './ast';
 import { resolveTranslation } from './resolve';
 import { resolveLocale, storeLocale } from './detect-language';
 import type { Translations } from './types';
 
-const locales: Record<Locale, Translations> = { es, en, fr, de, pt };
+const locales: Record<Locale, Translations> = { es, en, fr, de, pt, ast };
 
 export interface LanguageContextValue {
   locale: Locale;

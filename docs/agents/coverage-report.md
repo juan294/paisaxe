@@ -1,16 +1,16 @@
 # Test Coverage Report
 
-> Last updated: 2026-02-02
+> Last updated: 2026-02-03
 > Scheduled: nightly at 2:00 CET via `scripts/coverage-agent.sh`
 
 ## Summary
 
-- **Total tests:** 2197
-- **Test files:** 142
-- **Statement coverage:** 62.76%
-- **Branch coverage:** 56.47%
-- **Function coverage:** 62.40%
-- **Line coverage:** 62.94%
+- **Total tests:** 2294
+- **Test files:** 152
+- **Statement coverage:** 64.92%
+- **Branch coverage:** 58.97%
+- **Function coverage:** 63.53%
+- **Line coverage:** 65.24%
 
 *Note: Coverage percentages appear lower due to expanded coverage scope that now includes more previously-uncovered files.*
 
@@ -47,8 +47,10 @@
 | `src/app/immersive/layout.tsx` | App |
 | `src/app/immersive/loading.tsx` | App |
 | `src/app/story/[slug]/opengraph-image.tsx` | App |
+| `src/app/story/[slug]/page.tsx` | App |
 | `src/components/a11y/lang-sync.tsx` | A11y |
 | `src/components/a11y/skip-link.tsx` | A11y |
+| `src/components/admin/admin-tabs.tsx` | Admin |
 | `src/components/admin/curation-badge.tsx` | Admin |
 | `src/components/admin/placeholder-badge.tsx` | Admin |
 | `src/components/admin/selection-toolbar.tsx` | Admin |
@@ -115,6 +117,7 @@
 |------|-------|--------|-------|-------|--------|
 | `src/proxy.ts` | 98% | 97% | 100% | 98% | Line 12 is a type import only executed at compile time |
 | `src/app/admin/page.tsx` | 56% | 61% | 47% | 58% | Complex admin UI with many interactive states that require browser-specific testing |
+| `src/app/api/admin/agent-reports/route.ts` | 92% | 100% | 100% | 92% | File system operations with fs.stat edge cases |
 | `src/app/api/admin/elevenlabs-analytics/route.ts` | 91% | 81% | 95% | 90% | Some ElevenLabs API response edge cases not testable without live API |
 | `src/app/api/admin/marketing/accounts/route.ts` | 76% | 85% | 100% | 76% | Error handling branches for database constraint violations |
 | `src/app/api/admin/marketing/agent/route.ts` | 81% | 71% | 100% | 81% | Complex AI agent response handling edge cases |
@@ -128,13 +131,18 @@
 | `src/app/api/chat/route.ts` | 91% | 70% | 100% | 91% | Claude API streaming edge cases |
 | `src/app/api/favorites/route.ts` | 93% | 100% | 70% | 92% | Middleware auth bypass path not reachable in tests |
 | `src/app/api/health/route.ts` | 90% | 61% | 100% | 90% | Database storage calculation branches |
+| `src/app/api/suggestions/route.ts` | 88% | 94% | 67% | 88% | Rate limiting internal state management |
+| `src/app/api/voice-access/route.ts` | 84% | 100% | 50% | 84% | getSupabaseClient helper function coverage |
 | `src/app/api/webhooks/supabase/route.ts` | 95% | 95% | 100% | 100% | HMAC validation branch |
 | `src/app/auth/callback/route.ts` | 71% | 100% | 25% | 71% | Supabase Auth cookie handling (setAll catch block unreachable in jsdom) |
 | `src/app/favorites/page.tsx` | 86% | 77% | 82% | 89% | Complex RSC with suspense boundaries |
 | `src/app/immersive/page.tsx` | 69% | 46% | 69% | 70% | Complex client interactions with story navigation |
-| `src/app/story/[slug]/page.tsx` | 0% | 0% | 0% | 0% | Server component with redirect - tested via generateMetadata in separate test file |
+| `src/app/pricing/page.tsx` | 71% | 70% | 100% | 71% | LemonSqueezy checkout flow with client-side redirects |
+| `src/app/pricing/success/page.tsx` | 100% | 100% | 100% | 100% | Fully covered |
 | `src/components/provider.tsx` | 60% | 50% | 100% | 60% | PostHog analytics initialization (browser-only) |
+| `src/components/admin/theme-toggle.tsx` | 100% | 100% | 100% | 100% | Fully covered |
 | `src/components/admin/*` (multiple) | 0-42% | 0-48% | 0-40% | 0-42% | Complex admin UI components with browser-specific interactions |
+| `src/components/immersive/fullscreen-button.tsx` | ~80% | ~75% | ~80% | ~80% | Fullscreen API not available in jsdom (requestFullscreen/exitFullscreen) |
 | `src/components/immersive/mood-overlay.tsx` | 11% | 100% | 0% | 11% | Framer Motion animation component - visual testing only |
 | `src/components/immersive/question-prompts.tsx` | 0% | 0% | 0% | 0% | Simple presentational component - covered by parent tests |
 | `src/components/immersive/freshness-badge.tsx` | 0% | 0% | 0% | 0% | Simple presentational component - covered by parent tests |
@@ -179,59 +187,60 @@ These are deliberately untested and considered acceptable:
 
 8. **Claude API streaming** (`src/lib/claude.ts` streaming functions): The Anthropic SDK streaming requires live API access. Core response generation is tested; streaming edge cases are covered by E2E tests.
 
-9. **Story page redirect** (`src/app/story/[slug]/page.tsx`): Server component that immediately redirects. The `generateMetadata` function is fully tested in a separate test file.
+9. **Fullscreen API** (`src/components/immersive/fullscreen-button.tsx`): The browser Fullscreen API (requestFullscreen/exitFullscreen) is not available in jsdom. iOS modal flow is tested.
 
 ## Changes Made This Run
 
-### Test files created:
-- `src/app/coming-soon/page.test.tsx` (9 tests) - Tests for coming-soon page component and metadata
-- `src/app/story/[slug]/page.test.tsx` (5 tests) - Tests for story page redirect and metadata generation
-- `src/app/api/admin/marketing/agent-logs/route.test.ts` (9 tests) - Tests for agent logs API endpoint
-- `src/app/api/admin/marketing/posts/route.test.ts` (18 tests) - Tests for marketing posts CRUD API
-- `src/app/api/admin/marketing/schedule/route.test.ts` (29 tests) - Tests for schedule management API
-- `src/app/api/chat/stream/route.test.ts` (12 tests) - Tests for SSE streaming chat endpoint
+### Test files created (2026-02-03):
+- `src/app/api/voice-access/route.test.ts` (7 tests) - Tests for voice access API endpoint
+- `src/app/api/suggestions/route.test.ts` (16 tests) - Tests for suggestions API endpoint (GET/POST)
+- `src/app/api/admin/agent-reports/route.test.ts` (3 tests) - Tests for agent reports API
+- `src/app/coming-soon/page.test.tsx` (6 tests) - Tests for coming-soon page component
+- `src/app/pricing/page.test.tsx` (12 tests) - Tests for pricing page component
+- `src/app/pricing/success/page.test.tsx` (9 tests) - Tests for pricing success page
+- `src/app/story/[slug]/page.test.tsx` (4 tests) - Tests for story page redirect and metadata
+- `src/components/admin/admin-tabs.test.tsx` (7 tests) - Tests for admin tabs component
+- `src/components/admin/theme-toggle.test.tsx` (6 tests) - Tests for theme toggle component
+- `src/components/immersive/fullscreen-button.test.tsx` (5 tests) - Tests for fullscreen button (iOS modal)
 
-### Coverage improvements (2026-01-30):
-- **src/app/coming-soon/page.tsx**: 0% → 100%
-- **src/app/api/admin/marketing/agent-logs/route.ts**: 0% → 100%
-- **src/app/api/admin/marketing/posts/route.ts**: 0% → 100%
-- **src/app/api/admin/marketing/schedule/route.ts**: 0% → 96%
-- **src/app/api/chat/stream/route.ts**: 0% → 100%
+### Coverage improvements (2026-02-03):
+- **src/app/api/voice-access/route.ts**: 0% → 84%
+- **src/app/api/suggestions/route.ts**: 0% → 88%
+- **src/app/api/admin/agent-reports/route.ts**: 0% → 92%
+- **src/app/coming-soon/page.tsx**: Maintained at 100%
+- **src/app/pricing/page.tsx**: 0% → 71%
+- **src/app/pricing/success/page.tsx**: 0% → 100%
+- **src/app/story/[slug]/page.tsx**: 0% → 100%
+- **src/components/admin/admin-tabs.tsx**: 0% → 100%
+- **src/components/admin/theme-toggle.tsx**: 0% → 100%
+- **src/components/immersive/fullscreen-button.tsx**: 0% → ~80%
 
-### Coverage improvements (2026-02-02):
-- **src/lib/encryption.ts**: 0% → 100%
-- **src/lib/credentials.ts**: 0% → 100%
-- **src/lib/platforms/types.ts**: 0% → 100%
-- **src/lib/platforms/index.ts**: 0% → ~93%
-- **src/lib/platforms/x-client.ts**: 0% → ~94%
-- **src/components/immersive/freshness-badge.tsx**: 0% → 100%
-- **src/components/immersive/question-prompts.tsx**: 0% → 100%
-- **src/components/immersive/user-submitted-badge.tsx**: 0% → 100%
-- **src/components/immersive/surprise-me-button.tsx**: 0% → 100%
-- **src/components/immersive/mood-overlay.tsx**: 11% → 100%
-- **src/components/immersive/suggest-place-button.tsx**: 0% → 100%
-- **src/components/immersive/suggest-place-dialog.tsx**: 0% → ~73%
-- **src/components/premium/voice-purchase-cta.tsx**: 0% → ~87%
-
-### Overall improvement (2026-01-30):
-- Statement coverage: 72.75% → 78.39% (+5.64%)
-- Branch coverage: 66.42% → 71.78% (+5.36%)
-- Function coverage: 70.98% → 72.25% (+1.27%)
-- Line coverage: 73.23% → 79.19% (+5.96%)
-- Total tests: 1921 → 1998 (+77 tests)
-
-### Overall improvement (2026-02-02):
-- Total tests: 1998 → 2197 (+199 tests)
-- Test files: 127 → 142 (+15 files)
+### Overall improvement (2026-02-03):
+- Statement coverage: 62.11% → 64.92% (+2.81%)
+- Branch coverage: 56.01% → 58.97% (+2.96%)
+- Function coverage: 60.94% → 63.53% (+2.59%)
+- Line coverage: 62.31% → 65.24% (+2.93%)
+- Total tests: 2197 → 2294 (+97 tests)
+- Test files: 142 → 152 (+10 files)
 
 ## How It Works
 
 1. Runs `npx vitest run --coverage` to measure current coverage
 2. Identifies files below 100% statement coverage
-3. Reads source + test files, writes missing tests
-4. Re-runs full suite to verify nothing broke
-5. Updates this file with the results
-6. Logs output to `logs/coverage-agent-YYYY-MM-DD.log`
+3. Reads source + test files, **including actual type definitions**
+4. Writes missing tests with **correctly typed mocks**
+5. **Runs `npm run typecheck` to validate TypeScript** — fixes any errors before proceeding
+6. Re-runs full suite to verify nothing broke
+7. Updates this file with the results
+8. Logs output to `logs/coverage-agent-YYYY-MM-DD.log`
+
+### Type Safety Requirements
+
+The coverage agent MUST ensure all generated tests pass TypeScript validation:
+- Mock objects must match their real interface exactly
+- No extra properties on mock returns (e.g., `{ valid: true }` union types shouldn't have `error` property)
+- Nullable types must be properly annotated (`as Date | null`)
+- Always read actual type definitions before creating mocks
 
 Run manually anytime:
 ```bash
@@ -246,3 +255,6 @@ Run manually anytime:
 - **2026-02-02**: Coverage Agent run -- 2197 tests, 142 files (+199 tests, +15 test files)
   - Added tests for: encryption, credentials, platforms module, immersive components (freshness-badge, question-prompts, user-submitted-badge, surprise-me-button, mood-overlay, suggest-place-dialog, suggest-place-button), voice-purchase-cta
   - Previously 0% files now covered: freshness-badge (100%), question-prompts (100%), user-submitted-badge (100%), surprise-me-button (100%), mood-overlay (100%), suggest-place-button (100%), encryption (100%), credentials (100%), platforms/types (100%), platforms/index (~93%), platforms/x-client (~94%)
+- **2026-02-03**: Coverage Agent run -- 2294 tests, 152 files (+2.81% statement coverage)
+  - Added tests for: voice-access API, suggestions API, agent-reports API, pricing pages, story page redirect, admin-tabs, theme-toggle, fullscreen-button
+  - Previously 0% files now covered: voice-access (84%), suggestions (88%), agent-reports (92%), pricing/page (71%), pricing/success (100%), story/[slug]/page (100%), admin-tabs (100%), theme-toggle (100%), fullscreen-button (~80%)

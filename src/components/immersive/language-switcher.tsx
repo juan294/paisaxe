@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 const languages: { code: Locale; label: string }[] = [
   { code: "es", label: "ES" },
+  { code: "ast", label: "AST" },
   { code: "en", label: "EN" },
   { code: "fr", label: "FR" },
   { code: "de", label: "DE" },
