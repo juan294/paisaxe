@@ -98,7 +98,7 @@ export async function keywordSearch(query: string, limit: number = 5): Promise<C
   const { data, error } = await supabase
     .from("chunks")
     .select("id, content, source_pdf, page_number, section_title, image_refs")
-    .textSearch("content", query, { type: "websearch" })
+    .textSearch("content", query, { type: "websearch", config: "spanish" })
     .limit(limit);
 
   if (error) {
