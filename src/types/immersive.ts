@@ -43,7 +43,7 @@ export interface StoryTranslation {
 }
 
 /** Supported locales for story translations (matches Locale type from i18n) */
-export type StoryLocale = 'en' | 'fr' | 'de' | 'pt';
+export type StoryLocale = 'en' | 'fr' | 'de' | 'pt' | 'ast';
 
 export interface StoryMetadata {
   question_prompts?: string[];

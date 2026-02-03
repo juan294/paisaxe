@@ -1,5 +1,5 @@
 /**
- * Story translations for en, fr, de, pt locales.
+ * Story translations for en, fr, de, pt, ast locales.
  * Spanish (es) is the default and stored in the main story fields.
  *
  * These translations are used by the seed-translations.ts script
@@ -36,6 +36,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Picos da Europa',
       description: 'Dois lagos de origem glaciar rodeados pelos imponentes picos dos Picos da Europa. Uma paisagem de tirar o fôlego em qualquer época do ano.',
     },
+    ast: {
+      title: 'Llagos de Cuadonga',
+      subtitle: 'Picos d\'Europa',
+      description: 'Dos llagos d\'orixe glaciar arrodiaos polos imponentes picos de los Picos d\'Europa. Un paisaxe de quitar l\'aliendu en cualquier temporada.',
+    },
   },
 
   'oviedo-catedral': {
@@ -58,6 +63,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Catedral de Oviedo',
       subtitle: 'Capital do Principado',
       description: 'A joia do gótico asturiano, com a sua Câmara Santa declarada Património da Humanidade. Séculos de história em cada pedra.',
+    },
+    ast: {
+      title: 'Catedral d\'Uviéu',
+      subtitle: 'Capital del Principáu',
+      description: 'La xoya del góticu asturianu, cola so Cámara Santa declarada Patrimoniu de la Humanidá. Sieglos d\'historia en cada piedra.',
     },
   },
 
@@ -82,6 +92,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Tradição em cada colherada',
       description: 'O prato mais emblemático da nossa gastronomia. Feijão branco, chouriço, morcela e presunto cozinhados lentamente com todo o sabor das Astúrias.',
     },
+    ast: {
+      title: 'Llagos de Cuadonga',
+      subtitle: 'Picos d\'Europa',
+      description: 'Dos llagos d\'orixe glaciar arrodiaos polos imponentes picos de los Picos d\'Europa. Un paisaxe de quitar l\'aliendu en cualquier temporada.',
+    },
   },
 
   'prerromanico': {
@@ -104,6 +119,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Arte Pré-Românica',
       subtitle: 'Património Mundial',
       description: 'Santa María del Naranco, San Miguel de Lillo... Tesouros arquitetónicos únicos no mundo que contam a história do Reino das Astúrias.',
+    },
+    ast: {
+      title: 'Catedral d\'Uviéu',
+      subtitle: 'Capital del Principáu',
+      description: 'La xoya del góticu asturianu, cola so Cámara Santa declarada Patrimoniu de la Humanidá. Sieglos d\'historia en cada piedra.',
     },
   },
 
@@ -128,6 +148,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'A Garganta Divina',
       description: '12 quilómetros escavados na rocha entre Caín e Poncebos. Uma das trilhas mais espetaculares da Europa.',
     },
+    ast: {
+      title: 'Fabada Asturiana',
+      subtitle: 'Tradición en cada cucharada',
+      description: 'El platu más emblemáticu de la nuesa gastronomía. Fabes, chorizu, morciellu y lacón a fueu lentu con tol sabor d\'Asturies.',
+    },
   },
 
   'playa-silencio': {
@@ -150,6 +175,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Praia do Silêncio',
       subtitle: 'Cudillero',
       description: 'Um anfiteatro natural de falésias abraçando águas cristalinas. Silêncio, paz e a beleza selvagem do Mar Cantábrico.',
+    },
+    ast: {
+      title: 'Arte Prerrománicu',
+      subtitle: 'Patrimoniu Mundial',
+      description: 'Santa María del Narancu, San Miguel de Lliño... Ayalgues arquitectóniques úniques nel mundu que cuenten la historia del Reinu d\'Asturies.',
     },
   },
 
@@ -174,6 +204,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Cultura líquida',
       description: 'A arte de escanciar, as sidrerias centenárias, o ritual do culín. Mais do que uma bebida, uma forma de entender a vida.',
     },
+    ast: {
+      title: 'Ruta del Cares',
+      subtitle: 'La Garganta Divina',
+      description: '12 quilómetros escavaos na piedra ente Caín y Poncebos. Una de les rutes de senderismu más espectaculares d\'Europa.',
+    },
   },
 
   'gijon': {
@@ -196,6 +231,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Gijón',
       subtitle: 'Cidade e mar',
       description: 'Cimadevilla, San Lorenzo, o Elogio do Horizonte... Uma cidade que olha para o mar com a personalidade única do autêntico.',
+    },
+    ast: {
+      title: 'Playa\'l Silenciu',
+      subtitle: 'Cuideiru',
+      description: 'Un anfiteatru natural de cantiles abrazando agües cristalinas. Silenciu, paz y la guapura selvaxe del Mar Cantábricu.',
     },
   },
 
@@ -220,6 +260,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Vila do Adelantado',
       description: 'O centro histórico mais bem preservado das Astúrias, com as suas arcadas medievais e o moderno Centro Niemeyer virado para o futuro.',
     },
+    ast: {
+      title: 'Sidra Asturiana',
+      subtitle: 'Cultura llíquida',
+      description: 'L\'arte d\'escanciar, les sidreríes centenaries, el ritual del culín. Más qu\'una bébora, una manera d\'entender la vida.',
+    },
   },
 
   'camino-santiago': {
@@ -242,6 +287,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Caminho de Santiago',
       subtitle: 'Caminho Primitivo',
       description: 'O caminho original traçado pelo Rei Afonso II desde Oviedo. Trilhos históricos através das montanhas e vales das Astúrias.',
+    },
+    ast: {
+      title: 'Xixón',
+      subtitle: 'Ciudá y mar',
+      description: 'Cimadevilla, San Llorienzo, l\'Eloxu del Horizonte... Una ciudá que mira al mar cola personalidá única de lo auténtico.',
     },
   },
 
@@ -266,6 +316,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Entre praias e montanhas',
       description: 'Mais de 30 praias, falésias espetaculares e um centro histórico encantador. A essência das Astúrias orientais.',
     },
+    ast: {
+      title: 'Avilés',
+      subtitle: 'Villa del Adelantáu',
+      description: 'El cascu antiguu meyor conserváu d\'Asturies, coles sos arcades medievales y el modernu Centru Niemeyer mirando al futuru.',
+    },
   },
 
   'cangas-onis': {
@@ -288,6 +343,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Cangas de Onís',
       subtitle: 'Primeira capital do reino',
       description: 'A ponte romana sobre o Sella, a Basílica de Covadonga e a porta de entrada para os Picos da Europa.',
+    },
+    ast: {
+      title: 'Camín de Santiago',
+      subtitle: 'Camín Primitivu',
+      description: 'El camín orixinal trazáu pol rei Alfonso II dende Uviéu. Senderos históricos per montes y valles d\'Asturies.',
     },
   },
 
@@ -312,6 +372,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'As Pirogas',
       description: 'A festa desportiva mais emblemática das Astúrias. Todos os agostos, milhares de remadores descem o rio de Arriondas a Ribadesella.',
     },
+    ast: {
+      title: 'Llanes',
+      subtitle: 'Ente playes y montes',
+      description: 'Más de 30 playes, cantiles espectaculares y un cascu históricu encantador. La esencia d\'Asturies oriental.',
+    },
   },
 
   'quesos-asturianos': {
@@ -334,6 +399,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Queijos Asturianos',
       subtitle: 'Mais de 40 variedades',
       description: 'Cabrales, Gamonéu, Afuega\'l Pitu... Uma tradição queijeira única na Europa, com sabores que vão do suave ao intenso.',
+    },
+    ast: {
+      title: 'Cangues d\'Onís',
+      subtitle: 'Primera capital del reinu',
+      description: 'El puente romanu sobre\'l Sella, la Basílica de Cuadonga y la puerta d\'entrada a los Picos d\'Europa.',
     },
   },
 
@@ -358,6 +428,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Rota verde do vale',
       description: '30 quilómetros de antigo traçado ferroviário convertidos em trilho. Ideal para famílias, entre bosques e o habitat do urso-pardo.',
     },
+    ast: {
+      title: 'Descensu del Sella',
+      subtitle: 'Les Piragües',
+      description: 'La fiesta deportiva más emblemática d\'Asturies. Cada agostu, miles de palistes baxen el ríu d\'Arriondas a Ribadesella.',
+    },
   },
 
   'cudillero': {
@@ -380,6 +455,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Cudillero',
       subtitle: 'O anfiteatro do mar',
       description: 'Casas coloridas que trepam pela encosta formando um pitoresco anfiteatro virado para o Mar Cantábrico. Uma aldeia piscatória única.',
+    },
+    ast: {
+      title: 'Quesos Asturianos',
+      subtitle: 'Más de 40 variedaes',
+      description: 'Cabrales, Gamonéu, Afuega\'l Pitu... Una tradición quesera única n\'Europa, con sabores dende\'l suave al intensu.',
     },
   },
 
@@ -404,6 +484,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Tradição cuteleira',
       description: 'A aldeia que revitalizou o turismo rural em Espanha. Facas artesanais, ferreiros e a magia do interior ocidental das Astúrias.',
     },
+    ast: {
+      title: 'Sienda l\'Osu',
+      subtitle: 'Ruta verde del valle',
+      description: '30 quilómetros d\'antigua vía ferrial convertida en senderu. Ideal pa families, per montes y l\'hábitat del osu pardu.',
+    },
   },
 
   'bufones-de-pria': {
@@ -427,6 +512,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'O rugido do mar',
       description: 'Chaminés naturais pelas quais o mar lança jatos de água e espuma com som estrondoso. A força bruta do Cantábrico.',
     },
+    ast: {
+      title: 'Cuideiru',
+      subtitle: 'L\'anfiteatru del mar',
+      description: 'Cases de colores xubiendo pela llomba formando un pintorescu anfiteatru frente al Mar Cantábricu. Un pueblu de pescadores únicu.',
+    },
   },
 
   'luarca': {
@@ -449,6 +539,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Luarca',
       subtitle: 'A vila branca da costa',
       description: 'Porto pesqueiro, cemitério com vistas para o mar e ruas empedradas. A elegância marinheira do ocidente asturiano.',
+    },
+    ast: {
+      title: 'Taramundi',
+      subtitle: 'Tradición cutelera',
+      description: 'El pueblu que revitalizó\'l turismu rural n\'España. Cuchiellos artesanales, ferreros y la maxa d\'Asturies occidental.',
     },
   },
 
@@ -477,6 +572,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Navia',
       description: 'Um dos principais focos gastronómicos do ocidente asturiano, especializado em mariscos e peixes do Cantábrico com mais de 300 referências de vinhos.',
     },
+    ast: {
+      title: 'Bufones de Pría',
+      subtitle: 'El bramu del mar',
+      description: 'Chimenees naturales peles que\'l mar escupe chorros d\'agua y arrocíu con un soníu atronador. La fuerza bruta del Cantábricu.',
+    },
   },
 
   'restaurant-villa-blanca': {
@@ -499,6 +599,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Villa Blanca',
       subtitle: 'Luarca',
       description: 'Mais de cinquenta anos de história oferecendo autêntica cozinha tradicional asturiana. O seu pote e fabada com receitas atualizadas são imperdíveis.',
+    },
+    ast: {
+      title: 'Lluarca',
+      subtitle: 'La villa blanca de la costa',
+      description: 'Puertu pesqueru, campusantu con vistes al mar y calleyones empedraos. La elegancia marinera d\'Asturies occidental.',
     },
   },
 
@@ -523,6 +628,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Malleza, Salas',
       description: 'Casona asturiana com toques coloniais com gastronomia de inspiração francesa e alma asturiana. Quase trinta anos de história sob a batuta de Luis Rubio.',
     },
+    ast: {
+      title: 'Blanco',
+      subtitle: 'Navia',
+      description: 'Ún de los principales focos gastronómicos d\'Asturies occidental, especializáu en mariscos del Cantábricu con más de 300 referencies de vinos.',
+    },
   },
 
   'restaurant-casa-zoilo': {
@@ -545,6 +655,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Casa Zoilo',
       subtitle: 'Muros de Nalón',
       description: 'Mais de 70 anos a alimentar viajantes com especialidade em caça, miudezas e fabes preparados de cinco maneiras diferentes.',
+    },
+    ast: {
+      title: 'Villa Blanca',
+      subtitle: 'Lluarca',
+      description: 'Más de cincuenta años d\'historia ufiertando auténtica cocina tradicional asturiana. El so pote y fabada con recetes actualizaes son imprescindibles.',
     },
   },
 
@@ -569,6 +684,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Salinas',
       description: 'Uma das maiores variedades de peixes e mariscos do país, com vistas soberbas para a praia de Salinas.',
     },
+    ast: {
+      title: 'Al Son del Indiano',
+      subtitle: 'Malleza, Salas',
+      description: 'Casona asturiana con toques coloniales con gastronomía d\'inspiración francesa y alma asturiana. Cuasi trenta años d\'historia baxo la batuta de Luis Rubio.',
+    },
   },
 
   'restaurant-eleonore': {
@@ -591,6 +711,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Éleonore',
       subtitle: 'Salinas',
       description: 'Cozinha atualizada construída desde a pastelaria com apenas dez mesas e vistas panorâmicas para a baía.',
+    },
+    ast: {
+      title: 'Casa Zoilo',
+      subtitle: 'Muros de Nalón',
+      description: 'Más de 70 años alimentando viaxeros con especialidá en caza, casquería y fabes preparaes de cinco maneres distintes.',
     },
   },
 
@@ -615,6 +740,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Posada, Llanera',
       description: 'Combina cozinha tradicional asturiana com abordagem inovadora, usando produtos da sua própria horta. Imperdíveis: a almôndega de santola e a costela de gochu.',
     },
+    ast: {
+      title: 'Real Balneario',
+      subtitle: 'Salines',
+      description: 'Una de les variedaes más amplies de pexe y mariscu del país, con vistes soberbies a la playa de Salines.',
+    },
   },
 
   'restaurant-casa-fermin': {
@@ -637,6 +767,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Casa Fermín',
       subtitle: 'Oviedo',
       description: 'Uma das salas de jantar mais elegantes da capital, com três gerações dedicadas a produtos de excelente qualidade.',
+    },
+    ast: {
+      title: 'Éleonore',
+      subtitle: 'Salines',
+      description: 'Cocina contemporánea construyida dende la pastelería con namás diez meses y vistes panorámiques a la badía.',
     },
   },
 
@@ -661,6 +796,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Oviedo',
       description: 'Sala de jantar elegante distinguida com numerosos prémios. Experimente a sua salada de lavagante e peixes do Cantábrico.',
     },
+    ast: {
+      title: 'Arraigo',
+      subtitle: 'Posada, Llanera',
+      description: 'Combina cocina tradicional asturiana con enfoque innovador, usando productos de la so propia güerta. Imprescindibles: l\'albóndiga de ñocla y la costiella de gochu.',
+    },
   },
 
   'restaurant-el-mono-que-lee': {
@@ -683,6 +823,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'El Mono que Lee',
       subtitle: 'Oviedo',
       description: 'Restaurante encantador no Centro Histórico com atmosfera acolhedora, ideal para jantares românticos ou encontros entre amigos.',
+    },
+    ast: {
+      title: 'Casa Fermín',
+      subtitle: 'Uviéu',
+      description: 'Una de les sales de comer más elegantes de la capital, con tres xeneraciones dedicaes a productos d\'escelente calidá.',
     },
   },
 
@@ -707,6 +852,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Oviedo',
       description: 'Referência da cozinha tradicional asturiana e paragem chave para peregrinos do Caminho Primitivo. Famosa pelos seus guisados e fabada.',
     },
+    ast: {
+      title: 'Del Arco',
+      subtitle: 'Uviéu',
+      description: 'Distinguida sala de comer elegante con numberosos premios. Prueba la so ensalada de llocántaru y pexes del Cantábricu.',
+    },
   },
 
   'restaurant-pedro-martino': {
@@ -729,6 +879,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Pedro Martino',
       subtitle: 'Caces, Oviedo',
       description: 'Em cenário espetacular rodeado de montanhas sobre o Rio Nalón, oferecendo visão pessoal da tradição asturiana desde perspetiva atual.',
+    },
+    ast: {
+      title: 'El Mono que Lee',
+      subtitle: 'Uviéu',
+      description: 'Restaurante encantador nel Cascu Vieyu con atmósfera acogedora, ideal pa cenes romántiques o alcuentros con amigos.',
     },
   },
 
@@ -753,6 +908,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Las Caldas, Oviedo',
       description: 'Cozinha tradicional no casino histórico do Gran Hotel Las Caldas, conservando elementos originais do século XIX.',
     },
+    ast: {
+      title: 'La Tabernilla de Oviedo',
+      subtitle: 'Uviéu',
+      description: 'Referencia de la cocina tradicional asturiana y parada clave pa pelegrinos del Camín Primitivu. Famosa polos sos guisaos y fabada.',
+    },
   },
 
   'restaurant-roble-by-jairo-rodriguez': {
@@ -776,6 +936,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'La Pola, Lena',
       description: 'Visão pessoal da gastronomia asturiana na porta de entrada das Astúrias. Gambas, rosbife, leitão e sobremesas memoráveis.',
     },
+    ast: {
+      title: 'Pedro Martino',
+      subtitle: 'Caces, Uviéu',
+      description: 'Nun escenariu espectacular arrodiáu de montes sobre\'l ríu Nalón, ufiertando una visión personal de la tradición asturiana dende perspectiva actual.',
+    },
   },
 
   'restaurant-casa-gerardo': {
@@ -798,6 +963,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Casa Gerardo',
       subtitle: 'Priendes, Carreño',
       description: 'Restaurante centenário na vanguarda da criatividade gastronómica. Marcos Morán elevou produtos simples aos altares da culinária.',
+    },
+    ast: {
+      title: 'Scanda',
+      subtitle: 'Las Caldas, Uviéu',
+      description: 'Cocina tradicional nel casinu históricu del Gran Hotel Las Caldas, calteniendo elementos orixinales del sieglu XIX.',
     },
   },
 
@@ -826,6 +996,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Oviedo',
       description: 'A joia do gótico asturiano com a Câmara Santa, Património Mundial, que guarda as relíquias mais veneradas do Caminho de Santiago.',
     },
+    ast: {
+      title: 'Roble by Jairo Rodríguez',
+      subtitle: 'La Pola, Lena',
+      description: 'Visión personal de la gastronomía asturiana na puerta d\'entrada d\'Asturies. Camarones, rosbif, cochinillu y postres memorables.',
+    },
   },
 
   'santa-maria-del-naranco': {
@@ -848,6 +1023,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Santa María del Naranco',
       subtitle: 'Oviedo',
       description: 'Palácio de recreio do rei Ramiro I, obra-prima do pré-românico asturiano e Património Mundial desde 1985.',
+    },
+    ast: {
+      title: 'Casa Gerardo',
+      subtitle: 'Priendes, Carreño',
+      description: 'Restaurante centenariu na vanguardia de la creatividá gastronómica. Marcos Morán xubió productos simples a les altures culinaries.',
     },
   },
 
@@ -872,6 +1052,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Oviedo',
       description: 'Igreja pré-românica do século IX com extraordinárias gelosias de pedra rendilhada e restos de pintura mural originais.',
     },
+    ast: {
+      title: 'Catedral de San Salvador',
+      subtitle: 'Uviéu',
+      description: 'La xoya del góticu asturianu cola Cámara Santa, Patrimoniu Mundial, que guarda les reliquies más veneraes del Camín de Santiago.',
+    },
   },
 
   'teatro-campoamor': {
@@ -894,6 +1079,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Teatro Campoamor',
       subtitle: 'Oviedo',
       description: 'Teatro emblemático onde são entregues os Prémios Princesa das Astúrias, referência cultural da capital.',
+    },
+    ast: {
+      title: 'Santa María del Narancu',
+      subtitle: 'Uviéu',
+      description: 'Palaciu de recréu del rei Ramiro I, obra maestra del prerrománicu asturianu y Patrimoniu Mundial dende 1985.',
     },
   },
 
@@ -918,6 +1108,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Gijón',
       description: 'Escultura icónica de Eduardo Chillida no Cerro de Santa Catalina, símbolo da cidade e miradouro privilegiado.',
     },
+    ast: {
+      title: 'San Miguel de Lliño',
+      subtitle: 'Uviéu',
+      description: 'Ilesia prerrománica del sieglu IX con estraordinaries celosíes de piedra tallada y restos de pintura mural orixinales.',
+    },
   },
 
   'centro-niemeyer': {
@@ -940,6 +1135,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Centro Niemeyer',
       subtitle: 'Avilés',
       description: 'O único centro cultural desenhado por Oscar Niemeyer em Espanha, ícone da arquitetura contemporânea.',
+    },
+    ast: {
+      title: 'Teatru Campoamor',
+      subtitle: 'Uviéu',
+      description: 'Teatru emblemáticu onde s\'entreguen los Premios Princesa d\'Asturies, referencia cultural de la capital.',
     },
   },
 
@@ -964,6 +1164,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Covadonga',
       description: 'Santuário onde começou a Reconquista, local de peregrinação com a Santa Gruta e a Santina.',
     },
+    ast: {
+      title: 'Eloxu del Horizonte',
+      subtitle: 'Xixón',
+      description: 'Escultura icónica d\'Eduardo Chillida nel Cerru de Santa Catalina, símbolu de la ciudá y mirador privilexáu.',
+    },
   },
 
   'cueva-de-tito-bustillo': {
@@ -986,6 +1191,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Gruta de Tito Bustillo',
       subtitle: 'Ribadesella',
       description: 'Uma das grutas com arte rupestre mais importantes da Europa, com pinturas de 15.000 anos de antiguidade.',
+    },
+    ast: {
+      title: 'Centru Niemeyer',
+      subtitle: 'Avilés',
+      description: 'L\'únicu centru cultural diseñáu por Oscar Niemeyer n\'España, iconu de l\'arquitectura contemporánea.',
     },
   },
 
@@ -1010,6 +1220,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Cabrales',
       description: 'O pico mais emblemático dos Picos da Europa, com os seus 2.519 metros desafiando alpinistas de todo o mundo.',
     },
+    ast: {
+      title: 'Basílica de Cuadonga',
+      subtitle: 'Cuadonga',
+      description: 'Santuariu onde empezó la Reconquista, llugar de pelegrinación cola Santa Cueva y la Santina.',
+    },
   },
 
   'playa-de-gulpiyuri': {
@@ -1032,6 +1247,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Praia de Gulpiyuri',
       subtitle: 'Llanes',
       description: 'Diminuta praia interior a 100 metros do mar, alimentada por um túnel sob as falésias. Uma raridade geológica.',
+    },
+    ast: {
+      title: 'Cueva de Tito Bustillo',
+      subtitle: 'Ribadesella',
+      description: 'Ún de los xacimientos d\'arte rupestre más importantes d\'Europa, con pintures de 15.000 años d\'antigüedá.',
     },
   },
 
@@ -1056,6 +1276,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Gijón',
       description: 'Quilómetro e meio de areia dourada em pleno centro urbano, uma das praias urbanas mais famosas de Espanha.',
     },
+    ast: {
+      title: 'Naranjo de Bulnes',
+      subtitle: 'Cabrales',
+      description: 'El picu más emblemáticu de los Picos d\'Europa, colos sos 2.519 metros desafiando alpinistes de tol mundu.',
+    },
   },
 
   'jardin-botanico-atlantico': {
@@ -1078,6 +1303,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Jardim Botânico Atlântico',
       subtitle: 'Gijón',
       description: '25 hectares de jardins temáticos que percorrem a flora do Cantábrico e dos ecossistemas atlânticos.',
+    },
+    ast: {
+      title: 'Playa de Gulpiyuri',
+      subtitle: 'Llanes',
+      description: 'Diminuta playa interior a 100 metros del mar, alimentada por un túnel baxo los cantiles. Una rareza xeolóxica.',
     },
   },
 
@@ -1102,6 +1332,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Gijón',
       description: 'Impressionante conjunto arquitetónico reconvertido em centro cultural, com teatro, centro de arte e espaços criativos.',
     },
+    ast: {
+      title: 'Playa de San Llorienzo',
+      subtitle: 'Xixón',
+      description: 'Quilómetru y mediu d\'arena dorao en plenu centru urbanu, una de les playes urbanes más famoses d\'España.',
+    },
   },
 
   'acuario-de-gijon': {
@@ -1124,6 +1359,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Aquário de Gijón',
       subtitle: 'Gijón',
       description: 'Viagem pelos mares do mundo desde o Cantábrico até às Caraíbas, com tubarões, raias e espécies tropicais.',
+    },
+    ast: {
+      title: 'Xardín Botánicu Atlánticu',
+      subtitle: 'Xixón',
+      description: '25 hectárees de xardinos temáticos esplorando la flora del Cantábricu y los ecosistemes atlánticos.',
     },
   },
 
@@ -1148,6 +1388,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Avilés',
       description: 'Um dos conjuntos medievais mais bem conservados das Astúrias, com arcadas, palácios e a igreja de San Nicolás.',
     },
+    ast: {
+      title: 'Llaboral Ciudá de la Cultura',
+      subtitle: 'Xixón',
+      description: 'Impresionante conxuntu arquitectónicu reconvertíu en centru cultural, con teatru, centru d\'arte y espacios creativos.',
+    },
   },
 
   'castro-de-coana': {
@@ -1170,6 +1415,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Castro de Coaña',
       subtitle: 'Coaña',
       description: 'Um dos povoados fortificados pré-romanos mais bem conservados da península, testemunho da cultura castreja.',
+    },
+    ast: {
+      title: 'Acuariu de Xixón',
+      subtitle: 'Xixón',
+      description: 'Viaxe pelos mares del mundu dende\'l Cantábricu al Caribe, con tiburones, rayes y especies tropicales.',
     },
   },
 
@@ -1194,6 +1444,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Cudillero',
       description: 'Falésia espetacular de 80 metros com farol histórico e vistas infinitas sobre o Mar Cantábrico.',
     },
+    ast: {
+      title: 'Cascu Antiguu d\'Avilés',
+      subtitle: 'Avilés',
+      description: 'Ún de los conxuntos medievales meyor conservaos d\'Asturies, con arcades, palacios y la ilesia de San Nicolás.',
+    },
   },
 
   'playa-de-las-catedrales': {
@@ -1216,6 +1471,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Praia das Catedrais',
       subtitle: 'Ribadeo',
       description: 'Impressionantes formações rochosas semelhantes a arcobotantes de catedral gótica, acessíveis com maré baixa.',
+    },
+    ast: {
+      title: 'Castru de Cuaña',
+      subtitle: 'Cuaña',
+      description: 'Ún de los poblaos fortificaos prerromanos meyor conservaos de la península, testimoniu de la cultura castreña.',
     },
   },
 
@@ -1244,6 +1504,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Colunga',
       description: 'Viagem ao passado em forma de pegada de dinossauro. Réplicas à escala real, fósseis autênticos e atividades interativas para toda a família.',
     },
+    ast: {
+      title: 'Cabu Vidio',
+      subtitle: 'Cuideiru',
+      description: 'Cantil espectacular de 80 metros con faru históricu y vistes infinites sobre\'l Mar Cantábricu.',
+    },
   },
 
   'teleferico-de-fuente-de': {
@@ -1266,6 +1531,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Teleférico de Fuente Dé',
       subtitle: 'Picos da Europa',
       description: 'Subida vertiginosa de 753 metros em 4 minutos até ao coração dos Picos da Europa. Vistas de tirar o fôlego.',
+    },
+    ast: {
+      title: 'Playa de les Catedrales',
+      subtitle: 'Ribadeo',
+      description: 'Impresionantes formaciones roqueñes asemeyaes a arbotantes de catedral gótica, accesibles con marea baxa.',
     },
   },
 
@@ -1290,6 +1560,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Teverga',
       description: 'Reproduções das melhores pinturas rupestres do mundo em grutas artificiais. Arte paleolítica acessível a todos.',
     },
+    ast: {
+      title: 'Muséu del Xurásicu (MUJA)',
+      subtitle: 'Colunga',
+      description: 'Viaxe al pasáu en forma de buelga de dinosauriu. Répliques a escala real, fósiles auténticos y actividaes interactives pa tola familia.',
+    },
   },
 
   'mina-de-arnao': {
@@ -1312,6 +1587,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Mina de Arnao',
       subtitle: 'Castrillón',
       description: 'Primeira mina de carvão submarina da Europa convertida em museu. Descida às entranhas da história industrial.',
+    },
+    ast: {
+      title: 'Teleféricu de Fuente Dé',
+      subtitle: 'Picos d\'Europa',
+      description: 'Xubida vertixinosa de 753 metros en 4 minutos al corazón de los Picos d\'Europa. Vistes de quitar l\'aliendu.',
     },
   },
 
@@ -1336,6 +1616,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Langreo',
       description: 'Viagem de comboio por galerias mineiras com poço e castelo original. A memória da mineração asturiana.',
     },
+    ast: {
+      title: 'Parque de la Prehistoria',
+      subtitle: 'Teverga',
+      description: 'Reproducciones de les meyores pintures rupestres del mundu en cueves artificiales. Arte paleolíticu accesible pa toos.',
+    },
   },
 
   'bosque-de-muniellos': {
@@ -1358,6 +1643,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Bosque de Muniellos',
       subtitle: 'Cangas del Narcea',
       description: 'O maior carvalhal de Espanha e um dos mais bem conservados da Europa. Reserva natural com acesso limitado.',
+    },
+    ast: {
+      title: 'Mina d\'Arnao',
+      subtitle: 'Castrillón',
+      description: 'La primera mina de carbón submarina d\'Europa convertida en muséu. Baxada a les entrañes de la historia industrial.',
     },
   },
 
@@ -1382,6 +1672,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Cangas de Onís',
       description: 'Canyoning, escalada, vias ferratas e puenting no coração dos Picos da Europa. Adrenalina garantida.',
     },
+    ast: {
+      title: 'Tren Mineru de Samuño',
+      subtitle: 'Llangréu',
+      description: 'Viaxe en tren per galeríes mineres con pozu y castillete orixinal. La memoria de la minería asturiana.',
+    },
   },
 
   'playa-de-rodiles': {
@@ -1404,6 +1699,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Praia de Rodiles',
       subtitle: 'Villaviciosa',
       description: 'Extensa praia com dunas, ria e uma das melhores ondas de surf do Cantábrico. Paraíso para famílias e surfistas.',
+    },
+    ast: {
+      title: 'Monte de Muniellos',
+      subtitle: 'Cangues del Narcea',
+      description: 'El mayor carbayal d\'España y ún de los meyor conservaos d\'Europa. Reserva natural con accesu llimitáu.',
     },
   },
 
@@ -1432,6 +1732,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'De Oviedo a Santiago',
       description: 'A rota jacobeia mais antiga, partindo da Catedral de Oviedo. 14 etapas através de montanhas e florestas até Santiago de Compostela.',
     },
+    ast: {
+      title: 'Aventura nos Picos',
+      subtitle: 'Cangues d\'Onís',
+      description: 'Barranquismu, escalada, víes ferrates y puentismu nel corazón de los Picos d\'Europa. Adrenalina garantizada.',
+    },
   },
 
   'camino-camino-del-norte': {
@@ -1454,6 +1759,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Caminho do Norte',
       subtitle: 'Costa cantábrica',
       description: 'O caminho costeiro que percorre falésias, praias e vilas piscatórias das Astúrias. Vistas espetaculares do Cantábrico.',
+    },
+    ast: {
+      title: 'Playa de Rodiles',
+      subtitle: 'Villaviciosa',
+      description: 'Estensa playa con dunes, ría y una de les meyores foles de surf del Cantábricu. Paraísu pa families y surfistes.',
     },
   },
 
@@ -1482,6 +1792,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Picos da Europa',
       description: 'O rei dos queijos azuis espanhóis, maturado em grutas naturais dos Picos. Sabor intenso e inconfundível.',
     },
+    ast: {
+      title: 'Camín Primitivu',
+      subtitle: 'D\'Uviéu a Santiago',
+      description: 'La ruta xacobea más antigua, partiendo de la Catedral d\'Uviéu. 14 etapes per montes y montes hasta Santiago de Compostela.',
+    },
   },
 
   'gastro-cachopo-asturiano': {
@@ -1504,6 +1819,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Cachopo Asturiano',
       subtitle: 'Todas as Astúrias',
       description: 'Dois filetes de vitela recheados de presunto e queijo, panados e fritos. O prato substancial por excelência.',
+    },
+    ast: {
+      title: 'Camín del Norte',
+      subtitle: 'Costa cantábrica',
+      description: 'El camín costeru que percuerre cantiles, playes y villes pesqueres d\'Asturies. Vistes espectaculares del Cantábricu.',
     },
   },
 
@@ -1528,6 +1848,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Todas as Astúrias',
       description: 'Sobremesa cremosa com canela e limão, cozinhada lentamente até conseguir a textura perfeita. Tradição em cada colherada.',
     },
+    ast: {
+      title: 'Quesu Cabrales',
+      subtitle: 'Picos d\'Europa',
+      description: 'El rei de los quesos azules españoles, matizáu en cueves naturales de los Picos. Sabor intensu ya inconfundible.',
+    },
   },
 
   'gastro-pote-asturiano': {
@@ -1550,6 +1875,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Pote Asturiano',
       subtitle: 'Todas as Astúrias',
       description: 'Guisado de couves com batatas, feijão e compango. Reconfortante prato de colher para os dias frios de montanha.',
+    },
+    ast: {
+      title: 'Cachopo Asturianu',
+      subtitle: 'Toa Asturies',
+      description: 'Dos filetes de xata rellenos de xamón y quesu, empanaos y fritos. El platu contundente por escelencia.',
     },
   },
 
@@ -1574,6 +1904,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Todas as Astúrias',
       description: 'Bolos de milho fritos acompanhados de carne de porco picada. Sabor autêntico da cozinha rural asturiana.',
     },
+    ast: {
+      title: 'Arroz con Lleche',
+      subtitle: 'Toa Asturies',
+      description: 'Postre cremoso con canela y llimón, cocináu a fueu lentu hasta llograr la testura perfecta. Tradición en cada cucharada.',
+    },
   },
 
   'gastro-oricios-erizos-de-mar': {
@@ -1596,6 +1931,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Oricios (Ouriços-do-Mar)',
       subtitle: 'Costa cantábrica',
       description: 'Iguaria marinha de inverno. Ouriços-do-mar frescos servidos na sua carapaça, manjar dos entendidos.',
+    },
+    ast: {
+      title: 'Pote Asturianu',
+      subtitle: 'Toa Asturies',
+      description: 'Cocíu de bérces con pataques, fabes y compango. Reconfortante platu de cuchiara pa los díes fríos de monte.',
     },
   },
 
@@ -1624,6 +1964,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Mieres',
       description: 'Referência da comarca do Caudal com receituário tradicional atualizado e trato requintado em sala.',
     },
+    ast: {
+      title: 'Tortos con Picadillo',
+      subtitle: 'Toa Asturies',
+      description: 'Tortillas de maíz frites acompañaes de carne de gochu picao. Sabor auténticu de la cocina rural asturiana.',
+    },
   },
 
   'restaurant-casa-adela': {
@@ -1646,6 +1991,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Casa Adela',
       subtitle: 'Lada, Langreo',
       description: 'Casa de comidas em bonito chalé com guisados tradicionais. Imperdíveis os tortos de milho e o terraço sob o hórreo.',
+    },
+    ast: {
+      title: 'Oricios (Erizos de Mar)',
+      subtitle: 'Costa cantábrica',
+      description: 'Delicatesen marina d\'iviernu. Oricios frescos servíos na so concha, un manxar pa los entendíos.',
     },
   },
 
@@ -1670,6 +2020,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Valdesoto, Siero',
       description: 'Mãe e filha preparam tripas, cabrito e cebolas recheadas de lamber os dedos, longe do bulício.',
     },
+    ast: {
+      title: 'El Cenador del Azul',
+      subtitle: 'Mieres',
+      description: 'Referencia na comarca del Caudal con recetes tradicionales actualizaes y tratu esquisitu en sala.',
+    },
   },
 
   'restaurant-la-ferrada': {
@@ -1692,6 +2047,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'La Ferrada',
       subtitle: 'Noreña',
       description: 'Antigas cavalariças convertidas em restaurante com quatro acolhedoras salas, esplanada com grelhadores e preços contidos.',
+    },
+    ast: {
+      title: 'Casa Adela',
+      subtitle: 'Lada, Llangréu',
+      description: 'Casa de comíes nun guapu chalé con guisaos tradicionales. Imprescindibles los tortos de maíz y la terraza baxo l\'horru.',
     },
   },
 
@@ -1716,6 +2076,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Mazaneda, Gozón',
       description: 'Bar-mercearia tradicional com mais de 90 anos de história. Os seus croquetes estão entre os melhores de Espanha.',
     },
+    ast: {
+      title: 'Casa Telva',
+      subtitle: 'Valdesoto, Sieru',
+      description: 'Ma y fía preparen callos, cabritu y cebolles rellenes de llamber los deos, lloñe del bullicio.',
+    },
   },
 
   'restaurant-abarike': {
@@ -1738,6 +2103,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Abarike',
       subtitle: 'Gijón',
       description: 'Marisqueira de autor onde sustentabilidade e qualidade se unem à visão descontraída da chef Lara Roguez.',
+    },
+    ast: {
+      title: 'La Ferrada',
+      subtitle: 'Noreña',
+      description: 'Antigües caballerizas convertíes en restaurante con cuatro acogedores sales, terraza con parrilles y precios conteníos.',
     },
   },
 
@@ -1762,6 +2132,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Gijón',
       description: 'Restaurante com caves no piso inferior, bar de vinhos a copo e um dos menus do dia mais completos da cidade.',
     },
+    ast: {
+      title: 'Casa Belarmino',
+      subtitle: 'Mazaneda, Gozón',
+      description: 'Bar-tienda tradicional con más de 90 años d\'historia. Les sos croquetes tán ente les meyores d\'España.',
+    },
   },
 
   'restaurant-la-pondala': {
@@ -1784,6 +2159,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'La Pondala',
       subtitle: 'Somió, Gijón',
       description: 'Quase 130 anos de história, favorito dos empresários. Rosbife, legumes da época e o terraço mais desejado no verão.',
+    },
+    ast: {
+      title: 'Abarike',
+      subtitle: 'Xixón',
+      description: 'Marisquería d\'autor onde sostenibilidá y calidá s\'atopen cola visión desenfadada de la chef Lara Roguez.',
     },
   },
 
@@ -1808,6 +2188,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Gijón',
       description: 'Homenagem aos bosques asturianos com produtos de temporada de alta qualidade, desde carnes a mariscos e arrozes.',
     },
+    ast: {
+      title: 'Ciudadela',
+      subtitle: 'Xixón',
+      description: 'Restaurante con cueves nel pisu inferior, bar de vinos a copa y ún de los menús del día más completos de la ciudá.',
+    },
   },
 
   'restaurant-the-green-artiem-asturias': {
@@ -1830,6 +2215,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'The Green - Artiem Asturias',
       subtitle: 'Quintueles',
       description: 'Proposta gastronómica saudável e sustentável em envolvente natural privilegiada, com horta própria.',
+    },
+    ast: {
+      title: 'La Pondala',
+      subtitle: 'Somió, Xixón',
+      description: 'Cuasi 130 años d\'historia, favoritu d\'homes de negocios. Rosbif, verdures de temporada y la terraza más codiciada nel branu.',
     },
   },
 
@@ -1854,6 +2244,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Torazo, Cabranes',
       description: 'Cozinha tradicional asturiana com vistas espetaculares para a Sierra del Sueve.',
     },
+    ast: {
+      title: 'Mamáguaja',
+      subtitle: 'Xixón',
+      description: 'Homenaxe a los montes asturianos con productos de temporada d\'alta calidá, dende carnes a mariscos y arroces.',
+    },
   },
 
   'restaurant-eutimio': {
@@ -1876,6 +2271,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Eutimio',
       subtitle: 'Lastres',
       description: 'Referência da cozinha marineira asturiana com vistas para o porto pesqueiro de Lastres.',
+    },
+    ast: {
+      title: 'The Green - Artiem Asturias',
+      subtitle: 'Quintueles',
+      description: 'Propuesta gastronómica saludable y sostenible n\'entornu natural privilexáu, con güerta propia.',
     },
   },
 
@@ -1900,6 +2300,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Nueva de Llanes',
       description: 'Cozinha de autor em ambiente íntimo com produtos locais da época.',
     },
+    ast: {
+      title: 'El Balcón de Torazo',
+      subtitle: 'Torazo, Cabranes',
+      description: 'Cocina tradicional asturiana con vistes espectaculares a la Sierra del Sueve.',
+    },
   },
 
   'restaurant-zascandil': {
@@ -1922,6 +2327,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Zascandil',
       subtitle: 'Gijón',
       description: 'Cozinha de mercado mediterrânica com horta própria e vistas para a baía de San Lorenzo.',
+    },
+    ast: {
+      title: 'Eutimio',
+      subtitle: 'Llastres',
+      description: 'Referencia de la cocina marinera asturiana con vistes al puertu pesqueru de Llastres.',
     },
   },
 
@@ -1946,6 +2356,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Cofiño, Parres',
       description: 'Hotel boutique com restaurante que oferece cozinha tradicional revista em espetacular envolvente rural.',
     },
+    ast: {
+      title: 'Tella',
+      subtitle: 'Nueva de Llanes',
+      description: 'Cocina d\'autor n\'ambiente íntimu con productos llocales de temporada.',
+    },
   },
 
   'restaurant-el-corral-del-indianu': {
@@ -1968,6 +2383,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'El Corral del Indianu',
       subtitle: 'Arriondas',
       description: 'Referência gastronómica do oriente asturiano com José Antonio Campoviejo à frente.',
+    },
+    ast: {
+      title: 'Zascandil',
+      subtitle: 'Xixón',
+      description: 'Cocina de mercáu mediterránea con güerta propia y vistes a la badía de San Llorienzo.',
     },
   },
 
@@ -1992,6 +2412,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Ribadesella',
       description: 'Tradição hoteleira de Ribadesella com produtos do mar e da horta local.',
     },
+    ast: {
+      title: 'Puebloastur',
+      subtitle: 'Cofiño, Parres',
+      description: 'Hotel boutique con restaurante qu\'ufierta cocina tradicional revisada n\'espectacular entornu rural.',
+    },
   },
 
   'restaurant-quince-nudos': {
@@ -2014,6 +2439,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Quince Nudos',
       subtitle: 'Llanes',
       description: 'Cozinha marineira de qualidade com vistas para o porto de Llanes e os Picos da Europa.',
+    },
+    ast: {
+      title: 'El Corral del Indianu',
+      subtitle: 'Arriondas',
+      description: 'Referencia gastronómica d\'Asturies oriental con José Antonio Campoviejo al frente.',
     },
   },
 
@@ -2038,6 +2468,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Gijón',
       description: 'Tradição hoteleira com mais de um século de história oferecendo produtos de primeira qualidade do Cantábrico.',
     },
+    ast: {
+      title: 'Los Arcos',
+      subtitle: 'Ribadesella',
+      description: 'Tradición hostelera de Ribadesella con productos del mar y de la güerta llocal.',
+    },
   },
 
   'restaurant-palacio-de-cutre': {
@@ -2060,6 +2495,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Palacio de Cutre',
       subtitle: 'Cutre, Piloña',
       description: 'Casona palaciana do século XVII convertida em restaurante com cozinha de raízes asturianas.',
+    },
+    ast: {
+      title: 'Quince Nudos',
+      subtitle: 'Llanes',
+      description: 'Cocina marinera de calidá con vistes al puertu de Llanes y los Picos d\'Europa.',
     },
   },
 
@@ -2088,6 +2528,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Oviedo',
       description: 'Uma das melhores coleções de arte de Espanha, com obras desde o século XIV até à atualidade.',
     },
+    ast: {
+      title: 'V. Crespo',
+      subtitle: 'Xixón',
+      description: 'Tradición hostelera con más d\'un sieglu d\'historia ufiertando productos de primera calidá del Cantábricu.',
+    },
   },
 
   'cueva-del-sidron': {
@@ -2110,6 +2555,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Gruta de El Sidrón',
       subtitle: 'Piloña',
       description: 'Jazida onde foram encontrados restos de neandertais de 49.000 anos. Centro de interpretação fascinante.',
+    },
+    ast: {
+      title: 'Palaciu de Cutre',
+      subtitle: 'Cutre, Piloña',
+      description: 'Casona palaciega del sieglu XVII convertida en restaurante con cocina de raigañu asturianu.',
     },
   },
 
@@ -2134,6 +2584,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Oviedo',
       description: 'Local de peregrinação essencial no Caminho. Guarda a Arca Santa e as cruzes da Vitória e dos Anjos.',
     },
+    ast: {
+      title: 'Muséu de Belles Artes d\'Asturies',
+      subtitle: 'Uviéu',
+      description: 'Una de les meyores coleiciones d\'arte d\'España, con obres dende\'l sieglu XIV hasta l\'actualidá.',
+    },
   },
 
   'camino-monasterio-de-san-salvador': {
@@ -2157,6 +2612,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Cornellana',
       description: 'Paragem obrigatória no Caminho Primitivo, com claustro românico e belo retábulo barroco.',
     },
+    ast: {
+      title: 'Cueva d\'El Sidrón',
+      subtitle: 'Piloña',
+      description: 'Xacimientu onde s\'atoparon restos neandertales de 49.000 años. Centru d\'interpretación fascinante.',
+    },
   },
 
   'camino-puerto-del-palo': {
@@ -2179,6 +2639,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Puerto del Palo',
       subtitle: 'Tineo',
       description: 'Passo de montanha no Caminho Primitivo com ermida e vistas panorâmicas. Um dos pontos mais altos da rota.',
+    },
+    ast: {
+      title: 'Cámara Santa d\'Uviéu',
+      subtitle: 'Uviéu',
+      description: 'Llugar de pelegrinación esencial nel Camín. Guarda l\'Arca Santa y les cruces de la Vitoria y de los Ánxeles.',
     },
   },
 
@@ -2207,6 +2672,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Picos da Europa',
       description: 'Enol e Ercina, dois lagos de origem glaciar rodeados dos picos mais imponentes dos Picos da Europa.',
     },
+    ast: {
+      title: 'Monesteriu de San Salvador',
+      subtitle: 'Cornellana',
+      description: 'Parada obligada nel Camín Primitivu, con claustru románicu y guapu retablu barrocu.',
+    },
   },
 
   'ruta-del-cares': {
@@ -2229,6 +2699,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Rota do Cares',
       subtitle: 'Picos da Europa',
       description: '12 quilómetros de trilho talhado na rocha entre Leão e Astúrias, a rota de caminhada mais famosa de Espanha.',
+    },
+    ast: {
+      title: 'Puertu del Palu',
+      subtitle: 'Tinéu',
+      description: 'Pasu de monte nel Camín Primitivu con ermita y vistes panorámiques. Ún de los puntos más altos de la ruta.',
     },
   },
 
@@ -2253,6 +2728,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       subtitle: 'Cudillero',
       description: 'Praia virgem rodeada de falésias, acessível apenas a pé, considerada uma das mais bonitas das Astúrias.',
     },
+    ast: {
+      title: 'Playa\'l Silenciu',
+      subtitle: 'Cuideiru',
+      description: 'Playa virxe arrodiada de cantiles, accesible namás a pie, considerada una de les más guapes d\'Asturies.',
+    },
   },
 
   'senda-del-oso': {
@@ -2275,6 +2755,11 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Senda do Urso',
       subtitle: 'Teverga-Quirós',
       description: '36 quilómetros de via verde perfeita para bicicleta, com cercado de ursos e paisagens de montanha espetaculares.',
+    },
+    ast: {
+      title: 'Sienda l\'Osu',
+      subtitle: 'Teverga-Quirós',
+      description: '36 quilómetros de vía verde perfecta pa bici, con cercáu d\'osos y paisaxes de monte espectaculares.',
     },
   },
 };

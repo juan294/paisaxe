@@ -1,6 +1,6 @@
 import type { Locale } from './types';
 
-const SUPPORTED_LOCALES: Locale[] = ['es', 'en', 'fr', 'de', 'pt'];
+const SUPPORTED_LOCALES: Locale[] = ['es', 'en', 'fr', 'de', 'pt', 'ast'];
 const DEFAULT_LOCALE: Locale = 'es';
 const STORAGE_KEY = 'paisaxe-locale';
 

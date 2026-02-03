@@ -1,6 +1,6 @@
 # Localization Report
 
-**Generated:** 2026-02-01
+**Generated:** 2026-02-03
 **Agent:** Paisaxe Localization Agent
 **Status:** All translations complete
 
@@ -11,6 +11,7 @@
 | Locale | UI Keys | UI Coverage | Story Translations | Story Coverage |
 |--------|---------|-------------|-------------------|----------------|
 | es (Spanish) | 221 | 100% (source) | — (source) | 100% (source) |
+| ast (Asturian) | 221 | 100% | 97 stories | 100% |
 | en (English) | 221 | 100% | 97 stories | 100% |
 | fr (French) | 221 | 100% | 97 stories | 100% |
 | de (German) | 221 | 100% | 97 stories | 100% |
@@ -121,10 +122,17 @@ All 221 translation keys are present and identical across all 5 locale files.
 
 ## Changes Since Last Report
 
+- **Asturian (Bable) added**: Full localization support for the native language of Asturias
+- **Locales increased**: 5 → 6 languages (es, ast, en, fr, de, pt)
 - **UI Keys increased**: 183 → 221 (+38 keys)
 - **Stories increased**: 93 → 97 (+4 stories)
 
-New keys added to all locales:
+New language added:
+- Asturian (ast) - Complete UI translations (221 keys) and story translations (97 stories)
+- Language switcher displays "AST" between ES and EN
+- Proper Asturian vocabulary and grammar used throughout
+
+Previous changes:
 - Premium section expanded (pricing, FAQ keys)
 - Voice section expanded (upgrade prompts, sign-in prompts by category)
 - Chat section (copy conversation feature)
@@ -149,8 +157,9 @@ New keys added to all locales:
 
 ## Technical Notes
 
-- UI translations: `src/lib/i18n/{es,en,fr,de,pt}.ts`
+- UI translations: `src/lib/i18n/{es,ast,en,fr,de,pt}.ts`
 - Story translations: `content/translations/story-translations.ts`
 - TypeScript check: `npm run typecheck` passes
 - Spanish is the source of truth for all content
+- Asturian (Bable) added as native language option alongside Spanish
 - All files use strict TypeScript typing via `Translations` interface

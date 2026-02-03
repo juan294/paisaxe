@@ -33,7 +33,7 @@ describe("LanguageSwitcher", () => {
       // Dropdown is hidden via CSS (opacity-0, pointer-events-none)
       // The buttons exist in DOM but are not visible/clickable
       const allButtons = screen.getAllByRole("button");
-      expect(allButtons).toHaveLength(6); // 1 toggle + 5 language options (hidden)
+      expect(allButtons).toHaveLength(7); // 1 toggle + 6 language options (hidden)
     });
 
     it("should show FR when locale is fr", () => {
@@ -67,6 +67,14 @@ describe("LanguageSwitcher", () => {
       const toggleButton = screen.getByRole("button", { expanded: false });
       expect(within(toggleButton).getByText("PT")).toBeInTheDocument();
     });
+
+    it("should show AST when locale is ast", () => {
+      mockLocale = "ast";
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      expect(within(toggleButton).getByText("AST")).toBeInTheDocument();
+    });
   });
 
   describe("expanded state", () => {
@@ -80,7 +88,7 @@ describe("LanguageSwitcher", () => {
 
       // All language options should now be visible
       const allButtons = screen.getAllByRole("button");
-      expect(allButtons).toHaveLength(6); // 1 toggle + 5 language options
+      expect(allButtons).toHaveLength(7); // 1 toggle + 6 language options
     });
 
     it("should highlight the current language in the dropdown", () => {
@@ -145,6 +153,17 @@ describe("LanguageSwitcher", () => {
       fireEvent.click(screen.getByRole("button", { name: "PT" }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("pt");
+    });
+
+    it("should call setLocale with ast when AST is clicked", () => {
+      mockLocale = "es";
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+      fireEvent.click(screen.getByRole("button", { name: "AST" }));
+
+      expect(mockSetLocale).toHaveBeenCalledWith("ast");
     });
 
     it("should call setLocale with es when ES is clicked from different locale", () => {
