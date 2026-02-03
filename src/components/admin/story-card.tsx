@@ -4,8 +4,40 @@ import Image from "next/image";
 import { ImageIcon, Pencil, Check } from "lucide-react";
 import type { AdminStory } from "@/types/admin";
 import { CATEGORY_LABELS } from "@/types/immersive";
+import type { StoryMetadata, StoryLocale, TranslationStatus } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
+
+const TRANSLATION_LOCALES: StoryLocale[] = ["en", "fr", "de", "pt", "ast"];
+
+/**
+ * Check if a story is missing any translations.
+ */
+function hasMissingTranslations(story: AdminStory): boolean {
+  const metadata = story.metadata as StoryMetadata | undefined;
+  if (!metadata) return true;
+
+  const translations = metadata.translations || {};
+  const status = metadata.translation_status || {};
+
+  for (const locale of TRANSLATION_LOCALES) {
+    const translation = translations[locale];
+    const localeStatus = status[locale] as TranslationStatus | undefined;
+
+    // Missing if no translation content or status is not complete
+    const hasContent = translation && (
+      translation.title?.trim() ||
+      translation.subtitle?.trim() ||
+      translation.description?.trim()
+    );
+
+    if (!hasContent || localeStatus?.status !== "complete") {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 interface StoryCardProps {
   story: AdminStory;
@@ -115,10 +147,10 @@ export function StoryCard({
             </div>
 
             {/* Badges container - top right, always visible */}
-            <div className="absolute right-3 top-3 flex items-center gap-2">
+            <div className="absolute right-3 top-3 flex items-center gap-1.5">
               {/* Pending badge */}
               {needsCuration && (
-                <span className="rounded-full bg-[#c9a55c] px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-white shadow-lg">
+                <span className="rounded-full bg-[#c9a55c] px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white shadow-lg">
                   Pending
                 </span>
               )}
@@ -127,15 +159,25 @@ export function StoryCard({
               {isPlaceholderImage(story) && (
                 <span
                   data-testid="placeholder-badge"
-                  className="rounded-full bg-blue-500 px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-white shadow-lg"
+                  className="rounded-full bg-blue-500 px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white shadow-lg"
                 >
                   Placeholder
                 </span>
               )}
 
+              {/* Missing translations badge */}
+              {hasMissingTranslations(story) && (
+                <span
+                  data-testid="translations-badge"
+                  className="rounded-full bg-purple-500 px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white shadow-lg"
+                >
+                  i18n
+                </span>
+              )}
+
               {/* Edit button - appears on hover */}
-              <div className="flex h-8 w-8 scale-90 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 group-hover:scale-100 group-hover:opacity-100 dark:bg-[#252320]/90">
-                <Pencil className="h-3.5 w-3.5 text-[#2d2a26] dark:text-[#f5f3ee]" />
+              <div className="flex h-7 w-7 scale-90 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 group-hover:scale-100 group-hover:opacity-100 dark:bg-[#252320]/90">
+                <Pencil className="h-3 w-3 text-[#2d2a26] dark:text-[#f5f3ee]" />
               </div>
             </div>
           </>
@@ -177,11 +219,18 @@ export function StoryCard({
                 No image · Click to add
               </p>
             </div>
-            {needsCuration && (
-              <span className="rounded-full bg-[#c9a55c] px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-white">
-                Pending
-              </span>
-            )}
+            <div className="flex items-center gap-1.5">
+              {needsCuration && (
+                <span className="rounded-full bg-[#c9a55c] px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white">
+                  Pending
+                </span>
+              )}
+              {hasMissingTranslations(story) && (
+                <span className="rounded-full bg-purple-500 px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white">
+                  i18n
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>

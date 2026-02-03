@@ -51,6 +51,15 @@ import type { AdminStory, CurationStatus, ContentImage } from "@/types/admin";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
+import { StoryTranslationsTab } from "./story-translations-tab";
+import { Languages } from "lucide-react";
+import { updateStoryTranslation } from "@/lib/admin-api";
+import type { StoryLocale, StoryTranslation } from "@/types/immersive";
+
+interface PendingTranslationChange {
+  locale: StoryLocale;
+  translation: StoryTranslation;
+}
 
 const CATEGORIES: { value: StoryCategory; label: string }[] = [
   { value: "nature", label: "Nature" },
@@ -87,7 +96,7 @@ function generateSlug(title: string): string {
     .replace(/^-|-$/g, "");
 }
 
-type TabType = "details" | "image";
+type TabType = "details" | "image" | "translations";
 type ImageSourceType = "content" | "url" | "upload";
 
 interface StoryEditorDialogProps {
@@ -138,6 +147,8 @@ export function StoryEditorDialog({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasDetailsChanges, setHasDetailsChanges] = useState(false);
   const [hasImageChanges, setHasImageChanges] = useState(false);
+  const [hasTranslationChanges, setHasTranslationChanges] = useState(false);
+  const [pendingTranslations, setPendingTranslations] = useState<PendingTranslationChange[]>([]);
 
   // Initialize form when story changes
   useEffect(() => {
@@ -156,6 +167,8 @@ export function StoryEditorDialog({
       setShowOptionalFields(!!(story.location || story.duration || story.sourcePdf || (story.metadata?.question_prompts as string[])?.length));
       setHasDetailsChanges(false);
       setHasImageChanges(false);
+      setHasTranslationChanges(false);
+      setPendingTranslations([]);
       setPreviewUrl(null);
       setImageUrl("");
       setSelectedFile(null);
@@ -193,6 +206,12 @@ export function StoryEditorDialog({
       imageSource !== (story.imageSource || "");
     setHasImageChanges(changed);
   }, [story, previewUrl, selectedFile, imageSource]);
+
+  // Memoized callback for translation changes to prevent infinite loops
+  const handleTranslationChange = useCallback((hasChanges: boolean, changes: PendingTranslationChange[]) => {
+    setHasTranslationChanges(hasChanges);
+    setPendingTranslations(changes);
+  }, []);
 
   const handleSlugChange = (value: string) => {
     setSlugManuallyEdited(true);
@@ -416,6 +435,18 @@ export function StoryEditorDialog({
         }
       }
 
+      // Save translations if changed
+      if (hasTranslationChanges && pendingTranslations.length > 0) {
+        for (const { locale, translation } of pendingTranslations) {
+          const translationResult = await updateStoryTranslation(story.id, locale, translation);
+          if (translationResult.error) {
+            setError(translationResult.error);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+
       resetAndClose();
     } catch {
       setError("Failed to save changes");
@@ -562,11 +593,31 @@ export function StoryEditorDialog({
               <ImageIcon className="h-4 w-4" />
               Image
             </button>
+            <button
+              onClick={() => setActiveTab("translations")}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+                activeTab === "translations"
+                  ? "bg-white text-[#2d2a26] shadow-sm dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
+                  : "text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+              )}
+            >
+              <Languages className="h-4 w-4" />
+              Translations
+              {hasTranslationChanges && (
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              )}
+            </button>
           </div>
 
           {/* Tab Content */}
           <div className="space-y-4">
-            {activeTab === "details" ? (
+            {activeTab === "translations" ? (
+              <StoryTranslationsTab
+                story={story}
+                onTranslationChange={handleTranslationChange}
+              />
+            ) : activeTab === "details" ? (
               <>
                 {/* Title */}
                 <div className="space-y-2">

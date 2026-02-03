@@ -1,4 +1,4 @@
-import type { StoryRow, StoryCategory, StoryLocation, StoryDuration } from "./immersive";
+import type { StoryRow, StoryCategory, StoryLocation, StoryDuration, StoryLocale, StoryTranslation, TranslationStatus } from "./immersive";
 
 // Curation status for admin workflow
 export type CurationStatus = "needs_curation" | "approved";
@@ -139,4 +139,46 @@ export interface UpdateStoryResponse {
   sourcePdf: string | null;
   metadata: Record<string, unknown> | null;
   updatedAt: string;
+}
+
+// Translation API types
+export interface StoryTranslationsResponse {
+  storyId: string;
+  /** Original Spanish content */
+  original: {
+    title: string;
+    subtitle: string;
+    description: string;
+  };
+  /** Translations per locale */
+  translations: Partial<Record<StoryLocale, StoryTranslation>>;
+  /** Status per locale */
+  status: Partial<Record<StoryLocale, TranslationStatus>>;
+  /** ISO timestamp of last translation generation */
+  lastTranslatedAt?: string;
+}
+
+export interface UpdateTranslationRequest {
+  locale: StoryLocale;
+  translation: StoryTranslation;
+}
+
+export interface GenerateTranslationsRequest {
+  /** Specific locales to translate. If omitted, translates all 5 locales */
+  locales?: StoryLocale[];
+  /** Force retranslation even if translation already exists */
+  forceRetranslate?: boolean;
+}
+
+export interface GenerateTranslationsResponse {
+  storyId: string;
+  /** Results per locale */
+  results: Record<StoryLocale, {
+    success: boolean;
+    error?: string;
+  }>;
+  /** Number of successful translations */
+  successCount: number;
+  /** Number of failed translations */
+  failedCount: number;
 }
