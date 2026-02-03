@@ -26,6 +26,11 @@ export default defineConfig({
       name: "mobile",
       use: { ...devices["Pixel 7"] },
     },
+    {
+      name: "qa-journey",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: "qa-journey.spec.ts",
+    },
   ],
 
   webServer: {
