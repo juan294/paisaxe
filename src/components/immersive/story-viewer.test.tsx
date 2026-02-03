@@ -470,6 +470,63 @@ describe("StoryViewer", () => {
         expect(bottomContent).toHaveClass("opacity-0");
       }
     });
+
+    it("should show upper-right toolbar controls initially", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Find the upper-right controls nav by its aria-label
+      const controlsNav = screen.getByRole("navigation", { name: "Story controls" });
+      expect(controlsNav).toHaveClass("opacity-100");
+    });
+
+    it("should hide upper-right toolbar controls when toggling info off with i key", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const controlsNav = screen.getByRole("navigation", { name: "Story controls" });
+      expect(controlsNav).toHaveClass("opacity-100");
+
+      fireEvent.keyDown(window, { key: "i" });
+
+      // After pressing i, upper-right controls should be hidden
+      expect(controlsNav).toHaveClass("opacity-0");
+    });
+
+    it("should hide upper-right toolbar controls when clicking screen", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const controlsNav = screen.getByRole("navigation", { name: "Story controls" });
+      const mainContainer = screen.getByRole("main");
+
+      fireEvent.click(mainContainer);
+
+      // After clicking, upper-right controls should be hidden
+      expect(controlsNav).toHaveClass("opacity-0");
+    });
+
+    it("should show upper-right toolbar controls again when toggling info back on", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const controlsNav = screen.getByRole("navigation", { name: "Story controls" });
+
+      // First toggle off
+      fireEvent.keyDown(window, { key: "i" });
+      expect(controlsNav).toHaveClass("opacity-0");
+
+      // Then toggle back on
+      fireEvent.keyDown(window, { key: "i" });
+      expect(controlsNav).toHaveClass("opacity-100");
+    });
+
+    it("should have pointer-events-none on upper-right toolbar when hidden", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const controlsNav = screen.getByRole("navigation", { name: "Story controls" });
+
+      fireEvent.keyDown(window, { key: "i" });
+
+      // When hidden, should have pointer-events-none to prevent interaction
+      expect(controlsNav).toHaveClass("pointer-events-none");
+    });
   });
 
   describe("empty stories", () => {
