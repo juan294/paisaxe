@@ -75,7 +75,7 @@ function AdminPageContent() {
   const { isAdmin, isLoading: isRoleLoading } = useAdminRole();
 
   const [allStories, setAllStories] = useState<AdminStory[]>([]);
-  const [filter, setFilter] = useState<FilterType>("all");
+  const [filter, setFilter] = useState<FilterType>("needs_curation");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -423,14 +423,6 @@ function AdminPageContent() {
             {/* Stat Cards - clickable as filters */}
             <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
               <StatCard
-                icon={<Layers className="h-5 w-5" />}
-                value={totalCount}
-                label="Total"
-                variant="default"
-                isActive={filter === "all"}
-                onClick={() => setFilter("all")}
-              />
-              <StatCard
                 icon={<Clock className="h-5 w-5" />}
                 value={needsCurationCount}
                 label="Pending"
@@ -450,9 +442,17 @@ function AdminPageContent() {
                 icon={<Languages className="h-5 w-5" />}
                 value={missingTranslationsCount}
                 label="Missing i18n"
-                variant="default"
+                variant="purple"
                 isActive={filter === "missing_translations"}
                 onClick={() => setFilter("missing_translations")}
+              />
+              <StatCard
+                icon={<Layers className="h-5 w-5" />}
+                value={totalCount}
+                label="Total"
+                variant="default"
+                isActive={filter === "all"}
+                onClick={() => setFilter("all")}
               />
             </div>
 
@@ -572,7 +572,7 @@ interface StatCardProps {
   icon: React.ReactNode;
   value: number;
   label: string;
-  variant: "default" | "warning" | "success";
+  variant: "default" | "warning" | "success" | "purple";
   isActive?: boolean;
   onClick?: () => void;
 }
@@ -610,6 +610,16 @@ function StatCard({ icon, value, label, variant, isActive, onClick }: StatCardPr
       activeText: "text-[#f5f3ee]",
       subtext: "text-[#6b6560] dark:text-[#a39e98]",
       activeSubtext: "text-[#c4d9c4]",
+    },
+    purple: {
+      bg: "bg-white dark:bg-[#252320]",
+      activeBg: "bg-[#6b5a8a] dark:bg-[#6b5a8a]",
+      icon: "text-[#9b7ac9]",
+      activeIcon: "text-[#c9b7e8]",
+      text: "text-[#2d2a26] dark:text-[#f5f3ee]",
+      activeText: "text-[#f5f3ee]",
+      subtext: "text-[#6b6560] dark:text-[#a39e98]",
+      activeSubtext: "text-[#d4c9e8]",
     },
   };
 
