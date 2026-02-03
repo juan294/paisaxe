@@ -331,8 +331,9 @@ describe("AdminPage", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        // Default filter is Pending (needs_curation), so only pending stories are shown
         expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
-        expect(screen.getByText("Gijón Beach")).toBeInTheDocument();
+        expect(screen.queryByText("Gijón Beach")).not.toBeInTheDocument(); // approved, not shown
         expect(screen.getByText("Asturian Cider")).toBeInTheDocument();
       });
     });
@@ -448,35 +449,17 @@ describe("AdminPage", () => {
       expect(screen.getByTestId("story-grid")).toBeInTheDocument();
     });
 
-    it("stat cards work as filter buttons (Total, Pending, Approved)", async () => {
+    it("stat cards work as filter buttons (Pending, Approved, Total)", async () => {
       render(<AdminPage />);
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
       });
 
-      // Initially all 3 stories are shown (filter = "all")
+      // Initially only pending stories are shown (filter = "needs_curation" by default)
       expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
-      expect(screen.getByTestId("story-story-2")).toBeInTheDocument();
+      expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
       expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
-
-      // Stat cards are clickable filter buttons with rounded-2xl class
-      // Click "Pending" stat card to filter client-side
-      const pendingCard = screen.getAllByRole("button").find(btn =>
-        btn.classList.contains("rounded-2xl") && btn.textContent?.includes("Pending")
-      );
-      expect(pendingCard).toBeDefined();
-
-      await act(async () => {
-        fireEvent.click(pendingCard!);
-      });
-
-      // Now only pending stories (story-1 and story-3) should be visible
-      await waitFor(() => {
-        expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
-        expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
-        expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
-      });
 
       // Click "Approved" stat card
       const approvedCard = screen.getAllByRole("button").find(btn =>
@@ -495,7 +478,7 @@ describe("AdminPage", () => {
         expect(screen.queryByTestId("story-story-3")).not.toBeInTheDocument();
       });
 
-      // Click "Total" stat card to show all again
+      // Click "Total" stat card to show all
       const totalCard = screen.getAllByRole("button").find(btn =>
         btn.classList.contains("rounded-2xl") && btn.textContent?.includes("Total")
       );
@@ -505,10 +488,27 @@ describe("AdminPage", () => {
         fireEvent.click(totalCard!);
       });
 
-      // All stories visible again
+      // All stories visible
       await waitFor(() => {
         expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
         expect(screen.getByTestId("story-story-2")).toBeInTheDocument();
+        expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
+      });
+
+      // Click "Pending" stat card to go back to pending filter
+      const pendingCard = screen.getAllByRole("button").find(btn =>
+        btn.classList.contains("rounded-2xl") && btn.textContent?.includes("Pending")
+      );
+      expect(pendingCard).toBeDefined();
+
+      await act(async () => {
+        fireEvent.click(pendingCard!);
+      });
+
+      // Only pending stories again
+      await waitFor(() => {
+        expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
+        expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
         expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
       });
     });
@@ -549,6 +549,14 @@ describe("AdminPage", () => {
 
         await waitFor(() => {
           expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        // Click "Total" to show all stories first (default is Pending)
+        const totalCard = screen.getAllByRole("button").find(btn =>
+          btn.classList.contains("rounded-2xl") && btn.textContent?.includes("Total")
+        );
+        await act(async () => {
+          fireEvent.click(totalCard!);
         });
 
         const searchInput = screen.getByPlaceholderText("Search stories...");
@@ -645,6 +653,14 @@ describe("AdminPage", () => {
 
         await waitFor(() => {
           expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        // Click "Total" to show all stories first (default is Pending)
+        const totalCard = screen.getAllByRole("button").find(btn =>
+          btn.classList.contains("rounded-2xl") && btn.textContent?.includes("Total")
+        );
+        await act(async () => {
+          fireEvent.click(totalCard!);
         });
 
         const searchInput = screen.getByPlaceholderText("Search stories...");
