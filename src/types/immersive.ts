@@ -45,6 +45,13 @@ export interface StoryTranslation {
 /** Supported locales for story translations (matches Locale type from i18n) */
 export type StoryLocale = 'en' | 'fr' | 'de' | 'pt' | 'ast';
 
+/** Status of a translation for a specific locale */
+export interface TranslationStatus {
+  status: 'pending' | 'translating' | 'complete' | 'failed';
+  error?: string;
+  updatedAt?: string;
+}
+
 export interface StoryMetadata {
   question_prompts?: string[];
   mood_tags?: string[];
@@ -52,6 +59,10 @@ export interface StoryMetadata {
   asturianu_subtitle?: string;
   /** Translations for non-Spanish locales. Spanish is the default in title/subtitle/description fields */
   translations?: Partial<Record<StoryLocale, StoryTranslation>>;
+  /** Per-language translation status tracking */
+  translation_status?: Partial<Record<StoryLocale, TranslationStatus>>;
+  /** ISO timestamp of last translation generation */
+  last_translated_at?: string;
   [key: string]: unknown;
 }
 

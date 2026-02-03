@@ -7,7 +7,10 @@ import type {
   CreateStoryResponse,
   UpdateStoryRequest,
   UpdateStoryResponse,
+  StoryTranslationsResponse,
+  GenerateTranslationsResponse,
 } from "@/types/admin";
+import type { StoryLocale, StoryTranslation } from "@/types/immersive";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import type { AnalyticsDashboardData } from "@/types/analytics";
 import type { ElevenLabsAnalyticsDashboardData } from "@/types/elevenlabs-analytics";
@@ -527,6 +530,87 @@ export async function fetchLemonSqueezyAnalytics(
     };
   } catch (error) {
     console.error("Error fetching Lemon Squeezy analytics:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Fetch translations for a story
+ */
+export async function fetchStoryTranslations(
+  storyId: string
+): Promise<AdminApiResponse<StoryTranslationsResponse>> {
+  try {
+    const response = await fetch(`${API_BASE}/stories/${storyId}/translations`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to fetch translations" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching translations:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Update a single locale translation for a story
+ */
+export async function updateStoryTranslation(
+  storyId: string,
+  locale: StoryLocale,
+  translation: StoryTranslation
+): Promise<AdminApiResponse<{ success: boolean; locale: StoryLocale; storyId: string }>> {
+  try {
+    const response = await fetch(`${API_BASE}/stories/${storyId}/translations`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ locale, translation }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to update translation" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error updating translation:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Generate translations for a story using Claude API
+ */
+export async function generateStoryTranslations(
+  storyId: string,
+  options?: {
+    locales?: StoryLocale[];
+    forceRetranslate?: boolean;
+  }
+): Promise<AdminApiResponse<GenerateTranslationsResponse>> {
+  try {
+    const response = await fetch(`${API_BASE}/stories/${storyId}/translations`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(options || {}),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to generate translations" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error generating translations:", error);
     return { error: "Network error" };
   }
 }
