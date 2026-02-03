@@ -12,7 +12,7 @@ Tasks to complete once the domain (paisaxe.com / paisaxe.es) is fully configured
 |---|------|--------|
 | 1 | Add WEBHOOK_SECRET to Vercel | COMPLETED (2026-01-31) |
 | 2 | Configure Supabase Database Webhook Settings | COMPLETED |
-| 3 | Configure Supabase Edge Function Settings | NEEDS VERIFICATION |
+| 3 | Configure Supabase Edge Function Settings | REMOVED (not needed on Pro tier) |
 | 4 | Deploy Edge Functions | COMPLETED (2026-01-31) |
 | 5 | Verify Database Migrations | COMPLETED |
 | 6 | Update NEXT_PUBLIC_SITE_URL on Vercel | COMPLETED (24h ago) |
@@ -36,23 +36,18 @@ Tasks to complete once the domain (paisaxe.com / paisaxe.es) is fully configured
 
 ## 3. Configure Supabase Edge Function Settings
 
-**NEEDS VERIFICATION** - These SQL commands should be run in the Supabase SQL Editor to enable pg_cron to call the Edge Functions:
+**REMOVED** (2026-02-03) - This configuration is not needed on the Pro tier:
 
+1. Pro tier databases don't auto-pause (that's only a free tier limitation)
+2. Upptime pings `/api/health` every 5 minutes, which queries the database
+3. The `ALTER DATABASE ... SET` command requires superuser privileges not available in Supabase's SQL Editor
+
+The `edge-keep-alive` cron job was unscheduled:
 ```sql
--- Set the Edge Functions base URL
-ALTER DATABASE postgres SET app.supabase_functions_url = 'https://axoishtlumlswzhegseq.supabase.co/functions/v1';
-
--- Set the service role key for authentication
--- Get this from: Supabase Dashboard > Settings > API > service_role key
-ALTER DATABASE postgres SET app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
+SELECT cron.unschedule('edge-keep-alive');
 ```
 
-To get the service role key:
-1. Go to https://supabase.com/dashboard/project/axoishtlumlswzhegseq/settings/api
-2. Copy the `service_role` key (the secret one, not the anon key)
-3. Run the SQL command above
-
-**Note**: This may already be configured. The Edge Function will fail silently if not set up.
+The Edge Function `keep-alive` remains deployed and can be called manually if needed.
 
 ---
 
@@ -77,9 +72,10 @@ supabase functions list
 |-----|--------|
 | `analyze-main-tables` | Active |
 | `cleanup-cron-history` | Active |
-| `edge-keep-alive` | Active |
 | `keep-alive` | Active |
 | `vacuum-analyze-chunks` | Active |
+
+**Note**: `edge-keep-alive` was removed on 2026-02-03 (not needed on Pro tier).
 
 **Note**: The `vacuum-analyze-analytics` and `edge-cleanup-analytics` jobs were removed as part of the PostHog migration.
 
