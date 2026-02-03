@@ -213,6 +213,13 @@ export function StoryEditorDialog({
     setPendingTranslations(changes);
   }, []);
 
+  // Callback when translations are auto-generated - update parent's story data
+  const handleMetadataUpdated = useCallback((metadata: Record<string, unknown>) => {
+    if (story) {
+      onUpdate(story.id, { metadata });
+    }
+  }, [story, onUpdate]);
+
   const handleSlugChange = (value: string) => {
     setSlugManuallyEdited(true);
     setSlug(value);
@@ -616,6 +623,7 @@ export function StoryEditorDialog({
               <StoryTranslationsTab
                 story={story}
                 onTranslationChange={handleTranslationChange}
+                onMetadataUpdated={handleMetadataUpdated}
               />
             ) : activeTab === "details" ? (
               <>
