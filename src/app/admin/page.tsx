@@ -29,13 +29,46 @@ import {
   ArrowUpRight,
   Search,
   Plus,
+  Languages,
 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { Input } from "@/components/ui/input";
 import type { AdminStory, CurationStatus, CreateStoryResponse } from "@/types/admin";
+import type { StoryMetadata, StoryLocale, TranslationStatus } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 
-type FilterType = "all" | CurationStatus;
+type FilterType = "all" | CurationStatus | "missing_translations";
+
+const TRANSLATION_LOCALES: StoryLocale[] = ["en", "fr", "de", "pt", "ast"];
+
+/**
+ * Check if a story is missing any translations.
+ */
+function hasMissingTranslations(story: AdminStory): boolean {
+  const metadata = story.metadata as StoryMetadata | undefined;
+  if (!metadata) return true;
+
+  const translations = metadata.translations || {};
+  const status = metadata.translation_status || {};
+
+  for (const locale of TRANSLATION_LOCALES) {
+    const translation = translations[locale];
+    const localeStatus = status[locale] as TranslationStatus | undefined;
+
+    // Missing if no translation content or status is not complete
+    const hasContent = translation && (
+      translation.title?.trim() ||
+      translation.subtitle?.trim() ||
+      translation.description?.trim()
+    );
+
+    if (!hasContent || localeStatus?.status !== "complete") {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 function AdminPageContent() {
   const { user, isLoading: isAuthLoading, signInWithGoogle, signOut } = useAuth();
@@ -98,7 +131,11 @@ function AdminPageContent() {
   // Filter stories client-side for display
   const filteredStories = allStories.filter((story) => {
     // Status filter
-    if (filter !== "all" && story.curationStatus !== filter) return false;
+    if (filter === "missing_translations") {
+      if (!hasMissingTranslations(story)) return false;
+    } else if (filter !== "all" && story.curationStatus !== filter) {
+      return false;
+    }
 
     // Search filter
     if (searchQuery) {
@@ -313,7 +350,7 @@ function AdminPageContent() {
   const approvedCount = allStories.filter(
     (s) => s.curationStatus === "approved"
   ).length;
-  const withImagesCount = allStories.filter((s) => s.image).length;
+  const missingTranslationsCount = allStories.filter(hasMissingTranslations).length;
 
 
   return (
@@ -410,10 +447,12 @@ function AdminPageContent() {
                 onClick={() => setFilter("approved")}
               />
               <StatCard
-                icon={<ImageIcon className="h-5 w-5" />}
-                value={withImagesCount}
-                label="With Images"
+                icon={<Languages className="h-5 w-5" />}
+                value={missingTranslationsCount}
+                label="Missing i18n"
                 variant="default"
+                isActive={filter === "missing_translations"}
+                onClick={() => setFilter("missing_translations")}
               />
             </div>
 

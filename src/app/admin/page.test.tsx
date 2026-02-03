@@ -156,6 +156,9 @@ vi.mock("lucide-react", () => ({
   Plus: (props: Record<string, unknown>) => (
     <span data-testid="icon-plus" {...props} />
   ),
+  Languages: (props: Record<string, unknown>) => (
+    <span data-testid="icon-languages" {...props} />
+  ),
 }));
 
 // Mock theme components
@@ -374,7 +377,7 @@ describe("AdminPage", () => {
       });
     });
 
-    it("shows story counts in metric cards (total, pending, approved, with images)", async () => {
+    it("shows story counts in metric cards (total, pending, approved, missing i18n)", async () => {
       render(<AdminPage />);
 
       await waitFor(() => {
@@ -386,7 +389,7 @@ describe("AdminPage", () => {
       expect(screen.getByText("Total")).toBeInTheDocument();
       expect(screen.getAllByText("Pending").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Approved").length).toBeGreaterThan(0);
-      expect(screen.getByText("With Images")).toBeInTheDocument();
+      expect(screen.getByText("Missing i18n")).toBeInTheDocument();
     });
 
     it("logout calls signOut", async () => {
