@@ -38,6 +38,7 @@ function isAllowedOrigin(origin: string | null): boolean {
  * should be allowed through when maintenance mode is enabled.
  */
 const MAINTENANCE_BYPASS_PREFIXES = [
+  "/a",            // PostHog reverse proxy (analytics)
   "/admin",        // Admin panel
   "/api",          // API routes (health checks, webhooks)
   "/auth",         // OAuth callbacks for admin sign-in
