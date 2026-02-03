@@ -42,14 +42,14 @@ FOCUS AREAS:
 - Outdated dependencies with security patches available
 - Transitive dependency risks`,
 
-  docs_freshness_agent_enabled: `You are the Paisaxe Docs Freshness Agent. Your job is to identify stale documentation.
+  documentation_agent_enabled: `You are the Paisaxe Documentation Agent. Your job is to identify stale documentation.
 
 STEPS:
 1. Compare CLAUDE.md structure with actual codebase
 2. Find files modified since docs were last updated
 3. Check for undocumented API routes
 4. Check for undocumented feature flags
-5. Update docs/agents/docs-freshness-report.md with findings
+5. Update docs/agents/documentation-report.md with findings
 
 CHECK FOR:
 - New migrations not documented
@@ -76,14 +76,14 @@ TRACK:
 const SCHEDULE_INFO: Record<string, string> = {
   coverage_agent_enabled: "Daily at 2:00 AM",
   security_agent_enabled: "Weekly on Monday at 9:00 AM",
-  docs_freshness_agent_enabled: "Weekly on Sunday at 6:00 AM",
+  documentation_agent_enabled: "Weekly on Sunday at 6:00 AM",
   performance_agent_enabled: "Weekly on Saturday at 10:00 AM",
 };
 
 const OUTPUT_FILES: Record<string, string> = {
   coverage_agent_enabled: "docs/agents/coverage-report.md",
   security_agent_enabled: "docs/agents/security-report.md",
-  docs_freshness_agent_enabled: "docs/agents/docs-freshness-report.md",
+  documentation_agent_enabled: "docs/agents/documentation-report.md",
   performance_agent_enabled: "docs/agents/performance-report.md",
 };
 

@@ -7,7 +7,7 @@ import path from "path";
 const AGENT_REPORTS: Record<string, string> = {
   coverage_agent_enabled: "coverage-report.md",
   security_agent_enabled: "security-report.md",
-  docs_freshness_agent_enabled: "docs-freshness-report.md",
+  documentation_agent_enabled: "documentation-report.md",
   performance_agent_enabled: "performance-report.md",
   qa_agent_enabled: "qa-report.md",
 };

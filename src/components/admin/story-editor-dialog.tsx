@@ -164,7 +164,7 @@ export function StoryEditorDialog({
       setSourcePdf(story.sourcePdf || "");
       setQuestionPrompts((story.metadata?.question_prompts as string[]) || []);
       setImageSource(story.imageSource || "");
-      setShowOptionalFields(!!(story.location || story.duration || story.sourcePdf || (story.metadata?.question_prompts as string[])?.length));
+      setShowOptionalFields(false);
       setHasDetailsChanges(false);
       setHasImageChanges(false);
       setHasTranslationChanges(false);

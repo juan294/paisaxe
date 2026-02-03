@@ -539,6 +539,6 @@ All flags are managed from the admin panel and take effect within approximately 
 | `automated_agents` | Master toggle for all automated CI/CD agents |
 | `coverage_agent_enabled` | Coverage agent (runs daily at 2:00 AM) |
 | `security_agent_enabled` | Security agent (runs weekly on Monday) |
-| `docs_freshness_agent_enabled` | Docs freshness agent (runs weekly on Sunday) |
+| `documentation_agent_enabled` | Documentation agent (runs weekly on Sunday) |
 | `performance_agent_enabled` | Performance agent (runs weekly on Saturday) |
 | `qa_agent_enabled` | QA agent for LLM response quality testing |

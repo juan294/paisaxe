@@ -195,7 +195,7 @@ Local agents run via macOS launchd and are controllable via feature flags in the
 | `automated_agents` | Automated Agents (Master) | Enabled |
 | `coverage_agent_enabled` | Coverage Agent | Enabled |
 | `security_agent_enabled` | Security Agent | Disabled |
-| `docs_freshness_agent_enabled` | Docs Freshness Agent | Disabled |
+| `documentation_agent_enabled` | Documentation Agent | Disabled |
 | `performance_agent_enabled` | Performance Agent | Disabled |
 | `qa_agent_enabled` | QA Agent | Disabled |
 | `localization_agent_enabled` | Localization Agent | Disabled |
@@ -208,7 +208,7 @@ Disable the master toggle to stop all agents. Individual flags control each agen
 |-------|--------|----------|--------|
 | Coverage | `scripts/coverage-agent.sh` | Daily 2:00 AM | `docs/agents/coverage-report.md` |
 | Security | `scripts/security-agent.sh` | Weekly Monday 9:00 AM | `docs/agents/security-report.md` |
-| Docs Freshness | `scripts/docs-freshness-agent.sh` | Weekly Sunday 6:00 AM | `docs/agents/docs-freshness-report.md` |
+| Documentation | `scripts/documentation-agent.sh` | Weekly Sunday 6:00 AM | `docs/agents/documentation-report.md` |
 | Performance | `scripts/performance-agent.sh` | Weekly Saturday 10:00 AM | `docs/agents/performance-report.md` |
 | QA | `scripts/qa-agent.sh` | Weekly Sunday 8:00 AM | `docs/agents/qa-report.md` |
 | Localization | `scripts/localization-agent.sh` | Weekly Sunday 7:00 AM | `docs/agents/localization-report.md` |
@@ -220,7 +220,7 @@ Shared utilities in `scripts/lib/agent-utils.sh` provide feature flag checking, 
 Located in `~/Library/LaunchAgents/`:
 - `com.paisaxe.coverage-agent.plist`
 - `com.paisaxe.security-agent.plist`
-- `com.paisaxe.docs-freshness-agent.plist`
+- `com.paisaxe.documentation-agent.plist`
 - `com.paisaxe.performance-agent.plist`
 - `com.paisaxe.qa-agent.plist`
 - `com.paisaxe.localization-agent.plist`
@@ -243,7 +243,7 @@ Unlike cron, launchd runs missed jobs when the Mac wakes from sleep. Logs writte
 
 - **Coverage Agent**: Runs nightly. Uses Claude CLI to analyze test coverage and write missing tests. Updates `docs/agents/coverage-report.md`.
 - **Security Agent**: Runs weekly. Performs `npm audit`, license checking, copyleft detection, and outdated package reports.
-- **Docs Freshness Agent**: Runs weekly. Checks for stale docs, new migrations needing documentation, undocumented API routes and feature flags.
+- **Documentation Agent**: Runs weekly. Checks for stale docs, new migrations needing documentation, undocumented API routes and feature flags.
 - **Performance Agent**: Runs weekly. Analyzes bundle sizes, Lighthouse scores, Core Web Vitals, dependency counts, and disk usage.
 - **QA Agent**: Runs weekly. Automated LLM testing for RAG quality, safety, content boundaries, and response quality. Budget-conscious sampling (configurable via `testsPerCategory` in feature flag config). See `docs/testbed.md` for full test catalog.
 - **Localization Agent**: Runs weekly. Ensures 100% translation coverage across all 5 locales (es, en, fr, de, pt). Detects missing UI strings and story translations, then auto-fills gaps. Spanish is source of truth.

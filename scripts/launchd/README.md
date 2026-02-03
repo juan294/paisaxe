@@ -16,7 +16,7 @@ launchctl load ~/Library/LaunchAgents/com.paisaxe.*.plist
 | Agent | Schedule | Description |
 |-------|----------|-------------|
 | coverage-agent | Daily 2:00 AM | Runs tests, identifies coverage gaps, writes new tests |
-| docs-freshness-agent | Sundays 6:00 AM | Checks documentation freshness, updates stale docs |
+| documentation-agent | Sundays 6:00 AM | Checks documentation freshness, updates stale docs |
 | qa-agent | Sundays 8:00 AM | Runs LLM quality tests (requires dev server) |
 | security-agent | Mondays 9:00 AM | Scans for vulnerabilities, analyzes exploitability |
 | performance-agent | Saturdays 10:00 AM | Runs Lighthouse audits, tracks performance trends |
