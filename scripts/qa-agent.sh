@@ -9,13 +9,19 @@ LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/qa-agent-$(date +%Y-%m-%d).log"
 REPORT_FILE="$PROJECT_DIR/docs/agents/qa-report.md"
 METRICS_FILE="$PROJECT_DIR/.qa-metrics.tmp"
+JOURNEY_METRICS_FILE="$PROJECT_DIR/.qa-journey-metrics.tmp"
 SERVER_PID=""
 SERVER_LOG="$LOG_DIR/qa-agent-server.log"
+
+# Test user configuration (for authenticated journey tests)
+QA_TEST_USER_EMAIL="${QA_TEST_USER_EMAIL:-}"
+QA_TEST_USER_PASSWORD="${QA_TEST_USER_PASSWORD:-}"
 
 mkdir -p "$LOG_DIR"
 
 # Source shared utilities and check feature flags
 source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
+source "$PROJECT_DIR/scripts/lib/github-issues.sh"
 
 # Cleanup function to ensure server is stopped on exit
 cleanup() {
@@ -25,6 +31,7 @@ cleanup() {
     wait "$SERVER_PID" 2>/dev/null || true
   fi
   rm -f "$METRICS_FILE"
+  rm -f "$JOURNEY_METRICS_FILE"
 }
 trap cleanup EXIT
 
@@ -41,7 +48,9 @@ cd "$PROJECT_DIR"
 
 # Get configuration from feature flag
 TESTS_PER_CATEGORY=$(get_agent_config "qa_agent_enabled" "testsPerCategory" || echo "3")
-log_info "Running $TESTS_PER_CATEGORY tests per category" | tee -a "$LOG_FILE"
+ENABLE_JOURNEY_TESTS=$(get_agent_config "qa_agent_enabled" "enableJourneyTests" || echo "true")
+ENABLE_GITHUB_ISSUES=$(get_agent_config "qa_agent_enabled" "enableGithubIssues" || echo "true")
+log_info "Configuration: $TESTS_PER_CATEGORY tests/category, journeyTests=$ENABLE_JOURNEY_TESTS, githubIssues=$ENABLE_GITHUB_ISSUES" | tee -a "$LOG_FILE"
 
 # Check if server is already running
 if curl -s --max-time 2 "http://localhost:3000/api/health" > /dev/null 2>&1; then
@@ -71,8 +80,10 @@ else
   log_success "Dev server ready (took ${WAITED}s)" | tee -a "$LOG_FILE"
 fi
 
-# Run the automated test suite and capture output
-log_info "Running automated QA tests..." | tee -a "$LOG_FILE"
+# =============================================================================
+# PHASE 1: LLM Quality Tests
+# =============================================================================
+log_info "=== Phase 1: LLM Quality Tests ===" | tee -a "$LOG_FILE"
 
 export QA_TESTS_PER_CATEGORY="$TESTS_PER_CATEGORY"
 
@@ -124,6 +135,109 @@ FAILED_DETAILS=$(echo "$TEST_OUTPUT" | grep -A 20 "FAIL\|AssertionError\|Expecte
   fi
 } > "$METRICS_FILE"
 
+# =============================================================================
+# PHASE 2: Browser Journey Tests (Playwright)
+# =============================================================================
+JOURNEY_PASSED=0
+JOURNEY_FAILED=0
+JOURNEY_OUTPUT=""
+
+if [[ "$ENABLE_JOURNEY_TESTS" == "true" ]]; then
+  log_info "=== Phase 2: Browser Journey Tests ===" | tee -a "$LOG_FILE"
+
+  # Run Playwright journey tests
+  JOURNEY_OUTPUT=$(npx playwright test qa-journey.spec.ts --project=qa-journey --reporter=list 2>&1) || JOURNEY_EXIT_CODE=$?
+  JOURNEY_EXIT_CODE=${JOURNEY_EXIT_CODE:-0}
+
+  # Parse journey test results
+  JOURNEY_PASSED=$(echo "$JOURNEY_OUTPUT" | grep -oE '[0-9]+ passed' | head -1 | awk '{print $1}' || echo "0")
+  JOURNEY_FAILED=$(echo "$JOURNEY_OUTPUT" | grep -oE '[0-9]+ failed' | head -1 | awk '{print $1}' || echo "0")
+
+  log_info "Journey test results: $JOURNEY_PASSED passed, $JOURNEY_FAILED failed" | tee -a "$LOG_FILE"
+
+  # Write journey metrics
+  {
+    echo ""
+    echo "BROWSER JOURNEY TEST RESULTS:"
+    echo "- Passed: $JOURNEY_PASSED"
+    echo "- Failed: $JOURNEY_FAILED"
+    echo ""
+    echo "JOURNEY TEST OUTPUT:"
+    echo "$JOURNEY_OUTPUT"
+  } > "$JOURNEY_METRICS_FILE"
+else
+  log_info "=== Phase 2: Browser Journey Tests (SKIPPED - disabled in config) ===" | tee -a "$LOG_FILE"
+  echo "Browser journey tests skipped (disabled in config)" > "$JOURNEY_METRICS_FILE"
+fi
+
+# =============================================================================
+# PHASE 3: Test User Cleanup
+# =============================================================================
+log_info "=== Phase 3: Test User Cleanup ===" | tee -a "$LOG_FILE"
+
+if [[ -n "$QA_TEST_USER_EMAIL" ]]; then
+  # Validate email pattern before calling cleanup
+  if [[ "$QA_TEST_USER_EMAIL" == qa-test-*@paisaxe.dev ]]; then
+    log_info "Cleaning up test user data for: $QA_TEST_USER_EMAIL" | tee -a "$LOG_FILE"
+
+    # Call the cleanup function via Supabase REST API
+    CLEANUP_RESULT=$(curl -s -X POST \
+      "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/cleanup_qa_test_user" \
+      -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+      -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+      -H "Content-Type: application/json" \
+      -d "{\"test_email\": \"$QA_TEST_USER_EMAIL\"}" 2>&1) || {
+      log_warn "Test user cleanup failed (non-critical): $CLEANUP_RESULT" | tee -a "$LOG_FILE"
+    }
+
+    log_info "Cleanup result: $CLEANUP_RESULT" | tee -a "$LOG_FILE"
+  else
+    log_warn "Skipping cleanup - email doesn't match qa-test-*@paisaxe.dev pattern" | tee -a "$LOG_FILE"
+  fi
+else
+  log_info "No QA_TEST_USER_EMAIL configured — skipping cleanup" | tee -a "$LOG_FILE"
+fi
+
+# =============================================================================
+# PHASE 4: GitHub Issue Filing
+# =============================================================================
+log_info "=== Phase 4: GitHub Issue Filing ===" | tee -a "$LOG_FILE"
+
+TOTAL_FAILURES=$((FAILED_TESTS + JOURNEY_FAILED))
+
+if [[ "$ENABLE_GITHUB_ISSUES" == "true" && $TOTAL_FAILURES -gt 0 ]]; then
+  log_info "Filing GitHub issues for $TOTAL_FAILURES failures..." | tee -a "$LOG_FILE"
+
+  # File issues for LLM test failures
+  if [[ $FAILED_TESTS -gt 0 ]]; then
+    # Extract individual failure names and create issues
+    FAILURE_NAMES=$(echo "$TEST_OUTPUT" | grep -E "^\s*[✗×]|FAIL" | head -5 || echo "")
+    if [[ -n "$FAILURE_NAMES" ]]; then
+      create_summary_issue "$PASS_RATE" "$FAILED_TESTS" "$FAILURE_NAMES" 2>&1 | tee -a "$LOG_FILE" || {
+        log_warn "Failed to create GitHub issue (gh CLI may not be configured)" | tee -a "$LOG_FILE"
+      }
+    fi
+  fi
+
+  # File issues for journey test failures
+  if [[ $JOURNEY_FAILED -gt 0 ]]; then
+    JOURNEY_FAILURES=$(echo "$JOURNEY_OUTPUT" | grep -E "^\s*[✗×]|FAIL" | head -5 || echo "Journey test failures detected")
+    create_journey_failure_issue "Browser Journey Tests" "$JOURNEY_FAILURES" "" 2>&1 | tee -a "$LOG_FILE" || {
+      log_warn "Failed to create journey failure issue" | tee -a "$LOG_FILE"
+    }
+  fi
+
+  log_success "GitHub issue filing complete" | tee -a "$LOG_FILE"
+elif [[ "$ENABLE_GITHUB_ISSUES" != "true" ]]; then
+  log_info "GitHub issue filing disabled in config — skipping" | tee -a "$LOG_FILE"
+else
+  log_info "No failures detected — no issues to file" | tee -a "$LOG_FILE"
+fi
+
+# =============================================================================
+# PHASE 5: Claude Analysis & Report Generation
+# =============================================================================
+log_info "=== Phase 5: Claude Analysis & Report ===" | tee -a "$LOG_FILE"
 log_info "Metrics collected, invoking Claude for analysis..." | tee -a "$LOG_FILE"
 
 # Fetch the prompt from the feature flag config
@@ -171,9 +285,14 @@ Additional context:
 - Report file: $REPORT_FILE
 - Date: $(date '+%Y-%m-%d')
 - Test file location: src/tests/qa/llm-quality.test.ts
+- Journey tests enabled: $ENABLE_JOURNEY_TESTS
+- GitHub issues enabled: $ENABLE_GITHUB_ISSUES
 
 QA metrics:
 $(cat "$METRICS_FILE")
+
+Journey test metrics:
+$(cat "$JOURNEY_METRICS_FILE" 2>/dev/null || echo "No journey test data available")
 PROMPT
 
 log_success "Claude analysis complete" | tee -a "$LOG_FILE"
