@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.paisaxe.docs-freshness-agent</string>
+	<string>com.paisaxe.documentation-agent</string>
 
 	<key>ProgramArguments</key>
 	<array>
 		<string>/bin/bash</string>
-		<string>/Users/juan/Documents/GenAI_Projects/paisaxe/scripts/docs-freshness-agent.sh</string>
+		<string>/Users/juan/Documents/GenAI_Projects/paisaxe/scripts/documentation-agent.sh</string>
 	</array>
 
 	<key>StartCalendarInterval</key>
@@ -22,10 +22,10 @@
 	</dict>
 
 	<key>StandardOutPath</key>
-	<string>/Users/juan/Documents/GenAI_Projects/paisaxe/logs/docs-freshness-agent-launchd.log</string>
+	<string>/Users/juan/Documents/GenAI_Projects/paisaxe/logs/documentation-agent-launchd.log</string>
 
 	<key>StandardErrorPath</key>
-	<string>/Users/juan/Documents/GenAI_Projects/paisaxe/logs/docs-freshness-agent-launchd-err.log</string>
+	<string>/Users/juan/Documents/GenAI_Projects/paisaxe/logs/documentation-agent-launchd-err.log</string>
 
 	<key>WorkingDirectory</key>
 	<string>/Users/juan/Documents/GenAI_Projects/paisaxe</string>

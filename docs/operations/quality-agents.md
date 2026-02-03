@@ -46,7 +46,7 @@ GitHub Actions (Scheduled)
 Local Agents (macOS launchd)
   +-- coverage-agent ...... Daily 02:00 AM - test coverage analysis
   +-- security-agent ...... Weekly Monday 09:00 AM - npm audit + licenses
-  +-- docs-freshness-agent  Weekly Sunday 06:00 AM - stale docs detection
+  +-- documentation-agent  Weekly Sunday 06:00 AM - stale docs detection
   +-- performance-agent ... Weekly Saturday 10:00 AM - Lighthouse + bundles
 
 Database (pg_cron)
@@ -79,7 +79,7 @@ Four agents run locally via macOS launchd, controlled via feature flags in the a
 |-------|--------|----------|--------|---------|
 | Coverage | `scripts/coverage-agent.sh` | Daily 2:00 AM | `docs/agents/coverage-report.md` | Enabled |
 | Security | `scripts/security-agent.sh` | Mon 9:00 AM | `docs/agents/security-report.md` | Disabled |
-| Docs Freshness | `scripts/docs-freshness-agent.sh` | Sun 6:00 AM | `docs/agents/docs-freshness-report.md` | Disabled |
+| Documentation | `scripts/documentation-agent.sh` | Sun 6:00 AM | `docs/agents/documentation-report.md` | Disabled |
 | Performance | `scripts/performance-agent.sh` | Sat 10:00 AM | `docs/agents/performance-report.md` | Disabled |
 
 ### Feature Flag Control
@@ -91,7 +91,7 @@ Agents check feature flags before running. Control them via the **production adm
 | `automated_agents` | Master kill switch — disables ALL agents |
 | `coverage_agent_enabled` | Enable/disable coverage agent |
 | `security_agent_enabled` | Enable/disable security agent |
-| `docs_freshness_agent_enabled` | Enable/disable docs freshness agent |
+| `documentation_agent_enabled` | Enable/disable documentation agent |
 | `performance_agent_enabled` | Enable/disable performance agent |
 
 **Important**: Local agents fetch flags from the **production** API (`paisaxe.es/api/feature-flags`), not localhost. This allows control even when the dev server isn't running.
@@ -103,7 +103,7 @@ Located in `~/Library/LaunchAgents/`:
 ```
 com.paisaxe.coverage-agent.plist
 com.paisaxe.security-agent.plist
-com.paisaxe.docs-freshness-agent.plist
+com.paisaxe.documentation-agent.plist
 com.paisaxe.performance-agent.plist
 ```
 
@@ -155,7 +155,7 @@ Runs weekly on Monday at 9:00 AM. Performs:
 
 Output: `docs/agents/security-report.md`
 
-#### Docs Freshness Agent
+#### Documentation Agent
 
 Runs weekly on Sunday at 6:00 AM. Checks:
 - Files modified since CLAUDE.md was updated
@@ -164,7 +164,7 @@ Runs weekly on Sunday at 6:00 AM. Checks:
 - Undocumented feature flags
 - Documentation file ages
 
-Output: `docs/agents/docs-freshness-report.md`
+Output: `docs/agents/documentation-report.md`
 
 #### Performance Agent
 
@@ -426,7 +426,7 @@ All agent reports go to `docs/agents/`:
 docs/agents/
 ├── coverage-report.md
 ├── security-report.md
-├── docs-freshness-report.md
+├── documentation-report.md
 └── performance-report.md
 ```
 
@@ -437,7 +437,7 @@ docs/agents/
 | `automated_agents` | Automated Agents (Master) | Enabled |
 | `coverage_agent_enabled` | Coverage Agent | Enabled |
 | `security_agent_enabled` | Security Agent | Disabled |
-| `docs_freshness_agent_enabled` | Docs Freshness Agent | Disabled |
+| `documentation_agent_enabled` | Documentation Agent | Disabled |
 | `performance_agent_enabled` | Performance Agent | Disabled |
 | `maintenance_mode` | Maintenance Mode | Disabled |
 
@@ -455,7 +455,7 @@ docs/agents/
 | `scripts/lib/agent-utils.sh` | Shared agent utilities |
 | `scripts/coverage-agent.sh` | Coverage agent script |
 | `scripts/security-agent.sh` | Security agent script |
-| `scripts/docs-freshness-agent.sh` | Docs freshness agent script |
+| `scripts/documentation-agent.sh` | Docs freshness agent script |
 | `scripts/performance-agent.sh` | Performance agent script |
 | `.github/workflows/*.yml` | CI/CD workflows |
 | `lighthouserc.json` | Lighthouse thresholds |
@@ -472,5 +472,5 @@ Located in `~/Library/LaunchAgents/`:
 |-------|-------|
 | `com.paisaxe.coverage-agent.plist` | Coverage Agent |
 | `com.paisaxe.security-agent.plist` | Security Agent |
-| `com.paisaxe.docs-freshness-agent.plist` | Docs Freshness Agent |
+| `com.paisaxe.documentation-agent.plist` | Documentation Agent |
 | `com.paisaxe.performance-agent.plist` | Performance Agent |

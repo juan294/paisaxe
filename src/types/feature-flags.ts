@@ -16,7 +16,7 @@ export type FeatureFlagKey =
   | "automated_agents"
   | "coverage_agent_enabled"
   | "security_agent_enabled"
-  | "docs_freshness_agent_enabled"
+  | "documentation_agent_enabled"
   | "performance_agent_enabled"
   | "qa_agent_enabled"
   | "localization_agent_enabled"
