@@ -29,6 +29,7 @@ interface PendingTranslationChanges {
 interface StoryTranslationsTabProps {
   story: AdminStory;
   onTranslationChange?: (hasChanges: boolean, pendingChanges: PendingTranslationChanges[]) => void;
+  onMetadataUpdated?: (metadata: Record<string, unknown>) => void;
 }
 
 interface LocaleState {
@@ -54,6 +55,7 @@ const STATUS_COLORS: Record<TranslationStatus["status"], string> = {
 export function StoryTranslationsTab({
   story,
   onTranslationChange,
+  onMetadataUpdated,
 }: StoryTranslationsTabProps) {
   const [selectedLocale, setSelectedLocale] = useState<StoryLocale>("en");
   const [isLoading, setIsLoading] = useState(true);
@@ -84,7 +86,7 @@ export function StoryTranslationsTab({
   });
 
   // Load translations on mount
-  const loadTranslations = useCallback(async () => {
+  const loadTranslations = useCallback(async (notifyParent = false) => {
     setIsLoading(true);
     setError("");
 
@@ -108,10 +110,19 @@ export function StoryTranslationsTab({
         };
       }
       setLocaleStates(newStates);
+
+      // Notify parent of updated metadata (for refreshing story cards)
+      if (notifyParent && onMetadataUpdated) {
+        onMetadataUpdated({
+          ...story.metadata,
+          translations: result.data.translations,
+          translation_status: result.data.status,
+        });
+      }
     }
 
     setIsLoading(false);
-  }, [story.id]);
+  }, [story.id, story.metadata, onMetadataUpdated]);
 
   useEffect(() => {
     loadTranslations();
@@ -164,8 +175,8 @@ export function StoryTranslationsTab({
           result.data.successCount + result.data.failedCount
         } translations`
       );
-      // Reload to get fresh data
-      await loadTranslations();
+      // Reload to get fresh data and notify parent to update story cards
+      await loadTranslations(true);
       setTimeout(() => setSuccessMessage(""), 3000);
     }
 
@@ -187,7 +198,8 @@ export function StoryTranslationsTab({
       setError(result.error);
     } else {
       setSuccessMessage(`${LOCALE_NAMES[locale]} regenerated`);
-      await loadTranslations();
+      // Reload to get fresh data and notify parent to update story cards
+      await loadTranslations(true);
       setTimeout(() => setSuccessMessage(""), 3000);
     }
 
