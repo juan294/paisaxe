@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { fetchElevenLabsAnalytics } from "@/lib/admin-api";
-import { RefreshCw, AlertCircle, Mic, Clock, MessageSquare, Star } from "lucide-react";
+import { AlertCircle, Mic, Clock, MessageSquare, Star } from "lucide-react";
 import type {
   ElevenLabsAnalyticsDashboardData,
   ElevenLabsAgentBreakdown,
@@ -103,9 +103,7 @@ export function ElevenLabsAnalyticsPanel() {
       )}
 
       {isLoading && !data ? (
-        <div className="flex min-h-[200px] items-center justify-center">
-          <RefreshCw className="h-5 w-5 animate-spin text-[#a39e98]" />
-        </div>
+        <SkeletonVoiceDashboard />
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[200px] flex-col items-center justify-center gap-4">
           <Mic className="h-8 w-8 text-[#e5e3de]" />
@@ -418,6 +416,137 @@ function RecentConversationsTable({ number, conversations }: RecentConversations
               </td>
               <td className="py-2 text-right font-mono text-sm font-medium tabular-nums text-amber-600 dark:text-amber-400">
                 {conv.call_duration_secs ? `${conv.call_duration_secs}s` : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+// ============================================================================
+// Skeleton Components for Loading State
+// ============================================================================
+
+function SkeletonVoiceDashboard() {
+  return (
+    <>
+      {/* Active Calls Widget Skeleton */}
+      <div className="inline-flex items-center gap-3 rounded-full bg-[#f5f3ee] px-4 py-2 dark:bg-[#3d3a36]">
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#d5d3ce] dark:bg-[#4d4944]" />
+        <div className="h-4 w-24 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+      </div>
+
+      {/* Summary Stats Skeleton */}
+      <section className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:grid-cols-6">
+        <SkeletonStatCard color="blue" />
+        <SkeletonStatCard color="emerald" />
+        <SkeletonStatCard color="stone" />
+        <SkeletonStatCard color="violet" />
+        <SkeletonStatCard color="amber" />
+        <SkeletonStatCard color="yellow" />
+      </section>
+
+      {/* Breakdown Tables Skeleton */}
+      <div className="grid gap-12 lg:grid-cols-2">
+        <SkeletonBreakdownTable number="01" title="By Agent" />
+        <SkeletonBreakdownTable number="02" title="By Language" />
+        <SkeletonBreakdownTable number="03" title="By Status" />
+        <SkeletonRecentConversations number="04" />
+      </div>
+    </>
+  );
+}
+
+const skeletonColorClasses: Record<string, string> = {
+  blue: "bg-blue-200 dark:bg-blue-900/30",
+  emerald: "bg-emerald-200 dark:bg-emerald-900/30",
+  amber: "bg-amber-200 dark:bg-amber-900/30",
+  rose: "bg-rose-200 dark:bg-rose-900/30",
+  violet: "bg-violet-200 dark:bg-violet-900/30",
+  yellow: "bg-yellow-200 dark:bg-yellow-900/30",
+  stone: "bg-[#e5e3de] dark:bg-[#3d3a36]",
+};
+
+function SkeletonStatCard({ color }: { color: string }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="h-4 w-4 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+        <div className="h-3 w-20 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+      </div>
+      <div className={`h-9 w-16 animate-pulse rounded ${skeletonColorClasses[color] || skeletonColorClasses.stone}`} />
+    </div>
+  );
+}
+
+function SkeletonBreakdownTable({ number, title }: { number: string; title: string }) {
+  return (
+    <section>
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        {number} — {title}
+      </h3>
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">#</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Name</th>
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+              Count
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+          {[1, 2, 3].map((idx) => (
+            <tr key={idx}>
+              <td className="py-2 font-mono text-sm tabular-nums text-[#a39e98]">
+                {String(idx).padStart(2, "0")}
+              </td>
+              <td className="py-2">
+                <div
+                  className="h-4 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]"
+                  style={{ width: `${65 - idx * 10}%` }}
+                />
+              </td>
+              <td className="py-2 text-right">
+                <div className="ml-auto h-4 w-10 animate-pulse rounded bg-sky-200 dark:bg-sky-900/30" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function SkeletonRecentConversations({ number }: { number: string }) {
+  return (
+    <section>
+      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+        {number} — Recent Conversations
+      </h3>
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Time</th>
+            <th className="pb-2 font-mono text-xs uppercase tracking-widest text-[#a39e98]">Status</th>
+            <th className="pb-2 text-right font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+              Duration
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
+          {[1, 2, 3, 4, 5].map((idx) => (
+            <tr key={idx}>
+              <td className="py-2">
+                <div className="h-3 w-28 animate-pulse rounded bg-[#e5e3de] dark:bg-[#3d3a36]" />
+              </td>
+              <td className="py-2">
+                <div className="h-5 w-16 animate-pulse rounded-full bg-emerald-100 dark:bg-emerald-900/30" />
+              </td>
+              <td className="py-2 text-right">
+                <div className="ml-auto h-4 w-8 animate-pulse rounded bg-amber-200 dark:bg-amber-900/30" />
               </td>
             </tr>
           ))}
