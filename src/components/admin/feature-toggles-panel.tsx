@@ -19,7 +19,7 @@ import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import { VisitorVoiceConfigPanel } from "./visitor-voice-config-panel";
 import { AgentConfigPanel } from "./agent-config-panel";
 import { MaintenanceConfigPanel } from "./maintenance-config-panel";
-import { TunnelControlPanel } from "./tunnel-control-panel";
+import { TunnelTableRow } from "./tunnel-control-panel";
 import { Bot } from "lucide-react";
 
 // Feature flag categories
@@ -320,45 +320,45 @@ export function FeatureTogglesPanel() {
       )}
 
       {/* Search and Category Tabs */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex items-center gap-4">
         {/* Search Input */}
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a39e98]" />
           <input
             type="text"
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-11 w-64 rounded-xl border-none bg-white pl-10 pr-4 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus:outline-none focus:ring-1 focus:ring-[#c9a55c] dark:bg-[#252320] dark:text-[#f5f3ee]"
+            className="h-11 w-48 rounded-xl border-none bg-white pl-10 pr-4 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus:outline-none focus:ring-1 focus:ring-[#c9a55c] dark:bg-[#252320] dark:text-[#f5f3ee]"
           />
         </div>
 
         {/* Category Tabs */}
-        <div className="flex flex-wrap items-center gap-2">
-        {CATEGORIES.map((category) => (
-          <button
-            key={category.key}
-            onClick={() => setActiveCategory(category.key)}
-            className={cn(
-              "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
-              activeCategory === category.key
-                ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
-                : "text-[#6b6560] hover:bg-white dark:text-[#a39e98] dark:hover:bg-[#252320]"
-            )}
-            title={category.description}
-          >
-            {category.icon}
-            {category.label}
-            <span className={cn(
-              "rounded-full px-2 py-0.5 text-xs tabular-nums",
-              activeCategory === category.key
-                ? "bg-[#1a1917] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
-                : "bg-[#e5e3de] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
-            )}>
-              {enabledByCategory[category.key].enabled}/{enabledByCategory[category.key].total}
-            </span>
-          </button>
-        ))}
+        <div className="flex items-center gap-2">
+          {CATEGORIES.map((category) => (
+            <button
+              key={category.key}
+              onClick={() => setActiveCategory(category.key)}
+              className={cn(
+                "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
+                activeCategory === category.key
+                  ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
+                  : "text-[#6b6560] hover:bg-white dark:text-[#a39e98] dark:hover:bg-[#252320]"
+              )}
+              title={category.description}
+            >
+              {category.icon}
+              {category.label}
+              <span className={cn(
+                "rounded-full px-2 py-0.5 text-xs tabular-nums",
+                activeCategory === category.key
+                  ? "bg-[#1a1917] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
+                  : "bg-[#e5e3de] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
+              )}>
+                {enabledByCategory[category.key].enabled}/{enabledByCategory[category.key].total}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -366,13 +366,6 @@ export function FeatureTogglesPanel() {
       <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
         {CATEGORIES.find((c) => c.key === activeCategory)?.description}
       </p>
-
-      {/* Dev Tunnel Control (System category only) */}
-      {activeCategory === "system" && (
-        <div className="rounded-2xl bg-white px-6 dark:bg-[#252320]">
-          <TunnelControlPanel />
-        </div>
-      )}
 
       {/* Flags Table */}
       {filteredFlags.length === 0 ? (
@@ -498,6 +491,10 @@ export function FeatureTogglesPanel() {
                 )}
               </Fragment>
             ))}
+            {/* Dev Tunnel row (System category only, development only) */}
+            {activeCategory === "system" && (
+              <TunnelTableRow rowNumber={filteredFlags.length + 1} />
+            )}
           </tbody>
         </table>
       )}

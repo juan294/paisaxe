@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Cloud, CloudOff, ExternalLink, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TunnelStatus {
@@ -9,11 +9,15 @@ interface TunnelStatus {
   url: string | null;
 }
 
+interface TunnelTableRowProps {
+  rowNumber: number;
+}
+
 /**
- * Control panel for the Cloudflare tunnel (development only).
- * Allows starting/stopping the tunnel from the admin panel.
+ * Tunnel control rendered as a table row for the System category.
+ * Development-only - returns null in production.
  */
-export function TunnelControlPanel() {
+export function TunnelTableRow({ rowNumber }: TunnelTableRowProps) {
   const [status, setStatus] = useState<TunnelStatus>({ running: false, url: null });
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -63,79 +67,82 @@ export function TunnelControlPanel() {
     }
   };
 
+  // Don't render in production
+  if (error === "Only available in development") {
+    return null;
+  }
+
+  // Loading state as a table row
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-[#a39e98]">
-        <RefreshCw className="h-4 w-4 animate-spin" />
-        <span className="text-sm">Checking tunnel status...</span>
-      </div>
+      <tr>
+        <td className="py-5 text-center align-top font-mono text-sm tabular-nums text-[#a39e98]">
+          {String(rowNumber).padStart(2, "0")}
+        </td>
+        <td className="py-5 align-top" colSpan={5}>
+          <div className="flex items-center gap-2 text-[#a39e98]">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Checking tunnel...</span>
+          </div>
+        </td>
+      </tr>
     );
   }
 
-  if (error === "Only available in development") {
-    return null; // Don't show in production
-  }
-
   return (
-    <div className="flex items-center justify-between py-5">
-      <div className="flex items-center gap-4">
-        <div className={cn(
-          "flex h-10 w-10 items-center justify-center rounded-lg",
-          status.running
-            ? "bg-emerald-500/10 text-emerald-500"
-            : "bg-[#f5f3ee] text-[#a39e98] dark:bg-[#3d3a36]"
-        )}>
-          {status.running ? (
-            <Cloud className="h-5 w-5" />
-          ) : (
-            <CloudOff className="h-5 w-5" />
+    <tr className={cn("group", status.running && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
+      <td className="py-5 text-center align-top font-mono text-sm tabular-nums text-[#a39e98]">
+        {String(rowNumber).padStart(2, "0")}
+      </td>
+      <td className="py-5 align-top">
+        <div className="flex items-center gap-2 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+          Dev Tunnel
+          {status.running && status.url && (
+            <a
+              href={status.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </a>
           )}
         </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
-              Dev Tunnel
-            </span>
-            {status.running && status.url && (
-              <a
-                href={status.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-[#6b6560] hover:text-[#2d2a26] dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
-              >
-                {status.url.replace("https://", "")}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
-          <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
-            {status.running
-              ? "Exposes localhost:3000 for webhook testing"
-              : "Start tunnel to test ElevenLabs webhooks locally"}
-          </p>
-          {error && (
-            <p className="text-xs text-red-500">{error}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <span className={cn(
-          "font-mono text-xs uppercase tracking-widest",
-          status.running
-            ? "text-[#2d2a26] dark:text-[#f5f3ee]"
-            : "text-[#a39e98]"
-        )}>
-          {status.running ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              On
-            </span>
-          ) : (
-            "Off"
-          )}
-        </span>
-
+      </td>
+      <td className="py-5 pr-4 align-top text-sm text-[#6b6560] dark:text-[#a39e98]">
+        {status.running && status.url ? (
+          <span>
+            Exposes localhost:3000 at{" "}
+            <a
+              href={status.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#2d2a26] hover:underline dark:text-[#f5f3ee]"
+            >
+              {status.url.replace("https://", "")}
+            </a>
+          </span>
+        ) : (
+          "Start tunnel to test ElevenLabs webhooks locally"
+        )}
+        {error && <span className="ml-2 text-xs text-red-500">({error})</span>}
+      </td>
+      <td className="py-5 align-top">
+        <span className="text-xs text-[#a39e98]">—</span>
+      </td>
+      <td className="py-5 text-center align-top">
+        {status.running ? (
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-[#2d2a26] dark:text-[#f5f3ee]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            On
+          </span>
+        ) : (
+          <span className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            Off
+          </span>
+        )}
+      </td>
+      <td className="py-5 text-center align-top">
         <button
           onClick={handleToggle}
           disabled={isUpdating}
@@ -159,7 +166,7 @@ export function TunnelControlPanel() {
             )}
           />
         </button>
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 }
