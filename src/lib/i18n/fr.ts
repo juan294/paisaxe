@@ -216,7 +216,7 @@ export const fr: Translations = {
     feature_realtime: 'Météo et recommandations en temps réel',
     per_day: '/ jour',
     sign_in_to_purchase: 'Connectez-vous pour acheter',
-    secure_payment: 'Paiement securise via Lemon Squeezy',
+    secure_payment: 'Paiement securise via Stripe',
     success_title: 'C\'est pret !',
     success_subtitle: 'Votre Pass Jour est maintenant actif',
     success_expires: 'Votre acces est valide jusqu\'a',

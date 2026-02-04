@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AnalyticsTabs, type AnalyticsSubTab } from "./analytics-tabs";
 import { VisitorsAnalyticsPanel } from "./visitors-analytics-panel";
-import { LemonSqueezyAnalyticsPanel } from "./lemonsqueezy-analytics-panel";
+import { StripeAnalyticsPanel } from "./stripe-analytics-panel";
 import { ElevenLabsAnalyticsPanel } from "./elevenlabs-analytics-panel";
 
 /**
@@ -16,7 +16,7 @@ export function AnalyticsDashboard() {
   return (
     <AnalyticsTabs activeTab={activeSubTab} onTabChange={setActiveSubTab}>
       {activeSubTab === "visitors" && <VisitorsAnalyticsPanel />}
-      {activeSubTab === "revenue" && <LemonSqueezyAnalyticsPanel />}
+      {activeSubTab === "revenue" && <StripeAnalyticsPanel />}
       {activeSubTab === "voice" && <ElevenLabsAnalyticsPanel />}
     </AnalyticsTabs>
   );

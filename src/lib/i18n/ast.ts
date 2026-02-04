@@ -223,7 +223,7 @@ export const ast: Translations = {
     feature_realtime: 'Clima y recomendaciones en tiempu real',
     per_day: '/ día',
     sign_in_to_purchase: 'Anicia sesión pa mercar',
-    secure_payment: 'Pagu seguru vía Lemon Squeezy',
+    secure_payment: 'Pagu seguru vía Stripe',
     success_title: 'Llisto!',
     success_subtitle: 'El to Pase Diariu yá ta activu',
     success_expires: 'L\'accesu ye válidu hasta',

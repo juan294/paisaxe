@@ -59,6 +59,7 @@
     "react-markdown": "^10.1.0",
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
+    "stripe": "^20.3.0",
     "tailwind-merge": "^3.0.0",
     "twitter-api-v2": "^1.29.0",
     "voyageai": "^0.1.0"

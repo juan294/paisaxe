@@ -39,12 +39,9 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-vi.mock("@/lib/lemonsqueezy", () => ({
-  createDayPassCheckoutUrl: vi.fn(
-    () => "https://checkout.lemonsqueezy.com/test"
-  ),
-  isLemonSqueezyConfigured: vi.fn(() => true),
-}));
+// Mock fetch for checkout API
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 // Mock next/link
 vi.mock("next/link", () => ({
@@ -60,6 +57,11 @@ vi.mock("next/link", () => ({
 describe("PricingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ url: "https://checkout.stripe.com/test" }),
+    });
     mockUseAuth.mockReturnValue({
       user: null,
       session: null,

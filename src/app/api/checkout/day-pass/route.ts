@@ -1,0 +1,67 @@
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
+import { createDayPassCheckoutSession } from "@/lib/stripe";
+
+async function getSupabaseClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Ignore in server component context
+          }
+        },
+      },
+    }
+  );
+}
+
+/**
+ * POST /api/checkout/day-pass
+ *
+ * Creates a Stripe Checkout Session for the Day Pass product.
+ * Requires authentication. Returns the checkout URL.
+ */
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  try {
+    const supabase = await getSupabaseClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const origin =
+      request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL;
+
+    const checkoutUrl = await createDayPassCheckoutSession({
+      userId: user.id,
+      userEmail: user.email || "",
+      successUrl: `${origin}/pricing/success`,
+      cancelUrl: `${origin}/pricing`,
+    });
+
+    return NextResponse.json({ url: checkoutUrl });
+  } catch (error) {
+    console.error("[checkout/day-pass] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to create checkout session" },
+      { status: 500 }
+    );
+  }
+}
