@@ -297,17 +297,39 @@ Playwright E2E tests run against a built app on push/PR to `develop` and `main`.
 - Database migrations should be validated locally before pushing
 - Claude Review requires `ANTHROPIC_API_KEY` as a GitHub repository secret
 
-## Lemon Squeezy Payments
+## Stripe Payments
 
-Voice Pass purchases (24h voice access for €1.99) processed via Lemon Squeezy.
+Voice Pass purchases (24h voice access for €1.99) processed via Stripe.
 
-**CRITICAL**: Test mode and Live mode use different variant ID formats:
-- **Test Mode**: UUID format (e.g., `bf128a3b-c4a4-4f19-a0eb-5ad346492538`)
-- **Live Mode**: Numeric format (e.g., `1267701`)
+### Setup
 
-Get the correct variant ID from the **Share button** in Lemon Squeezy dashboard, NOT from "Copy variant ID".
+1. Create a Stripe account at [stripe.com](https://stripe.com)
+2. Create a product "Voice Pass - 24h" at €1.99 in the Stripe Dashboard
+3. Copy the Price ID (starts with `price_`)
+4. Create a webhook endpoint pointing to `/api/webhooks/stripe`
+5. Select `checkout.session.completed` event
+6. Copy the webhook signing secret (starts with `whsec_`)
 
-See [lemonsqueezy-setup.md](./lemonsqueezy-setup.md) for complete setup guide, webhook configuration, and troubleshooting.
+### Environment Variables
+
+```
+STRIPE_SECRET_KEY=sk_live_...           # Server-side API key
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...  # Client-side key
+STRIPE_WEBHOOK_SECRET=whsec_...         # Webhook signature verification
+STRIPE_DAY_PASS_PRICE_ID=price_...      # Price ID for Day Pass
+```
+
+### Webhook Testing (Local)
+
+Use the Stripe CLI for local webhook testing:
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+### Admin Analytics
+
+Revenue analytics are available in the admin panel under Analytics → Revenue tab, pulling data directly from Stripe's API.
 
 ## ElevenLabs Voice Agents
 

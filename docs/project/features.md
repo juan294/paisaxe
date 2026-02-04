@@ -320,7 +320,7 @@ The Analytics tab organizes metrics into three sub-tabs, each focused on a speci
 | Sub-tab | Shortcut | Data Source | Default Date Range |
 |---------|----------|-------------|-------------------|
 | Visitors | `v` | PostHog | Last 7 days |
-| Revenue | `r` | Lemon Squeezy | Last 30 days |
+| Revenue | `r` | Stripe | Last 30 days |
 | Voice | `e` | ElevenLabs | Last 30 days |
 
 Each sub-tab loads data lazily—API calls are only made when a tab becomes active.
@@ -357,15 +357,15 @@ Visitor metrics powered by PostHog (EU Cloud).
 
 #### Revenue Analytics
 
-Revenue metrics from Lemon Squeezy, the payment processor for pay-per-use voice chat credits.
+Revenue metrics from Stripe, the payment processor for Voice Pass purchases.
 
 **Summary cards:**
 
 | Metric | Description |
 |--------|-------------|
-| Total Revenue | All-time revenue from the store |
+| Total Revenue | All-time revenue from successful payments |
 | 30-Day Revenue | Revenue in the last 30 days |
-| Total Orders | All-time order count |
+| Total Orders | All-time successful order count |
 | Avg Order Value | Average revenue per order |
 
 **Revenue chart** — Bar chart showing daily revenue over the selected date range.
@@ -375,11 +375,11 @@ Revenue metrics from Lemon Squeezy, the payment processor for pay-per-use voice 
 | Section | Description |
 |---------|-------------|
 | Revenue by Product | Product breakdown with order count and revenue |
-| Recent Orders | Last 20 orders with status badges (Paid, Pending, Refunded) |
+| Recent Orders | Last 20 orders with status badges (Succeeded, Pending, Failed) |
 
-**Configuration** — Requires `LEMONSQUEEZY_API_KEY` and optionally `LEMONSQUEEZY_STORE_ID` environment variables. If not configured, shows a warning with a link to the Lemon Squeezy API settings.
+**Configuration** — Requires `STRIPE_SECRET_KEY` environment variable. If not configured, shows a warning with a link to the Stripe Dashboard.
 
-**External link** — A button at the bottom opens the full Lemon Squeezy dashboard for detailed reports.
+**External link** — A button at the bottom opens the full Stripe Dashboard for detailed reports.
 
 #### Voice Analytics
 
