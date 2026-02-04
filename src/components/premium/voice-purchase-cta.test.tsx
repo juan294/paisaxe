@@ -13,9 +13,10 @@ vi.mock("@/lib/i18n", () => ({
         "premium.voice_description": "Talk naturally with our AI guides",
         "premium.feature_24h": "24-hour access",
         "premium.feature_unlimited": "Unlimited conversations",
+        "premium.feature_realtime": "Real-time guidance",
         "premium.per_day": "per day",
         "premium.sign_in_to_purchase": "Sign in to purchase",
-        "premium.secure_payment": "Secure payment via Lemon Squeezy",
+        "premium.secure_payment": "Secure payment via Stripe",
       };
       return translations[key] || key;
     },
@@ -23,11 +24,9 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-// Mock lemonsqueezy
-vi.mock("@/lib/lemonsqueezy", () => ({
-  isLemonSqueezyConfigured: vi.fn(() => true),
-  createDayPassCheckoutUrl: vi.fn(() => "https://checkout.lemonsqueezy.com/test"),
-}));
+// Mock fetch for checkout API
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 // Create mocks
 const mockSignInWithGoogle = vi.fn();
@@ -47,6 +46,11 @@ const originalLocation = window.location;
 
 beforeEach(() => {
   mockSignInWithGoogle.mockClear();
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve({ url: "https://checkout.stripe.com/test" }),
+  });
   mockUser = { id: "user-123", email: "test@example.com" };
   mockSession = { access_token: "test-token" };
 
@@ -94,7 +98,7 @@ describe("VoicePurchaseCTA", () => {
 
     it("renders secure payment info", () => {
       render(<VoicePurchaseCTA />);
-      expect(screen.getByText("Secure payment via Lemon Squeezy")).toBeInTheDocument();
+      expect(screen.getByText("Secure payment via Stripe")).toBeInTheDocument();
     });
 
     it("shows 'Get Day Pass' button when user is signed in", () => {
@@ -109,10 +113,14 @@ describe("VoicePurchaseCTA", () => {
       expect(screen.getByRole("button", { name: "Sign in to purchase" })).toBeInTheDocument();
     });
 
-    it("redirects to checkout when clicking purchase button", () => {
+    it("redirects to checkout when clicking purchase button", async () => {
       render(<VoicePurchaseCTA />);
       fireEvent.click(screen.getByRole("button", { name: "Get Day Pass" }));
-      expect(window.location.href).toBe("https://checkout.lemonsqueezy.com/test");
+
+      // Wait for fetch to resolve and redirect to happen
+      await vi.waitFor(() => {
+        expect(window.location.href).toBe("https://checkout.stripe.com/test");
+      });
     });
 
     it("calls signInWithGoogle when clicking button without session", () => {

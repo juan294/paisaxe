@@ -216,7 +216,7 @@ export const de: Translations = {
     feature_realtime: 'Echtzeit-Wetter und Empfehlungen',
     per_day: '/ Tag',
     sign_in_to_purchase: 'Anmelden zum Kaufen',
-    secure_payment: 'Sichere Zahlung uber Lemon Squeezy',
+    secure_payment: 'Sichere Zahlung uber Stripe',
     success_title: 'Alles bereit!',
     success_subtitle: 'Dein Tagespass ist jetzt aktiv',
     success_expires: 'Dein Zugang ist gultig bis',

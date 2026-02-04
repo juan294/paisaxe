@@ -223,7 +223,7 @@ export const en: Translations = {
     feature_realtime: 'Real-time weather and recommendations',
     per_day: '/ day',
     sign_in_to_purchase: 'Sign in to purchase',
-    secure_payment: 'Secure payment via Lemon Squeezy',
+    secure_payment: 'Secure payment via Stripe',
     success_title: 'You\'re all set!',
     success_subtitle: 'Your Day Pass is now active',
     success_expires: 'Your access is valid until',

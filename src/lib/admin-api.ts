@@ -14,7 +14,7 @@ import type { StoryLocale, StoryTranslation } from "@/types/immersive";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import type { AnalyticsDashboardData } from "@/types/analytics";
 import type { ElevenLabsAnalyticsDashboardData } from "@/types/elevenlabs-analytics";
-import type { LemonSqueezyAnalyticsDashboardData } from "@/types/lemonsqueezy-analytics";
+import type { StripeAnalyticsDashboardData } from "@/types/stripe-analytics";
 import type { AdminStorySuggestion, SuggestionStatus, StorySuggestion } from "@/types/suggestions";
 
 const API_BASE = "/api/admin";
@@ -505,14 +505,14 @@ export async function deleteSuggestion(
 }
 
 /**
- * Fetch Lemon Squeezy revenue analytics
+ * Fetch Stripe revenue analytics
  */
-export async function fetchLemonSqueezyAnalytics(
+export async function fetchStripeAnalytics(
   from?: string,
   to?: string
-): Promise<AdminApiResponse<LemonSqueezyAnalyticsDashboardData> & { warning?: string }> {
+): Promise<AdminApiResponse<StripeAnalyticsDashboardData> & { warning?: string }> {
   try {
-    const url = new URL(`${API_BASE}/lemonsqueezy-analytics`, window.location.origin);
+    const url = new URL(`${API_BASE}/stripe-analytics`, window.location.origin);
     if (from) url.searchParams.set("from", from);
     if (to) url.searchParams.set("to", to);
 
@@ -520,7 +520,7 @@ export async function fetchLemonSqueezyAnalytics(
 
     if (!response.ok) {
       const error = await response.json();
-      return { error: error.error || "Failed to fetch Lemon Squeezy analytics" };
+      return { error: error.error || "Failed to fetch Stripe analytics" };
     }
 
     const result = await response.json();
@@ -529,7 +529,7 @@ export async function fetchLemonSqueezyAnalytics(
       warning: result.warning,
     };
   } catch (error) {
-    console.error("Error fetching Lemon Squeezy analytics:", error);
+    console.error("Error fetching Stripe analytics:", error);
     return { error: "Network error" };
   }
 }

@@ -1,37 +1,44 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
-import { createDayPassCheckoutUrl, isLemonSqueezyConfigured } from "@/lib/lemonsqueezy";
 import Link from "next/link";
-import { ArrowLeft, Clock, Check, RefreshCw, AudioLines, MapPin } from "lucide-react";
+import { ArrowLeft, Clock, Check, RefreshCw, AudioLines, MapPin, Loader2 } from "lucide-react";
 
 export default function PricingPage() {
   const { user, session, signInWithGoogle } = useAuth();
   const { canUseVoice, isWhitelisted, expiresAt, isLoading } = useVoiceAccess();
   const { t } = useTranslation();
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
 
-  const handlePurchase = () => {
+  const handlePurchase = async () => {
     if (!user || !session) {
       signInWithGoogle("/pricing");
       return;
     }
 
-    if (!isLemonSqueezyConfigured()) {
-      console.error("[pricing] Lemon Squeezy not configured");
-      return;
+    setIsCheckoutLoading(true);
+
+    try {
+      const response = await fetch("/api/checkout/day-pass", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create checkout session");
+      }
+
+      const { url } = await response.json();
+      window.location.href = url;
+    } catch (error) {
+      console.error("[pricing] Checkout error:", error);
+      setIsCheckoutLoading(false);
     }
-
-    const successUrl = `${window.location.origin}/pricing/success`;
-
-    const checkoutUrl = createDayPassCheckoutUrl({
-      userId: user.id,
-      userEmail: user.email ?? "",
-      successUrl,
-    });
-
-    window.location.href = checkoutUrl;
   };
 
   if (isLoading) {
@@ -148,8 +155,10 @@ export default function PricingPage() {
             <div className="p-6 pt-2">
               <button
                 onClick={handlePurchase}
-                className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors"
+                disabled={isCheckoutLoading}
+                className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
+                {isCheckoutLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                 {user ? t("premium.pricing_cta") : t("premium.sign_in_to_purchase")}
               </button>
               <p className="mt-3 text-center text-xs text-neutral-500">

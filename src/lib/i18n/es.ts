@@ -223,7 +223,7 @@ export const es: Translations = {
     feature_realtime: 'Clima y recomendaciones en tiempo real',
     per_day: '/ dia',
     sign_in_to_purchase: 'Inicia sesion para comprar',
-    secure_payment: 'Pago seguro via Lemon Squeezy',
+    secure_payment: 'Pago seguro via Stripe',
     success_title: 'Listo!',
     success_subtitle: 'Tu Pase Diario ya esta activo',
     success_expires: 'Tu acceso es valido hasta',

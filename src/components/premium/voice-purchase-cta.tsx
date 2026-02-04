@@ -1,9 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTranslation } from "@/lib/i18n";
-import { createDayPassCheckoutUrl, isLemonSqueezyConfigured } from "@/lib/lemonsqueezy";
-import { Mic, Clock, Sparkles, MapPin } from "lucide-react";
+import { Mic, Clock, Sparkles, MapPin, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VoicePurchaseCTAProps {
@@ -14,32 +14,39 @@ interface VoicePurchaseCTAProps {
 
 /**
  * Call-to-action component for voice pass purchase.
- * Shows pricing and redirects to Lemon Squeezy checkout.
+ * Shows pricing and redirects to Stripe checkout.
  */
 export function VoicePurchaseCTA({ compact = false, className }: VoicePurchaseCTAProps) {
   const { user, session, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
 
-  const handlePurchase = () => {
+  const handlePurchase = async () => {
     if (!user || !session) {
       signInWithGoogle();
       return;
     }
 
-    if (!isLemonSqueezyConfigured()) {
-      console.error("[voice-purchase-cta] Lemon Squeezy not configured");
-      return;
+    setIsCheckoutLoading(true);
+
+    try {
+      const response = await fetch("/api/checkout/day-pass", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create checkout session");
+      }
+
+      const { url } = await response.json();
+      window.location.href = url;
+    } catch (error) {
+      console.error("[voice-purchase-cta] Checkout error:", error);
+      setIsCheckoutLoading(false);
     }
-
-    const successUrl = `${window.location.origin}/pricing/success`;
-
-    const checkoutUrl = createDayPassCheckoutUrl({
-      userId: user.id,
-      userEmail: user.email ?? "",
-      successUrl,
-    });
-
-    window.location.href = checkoutUrl;
   };
 
   if (compact) {
@@ -51,8 +58,10 @@ export function VoicePurchaseCTA({ compact = false, className }: VoicePurchaseCT
         </div>
         <button
           onClick={handlePurchase}
-          className="px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-medium rounded-full hover:from-amber-400 hover:to-yellow-400 transition-all text-sm"
+          disabled={isCheckoutLoading}
+          className="px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-medium rounded-full hover:from-amber-400 hover:to-yellow-400 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
+          {isCheckoutLoading && <Loader2 className="h-4 w-4 animate-spin" />}
           {t("premium.get_day_pass")} - €1.99
         </button>
       </div>
@@ -111,8 +120,10 @@ export function VoicePurchaseCTA({ compact = false, className }: VoicePurchaseCT
       {/* CTA Button */}
       <button
         onClick={handlePurchase}
-        className="w-full max-w-xs px-6 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-semibold rounded-full hover:from-amber-400 hover:to-yellow-400 transition-all shadow-lg shadow-amber-500/25"
+        disabled={isCheckoutLoading}
+        className="w-full max-w-xs px-6 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-semibold rounded-full hover:from-amber-400 hover:to-yellow-400 transition-all shadow-lg shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
+        {isCheckoutLoading && <Loader2 className="h-4 w-4 animate-spin" />}
         {user ? t("premium.get_day_pass") : t("premium.sign_in_to_purchase")}
       </button>
 
