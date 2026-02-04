@@ -5,7 +5,7 @@ import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
 import { createDayPassCheckoutUrl, isLemonSqueezyConfigured } from "@/lib/lemonsqueezy";
 import Link from "next/link";
-import { ArrowLeft, Clock, Check, RefreshCw, AudioLines } from "lucide-react";
+import { ArrowLeft, Clock, Check, RefreshCw, AudioLines, MapPin } from "lucide-react";
 
 export default function PricingPage() {
   const { user, session, signInWithGoogle } = useAuth();
@@ -134,6 +134,12 @@ export default function PricingPage() {
                 <AudioLines className="h-4 w-4 text-neutral-500 flex-shrink-0" />
                 <span className="text-sm text-neutral-300">
                   {t("premium.feature_unlimited")}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <MapPin className="h-4 w-4 text-neutral-500 flex-shrink-0" />
+                <span className="text-sm text-neutral-300">
+                  {t("premium.feature_realtime")}
                 </span>
               </div>
             </div>
