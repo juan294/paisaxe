@@ -6,6 +6,7 @@ import { Mic, MicOff, X, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
+import { useVoiceSession } from "@/hooks/use-voice-session";
 import type { Story } from "@/types/immersive";
 
 interface Message {
@@ -113,6 +114,9 @@ export function VoiceChatElevenLabs({
   const { t, locale } = useTranslation();
   const localizedStory = getLocalizedStory(story, locale);
 
+  // Voice session tracking for personalization
+  const voiceSession = useVoiceSession();
+
   // ElevenLabs conversation hook
   const conversation = useConversation({
     onConnect: () => {
@@ -123,7 +127,8 @@ export function VoiceChatElevenLabs({
       );
     },
     onDisconnect: () => {
-      // Connection ended
+      // Increment conversation count when session ends
+      voiceSession.incrementConversation();
     },
     onMessage: (message) => {
       if (message.message) {
@@ -173,13 +178,40 @@ export function VoiceChatElevenLabs({
 
     try {
       setError(null);
+
+      // Determine language override based on user's locale
+      const languageOverride = voiceSession.preferredLanguage === "Spanish" ? "es" : "en";
+
       await conversation.startSession({
         agentId,
         connectionType: "websocket",
         dynamicVariables: {
+          // Story context
           story_title: localizedStory.title,
           story_subtitle: localizedStory.subtitle,
           story_description: localizedStory.description,
+          story_category: story.category || "general",
+          story_location: story.location || "Asturias",
+
+          // Session awareness
+          conversation_count: String(voiceSession.conversationCount),
+          is_returning: voiceSession.isReturning ? "true" : "false",
+
+          // Language/locale
+          user_locale: voiceSession.userLocale,
+          preferred_language: voiceSession.preferredLanguage,
+
+          // Time context
+          time_of_day: voiceSession.timeOfDay,
+          current_time: new Date().toLocaleTimeString(voiceSession.userLocale, {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+        overrides: {
+          agent: {
+            language: languageOverride,
+          },
         },
       });
     } catch (err) {
