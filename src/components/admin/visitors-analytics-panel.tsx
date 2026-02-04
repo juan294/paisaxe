@@ -22,25 +22,48 @@ import type {
 // Storage key for persisting dev toggle preference
 const DEV_TOGGLE_KEY = "admin:visitors:includeLocalhost";
 
+function isLocalhost(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+  );
+}
+
 function getStoredDevToggle(): boolean {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem(DEV_TOGGLE_KEY) === "true";
+  const stored = localStorage.getItem(DEV_TOGGLE_KEY);
+  // If no stored preference, default to ON for localhost, OFF for production
+  if (stored === null) {
+    return isLocalhost();
+  }
+  return stored === "true";
 }
 
 export function VisitorsAnalyticsPanel() {
   const [data, setData] = useState<AnalyticsDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [includeLocalhost, setIncludeLocalhost] = useState(getStoredDevToggle);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [includeLocalhost, setIncludeLocalhost] = useState(false);
   const [dateRange, setDateRange] = useState({
     from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     to: new Date().toISOString().split("T")[0],
   });
 
-  // Persist dev toggle preference to localStorage
+  // Initialize from localStorage on mount (client-side only)
   useEffect(() => {
-    localStorage.setItem(DEV_TOGGLE_KEY, String(includeLocalhost));
-  }, [includeLocalhost]);
+    const storedValue = getStoredDevToggle();
+    setIncludeLocalhost(storedValue);
+    setIsInitialized(true);
+  }, []);
+
+  // Persist dev toggle preference to localStorage (skip initial mount)
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem(DEV_TOGGLE_KEY, String(includeLocalhost));
+    }
+  }, [includeLocalhost, isInitialized]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -58,9 +81,12 @@ export function VisitorsAnalyticsPanel() {
     setIsLoading(false);
   }, [dateRange, includeLocalhost]);
 
+  // Only fetch data after initialization is complete
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (isInitialized) {
+      loadData();
+    }
+  }, [loadData, isInitialized]);
 
   return (
     <div className="space-y-12">
