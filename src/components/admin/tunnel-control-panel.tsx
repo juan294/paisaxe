@@ -11,13 +11,14 @@ interface TunnelStatus {
 
 interface TunnelTableRowProps {
   rowNumber: number;
+  onStatusChange?: (status: { available: boolean; running: boolean }) => void;
 }
 
 /**
  * Tunnel control rendered as a table row for the System category.
  * Development-only - returns null in production.
  */
-export function TunnelTableRow({ rowNumber }: TunnelTableRowProps) {
+export function TunnelTableRow({ rowNumber, onStatusChange }: TunnelTableRowProps) {
   const [status, setStatus] = useState<TunnelStatus>({ running: false, url: null });
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -30,16 +31,19 @@ export function TunnelTableRow({ rowNumber }: TunnelTableRowProps) {
         const data = await response.json();
         setStatus(data);
         setError(null);
+        onStatusChange?.({ available: true, running: data.running });
       } else if (response.status === 403) {
         // Production environment - tunnel control not available
         setError("Only available in development");
+        onStatusChange?.({ available: false, running: false });
       }
     } catch {
       setError("Failed to check tunnel status");
+      onStatusChange?.({ available: true, running: false });
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [onStatusChange]);
 
   useEffect(() => {
     fetchStatus();
@@ -56,6 +60,7 @@ export function TunnelTableRow({ rowNumber }: TunnelTableRowProps) {
       if (response.ok) {
         const data = await response.json();
         setStatus({ running: data.running, url: data.url });
+        onStatusChange?.({ available: true, running: data.running });
       } else {
         const data = await response.json();
         setError(data.error || "Failed to toggle tunnel");
