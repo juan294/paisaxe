@@ -3,7 +3,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useTranslation } from "@/lib/i18n";
 import { createDayPassCheckoutUrl, isLemonSqueezyConfigured } from "@/lib/lemonsqueezy";
-import { Mic, Clock, Sparkles } from "lucide-react";
+import { Mic, Clock, Sparkles, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VoicePurchaseCTAProps {
@@ -95,6 +95,10 @@ export function VoicePurchaseCTA({ compact = false, className }: VoicePurchaseCT
         <div className="flex items-center gap-3 text-white/80 text-sm">
           <Mic className="h-4 w-4 text-amber-400 flex-shrink-0" />
           <span>{t("premium.feature_unlimited")}</span>
+        </div>
+        <div className="flex items-center gap-3 text-white/80 text-sm">
+          <MapPin className="h-4 w-4 text-amber-400 flex-shrink-0" />
+          <span>{t("premium.feature_realtime")}</span>
         </div>
       </div>
 
