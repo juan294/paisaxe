@@ -11,6 +11,7 @@ export type FeatureFlagKey =
   | "story_freshness"
   | "autoplay_button"
   | "visitor_voice_agent"
+  | "booking_system"
   | "maintenance_mode"
   | "user_story_suggestions"
   | "automated_agents"

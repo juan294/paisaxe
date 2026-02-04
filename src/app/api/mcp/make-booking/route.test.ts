@@ -5,13 +5,20 @@ import { GET, POST } from "./route";
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+// Mock feature flag
+const mockIsFeatureFlagEnabled = vi.fn();
+vi.mock("@/lib/feature-flags-server", () => ({
+  isFeatureFlagEnabled: () => mockIsFeatureFlagEnabled(),
+}));
+
 // Mock environment variable
 const originalEnv = process.env;
 
 describe("/api/mcp/make-booking", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    // Default: ElevenLabs outbound not configured (most common dev environment)
+    // Default: Feature flag enabled, ElevenLabs outbound not configured
+    mockIsFeatureFlagEnabled.mockResolvedValue(true);
     process.env = { ...originalEnv };
     delete process.env.ELEVENLABS_API_KEY;
     delete process.env.ELEVENLABS_PHONE_NUMBER_ID;
@@ -51,6 +58,35 @@ describe("/api/mcp/make-booking", () => {
   });
 
   describe("POST", () => {
+    it("should return fallback message when booking_system flag is disabled", async () => {
+      mockIsFeatureFlagEnabled.mockResolvedValue(false);
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("not_configured");
+      expect(data.message).toContain("Booking is temporarily unavailable");
+      expect(data.message).toContain("Casa Gerardo");
+      expect(data.message).toContain("+34 985 88 77 97");
+      expect(data.fallback_action).toContain("I can't make calls right now");
+    });
+
     it("should return 400 for missing required fields", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",

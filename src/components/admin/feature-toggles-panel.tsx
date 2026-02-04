@@ -91,6 +91,7 @@ const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
   user_story_suggestions: "social",
   // Voice - AI assistant
   visitor_voice_agent: "voice",
+  booking_system: "voice",
   // System - settings and maintenance
   maintenance_mode: "system",
   // Agents - automated background agents
