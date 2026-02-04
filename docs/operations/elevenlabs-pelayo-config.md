@@ -126,12 +126,35 @@ You know deeply about:
 You have access to tools for real-time information:
 - Weather tool: Use when asked about current weather in Asturias cities
 - Places tool: Use when asked for restaurant recommendations, attractions, or points of interest
+- Make Booking tool: Use to make reservations (restaurant, hotel, activity) on behalf of the user
 
 When using tools:
 - Summarize the results naturally in conversation
 - Don't just list data - weave it into your response
 - For weather: "Ahora mismo en Oviedo hace unos 15 grados con algo de nubosidad..."
-- For restaurants: "Conozco un sitio estupendo... Casa Gerardo en Prendes tiene..."
+- For places: "Conozco un sitio estupendo... Casa Gerardo en Prendes tiene..."
+
+# BOOKING RESERVATIONS
+When the visitor wants to make a reservation (restaurant, hotel, activity, etc.):
+
+1. First, search using search_places to find the business and get its phone number
+2. Confirm the choice with the visitor
+3. Collect their details:
+   - "¿Para cuántas personas?" (party size / guests)
+   - "¿Para cuándo?" (date)
+   - "¿A qué hora?" (time - if applicable)
+   - "¿A qué nombre? Necesito nombre y apellidos." (full name)
+   - "¿Un teléfono de contacto?" (phone)
+   - "¿Alguna petición especial?" (optional)
+4. Confirm all details before calling:
+   - "Vale, voy a llamar para reservar mesa para 4 personas, hoy a las 21:00, a nombre de Juan García López. ¿Correcto?"
+5. Use make_booking tool to make the booking
+6. Tell the visitor: "Estoy llamando ahora. Un momento..."
+7. Inform them of the result
+
+IMPORTANT: You MUST collect the visitor's full name AND phone number before making the call.
+
+If the call fails or is not available, give the visitor the phone number so they can call directly.
 
 # GUARDRAILS
 - Never invent specific prices, hours, or contact details - say "I'd recommend checking the official site"
@@ -363,6 +386,137 @@ Curated PDFs uploaded to ElevenLabs for specialized Asturias knowledge.
 }
 ```
 
+#### make_booking
+
+```json
+{
+  "type": "webhook",
+  "name": "make_booking",
+  "description": "Call a business (restaurant, hotel, activity provider) to make a reservation on behalf of the visitor. Use this AFTER searching for the place with search_places and getting its phone number. Before calling, you MUST ask the visitor for: their full name (nombre y apellidos), and their phone number for the business to call back.",
+  "disable_interruptions": false,
+  "force_pre_tool_speech": "auto",
+  "assignments": [],
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "api_schema": {
+    "url": "https://paisaxe.es/api/mcp/make-booking",
+    "method": "POST",
+    "path_params_schema": [],
+    "query_params_schema": [],
+    "request_body_schema": {
+      "id": "body",
+      "type": "object",
+      "description": "Booking request",
+      "properties": [
+        {
+          "id": "venue_name",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Name of the restaurant or business to call",
+          "dynamic_variable": "",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "phone_number",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Phone number of the restaurant (from search_places result)",
+          "dynamic_variable": "",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "party_size",
+          "type": "number",
+          "value_type": "llm_prompt",
+          "description": "Number of people for the reservation",
+          "dynamic_variable": "",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "date",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Date for the reservation (e.g., 'hoy', 'mañana', 'el viernes')",
+          "dynamic_variable": "",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "time",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Time for the reservation (e.g., '21:00', 'a las nueve')",
+          "dynamic_variable": "",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "customer_name",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Full name of the visitor (nombre y apellidos) for the reservation",
+          "dynamic_variable": "",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "customer_phone",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Visitor's phone number for the restaurant to call back",
+          "dynamic_variable": "",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": true
+        },
+        {
+          "id": "special_requests",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Any special requests (e.g., 'trona para bebé', 'mesa en terraza')",
+          "dynamic_variable": "",
+          "constant_value": "",
+          "enum": null,
+          "is_system_provided": false,
+          "required": false
+        }
+      ],
+      "required": false,
+      "value_type": "llm_prompt"
+    },
+    "request_headers": [
+      {
+        "type": "value",
+        "name": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "auth_connection": null
+  },
+  "response_timeout_secs": 35,
+  "dynamic_variables": {
+    "dynamic_variable_placeholders": {}
+  }
+}
+```
+
 ### Development Tools (paisaxe.tunnelfor.me)
 
 For local development testing with Pelayo-Dev agent.
@@ -497,6 +651,105 @@ For local development testing with Pelayo-Dev agent.
 }
 ```
 
+#### make_booking_dev
+
+```json
+{
+  "type": "webhook",
+  "name": "make_booking_dev",
+  "description": "DEV: Call a business to make a reservation on behalf of the visitor.",
+  "disable_interruptions": false,
+  "force_pre_tool_speech": "auto",
+  "assignments": [],
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "api_schema": {
+    "url": "https://paisaxe.tunnelfor.me/api/mcp/make-booking",
+    "method": "POST",
+    "path_params_schema": [],
+    "query_params_schema": [],
+    "request_body_schema": {
+      "id": "body",
+      "type": "object",
+      "description": "Booking request",
+      "properties": [
+        {
+          "id": "venue_name",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Name of the business to call",
+          "required": true
+        },
+        {
+          "id": "phone_number",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Business phone number",
+          "required": true
+        },
+        {
+          "id": "party_size",
+          "type": "number",
+          "value_type": "llm_prompt",
+          "description": "Number of people",
+          "required": true
+        },
+        {
+          "id": "date",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Reservation date",
+          "required": true
+        },
+        {
+          "id": "time",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Reservation time",
+          "required": true
+        },
+        {
+          "id": "customer_name",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Full name for reservation",
+          "required": true
+        },
+        {
+          "id": "customer_phone",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Visitor's callback phone",
+          "required": true
+        },
+        {
+          "id": "special_requests",
+          "type": "string",
+          "value_type": "llm_prompt",
+          "description": "Special requests",
+          "required": false
+        }
+      ],
+      "required": false,
+      "value_type": "llm_prompt"
+    },
+    "request_headers": [
+      {
+        "type": "value",
+        "name": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "auth_connection": null
+  },
+  "response_timeout_secs": 45,
+  "dynamic_variables": {
+    "dynamic_variable_placeholders": {}
+  }
+}
+```
+
 ### System Tools Enabled
 
 - **Detect language** - Auto-detect visitor's language for multilingual support
@@ -624,6 +877,10 @@ npm run dev
       "types": ["restaurant", "food", "establishment"],
       "location": { "lat": 43.449, "lng": -6.076 },
       "is_open": true,
+      "opening_hours": ["Monday: 1:00 - 4:00 PM", "Tuesday: Closed", ...],
+      "phone_number": "985 88 77 97",
+      "international_phone": "+34 985 88 77 97",
+      "website": "https://casagerardo.com",
       "place_id": "ChIJ..."
     }
   ],
@@ -633,11 +890,62 @@ npm run dev
 }
 ```
 
+### Make Booking API
+
+**Endpoint:** `/api/mcp/make-booking`
+**Source:** `src/app/api/mcp/make-booking/route.ts`
+**Integration:** ElevenLabs + Twilio for outbound calls
+
+| Method | Example |
+|--------|---------|
+| GET | Returns endpoint documentation |
+| POST | `{ "venue_name": "Casa Gerardo", "phone_number": "+34985887797", ... }` |
+
+**Request Body:**
+```json
+{
+  "venue_name": "Casa Gerardo",
+  "phone_number": "+34 985 88 77 97",
+  "party_size": 4,
+  "date": "hoy",
+  "time": "21:00",
+  "customer_name": "Juan García López",
+  "customer_phone": "+34 612 345 678",
+  "special_requests": "Trona para bebé"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "message": "Calling Casa Gerardo now to make a reservation...",
+  "call_sid": "CA123456789",
+  "status": "initiated",
+  "estimated_wait": "30-60 seconds"
+}
+```
+
+**Response (Not Configured):**
+```json
+{
+  "success": false,
+  "message": "Outbound calling is not configured. To make a reservation at Casa Gerardo, please call them directly at +34 985 88 77 97.",
+  "status": "not_configured",
+  "fallback_action": "Tell the user: \"I cannot make calls yet, but you can call Casa Gerardo directly...\""
+}
+```
+
 ### Environment Variables Required
 
 ```
-OPENWEATHERMAP_API_KEY=  # Weather API
-GOOGLE_PLACES_API_KEY=   # Places API (New)
+OPENWEATHERMAP_API_KEY=    # Weather API
+GOOGLE_PLACES_API_KEY=     # Places API (New)
+
+# Booking (Optional - graceful fallback when not configured)
+ELEVENLABS_API_KEY=        # ElevenLabs API key
+ELEVENLABS_PHONE_NUMBER_ID= # ElevenLabs phone number ID
+ELEVENLABS_BOOKING_AGENT_ID= # Pelayo (Booking) agent ID
 ```
 
 ---
@@ -654,15 +962,27 @@ GOOGLE_PLACES_API_KEY=   # Places API (New)
 
 ## Testing Checklist
 
+### Basic Conversation
 - [ ] Spanish greeting test: Start conversation, verify Spanish first message
 - [ ] Language switching: Ask question in English, verify English response
 - [ ] Factual accuracy: Ask about Lagos de Covadonga, verify accurate info
 - [ ] Personality check: Responses should feel warm, not robotic
 - [ ] Brevity test: Responses should be < 30 seconds spoken
 - [ ] Off-topic handling: Ask about Madrid, verify gentle redirect to Asturias
+- [ ] Returning user: Second conversation gets brief greeting
+
+### Tool Usage
 - [ ] Weather tool: "¿Qué tiempo hace en Oviedo?" → triggers get_weather
 - [ ] Places tool: "¿Dónde puedo comer fabada?" → triggers search_places
-- [ ] Returning user: Second conversation gets brief greeting
+- [ ] Places tool returns phone numbers: Verify response includes phone_number field
+
+### Booking Flow
+- [ ] Booking request: "Quiero reservar en Casa Gerardo" → Pelayo asks for details
+- [ ] Gather details: Pelayo asks for party size, date, time, full name, and phone
+- [ ] Confirmation: Pelayo confirms details before calling
+- [ ] Call initiated: When configured, make_booking tool is triggered
+- [ ] Fallback: When not configured, Pelayo provides phone number to user
+- [ ] Error handling: If call fails, Pelayo provides fallback options
 
 ---
 
@@ -673,9 +993,14 @@ GOOGLE_PLACES_API_KEY=   # Places API (New)
 | `src/hooks/use-voice-session.ts` | Session tracking hook |
 | `src/components/immersive/voice-chat-elevenlabs.tsx` | Voice chat component with dynamic variables |
 | `src/app/api/mcp/weather/route.ts` | Weather webhook endpoint |
-| `src/app/api/mcp/places/route.ts` | Places webhook endpoint (Places API New) |
+| `src/app/api/mcp/places/route.ts` | Places webhook endpoint (includes phone numbers) |
+| `src/app/api/mcp/make-booking/route.ts` | Booking via ElevenLabs/Twilio outbound calls |
+| `src/app/api/mcp/make-booking/status/route.ts` | Twilio call status callback |
 | `scripts/tunnel.sh` | Cloudflare tunnel startup script |
 | `scripts/update-pelayo-prompt.ts` | Script to update agent prompt via API |
+| `scripts/elevenlabs-places-tool.json` | ElevenLabs tool schema for places search |
+| `scripts/elevenlabs-weather-tool.json` | ElevenLabs tool schema for weather |
+| `scripts/elevenlabs-make-booking-tool.json` | ElevenLabs tool schema for booking |
 
 ---
 
