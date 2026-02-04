@@ -318,6 +318,7 @@ Voice agents for the Paisaxe experience, configured in `src/config/elevenlabs-ag
 | Agent | Purpose | Language | Config |
 |-------|---------|----------|--------|
 | **Pelayo** | Tourism guide for immersive stories | Spanish/English | [Detailed config](./elevenlabs-pelayo-config.md) |
+| **Pelayo (Booking)** | Outbound calls to make reservations | Spanish | [Booking config](./pelayo-booking-system-prompt.md) |
 | Xander | X/Twitter marketing | English | Marketing prompt |
 | Iris | Instagram marketing | English | Marketing prompt |
 | Penny | Pinterest marketing | English | Marketing prompt |
@@ -330,6 +331,24 @@ Controlled by the `visitor_voice_agent` feature flag in admin panel:
 2. Set the ElevenLabs Agent ID (Pelayo's ID)
 3. Whitelist specific user emails
 4. Users must sign in with Google OAuth to access voice
+
+### Booking System
+
+Pelayo can make outbound calls to restaurants/hotels to book reservations. Controlled by `booking_system` feature flag.
+
+**Flow:**
+1. User asks Pelayo to book a restaurant
+2. Pelayo collects details (party size, date, time, name, phone)
+3. `make_booking` tool initiates call via ElevenLabs + Twilio
+4. Booking agent (Pelayo Booking) speaks with the restaurant
+5. Post-call webhook sends SMS confirmation to user
+
+**SMS Confirmation** (requires `sms_booking_confirmation` flag):
+- ElevenLabs sends post-call webhook to `/api/webhooks/elevenlabs`
+- Webhook analyzes transcript for outcome (confirmed/denied/no_answer)
+- SMS sent to customer via Twilio with result
+
+See [elevenlabs-pelayo-config.md](./elevenlabs-pelayo-config.md) for full booking and SMS configuration.
 
 ### Setup Script
 
