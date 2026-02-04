@@ -166,7 +166,7 @@ describe("VoicePurchaseCTA", () => {
     });
   });
 
-  // Note: Testing the "Lemon Squeezy not configured" case would require module isolation
+  // Note: Testing the "Stripe not configured" case would require module isolation
   // which is complex with vi.mock. The path is covered by manual inspection as it simply
   // logs an error and returns early. The other tests cover the happy path adequately.
 });

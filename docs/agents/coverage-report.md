@@ -137,7 +137,7 @@
 | `src/app/auth/callback/route.ts` | 71% | 100% | 25% | 71% | Supabase Auth cookie handling (setAll catch block unreachable in jsdom) |
 | `src/app/favorites/page.tsx` | 86% | 77% | 82% | 89% | Complex RSC with suspense boundaries |
 | `src/app/immersive/page.tsx` | 69% | 46% | 69% | 70% | Complex client interactions with story navigation |
-| `src/app/pricing/page.tsx` | 71% | 70% | 100% | 71% | LemonSqueezy checkout flow with client-side redirects |
+| `src/app/pricing/page.tsx` | 71% | 70% | 100% | 71% | Stripe checkout flow with client-side redirects |
 | `src/app/pricing/success/page.tsx` | 100% | 100% | 100% | 100% | Fully covered |
 | `src/components/provider.tsx` | 60% | 50% | 100% | 60% | PostHog analytics initialization (browser-only) |
 | `src/components/admin/theme-toggle.tsx` | 100% | 100% | 100% | 100% | Fully covered |

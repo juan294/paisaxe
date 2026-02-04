@@ -19,7 +19,7 @@ For operations (monitoring, pg_cron, webhooks, agents), see @docs/operations/ope
 | Embeddings | Voyage AI (voyage-3, 512 dims) |
 | Reranking | Voyage AI (rerank-2.5) |
 | Voice | ElevenLabs Conversational AI |
-| Payments | Lemon Squeezy |
+| Payments | Stripe |
 | Testing | Vitest + Playwright |
 | Deployment | Vercel |
 
@@ -81,8 +81,11 @@ GOOGLE_CLIENT_SECRET=
 WEBHOOK_SECRET=          # Supabase webhooks
 NEXT_PUBLIC_SITE_URL=
 
-LEMONSQUEEZY_API_KEY=    # Revenue analytics (optional)
-LEMONSQUEEZY_STORE_ID=   # Revenue analytics (optional)
+# Stripe (payments)
+STRIPE_SECRET_KEY=                      # Server-side API key
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=     # Client-side publishable key
+STRIPE_WEBHOOK_SECRET=                  # Webhook signature verification
+STRIPE_DAY_PASS_PRICE_ID=               # Price ID for Day Pass product
 ```
 
 ## Architecture Decisions
