@@ -263,8 +263,9 @@ describe("FeatureTogglesPanel", () => {
     it("displays correct enabled/total count", async () => {
       render(<FeatureTogglesPanel />);
 
+      // 3 enabled flags + 7 total (6 flags + 1 tunnel assumed available in dev)
       await waitFor(() => {
-        expect(screen.getByText("3/6 Active")).toBeInTheDocument();
+        expect(screen.getByText("3/7 Active")).toBeInTheDocument();
       });
     });
 

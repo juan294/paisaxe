@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TunnelStatus {
@@ -11,18 +11,21 @@ interface TunnelStatus {
 
 interface TunnelTableRowProps {
   rowNumber: number;
-  onStatusChange?: (status: { available: boolean; running: boolean }) => void;
+  onRunningChange?: (running: boolean) => void;
 }
 
 /**
  * Tunnel control rendered as a table row for the System category.
  * Development-only - returns null in production.
+ *
+ * Renders the full UI immediately with default OFF state,
+ * then updates in background when status is fetched.
  */
-export function TunnelTableRow({ rowNumber, onStatusChange }: TunnelTableRowProps) {
+export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowProps) {
   const [status, setStatus] = useState<TunnelStatus>({ running: false, url: null });
-  const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isProduction, setIsProduction] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -31,19 +34,15 @@ export function TunnelTableRow({ rowNumber, onStatusChange }: TunnelTableRowProp
         const data = await response.json();
         setStatus(data);
         setError(null);
-        onStatusChange?.({ available: true, running: data.running });
+        onRunningChange?.(data.running);
       } else if (response.status === 403) {
         // Production environment - tunnel control not available
-        setError("Only available in development");
-        onStatusChange?.({ available: false, running: false });
+        setIsProduction(true);
       }
     } catch {
       setError("Failed to check tunnel status");
-      onStatusChange?.({ available: true, running: false });
-    } finally {
-      setIsLoading(false);
     }
-  }, [onStatusChange]);
+  }, [onRunningChange]);
 
   useEffect(() => {
     fetchStatus();
@@ -60,7 +59,7 @@ export function TunnelTableRow({ rowNumber, onStatusChange }: TunnelTableRowProp
       if (response.ok) {
         const data = await response.json();
         setStatus({ running: data.running, url: data.url });
-        onStatusChange?.({ available: true, running: data.running });
+        onRunningChange?.(data.running);
       } else {
         const data = await response.json();
         setError(data.error || "Failed to toggle tunnel");
@@ -73,25 +72,8 @@ export function TunnelTableRow({ rowNumber, onStatusChange }: TunnelTableRowProp
   };
 
   // Don't render in production
-  if (error === "Only available in development") {
+  if (isProduction) {
     return null;
-  }
-
-  // Loading state as a table row
-  if (isLoading) {
-    return (
-      <tr>
-        <td className="py-5 text-center align-top font-mono text-sm tabular-nums text-[#a39e98]">
-          {String(rowNumber).padStart(2, "0")}
-        </td>
-        <td className="py-5 align-top" colSpan={5}>
-          <div className="flex items-center gap-2 text-[#a39e98]">
-            <RefreshCw className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Checking tunnel...</span>
-          </div>
-        </td>
-      </tr>
-    );
   }
 
   return (
