@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
+import { createAdminClient } from "@/lib/supabase";
 
 /**
  * MCP-compatible Make Booking API endpoint for ElevenLabs voice agents.
@@ -353,9 +354,49 @@ export async function POST(request: Request): Promise<NextResponse> {
     const result = await initiateCall(normalizedPhone, callRequest);
 
     if (result.success) {
+      // Store pending booking for webhook to find later
+      const conversationId = result.conversationId || result.callSid;
+      const normalizedCustomerPhone = normalizePhoneNumber(customer_phone);
+
+      if (conversationId) {
+        try {
+          const supabase = createAdminClient();
+          const { error: insertError } = await supabase
+            .from("pending_bookings")
+            .insert({
+              conversation_id: conversationId,
+              venue_name,
+              venue_phone: normalizedPhone,
+              customer_name,
+              customer_phone: normalizedCustomerPhone,
+              party_size: Number(party_size),
+              booking_date: date,
+              booking_time: time,
+              special_requests: params.special_requests || null,
+              status: "pending",
+            });
+
+          if (insertError) {
+            console.error("[make-booking] Failed to store pending booking:", insertError);
+            // Don't fail the request - call was already initiated
+          } else {
+            console.log(`[make-booking] Stored pending booking for conversation: ${conversationId}`);
+          }
+        } catch (dbError) {
+          console.error("[make-booking] Database error storing pending booking:", dbError);
+          // Don't fail the request - call was already initiated
+        }
+      }
+
+      // Check if SMS confirmation is enabled
+      const smsEnabled = await isFeatureFlagEnabled("sms_booking_confirmation");
+      const smsNote = smsEnabled
+        ? ` I'll send you an SMS at ${customer_phone} once the reservation is confirmed.`
+        : "";
+
       return NextResponse.json<MakeBookingResponse>({
         success: true,
-        message: `Calling ${venue_name} now to make a reservation for ${party_size} people on ${date} at ${time} under the name ${customer_name}. Pelayo will speak with the restaurant staff.`,
+        message: `Calling ${venue_name} now to make a reservation for ${party_size} people on ${date} at ${time} under the name ${customer_name}.${smsNote}`,
         call_sid: result.callSid || result.conversationId,
         status: "initiated",
         estimated_wait: "30-60 seconds",
