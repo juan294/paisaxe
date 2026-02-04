@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 
 /**
  * MCP-compatible Make Booking API endpoint for ElevenLabs voice agents.
@@ -255,6 +256,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     } else {
       // Flat format from ElevenLabs webhook
       params = body;
+    }
+
+    // Check if booking system is enabled via feature flag
+    const bookingEnabled = await isFeatureFlagEnabled("booking_system");
+
+    if (!bookingEnabled) {
+      const venueName = params.venue_name || "the business";
+      const phoneNumber = params.phone_number || "their phone number";
+
+      return NextResponse.json<MakeBookingResponse>({
+        success: false,
+        message: `Booking is temporarily unavailable. Please call ${venueName} directly at ${phoneNumber} to make your reservation.`,
+        status: "not_configured",
+        fallback_action: `Tell the user: "I can't make calls right now, but you can call ${venueName} directly at ${phoneNumber}."`,
+      });
     }
 
     // Validate required fields
