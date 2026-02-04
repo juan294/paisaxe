@@ -56,8 +56,8 @@ export async function createDayPassCheckoutSession(
     metadata: { user_id: options.userId },
     success_url: options.successUrl,
     cancel_url: options.cancelUrl,
-    // Enable automatic tax calculation for EU VAT
-    automatic_tax: { enabled: true },
+    // Note: automatic_tax requires Stripe Tax to be configured in dashboard
+    // automatic_tax: { enabled: true },
   });
 
   if (!session.url) {
