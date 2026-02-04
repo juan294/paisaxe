@@ -134,6 +134,7 @@ export function FeatureTogglesPanel() {
   const [activeCategory, setActiveCategory] = useState<FlagCategory>("agents");
   const [searchQuery, setSearchQuery] = useState("");
   const [agentLastRuns, setAgentLastRuns] = useState<Record<string, string>>({});
+  const [tunnelStatus, setTunnelStatus] = useState<{ available: boolean; running: boolean }>({ available: false, running: false });
 
   const loadFlags = useCallback(async () => {
     setIsLoading(true);
@@ -230,7 +231,7 @@ export function FeatureTogglesPanel() {
     return grouped;
   }, [flags]);
 
-  // Count enabled flags per category
+  // Count enabled flags per category (including tunnel in system)
   const enabledByCategory = useMemo(() => {
     const counts: Record<FlagCategory, { enabled: number; total: number }> & { all: { enabled: number; total: number } } = {
       all: { enabled: 0, total: 0 },
@@ -254,8 +255,18 @@ export function FeatureTogglesPanel() {
       }
     });
 
+    // Include tunnel in system category count (dev only)
+    if (tunnelStatus.available) {
+      counts.system.total++;
+      counts.all.total++;
+      if (tunnelStatus.running) {
+        counts.system.enabled++;
+        counts.all.enabled++;
+      }
+    }
+
     return counts;
-  }, [flags]);
+  }, [flags, tunnelStatus]);
 
   // Filter flags based on active category and search query
   const filteredFlags = useMemo(() => {
@@ -493,7 +504,7 @@ export function FeatureTogglesPanel() {
             ))}
             {/* Dev Tunnel row (System category only, development only) */}
             {activeCategory === "system" && (
-              <TunnelTableRow rowNumber={filteredFlags.length + 1} />
+              <TunnelTableRow rowNumber={filteredFlags.length + 1} onStatusChange={setTunnelStatus} />
             )}
           </tbody>
         </table>
