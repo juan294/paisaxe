@@ -3,34 +3,39 @@ import { NextResponse } from "next/server";
 /**
  * MCP-compatible Places API endpoint for ElevenLabs voice agents.
  * Searches for restaurants, attractions, and points of interest in Asturias.
+ * Uses Google Places API (New) - the modern version.
  *
  * GET /api/mcp/places?query=fabada&type=restaurant&city=Oviedo
  * POST /api/mcp/places (MCP tool call format)
  */
 
-interface GooglePlacesResult {
-  name: string;
-  formatted_address: string;
+// Places API (New) response types
+interface PlacesApiPlace {
+  id: string;
+  displayName?: {
+    text: string;
+    languageCode: string;
+  };
+  formattedAddress?: string;
   rating?: number;
-  user_ratings_total?: number;
-  price_level?: number;
-  types: string[];
-  geometry: {
-    location: {
-      lat: number;
-      lng: number;
-    };
+  userRatingCount?: number;
+  priceLevel?: string;
+  types?: string[];
+  location?: {
+    latitude: number;
+    longitude: number;
   };
-  opening_hours?: {
-    open_now?: boolean;
+  regularOpeningHours?: {
+    openNow?: boolean;
   };
-  place_id: string;
 }
 
-interface GooglePlacesResponse {
-  results: GooglePlacesResult[];
-  status: string;
-  error_message?: string;
+interface PlacesApiResponse {
+  places?: PlacesApiPlace[];
+  error?: {
+    message: string;
+    status: string;
+  };
 }
 
 interface Place {
@@ -96,20 +101,35 @@ const VALID_TYPES = [
   "spa",
 ];
 
-function transformPlace(result: GooglePlacesResult): Place {
+// Convert priceLevel string to number (PRICE_LEVEL_FREE=0, PRICE_LEVEL_INEXPENSIVE=1, etc.)
+function priceLevelToNumber(priceLevel?: string): number | null {
+  if (!priceLevel) return null;
+  const levels: Record<string, number> = {
+    PRICE_LEVEL_FREE: 0,
+    PRICE_LEVEL_INEXPENSIVE: 1,
+    PRICE_LEVEL_MODERATE: 2,
+    PRICE_LEVEL_EXPENSIVE: 3,
+    PRICE_LEVEL_VERY_EXPENSIVE: 4,
+  };
+  return levels[priceLevel] ?? null;
+}
+
+function transformPlace(result: PlacesApiPlace): Place {
   return {
-    name: result.name,
-    address: result.formatted_address,
+    name: result.displayName?.text || "Unknown",
+    address: result.formattedAddress || "",
     rating: result.rating ?? null,
-    reviews_count: result.user_ratings_total ?? 0,
-    price_level: result.price_level ?? null,
-    types: result.types.filter((t) => !t.includes("_") || VALID_TYPES.includes(t)),
+    reviews_count: result.userRatingCount ?? 0,
+    price_level: priceLevelToNumber(result.priceLevel),
+    types: (result.types || []).filter(
+      (t) => !t.includes("_") || VALID_TYPES.includes(t)
+    ),
     location: {
-      lat: result.geometry.location.lat,
-      lng: result.geometry.location.lng,
+      lat: result.location?.latitude || 0,
+      lng: result.location?.longitude || 0,
     },
-    is_open: result.opening_hours?.open_now ?? null,
-    place_id: result.place_id,
+    is_open: result.regularOpeningHours?.openNow ?? null,
+    place_id: result.id,
   };
 }
 
@@ -137,34 +157,76 @@ async function searchPlaces(
     }
   }
 
-  // Build URL
-  const baseUrl = "https://maps.googleapis.com/maps/api/place/textsearch/json";
-  const params = new URLSearchParams({
-    query: `${query} Asturias`,
-    key: apiKey,
-    location: `${location.lat},${location.lng}`,
-    radius: String(radius),
-    language: "es",
+  // Build request for Places API (New)
+  const baseUrl = "https://places.googleapis.com/v1/places:searchText";
+
+  // Build the request body
+  const requestBody: {
+    textQuery: string;
+    languageCode: string;
+    maxResultCount: number;
+    locationBias: {
+      circle: {
+        center: { latitude: number; longitude: number };
+        radius: number;
+      };
+    };
+    includedType?: string;
+  } = {
+    textQuery: `${query} Asturias`,
+    languageCode: "es",
+    maxResultCount: 5,
+    locationBias: {
+      circle: {
+        center: {
+          latitude: location.lat,
+          longitude: location.lng,
+        },
+        radius: radius,
+      },
+    },
+  };
+
+  // Add type filter if valid
+  if (type && VALID_TYPES.includes(type)) {
+    requestBody.includedType = type;
+  }
+
+  // Fields to request (controls billing)
+  const fieldMask = [
+    "places.id",
+    "places.displayName",
+    "places.formattedAddress",
+    "places.rating",
+    "places.userRatingCount",
+    "places.priceLevel",
+    "places.types",
+    "places.location",
+    "places.regularOpeningHours",
+  ].join(",");
+
+  const response = await fetch(baseUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": fieldMask,
+    },
+    body: JSON.stringify(requestBody),
   });
 
-  if (type && VALID_TYPES.includes(type)) {
-    params.set("type", type);
-  }
-
-  const url = `${baseUrl}?${params.toString()}`;
-  const response = await fetch(url);
-
   if (!response.ok) {
-    throw new Error(`Places API error: ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(`Places API error: ${response.status} - ${errorText}`);
   }
 
-  const data: GooglePlacesResponse = await response.json();
+  const data: PlacesApiResponse = await response.json();
 
-  if (data.status === "REQUEST_DENIED") {
-    throw new Error(data.error_message || "API request denied");
+  if (data.error) {
+    throw new Error(data.error.message || "API request denied");
   }
 
-  if (data.status === "ZERO_RESULTS" || !data.results?.length) {
+  if (!data.places?.length) {
     return {
       places: [],
       query,
@@ -173,8 +235,8 @@ async function searchPlaces(
     };
   }
 
-  // Transform and limit results
-  const places = data.results.slice(0, 5).map(transformPlace);
+  // Transform results
+  const places = data.places.map(transformPlace);
 
   return {
     places,

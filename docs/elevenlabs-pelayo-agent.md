@@ -236,83 +236,76 @@ Both tools have been added to the agent in ElevenLabs Dashboard → Tools tab.
 
 ---
 
-## Current Status & Where We Got Stuck
+## Development & Production Workflow
+
+### Two-Agent Strategy
+
+To safely develop and test webhook tools without affecting production:
+
+| Agent | Purpose | Webhook URLs |
+|-------|---------|--------------|
+| **Pelayo** | Production | `https://paisaxe.es/api/mcp/*` |
+| **Pelayo-Dev** | Local testing | `https://paisaxe.tunnelfor.me/api/mcp/*` |
+
+### Local Development Setup
+
+1. **Start the dev server**
+   ```bash
+   npm run dev
+   ```
+
+2. **Start the Cloudflare tunnel** (in another terminal)
+   ```bash
+   ./scripts/tunnel.sh
+   ```
+   This exposes `localhost:3000` at `https://paisaxe.tunnelfor.me`
+
+3. **Test with Pelayo-Dev agent**
+   - The dev agent's tools point to `paisaxe.tunnelfor.me`
+   - Production agent remains untouched
+
+### Cloudflare Tunnel Details
+
+- **Tunnel name:** `paisaxe`
+- **Tunnel ID:** `9be5c7a4-6de2-4cc1-8e4f-714cec7e449e`
+- **Config file:** `~/.cloudflared/config-paisaxe.yml`
+- **Public URL:** `https://paisaxe.tunnelfor.me`
+
+### Test Scenarios
+
+| Prompt | Expected Tool |
+|--------|---------------|
+| "¿Qué tiempo hace en Oviedo?" | `get_weather` |
+| "¿Dónde puedo comer fabada?" | `search_places` |
+| "Recomiéndame una sidrería en Gijón" | `search_places` |
+
+### Deployment Flow
+
+1. Develop and test locally with Pelayo-Dev agent
+2. When ready, deploy code to production:
+   ```bash
+   git push origin develop
+   # Merge develop → main for production release
+   ```
+3. Production agent automatically uses the updated code at `paisaxe.es`
+
+---
+
+## Implementation Status
 
 ### Completed ✅
 1. Created `use-voice-session` hook for session tracking
 2. Updated `voice-chat-elevenlabs.tsx` with new dynamic variables
 3. Created weather webhook endpoint (`/api/mcp/weather`)
-4. Created places webhook endpoint (`/api/mcp/places`)
+4. Created places webhook endpoint (`/api/mcp/places`) - using Places API (New)
 5. Updated system prompt via ElevenLabs API
 6. Configured both webhook tools in ElevenLabs Dashboard
-7. Installed `cloudflared` via Homebrew
+7. Set up Cloudflare tunnel at `paisaxe.tunnelfor.me`
+8. Created `scripts/tunnel.sh` convenience script
 
-### Blocked 🚫
-**DNS Resolution Issue** - Cannot test locally because of network DNS problems:
-```
-ping: cannot resolve api.cloudflare.com: Unknown host
-failed to request quick Tunnel: dial tcp: lookup api.trycloudflare.com: no such host
-```
-
-The Mac needs a restart to fix DNS resolution. After restart:
-
-### To Resume After Restart
-
-1. **Fix DNS (should be fixed after restart)**
-   ```bash
-   ping api.cloudflare.com  # Verify DNS works
-   ```
-
-2. **Create Cloudflare Tunnel**
-   ```bash
-   cloudflared tunnel create paisaxe-dev
-   cloudflared tunnel route dns paisaxe-dev dev.tunnelfor.me
-   ```
-
-3. **Create tunnel config**
-   ```bash
-   mkdir -p ~/.cloudflared
-   cat > ~/.cloudflared/config.yml << 'EOF'
-   tunnel: paisaxe-dev
-   credentials-file: /Users/juan/.cloudflared/<TUNNEL_ID>.json
-
-   ingress:
-     - hostname: dev.tunnelfor.me
-       service: http://localhost:3000
-     - service: http_status:404
-   EOF
-   ```
-
-4. **Start dev server and tunnel**
-   ```bash
-   # Terminal 1
-   npm run dev
-
-   # Terminal 2
-   cloudflared tunnel run paisaxe-dev
-   ```
-
-5. **Update ElevenLabs tools for testing**
-   - Change webhook URLs from `https://paisaxe.es/api/mcp/*` to `https://dev.tunnelfor.me/api/mcp/*`
-   - Test the agent with voice
-   - Verify tools are called and return data
-
-6. **Test scenarios**
-   - "¿Qué tiempo hace en Oviedo?" → Should trigger get_weather
-   - "¿Dónde puedo comer fabada?" → Should trigger search_places
-   - First conversation → Full greeting
-   - Second conversation → Short greeting
-
-7. **After testing, restore production URLs**
-   - Change webhook URLs back to `https://paisaxe.es/api/mcp/*`
-
-8. **Deploy to production**
-   ```bash
-   git add -A
-   git commit -m "feat(voice): add weather and places webhook tools for Pelayo agent"
-   git push origin develop
-   # Then merge to main for production
-   ```
+### Pending
+- [ ] Create Pelayo-Dev agent in ElevenLabs (clone of Pelayo with dev URLs)
+- [ ] Voice testing with both agents
 
 ---
 
