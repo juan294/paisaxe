@@ -69,6 +69,17 @@ const mockFlags: FeatureFlag[] = [
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z",
   },
+  {
+    id: "6",
+    flagKey: "coverage_agent_enabled",
+    enabled: true,
+    label: "Coverage Agent",
+    description: "Automated test coverage agent",
+    config: {},
+    environment: "production",
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+  },
 ];
 
 describe("FeatureTogglesPanel", () => {
@@ -97,48 +108,43 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
-      // Default is System tab, wait for it to load
+      // Default is Agents tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+        expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
       });
 
-      // Switch to Voice tab to see voice flags
-      const voiceTab = screen.getByRole("button", { name: /voice/i });
-      await user.click(voiceTab);
-
+      // Search for coverage
       const searchInput = screen.getByPlaceholderText(/search/i);
-      await user.type(searchInput, "voice");
+      await user.type(searchInput, "coverage");
 
-      // Only "Visitor Voice Agent" should be visible
-      expect(screen.getByText("Visitor Voice Agent")).toBeInTheDocument();
-      expect(screen.queryByText("Contextual Prompts")).not.toBeInTheDocument();
-      expect(screen.queryByText("Related Stories")).not.toBeInTheDocument();
+      // Only "Coverage Agent" should be visible
+      expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
     });
 
     it("filters flags by description when searching", async () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
-      // Default is System tab, wait for it to load
+      // Default is Agents tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+        expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
       });
 
-      // Search for maintenance (should find it in System tab)
+      // Search for "test coverage" (from description)
       const searchInput = screen.getByPlaceholderText(/search/i);
-      await user.type(searchInput, "maintenance");
+      await user.type(searchInput, "test coverage");
 
-      // "Maintenance Mode" should be visible
-      expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+      // "Coverage Agent" should be visible
+      expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
     });
 
     it("search is case-insensitive", async () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
-      // Default is System tab, wait for it to load
+      // Default is Agents tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+        expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
       });
 
       // Switch to Experience tab (where Ambient Discovery is)
@@ -155,9 +161,9 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
-      // Default is System tab, wait for it to load
+      // Default is Agents tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+        expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
       });
 
       const searchInput = screen.getByPlaceholderText(/search/i);
@@ -170,9 +176,9 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
-      // Default is System tab, wait for it to load
+      // Default is Agents tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+        expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
       });
 
       // Click on Discovery category
@@ -196,22 +202,22 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
-      // Default is System tab, wait for it to load
+      // Default is Agents tab, wait for it to load
       await waitFor(() => {
-        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+        expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
       });
 
       const searchInput = screen.getByPlaceholderText(/search/i);
-      await user.type(searchInput, "maintenance");
+      await user.type(searchInput, "coverage");
 
-      // Maintenance Mode should still be visible (matches search)
-      expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+      // Coverage Agent should still be visible (matches search)
+      expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
 
       // Clear search
       await user.clear(searchInput);
 
-      // Maintenance Mode should still be visible (in System category)
-      expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+      // Coverage Agent should still be visible (in Agents category)
+      expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
     });
   });
 
@@ -223,17 +229,17 @@ describe("FeatureTogglesPanel", () => {
       expect(spinner).toBeInTheDocument();
     });
 
-    it("defaults to System tab and shows system flags", async () => {
+    it("defaults to Agents tab and shows agent flags", async () => {
       render(<FeatureTogglesPanel />);
 
-      // Should show Maintenance Mode (System category) by default
+      // Should show Coverage Agent (Agents category) by default
       await waitFor(() => {
-        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+        expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
       });
 
       // Should NOT show flags from other categories
       expect(screen.queryByText("Contextual Prompts")).not.toBeInTheDocument();
-      expect(screen.queryByText("Related Stories")).not.toBeInTheDocument();
+      expect(screen.queryByText("Maintenance Mode")).not.toBeInTheDocument();
     });
 
     it("shows different flags when switching category tabs", async () => {
@@ -241,7 +247,7 @@ describe("FeatureTogglesPanel", () => {
       render(<FeatureTogglesPanel />);
 
       await waitFor(() => {
-        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+        expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
       });
 
       // Click on Discovery tab
@@ -251,14 +257,14 @@ describe("FeatureTogglesPanel", () => {
       // Should show discovery flags
       expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
       expect(screen.getByText("Related Stories")).toBeInTheDocument();
-      expect(screen.queryByText("Maintenance Mode")).not.toBeInTheDocument();
+      expect(screen.queryByText("Coverage Agent")).not.toBeInTheDocument();
     });
 
     it("displays correct enabled/total count", async () => {
       render(<FeatureTogglesPanel />);
 
       await waitFor(() => {
-        expect(screen.getByText("2/5 Active")).toBeInTheDocument();
+        expect(screen.getByText("3/6 Active")).toBeInTheDocument();
       });
     });
 
@@ -266,26 +272,26 @@ describe("FeatureTogglesPanel", () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
-      // Default is System tab with Maintenance Mode (which is disabled/false in mock)
+      // Default is Agents tab with Coverage Agent (which is enabled/true in mock)
       await waitFor(() => {
-        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+        expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
       });
 
-      // Find the toggle specifically labeled for Maintenance Mode
-      const maintenanceToggle = screen.getByRole("switch", { name: /toggle maintenance mode/i });
-      await user.click(maintenanceToggle);
+      // Find the toggle specifically labeled for Coverage Agent
+      const coverageToggle = screen.getByRole("switch", { name: /toggle coverage agent/i });
+      await user.click(coverageToggle);
 
-      // Maintenance Mode is initially false, so clicking toggle should enable it (true)
-      expect(updateFeatureFlag).toHaveBeenCalledWith("maintenance_mode", true);
+      // Coverage Agent is initially true, so clicking toggle should disable it (false)
+      expect(updateFeatureFlag).toHaveBeenCalledWith("coverage_agent_enabled", false);
     });
 
     it("filters by category when tab is clicked", async () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
-      // Default is System tab
+      // Default is Agents tab
       await waitFor(() => {
-        expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
+        expect(screen.getByText("Coverage Agent")).toBeInTheDocument();
       });
 
       // Click on Discovery category tab
@@ -295,7 +301,7 @@ describe("FeatureTogglesPanel", () => {
       // Should only show discovery flags
       expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
       expect(screen.getByText("Related Stories")).toBeInTheDocument();
-      expect(screen.queryByText("Maintenance Mode")).not.toBeInTheDocument();
+      expect(screen.queryByText("Coverage Agent")).not.toBeInTheDocument();
       expect(screen.queryByText("Visitor Voice Agent")).not.toBeInTheDocument();
     });
 
