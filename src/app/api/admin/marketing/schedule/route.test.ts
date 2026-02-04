@@ -1,0 +1,517 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest, NextResponse } from "next/server";
+import type { MarketingScheduleRow } from "@/types/marketing";
+
+// Mock admin auth
+vi.mock("@/lib/admin-auth", () => ({
+  validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
+}));
+
+// Create mock functions
+const mockSelect = vi.fn();
+const mockOrder = vi.fn();
+const mockEq = vi.fn();
+const mockInsert = vi.fn();
+const mockUpdate = vi.fn();
+const mockDelete = vi.fn();
+const mockSingle = vi.fn();
+
+const createMockSchedule = (overrides?: Partial<MarketingScheduleRow>): MarketingScheduleRow => ({
+  id: "schedule-1",
+  platform: "x",
+  day_of_week: null,
+  time_utc: "14:00",
+  content_type: "auto",
+  is_active: true,
+  created_at: "2024-01-01T00:00:00Z",
+  ...overrides,
+});
+
+// Mock Supabase with proper chain structure
+vi.mock("@/lib/supabase", () => ({
+  createAdminClient: () => ({
+    from: () => ({
+      select: (...args: unknown[]) => {
+        mockSelect(...args);
+        return {
+          order: (...orderArgs: unknown[]) => {
+            mockOrder(...orderArgs);
+            return {
+              order: (...orderArgs2: unknown[]) => {
+                mockOrder(...orderArgs2);
+                return {
+                  order: (...orderArgs3: unknown[]) => {
+                    mockOrder(...orderArgs3);
+                    return {
+                      eq: (...eqArgs: unknown[]) => {
+                        mockEq(...eqArgs);
+                        return Promise.resolve({
+                          data: [createMockSchedule()],
+                          error: null,
+                        });
+                      },
+                      then: (resolve: (result: { data: MarketingScheduleRow[]; error: null }) => void) => {
+                        resolve({
+                          data: [createMockSchedule()],
+                          error: null,
+                        });
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+      insert: (...args: unknown[]) => {
+        mockInsert(...args);
+        return {
+          select: () => ({
+            single: () => {
+              mockSingle();
+              return Promise.resolve({
+                data: createMockSchedule(),
+                error: null,
+              });
+            },
+          }),
+        };
+      },
+      update: (...args: unknown[]) => {
+        mockUpdate(...args);
+        return {
+          eq: (...eqArgs: unknown[]) => {
+            mockEq(...eqArgs);
+            return {
+              select: () => ({
+                single: () => {
+                  mockSingle();
+                  return Promise.resolve({
+                    data: createMockSchedule({ time_utc: "15:00" }),
+                    error: null,
+                  });
+                },
+              }),
+            };
+          },
+        };
+      },
+      delete: () => {
+        mockDelete();
+        return {
+          eq: (...eqArgs: unknown[]) => {
+            mockEq(...eqArgs);
+            return Promise.resolve({ error: null });
+          },
+        };
+      },
+    }),
+  }),
+}));
+
+// Import after mocks
+import { GET, POST, PUT, DELETE } from "./route";
+import { validateAdminAuth } from "@/lib/admin-auth";
+
+describe("/api/admin/marketing/schedule", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("GET", () => {
+    it("should return 401 if not authenticated", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValueOnce({
+        valid: false,
+        error: NextResponse.json({ error: "Not authenticated" }, { status: 401 }),
+      });
+
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toBe("Not authenticated");
+    });
+
+    it("should return all schedules", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data).toBeDefined();
+      expect(Array.isArray(data.data)).toBe(true);
+    });
+
+    it("should apply platform filter when provided", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?platform=x"
+      );
+      await GET(request);
+
+      expect(mockEq).toHaveBeenCalledWith("platform", "x");
+    });
+
+    it("should not apply filter for invalid platform", async () => {
+      mockEq.mockClear();
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?platform=invalid"
+      );
+      await GET(request);
+
+      // Should not have called eq with platform
+      const platformCalls = mockEq.mock.calls.filter(
+        (call) => call[0] === "platform"
+      );
+      expect(platformCalls.length).toBe(0);
+    });
+  });
+
+  describe("POST", () => {
+    it("should return 401 if not authenticated", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValueOnce({
+        valid: false,
+        error: NextResponse.json({ error: "Not authenticated" }, { status: 401 }),
+      });
+
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "POST",
+        body: JSON.stringify({ platform: "x", timeUtc: "14:00" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(401);
+    });
+
+    it("should return 400 when missing required fields", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "POST",
+        body: JSON.stringify({ platform: "x" }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("Missing required fields");
+    });
+
+    it("should return 400 for invalid platform", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "POST",
+        body: JSON.stringify({ platform: "tiktok", timeUtc: "14:00" }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("Invalid platform");
+    });
+
+    it("should return 400 for invalid time format", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "POST",
+        body: JSON.stringify({ platform: "x", timeUtc: "2:00 PM" }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("Invalid timeUtc format");
+    });
+
+    it("should return 400 for invalid content type", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "POST",
+        body: JSON.stringify({
+          platform: "x",
+          timeUtc: "14:00",
+          contentType: "invalid",
+        }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("Invalid contentType");
+    });
+
+    it("should return 400 for invalid dayOfWeek", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "POST",
+        body: JSON.stringify({ platform: "x", timeUtc: "14:00", dayOfWeek: 7 }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("Invalid dayOfWeek");
+    });
+
+    it("should create schedule successfully", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "POST",
+        body: JSON.stringify({
+          platform: "x",
+          timeUtc: "14:00",
+          contentType: "auto",
+          dayOfWeek: 1,
+        }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(data.data).toBeDefined();
+      expect(mockInsert).toHaveBeenCalledWith({
+        platform: "x",
+        day_of_week: 1,
+        time_utc: "14:00",
+        content_type: "auto",
+        is_active: true,
+      });
+    });
+
+    it("should accept all valid platforms", async () => {
+      const validPlatforms = ["x", "instagram", "pinterest"];
+
+      for (const platform of validPlatforms) {
+        mockInsert.mockClear();
+        const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+          method: "POST",
+          body: JSON.stringify({ platform, timeUtc: "14:00" }),
+        });
+        const response = await POST(request);
+
+        expect(response.status).toBe(201);
+      }
+    });
+
+    it("should accept all valid content types", async () => {
+      const validTypes = [
+        "photo_caption",
+        "reel_caption",
+        "thread",
+        "pin_description",
+        "story_prompt",
+        "auto",
+      ];
+
+      for (const contentType of validTypes) {
+        mockInsert.mockClear();
+        const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+          method: "POST",
+          body: JSON.stringify({ platform: "x", timeUtc: "14:00", contentType }),
+        });
+        const response = await POST(request);
+
+        expect(response.status).toBe(201);
+      }
+    });
+
+    it("should accept valid dayOfWeek values 0-6", async () => {
+      for (let day = 0; day <= 6; day++) {
+        mockInsert.mockClear();
+        const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+          method: "POST",
+          body: JSON.stringify({ platform: "x", timeUtc: "14:00", dayOfWeek: day }),
+        });
+        const response = await POST(request);
+
+        expect(response.status).toBe(201);
+      }
+    });
+
+    it("should accept null dayOfWeek for every day", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "POST",
+        body: JSON.stringify({ platform: "x", timeUtc: "14:00", dayOfWeek: null }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({ day_of_week: null })
+      );
+    });
+  });
+
+  describe("PUT", () => {
+    it("should return 401 if not authenticated", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValueOnce({
+        valid: false,
+        error: NextResponse.json({ error: "Not authenticated" }, { status: 401 }),
+      });
+
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({ timeUtc: "15:00" }),
+        }
+      );
+      const response = await PUT(request);
+
+      expect(response.status).toBe(401);
+    });
+
+    it("should return 400 when id is missing", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "PUT",
+        body: JSON.stringify({ timeUtc: "15:00" }),
+      });
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("id query parameter required");
+    });
+
+    it("should return 400 when no valid fields to update", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({}),
+        }
+      );
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("No valid fields to update");
+    });
+
+    it("should return 400 for invalid timeUtc format", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({ timeUtc: "invalid" }),
+        }
+      );
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("Invalid timeUtc format");
+    });
+
+    it("should return 400 for invalid contentType", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({ contentType: "invalid" }),
+        }
+      );
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("Invalid contentType");
+    });
+
+    it("should return 400 for invalid dayOfWeek", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({ dayOfWeek: 10 }),
+        }
+      );
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("Invalid dayOfWeek");
+    });
+
+    it("should update schedule successfully", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({ timeUtc: "15:00" }),
+        }
+      );
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data).toBeDefined();
+      expect(mockUpdate).toHaveBeenCalledWith({ time_utc: "15:00" });
+      expect(mockEq).toHaveBeenCalledWith("id", "schedule-1");
+    });
+
+    it("should update isActive successfully", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({ isActive: false }),
+        }
+      );
+      const response = await PUT(request);
+
+      expect(response.status).toBe(200);
+      expect(mockUpdate).toHaveBeenCalledWith({ is_active: false });
+    });
+
+    it("should allow setting dayOfWeek to null", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({ dayOfWeek: null }),
+        }
+      );
+      const response = await PUT(request);
+
+      expect(response.status).toBe(200);
+      expect(mockUpdate).toHaveBeenCalledWith({ day_of_week: null });
+    });
+  });
+
+  describe("DELETE", () => {
+    it("should return 401 if not authenticated", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValueOnce({
+        valid: false,
+        error: NextResponse.json({ error: "Not authenticated" }, { status: 401 }),
+      });
+
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        { method: "DELETE" }
+      );
+      const response = await DELETE(request);
+
+      expect(response.status).toBe(401);
+    });
+
+    it("should return 400 when id is missing", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "DELETE",
+      });
+      const response = await DELETE(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("id query parameter required");
+    });
+
+    it("should delete schedule successfully", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        { method: "DELETE" }
+      );
+      const response = await DELETE(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(mockDelete).toHaveBeenCalled();
+      expect(mockEq).toHaveBeenCalledWith("id", "schedule-1");
+    });
+  });
+});
