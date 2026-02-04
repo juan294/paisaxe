@@ -19,6 +19,10 @@ function createPlacesApiResponse(places: Array<{
   lat: number;
   lng: number;
   openNow?: boolean;
+  weekdayDescriptions?: string[];
+  nationalPhoneNumber?: string;
+  internationalPhoneNumber?: string;
+  websiteUri?: string;
   id: string;
 }>) {
   return {
@@ -31,7 +35,12 @@ function createPlacesApiResponse(places: Array<{
       priceLevel: p.priceLevel,
       types: p.types || ["restaurant", "food", "establishment"],
       location: { latitude: p.lat, longitude: p.lng },
-      regularOpeningHours: p.openNow !== undefined ? { openNow: p.openNow } : undefined,
+      regularOpeningHours: p.openNow !== undefined
+        ? { openNow: p.openNow, weekdayDescriptions: p.weekdayDescriptions }
+        : undefined,
+      nationalPhoneNumber: p.nationalPhoneNumber,
+      internationalPhoneNumber: p.internationalPhoneNumber,
+      websiteUri: p.websiteUri,
     })),
   };
 }
@@ -58,6 +67,10 @@ describe("/api/mcp/places", () => {
           lat: 43.5234,
           lng: -5.7891,
           openNow: true,
+          weekdayDescriptions: ["Monday: 1:00 - 4:00 PM", "Tuesday: Closed"],
+          nationalPhoneNumber: "985 88 77 97",
+          internationalPhoneNumber: "+34 985 88 77 97",
+          websiteUri: "https://casagerardo.com",
           id: "ChIJ123abc",
         },
         {
@@ -90,7 +103,13 @@ describe("/api/mcp/places", () => {
         name: "Casa Gerardo",
         rating: 4.5,
         price_level: 3, // PRICE_LEVEL_EXPENSIVE = 3
+        phone_number: "985 88 77 97",
+        international_phone: "+34 985 88 77 97",
+        website: "https://casagerardo.com",
+        opening_hours: ["Monday: 1:00 - 4:00 PM", "Tuesday: Closed"],
       });
+      // Second place has no phone number
+      expect(data.places[1].phone_number).toBeNull();
     });
 
     it("should return 400 if query parameter is missing", async () => {

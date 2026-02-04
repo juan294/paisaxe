@@ -27,7 +27,11 @@ interface PlacesApiPlace {
   };
   regularOpeningHours?: {
     openNow?: boolean;
+    weekdayDescriptions?: string[];
   };
+  nationalPhoneNumber?: string;
+  internationalPhoneNumber?: string;
+  websiteUri?: string;
 }
 
 interface PlacesApiResponse {
@@ -50,6 +54,10 @@ interface Place {
     lng: number;
   };
   is_open: boolean | null;
+  opening_hours: string[] | null;
+  phone_number: string | null;
+  international_phone: string | null;
+  website: string | null;
   place_id: string;
 }
 
@@ -129,6 +137,10 @@ function transformPlace(result: PlacesApiPlace): Place {
       lng: result.location?.longitude || 0,
     },
     is_open: result.regularOpeningHours?.openNow ?? null,
+    opening_hours: result.regularOpeningHours?.weekdayDescriptions ?? null,
+    phone_number: result.nationalPhoneNumber ?? null,
+    international_phone: result.internationalPhoneNumber ?? null,
+    website: result.websiteUri ?? null,
     place_id: result.id,
   };
 }
@@ -193,6 +205,8 @@ async function searchPlaces(
   }
 
   // Fields to request (controls billing)
+  // Note: nationalPhoneNumber, internationalPhoneNumber, websiteUri are Contact fields
+  // weekdayDescriptions requires regularOpeningHours to be included
   const fieldMask = [
     "places.id",
     "places.displayName",
@@ -203,6 +217,9 @@ async function searchPlaces(
     "places.types",
     "places.location",
     "places.regularOpeningHours",
+    "places.nationalPhoneNumber",
+    "places.internationalPhoneNumber",
+    "places.websiteUri",
   ].join(",");
 
   const response = await fetch(baseUrl, {
