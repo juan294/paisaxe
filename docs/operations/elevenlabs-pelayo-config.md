@@ -1,7 +1,8 @@
 # ElevenLabs Pelayo Agent Configuration
 
 > **Last Updated:** 2026-02-04
-> **Agent ID:** `agent_3101kg5bvnf4f1r94f0cav0v9y61`
+> **Agent ID (Guide):** `agent_3101kg5bvnf4f1r94f0cav0v9y61`
+> **Agent ID (Booking):** `agent_5201kgm2956ge8ct95yxjas867z5`
 
 Pelayo is the primary voice agent for Paisaxe immersive stories - a warm and knowledgeable tourism guide for Asturias, Spain.
 
@@ -936,6 +937,155 @@ npm run dev
 }
 ```
 
+---
+
+## SMS Booking Confirmation
+
+After the booking agent completes a call, ElevenLabs sends a post-call webhook to notify the system of the outcome. The webhook handler analyzes the call transcript and sends an SMS to the customer.
+
+### Architecture
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  make-booking   │───▶│  pending_bookings │───▶│   ElevenLabs    │
+│    endpoint     │    │     (Supabase)    │    │  booking agent  │
+└─────────────────┘    └──────────────────┘    └────────┬────────┘
+                                                        │
+                              ┌──────────────────┐      │ call ends
+                              │  /api/webhooks/  │◀─────┘
+                              │    elevenlabs    │
+                              └────────┬─────────┘
+                                       │
+                       ┌───────────────┴───────────────┐
+                       ▼                               ▼
+              ┌─────────────────┐            ┌─────────────────┐
+              │  Update booking │            │   Send SMS via  │
+              │     status      │            │     Twilio      │
+              └─────────────────┘            └─────────────────┘
+```
+
+### Post-Call Webhook
+
+**Endpoint:** `/api/webhooks/elevenlabs`
+**Source:** `src/app/api/webhooks/elevenlabs/route.ts`
+
+The webhook receives `post_call_transcription` events from ElevenLabs containing:
+- `conversation_id` - Links to pending_booking record
+- `transcript` - Full conversation text
+- `analysis.call_successful` - Whether the call connected
+- `analysis.transcript_summary` - AI summary of the call
+
+### Outcome Detection
+
+The handler analyzes the transcript for keywords to determine booking status:
+
+| Outcome | Keywords (Spanish) |
+|---------|-------------------|
+| **confirmed** | confirmado, reservado, perfecto, le esperamos, apuntado |
+| **denied** | completo, no tenemos, no hay, lleno, cerrado |
+| **no_answer** | buzón, voicemail, no contesta, ocupado |
+| **failed** | (default if no patterns match) |
+
+### SMS Templates
+
+**Confirmed:**
+```
+✓ Reserva confirmada
+
+Casa Gerardo
+📅 Hoy, 21:00
+👥 4 personas
+📞 +34 985 88 77 97
+
+— Pelayo (paisaxe.es)
+```
+
+**Denied:**
+```
+✗ No disponible
+
+Casa Gerardo no tiene mesa para 4 personas hoy a las 21:00.
+
+Puedes llamarles directamente: +34 985 88 77 97
+
+— Pelayo (paisaxe.es)
+```
+
+**No Answer:**
+```
+📞 Sin respuesta
+
+No pudimos contactar con Casa Gerardo.
+
+Prueba a llamar directamente: +34 985 88 77 97
+
+— Pelayo (paisaxe.es)
+```
+
+### ElevenLabs Webhook Configuration
+
+Configure the webhook in the ElevenLabs dashboard:
+
+1. Go to the **Pelayo (Booking)** agent
+2. Navigate to **Security** tab
+3. Find **Post-call Webhook** section
+4. Click **Create Webhook**
+5. Configure:
+   - **Name:** `Paisaxe Booking SMS`
+   - **URL:** `https://paisaxe.es/api/webhooks/elevenlabs`
+   - **Auth Method:** HMAC
+6. Enable webhook events:
+   - ✅ **Transcript** - Required for outcome detection
+   - ❌ **Audio** - Not needed
+   - ✅ **Call Initiation Failures** - Notifies customer if call fails to connect
+7. Copy the **webhook secret** and add to environment:
+   - Local: `ELEVENLABS_WEBHOOK_SECRET=wsec_...` in `.env.local`
+   - Production: `vercel env add ELEVENLABS_WEBHOOK_SECRET production`
+
+### Feature Flags
+
+| Flag | Purpose |
+|------|---------|
+| `booking_system` | Master toggle for booking calls |
+| `sms_booking_confirmation` | Toggle SMS notifications after calls |
+
+Both must be enabled for SMS to be sent. The booking call will still work if only `booking_system` is enabled.
+
+### Database: `pending_bookings` Table
+
+Tracks booking requests for webhook correlation:
+
+```sql
+CREATE TABLE pending_bookings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id TEXT UNIQUE NOT NULL,  -- From ElevenLabs
+  venue_name TEXT NOT NULL,
+  venue_phone TEXT NOT NULL,
+  customer_name TEXT NOT NULL,
+  customer_phone TEXT NOT NULL,          -- SMS destination (E.164)
+  party_size INTEGER NOT NULL,
+  booking_date TEXT NOT NULL,
+  booking_time TEXT NOT NULL,
+  special_requests TEXT,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending/confirmed/denied/no_answer/failed
+  outcome_message TEXT,                   -- SMS content sent
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Migrations:**
+- `053_pending_bookings.sql` - Creates table
+- `054_sms_confirmation_flag.sql` - Adds feature flag
+
+### Cost Estimate
+
+| Item | Cost |
+|------|------|
+| Twilio SMS to Spain | ~€0.07/message |
+| Expected volume (beta) | ~100 bookings/month |
+| Monthly estimate | ~€7/month |
+
 ### Environment Variables Required
 
 ```
@@ -946,6 +1096,12 @@ GOOGLE_PLACES_API_KEY=     # Places API (New)
 ELEVENLABS_API_KEY=        # ElevenLabs API key
 ELEVENLABS_PHONE_NUMBER_ID= # ElevenLabs phone number ID
 ELEVENLABS_BOOKING_AGENT_ID= # Pelayo (Booking) agent ID
+
+# SMS Booking Confirmation (Optional)
+ELEVENLABS_WEBHOOK_SECRET= # Webhook signing secret for post-call webhooks
+TWILIO_ACCOUNT_SID=        # Twilio account for SMS
+TWILIO_AUTH_TOKEN=         # Twilio auth token
+TWILIO_PHONE_NUMBER=       # Twilio phone number (E.164 format)
 ```
 
 ---
@@ -984,6 +1140,13 @@ ELEVENLABS_BOOKING_AGENT_ID= # Pelayo (Booking) agent ID
 - [ ] Fallback: When not configured, Pelayo provides phone number to user
 - [ ] Error handling: If call fails, Pelayo provides fallback options
 
+### SMS Confirmation Flow
+- [ ] Pending booking created: Check `pending_bookings` table after call initiated
+- [ ] Webhook received: Check Vercel logs for `[elevenlabs-webhook]` entries
+- [ ] Outcome detected: Verify correct status (confirmed/denied/no_answer/failed)
+- [ ] SMS sent: Customer receives SMS with booking result
+- [ ] Database updated: `pending_bookings.status` and `outcome_message` populated
+
 ---
 
 ## Files Reference
@@ -996,11 +1159,15 @@ ELEVENLABS_BOOKING_AGENT_ID= # Pelayo (Booking) agent ID
 | `src/app/api/mcp/places/route.ts` | Places webhook endpoint (includes phone numbers) |
 | `src/app/api/mcp/make-booking/route.ts` | Booking via ElevenLabs/Twilio outbound calls |
 | `src/app/api/mcp/make-booking/status/route.ts` | Twilio call status callback |
+| `src/app/api/webhooks/elevenlabs/route.ts` | Post-call webhook for SMS confirmation |
+| `src/lib/twilio-sms.ts` | Twilio SMS utility and message templates |
 | `scripts/tunnel.sh` | Cloudflare tunnel startup script |
 | `scripts/update-pelayo-prompt.ts` | Script to update agent prompt via API |
 | `scripts/elevenlabs-places-tool.json` | ElevenLabs tool schema for places search |
 | `scripts/elevenlabs-weather-tool.json` | ElevenLabs tool schema for weather |
 | `scripts/elevenlabs-make-booking-tool.json` | ElevenLabs tool schema for booking |
+| `supabase/migrations/053_pending_bookings.sql` | Pending bookings table |
+| `supabase/migrations/054_sms_confirmation_flag.sql` | SMS confirmation feature flag |
 
 ---
 
