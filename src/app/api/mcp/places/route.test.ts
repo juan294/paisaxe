@@ -8,6 +8,34 @@ global.fetch = mockFetch;
 // Mock environment variable
 const originalEnv = process.env;
 
+// Helper to create Places API (New) response format
+function createPlacesApiResponse(places: Array<{
+  name: string;
+  address: string;
+  rating?: number;
+  reviewsCount?: number;
+  priceLevel?: string;
+  types?: string[];
+  lat: number;
+  lng: number;
+  openNow?: boolean;
+  id: string;
+}>) {
+  return {
+    places: places.map((p) => ({
+      id: p.id,
+      displayName: { text: p.name, languageCode: "es" },
+      formattedAddress: p.address,
+      rating: p.rating,
+      userRatingCount: p.reviewsCount,
+      priceLevel: p.priceLevel,
+      types: p.types || ["restaurant", "food", "establishment"],
+      location: { latitude: p.lat, longitude: p.lng },
+      regularOpeningHours: p.openNow !== undefined ? { openNow: p.openNow } : undefined,
+    })),
+  };
+}
+
 describe("/api/mcp/places", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -20,33 +48,30 @@ describe("/api/mcp/places", () => {
 
   describe("GET", () => {
     it("should return places for a valid search query", async () => {
-      const mockPlacesResponse = {
-        results: [
-          {
-            name: "Casa Gerardo",
-            formatted_address: "Carretera AS-19, Prendes, Asturias",
-            rating: 4.5,
-            user_ratings_total: 1200,
-            price_level: 3,
-            types: ["restaurant", "food", "establishment"],
-            geometry: { location: { lat: 43.5234, lng: -5.7891 } },
-            opening_hours: { open_now: true },
-            place_id: "ChIJ123abc",
-          },
-          {
-            name: "El Molín de la Pedrera",
-            formatted_address: "Gijón, Asturias",
-            rating: 4.3,
-            user_ratings_total: 800,
-            price_level: 2,
-            types: ["restaurant", "food", "establishment"],
-            geometry: { location: { lat: 43.5453, lng: -5.6619 } },
-            opening_hours: { open_now: false },
-            place_id: "ChIJ456def",
-          },
-        ],
-        status: "OK",
-      };
+      const mockPlacesResponse = createPlacesApiResponse([
+        {
+          name: "Casa Gerardo",
+          address: "Carretera AS-19, Prendes, Asturias",
+          rating: 4.5,
+          reviewsCount: 1200,
+          priceLevel: "PRICE_LEVEL_EXPENSIVE",
+          lat: 43.5234,
+          lng: -5.7891,
+          openNow: true,
+          id: "ChIJ123abc",
+        },
+        {
+          name: "El Molín de la Pedrera",
+          address: "Gijón, Asturias",
+          rating: 4.3,
+          reviewsCount: 800,
+          priceLevel: "PRICE_LEVEL_MODERATE",
+          lat: 43.5453,
+          lng: -5.6619,
+          openNow: false,
+          id: "ChIJ456def",
+        },
+      ]);
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -64,7 +89,7 @@ describe("/api/mcp/places", () => {
       expect(data.places[0]).toMatchObject({
         name: "Casa Gerardo",
         rating: 4.5,
-        price_level: 3,
+        price_level: 3, // PRICE_LEVEL_EXPENSIVE = 3
       });
     });
 
@@ -93,11 +118,7 @@ describe("/api/mcp/places", () => {
     it("should filter by type when provided", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () =>
-          Promise.resolve({
-            results: [],
-            status: "ZERO_RESULTS",
-          }),
+        json: () => Promise.resolve({ places: [] }),
       });
 
       const request = new Request(
@@ -105,19 +126,20 @@ describe("/api/mcp/places", () => {
       );
       await GET(request);
 
+      // Places API (New) uses POST with JSON body
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("type=bar")
+        "https://places.googleapis.com/v1/places:searchText",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"includedType":"bar"'),
+        })
       );
     });
 
     it("should default search to Asturias region", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () =>
-          Promise.resolve({
-            results: [],
-            status: "ZERO_RESULTS",
-          }),
+        json: () => Promise.resolve({ places: [] }),
       });
 
       const request = new Request(
@@ -125,20 +147,16 @@ describe("/api/mcp/places", () => {
       );
       await GET(request);
 
-      // Should include Asturias center coordinates
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("location=43.36")
-      );
+      // Should include Asturias center coordinates in locationBias
+      const call = mockFetch.mock.calls[0];
+      const body = JSON.parse(call[1].body);
+      expect(body.locationBias.circle.center.latitude).toBeCloseTo(43.3619, 2);
     });
 
     it("should support location-specific searches", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () =>
-          Promise.resolve({
-            results: [],
-            status: "ZERO_RESULTS",
-          }),
+        json: () => Promise.resolve({ places: [] }),
       });
 
       const request = new Request(
@@ -147,29 +165,26 @@ describe("/api/mcp/places", () => {
       await GET(request);
 
       // Should use Gijón coordinates
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("location=43.5453")
-      );
+      const call = mockFetch.mock.calls[0];
+      const body = JSON.parse(call[1].body);
+      expect(body.locationBias.circle.center.latitude).toBeCloseTo(43.5453, 2);
     });
   });
 
   describe("POST", () => {
     it("should support MCP tool call format", async () => {
-      const mockPlacesResponse = {
-        results: [
-          {
-            name: "Sidrería Tierra Astur",
-            formatted_address: "Oviedo, Asturias",
-            rating: 4.2,
-            user_ratings_total: 500,
-            price_level: 2,
-            types: ["restaurant", "bar"],
-            geometry: { location: { lat: 43.3619, lng: -5.8494 } },
-            place_id: "ChIJ789ghi",
-          },
-        ],
-        status: "OK",
-      };
+      const mockPlacesResponse = createPlacesApiResponse([
+        {
+          name: "Sidrería Tierra Astur",
+          address: "Oviedo, Asturias",
+          rating: 4.2,
+          reviewsCount: 500,
+          priceLevel: "PRICE_LEVEL_MODERATE",
+          lat: 43.3619,
+          lng: -5.8494,
+          id: "ChIJ789ghi",
+        },
+      ]);
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
