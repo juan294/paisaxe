@@ -92,6 +92,7 @@ const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
   // Voice - AI assistant
   visitor_voice_agent: "voice",
   booking_system: "voice",
+  sms_booking_confirmation: "voice",
   // System - settings and maintenance
   maintenance_mode: "system",
   // Agents - automated background agents

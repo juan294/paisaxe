@@ -8,7 +8,17 @@ global.fetch = mockFetch;
 // Mock feature flag
 const mockIsFeatureFlagEnabled = vi.fn();
 vi.mock("@/lib/feature-flags-server", () => ({
-  isFeatureFlagEnabled: () => mockIsFeatureFlagEnabled(),
+  isFeatureFlagEnabled: (key: string) => mockIsFeatureFlagEnabled(key),
+}));
+
+// Mock Supabase
+const mockInsert = vi.fn();
+vi.mock("@/lib/supabase", () => ({
+  createAdminClient: vi.fn(() => ({
+    from: vi.fn(() => ({
+      insert: mockInsert,
+    })),
+  })),
 }));
 
 // Mock environment variable
@@ -17,8 +27,14 @@ const originalEnv = process.env;
 describe("/api/mcp/make-booking", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    // Default: Feature flag enabled, ElevenLabs outbound not configured
-    mockIsFeatureFlagEnabled.mockResolvedValue(true);
+    // Default: Feature flags enabled, ElevenLabs outbound not configured
+    mockIsFeatureFlagEnabled.mockImplementation((key: string) => {
+      if (key === "booking_system") return Promise.resolve(true);
+      if (key === "sms_booking_confirmation") return Promise.resolve(true);
+      return Promise.resolve(false);
+    });
+    // Default: DB insert succeeds
+    mockInsert.mockResolvedValue({ error: null });
     process.env = { ...originalEnv };
     delete process.env.ELEVENLABS_API_KEY;
     delete process.env.ELEVENLABS_PHONE_NUMBER_ID;
@@ -59,7 +75,10 @@ describe("/api/mcp/make-booking", () => {
 
   describe("POST", () => {
     it("should return fallback message when booking_system flag is disabled", async () => {
-      mockIsFeatureFlagEnabled.mockResolvedValue(false);
+      mockIsFeatureFlagEnabled.mockImplementation((key: string) => {
+        if (key === "booking_system") return Promise.resolve(false);
+        return Promise.resolve(true);
+      });
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
@@ -361,6 +380,151 @@ describe("/api/mcp/make-booking", () => {
       expect(body.conversation_initiation_client_data.dynamic_variables.customer_phone).toBe(
         "672172383"
       );
+    });
+
+    it("should store pending booking after successful call initiation", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_123456789" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+          special_requests: "Trona para bebé",
+        }),
+      });
+
+      await POST(request);
+
+      // Verify pending booking was stored
+      expect(mockInsert).toHaveBeenCalledWith({
+        conversation_id: "conv_123456789",
+        venue_name: "Casa Gerardo",
+        venue_phone: "+34985887797",
+        customer_name: "Juan García López",
+        customer_phone: "+34612345678",
+        party_size: 4,
+        booking_date: "hoy",
+        booking_time: "21:00",
+        special_requests: "Trona para bebé",
+        status: "pending",
+      });
+    });
+
+    it("should include SMS note in message when sms_booking_confirmation is enabled", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_123456789" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(data.message).toContain("I'll send you an SMS");
+      expect(data.message).toContain("+34612345678");
+    });
+
+    it("should not include SMS note when sms_booking_confirmation is disabled", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockIsFeatureFlagEnabled.mockImplementation((key: string) => {
+        if (key === "booking_system") return Promise.resolve(true);
+        if (key === "sms_booking_confirmation") return Promise.resolve(false);
+        return Promise.resolve(false);
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_123456789" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(data.message).not.toContain("SMS");
+    });
+
+    it("should handle pending booking insert failure gracefully", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_123456789" }),
+      });
+
+      // Simulate DB error
+      mockInsert.mockResolvedValueOnce({ error: { message: "Database error" } });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Call should still succeed even if DB insert fails
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe("initiated");
     });
   });
 });
