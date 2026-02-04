@@ -120,7 +120,8 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-md bg-white/10 border-white/20 text-white backdrop-blur-xl rounded-2xl"
+        className="sm:max-w-md bg-white/10 border border-white/20 text-white backdrop-blur-xl rounded-2xl shadow-lg"
+        overlayClassName="bg-black/40 backdrop-blur-sm"
         onClick={(e) => e.stopPropagation()}
       >
         <DialogHeader>
@@ -182,7 +183,7 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
                 >
                   <SelectValue placeholder={t("suggestions.location_placeholder")} />
                 </SelectTrigger>
-                <SelectContent className="bg-black/90 border-white/20 text-white">
+                <SelectContent className="bg-white/10 backdrop-blur-xl border-white/20 text-white">
                   <SelectItem value="eastern">{t("suggestions.location_eastern")}</SelectItem>
                   <SelectItem value="central">{t("suggestions.location_central")}</SelectItem>
                   <SelectItem value="western">{t("suggestions.location_western")}</SelectItem>
