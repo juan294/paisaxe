@@ -131,7 +131,7 @@ export function FeatureTogglesPanel() {
   const [error, setError] = useState("");
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<FlagCategory>("system");
+  const [activeCategory, setActiveCategory] = useState<FlagCategory>("agents");
   const [searchQuery, setSearchQuery] = useState("");
   const [agentLastRuns, setAgentLastRuns] = useState<Record<string, string>>({});
 
