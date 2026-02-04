@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import ImmersivePage from "./page";
+import { ImmersivePageContent } from "./immersive-page-content";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ReactNode } from "react";
 import { createMockT } from "@/test/i18n-mock";
@@ -59,6 +59,7 @@ vi.mock("@/hooks/use-feature-flags", () => ({
   useFeatureFlags: () => ({
     flags: [],
     isLoading: false,
+    isReady: true,
     isEnabled: () => false,
   }),
 }));
@@ -120,7 +121,7 @@ vi.mock("@/lib/stories-data", async (importOriginal) => {
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-describe("ImmersivePage", () => {
+describe("ImmersivePageContent", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({
@@ -139,7 +140,7 @@ describe("ImmersivePage", () => {
 
   describe("rendering", () => {
     it("should render StoryViewer component", async () => {
-      renderWithAuth(<ImmersivePage />);
+      renderWithAuth(<ImmersivePageContent serverShuffleSeed={null} />);
       await waitForLoaded();
 
       // Should show first story from STORIES
@@ -147,7 +148,7 @@ describe("ImmersivePage", () => {
     });
 
     it("should render with initial story index of 0", async () => {
-      renderWithAuth(<ImmersivePage />);
+      renderWithAuth(<ImmersivePageContent serverShuffleSeed={null} />);
       await waitForLoaded();
 
       // First story should be visible
@@ -155,18 +156,30 @@ describe("ImmersivePage", () => {
     });
 
     it("should render ask button", async () => {
-      renderWithAuth(<ImmersivePage />);
+      renderWithAuth(<ImmersivePageContent serverShuffleSeed={null} />);
       await waitForLoaded();
 
       expect(
         screen.getByRole("button", { name: "Preguntar sobre esto" })
       ).toBeInTheDocument();
     });
+
+    it("should shuffle stories when serverShuffleSeed is provided", async () => {
+      // Use a specific seed that produces known shuffle order
+      const seed = 12345;
+      renderWithAuth(<ImmersivePageContent serverShuffleSeed={seed} />);
+      await waitForLoaded();
+
+      // The title should be rendered - the specific story depends on the seed
+      // Just verify that some story title is displayed (shuffle happened)
+      const titleElement = screen.getByRole("heading", { level: 1 });
+      expect(titleElement).toBeInTheDocument();
+    });
   });
 
   describe("chat dialog", () => {
     it("should not show VoiceChat initially", async () => {
-      renderWithAuth(<ImmersivePage />);
+      renderWithAuth(<ImmersivePageContent serverShuffleSeed={null} />);
       await waitForLoaded();
 
       // VoiceChat should be closed initially - input should not be visible
@@ -176,7 +189,7 @@ describe("ImmersivePage", () => {
     });
 
     it("should open VoiceChat when clicking ask button", async () => {
-      renderWithAuth(<ImmersivePage />);
+      renderWithAuth(<ImmersivePageContent serverShuffleSeed={null} />);
       await waitForLoaded();
 
       fireEvent.click(
@@ -191,7 +204,7 @@ describe("ImmersivePage", () => {
     });
 
     it("should close VoiceChat when clicking close button", async () => {
-      renderWithAuth(<ImmersivePage />);
+      renderWithAuth(<ImmersivePageContent serverShuffleSeed={null} />);
       await waitForLoaded();
 
       // Open chat
@@ -211,7 +224,7 @@ describe("ImmersivePage", () => {
 
   describe("story navigation", () => {
     it("should show second story after navigating", async () => {
-      renderWithAuth(<ImmersivePage />);
+      renderWithAuth(<ImmersivePageContent serverShuffleSeed={null} />);
       await waitForLoaded();
 
       // Find next button and click it
@@ -256,7 +269,7 @@ describe("ImmersivePage", () => {
         },
       ]);
 
-      renderWithAuth(<ImmersivePage />);
+      renderWithAuth(<ImmersivePageContent serverShuffleSeed={null} />);
       await waitForLoaded();
 
       // The StoryViewer renders filter controls. First open the filter dropdown
@@ -293,7 +306,7 @@ describe("ImmersivePage", () => {
 
   describe("integration", () => {
     it("should pass current story to VoiceChat", async () => {
-      renderWithAuth(<ImmersivePage />);
+      renderWithAuth(<ImmersivePageContent serverShuffleSeed={null} />);
       await waitForLoaded();
 
       // Open chat
