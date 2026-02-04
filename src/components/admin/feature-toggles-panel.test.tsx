@@ -102,9 +102,9 @@ describe("FeatureTogglesPanel", () => {
         expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
-      // Switch to All tab to see all flags
-      const allTab = screen.getByRole("button", { name: /all/i });
-      await user.click(allTab);
+      // Switch to Voice tab to see voice flags
+      const voiceTab = screen.getByRole("button", { name: /voice/i });
+      await user.click(voiceTab);
 
       const searchInput = screen.getByPlaceholderText(/search/i);
       await user.type(searchInput, "voice");
@@ -141,15 +141,14 @@ describe("FeatureTogglesPanel", () => {
         expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
-      // Switch to All tab
-      const allTab = screen.getByRole("button", { name: /all/i });
-      await user.click(allTab);
+      // Switch to Experience tab (where Ambient Discovery is)
+      const experienceTab = screen.getByRole("button", { name: /experience/i });
+      await user.click(experienceTab);
 
       const searchInput = screen.getByPlaceholderText(/search/i);
       await user.type(searchInput, "AMBIENT");
 
       expect(screen.getByText("Ambient Discovery")).toBeInTheDocument();
-      expect(screen.queryByText("Contextual Prompts")).not.toBeInTheDocument();
     });
 
     it("shows no results message when search has no matches", async () => {
@@ -237,7 +236,7 @@ describe("FeatureTogglesPanel", () => {
       expect(screen.queryByText("Related Stories")).not.toBeInTheDocument();
     });
 
-    it("shows all flags when All tab is clicked", async () => {
+    it("shows different flags when switching category tabs", async () => {
       const user = userEvent.setup();
       render(<FeatureTogglesPanel />);
 
@@ -245,14 +244,14 @@ describe("FeatureTogglesPanel", () => {
         expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
-      // Click on All tab
-      const allTab = screen.getByRole("button", { name: /all/i });
-      await user.click(allTab);
+      // Click on Discovery tab
+      const discoveryTab = screen.getByRole("button", { name: /discovery/i });
+      await user.click(discoveryTab);
 
-      // Should show all flags
+      // Should show discovery flags
       expect(screen.getByText("Contextual Prompts")).toBeInTheDocument();
       expect(screen.getByText("Related Stories")).toBeInTheDocument();
-      expect(screen.getByText("Ambient Discovery")).toBeInTheDocument();
+      expect(screen.queryByText("Maintenance Mode")).not.toBeInTheDocument();
     });
 
     it("displays correct enabled/total count", async () => {
@@ -272,8 +271,9 @@ describe("FeatureTogglesPanel", () => {
         expect(screen.getByText("Maintenance Mode")).toBeInTheDocument();
       });
 
-      const toggleButtons = screen.getAllByRole("switch");
-      await user.click(toggleButtons[0]);
+      // Find the toggle specifically labeled for Maintenance Mode
+      const maintenanceToggle = screen.getByRole("switch", { name: /toggle maintenance mode/i });
+      await user.click(maintenanceToggle);
 
       // Maintenance Mode is initially false, so clicking toggle should enable it (true)
       expect(updateFeatureFlag).toHaveBeenCalledWith("maintenance_mode", true);

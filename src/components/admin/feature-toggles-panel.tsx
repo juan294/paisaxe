@@ -19,9 +19,11 @@ import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import { VisitorVoiceConfigPanel } from "./visitor-voice-config-panel";
 import { AgentConfigPanel } from "./agent-config-panel";
 import { MaintenanceConfigPanel } from "./maintenance-config-panel";
+import { TunnelControlPanel } from "./tunnel-control-panel";
+import { Bot } from "lucide-react";
 
 // Feature flag categories
-type FlagCategory = "discovery" | "experience" | "social" | "voice" | "system";
+type FlagCategory = "discovery" | "experience" | "social" | "voice" | "system" | "agents";
 
 interface CategoryConfig {
   key: FlagCategory;
@@ -59,7 +61,13 @@ const CATEGORIES: CategoryConfig[] = [
     key: "system",
     label: "System",
     icon: <Cog className="h-4 w-4" />,
-    description: "Administrative controls",
+    description: "System settings and maintenance",
+  },
+  {
+    key: "agents",
+    label: "Agents",
+    icon: <Bot className="h-4 w-4" />,
+    description: "Automated background agents",
   },
 ];
 
@@ -83,15 +91,16 @@ const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
   user_story_suggestions: "social",
   // Voice - AI assistant
   visitor_voice_agent: "voice",
-  // System - admin controls
+  // System - settings and maintenance
   maintenance_mode: "system",
-  automated_agents: "system",
-  coverage_agent_enabled: "system",
-  security_agent_enabled: "system",
-  documentation_agent_enabled: "system",
-  performance_agent_enabled: "system",
-  qa_agent_enabled: "system",
-  localization_agent_enabled: "system",
+  // Agents - automated background agents
+  automated_agents: "agents",
+  coverage_agent_enabled: "agents",
+  security_agent_enabled: "agents",
+  documentation_agent_enabled: "agents",
+  performance_agent_enabled: "agents",
+  qa_agent_enabled: "agents",
+  localization_agent_enabled: "agents",
 };
 
 // Flags that have configurable settings
@@ -122,7 +131,7 @@ export function FeatureTogglesPanel() {
   const [error, setError] = useState("");
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<FlagCategory | "all">("system");
+  const [activeCategory, setActiveCategory] = useState<FlagCategory>("system");
   const [searchQuery, setSearchQuery] = useState("");
   const [agentLastRuns, setAgentLastRuns] = useState<Record<string, string>>({});
 
@@ -208,6 +217,7 @@ export function FeatureTogglesPanel() {
       social: [],
       voice: [],
       system: [],
+      agents: [],
     };
 
     flags.forEach((flag) => {
@@ -222,13 +232,14 @@ export function FeatureTogglesPanel() {
 
   // Count enabled flags per category
   const enabledByCategory = useMemo(() => {
-    const counts: Record<FlagCategory | "all", { enabled: number; total: number }> = {
+    const counts: Record<FlagCategory, { enabled: number; total: number }> & { all: { enabled: number; total: number } } = {
       all: { enabled: 0, total: 0 },
       discovery: { enabled: 0, total: 0 },
       experience: { enabled: 0, total: 0 },
       social: { enabled: 0, total: 0 },
       voice: { enabled: 0, total: 0 },
       system: { enabled: 0, total: 0 },
+      agents: { enabled: 0, total: 0 },
     };
 
     flags.forEach((flag) => {
@@ -248,7 +259,7 @@ export function FeatureTogglesPanel() {
 
   // Filter flags based on active category and search query
   const filteredFlags = useMemo(() => {
-    let result = activeCategory === "all" ? flags : flagsByCategory[activeCategory];
+    let result = flagsByCategory[activeCategory];
 
     // Apply search filter
     if (searchQuery) {
@@ -267,7 +278,7 @@ export function FeatureTogglesPanel() {
     }
 
     return result;
-  }, [flags, flagsByCategory, activeCategory, searchQuery]);
+  }, [flagsByCategory, activeCategory, searchQuery]);
 
   if (isLoading && flags.length === 0) {
     return (
@@ -348,33 +359,19 @@ export function FeatureTogglesPanel() {
             </span>
           </button>
         ))}
-        <button
-          onClick={() => setActiveCategory("all")}
-          className={cn(
-            "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
-            activeCategory === "all"
-              ? "bg-[#2d2a26] text-[#f5f3ee] dark:bg-[#f5f3ee] dark:text-[#2d2a26]"
-              : "text-[#6b6560] hover:bg-white dark:text-[#a39e98] dark:hover:bg-[#252320]"
-          )}
-        >
-          All
-          <span className={cn(
-            "rounded-full px-2 py-0.5 text-xs tabular-nums",
-            activeCategory === "all"
-              ? "bg-[#1a1917] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
-              : "bg-[#e5e3de] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
-          )}>
-            {enabledByCategory.all.enabled}/{enabledByCategory.all.total}
-          </span>
-        </button>
         </div>
       </div>
 
       {/* Category Description */}
-      {activeCategory !== "all" && (
-        <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
-          {CATEGORIES.find((c) => c.key === activeCategory)?.description}
-        </p>
+      <p className="text-sm text-[#6b6560] dark:text-[#a39e98]">
+        {CATEGORIES.find((c) => c.key === activeCategory)?.description}
+      </p>
+
+      {/* Dev Tunnel Control (System category only) */}
+      {activeCategory === "system" && (
+        <div className="rounded-2xl bg-white px-6 dark:bg-[#252320]">
+          <TunnelControlPanel />
+        </div>
       )}
 
       {/* Flags Table */}
@@ -390,7 +387,7 @@ export function FeatureTogglesPanel() {
             <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
               <th className="w-12 pb-3 text-center font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">#</th>
               <th className="w-[240px] pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
-                {activeCategory === "system" ? "Agent" : "Feature"}
+                {activeCategory === "agents" ? "Agent" : activeCategory === "system" ? "Setting" : "Feature"}
               </th>
               <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Description</th>
               <th className="w-24 pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Last Run</th>
