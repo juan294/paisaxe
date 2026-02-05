@@ -221,7 +221,7 @@ export const en: Translations = {
     feature_24h: '24 hours of unlimited conversations',
     feature_unlimited: 'Ask unlimited questions',
     feature_realtime: 'Real-time weather and recommendations',
-    feature_booking: 'Books restaurants and hotels for you',
+    feature_booking: 'Pelayo books restaurants and hotels for you',
     per_day: '/ day',
     sign_in_to_purchase: 'Sign in to purchase',
     secure_payment: 'Secure payment via Stripe',

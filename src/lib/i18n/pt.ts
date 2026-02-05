@@ -214,7 +214,7 @@ export const pt: Translations = {
     feature_24h: '24 horas de conversas ilimitadas',
     feature_unlimited: 'Perguntas ilimitadas',
     feature_realtime: 'Clima e recomendações em tempo real',
-    feature_booking: 'Reserva restaurantes e hotéis por si',
+    feature_booking: 'Pelayo reserva restaurantes e hotéis por si',
     per_day: '/ dia',
     sign_in_to_purchase: 'Inicie sessao para comprar',
     secure_payment: 'Pagamento seguro via Stripe',
