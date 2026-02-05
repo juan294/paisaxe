@@ -15,16 +15,18 @@ describe("anthropic-costs", () => {
   });
 
   describe("fetchAnthropicCosts", () => {
-    it("returns null when ANTHROPIC_ADMIN_API_KEY is not set", async () => {
+    it("returns null when no API key is set", async () => {
       delete process.env.ANTHROPIC_ADMIN_API_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
 
       const result = await fetchAnthropicCosts("2024-01-01", "2024-01-31");
 
       expect(result).toBeNull();
     });
 
-    it("returns cost data when API responds successfully", async () => {
-      process.env.ANTHROPIC_ADMIN_API_KEY = "sk-ant-admin-test";
+    it("returns cost data when API responds successfully with ANTHROPIC_API_KEY", async () => {
+      delete process.env.ANTHROPIC_ADMIN_API_KEY;
+      process.env.ANTHROPIC_API_KEY = "sk-ant-api-test";
 
       const mockResponse = {
         data: [
@@ -49,8 +51,31 @@ describe("anthropic-costs", () => {
       expect(result?.costFormatted).toBe("$25.75");
     });
 
-    it("returns null when API returns error", async () => {
+    it("prefers ANTHROPIC_ADMIN_API_KEY over ANTHROPIC_API_KEY", async () => {
       process.env.ANTHROPIC_ADMIN_API_KEY = "sk-ant-admin-test";
+      process.env.ANTHROPIC_API_KEY = "sk-ant-api-test";
+
+      const mockResponse = { data: [] };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      await fetchAnthropicCosts("2024-01-01", "2024-01-31");
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            "x-api-key": "sk-ant-admin-test",
+          }),
+        })
+      );
+    });
+
+    it("returns null when API returns error", async () => {
+      process.env.ANTHROPIC_API_KEY = "sk-ant-api-test";
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: false,
@@ -64,7 +89,7 @@ describe("anthropic-costs", () => {
     });
 
     it("returns null when fetch throws error", async () => {
-      process.env.ANTHROPIC_ADMIN_API_KEY = "sk-ant-admin-test";
+      process.env.ANTHROPIC_API_KEY = "sk-ant-api-test";
 
       global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
 
@@ -75,8 +100,9 @@ describe("anthropic-costs", () => {
   });
 
   describe("fetchAnthropicCostsByDay", () => {
-    it("returns empty array when API key is not set", async () => {
+    it("returns empty array when no API key is set", async () => {
       delete process.env.ANTHROPIC_ADMIN_API_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
 
       const result = await fetchAnthropicCostsByDay("2024-01-01", "2024-01-31");
 
@@ -84,7 +110,7 @@ describe("anthropic-costs", () => {
     });
 
     it("returns daily costs when API responds successfully", async () => {
-      process.env.ANTHROPIC_ADMIN_API_KEY = "sk-ant-admin-test";
+      process.env.ANTHROPIC_API_KEY = "sk-ant-api-test";
 
       const mockResponse = {
         data: [
@@ -106,7 +132,7 @@ describe("anthropic-costs", () => {
     });
 
     it("returns empty array when API fails", async () => {
-      process.env.ANTHROPIC_ADMIN_API_KEY = "sk-ant-admin-test";
+      process.env.ANTHROPIC_API_KEY = "sk-ant-api-test";
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: false,

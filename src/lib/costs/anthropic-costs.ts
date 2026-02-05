@@ -12,17 +12,18 @@ interface AnthropicCostReportResponse {
 }
 
 /**
- * Fetches cost data from Anthropic Admin API.
- * Requires ANTHROPIC_ADMIN_API_KEY environment variable.
+ * Fetches cost data from Anthropic API.
+ * Uses ANTHROPIC_API_KEY (or ANTHROPIC_ADMIN_API_KEY if set).
  * @see https://docs.anthropic.com/en/api/admin-api/cost-report
  */
 export async function fetchAnthropicCosts(
   startDate: string,
   endDate: string
 ): Promise<ServiceCost | null> {
-  const adminKey = process.env.ANTHROPIC_ADMIN_API_KEY?.trim();
+  // Use admin key if available, otherwise fall back to regular API key
+  const apiKey = (process.env.ANTHROPIC_ADMIN_API_KEY || process.env.ANTHROPIC_API_KEY)?.trim();
 
-  if (!adminKey) {
+  if (!apiKey) {
     return null;
   }
 
@@ -37,7 +38,7 @@ export async function fetchAnthropicCosts(
       `https://api.anthropic.com/v1/organizations/cost_report?${params}`,
       {
         headers: {
-          "x-api-key": adminKey,
+          "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
         },
       }
@@ -81,9 +82,9 @@ export async function fetchAnthropicCostsByDay(
   startDate: string,
   endDate: string
 ): Promise<Array<{ date: string; costUsd: number }>> {
-  const adminKey = process.env.ANTHROPIC_ADMIN_API_KEY?.trim();
+  const apiKey = (process.env.ANTHROPIC_ADMIN_API_KEY || process.env.ANTHROPIC_API_KEY)?.trim();
 
-  if (!adminKey) {
+  if (!apiKey) {
     return [];
   }
 
@@ -98,7 +99,7 @@ export async function fetchAnthropicCostsByDay(
       `https://api.anthropic.com/v1/organizations/cost_report?${params}`,
       {
         headers: {
-          "x-api-key": adminKey,
+          "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
         },
       }
