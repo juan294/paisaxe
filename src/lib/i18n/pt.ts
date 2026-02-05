@@ -223,7 +223,7 @@ export const pt: Translations = {
     success_expires: 'O seu acesso e valido ate',
     success_cta: 'Comecar a Falar',
     pricing_title: 'Conversas de Voz',
-    pricing_subtitle: 'Sem digitar. Pergunte o que as fotos não mostram.',
+    pricing_subtitle: 'Sem digitar. Respostas reais. Reservas reais.',
     pricing_cta: 'Obter Passe Diario',
     faq_title: 'Perguntas?',
     faq_what_included: 'O que esta incluido?',

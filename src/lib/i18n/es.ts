@@ -230,7 +230,7 @@ export const es: Translations = {
     success_expires: 'Tu acceso es valido hasta',
     success_cta: 'Empezar a Hablar',
     pricing_title: 'Conversaciones de Voz',
-    pricing_subtitle: 'Sin teclear. Pregunta lo que las fotos no pueden mostrarte.',
+    pricing_subtitle: 'Sin teclear. Respuestas reales. Reservas reales.',
     pricing_cta: 'Obtener Pase Diario',
     faq_title: 'Preguntas?',
     faq_what_included: 'Que incluye?',

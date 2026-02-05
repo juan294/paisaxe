@@ -230,7 +230,7 @@ export const en: Translations = {
     success_expires: 'Your access is valid until',
     success_cta: 'Start Talking',
     pricing_title: 'Voice Conversations',
-    pricing_subtitle: 'Skip the typing. Ask what the photos can\'t show you.',
+    pricing_subtitle: 'No typing. Real answers. Real reservations.',
     pricing_cta: 'Get Day Pass',
     faq_title: 'Questions?',
     faq_what_included: 'What\'s included?',
