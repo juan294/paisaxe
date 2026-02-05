@@ -206,6 +206,18 @@ export const fr: Translations = {
     attribution_hint: 'Si publié, nous vous créditerons ainsi. Laissez vide pour rester anonyme.',
   },
 
+  upsell: {
+    weather_title: 'Pelayo connaît la météo',
+    weather_subtitle: 'Le Pass Vocal inclut la météo en temps réel pour vos plans',
+    booking_title: 'Laissez Pelayo réserver pour vous',
+    booking_subtitle: 'Il peut appeler restaurants et hôtels en votre nom',
+    realtime_title: 'Infos en temps réel',
+    realtime_subtitle: 'Horaires, disponibilité, conditions actuelles',
+    slow_typing_title: 'Sans taper',
+    slow_typing_subtitle: 'Parlez simplement. Pelayo écoute et répond instantanément',
+    try_voice: 'Essayer le Pass Vocal',
+  },
+
   premium: {
     voice_locked: 'Le chat vocal est une fonction premium',
     get_day_pass: 'Obtenir un Pass Jour',

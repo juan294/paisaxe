@@ -206,6 +206,18 @@ export const de: Translations = {
     attribution_hint: 'Bei Veröffentlichung werden wir Sie so nennen. Leer lassen für anonym.',
   },
 
+  upsell: {
+    weather_title: 'Pelayo kennt das Wetter',
+    weather_subtitle: 'Der Sprachpass enthält Echtzeit-Wetter für deine Pläne',
+    booking_title: 'Lass Pelayo für dich buchen',
+    booking_subtitle: 'Er kann Restaurants und Hotels in deinem Namen anrufen',
+    realtime_title: 'Echtzeit-Infos',
+    realtime_subtitle: 'Öffnungszeiten, Verfügbarkeit, aktuelle Bedingungen',
+    slow_typing_title: 'Ohne Tippen',
+    slow_typing_subtitle: 'Einfach sprechen. Pelayo hört zu und antwortet sofort',
+    try_voice: 'Sprachpass testen',
+  },
+
   premium: {
     voice_locked: 'Sprachchat ist eine Premium-Funktion',
     get_day_pass: 'Tagespass Holen',

@@ -12,11 +12,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PrivacyNotice } from "./privacy-notice";
 import { ChatActions } from "./chat-actions";
+import { ChatUpsellCTA } from "./chat-upsell-cta";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
+import {
+  detectUpsellMarker,
+  type UpsellReason,
+} from "@/lib/chat-upsell-detection";
+import {
+  canShowUpsell,
+  recordUpsellShown,
+  recordUpsellDismissed,
+} from "@/lib/chat-upsell-throttle";
 
 interface VoiceChatProps {
   story: Story;
@@ -29,6 +39,10 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   images?: ImageResult[];
+  /** Upsell reason detected in this message, if any */
+  upsellReason?: UpsellReason;
+  /** Whether the upsell CTA for this message was dismissed */
+  upsellDismissed?: boolean;
 }
 
 export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatProps) {
@@ -98,6 +112,20 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
 
   const handleVoiceFallback = useCallback(() => {
     setUseElevenLabs(false);
+  }, []);
+
+  const handleUpsellDismiss = useCallback((messageIndex: number) => {
+    recordUpsellDismissed(messageIndex);
+    setMessages((prev) => {
+      const updated = [...prev];
+      if (updated[messageIndex]) {
+        updated[messageIndex] = {
+          ...updated[messageIndex],
+          upsellDismissed: true,
+        };
+      }
+      return updated;
+    });
   }, []);
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -177,12 +205,27 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                   return updated;
                 });
               } else if (event.type === "done") {
-                // Add images from final event
+                // Process upsell markers and add images from final event
                 setMessages((prev) => {
                   const updated = [...prev];
+                  const currentMsg = updated[assistantIndex];
+                  const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
+                    currentMsg.content
+                  );
+
+                  // Only set upsell reason if user doesn't have voice access and throttle allows
+                  const shouldShowUpsell =
+                    hasUpsell && !canUseVoice && canShowUpsell(assistantIndex);
+
+                  if (shouldShowUpsell) {
+                    recordUpsellShown();
+                  }
+
                   updated[assistantIndex] = {
-                    ...updated[assistantIndex],
+                    ...currentMsg,
+                    content: cleanContent,
                     images: event.images,
+                    upsellReason: shouldShowUpsell ? reason ?? undefined : undefined,
                   };
                   return updated;
                 });
@@ -334,57 +377,66 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                 </div>
               )}
               {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "max-w-[85%] p-3 rounded-2xl",
-                    msg.role === "user"
-                      ? "ml-auto bg-white text-gray-900"
-                      : "bg-white/20 text-white"
-                  )}
-                >
-                  {msg.role === "user" ? (
-                    msg.content
-                  ) : (
-                    <ReactMarkdown
-                      components={{
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                        ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                        li: ({ children }) => <li>{children}</li>,
-                        a: ({ href, children }) => (
-                          <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">
-                            {children}
-                          </a>
-                        ),
-                      }}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
-                  )}
-                  {msg.images && msg.images.length > 0 && (
-                    <div className="mt-3 space-y-3">
-                      {msg.images.map((image) => (
-                        <figure key={image.id} className="overflow-hidden rounded-xl">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={image.path}
-                            alt={image.caption || t("chat.image_alt")}
-                            className="w-full rounded-xl object-cover"
-                            loading="lazy"
-                          />
-                          {image.caption && (
-                            <figcaption className="mt-1.5 text-xs text-white/70">
-                              {image.caption}
-                            </figcaption>
-                          )}
-                          <p className="mt-0.5 text-xs text-white/40">
-                            {t("chat.source")}: {image.sourcePdf}
-                          </p>
-                        </figure>
-                      ))}
-                    </div>
+                <div key={i}>
+                  <div
+                    className={cn(
+                      "max-w-[85%] p-3 rounded-2xl",
+                      msg.role === "user"
+                        ? "ml-auto bg-white text-gray-900"
+                        : "bg-white/20 text-white"
+                    )}
+                  >
+                    {msg.role === "user" ? (
+                      msg.content
+                    ) : (
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                          ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                          li: ({ children }) => <li>{children}</li>,
+                          a: ({ href, children }) => (
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    )}
+                    {msg.images && msg.images.length > 0 && (
+                      <div className="mt-3 space-y-3">
+                        {msg.images.map((image) => (
+                          <figure key={image.id} className="overflow-hidden rounded-xl">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={image.path}
+                              alt={image.caption || t("chat.image_alt")}
+                              className="w-full rounded-xl object-cover"
+                              loading="lazy"
+                            />
+                            {image.caption && (
+                              <figcaption className="mt-1.5 text-xs text-white/70">
+                                {image.caption}
+                              </figcaption>
+                            )}
+                            <p className="mt-0.5 text-xs text-white/40">
+                              {t("chat.source")}: {image.sourcePdf}
+                            </p>
+                          </figure>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {/* Inline upsell CTA for messages with detected upsell triggers */}
+                  {msg.upsellReason && !msg.upsellDismissed && (
+                    <ChatUpsellCTA
+                      reason={msg.upsellReason}
+                      onDismiss={() => handleUpsellDismiss(i)}
+                      className="mt-3"
+                    />
                   )}
                 </div>
               ))}

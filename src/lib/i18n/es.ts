@@ -213,6 +213,18 @@ export const es: Translations = {
     attribution_hint: 'Si se publica, te daremos credito asi. Dejalo vacio para anonimo.',
   },
 
+  upsell: {
+    weather_title: 'Pelayo sabe el tiempo',
+    weather_subtitle: 'El Pase de Voz incluye clima en tiempo real para tus planes',
+    booking_title: 'Deja que Pelayo reserve por ti',
+    booking_subtitle: 'Puede llamar a restaurantes y hoteles en tu nombre',
+    realtime_title: 'Info en tiempo real',
+    realtime_subtitle: 'Horarios de apertura, disponibilidad, condiciones actuales',
+    slow_typing_title: 'Sin teclear',
+    slow_typing_subtitle: 'Solo habla. Pelayo escucha y responde al instante',
+    try_voice: 'Probar Pase de Voz',
+  },
+
   premium: {
     voice_locked: 'El chat de voz es una funcion premium',
     get_day_pass: 'Obtener Pase Diario',

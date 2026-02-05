@@ -213,6 +213,18 @@ export const ast: Translations = {
     attribution_hint: 'Si se publica, dámoste créitu asina. Déxalo balero pa anónimu.',
   },
 
+  upsell: {
+    weather_title: 'Pelayu sabe\'l tiempu',
+    weather_subtitle: 'El Pase de Voz inclúi clima en tiempu real pa los tos planes',
+    booking_title: 'Dexa que Pelayu reserve por ti',
+    booking_subtitle: 'Pue llamar a restaurantes y hoteles nel to nome',
+    realtime_title: 'Info en tiempu real',
+    realtime_subtitle: 'Horarios d\'apertura, disponibilidá, condiciones actuales',
+    slow_typing_title: 'Ensin teclear',
+    slow_typing_subtitle: 'Namás fala. Pelayu escucha y respuende al intre',
+    try_voice: 'Probar Pase de Voz',
+  },
+
   premium: {
     voice_locked: 'El chat de voz ye una función premium',
     get_day_pass: 'Obtener Pase Diariu',
