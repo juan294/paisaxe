@@ -62,7 +62,8 @@ describe("elevenlabs-costs", () => {
       // 10000 chars / 1000 * $0.30 = $3.00
       expect(result?.costUsd).toBe(3.0);
       expect(result?.costFormatted).toBe("$3.00");
-      expect(result?.notes).toContain("10,000 characters");
+      expect(result?.notes).toContain("90,000 / 100,000 credits remaining");
+      expect(result?.notes).toContain("10% used");
     });
 
     it("returns null when API returns error", async () => {
