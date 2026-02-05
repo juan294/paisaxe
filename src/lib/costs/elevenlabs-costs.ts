@@ -71,17 +71,24 @@ export async function fetchElevenLabsCosts(
 
     // Estimate cost based on character usage
     // This gives us the characters used in the current billing period
-    const charactersUsed = data.character_count;
+    const charactersUsed = data.character_count || 0;
     const estimatedCost =
       (charactersUsed / 1000) * ELEVENLABS_PRICING.voiceGenerationPer1kChars;
 
-    // Get the billing period from the API
-    const billingStart = new Date(
-      data.billing_period.start_unix * 1000
-    ).toISOString().split("T")[0];
-    const billingEnd = new Date(
-      data.billing_period.end_unix * 1000
-    ).toISOString().split("T")[0];
+    // Get the billing period from the API (with fallback to current month)
+    const now = new Date();
+    const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const startUnix = data.billing_period?.start_unix;
+    const endUnix = data.billing_period?.end_unix;
+
+    const billingStart = startUnix && startUnix > 0
+      ? new Date(startUnix * 1000).toISOString().split("T")[0]
+      : defaultStart.toISOString().split("T")[0];
+    const billingEnd = endUnix && endUnix > 0
+      ? new Date(endUnix * 1000).toISOString().split("T")[0]
+      : defaultEnd.toISOString().split("T")[0];
 
     return {
       serviceId: PLATFORM_SERVICES.elevenlabs.id,
