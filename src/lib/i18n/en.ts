@@ -213,6 +213,18 @@ export const en: Translations = {
     attribution_hint: 'If published, we\'ll credit you this way. Leave empty to stay anonymous.',
   },
 
+  upsell: {
+    weather_title: 'Pelayo knows the weather',
+    weather_subtitle: 'Voice Pass includes real-time weather for your plans',
+    booking_title: 'Let Pelayo book for you',
+    booking_subtitle: 'He can call restaurants and hotels on your behalf',
+    realtime_title: 'Get real-time info',
+    realtime_subtitle: 'Opening hours, availability, current conditions',
+    slow_typing_title: 'Skip the typing',
+    slow_typing_subtitle: 'Just talk. Pelayo listens and responds instantly',
+    try_voice: 'Try Voice Pass',
+  },
+
   premium: {
     voice_locked: 'Voice chat is a premium feature',
     get_day_pass: 'Get Day Pass',
