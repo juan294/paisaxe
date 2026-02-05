@@ -195,7 +195,7 @@ describe("PricingPage", () => {
     render(<PricingPage />);
 
     expect(screen.getByText("premium.feature_24h")).toBeInTheDocument();
-    expect(screen.getByText("premium.feature_unlimited")).toBeInTheDocument();
+    expect(screen.getByText("premium.feature_booking")).toBeInTheDocument();
   });
 
   it("should render FAQ section", () => {

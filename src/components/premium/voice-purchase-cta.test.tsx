@@ -12,8 +12,8 @@ vi.mock("@/lib/i18n", () => ({
         "premium.voice_title": "Unlock Voice Chat",
         "premium.voice_description": "Talk naturally with our AI guides",
         "premium.feature_24h": "24-hour access",
-        "premium.feature_unlimited": "Unlimited conversations",
         "premium.feature_realtime": "Real-time guidance",
+        "premium.feature_booking": "Books restaurants and hotels for you",
         "premium.per_day": "per day",
         "premium.sign_in_to_purchase": "Sign in to purchase",
         "premium.secure_payment": "Secure payment via Stripe",
@@ -93,7 +93,7 @@ describe("VoicePurchaseCTA", () => {
     it("renders feature list", () => {
       render(<VoicePurchaseCTA />);
       expect(screen.getByText("24-hour access")).toBeInTheDocument();
-      expect(screen.getByText("Unlimited conversations")).toBeInTheDocument();
+      expect(screen.getByText("Books restaurants and hotels for you")).toBeInTheDocument();
     });
 
     it("renders secure payment info", () => {
