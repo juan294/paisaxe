@@ -204,7 +204,107 @@ Essential functionality that must work.
 
 ---
 
-## 11. Stress & Edge Cases 👤
+## 11. Payments & Day Pass (Stripe) 👤
+
+Test the voice access purchase flow using real/test Stripe credentials.
+
+> **Manual only**: Requires real checkout flow, payment processing, and database verification.
+
+**Test Cards (Stripe Test Mode):**
+- Success: `4242 4242 4242 4242` (Visa)
+- Decline: `4000 0000 0000 0002`
+- Auth required: `4000 0025 0000 3155`
+- Expiry: Any future date, CVC: Any 3 digits
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 11.1 | **Pricing page displays correctly** | Visit `/pricing` while logged out | Shows Day Pass offer (€1.99), login prompt for purchase | | |
+| 11.2 | **Auth required for purchase** | Click "Get Day Pass" while logged out | Redirects to sign-in, then back to pricing | | |
+| 11.3 | **Checkout session created** | Sign in, click "Get Day Pass" | Redirects to Stripe Checkout page | | |
+| 11.4 | **Successful payment flow** | Complete payment with test card `4242...` | Redirected to `/pricing/success`, webhook received | | |
+| 11.5 | **Voice access granted after purchase** | After payment, check `/api/voice-access` | Returns `{ hasAccess: true, expiresAt: "..." }` with 24hr expiry | | |
+| 11.6 | **Premium status shown on pricing** | Return to `/pricing` after purchase | Shows "Premium Access" with expiration time | | |
+| 11.7 | **Declined card handling** | Use card `4000 0000 0000 0002` | Stripe shows decline message, no purchase created | | |
+| 11.8 | **Cancelled checkout** | Start checkout, click back/cancel | Returns to `/pricing`, no purchase created | | |
+| 11.9 | **Expired access handling** | Wait for purchase to expire (or manually update DB) | `/api/voice-access` returns `hasAccess: false`, can repurchase | | |
+| 11.10 | **Duplicate purchase protection** | Purchase again while active pass exists | Either extends or shows existing access (no duplicate records) | | |
+| 11.11 | **Webhook signature verification** | Check Stripe Dashboard → Webhooks | All webhooks show successful signature verification | | |
+| 11.12 | **Voice agent gated by access** | Try voice agent without purchase | Shows paywall/upgrade prompt | | |
+
+**Database verification after purchase:**
+```sql
+SELECT * FROM voice_purchases WHERE user_id = 'your-user-id' ORDER BY created_at DESC;
+-- Should show: purchase_type='day_pass', expires_at=~24hrs from now
+```
+
+---
+
+## 12. Restaurant Booking System 👤
+
+Test Pelayo's ability to call restaurants and make reservations.
+
+> **Manual only**: Requires real phone calls via ElevenLabs/Twilio, database verification.
+
+**Prerequisites:**
+- Feature flag `booking_system` enabled
+- Valid ElevenLabs API key and booking agent configured
+- Twilio account connected to ElevenLabs
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 12.1 | **Booking disabled gracefully** | Disable `booking_system` flag, ask Pelayo to book | Pelayo declines, suggests calling directly with phone number | | |
+| 12.2 | **Valid booking request** | Ask: "Book a table at Casa Gerardo for 4 at 9pm tonight, my number is 612345678" | Pelayo initiates call, says "I'm calling now..." | | |
+| 12.3 | **Phone number validation** | Provide invalid phone like "123-456" | Pelayo asks for valid Spanish number | | |
+| 12.4 | **Missing booking details** | Ask to book without party size or time | Pelayo asks for missing information | | |
+| 12.5 | **Pending booking created** | After call initiation, check DB | `pending_bookings` has record with status='pending' | | |
+| 12.6 | **Natural date handling** | Say "book for tomorrow" or "for Friday" | Pelayo understands and uses correct date | | |
+| 12.7 | **Natural time handling** | Say "at nine" or "lunchtime" | Pelayo converts to appropriate time (21:00, 14:00) | | |
+| 12.8 | **Special requests passed** | Say "we need a high chair" | Special request noted in booking and passed to call | | |
+| 12.9 | **Call status tracking** | Monitor call in ElevenLabs dashboard | Call shows queued → in-progress → completed states | | |
+| 12.10 | **Booking confirmation flow** | Restaurant confirms reservation | SMS sent with confirmation details, DB status='confirmed' | | |
+| 12.11 | **Booking denial flow** | Restaurant says "fully booked" | SMS sent with unavailable message, DB status='denied' | | |
+| 12.12 | **No answer flow** | Restaurant doesn't answer | SMS sent with no-answer message, DB status='no_answer' | | |
+| 12.13 | **International number rejection** | Provide French number "+33 6 12 34 56 78" | Rejects as non-Spanish, asks for Spanish number | | |
+
+**Database verification after booking:**
+```sql
+SELECT conversation_id, venue_name, party_size, booking_date, booking_time, status
+FROM pending_bookings ORDER BY created_at DESC LIMIT 5;
+```
+
+---
+
+## 13. SMS Notifications (Twilio) 👤
+
+Test SMS delivery for booking confirmations and alerts.
+
+> **Manual only**: Requires real phone to receive SMS, Twilio account verification.
+
+**Prerequisites:**
+- Feature flag `sms_booking_confirmation` enabled
+- Valid Twilio credentials (Account SID, Auth Token, Phone Number)
+- Phone number to receive test SMS
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 13.1 | **Confirmation SMS received** | Complete successful booking flow | SMS received: "✓ Reserva confirmada" with details | | |
+| 13.2 | **Unavailable SMS received** | Booking denied by restaurant | SMS received: "✗ No disponible" with restaurant phone | | |
+| 13.3 | **No answer SMS received** | Restaurant doesn't answer | SMS received: "📞 Sin respuesta" with direct number | | |
+| 13.4 | **Failed call SMS received** | Call fails to connect | SMS received with error message and fallback | | |
+| 13.5 | **SMS formatting correct** | Check received SMS | Contains venue name, date, time, party size, phone | | |
+| 13.6 | **SMS disabled gracefully** | Disable `sms_booking_confirmation` flag | Booking completes but no SMS sent | | |
+| 13.7 | **Invalid phone number handling** | Booking with malformed customer phone | Call proceeds, SMS fails gracefully (logged, not crash) | | |
+| 13.8 | **Twilio delivery status** | Check Twilio Console → Messages | All messages show "Delivered" status | | |
+| 13.9 | **Health check SMS alerts** | Trigger critical health check failure | QA alert SMS sent to `QA_ALERT_PHONE` | | |
+
+**Twilio Console verification:**
+1. Go to Twilio Console → Messaging → Logs
+2. Verify messages sent from your Twilio number
+3. Check delivery status (Delivered/Failed/Undelivered)
+
+---
+
+## 14. Stress & Edge Cases 👤
 
 Unusual but possible scenarios.
 
@@ -212,14 +312,14 @@ Unusual but possible scenarios.
 
 | # | Test Case | Steps | Expected Behavior | Result | Notes |
 |---|-----------|-------|-------------------|--------|-------|
-| 11.1 | **Emoji overload** | Send message of only emojis (20+) | Handled, maybe playful response | | |
-| 11.2 | **Copy-paste PDF text** | Paste large chunk of PDF content as question | Recognizes, doesn't loop | | |
-| 11.3 | **Recursive question** | "What would you answer if I asked you X?" | Handles meta-questions gracefully | | |
-| 11.4 | **Contradiction challenge** | "You said X before but now Y" (even if false) | Corrects politely, doesn't get defensive | | |
-| 11.5 | **Repeated identical question** | Ask same question 5 times in a row | Answers consistently or notes repetition | | |
-| 11.6 | **API timeout simulation** | Slow network, let request timeout | User sees timeout message, can retry | | |
-| 11.7 | **Browser back during response** | Navigate away mid-stream | No orphaned processes, clean state on return | | |
-| 11.8 | **Multiple tabs same session** | Open chat in 3 tabs, use all | No conflicts, sessions isolated or synced | | |
+| 14.1 | **Emoji overload** | Send message of only emojis (20+) | Handled, maybe playful response | | |
+| 14.2 | **Copy-paste PDF text** | Paste large chunk of PDF content as question | Recognizes, doesn't loop | | |
+| 14.3 | **Recursive question** | "What would you answer if I asked you X?" | Handles meta-questions gracefully | | |
+| 14.4 | **Contradiction challenge** | "You said X before but now Y" (even if false) | Corrects politely, doesn't get defensive | | |
+| 14.5 | **Repeated identical question** | Ask same question 5 times in a row | Answers consistently or notes repetition | | |
+| 14.6 | **API timeout simulation** | Slow network, let request timeout | User sees timeout message, can retry | | |
+| 14.7 | **Browser back during response** | Navigate away mid-stream | No orphaned processes, clean state on return | | |
+| 14.8 | **Multiple tabs same session** | Open chat in 3 tabs, use all | No conflicts, sessions isolated or synced | | |
 
 ---
 
@@ -237,8 +337,11 @@ Unusual but possible scenarios.
 | 8. Admin & Auth | 5 | | | |
 | 9. Critical Paths | 9 | | | |
 | 10. Compliance | 7 | | | |
-| 11. Stress & Edge | 8 | | | |
-| **TOTAL** | **92** | | | |
+| 11. Payments (Day Pass) | 12 | | | |
+| 12. Restaurant Bookings | 13 | | | |
+| 13. SMS Notifications | 9 | | | |
+| 14. Stress & Edge | 8 | | | |
+| **TOTAL** | **126** | | | |
 
 ---
 
@@ -252,5 +355,5 @@ Unusual but possible scenarios.
 
 ---
 
-*Last updated: [DATE]*
+*Last updated: 2026-02-05*
 *Tested by: [NAME]*
