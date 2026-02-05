@@ -86,6 +86,12 @@ STRIPE_SECRET_KEY=                      # Server-side API key
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=     # Client-side publishable key
 STRIPE_WEBHOOK_SECRET=                  # Webhook signature verification
 STRIPE_DAY_PASS_PRICE_ID=               # Price ID for Day Pass product
+
+# Twilio (SMS alerts, voice booking)
+TWILIO_ACCOUNT_SID=                     # Twilio account SID
+TWILIO_AUTH_TOKEN=                      # Twilio auth token
+TWILIO_PHONE_NUMBER=                    # Twilio sender phone number
+QA_ALERT_PHONE=                         # Phone for critical alerts (E.164: +34612345678)
 ```
 
 ## Architecture Decisions
