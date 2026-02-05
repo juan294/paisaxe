@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
-import { ArrowLeft, Clock, Check, RefreshCw, AudioLines, MapPin, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin, Loader2 } from "lucide-react";
 
 export default function PricingPage() {
   const { user, session, signInWithGoogle } = useAuth();
@@ -138,9 +138,9 @@ export default function PricingPage() {
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <AudioLines className="h-4 w-4 text-neutral-500 flex-shrink-0" />
+                <Phone className="h-4 w-4 text-neutral-500 flex-shrink-0" />
                 <span className="text-sm text-neutral-300">
-                  {t("premium.feature_unlimited")}
+                  {t("premium.feature_booking")}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -179,7 +179,8 @@ export default function PricingPage() {
                 {t("premium.faq_what_included")}
               </h3>
               <p className="text-xs text-neutral-500">
-                {t("premium.faq_what_included_answer")}
+                {t("premium.faq_what_included_answer")}{" "}
+                <strong className="text-neutral-300">{t("premium.faq_what_included_highlight")}</strong>
               </p>
             </div>
             <div>

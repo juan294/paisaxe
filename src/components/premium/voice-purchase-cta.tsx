@@ -102,10 +102,6 @@ export function VoicePurchaseCTA({ compact = false, className }: VoicePurchaseCT
           <span>{t("premium.feature_24h")}</span>
         </div>
         <div className="flex items-center gap-3 text-white/80 text-sm">
-          <Mic className="h-4 w-4 text-amber-400 flex-shrink-0" />
-          <span>{t("premium.feature_unlimited")}</span>
-        </div>
-        <div className="flex items-center gap-3 text-white/80 text-sm">
           <MapPin className="h-4 w-4 text-amber-400 flex-shrink-0" />
           <span>{t("premium.feature_realtime")}</span>
         </div>
