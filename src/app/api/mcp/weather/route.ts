@@ -36,7 +36,8 @@ interface WeatherResponse {
 }
 
 
-// Asturias cities with their coordinates for better accuracy
+// Asturias and Picos de Europa region cities with their coordinates
+// Note: Picos de Europa spans Asturias, Cantabria, and León - all within our tourism scope
 const ASTURIAS_CITIES: Record<string, { lat: number; lon: number }> = {
   oviedo: { lat: 43.3619, lon: -5.8494 },
   gijón: { lat: 43.5453, lon: -5.6619 },
@@ -56,6 +57,17 @@ const ASTURIAS_CITIES: Record<string, { lat: number; lon: number }> = {
   "pola de siero": { lat: 43.3939, lon: -5.6572 },
   covadonga: { lat: 43.3103, lon: -5.0531 },
   "picos de europa": { lat: 43.1986, lon: -4.8417 },
+  // Fuente Dé - technically Cantabria but part of Picos de Europa tourism
+  "fuente dé": { lat: 43.1486, lon: -4.8089 },
+  "fuente de": { lat: 43.1486, lon: -4.8089 },
+  teleférico: { lat: 43.1486, lon: -4.8089 },
+  "teleférico de fuente dé": { lat: 43.1486, lon: -4.8089 },
+  // Ruta del Cares - spans Asturias/León
+  cares: { lat: 43.2167, lon: -4.8667 },
+  "ruta del cares": { lat: 43.2167, lon: -4.8667 },
+  caín: { lat: 43.2056, lon: -4.9167 },
+  cain: { lat: 43.2056, lon: -4.9167 },
+  poncebos: { lat: 43.2611, lon: -4.8333 },
 };
 
 async function fetchWeather(city: string): Promise<WeatherResponse> {
