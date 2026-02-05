@@ -5,9 +5,10 @@ import { AnalyticsTabs, type AnalyticsSubTab } from "./analytics-tabs";
 import { VisitorsAnalyticsPanel } from "./visitors-analytics-panel";
 import { StripeAnalyticsPanel } from "./stripe-analytics-panel";
 import { ElevenLabsAnalyticsPanel } from "./elevenlabs-analytics-panel";
+import { CostsAnalyticsPanel } from "./costs-analytics-panel";
 
 /**
- * Analytics Dashboard with sub-tabs for Visitors, Revenue, and Voice analytics.
+ * Analytics Dashboard with sub-tabs for Visitors, Revenue, Voice, and Costs analytics.
  * This component organizes all analytics into a tabbed interface.
  */
 export function AnalyticsDashboard() {
@@ -18,6 +19,7 @@ export function AnalyticsDashboard() {
       {activeSubTab === "visitors" && <VisitorsAnalyticsPanel />}
       {activeSubTab === "revenue" && <StripeAnalyticsPanel />}
       {activeSubTab === "voice" && <ElevenLabsAnalyticsPanel />}
+      {activeSubTab === "costs" && <CostsAnalyticsPanel />}
     </AnalyticsTabs>
   );
 }

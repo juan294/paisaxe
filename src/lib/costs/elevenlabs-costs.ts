@@ -1,0 +1,123 @@
+import type { ServiceCost } from "@/types/costs-analytics";
+import { PLATFORM_SERVICES } from "@/types/costs-analytics";
+
+// ElevenLabs pricing tiers (as of 2024)
+// These are estimates based on public pricing
+const ELEVENLABS_PRICING = {
+  // Cost per 1000 characters for voice generation
+  voiceGenerationPer1kChars: 0.30,
+  // Cost per minute for conversational AI
+  conversationalAiPerMinute: 0.08,
+};
+
+interface ElevenLabsUsageResponse {
+  character_count: number;
+  character_limit: number;
+  can_extend_character_limit: boolean;
+  allowed_to_extend_character_limit: boolean;
+  next_character_count_reset_unix: number;
+  voice_limit: number;
+  max_voice_add_edits: number;
+  voice_add_edit_counter: number;
+  professional_voice_limit: number;
+  can_extend_voice_limit: boolean;
+  can_use_instant_voice_cloning: boolean;
+  can_use_professional_voice_cloning: boolean;
+  currency: string;
+  status: string;
+  billing_period: {
+    start_unix: number;
+    end_unix: number;
+  };
+}
+
+/**
+ * Estimates ElevenLabs costs based on usage data.
+ * Note: ElevenLabs API provides character usage, not direct cost data.
+ * We estimate based on their public pricing.
+ * @param _startDate - unused, ElevenLabs returns current billing period only
+ * @param _endDate - unused, ElevenLabs returns current billing period only
+ */
+export async function fetchElevenLabsCosts(
+  _startDate: string,
+  _endDate: string
+): Promise<ServiceCost | null> {
+  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
+
+  if (!apiKey) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      "https://api.elevenlabs.io/v1/user/subscription",
+      {
+        headers: {
+          "xi-api-key": apiKey,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.error(
+        "ElevenLabs subscription API error:",
+        response.status,
+        await response.text()
+      );
+      return null;
+    }
+
+    const data: ElevenLabsUsageResponse = await response.json();
+
+    // Estimate cost based on character usage
+    // This gives us the characters used in the current billing period
+    const charactersUsed = data.character_count;
+    const estimatedCost =
+      (charactersUsed / 1000) * ELEVENLABS_PRICING.voiceGenerationPer1kChars;
+
+    // Get the billing period from the API
+    const billingStart = new Date(
+      data.billing_period.start_unix * 1000
+    ).toISOString().split("T")[0];
+    const billingEnd = new Date(
+      data.billing_period.end_unix * 1000
+    ).toISOString().split("T")[0];
+
+    return {
+      serviceId: PLATFORM_SERVICES.elevenlabs.id,
+      serviceName: PLATFORM_SERVICES.elevenlabs.name,
+      category: PLATFORM_SERVICES.elevenlabs.category,
+      costUsd: estimatedCost,
+      costFormatted: formatUsd(estimatedCost),
+      source: "estimate",
+      billingPeriodStart: billingStart,
+      billingPeriodEnd: billingEnd,
+      dashboardUrl: PLATFORM_SERVICES.elevenlabs.dashboardUrl,
+      notes: `Estimated from ${charactersUsed.toLocaleString()} characters used`,
+    };
+  } catch (error) {
+    console.error("Error fetching ElevenLabs usage:", error);
+    return null;
+  }
+}
+
+/**
+ * Returns empty array since ElevenLabs doesn't provide daily breakdown.
+ * Cost estimation is done at the billing period level only.
+ */
+export function fetchElevenLabsCostsByDay(
+  _startDate: string,
+  _endDate: string
+): Promise<Array<{ date: string; costUsd: number }>> {
+  // ElevenLabs doesn't provide daily breakdown
+  return Promise.resolve([]);
+}
+
+function formatUsd(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
