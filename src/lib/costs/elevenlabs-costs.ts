@@ -69,9 +69,15 @@ export async function fetchElevenLabsCosts(
 
     const data: ElevenLabsUsageResponse = await response.json();
 
-    // Estimate cost based on character usage
-    // This gives us the characters used in the current billing period
+    // Get character usage stats
     const charactersUsed = data.character_count || 0;
+    const charactersLimit = data.character_limit || 0;
+    const charactersRemaining = Math.max(0, charactersLimit - charactersUsed);
+    const usagePercent = charactersLimit > 0
+      ? Math.round((charactersUsed / charactersLimit) * 100)
+      : 0;
+
+    // Estimate cost based on character usage
     const estimatedCost =
       (charactersUsed / 1000) * ELEVENLABS_PRICING.voiceGenerationPer1kChars;
 
@@ -100,7 +106,7 @@ export async function fetchElevenLabsCosts(
       billingPeriodStart: billingStart,
       billingPeriodEnd: billingEnd,
       dashboardUrl: PLATFORM_SERVICES.elevenlabs.dashboardUrl,
-      notes: `Estimated from ${charactersUsed.toLocaleString()} characters used`,
+      notes: `${charactersRemaining.toLocaleString()} / ${charactersLimit.toLocaleString()} credits remaining (${usagePercent}% used)`,
     };
   } catch (error) {
     console.error("Error fetching ElevenLabs usage:", error);
