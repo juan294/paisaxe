@@ -383,16 +383,16 @@ export function StoryViewer({
         </div>
       </article>
 
-      {/* Navigation arrows - invisible tap zones on mobile/tablet, visible buttons on desktop */}
+      {/* Navigation arrows - invisible tap zones on phones, visible buttons on tablets/desktop */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           goToPrev();
         }}
         aria-label={t("accessibility.previous_story")}
-        className="absolute left-0 top-0 h-full w-20 z-20 flex items-center justify-start pl-4 md:left-4 md:top-1/2 md:h-auto md:w-auto md:-translate-y-1/2 md:p-3 md:rounded-full md:bg-white/10 md:hover:bg-white/20 md:backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black touch-nav-reset touch-nav-left"
+        className="absolute left-0 top-0 h-full w-20 z-20 flex items-center justify-start pl-4 sm:left-4 sm:top-1/2 sm:h-auto sm:w-auto sm:-translate-y-1/2 sm:p-3 sm:rounded-full sm:bg-white/10 sm:hover:bg-white/20 sm:backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black touch-nav-reset touch-nav-left"
       >
-        <ChevronLeft className="h-8 w-8 text-white hidden md:block desktop-pointer-only" />
+        <ChevronLeft className="h-8 w-8 text-white hidden sm:block" />
       </button>
 
       <button
@@ -401,9 +401,9 @@ export function StoryViewer({
           goToNext();
         }}
         aria-label={t("accessibility.next_story")}
-        className="absolute right-0 top-0 h-full w-20 z-20 flex items-center justify-end pr-4 md:right-4 md:top-1/2 md:h-auto md:w-auto md:-translate-y-1/2 md:p-3 md:rounded-full md:bg-white/10 md:hover:bg-white/20 md:backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black touch-nav-reset touch-nav-right"
+        className="absolute right-0 top-0 h-full w-20 z-20 flex items-center justify-end pr-4 sm:right-4 sm:top-1/2 sm:h-auto sm:w-auto sm:-translate-y-1/2 sm:p-3 sm:rounded-full sm:bg-white/10 sm:hover:bg-white/20 sm:backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black touch-nav-reset touch-nav-right"
       >
-        <ChevronRight className="h-8 w-8 text-white hidden md:block desktop-pointer-only" />
+        <ChevronRight className="h-8 w-8 text-white hidden sm:block" />
       </button>
 
       {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}

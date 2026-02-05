@@ -85,15 +85,15 @@
   animation: ambient-zoom 30s ease-in-out forwards;
 }
 
-/* Desktop pointer utilities - hide on touch-only devices (phones, tablets) */
-/* Uses pointer: coarse (touch screens) and hover: none (can't hover) to detect touch devices */
-@media (pointer: coarse), (hover: none) {
+/* Touch device utilities for small screens only (phones, not tablets) */
+/* Combines touch detection with max-width to exclude iPads and tablets */
+@media (pointer: coarse) and (max-width: 639px), (hover: none) and (max-width: 639px) {
   .desktop-pointer-only {
     display: none !important;
   }
 
-  /* Reset navigation buttons to full-height invisible tap zones on touch devices */
-  /* Overrides md: styles that create small visible circles */
+  /* Reset navigation buttons to full-height invisible tap zones on phones only */
+  /* On tablets (640px+), the visible arrow buttons will show */
   .touch-nav-reset {
     position: absolute !important;
     top: 0 !important;
