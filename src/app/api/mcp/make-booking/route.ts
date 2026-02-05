@@ -166,10 +166,10 @@ async function initiateCall(
   phoneNumber: string,
   request: MakeBookingRequest
 ): Promise<{ success: boolean; callSid?: string; conversationId?: string; error?: string }> {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  const phoneNumberId = process.env.ELEVENLABS_PHONE_NUMBER_ID;
+  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
+  const phoneNumberId = process.env.ELEVENLABS_PHONE_NUMBER_ID?.trim();
   // Use dedicated booking agent - NOT the tourism guide Pelayo
-  const bookingAgentId = process.env.ELEVENLABS_BOOKING_AGENT_ID;
+  const bookingAgentId = process.env.ELEVENLABS_BOOKING_AGENT_ID?.trim();
 
   if (!apiKey || !phoneNumberId || !bookingAgentId) {
     return {

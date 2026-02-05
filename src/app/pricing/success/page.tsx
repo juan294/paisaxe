@@ -71,7 +71,7 @@ export default function PricingSuccessPage() {
         {/* Not showing access - retry hint */}
         {!canUseVoice && (
           <p className="mt-6 text-xs text-neutral-500">
-            If your access is not showing, please wait a moment and refresh.
+            {t("premium.success_retry_hint")}
           </p>
         )}
       </div>

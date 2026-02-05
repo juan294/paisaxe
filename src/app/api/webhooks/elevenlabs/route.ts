@@ -73,7 +73,7 @@ async function verifySignature(
   payload: string,
   signature: string
 ): Promise<boolean> {
-  const secret = process.env.ELEVENLABS_WEBHOOK_SECRET;
+  const secret = process.env.ELEVENLABS_WEBHOOK_SECRET?.trim();
 
   if (!secret) {
     console.error("[elevenlabs-webhook] ELEVENLABS_WEBHOOK_SECRET not configured");

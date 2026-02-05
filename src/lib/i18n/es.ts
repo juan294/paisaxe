@@ -241,6 +241,7 @@ export const es: Translations = {
     success_subtitle: 'Tu Pase Diario ya esta activo',
     success_expires: 'Tu acceso es valido hasta',
     success_cta: 'Empezar a Hablar',
+    success_retry_hint: 'Si tu acceso no aparece, espera un momento y recarga la pagina.',
     pricing_title: 'Conversaciones de Voz',
     pricing_subtitle: 'Sin teclear. Respuestas reales. Reservas reales.',
     pricing_cta: 'Obtener Pase Diario',

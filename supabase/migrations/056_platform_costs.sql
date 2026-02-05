@@ -49,7 +49,7 @@ CREATE POLICY "Admins can read platform_costs"
   USING (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE user_profiles.id = auth.uid()
+      WHERE user_profiles.user_id = (select auth.uid())
       AND user_profiles.role = 'admin'
     )
   );
@@ -62,7 +62,7 @@ CREATE POLICY "Admins can insert platform_costs"
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE user_profiles.id = auth.uid()
+      WHERE user_profiles.user_id = (select auth.uid())
       AND user_profiles.role = 'admin'
     )
   );
@@ -75,14 +75,14 @@ CREATE POLICY "Admins can update platform_costs"
   USING (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE user_profiles.id = auth.uid()
+      WHERE user_profiles.user_id = (select auth.uid())
       AND user_profiles.role = 'admin'
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE user_profiles.id = auth.uid()
+      WHERE user_profiles.user_id = (select auth.uid())
       AND user_profiles.role = 'admin'
     )
   );
@@ -95,7 +95,7 @@ CREATE POLICY "Admins can delete platform_costs"
   USING (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE user_profiles.id = auth.uid()
+      WHERE user_profiles.user_id = (select auth.uid())
       AND user_profiles.role = 'admin'
     )
   );

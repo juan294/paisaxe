@@ -30,7 +30,7 @@
       "src/app/**/error.tsx",
       "src/app/robots.ts",
       "src/app/sitemap.ts",
-      "src/middleware.ts"
+      "src/proxy.ts"
     ]
   },
   "vitest": {

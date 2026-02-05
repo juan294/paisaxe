@@ -72,7 +72,7 @@ async function* streamWithCurl(
     stream: true,
   });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
 
   const curlProcess = spawn("curl", [
@@ -232,7 +232,7 @@ async function callWithCurl(
     messages,
   });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
 
   let lastError: Error | null = null;
