@@ -4,12 +4,14 @@ import { NextResponse } from "next/server";
  * Twilio Status Callback endpoint for booking calls.
  *
  * Twilio sends a POST request to this endpoint when a call's status changes.
- * This allows us to track whether the business answered, went to voicemail, etc.
+ * This provides low-level call state (ringing, answered, busy, etc.) but NOT
+ * the conversation content.
  *
- * In a production implementation, this could:
- * - Store call results in a database
- * - Trigger notifications to the user
- * - Update booking status in a CRM
+ * NOTE: Booking outcomes (confirmed/denied/no-answer) are handled by the
+ * ElevenLabs post-call webhook at /api/webhooks/elevenlabs, which receives
+ * the full transcript and can determine the actual booking result.
+ *
+ * This endpoint is kept for debugging and call monitoring purposes.
  */
 
 interface TwilioStatusCallback {
@@ -52,48 +54,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       answeredBy: status.AnsweredBy,
       to: status.To,
     });
-
-    // Track different outcomes
-    switch (status.CallStatus) {
-      case "completed":
-        if (status.AnsweredBy === "human") {
-          console.log(
-            `[make-booking/status] Restaurant answered (${status.To}), call duration: ${status.CallDuration}s`
-          );
-          // TODO: In production, mark booking as "pending confirmation"
-        } else if (status.AnsweredBy === "machine") {
-          console.log(
-            `[make-booking/status] Reached voicemail at ${status.To}`
-          );
-          // TODO: In production, mark booking as "voicemail left"
-        }
-        break;
-
-      case "busy":
-        console.log(
-          `[make-booking/status] Restaurant busy: ${status.To}`
-        );
-        // TODO: In production, schedule retry or notify user
-        break;
-
-      case "no-answer":
-        console.log(
-          `[make-booking/status] No answer from ${status.To}`
-        );
-        // TODO: In production, schedule retry or notify user
-        break;
-
-      case "failed":
-        console.log(
-          `[make-booking/status] Call failed to ${status.To}`
-        );
-        // TODO: In production, notify user and suggest manual booking
-        break;
-
-      default:
-        // queued, ringing, in-progress are intermediate states
-        break;
-    }
 
     // Always return 200 to acknowledge receipt
     return NextResponse.json({ received: true });
