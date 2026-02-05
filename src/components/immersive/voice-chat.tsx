@@ -177,6 +177,65 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
       const decoder = new TextDecoder();
       let buffer = "";
 
+      // Helper to process a single SSE event line
+      const processEvent = (line: string) => {
+        if (!line.startsWith("data: ")) return;
+
+        const jsonStr = line.slice(6);
+        try {
+          const event = JSON.parse(jsonStr);
+
+          if (event.type === "text") {
+            // Append text chunk to the assistant message
+            setMessages((prev) => {
+              const updated = [...prev];
+              const current = updated[assistantIndex];
+              updated[assistantIndex] = {
+                ...current,
+                content: current.content + event.content,
+              };
+              return updated;
+            });
+          } else if (event.type === "done") {
+            // Process upsell markers and add images from final event
+            setMessages((prev) => {
+              const updated = [...prev];
+              const currentMsg = updated[assistantIndex];
+              const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
+                currentMsg.content
+              );
+
+              // Only set upsell reason if user doesn't have voice access and throttle allows
+              const shouldShowUpsell =
+                hasUpsell && !canUseVoice && canShowUpsell(assistantIndex);
+
+              if (shouldShowUpsell) {
+                recordUpsellShown();
+              }
+
+              updated[assistantIndex] = {
+                ...currentMsg,
+                content: cleanContent,
+                images: event.images,
+                upsellReason: shouldShowUpsell ? reason ?? undefined : undefined,
+              };
+              return updated;
+            });
+          } else if (event.type === "error") {
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[assistantIndex] = {
+                role: "assistant",
+                content: t("chat.error_generic"),
+              };
+              return updated;
+            });
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      };
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -188,62 +247,14 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         buffer = lines.pop() || ""; // Keep incomplete event in buffer
 
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const jsonStr = line.slice(6);
-            try {
-              const event = JSON.parse(jsonStr);
-
-              if (event.type === "text") {
-                // Append text chunk to the assistant message
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  const current = updated[assistantIndex];
-                  updated[assistantIndex] = {
-                    ...current,
-                    content: current.content + event.content,
-                  };
-                  return updated;
-                });
-              } else if (event.type === "done") {
-                // Process upsell markers and add images from final event
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  const currentMsg = updated[assistantIndex];
-                  const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
-                    currentMsg.content
-                  );
-
-                  // Only set upsell reason if user doesn't have voice access and throttle allows
-                  const shouldShowUpsell =
-                    hasUpsell && !canUseVoice && canShowUpsell(assistantIndex);
-
-                  if (shouldShowUpsell) {
-                    recordUpsellShown();
-                  }
-
-                  updated[assistantIndex] = {
-                    ...currentMsg,
-                    content: cleanContent,
-                    images: event.images,
-                    upsellReason: shouldShowUpsell ? reason ?? undefined : undefined,
-                  };
-                  return updated;
-                });
-              } else if (event.type === "error") {
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  updated[assistantIndex] = {
-                    role: "assistant",
-                    content: t("chat.error_generic"),
-                  };
-                  return updated;
-                });
-              }
-            } catch {
-              // Ignore parse errors
-            }
-          }
+          processEvent(line);
         }
+      }
+
+      // Process any remaining buffer content after stream ends
+      // (the 'done' event might be in the final chunk)
+      if (buffer.trim()) {
+        processEvent(buffer.trim());
       }
     } catch {
       setMessages((prev) => {
