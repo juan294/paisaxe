@@ -22,6 +22,7 @@ mkdir -p "$LOG_DIR"
 # Source shared utilities and check feature flags
 source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
 source "$PROJECT_DIR/scripts/lib/github-issues.sh"
+source "$PROJECT_DIR/scripts/lib/sms-alerts.sh"
 
 # Cleanup function to ensure server is stopped on exit
 cleanup() {
@@ -139,6 +140,29 @@ else
 fi
 
 log_info "Health checks complete: $HEALTH_CHECKS_PASSED passed, $HEALTH_CHECKS_FAILED failed" | tee -a "$LOG_FILE"
+
+# Send SMS alert for critical health check failures
+if [[ $HEALTH_CHECKS_FAILED -gt 0 ]]; then
+  log_warn "Critical failures detected — sending SMS alert..." | tee -a "$LOG_FILE"
+
+  # Build list of failed checks
+  FAILED_CHECK_NAMES=""
+  if ! echo "$HEALTH_RESPONSE" | grep -q '"status":"ok"' 2>/dev/null; then
+    FAILED_CHECK_NAMES="App Health"
+  fi
+  if ! echo "$DB_RESPONSE" | grep -q '"success":true' 2>/dev/null; then
+    [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
+    FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Database"
+  fi
+  if ! echo "$STRIPE_RESPONSE" | grep -q '"success":true' 2>/dev/null; then
+    [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
+    FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Stripe"
+  fi
+
+  send_health_summary_alert "$HEALTH_CHECKS_FAILED" "$FAILED_CHECK_NAMES" 2>&1 | tee -a "$LOG_FILE" || {
+    log_warn "SMS alert failed (Twilio may not be configured)" | tee -a "$LOG_FILE"
+  }
+fi
 
 # Write health check results to metrics
 HEALTH_METRICS_FILE="$PROJECT_DIR/.qa-health-metrics.tmp"
