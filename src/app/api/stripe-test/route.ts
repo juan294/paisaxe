@@ -9,6 +9,11 @@ export async function GET() {
     return NextResponse.json({ error: "No STRIPE_SECRET_KEY" }, { status: 500 });
   }
 
+  // Debug: check for invisible characters
+  const keyLength = secretKey.length;
+  const trimmedKeyLength = secretKey.trim().length;
+  const hasInvisibleChars = keyLength !== trimmedKeyLength;
+
   if (!priceId) {
     return NextResponse.json({ error: "No STRIPE_DAY_PASS_PRICE_ID" }, { status: 500 });
   }
@@ -34,7 +39,10 @@ export async function GET() {
     return NextResponse.json({
       error: message,
       type: errorType,
-      keyPrefix: secretKey.substring(0, 12) + "...",
+      keyPrefix: secretKey.trim().substring(0, 12) + "...",
+      keyLength,
+      trimmedKeyLength,
+      hasInvisibleChars,
     }, { status: 500 });
   }
 }
