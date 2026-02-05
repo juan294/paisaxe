@@ -1,30 +1,26 @@
-#!/usr/bin/env npx ts-node
+#!/usr/bin/env npx tsx
 /**
- * Update Pelayo's System Prompt
+ * Recreate Pelayo Visitor Guide Agent
  *
- * Updates the Pelayo voice agent with enhanced dynamic variables
- * for personalized greetings and session awareness.
+ * This script creates a new Pelayo agent from scratch with the correct
+ * configuration including all tools.
  *
- * Usage: npx ts-node scripts/update-pelayo-prompt.ts
+ * Usage: npx tsx scripts/recreate-pelayo-agent.ts
  */
 
 import * as dotenv from "dotenv";
-
 dotenv.config({ path: ".env.local" });
 
 const API_KEY = process.env.ELEVENLABS_API_KEY;
 const BASE_URL = "https://api.elevenlabs.io/v1";
-
-// From src/config/elevenlabs-agents.ts
-const PELAYO_AGENT_ID = "agent_1201kgqhsdzxfkk9x7m1bjaew9mv";
 
 if (!API_KEY) {
   console.error("Error: ELEVENLABS_API_KEY not found in .env.local");
   process.exit(1);
 }
 
-// Enhanced system prompt with dynamic variables
-const ENHANCED_SYSTEM_PROMPT = `# CONTEXT VARIABLES
+// System prompt from update-pelayo-prompt.ts
+const SYSTEM_PROMPT = `# CONTEXT VARIABLES
 You have access to these dynamic variables about the current session:
 - Story: {{story_title}} - {{story_subtitle}}
 - Story description: {{story_description}}
@@ -125,6 +121,7 @@ You know deeply about:
 You have access to tools for real-time information:
 - Weather tool: Use when asked about current weather
 - Places tool: Use when asked for restaurant recommendations, attractions, or points of interest
+- Booking tool: Use to make reservations at restaurants (requires venue name, phone, party size, date, time, customer name, and customer phone)
 
 ## Weather Tool - Location Inference
 When asked about weather "there", "here", or for the current story, determine the city from context:
@@ -174,93 +171,228 @@ Avoid tourism clichés:
 
 Instead, be specific and sensory.`;
 
-// Enhanced first message with language awareness
-// Simple first message - complex Handlebars conditionals don't work in ElevenLabs
-// The system prompt handles language detection; first message is just a starting point
-const ENHANCED_FIRST_MESSAGE = `¡Hola! Soy Pelayo, tu guía de Asturias. ¿Qué te gustaría descubrir sobre {{story_title}}?`;
+const FIRST_MESSAGE = `¡Hola! Soy Pelayo, tu guía de Asturias. ¿Qué te gustaría descubrir sobre {{story_title}}?`;
 
-async function getAgent(): Promise<unknown> {
-  console.log("📥 Fetching current agent configuration...");
-
-  const response = await fetch(`${BASE_URL}/convai/agents/${PELAYO_AGENT_ID}`, {
-    headers: {
-      "xi-api-key": API_KEY!,
+// All tools for Pelayo
+const TOOLS = [
+  // Weather tool
+  {
+    type: "webhook",
+    name: "get_weather",
+    description:
+      "Get current weather for a city in Asturias or Picos de Europa. " +
+      "Use this when the visitor asks about weather conditions. " +
+      "Supported cities: Oviedo, Gijón, Avilés, Llanes, Cangas de Onís, Cudillero, " +
+      "Luarca, Ribadesella, Covadonga, Picos de Europa, Fuente Dé.",
+    api_schema: {
+      url: "https://paisaxe.es/api/mcp/weather",
+      method: "POST",
+      request_headers: {
+        "Content-Type": "application/json",
+      },
+      request_body_schema: {
+        type: "object",
+        required: ["city"],
+        properties: {
+          city: {
+            type: "string",
+            description:
+              "City name for weather lookup. Infer from story context if user says 'here' or 'there'.",
+          },
+        },
+      },
     },
-  });
+  },
+  // Places search tool
+  {
+    type: "webhook",
+    name: "search_places",
+    description:
+      "Search for restaurants, hotels, attractions, or activities in Asturias. " +
+      "Returns name, address, phone number, rating, and other details. " +
+      "Use this when the visitor wants recommendations or is planning to visit somewhere.",
+    api_schema: {
+      url: "https://paisaxe.es/api/mcp/places",
+      method: "POST",
+      request_headers: {
+        "Content-Type": "application/json",
+      },
+      request_body_schema: {
+        type: "object",
+        required: ["query"],
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "Search query (e.g., 'sidrerías en Gijón', 'hotel cerca de Covadonga', 'restaurante Casa Marcial')",
+          },
+          location: {
+            type: "string",
+            description: "Optional: specific city or area to search in",
+          },
+        },
+      },
+    },
+  },
+  // Make booking tool (with customer_phone)
+  {
+    type: "webhook",
+    name: "make_booking",
+    description:
+      "Make an outbound call to a restaurant or business to book a reservation for the visitor. " +
+      "Use this AFTER you have collected ALL required info: venue name, phone (from search_places), " +
+      "party size, date, time, visitor's full name, and visitor's phone number.",
+    api_schema: {
+      url: "https://paisaxe.es/api/mcp/make-booking",
+      method: "POST",
+      request_headers: {
+        "Content-Type": "application/json",
+      },
+      request_body_schema: {
+        type: "object",
+        description:
+          "Booking request details. Before calling, you MUST have collected: " +
+          "venue_name and phone_number (from search_places), party_size, date, time, " +
+          "customer_name (full name), and customer_phone (visitor's callback number).",
+        required: [
+          "venue_name",
+          "phone_number",
+          "party_size",
+          "date",
+          "time",
+          "customer_name",
+          "customer_phone",
+        ],
+        properties: {
+          venue_name: {
+            type: "string",
+            description: "Name of the venue (restaurant, hotel, activity provider) to call",
+          },
+          phone_number: {
+            type: "string",
+            description: "Phone number of the business (from search_places result)",
+          },
+          party_size: {
+            type: "number",
+            description: "Number of people for the reservation",
+          },
+          date: {
+            type: "string",
+            description:
+              "Date for the reservation (e.g., 'hoy', 'mañana', 'el viernes', '15 de febrero')",
+          },
+          time: {
+            type: "string",
+            description: "Time for the reservation (e.g., '21:00', 'a las nueve de la noche')",
+          },
+          customer_name: {
+            type: "string",
+            description: "Visitor's FULL NAME for the reservation (e.g., 'Juan García López')",
+          },
+          customer_phone: {
+            type: "string",
+            description:
+              "Visitor's phone number for the restaurant to call back if needed (e.g., '612345678', '+34612345678')",
+          },
+          special_requests: {
+            type: "string",
+            description:
+              "Any special requests (e.g., 'trona para bebé', 'mesa en terraza', 'alergia al gluten')",
+          },
+        },
+      },
+    },
+  },
+  // System tools
+  {
+    type: "system",
+    name: "end_call",
+    description: "End the current call gracefully when the conversation is complete.",
+  },
+  {
+    type: "system",
+    name: "language_detection",
+    description: "Detect and adapt to the visitor's language.",
+  },
+];
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to fetch agent: ${response.status} - ${error}`);
-  }
+// Dynamic variable placeholders
+const DYNAMIC_VARIABLES = {
+  dynamic_variable_placeholders: {
+    story_title: "Lagos de Covadonga",
+    story_subtitle: "Picos de Europa",
+    story_description: "Los lagos glaciares más famosos de Asturias",
+    story_category: "nature",
+    story_location: "eastern",
+    user_locale: "es-ES",
+    preferred_language: "Spanish",
+    conversation_count: "0",
+    is_returning: "false",
+    time_of_day: "morning",
+    current_time: "10:00",
+  },
+};
 
-  return response.json();
-}
+async function createAgent(): Promise<void> {
+  console.log("🎙️  Creating Pelayo Visitor Guide Agent\n");
 
-async function updateAgent(): Promise<void> {
-  console.log("📤 Updating Pelayo's system prompt...\n");
-
-  // The PATCH endpoint expects the full conversation_config structure
-  const updatePayload = {
+  const createPayload = {
+    name: "Paisaxe - Pelayo (Visitor Guide)",
     conversation_config: {
       agent: {
+        language: "es",
+        first_message: FIRST_MESSAGE,
+        dynamic_variables: DYNAMIC_VARIABLES,
         prompt: {
-          prompt: ENHANCED_SYSTEM_PROMPT,
+          prompt: SYSTEM_PROMPT,
+          llm: "gemini-2.0-flash",
+          temperature: 0.65,
+          max_tokens: 250,
+          tools: TOOLS,
         },
-        first_message: ENHANCED_FIRST_MESSAGE,
+      },
+      tts: {
+        model_id: "eleven_flash_v2_5",
+        voice_id: "Xb7hH8MSUJpSbSDYk0k2", // Ignacio voice
       },
     },
   };
 
-  const response = await fetch(`${BASE_URL}/convai/agents/${PELAYO_AGENT_ID}`, {
-    method: "PATCH",
+  console.log("📤 Creating agent...");
+
+  const response = await fetch(`${BASE_URL}/convai/agents/create`, {
+    method: "POST",
     headers: {
       "xi-api-key": API_KEY!,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(updatePayload),
+    body: JSON.stringify(createPayload),
   });
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Failed to update agent: ${response.status} - ${error}`);
+    throw new Error(`Failed to create agent: ${response.status} - ${error}`);
   }
 
-  const data = await response.json();
-  console.log("✅ Successfully updated Pelayo's system prompt!");
-  console.log(`   Agent ID: ${data.agent_id}`);
+  const result = await response.json();
+  console.log("✅ Agent created successfully!");
+  console.log(`   Agent ID: ${result.agent_id}`);
+  console.log("");
+
+  // IMPORTANT: Update the agent ID in the codebase
+  console.log("⚠️  IMPORTANT: Update the agent ID in these files:");
+  console.log("   1. src/config/elevenlabs-agents.ts");
+  console.log("   2. scripts/check-pelayo-config.ts");
+  console.log("   3. scripts/update-pelayo-prompt.ts");
+  console.log("   4. scripts/fix-pelayo-agent.ts");
+  console.log("");
+  console.log(`   New Agent ID: ${result.agent_id}`);
 }
 
 async function main(): Promise<void> {
-  console.log("🎙️  Updating Pelayo Voice Agent\n");
-  console.log("This script updates Pelayo with:");
-  console.log("  - Dynamic variables for personalization");
-  console.log("  - Session-aware greeting behavior");
-  console.log("  - Language detection support");
-  console.log("  - Time-of-day awareness");
-  console.log("  - Tool usage instructions (weather, places)");
-  console.log("");
-
   try {
-    // First, verify we can access the agent
-    const agent = await getAgent();
-    console.log("✅ Agent found\n");
-
-    // Update with new prompt
-    await updateAgent();
-
-    console.log("\n📋 New Dynamic Variables Available:");
-    console.log("  {{story_title}}, {{story_subtitle}}, {{story_description}}");
-    console.log("  {{story_category}}, {{story_location}}");
-    console.log("  {{conversation_count}}, {{is_returning}}");
-    console.log("  {{user_locale}}, {{preferred_language}}");
-    console.log("  {{time_of_day}}, {{current_time}}");
-
-    console.log("\n⚠️  Remember to configure in ElevenLabs Dashboard:");
-    console.log("  1. Tools → MCP → Add weather endpoint");
-    console.log("  2. Tools → MCP → Add places endpoint");
-    console.log("  3. Tools → System Tools → Enable Language Detection");
-
-    console.log("\n🎉 Done! Pelayo is now ready for personalized conversations.");
+    await createAgent();
+    console.log("\n🎉 Done! Pelayo Visitor Guide is back online.");
   } catch (error) {
     console.error("\n❌ Error:", error instanceof Error ? error.message : error);
     process.exit(1);
