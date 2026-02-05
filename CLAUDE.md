@@ -142,6 +142,37 @@ Core tables (see `supabase/migrations/` for full DDL):
 5. **Health endpoint is sacred** — `/api/health` monitored 24/7. Don't break it.
 6. **Database function security** — All functions need explicit `SET search_path`. Use `search_path = ''` with fully qualified refs for security-definer functions.
 
+## Troubleshooting
+
+### Vercel Environment Variables with Invisible Characters
+
+**Symptom**: API calls fail with connection errors or "invalid request" errors despite correct-looking credentials.
+
+**Cause**: When adding environment variables to Vercel via CLI, trailing whitespace or newlines can be accidentally included (e.g., from command output capture or copy-paste).
+
+**Diagnosis**:
+```typescript
+// Add this to debug endpoints:
+const rawLength = process.env.MY_VAR?.length ?? 0;
+const trimmedLength = process.env.MY_VAR?.trim().length ?? 0;
+const hasInvisibleChars = rawLength !== trimmedLength;
+// If hasInvisibleChars is true, the env var has trailing/leading whitespace
+```
+
+**Fix**: Always `.trim()` environment variables before use, especially API keys:
+```typescript
+const apiKey = process.env.API_KEY?.trim();
+```
+
+**Prevention**: When adding env vars to Vercel via CLI, pipe values directly:
+```bash
+# Good - pipes value directly
+grep '^MY_VAR=' .env.local | cut -d'=' -f2- | vercel env add MY_VAR production
+
+# Bad - may capture extra output
+echo $MY_VAR | vercel env add MY_VAR production
+```
+
 ## Agent Autonomy
 
 **Before asking the user to perform any manual step, exhaust all available tools first.**
