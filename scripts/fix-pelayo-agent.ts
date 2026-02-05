@@ -11,7 +11,7 @@ import * as dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
 const API_KEY = process.env.ELEVENLABS_API_KEY;
-const AGENT_ID = "agent_3101kg5bvnf4f1r94f0cav0v9y61";
+const AGENT_ID = "agent_1201kgqhsdzxfkk9x7m1bjaew9mv";
 const BASE_URL = "https://api.elevenlabs.io/v1";
 
 if (!API_KEY) {

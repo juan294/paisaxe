@@ -11,7 +11,7 @@
 // LOCATION-SPECIFIC: Replace these agent IDs with your own ElevenLabs agents
 export const ELEVENLABS_AGENT_IDS = {
   // Tourism guide for immersive stories (primary voice agent)
-  pelayo: "agent_3101kg5bvnf4f1r94f0cav0v9y61",
+  pelayo: "agent_1201kgqhsdzxfkk9x7m1bjaew9mv",
   // Marketing agents for social media content
   xander: "agent_5901kg4wgebce0abca4ssyav3684",
   iris: "agent_1301kg4wggmvfwgbx91h7sn2xsbh",
