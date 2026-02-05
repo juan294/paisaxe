@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTranslation } from "@/lib/i18n";
-import { Mic, Clock, Sparkles, MapPin, Loader2 } from "lucide-react";
+import { Mic, Clock, Sparkles, MapPin, Phone, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VoicePurchaseCTAProps {
@@ -108,6 +108,10 @@ export function VoicePurchaseCTA({ compact = false, className }: VoicePurchaseCT
         <div className="flex items-center gap-3 text-white/80 text-sm">
           <MapPin className="h-4 w-4 text-amber-400 flex-shrink-0" />
           <span>{t("premium.feature_realtime")}</span>
+        </div>
+        <div className="flex items-center gap-3 text-white/80 text-sm">
+          <Phone className="h-4 w-4 text-amber-400 flex-shrink-0" />
+          <span>{t("premium.feature_booking")}</span>
         </div>
       </div>
 
