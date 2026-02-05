@@ -37,6 +37,34 @@ develop   # Active development (DEFAULT)
 3. Merge `develop` → `main` only when releasing to production
 4. Always run tests before committing
 
+## Push Accountability (MANDATORY)
+
+**Every push requires CI verification. No exceptions. No matter how small the change.**
+
+After ANY `git push`, you MUST:
+
+1. **Check CI status** — Run `gh run list --limit 5` to see workflow status
+2. **Wait for completion** — If "in_progress", wait and check again with `gh run watch`
+3. **If CI fails** — Immediately investigate with `gh run view <run-id> --log-failed`
+4. **Fix and re-push** — Do not move on until all checks pass
+5. **Verify deployment** — For `main` branch, confirm Vercel deployment succeeds
+
+```bash
+# Check CI status after push
+gh run list --limit 5
+
+# Watch a specific run
+gh run watch
+
+# View failed logs
+gh run view <run-id> --log-failed
+
+# Check Vercel deployment status
+vercel ls --limit 5
+```
+
+**This is non-negotiable.** Pushing code and walking away is not acceptable. You own the outcome of your push until CI is green and deployment is healthy. If you break the build, you fix the build — immediately, not later.
+
 ## Test-Driven Development
 
 **NO feature ships without a test written first. No exceptions.**
