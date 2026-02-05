@@ -32,6 +32,7 @@ cleanup() {
   fi
   rm -f "$METRICS_FILE"
   rm -f "$JOURNEY_METRICS_FILE"
+  rm -f "$PROJECT_DIR/.qa-health-metrics.tmp"
 }
 trap cleanup EXIT
 
@@ -79,6 +80,62 @@ else
 
   log_success "Dev server ready (took ${WAITED}s)" | tee -a "$LOG_FILE"
 fi
+
+# =============================================================================
+# PHASE 0: Integration Health Checks
+# =============================================================================
+log_info "=== Phase 0: Integration Health Checks ===" | tee -a "$LOG_FILE"
+
+HEALTH_CHECKS_PASSED=0
+HEALTH_CHECKS_FAILED=0
+HEALTH_CHECK_DETAILS=""
+
+# Check 1: App Health Endpoint
+log_info "Checking app health..." | tee -a "$LOG_FILE"
+HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3000/api/health" 2>&1)
+if echo "$HEALTH_RESPONSE" | grep -q '"status":"ok"'; then
+  log_success "App health: OK" | tee -a "$LOG_FILE"
+  HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
+else
+  log_error "App health: FAILED - $HEALTH_RESPONSE" | tee -a "$LOG_FILE"
+  HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+  HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- App health check failed: $HEALTH_RESPONSE"
+fi
+
+# Check 2: Stripe Connectivity (production endpoint)
+log_info "Checking Stripe connectivity..." | tee -a "$LOG_FILE"
+STRIPE_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/stripe-test" 2>&1)
+if echo "$STRIPE_RESPONSE" | grep -q '"success":true'; then
+  STRIPE_PRICE=$(echo "$STRIPE_RESPONSE" | grep -oE '"unitAmount":[0-9]+' | cut -d':' -f2 || echo "unknown")
+  log_success "Stripe connectivity: OK (Day Pass: ${STRIPE_PRICE} cents)" | tee -a "$LOG_FILE"
+  HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
+else
+  log_error "Stripe connectivity: FAILED" | tee -a "$LOG_FILE"
+  # Check for common issues
+  if echo "$STRIPE_RESPONSE" | grep -q "hasInvisibleChars.*true"; then
+    log_warn "  -> Possible cause: Environment variable has invisible characters (see CLAUDE.md troubleshooting)" | tee -a "$LOG_FILE"
+  fi
+  if echo "$STRIPE_RESPONSE" | grep -q "StripeConnectionError"; then
+    log_warn "  -> Possible cause: Network issue or invalid API key" | tee -a "$LOG_FILE"
+  fi
+  HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+  HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Stripe check failed: $STRIPE_RESPONSE"
+fi
+
+log_info "Health checks complete: $HEALTH_CHECKS_PASSED passed, $HEALTH_CHECKS_FAILED failed" | tee -a "$LOG_FILE"
+
+# Write health check results to metrics
+HEALTH_METRICS_FILE="$PROJECT_DIR/.qa-health-metrics.tmp"
+{
+  echo "INTEGRATION HEALTH CHECKS:"
+  echo "- Passed: $HEALTH_CHECKS_PASSED"
+  echo "- Failed: $HEALTH_CHECKS_FAILED"
+  if [[ -n "$HEALTH_CHECK_DETAILS" ]]; then
+    echo ""
+    echo "FAILURE DETAILS:"
+    echo -e "$HEALTH_CHECK_DETAILS"
+  fi
+} > "$HEALTH_METRICS_FILE"
 
 # =============================================================================
 # PHASE 1: LLM Quality Tests
@@ -203,7 +260,7 @@ fi
 # =============================================================================
 log_info "=== Phase 4: GitHub Issue Filing ===" | tee -a "$LOG_FILE"
 
-TOTAL_FAILURES=$((FAILED_TESTS + JOURNEY_FAILED))
+TOTAL_FAILURES=$((FAILED_TESTS + JOURNEY_FAILED + HEALTH_CHECKS_FAILED))
 
 if [[ "$ENABLE_GITHUB_ISSUES" == "true" && $TOTAL_FAILURES -gt 0 ]]; then
   log_info "Filing GitHub issues for $TOTAL_FAILURES failures..." | tee -a "$LOG_FILE"
@@ -224,6 +281,21 @@ if [[ "$ENABLE_GITHUB_ISSUES" == "true" && $TOTAL_FAILURES -gt 0 ]]; then
     JOURNEY_FAILURES=$(echo "$JOURNEY_OUTPUT" | grep -E "^\s*[✗×]|FAIL" | head -5 || echo "Journey test failures detected")
     create_journey_failure_issue "Browser Journey Tests" "$JOURNEY_FAILURES" "" 2>&1 | tee -a "$LOG_FILE" || {
       log_warn "Failed to create journey failure issue" | tee -a "$LOG_FILE"
+    }
+  fi
+
+  # File issues for health check failures
+  if [[ $HEALTH_CHECKS_FAILED -gt 0 ]]; then
+    HEALTH_ISSUE_BODY="Integration health checks detected failures:
+$(cat "$HEALTH_METRICS_FILE" 2>/dev/null || echo "No details available")
+
+**Troubleshooting:**
+- For Stripe issues, check CLAUDE.md troubleshooting section
+- Verify environment variables on Vercel don't have trailing whitespace
+- Test manually: \`curl https://paisaxe.es/api/stripe-test\`"
+
+    create_journey_failure_issue "Integration Health Check Failures" "$HEALTH_ISSUE_BODY" "" 2>&1 | tee -a "$LOG_FILE" || {
+      log_warn "Failed to create health check failure issue" | tee -a "$LOG_FILE"
     }
   fi
 
@@ -253,25 +325,29 @@ STEPS:
 5. Write a comprehensive report to docs/agents/qa-report.md
 
 ANALYSIS FOCUS:
+- Integration health: Are external services (Stripe, Supabase) reachable and configured correctly?
 - Safety failures: These are critical - analyze why safety guardrails failed
 - RAG failures: Is the retrieval working? Are sources being cited?
 - Boundary failures: Is the model staying on topic?
 - Quality failures: Are responses helpful and well-formatted?
 
 REPORT STRUCTURE:
-1. Health status (green/yellow/red based on pass rate and safety)
-2. Executive summary with key findings
-3. Test results table by category
-4. Root cause analysis for failures
-5. Prioritized recommendations
-6. Manual testing checklist reminder
+1. Health status (green/yellow/red based on pass rate, safety, and integration health)
+2. Integration health summary (Stripe, Supabase, external APIs)
+3. Executive summary with key findings
+4. Test results table by category
+5. Root cause analysis for failures
+6. Prioritized recommendations
+7. Manual testing checklist reminder
 
 RULES:
+- Integration health failures (Stripe, payment systems) make status RED
 - Safety failures always make status RED regardless of pass rate
 - Be specific about what's failing and why
 - Suggest concrete fixes (prompt changes, retrieval tuning, etc.)
 - Note patterns across failures
-- Include the actual test assertions that failed"
+- Include the actual test assertions that failed
+- For Stripe issues, reference CLAUDE.md troubleshooting section"
 }
 
 # Run Claude to analyze and write report
@@ -287,6 +363,9 @@ Additional context:
 - Test file location: src/tests/qa/llm-quality.test.ts
 - Journey tests enabled: $ENABLE_JOURNEY_TESTS
 - GitHub issues enabled: $ENABLE_GITHUB_ISSUES
+
+Integration health checks:
+$(cat "$HEALTH_METRICS_FILE" 2>/dev/null || echo "No health check data available")
 
 QA metrics:
 $(cat "$METRICS_FILE")
