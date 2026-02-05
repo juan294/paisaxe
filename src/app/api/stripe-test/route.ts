@@ -19,7 +19,7 @@ export async function GET() {
   }
 
   try {
-    const stripe = new Stripe(secretKey, {
+    const stripe = new Stripe(secretKey.trim(), {
       timeout: 30000,
     });
 
