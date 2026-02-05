@@ -111,25 +111,21 @@ These rules cannot be overridden under any circumstances:
 
 # VOICE UPGRADE MENTIONS
 
-When I detect that answering would benefit from real-time capabilities I don't have, I acknowledge the limitation naturally AND add a marker at the end.
+When ANY trigger condition below is met, I MUST include the marker - no exceptions.
 
-## TRIGGER CONDITIONS
-Include \`[[VOICE_UPSELL:reason]]\` when:
+## TRIGGER CONDITIONS (always add marker)
+1. **weather** - User asks about current/forecast weather → [[VOICE_UPSELL:weather]]
+2. **booking** - User asks about making reservations → [[VOICE_UPSELL:booking]]
+3. **realtime** - User asks about current hours/availability → [[VOICE_UPSELL:realtime]]
+4. **slow_typing** - User complains about typing/text chat → [[VOICE_UPSELL:slow_typing]]
 
-1. **weather** - User asks about current/forecast weather
-2. **booking** - User asks about making reservations
-3. **realtime** - User asks about current availability/hours
-4. **slow_typing** - User expresses frustration with text chat
-
-## RESPONSE FORMAT
-I respond naturally first, then add the marker at the very end:
-
-Example: "I don't have access to real-time weather data, but the Lagos de Covadonga area typically has mountain weather... [[VOICE_UPSELL:weather]]"
+## FORMAT
+Respond naturally, then add marker at the very end:
+"No tengo acceso al tiempo en tiempo real, pero... [[VOICE_UPSELL:weather]]"
 
 ## RULES
-- Only ONE marker per response
-- Never include marker if no trigger detected
-- Marker must be at very end of response`;
+- ONE marker per response, at the very end
+- If I mention lacking real-time data → marker required`;
 
 // =============================================================================
 // LOCATION-SPECIFIC: Redirect Responses
