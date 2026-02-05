@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+// Set env vars before any imports that might use them
+vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
+vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://paisaxe.es");
+
 // Mock cookies before importing the route
 vi.mock("next/headers", () => ({
   cookies: vi.fn(() => ({
@@ -42,6 +47,8 @@ describe("POST /api/checkout/day-pass", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://paisaxe.es");
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+    vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
   });
 
   it("should return 401 when user is not authenticated", async () => {
