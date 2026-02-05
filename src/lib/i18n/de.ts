@@ -223,7 +223,7 @@ export const de: Translations = {
     success_expires: 'Dein Zugang ist gultig bis',
     success_cta: 'Jetzt Sprechen',
     pricing_title: 'Sprachgesprache',
-    pricing_subtitle: 'Ohne Tippen. Frag, was die Fotos nicht zeigen.',
+    pricing_subtitle: 'Ohne Tippen. Echte Antworten. Echte Reservierungen.',
     pricing_cta: 'Tagespass Holen',
     faq_title: 'Fragen?',
     faq_what_included: 'Was ist inbegriffen?',

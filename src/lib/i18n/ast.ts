@@ -230,7 +230,7 @@ export const ast: Translations = {
     success_expires: 'L\'accesu ye válidu hasta',
     success_cta: 'Empezar a Falar',
     pricing_title: 'Conversaciones de Voz',
-    pricing_subtitle: 'Ensin teclear. Entruga lo que les semeyes nun pueden amosar.',
+    pricing_subtitle: 'Ensin teclear. Rempuestes reales. Reserves reales.',
     pricing_cta: 'Obtener Pase Diariu',
     faq_title: 'Entrugues?',
     faq_what_included: 'Qué inclúi?',
