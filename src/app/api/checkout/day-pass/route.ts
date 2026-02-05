@@ -35,6 +35,18 @@ async function getSupabaseClient() {
  * Requires authentication. Returns the checkout URL.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Debug: Check env vars
+  const hasSecretKey = !!process.env.STRIPE_SECRET_KEY;
+  const hasPriceId = !!process.env.STRIPE_DAY_PASS_PRICE_ID;
+
+  if (!hasSecretKey || !hasPriceId) {
+    console.error("[checkout/day-pass] Missing env vars:", { hasSecretKey, hasPriceId });
+    return NextResponse.json(
+      { error: "Stripe not configured", hasSecretKey, hasPriceId },
+      { status: 500 }
+    );
+  }
+
   try {
     const supabase = await getSupabaseClient();
 
