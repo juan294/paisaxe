@@ -15,7 +15,6 @@ export async function GET() {
 
   try {
     const stripe = new Stripe(secretKey, {
-      apiVersion: "2026-01-28.clover",
       timeout: 30000,
     });
 
