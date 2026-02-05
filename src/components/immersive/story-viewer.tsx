@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Play, Pause, Bookmark, Share2, Shuffle, Lightbulb } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Pause, Bookmark, Share2, Shuffle, Lightbulb, Camera } from "lucide-react";
 import { BookmarkButton } from "./bookmark-button";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import { AuthButton } from "@/components/auth/auth-button";
@@ -337,8 +337,9 @@ export function StoryViewer({
 
         {/* Image source attribution */}
         {story.imageSource && (
-          <p className="text-xs text-white/50 mb-6">
-            {story.imageSource}
+          <p className="text-xs text-white/50 mb-6 flex items-center gap-1">
+            <Camera className="h-3 w-3" aria-hidden="true" />
+            <span>{story.imageSource}</span>
           </p>
         )}
 
