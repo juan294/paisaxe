@@ -7,8 +7,6 @@ import Stripe from "stripe";
  * - Day Pass (€1.99): 24 hours of unlimited voice conversations
  */
 
-// Stripe API version - use undefined to let Stripe SDK use its default
-const STRIPE_API_VERSION = undefined;
 
 /**
  * Get server-side Stripe client.
