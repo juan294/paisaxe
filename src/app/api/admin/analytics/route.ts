@@ -116,8 +116,8 @@ export async function GET(request: NextRequest) {
     return auth.error;
   }
 
-  const projectId = process.env.POSTHOG_PROJECT_ID;
-  const apiKey = process.env.POSTHOG_PERSONAL_API_KEY;
+  const projectId = process.env.POSTHOG_PROJECT_ID?.trim();
+  const apiKey = process.env.POSTHOG_PERSONAL_API_KEY?.trim();
 
   if (!projectId || !apiKey) {
     console.error("Missing POSTHOG_PROJECT_ID or POSTHOG_PERSONAL_API_KEY");

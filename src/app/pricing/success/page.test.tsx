@@ -137,7 +137,7 @@ describe("PricingSuccessPage", () => {
     render(<PricingSuccessPage />);
 
     expect(
-      screen.getByText(/access is not showing/i)
+      screen.getByText(/premium\.success_retry_hint/i)
     ).toBeInTheDocument();
   });
 
@@ -145,7 +145,7 @@ describe("PricingSuccessPage", () => {
     render(<PricingSuccessPage />);
 
     expect(
-      screen.queryByText(/access is not showing/i)
+      screen.queryByText(/premium\.success_retry_hint/i)
     ).not.toBeInTheDocument();
   });
 

@@ -150,7 +150,7 @@ async function searchPlaces(
   type?: string,
   city?: string
 ): Promise<PlacesResponse> {
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
 
   if (!apiKey) {
     throw new Error("Places API not configured");

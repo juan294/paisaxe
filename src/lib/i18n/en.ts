@@ -241,6 +241,7 @@ export const en: Translations = {
     success_subtitle: 'Your Day Pass is now active',
     success_expires: 'Your access is valid until',
     success_cta: 'Start Talking',
+    success_retry_hint: 'If your access is not showing, please wait a moment and refresh.',
     pricing_title: 'Voice Conversations',
     pricing_subtitle: 'No typing. Real answers. Real reservations.',
     pricing_cta: 'Get Day Pass',

@@ -234,6 +234,7 @@ export const de: Translations = {
     success_subtitle: 'Dein Tagespass ist jetzt aktiv',
     success_expires: 'Dein Zugang ist gultig bis',
     success_cta: 'Jetzt Sprechen',
+    success_retry_hint: 'Wenn dein Zugang nicht angezeigt wird, warte einen Moment und aktualisiere die Seite.',
     pricing_title: 'Sprachgesprache',
     pricing_subtitle: 'Ohne Tippen. Echte Antworten. Echte Reservierungen.',
     pricing_cta: 'Tagespass Holen',

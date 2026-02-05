@@ -3,7 +3,7 @@ import { VoyageAIClient } from "voyageai";
 import { EmbeddingCache } from "./embedding-cache";
 
 const voyageClient = new VoyageAIClient({
-  apiKey: process.env.VOYAGE_API_KEY,
+  apiKey: process.env.VOYAGE_API_KEY?.trim(),
 });
 
 const EMBEDDING_MODEL = "voyage-3.5";

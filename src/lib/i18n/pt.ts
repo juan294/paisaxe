@@ -234,6 +234,7 @@ export const pt: Translations = {
     success_subtitle: 'O seu Passe Diario esta agora ativo',
     success_expires: 'O seu acesso e valido ate',
     success_cta: 'Comecar a Falar',
+    success_retry_hint: 'Se o seu acesso nao aparece, aguarde um momento e atualize a pagina.',
     pricing_title: 'Conversas de Voz',
     pricing_subtitle: 'Sem digitar. Respostas reais. Reservas reais.',
     pricing_cta: 'Obter Passe Diario',

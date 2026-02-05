@@ -234,6 +234,7 @@ export const fr: Translations = {
     success_subtitle: 'Votre Pass Jour est maintenant actif',
     success_expires: 'Votre acces est valide jusqu\'a',
     success_cta: 'Commencer a Parler',
+    success_retry_hint: 'Si votre acces ne s\'affiche pas, veuillez patienter un moment et actualiser.',
     pricing_title: 'Conversations Vocales',
     pricing_subtitle: 'Sans taper. Vraies réponses. Vraies réservations.',
     pricing_cta: 'Obtenir un Pass Jour',

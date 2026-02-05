@@ -71,7 +71,7 @@ const ASTURIAS_CITIES: Record<string, { lat: number; lon: number }> = {
 };
 
 async function fetchWeather(city: string): Promise<WeatherResponse> {
-  const apiKey = process.env.OPENWEATHERMAP_API_KEY;
+  const apiKey = process.env.OPENWEATHERMAP_API_KEY?.trim();
 
   if (!apiKey) {
     throw new Error("Weather API not configured");
