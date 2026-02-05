@@ -13,7 +13,7 @@ import Stripe from "stripe";
  * Only use in API routes - never on client side.
  */
 export function getStripeClient(): Stripe {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
   if (!secretKey) {
     throw new Error("STRIPE_SECRET_KEY not configured");
   }
