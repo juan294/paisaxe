@@ -448,17 +448,24 @@ function ServiceBreakdownTable({
         {services.map((service) => (
           <tr key={`${service.serviceId}-${service.billingPeriodStart}`}>
             <td className="py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
-              <div className="flex items-center gap-2">
-                {service.serviceName}
-                {service.dashboardUrl && (
-                  <a
-                    href={service.dashboardUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#a39e98] hover:text-[#6b6560]"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  {service.serviceName}
+                  {service.dashboardUrl && (
+                    <a
+                      href={service.dashboardUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#a39e98] hover:text-[#6b6560]"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+                {service.notes && (
+                  <span className="text-xs text-[#a39e98]">
+                    {service.notes}
+                  </span>
                 )}
               </div>
             </td>
