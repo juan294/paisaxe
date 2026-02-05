@@ -41,7 +41,7 @@ export async function createDayPassCheckoutSession(
   options: StripeCheckoutOptions
 ): Promise<string> {
   const stripe = getStripeClient();
-  const priceId = process.env.STRIPE_DAY_PASS_PRICE_ID;
+  const priceId = process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
 
   if (!priceId) {
     throw new Error("STRIPE_DAY_PASS_PRICE_ID not configured");
