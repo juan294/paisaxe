@@ -221,7 +221,7 @@ export const ast: Translations = {
     feature_24h: '24 hores de conversaciones illimitaes',
     feature_unlimited: 'Entrugues illimitaes',
     feature_realtime: 'Clima y recomendaciones en tiempu real',
-    feature_booking: 'Reserva restaurantes y hoteles por ti',
+    feature_booking: 'Pelayu reserva restaurantes y hoteles por ti',
     per_day: '/ día',
     sign_in_to_purchase: 'Anicia sesión pa mercar',
     secure_payment: 'Pagu seguru vía Stripe',
