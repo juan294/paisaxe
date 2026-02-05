@@ -12,18 +12,21 @@ interface AnthropicCostReportResponse {
 }
 
 /**
- * Fetches cost data from Anthropic API.
- * Uses ANTHROPIC_API_KEY (or ANTHROPIC_ADMIN_API_KEY if set).
- * @see https://docs.anthropic.com/en/api/admin-api/cost-report
+ * Fetches cost data from Anthropic Admin API.
+ * REQUIRES ANTHROPIC_ADMIN_API_KEY (starts with sk-ant-admin-...).
+ * The regular API key does NOT work for cost reports.
+ *
+ * Get an Admin key from: Console > Manage > API keys > Admin keys tab
+ * @see https://docs.anthropic.com/en/api/admin-api/usage-cost/get-cost-report
  */
 export async function fetchAnthropicCosts(
   startDate: string,
   endDate: string
 ): Promise<ServiceCost | null> {
-  // Use admin key if available, otherwise fall back to regular API key
-  const apiKey = (process.env.ANTHROPIC_ADMIN_API_KEY || process.env.ANTHROPIC_API_KEY)?.trim();
+  const adminKey = process.env.ANTHROPIC_ADMIN_API_KEY?.trim();
 
-  if (!apiKey) {
+  if (!adminKey) {
+    // Silently return null - admin key is optional
     return null;
   }
 
@@ -38,7 +41,7 @@ export async function fetchAnthropicCosts(
       `https://api.anthropic.com/v1/organizations/cost_report?${params}`,
       {
         headers: {
-          "x-api-key": apiKey,
+          "x-api-key": adminKey,
           "anthropic-version": "2023-06-01",
         },
       }
@@ -77,14 +80,15 @@ export async function fetchAnthropicCosts(
 
 /**
  * Fetches daily cost breakdown from Anthropic.
+ * Requires ANTHROPIC_ADMIN_API_KEY.
  */
 export async function fetchAnthropicCostsByDay(
   startDate: string,
   endDate: string
 ): Promise<Array<{ date: string; costUsd: number }>> {
-  const apiKey = (process.env.ANTHROPIC_ADMIN_API_KEY || process.env.ANTHROPIC_API_KEY)?.trim();
+  const adminKey = process.env.ANTHROPIC_ADMIN_API_KEY?.trim();
 
-  if (!apiKey) {
+  if (!adminKey) {
     return [];
   }
 
@@ -99,7 +103,7 @@ export async function fetchAnthropicCostsByDay(
       `https://api.anthropic.com/v1/organizations/cost_report?${params}`,
       {
         headers: {
-          "x-api-key": apiKey,
+          "x-api-key": adminKey,
           "anthropic-version": "2023-06-01",
         },
       }
