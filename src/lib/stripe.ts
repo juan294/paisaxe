@@ -7,8 +7,8 @@ import Stripe from "stripe";
  * - Day Pass (€1.99): 24 hours of unlimited voice conversations
  */
 
-// Stripe API version - using the latest stable version
-const STRIPE_API_VERSION = "2026-01-28.clover" as const;
+// Stripe API version - use undefined to let Stripe SDK use its default
+const STRIPE_API_VERSION = undefined;
 
 /**
  * Get server-side Stripe client.
@@ -20,7 +20,6 @@ export function getStripeClient(): Stripe {
     throw new Error("STRIPE_SECRET_KEY not configured");
   }
   return new Stripe(secretKey, {
-    apiVersion: STRIPE_API_VERSION,
     timeout: 30000, // 30 second timeout
     maxNetworkRetries: 3,
   });
