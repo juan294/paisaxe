@@ -2,24 +2,25 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
 export async function GET() {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-  const priceId = process.env.STRIPE_DAY_PASS_PRICE_ID;
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+  const priceId = process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
 
   if (!secretKey) {
     return NextResponse.json({ error: "No STRIPE_SECRET_KEY" }, { status: 500 });
   }
 
   // Debug: check for invisible characters
-  const keyLength = secretKey.length;
-  const trimmedKeyLength = secretKey.trim().length;
-  const hasInvisibleChars = keyLength !== trimmedKeyLength;
+  const rawKeyLength = process.env.STRIPE_SECRET_KEY?.length ?? 0;
+  const rawPriceIdLength = process.env.STRIPE_DAY_PASS_PRICE_ID?.length ?? 0;
+  const keyHasInvisibleChars = rawKeyLength !== secretKey.length;
+  const priceIdHasInvisibleChars = rawPriceIdLength !== (priceId?.length ?? 0);
 
   if (!priceId) {
     return NextResponse.json({ error: "No STRIPE_DAY_PASS_PRICE_ID" }, { status: 500 });
   }
 
   try {
-    const stripe = new Stripe(secretKey.trim(), {
+    const stripe = new Stripe(secretKey, {
       timeout: 30000,
     });
 
@@ -39,10 +40,14 @@ export async function GET() {
     return NextResponse.json({
       error: message,
       type: errorType,
-      keyPrefix: secretKey.trim().substring(0, 12) + "...",
-      keyLength,
-      trimmedKeyLength,
-      hasInvisibleChars,
+      keyPrefix: secretKey.substring(0, 12) + "...",
+      priceIdPrefix: priceId.substring(0, 10) + "...",
+      rawKeyLength,
+      trimmedKeyLength: secretKey.length,
+      keyHasInvisibleChars,
+      rawPriceIdLength,
+      trimmedPriceIdLength: priceId.length,
+      priceIdHasInvisibleChars,
     }, { status: 500 });
   }
 }
