@@ -1,8 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Define mock functions that will be set up in vi.mock
+const mockCreate = vi.fn();
+const mockConstructEvent = vi.fn();
+
+// Mock Stripe before importing the module
+vi.mock("stripe", () => {
+  return {
+    default: class MockStripe {
+      checkout = {
+        sessions: {
+          create: mockCreate,
+        },
+      };
+      webhooks = {
+        constructEvent: mockConstructEvent,
+      };
+    },
+  };
+});
+
 import {
   isStripeConfigured,
   calculateExpiryDate,
   formatPrice,
+  getStripeClient,
+  createDayPassCheckoutSession,
+  verifyWebhookSignature,
 } from "./stripe";
 
 describe("stripe", () => {
@@ -53,6 +77,117 @@ describe("stripe", () => {
       const formatted = formatPrice(299, "USD");
       expect(formatted).toContain("2");
       expect(formatted).toContain("99");
+    });
+  });
+
+  describe("getStripeClient", () => {
+    it("should throw error when STRIPE_SECRET_KEY is missing", () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "");
+      expect(() => getStripeClient()).toThrow("STRIPE_SECRET_KEY not configured");
+    });
+
+    it("should return Stripe client when configured", () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      const client = getStripeClient();
+      expect(client).toBeDefined();
+    });
+  });
+
+  describe("createDayPassCheckoutSession", () => {
+    beforeEach(() => {
+      mockCreate.mockReset();
+    });
+
+    it("should throw error when STRIPE_DAY_PASS_PRICE_ID is missing", async () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "");
+
+      await expect(
+        createDayPassCheckoutSession({
+          userId: "user-123",
+          userEmail: "test@example.com",
+          successUrl: "https://example.com/success",
+          cancelUrl: "https://example.com/cancel",
+        })
+      ).rejects.toThrow("STRIPE_DAY_PASS_PRICE_ID not configured");
+    });
+
+    it("should create checkout session with correct parameters", async () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
+
+      mockCreate.mockResolvedValue({
+        url: "https://checkout.stripe.com/session123",
+      });
+
+      const url = await createDayPassCheckoutSession({
+        userId: "user-123",
+        userEmail: "test@example.com",
+        successUrl: "https://example.com/success",
+        cancelUrl: "https://example.com/cancel",
+      });
+
+      expect(url).toBe("https://checkout.stripe.com/session123");
+      expect(mockCreate).toHaveBeenCalledWith({
+        mode: "payment",
+        payment_method_types: ["card"],
+        line_items: [{ price: "price_123", quantity: 1 }],
+        customer_email: "test@example.com",
+        metadata: { user_id: "user-123" },
+        success_url: "https://example.com/success",
+        cancel_url: "https://example.com/cancel",
+      });
+    });
+
+    it("should throw error when session URL is not returned", async () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
+
+      mockCreate.mockResolvedValue({ url: null });
+
+      await expect(
+        createDayPassCheckoutSession({
+          userId: "user-123",
+          userEmail: "test@example.com",
+          successUrl: "https://example.com/success",
+          cancelUrl: "https://example.com/cancel",
+        })
+      ).rejects.toThrow("Failed to create checkout session - no URL returned");
+    });
+  });
+
+  describe("verifyWebhookSignature", () => {
+    beforeEach(() => {
+      mockConstructEvent.mockReset();
+    });
+
+    it("should throw error when STRIPE_WEBHOOK_SECRET is missing", () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_WEBHOOK_SECRET", "");
+
+      expect(() => verifyWebhookSignature("payload", "sig123")).toThrow(
+        "STRIPE_WEBHOOK_SECRET not configured"
+      );
+    });
+
+    it("should verify webhook signature and return event", () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_123");
+
+      const mockEvent = {
+        type: "checkout.session.completed",
+        data: { object: {} },
+      };
+      mockConstructEvent.mockReturnValue(mockEvent);
+
+      const event = verifyWebhookSignature("payload", "sig123");
+
+      expect(event).toBe(mockEvent);
+      expect(mockConstructEvent).toHaveBeenCalledWith(
+        "payload",
+        "sig123",
+        "whsec_123"
+      );
     });
   });
 });

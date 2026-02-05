@@ -244,4 +244,143 @@ describe("PricingPage", () => {
 
     expect(screen.queryByText("€1.99")).not.toBeInTheDocument();
   });
+
+  it("should call checkout API and redirect when authenticated user clicks purchase", async () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: "user-123", email: "test@example.com" },
+      session: { access_token: "token" },
+      signInWithGoogle: mockSignInWithGoogle,
+      isLoading: false,
+    });
+
+    // Mock window.location.href setter
+    const hrefSetter = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      value: { ...originalLocation, href: "" },
+      writable: true,
+    });
+    Object.defineProperty(window.location, "href", {
+      set: hrefSetter,
+      get: () => "",
+    });
+
+    render(<PricingPage />);
+
+    const button = screen.getByRole("button", { name: "premium.pricing_cta" });
+    fireEvent.click(button);
+
+    // Wait for async checkout call
+    await vi.waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith("/api/checkout/day-pass", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    });
+
+    // Should redirect to Stripe checkout
+    await vi.waitFor(() => {
+      expect(hrefSetter).toHaveBeenCalledWith("https://checkout.stripe.com/test");
+    });
+
+    // Restore
+    Object.defineProperty(window, "location", { value: originalLocation });
+  });
+
+  it("should handle checkout API error gracefully", async () => {
+    // Spy on console.error
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    mockUseAuth.mockReturnValue({
+      user: { id: "user-123", email: "test@example.com" },
+      session: { access_token: "token" },
+      signInWithGoogle: mockSignInWithGoogle,
+      isLoading: false,
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+    });
+
+    render(<PricingPage />);
+
+    const button = screen.getByRole("button", { name: "premium.pricing_cta" });
+    fireEvent.click(button);
+
+    // Wait for error to be logged
+    await vi.waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "[pricing] Checkout error:",
+        expect.any(Error)
+      );
+    });
+
+    // Button should be enabled again after error
+    await vi.waitFor(() => {
+      expect(button).not.toBeDisabled();
+    });
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("should show Premium Access text when isWhitelisted is true with no expiresAt", () => {
+    mockUseVoiceAccess.mockReturnValue({
+      hasAccess: false,
+      isWhitelisted: true,
+      canUseVoice: true,
+      needsSignIn: false,
+      needsPurchase: false,
+      expiresAt: null,
+      hoursUntilExpiry: null,
+      agentId: "test-agent",
+      isLoading: false,
+      refresh: mockRefresh,
+    });
+
+    render(<PricingPage />);
+
+    // Should show "Premium Access" instead of success_subtitle
+    expect(screen.getByText("Premium Access")).toBeInTheDocument();
+    // Should NOT show expiration date
+    expect(screen.queryByText(/premium.success_expires/)).not.toBeInTheDocument();
+  });
+
+  it("should show loading state on purchase button while checkout is in progress", async () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: "user-123", email: "test@example.com" },
+      session: { access_token: "token" },
+      signInWithGoogle: mockSignInWithGoogle,
+      isLoading: false,
+    });
+
+    // Create a promise that we can control
+    let resolveCheckout: (value: Response) => void;
+    const checkoutPromise = new Promise<Response>((resolve) => {
+      resolveCheckout = resolve;
+    });
+    mockFetch.mockReturnValueOnce(checkoutPromise);
+
+    render(<PricingPage />);
+
+    const button = screen.getByRole("button", { name: "premium.pricing_cta" });
+    fireEvent.click(button);
+
+    // Button should be disabled while loading
+    await vi.waitFor(() => {
+      expect(button).toBeDisabled();
+    });
+
+    // Spinner should be visible
+    const spinner = button.querySelector(".animate-spin");
+    expect(spinner).toBeInTheDocument();
+
+    // Resolve to clean up
+    resolveCheckout!({
+      ok: true,
+      json: () => Promise.resolve({ url: "https://checkout.stripe.com/test" }),
+    } as Response);
+  });
 });
