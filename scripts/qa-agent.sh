@@ -102,7 +102,23 @@ else
   HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- App health check failed: $HEALTH_RESPONSE"
 fi
 
-# Check 2: Stripe Connectivity (production endpoint)
+# Check 2: Database Connectivity (production endpoint)
+log_info "Checking database connectivity..." | tee -a "$LOG_FILE"
+DB_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/health/db" 2>&1)
+if echo "$DB_RESPONSE" | grep -q '"success":true'; then
+  DB_LATENCY=$(echo "$DB_RESPONSE" | grep -oE '"latencyMs":[0-9]+' | cut -d':' -f2 || echo "unknown")
+  log_success "Database connectivity: OK (latency: ${DB_LATENCY}ms)" | tee -a "$LOG_FILE"
+  HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
+else
+  log_error "Database connectivity: FAILED" | tee -a "$LOG_FILE"
+  if echo "$DB_RESPONSE" | grep -q "not configured"; then
+    log_warn "  -> Possible cause: Supabase environment variables missing or misconfigured" | tee -a "$LOG_FILE"
+  fi
+  HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+  HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Database check failed: $DB_RESPONSE"
+fi
+
+# Check 3: Stripe Connectivity (production endpoint)
 log_info "Checking Stripe connectivity..." | tee -a "$LOG_FILE"
 STRIPE_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/stripe-test" 2>&1)
 if echo "$STRIPE_RESPONSE" | grep -q '"success":true'; then
