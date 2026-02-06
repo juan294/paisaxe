@@ -39,6 +39,19 @@ vi.mock("@/hooks/use-feature-flags", () => ({
   }),
 }));
 
+// Mock useFavorites
+const mockToggleFavorite = vi.fn();
+const mockIsFavorite = vi.fn().mockReturnValue(false);
+vi.mock("@/hooks/use-favorites", () => ({
+  useFavorites: () => ({
+    favorites: [],
+    isFavorite: mockIsFavorite,
+    toggleFavorite: mockToggleFavorite,
+    isLoading: false,
+    requiresAuth: false,
+  }),
+}));
+
 // Mock useReducedMotion
 vi.mock("@/hooks/use-reduced-motion", () => ({
   useReducedMotion: () => false,
@@ -559,6 +572,48 @@ describe("StoryViewer", () => {
 
       // Multiple elements may have category text (story badge + filter dropdown)
       expect(screen.getAllByText("Gastronomia").length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("bookmark toggle", () => {
+    beforeEach(() => {
+      mockToggleFavorite.mockClear();
+      mockIsFavorite.mockReturnValue(false);
+    });
+
+    it("should toggle favorite for the current story when clicking bookmark button", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // The toolbar bookmark button should have "Guardar" label (toggle mode, not navigation)
+      const bookmarkBtn = screen.getByRole("button", { name: "Guardar" });
+      expect(bookmarkBtn).toBeInTheDocument();
+
+      fireEvent.click(bookmarkBtn);
+
+      expect(mockToggleFavorite).toHaveBeenCalledWith("story-1");
+    });
+
+    it("should show filled bookmark icon when current story is favorited", async () => {
+      mockIsFavorite.mockReturnValue(true);
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // When favorited, the button label should indicate removal
+      const bookmarkBtn = screen.getByRole("button", { name: "Quitar de guardados" });
+      expect(bookmarkBtn).toBeInTheDocument();
+
+      // The SVG should have fill-white class
+      const svg = bookmarkBtn.querySelector("svg");
+      expect(svg?.classList.contains("fill-white")).toBe(true);
+    });
+
+    it("should toggle favorite for the correct story at different index", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+
+      const bookmarkBtn = screen.getByRole("button", { name: "Guardar" });
+      fireEvent.click(bookmarkBtn);
+
+      expect(mockToggleFavorite).toHaveBeenCalledWith("story-2");
     });
   });
 });
