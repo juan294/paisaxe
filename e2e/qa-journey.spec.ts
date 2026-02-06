@@ -4,7 +4,13 @@ import {
   expect as authExpect,
   hasAuthCredentials,
 } from "./fixtures/auth";
-import { MOCK_CHAT_RESPONSE, MOCK_FEATURE_FLAGS } from "./fixtures/mock-data";
+import {
+  MOCK_CHAT_RESPONSE,
+  MOCK_CHAT_RESPONSE_FOLLOWUP,
+  MOCK_FEATURE_FLAGS,
+  MOCK_SUGGESTION_RESPONSE,
+  withFeatureFlags,
+} from "./fixtures/mock-data";
 
 /**
  * QA Journey Tests — End-to-end user journey testing for QA Agent
@@ -284,6 +290,153 @@ test.describe("QA Journey: Error Handling", () => {
     expect(body).toHaveProperty("status");
     expect(body).toHaveProperty("version");
     expect(["healthy", "degraded"]).toContain(body.status);
+  });
+});
+
+test.describe("QA Journey: New Features", () => {
+  test("Journey 13: Submit a place suggestion as anonymous user", async ({
+    page,
+  }, testInfo) => {
+    // Suggest button uses hidden md:block — skip on mobile
+    const viewport = page.viewportSize();
+    if (viewport && viewport.width < 768) testInfo.skip();
+    // Enable suggestion feature flag
+    await page.route("**/api/feature-flags", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          withFeatureFlags({ user_story_suggestions: true })
+        ),
+      })
+    );
+
+    // Mock suggestion API
+    await page.route("**/api/suggestions", (route) =>
+      route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_SUGGESTION_RESPONSE),
+      })
+    );
+
+    // Step 1: Navigate to immersive view
+    await page.goto("/immersive");
+    await expect(page.locator("h1")).toBeVisible();
+
+    // Step 2: Click the suggest button
+    const suggestButton = page.locator("[data-suggest-place-trigger]");
+    await expect(suggestButton).toBeVisible();
+    await suggestButton.click();
+
+    // Step 3: Dialog should open
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // Step 4: Fill the form
+    await dialog.locator("#place-name").fill("Playa del Silencio");
+
+    // Select location via combobox
+    await dialog.getByRole("combobox").click();
+    await page.getByRole("option").first().click();
+
+    // Add optional comment
+    await dialog.locator("#comment").fill("A beautiful hidden beach");
+
+    // Step 5: Submit
+    await dialog.locator('button[type="submit"]').click();
+
+    // Step 6: See success state (text-based — lucide icons render as img in Playwright)
+    await expect(
+      dialog.getByText(/thank|gracias|success/i)
+    ).toBeVisible({ timeout: 5000 });
+
+    // Step 7: Dialog auto-closes after success (2s timeout in component)
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
+
+    // Step 8: Back on immersive view
+    await expect(page.locator("h1")).toBeVisible();
+  });
+
+  test("Journey 14: Multi-turn chat conversation", async ({ page }) => {
+    // Mock feature flags
+    await page.route("**/api/feature-flags", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_FEATURE_FLAGS),
+      })
+    );
+
+    // Track call count to return different responses
+    let callCount = 0;
+    await page.route("**/api/chat/stream", (route) => {
+      callCount++;
+      const mockResponse =
+        callCount === 1 ? MOCK_CHAT_RESPONSE : MOCK_CHAT_RESPONSE_FOLLOWUP;
+
+      const textEvent = `data: ${JSON.stringify({ type: "text", content: mockResponse.message })}\n\n`;
+      const doneEvent = `data: ${JSON.stringify({ type: "done", images: mockResponse.images, sources: mockResponse.sources })}\n\n`;
+      return route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: textEvent + doneEvent,
+      });
+    });
+
+    // Step 1: Navigate to immersive
+    await page.goto("/immersive");
+    await expect(page.locator("h1")).toBeVisible();
+
+    // Step 2: Open chat
+    await page.locator('[data-testid="ask-button"]').click();
+    const chatPanel = page.locator(".fixed.inset-0.z-50");
+    await expect(chatPanel).toBeVisible();
+
+    // Dismiss privacy notice if shown
+    const privacyButton = chatPanel
+      .locator("button")
+      .filter({ hasText: /entend|understood|got it|ok|compris/i });
+    if (await privacyButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await privacyButton.click();
+    }
+
+    // Step 3: Send first message
+    await chatPanel.locator("input").fill("Tell me about the lakes");
+    await chatPanel.locator('button[type="submit"]').click();
+
+    // Step 4: Verify first user message and assistant response
+    await expect(
+      chatPanel.getByText("Tell me about the lakes")
+    ).toBeVisible();
+    await expect(
+      chatPanel.getByText(/Lagos de Covadonga son dos lagos/)
+    ).toBeVisible({ timeout: 5000 });
+
+    // Step 5: Send second message
+    await chatPanel.locator("input").fill("What about hiking?");
+    await chatPanel.locator('button[type="submit"]').click();
+
+    // Step 6: Verify second user message and assistant response
+    await expect(chatPanel.getByText("What about hiking?")).toBeVisible();
+    await expect(
+      chatPanel.getByText(/Senda del Cares/)
+    ).toBeVisible({ timeout: 5000 });
+
+    // Step 7: Both conversations should be visible (scroll history)
+    await expect(
+      chatPanel.getByText("Tell me about the lakes")
+    ).toBeVisible();
+    await expect(chatPanel.getByText("What about hiking?")).toBeVisible();
+
+    // Step 8: Close chat and return to immersive
+    const closeButton = chatPanel
+      .locator("button")
+      .filter({ has: page.locator("svg.lucide-x") });
+    await closeButton.click();
+
+    await expect(chatPanel).not.toBeVisible();
+    await expect(page.locator("h1")).toBeVisible();
   });
 });
 
