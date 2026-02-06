@@ -326,7 +326,6 @@ Complete checklist:
 - [ ] `src/agents/personas/xander-x-agent.md`
 - [ ] `src/agents/personas/iris-instagram-agent.md`
 - [ ] `src/agents/personas/penny-pinterest-agent.md`
-- [ ] `src/agents/personas/tiko-tiktok-agent.md`
 
 ---
 
