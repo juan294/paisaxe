@@ -20,10 +20,16 @@ const AGENTS = [
   { flagKey: "cost_analyst_agent_enabled", name: "Cost Analyst", schedule: "Daily at 3:00 AM", reportFile: "docs/agents/cost-analyst-report.md" },
 ];
 
-// Map flag keys to display names for shared context parsing
+// Map flag keys to display names for shared context parsing.
+// Supports both full keys ("coverage_agent_enabled") and short forms ("coverage_agent").
 const FLAG_TO_NAME: Record<string, string> = {};
 for (const agent of AGENTS) {
   FLAG_TO_NAME[agent.flagKey] = agent.name;
+  // Also map the short form without "_enabled" suffix
+  const shortKey = agent.flagKey.replace(/_enabled$/, "");
+  if (shortKey !== agent.flagKey) {
+    FLAG_TO_NAME[shortKey] = agent.name;
+  }
 }
 
 /**
@@ -54,6 +60,21 @@ function parseHealth(content: string): AgentHealthStatus {
   // Pattern 3: "Status: Complete" (localization report)
   const completeMatch = normalized.match(/\*\*status\s*:\*\*\s*complete/i);
   if (completeMatch) {
+    return "green";
+  }
+
+  // Pattern 4: Infer from content when no explicit health line exists.
+  // Check for negative indicators first (failures, errors).
+  const hasFailures = /\d+\s+failure/i.test(normalized);
+  const hasErrors = /typescript.*\d+\s+error/i.test(normalized);
+  if (hasFailures || hasErrors) {
+    return "yellow";
+  }
+
+  // If the report has substantive content (not just a header) and no negative
+  // indicators, treat it as green — the agent completed successfully.
+  const hasContent = normalized.length > 100 && /^#/m.test(normalized);
+  if (hasContent) {
     return "green";
   }
 
