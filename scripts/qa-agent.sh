@@ -34,6 +34,7 @@ cleanup() {
   rm -f "$METRICS_FILE"
   rm -f "$JOURNEY_METRICS_FILE"
   rm -f "$PROJECT_DIR/.qa-health-metrics.tmp"
+  rm -f "$PROJECT_DIR/.qa-gap-metrics.tmp"
 }
 trap cleanup EXIT
 
@@ -52,7 +53,8 @@ cd "$PROJECT_DIR"
 TESTS_PER_CATEGORY=$(get_agent_config "qa_agent_enabled" "testsPerCategory" || echo "3")
 ENABLE_JOURNEY_TESTS=$(get_agent_config "qa_agent_enabled" "enableJourneyTests" || echo "true")
 ENABLE_GITHUB_ISSUES=$(get_agent_config "qa_agent_enabled" "enableGithubIssues" || echo "true")
-log_info "Configuration: $TESTS_PER_CATEGORY tests/category, journeyTests=$ENABLE_JOURNEY_TESTS, githubIssues=$ENABLE_GITHUB_ISSUES" | tee -a "$LOG_FILE"
+ENABLE_GAP_ANALYSIS=$(get_agent_config "qa_agent_enabled" "enableGapAnalysis" || echo "true")
+log_info "Configuration: $TESTS_PER_CATEGORY tests/category, journeyTests=$ENABLE_JOURNEY_TESTS, githubIssues=$ENABLE_GITHUB_ISSUES, gapAnalysis=$ENABLE_GAP_ANALYSIS" | tee -a "$LOG_FILE"
 
 # Check if server is already running
 if curl -s --max-time 2 "http://localhost:3000/api/health" > /dev/null 2>&1; then
@@ -347,6 +349,138 @@ else
 fi
 
 # =============================================================================
+# PHASE 6: Test Gap Analysis
+# =============================================================================
+GAP_METRICS_FILE="$PROJECT_DIR/.qa-gap-metrics.tmp"
+
+if [[ "$ENABLE_GAP_ANALYSIS" == "true" ]]; then
+  log_info "=== Phase 6: Test Gap Analysis ===" | tee -a "$LOG_FILE"
+
+  GAP_HIGH=""
+  GAP_MEDIUM=""
+  GAP_LOW=""
+
+  # --- 6a: Feature flags in type definition vs mock fixture ---
+  log_info "Checking feature flag coverage in E2E mocks..." | tee -a "$LOG_FILE"
+
+  TYPE_FLAGS=$(sed -n '/^export type FeatureFlagKey/,/;$/p' "$PROJECT_DIR/src/types/feature-flags.ts" | grep -oE '"[a-z_]+"' | tr -d '"' | sort)
+  MOCK_FLAGS=$(grep -oE 'flagKey: "[a-z_]+"' "$PROJECT_DIR/e2e/fixtures/mock-data.ts" | grep -oE '"[a-z_]+"' | tr -d '"' | sort)
+
+  # Agent/internal flags don't belong in the E2E mock fixture
+  INTERNAL_FLAG_PATTERN="_agent_enabled$|^automated_agents$|^maintenance_mode$"
+  MISSING_FLAGS=$(comm -23 <(echo "$TYPE_FLAGS") <(echo "$MOCK_FLAGS") | grep -vE "$INTERNAL_FLAG_PATTERN" || true)
+
+  if [[ -n "$MISSING_FLAGS" ]]; then
+    while IFS= read -r flag; do
+      [[ -z "$flag" ]] && continue
+      GAP_MEDIUM="${GAP_MEDIUM}\n- Feature flag \`${flag}\` — missing from MOCK_FEATURE_FLAGS in \`e2e/fixtures/mock-data.ts\`"
+    done <<< "$MISSING_FLAGS"
+    FLAG_COUNT=$(echo "$MISSING_FLAGS" | grep -c . || true)
+    log_warn "Found $FLAG_COUNT feature flags missing from E2E mocks" | tee -a "$LOG_FILE"
+  else
+    log_success "All user-facing feature flags present in E2E mocks" | tee -a "$LOG_FILE"
+  fi
+
+  # --- 6b: API routes vs E2E smoke tests ---
+  log_info "Checking API route E2E coverage..." | tee -a "$LOG_FILE"
+
+  API_ROUTES=$(ls -d "$PROJECT_DIR"/src/app/api/*/ 2>/dev/null | xargs -I{} basename {} | sort)
+
+  for route in $API_ROUTES; do
+    if ! grep -rq "/api/${route}" "$PROJECT_DIR"/e2e/*.spec.ts 2>/dev/null; then
+      GAP_HIGH="${GAP_HIGH}\n- \`/api/${route}\` — no E2E spec references this route"
+    fi
+  done
+
+  # --- 6c: Pages vs E2E load tests ---
+  log_info "Checking page E2E coverage..." | tee -a "$LOG_FILE"
+
+  PAGES=$(find "$PROJECT_DIR/src/app" -name "page.tsx" -not -path "*/api/*" | sed "s|$PROJECT_DIR/src/app||" | sed 's|/page.tsx||' | sed 's|^$|/|' | sort)
+
+  for page_path in $PAGES; do
+    # Skip dynamic routes like [slug] — too hard to match reliably
+    [[ "$page_path" == *"["* ]] && continue
+    # Root page "/" would match everything — search for explicit root navigation
+    if [[ "$page_path" == "/" ]]; then
+      if ! grep -rqE "goto\(['\"]/" "$PROJECT_DIR"/e2e/*.spec.ts 2>/dev/null; then
+        GAP_LOW="${GAP_LOW}\n- Page \`/\` — no E2E load/render test found"
+      fi
+    else
+      if ! grep -rq "${page_path}" "$PROJECT_DIR"/e2e/*.spec.ts 2>/dev/null; then
+        GAP_LOW="${GAP_LOW}\n- Page \`${page_path}\` — no E2E load/render test found"
+      fi
+    fi
+  done
+
+  # --- 6d: data-testid in source vs E2E specs ---
+  log_info "Checking data-testid coverage..." | tee -a "$LOG_FILE"
+
+  SOURCE_TESTIDS=$(grep -roh 'data-testid="[^"]*"' "$PROJECT_DIR/src/" 2>/dev/null | grep -oE '"[^"]*"' | tr -d '"' | sort -u || true)
+  E2E_TESTIDS=$(grep -rohE "data-testid=['\"][^'\"]+['\"]|getByTestId\(['\"][^'\"]+['\"]\)" "$PROJECT_DIR/e2e/" 2>/dev/null | grep -oE "['\"][a-zA-Z0-9_-]+['\"]" | tr -d "'" | tr -d '"' | sort -u || true)
+
+  if [[ -n "$SOURCE_TESTIDS" && -n "$E2E_TESTIDS" ]]; then
+    UNTESTED_TESTIDS=$(comm -23 <(echo "$SOURCE_TESTIDS") <(echo "$E2E_TESTIDS") 2>/dev/null || true)
+  elif [[ -n "$SOURCE_TESTIDS" ]]; then
+    UNTESTED_TESTIDS="$SOURCE_TESTIDS"
+  else
+    UNTESTED_TESTIDS=""
+  fi
+
+  if [[ -n "$UNTESTED_TESTIDS" ]]; then
+    UNTESTED_COUNT=$(echo "$UNTESTED_TESTIDS" | grep -c . || true)
+    if [[ $UNTESTED_COUNT -le 10 ]]; then
+      while IFS= read -r testid; do
+        [[ -z "$testid" ]] && continue
+        GAP_LOW="${GAP_LOW}\n- \`data-testid=\"${testid}\"\` — defined in source but not referenced in E2E specs"
+      done <<< "$UNTESTED_TESTIDS"
+    else
+      GAP_LOW="${GAP_LOW}\n- ${UNTESTED_COUNT} \`data-testid\` attributes in source are not referenced in any E2E spec"
+    fi
+    log_info "Found $UNTESTED_COUNT untested data-testid attributes" | tee -a "$LOG_FILE"
+  fi
+
+  # --- Write gap analysis results ---
+  {
+    echo ""
+    echo "E2E TEST GAP ANALYSIS:"
+    echo "======================"
+    if [[ -n "$GAP_HIGH" ]]; then
+      echo ""
+      echo "HIGH PRIORITY (untested API routes):"
+      echo -e "$GAP_HIGH"
+    fi
+    if [[ -n "$GAP_MEDIUM" ]]; then
+      echo ""
+      echo "MEDIUM PRIORITY (missing mock fixtures):"
+      echo -e "$GAP_MEDIUM"
+    fi
+    if [[ -n "$GAP_LOW" ]]; then
+      echo ""
+      echo "LOW PRIORITY (pages and test IDs without E2E coverage):"
+      echo -e "$GAP_LOW"
+    fi
+    if [[ -z "$GAP_HIGH" && -z "$GAP_MEDIUM" && -z "$GAP_LOW" ]]; then
+      echo ""
+      echo "No test gaps detected. All features, routes, and pages have E2E coverage."
+    fi
+  } > "$GAP_METRICS_FILE"
+
+  TOTAL_GAPS=0
+  [[ -n "$GAP_HIGH" ]] && TOTAL_GAPS=$((TOTAL_GAPS + $(echo -e "$GAP_HIGH" | grep -c "^-" || true)))
+  [[ -n "$GAP_MEDIUM" ]] && TOTAL_GAPS=$((TOTAL_GAPS + $(echo -e "$GAP_MEDIUM" | grep -c "^-" || true)))
+  [[ -n "$GAP_LOW" ]] && TOTAL_GAPS=$((TOTAL_GAPS + $(echo -e "$GAP_LOW" | grep -c "^-" || true)))
+
+  if [[ $TOTAL_GAPS -gt 0 ]]; then
+    log_warn "Found $TOTAL_GAPS test coverage gaps" | tee -a "$LOG_FILE"
+  else
+    log_success "No test coverage gaps detected" | tee -a "$LOG_FILE"
+  fi
+else
+  log_info "=== Phase 6: Test Gap Analysis (SKIPPED - disabled in config) ===" | tee -a "$LOG_FILE"
+  echo "Test gap analysis skipped (disabled in config)" > "$GAP_METRICS_FILE"
+fi
+
+# =============================================================================
 # PHASE 5: Claude Analysis & Report Generation
 # =============================================================================
 log_info "=== Phase 5: Claude Analysis & Report ===" | tee -a "$LOG_FILE"
@@ -383,6 +517,9 @@ $(cat "$METRICS_FILE")
 
 Journey test metrics:
 $(cat "$JOURNEY_METRICS_FILE" 2>/dev/null || echo "No journey test data available")
+
+Test gap analysis:
+$(cat "$GAP_METRICS_FILE" 2>/dev/null || echo "No gap analysis data available")
 PROMPT
 
 log_success "Claude analysis complete" | tee -a "$LOG_FILE"

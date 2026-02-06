@@ -178,6 +178,46 @@ create_qa_issue() {
 
 **Already existed in Paisaxe.** If you don't have this, consider adding it—it's the highest-value enhancement.
 
+### Phase 6: Test Gap Analysis
+
+**What:** The QA agent reviews E2E test coverage on each run and identifies untested features.
+
+**Why:** As features are added, modified, or removed, test coverage drifts. Manual gap analysis (like the 28-test batch we added for suggestions, chat, flags, i18n, and static pages) should be caught automatically.
+
+**Gap Detection Heuristics:**
+
+| Signal | What the Agent Checks |
+|--------|----------------------|
+| New feature flags | Compare `src/app/api/feature-flags/` against `MOCK_FEATURE_FLAGS` in `e2e/fixtures/mock-data.ts` |
+| New API routes | Check each route under `src/app/api/` for a corresponding E2E smoke test |
+| New pages | Check each page under `src/app/` for a load/render E2E test |
+| New components with `data-testid` | Look for `data-testid` attributes in source that aren't referenced in any E2E spec |
+| Modified API contracts | Detect changed request/response shapes not reflected in E2E mocks |
+
+**Report Output:**
+
+Gaps appear in the QA report under "E2E Test Gap Analysis" as a prioritized list:
+
+```markdown
+## E2E Test Gap Analysis
+
+### High Priority
+- **`/api/bookings` — no E2E smoke test**
+  Suggested test: `expect((await request.get('/api/bookings')).status()).toBe(401)` (unauthenticated)
+
+### Medium Priority
+- **Feature flag `visitor_voice_agent` — missing from mock fixture**
+  Add to `MOCK_FEATURE_FLAGS` in `e2e/fixtures/mock-data.ts`
+
+### Low Priority
+- **`/about` page — no load test**
+  Suggested test: `await page.goto('/about'); await expect(page.locator('h1')).toBeVisible()`
+```
+
+**Key Decision:** The agent recommends tests but does not auto-generate spec files. Gap reports feed into the next development cycle as actionable items or GitHub issues.
+
+**Configuration:** Controlled by `enableGapAnalysis` in the `qa_agent_enabled` feature flag config (default: `true`).
+
 ---
 
 ## Minimal Implementation (No Database)
