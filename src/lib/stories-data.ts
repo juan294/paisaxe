@@ -10,9 +10,6 @@ import fallbackStoriesData from "@content/fallback-stories.json";
 // These stories are loaded from content/fallback-stories.json for easy content management
 export const FALLBACK_STORIES: Story[] = fallbackStoriesData.stories as Story[];
 
-// For backward compatibility
-export const STORIES = FALLBACK_STORIES;
-
 /**
  * Fetch all active stories from the database
  * Falls back to hardcoded stories if database is unavailable

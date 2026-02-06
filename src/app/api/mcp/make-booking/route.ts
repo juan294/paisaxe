@@ -200,8 +200,6 @@ async function initiateCall(
       },
     };
 
-    console.log("[make-booking] Request body:", JSON.stringify(requestBody, null, 2));
-
     // Use US regional endpoint to match Twilio webhook configuration
     const response = await fetch(
       "https://api.us.elevenlabs.io/v1/convai/twilio/outbound-call",
@@ -216,7 +214,6 @@ async function initiateCall(
     );
 
     const data = await response.json();
-    console.log("[make-booking] Full ElevenLabs response:", JSON.stringify(data, null, 2));
 
     if (!response.ok) {
       console.error("[make-booking] ElevenLabs error:", data);
@@ -225,10 +222,6 @@ async function initiateCall(
         error: data.detail?.message || data.message || `ElevenLabs API error: ${response.status}`,
       };
     }
-
-    console.log(
-      `[make-booking] Call initiated to ${request.venue_name}: ${data.callSid || data.conversation_id}`
-    );
 
     return {
       success: true,
@@ -342,7 +335,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       !process.env.ELEVENLABS_PHONE_NUMBER_ID
     ) {
       // Return a helpful message for testing/development
-      console.log("[make-booking] ElevenLabs outbound calling not configured, returning mock response");
       return NextResponse.json<MakeBookingResponse>({
         success: false,
         message: `Outbound calling is not configured. To make a reservation at ${venue_name}, please call them directly at ${phone_number}.`,
@@ -396,8 +388,6 @@ export async function POST(request: Request): Promise<NextResponse> {
           if (insertError) {
             console.error("[make-booking] Failed to store pending booking:", insertError);
             // Don't fail the request - call was already initiated
-          } else {
-            console.log(`[make-booking] Stored pending booking for conversation: ${conversationId}`);
           }
         } catch (dbError) {
           console.error("[make-booking] Database error storing pending booking:", dbError);

@@ -209,7 +209,3 @@ export const CHAT_CONFIG = {
   temperature: 0.7,
 } as const;
 
-/**
- * Type for chat configuration
- */
-export type ChatConfig = typeof CHAT_CONFIG;

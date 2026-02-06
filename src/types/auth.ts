@@ -7,7 +7,7 @@ export interface AuthUser {
   avatarUrl: string | null;
 }
 
-export interface AuthState {
+interface AuthState {
   user: AuthUser | null;
   session: Session | null;
   isLoading: boolean;

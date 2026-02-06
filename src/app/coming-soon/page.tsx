@@ -52,8 +52,8 @@ export default async function ComingSoonPage() {
     <main className="relative min-h-screen bg-[#030303] overflow-hidden">
       {/* Animated gradient background */}
       <div className="absolute inset-0 opacity-30">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-emerald-900/30 animate-gradient-shift" />
-        <div className="absolute inset-0 bg-gradient-to-tl from-purple-900/20 via-transparent to-blue-800/20 animate-gradient-shift-reverse" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-emerald-900/30 animate-gradient-shift motion-reduce:animate-none" />
+        <div className="absolute inset-0 bg-gradient-to-tl from-purple-900/20 via-transparent to-blue-800/20 animate-gradient-shift-reverse motion-reduce:animate-none" />
       </div>
 
       {/* Subtle noise texture overlay */}
@@ -67,24 +67,24 @@ export default async function ComingSoonPage() {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6">
         {/* Logo */}
-        <div className="w-24 h-24 md:w-32 md:h-32 mb-8 text-white/90 opacity-0 animate-fade-in-up">
+        <div className="w-24 h-24 md:w-32 md:h-32 mb-8 text-white/90 opacity-0 animate-fade-in-up motion-reduce:animate-none motion-reduce:opacity-100">
           <Logo primaryColor="currentColor" />
         </div>
 
         {/* Brand name */}
-        <h1 className="text-4xl md:text-6xl font-light tracking-[0.2em] text-white/95 mb-4 opacity-0 animate-fade-in-up-delay-1">
+        <h1 className="text-4xl md:text-6xl font-light tracking-[0.2em] text-white/95 mb-4 opacity-0 animate-fade-in-up-delay-1 motion-reduce:animate-none motion-reduce:opacity-100">
           PAISAXE
         </h1>
 
         {/* Tagline */}
         {config.show_tagline && (
-          <p className="text-lg md:text-xl text-white/60 tracking-widest uppercase mb-16 opacity-0 animate-fade-in-up-delay-2">
+          <p className="text-lg md:text-xl text-white/60 tracking-widest uppercase mb-16 opacity-0 animate-fade-in-up-delay-2 motion-reduce:animate-none motion-reduce:opacity-100">
             Look. Ask. Discover.
           </p>
         )}
 
         {/* Coming Soon / Maintenance Message */}
-        <div className={`opacity-0 ${config.show_tagline ? 'animate-fade-in-up-delay-3' : 'animate-fade-in-up-delay-2 mt-12'}`}>
+        <div className={`opacity-0 motion-reduce:opacity-100 motion-reduce:animate-none ${config.show_tagline ? 'animate-fade-in-up-delay-3' : 'animate-fade-in-up-delay-2 mt-12'}`}>
           <div className="relative">
             {/* Glassmorphism card */}
             <div className="px-10 py-5 rounded-full bg-white/[0.03] backdrop-blur-sm border border-white/10 shadow-2xl">

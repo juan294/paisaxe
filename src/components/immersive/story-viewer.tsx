@@ -408,7 +408,7 @@ export function StoryViewer({
 
       {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}
       <nav
-        aria-label="Story controls"
+        aria-label={t("accessibility.story_controls")}
         className={cn(
           "absolute top-16 right-4 md:right-6 z-20 flex items-center gap-2 md:gap-3 max-w-[calc(100%-8rem)] transition-all duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 motion-reduce:translate-y-0 pointer-events-none"
