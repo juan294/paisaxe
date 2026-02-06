@@ -8,6 +8,23 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@anthropic-ai/sdk", "sharp"],
+  // Exclude heavy directories from serverless function tracing.
+  // Routes using fs + process.cwd() (agents-summary, agents/run) cause
+  // Next.js to trace the entire project root, pulling in content/images
+  // and blowing past Vercel's 250MB unzipped function size limit.
+  outputFileTracingExcludes: {
+    "*": [
+      "./content/**",
+      "./coverage/**",
+      "./public/**",
+      "./docs/**",
+      "./logs/**",
+      "./scripts/**",
+      "./supabase/**",
+      "./e2e/**",
+      "./marketing/**",
+    ],
+  },
   // Reverse proxy for PostHog to avoid ad blockers
   rewrites: async () => [
     {
