@@ -1,40 +1,17 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-02-01 07:14:35
+> Auto-generated on 2026-02-06 10:27:19
 
 ## CLAUDE.md Status
 
-Last modified: **2026-01-31**
+Last modified: **2026-02-06**
 
 ## Files Modified Since Documentation Update
 
 These source files have been modified since CLAUDE.md was last updated and may need documentation updates.
 
-### Source Files (src/)
+No source files modified since documentation update.
 
-```
-src/app/api/admin/agent-reports/route.ts
-src/app/coming-soon/page.tsx
-src/components/admin/feature-toggles-panel.test.tsx
-src/components/admin/feature-toggles-panel.tsx
-src/components/admin/maintenance-config-panel.tsx
-src/config/location.ts
-src/tests/qa/llm-quality.test.ts
-src/types/feature-flags.ts
-```
-
-### Database Migrations
-
-```
-supabase/migrations/035_qa_agent_flag.sql
-supabase/migrations/036_docs_freshness_autonomous.sql
-```
-
-### Scripts
-
-```
-scripts/docs-freshness-agent.sh
-scripts/qa-agent.sh
-```
+No new migrations since documentation update.
 
 ## Documentation Gaps
 
@@ -45,6 +22,8 @@ These API routes may not be documented in CLAUDE.md:
 ```
 admin/agent-reports
 admin/analytics
+admin/costs-analytics
+admin/costs-analytics/[id]
 admin/elevenlabs-analytics
 admin/feature-flags/[key]
 admin/marketing/accounts
@@ -59,16 +38,29 @@ admin/stories/[id]/content-images
 admin/stories/[id]/image
 admin/stories/[id]/image-source
 admin/stories/[id]/status
+admin/stories/[id]/translations
 admin/stories/bulk-delete
 admin/stories/bulk-status
+admin/stripe-analytics
 admin/suggestions
 admin/suggestions/[id]
+admin/tunnel
 chat
 chat/stream
+checkout/day-pass
 favorites
 feature-flags
+health/db
+mcp/make-booking
+mcp/make-booking/status
+mcp/places
+mcp/weather
 suggestions
+voice-access
+webhooks/elevenlabs
+webhooks/stripe
 webhooks/supabase
+webhooks/translate
 
 ```
 
@@ -81,9 +73,12 @@ ambient_discovery
 asturianu_touches
 automated_agents
 autoplay_button
+booking_system
 contextual_prompts
 coverage_agent_enabled
 documentation_agent_enabled
+fullscreen_button
+localization_agent_enabled
 maintenance_mode
 mood_discovery
 performance_agent_enabled
@@ -92,6 +87,7 @@ randomized_order
 related_stories
 seasonal_surfacing
 security_agent_enabled
+sms_booking_confirmation
 story_freshness
 story_sharing
 surprise_me
@@ -99,46 +95,27 @@ user_story_suggestions
 
 ```
 
+## Changes Made This Run (2026-02-06)
+
+Added 4 undocumented feature flags to `docs/project/features.md`:
+
+| Flag | Section | Description |
+|------|---------|-------------|
+| `fullscreen_button` | Experience Flags | Fullscreen button in toolbar (native fullscreen on desktop, Add to Home Screen on iOS/iPad) |
+| `booking_system` | Voice Flags | Master toggle for Pelayo's outbound booking calls to restaurants/hotels |
+| `sms_booking_confirmation` | Voice Flags | SMS confirmation to customers via Twilio after booking calls complete |
+| `localization_agent_enabled` | System Flags | Localization agent (runs weekly on Sunday) — ensures 100% translation coverage |
+
+**API routes**: All 34 listed API routes are internal admin/backend routes. They are not meant for external consumption and are already described functionally in `features.md` (e.g., Analytics Dashboard, Story Management, Feature Flags sections). No separate API route documentation added.
+
+**Feature flags gap analysis**: The gaps report listed 23 flags as "potentially undocumented", but 19 were already documented in the Feature Flags Reference table. Only the 4 above were truly missing.
+
 ## Documentation File Ages
 
 | File | Last Modified |
 |------|--------------|
-| CLAUDE.md | 2026-01-31 |
+| CLAUDE.md | 2026-02-06 |
 | README.md | 2026-01-31 |
-
----
-
-## Changes Made This Run (2026-02-01)
-
-### Feature Flags Added to `docs/project/features.md`
-
-Reorganized Feature Flags Reference into categorized sections and added 9 previously undocumented flags:
-
-**Experience Flags:**
-- `autoplay_button` — Play/pause button for auto-play in story viewer
-
-**Social Flags:**
-- `user_story_suggestions` — "Suggest a Place" button for visitor submissions
-
-**Voice Flags:**
-- `visitor_voice_agent` — Voice agent access (whitelisted emails only)
-
-**System Flags:**
-- `maintenance_mode` — Shows maintenance page instead of the main app
-- `automated_agents` — Master toggle for all automated CI/CD agents
-- `coverage_agent_enabled` — Coverage agent (runs daily at 2:00 AM)
-- `security_agent_enabled` — Security agent (runs weekly on Monday)
-- `documentation_agent_enabled` — Docs freshness agent (runs weekly on Sunday)
-- `performance_agent_enabled` — Performance agent (runs weekly on Saturday)
-- `qa_agent_enabled` — QA agent for LLM response quality testing
-
-### API Routes Not Documented
-
-The following API routes were identified but intentionally **not documented** as they are internal admin/system routes:
-- All `admin/*` routes — Internal admin panel APIs
-- `chat`, `chat/stream` — Internal chat flow APIs (already described in features.md)
-- `favorites`, `feature-flags`, `suggestions` — Internal data APIs
-- `webhooks/supabase` — Internal webhook endpoint (already described in features.md)
 
 ---
 
