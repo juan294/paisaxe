@@ -66,27 +66,68 @@ const NO_ANSWER_PATTERNS = [
   "no ha sido posible",
 ];
 
+// 30-minute tolerance for timestamp validation (matches ElevenLabs SDK)
+const TIMESTAMP_TOLERANCE_SECONDS = 30 * 60;
+
+/**
+ * Parse ElevenLabs signature header format: "t=timestamp,v0=signature"
+ */
+function parseSignatureHeader(
+  header: string
+): { timestamp: number; signature: string } | null {
+  const parts: Record<string, string> = {};
+  for (const part of header.split(",")) {
+    const [key, ...rest] = part.split("=");
+    if (key && rest.length > 0) {
+      parts[key] = rest.join("=");
+    }
+  }
+
+  const timestamp = parts["t"] ? parseInt(parts["t"], 10) : NaN;
+  const signature = parts["v0"];
+
+  if (isNaN(timestamp) || !signature) {
+    return null;
+  }
+
+  return { timestamp, signature };
+}
+
 /**
  * Verify ElevenLabs webhook signature using HMAC-SHA256.
+ *
+ * ElevenLabs signs webhooks with: HMAC-SHA256("${timestamp}.${rawBody}", secret)
+ * The signature header format is: "t=timestamp,v0=hex_digest"
  */
-async function verifySignature(
+function verifySignature(
   payload: string,
-  signature: string
-): Promise<boolean> {
+  sigHeader: string
+): "valid" | "invalid" | "expired" | "missing_secret" {
   const secret = process.env.ELEVENLABS_WEBHOOK_SECRET?.trim();
 
   if (!secret) {
     console.error("[elevenlabs-webhook] ELEVENLABS_WEBHOOK_SECRET not configured");
-    return false;
+    return "missing_secret";
   }
 
-  if (!signature) {
-    return false;
+  const parsed = parseSignatureHeader(sigHeader);
+  if (!parsed) {
+    return "invalid";
+  }
+
+  const { timestamp, signature } = parsed;
+
+  // Validate timestamp freshness (reject replays older than 30 minutes)
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - timestamp) > TIMESTAMP_TOLERANCE_SECONDS) {
+    return "expired";
   }
 
   try {
+    // ElevenLabs signs "${timestamp}.${rawBody}"
+    const message = `${timestamp}.${payload}`;
     const hmac = createHmac("sha256", secret);
-    hmac.update(payload);
+    hmac.update(message);
     const expectedSignature = hmac.digest("hex");
 
     // Use timing-safe comparison to prevent timing attacks
@@ -94,12 +135,12 @@ async function verifySignature(
     const expectedBuffer = Buffer.from(expectedSignature, "hex");
 
     if (sigBuffer.length !== expectedBuffer.length) {
-      return false;
+      return "invalid";
     }
 
-    return timingSafeEqual(sigBuffer, expectedBuffer);
+    return timingSafeEqual(sigBuffer, expectedBuffer) ? "valid" : "invalid";
   } catch {
-    return false;
+    return "invalid";
   }
 }
 
@@ -175,10 +216,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Get raw body for signature verification
     const rawBody = await request.text();
 
-    // Get signature from header
-    const signature = request.headers.get("x-elevenlabs-signature");
+    // Get signature from header (ElevenLabs uses "elevenlabs-signature")
+    const sigHeader = request.headers.get("elevenlabs-signature");
 
-    if (!signature) {
+    if (!sigHeader) {
       console.warn("[elevenlabs-webhook] Missing signature header");
       return NextResponse.json(
         { error: "Missing signature" },
@@ -186,11 +227,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Verify signature
-    const isValid = await verifySignature(rawBody, signature);
+    // Verify signature (format: "t=timestamp,v0=hmac_hex")
+    const verifyResult = verifySignature(rawBody, sigHeader);
 
-    if (!isValid) {
-      console.warn("[elevenlabs-webhook] Invalid signature");
+    if (verifyResult === "expired") {
+      console.warn("[elevenlabs-webhook] Signature timestamp expired");
+      return NextResponse.json(
+        { error: "Signature expired" },
+        { status: 401 }
+      );
+    }
+
+    if (verifyResult !== "valid") {
+      console.warn(`[elevenlabs-webhook] Invalid signature: ${verifyResult}`);
       return NextResponse.json(
         { error: "Invalid signature" },
         { status: 401 }
