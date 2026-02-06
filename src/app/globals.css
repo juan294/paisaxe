@@ -85,13 +85,17 @@
   animation: ambient-zoom 30s ease-in-out forwards;
 }
 
-/* Touch device utilities for small screens only (phones, not tablets) */
-/* Combines touch detection with max-width to exclude iPads and tablets */
-@media (pointer: coarse) and (max-width: 639px), (hover: none) and (max-width: 639px) {
+/* Hide keyboard-only UI on ALL touch devices (phones + tablets) */
+/* iPad has no physical keyboard by default, so keyboard hints should not show */
+@media (pointer: coarse), (hover: none) {
   .desktop-pointer-only {
     display: none !important;
   }
+}
 
+/* Touch device utilities for small screens only (phones, not tablets) */
+/* Combines touch detection with max-width to exclude iPads and tablets */
+@media (pointer: coarse) and (max-width: 639px), (hover: none) and (max-width: 639px) {
   /* Reset navigation buttons to full-height invisible tap zones on phones only */
   /* On tablets (640px+), the visible arrow buttons will show */
   .touch-nav-reset {
