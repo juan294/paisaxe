@@ -76,8 +76,8 @@ TRACK:
 
 STEPS:
 
-1. COLLECT DATA — Query external billing APIs for current usage and spend:
-   a. Anthropic Admin API: curl -H "Authorization: Bearer $ANTHROPIC_ADMIN_API_KEY" -H "anthropic-version: 2023-06-01" "https://api.anthropic.com/v1/organizations/usage" to get token/cost data for the current billing period.
+1. COLLECT DATA — Query external billing APIs and config files for current usage and spend:
+   a. Anthropic: No API available (personal account — Admin API is Teams/Enterprise only). Use the fixed cost from recurring-costs.ts. Note in the report that Anthropic usage must be checked manually at https://console.anthropic.com/settings/billing.
    b. ElevenLabs API: curl -H "xi-api-key: $ELEVENLABS_API_KEY" "https://api.elevenlabs.io/v1/usage/character-stats" for voice usage stats.
    c. Twilio API: curl -u "$TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN" "https://api.twilio.com/2010-04-01/Accounts/$TWILIO_ACCOUNT_SID/Usage/Records/ThisMonth.json" for SMS/call costs.
    d. Read src/config/service-tiers.ts for current tier limits and pricing.

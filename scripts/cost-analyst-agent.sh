@@ -46,7 +46,8 @@ Additional context:
 - Output file: $DOC_FILE
 - Date: $(date '+%Y-%m-%d')
 - Environment variables available for API access:
-  ANTHROPIC_ADMIN_API_KEY, ELEVENLABS_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+  ELEVENLABS_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+- Note: Anthropic usage is NOT available via API (personal account). Use config file values only.
 - Config files to read:
   src/config/service-tiers.ts (tier limits and pricing)
   src/config/recurring-costs.ts (fixed subscription costs)
