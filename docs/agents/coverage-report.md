@@ -63,7 +63,10 @@
 | `src/components/auth/sign-in-prompt.tsx` | Auth |
 | `src/components/immersive/chat-upsell-cta.tsx` | Immersive |
 | `src/components/immersive/favorite-button.tsx` | Immersive |
+| `src/components/immersive/freshness-badge.tsx` | Immersive |
+| `src/components/immersive/mood-overlay.tsx` | Immersive |
 | `src/components/immersive/privacy-notice.tsx` | Immersive |
+| `src/components/immersive/question-prompts.tsx` | Immersive |
 | `src/components/immersive/related-stories.tsx` | Immersive |
 | `src/components/immersive/skeleton-chat-message.tsx` | Immersive |
 | `src/components/immersive/skeleton-story-card.tsx` | Immersive |
@@ -144,15 +147,11 @@
 | `src/app/auth/callback/route.ts` | 71% | 100% | 25% | 71% | Supabase Auth cookie handling (setAll catch block unreachable in jsdom) |
 | `src/app/favorites/page.tsx` | 86% | 77% | 82% | 89% | Complex RSC with suspense boundaries |
 | `src/app/immersive/page.tsx` | 69% | 46% | 69% | 70% | Complex client interactions with story navigation |
-| `src/app/pricing/page.tsx` | 100% | 100% | 100% | 100% | Fully covered including checkout flow |
-| `src/app/pricing/success/page.tsx` | 100% | 100% | 100% | 100% | Fully covered |
 | `src/components/provider.tsx` | 60% | 50% | 100% | 60% | PostHog analytics initialization (browser-only) |
-| `src/components/admin/theme-toggle.tsx` | 100% | 100% | 100% | 100% | Fully covered |
 | `src/components/admin/*` (multiple) | 0-42% | 0-48% | 0-40% | 0-42% | Complex admin UI components with browser-specific interactions |
 | `src/components/immersive/fullscreen-button.tsx` | ~80% | ~75% | ~80% | ~80% | Fullscreen API not available in jsdom (requestFullscreen/exitFullscreen) |
-| `src/components/immersive/mood-overlay.tsx` | 11% | 100% | 0% | 11% | Framer Motion animation component - visual testing only |
-| `src/components/immersive/question-prompts.tsx` | 0% | 0% | 0% | 0% | Simple presentational component - covered by parent tests |
-| `src/components/immersive/freshness-badge.tsx` | 0% | 0% | 0% | 0% | Simple presentational component - covered by parent tests |
+| `src/components/immersive/share-button.tsx` | 96% | 93% | 100% | 100% | Minor branch for window.location origin edge case |
+| `src/components/immersive/toolbar-overflow-menu.tsx` | 96% | 93% | 91% | 96% | Line 69: ref cleanup edge case |
 | `src/components/immersive/volume-button.tsx` | 0% | 0% | 0% | 0% | Audio control component - requires browser audio APIs |
 | `src/hooks/use-feature-flags.ts` | 86% | 70% | 100% | 84% | Fetch retry logic edge cases |
 | `src/hooks/use-reduced-motion.ts` | 92% | 50% | 100% | 100% | SSR check branch |
@@ -164,8 +163,10 @@
 | `src/lib/image-optimization.ts` | 95% | 69% | 100% | 96% | Sharp library edge cases |
 | `src/lib/localize-story.ts` | 100% | 87% | 100% | 100% | Branch coverage only - all statements covered |
 | `src/lib/rate-limit.ts` | 97% | 82% | 100% | 97% | Token bucket edge case |
+| `src/lib/costs/manual-costs.ts` | 93% | 92% | 100% | 93% | Supabase admin client null-check branches |
 | `src/lib/rerank.ts` | 89% | 86% | 100% | 89% | Voyage API error handling |
 | `src/lib/seasonal-weighting.ts` | 100% | 83% | 100% | 100% | Branch coverage only |
+| `src/lib/translate-story.ts` | 86% | 80% | 100% | 86% | Claude API translation calls and metadata edge cases |
 | `src/lib/i18n/detect-language.ts` | 91% | 83% | 100% | 97% | Navigator.languages fallback |
 | `src/lib/i18n/resolve.ts` | 92% | 88% | 100% | 92% | Translation key fallback chain |
 | `src/lib/i18n/index.ts` | 0% | 0% | 0% | 0% | Re-export only file (no executable code) |
@@ -186,51 +187,51 @@ These are deliberately untested and considered acceptable:
 
 4. **PostHog analytics initialization** (`src/components/provider.tsx`): Browser-only analytics code that requires a real browser environment.
 
-5. **Framer Motion animations** (`src/components/immersive/mood-overlay.tsx`): Visual animation components that are best verified through visual regression testing or E2E tests.
+5. **Audio controls** (`src/components/immersive/volume-button.tsx`): Requires browser audio APIs not available in jsdom.
 
-6. **Audio controls** (`src/components/immersive/volume-button.tsx`): Requires browser audio APIs not available in jsdom.
+6. **Complex admin UI components**: These components (content-dashboard, agent-chat, marketing-dashboard, etc.) have complex interactive states that are better tested via Playwright E2E tests rather than unit tests.
 
-7. **Complex admin UI components**: These components (content-dashboard, agent-chat, marketing-dashboard, etc.) have complex interactive states that are better tested via Playwright E2E tests rather than unit tests.
+7. **Claude API streaming** (`src/lib/claude.ts` streaming functions): The Anthropic SDK streaming requires live API access. Core response generation is tested; streaming edge cases are covered by E2E tests.
 
-8. **Claude API streaming** (`src/lib/claude.ts` streaming functions): The Anthropic SDK streaming requires live API access. Core response generation is tested; streaming edge cases are covered by E2E tests.
+8. **Fullscreen API** (`src/components/immersive/fullscreen-button.tsx`): The browser Fullscreen API (requestFullscreen/exitFullscreen) is not available in jsdom. iOS modal flow is tested.
 
-9. **Fullscreen API** (`src/components/immersive/fullscreen-button.tsx`): The browser Fullscreen API (requestFullscreen/exitFullscreen) is not available in jsdom. iOS modal flow is tested.
-
-10. **Admin tunnel route** (`src/app/api/admin/tunnel/route.ts`): Uses child_process spawn/exec for Cloudflare tunnel management. This is a development-only feature that requires actual shell execution and cannot be meaningfully tested in jsdom/vitest without mocking the entire child_process module, which would provide no real test value.
+9. **Admin tunnel route** (`src/app/api/admin/tunnel/route.ts`): Uses child_process spawn/exec for Cloudflare tunnel management. This is a development-only feature that requires actual shell execution and cannot be meaningfully tested in jsdom/vitest without mocking the entire child_process module, which would provide no real test value.
 
 ## Changes Made This Run
 
-### Test files created (2026-02-03):
-- `src/app/api/voice-access/route.test.ts` (7 tests) - Tests for voice access API endpoint
-- `src/app/api/suggestions/route.test.ts` (16 tests) - Tests for suggestions API endpoint (GET/POST)
-- `src/app/api/admin/agent-reports/route.test.ts` (3 tests) - Tests for agent reports API
-- `src/app/coming-soon/page.test.tsx` (6 tests) - Tests for coming-soon page component
-- `src/app/pricing/page.test.tsx` (12 tests) - Tests for pricing page component
-- `src/app/pricing/success/page.test.tsx` (9 tests) - Tests for pricing success page
-- `src/app/story/[slug]/page.test.tsx` (4 tests) - Tests for story page redirect and metadata
-- `src/components/admin/admin-tabs.test.tsx` (7 tests) - Tests for admin tabs component
-- `src/components/admin/theme-toggle.test.tsx` (6 tests) - Tests for theme toggle component
-- `src/components/immersive/fullscreen-button.test.tsx` (5 tests) - Tests for fullscreen button (iOS modal)
+### Test files created (2026-02-06):
+- `src/config/location.test.ts` (11 tests) - Tests for getRegionIds, getRegion, getRegionCoordinates
+- `src/app/privacy/page.test.tsx` (6 tests) - Tests for privacy policy page rendering
+- `src/app/terms/page.test.tsx` (6 tests) - Tests for terms of service page rendering
+- `src/app/api/health/db/route.test.ts` (8 tests) - Tests for database health check endpoint
+- `src/lib/costs/manual-costs.test.ts` (14 tests) - Tests for CRUD operations on manual cost entries
+- `src/components/immersive/toolbar-overflow-menu.test.tsx` (12 tests) - Tests for overflow menu and item components
+- `src/components/immersive/chat-upsell-cta.test.tsx` (8 tests) - Tests for upsell CTA with auth flows
 
-### Coverage improvements (2026-02-03):
-- **src/app/api/voice-access/route.ts**: 0% → 84%
-- **src/app/api/suggestions/route.ts**: 0% → 88%
-- **src/app/api/admin/agent-reports/route.ts**: 0% → 92%
-- **src/app/coming-soon/page.tsx**: Maintained at 100%
-- **src/app/pricing/page.tsx**: 0% → 71%
-- **src/app/pricing/success/page.tsx**: 0% → 100%
-- **src/app/story/[slug]/page.tsx**: 0% → 100%
-- **src/components/admin/admin-tabs.tsx**: 0% → 100%
-- **src/components/admin/theme-toggle.tsx**: 0% → 100%
-- **src/components/immersive/fullscreen-button.tsx**: 0% → ~80%
+### Test files modified (2026-02-06):
+- `src/lib/costs/twilio-costs.test.ts` (+6 tests) - Added fetchTwilioCostsByDay tests
+- `src/lib/translate-story.test.ts` (+7 tests) - Added updateStoryTranslation and getStoryTranslations tests
+- `src/components/immersive/share-button.test.tsx` (+4 tests) - Added stopPropagation, AbortError, share fallback, slug fallback tests
 
-### Overall improvement (2026-02-03):
-- Statement coverage: 62.11% → 64.92% (+2.81%)
-- Branch coverage: 56.01% → 58.97% (+2.96%)
-- Function coverage: 60.94% → 63.53% (+2.59%)
-- Line coverage: 62.31% → 65.24% (+2.93%)
-- Total tests: 2197 → 2294 (+97 tests)
-- Test files: 142 → 152 (+10 files)
+### Coverage improvements (2026-02-06):
+- **src/config/location.ts**: 66% → 100%
+- **src/app/privacy/page.tsx**: 0% → 100%
+- **src/app/terms/page.tsx**: 0% → 100%
+- **src/app/api/health/db/route.ts**: 0% → 100%
+- **src/lib/costs/manual-costs.ts**: 0% → 93%
+- **src/lib/costs/twilio-costs.ts**: 50% → 100%
+- **src/lib/translate-story.ts**: 66% → 86%
+- **src/components/immersive/chat-upsell-cta.tsx**: 5% → 100%
+- **src/components/immersive/toolbar-overflow-menu.tsx**: 52% → 96%
+- **src/components/immersive/share-button.tsx**: 79% → 96%
+
+### Overall improvement (2026-02-06):
+- Statement coverage: 65.41% → 67.45% (+2.04%)
+- Branch coverage: 59.57% → 61.45% (+1.88%)
+- Function coverage: 61.07% → 63.25% (+2.18%)
+- Line coverage: 65.68% → 68.07% (+2.39%)
+- Total tests: 2548 → 2630 (+82 tests)
+- Test files: 177 → 184 (+7 files)
 
 ## How It Works
 
@@ -277,3 +278,8 @@ Run manually anytime:
     - **src/app/pricing/page.tsx**: 57% → 100% (+43%)
     - **src/app/api/mcp/make-booking/status/route.ts**: 0% → 100% (+100%)
   - Documented admin/tunnel/route.ts as untestable (child_process/shell operations)
+- **2026-02-06**: Coverage Agent run -- 2630 tests, 184 files (+82 tests, +7 files, +2.04% statement coverage)
+  - Created 7 new test files: location config, privacy/terms pages, health/db route, manual-costs CRUD, toolbar-overflow-menu, chat-upsell-cta
+  - Enhanced 3 existing test files: twilio-costs (+6), translate-story (+7), share-button (+4)
+  - 6 files reached 100%: location, privacy/page, terms/page, health/db, twilio-costs, chat-upsell-cta
+  - 4 files significantly improved: manual-costs (0→93%), overflow-menu (52→96%), share-button (79→96%), translate-story (66→86%)
