@@ -31,7 +31,7 @@
 - **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
 - **UI strings**: 221 keys per locale, all present
 - **Story translations**: 22+ stories × 5 locales = 110+ translations, all complete
-- **Type safety**: ✅ All files pass TypeScript validation
+- **Type safety**: Pass — All files pass TypeScript validation
 - **Previous fix**: 72+ Asturian story misalignments corrected (2026-02-03)
 
 **Cross-agent recommendations:**
@@ -46,7 +46,7 @@
 - **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
 - **UI strings**: 221 keys per locale, all present
 - **Story translations**: 22+ stories × 5 locales = 110+ translations, all complete
-- **Type safety**: ✅ All files pass TypeScript validation
+- **Type safety**: Pass — All files pass TypeScript validation
 - **Previous fix**: 72+ Asturian story misalignments corrected (2026-02-03)
 
 **Cross-agent recommendations:**
