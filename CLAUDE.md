@@ -36,6 +36,9 @@ develop   # Active development (DEFAULT)
 2. Never commit directly to `main`
 3. Merge `develop` → `main` only when releasing to production
 4. Always run tests before committing
+5. **No PRs** — solo developer workflow. Commit/merge directly to `develop`, verify CI, done
+6. For multi-file features, use git worktrees: `git worktree add -b feature/name ../paisaxe-name develop`
+7. After merge, clean up: `git worktree remove` + `git branch -d`
 
 ## Push Accountability (MANDATORY)
 
