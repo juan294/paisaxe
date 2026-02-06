@@ -1,9 +1,36 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-02-01 07:14:35
+> Auto-generated on 2026-02-06 16:20:36
+> Updated by Documentation Agent on 2026-02-06
+
+## Changes Made This Run
+
+### Features Documentation (`docs/project/features.md`)
+
+**Added MCP Tools Section** — Documented Pelayo's four custom MCP tools in the Premium Voice Agent section:
+- `search_places`: Business/attraction search
+- `get_weather`: Asturian weather data
+- `make_booking`: Outbound booking calls (requires `booking_system` flag)
+- `check_booking_status`: Booking status queries
+
+**Expanded Webhooks Documentation** — Converted webhook prose into a structured table listing all 4 webhook endpoints:
+- `/api/webhooks/supabase` (cache invalidation)
+- `/api/webhooks/stripe` (payment updates)
+- `/api/webhooks/elevenlabs` (booking call transcripts, SMS triggers)
+- `/api/webhooks/translate` (translation completion)
+
+### Verification
+
+**Feature Flags** — All 24 feature flags were already documented in the Feature Flags Reference section. No updates needed.
+
+**API Routes** — Reviewed 43 API routes flagged as "undocumented":
+- **Admin routes** (`/api/admin/*`): Internal endpoints for admin panel UI. Already implicitly documented through UI feature descriptions (Analytics, Stories, Agents tabs, etc.). No external API documentation needed.
+- **MCP routes** (`/api/mcp/*`): Now documented as Pelayo's custom tools.
+- **Webhooks** (`/api/webhooks/*`): Now documented in expanded webhooks table.
+- **Other routes**: `chat/stream`, `checkout/day-pass`, `favorites`, `feature-flags`, `voice-access`, `health/db` are all implementation details of documented features. No additional documentation required.
 
 ## CLAUDE.md Status
 
-Last modified: **2026-01-31**
+Last modified: **2026-02-06**
 
 ## Files Modified Since Documentation Update
 
@@ -12,28 +39,23 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
-src/app/api/admin/agent-reports/route.ts
-src/app/coming-soon/page.tsx
-src/components/admin/feature-toggles-panel.test.tsx
-src/components/admin/feature-toggles-panel.tsx
-src/components/admin/maintenance-config-panel.tsx
-src/config/location.ts
-src/tests/qa/llm-quality.test.ts
-src/types/feature-flags.ts
+src/app/api/admin/agents-summary/route.ts
+src/components/admin/admin-tabs.tsx
+src/components/admin/agents-dashboard.tsx
+src/config/recurring-costs.test.ts
+src/config/recurring-costs.ts
+src/lib/costs/recurring-costs.test.ts
+src/proxy.test.ts
+src/test/setup.ts
+src/types/costs-analytics.ts
 ```
 
-### Database Migrations
-
-```
-supabase/migrations/035_qa_agent_flag.sql
-supabase/migrations/036_docs_freshness_autonomous.sql
-```
+No new migrations since documentation update.
 
 ### Scripts
 
 ```
-scripts/docs-freshness-agent.sh
-scripts/qa-agent.sh
+scripts/performance-agent.sh
 ```
 
 ## Documentation Gaps
@@ -44,7 +66,11 @@ These API routes may not be documented in CLAUDE.md:
 
 ```
 admin/agent-reports
+admin/agents-summary
+admin/agents/run
 admin/analytics
+admin/costs-analytics
+admin/costs-analytics/[id]
 admin/elevenlabs-analytics
 admin/feature-flags/[key]
 admin/marketing/accounts
@@ -59,16 +85,27 @@ admin/stories/[id]/content-images
 admin/stories/[id]/image
 admin/stories/[id]/image-source
 admin/stories/[id]/status
+admin/stories/[id]/translations
 admin/stories/bulk-delete
 admin/stories/bulk-status
+admin/stripe-analytics
 admin/suggestions
 admin/suggestions/[id]
-chat
+admin/tunnel
 chat/stream
+checkout/day-pass
 favorites
 feature-flags
-suggestions
+health/db
+mcp/make-booking
+mcp/make-booking/status
+mcp/places
+mcp/weather
+voice-access
+webhooks/elevenlabs
+webhooks/stripe
 webhooks/supabase
+webhooks/translate
 
 ```
 
@@ -81,9 +118,13 @@ ambient_discovery
 asturianu_touches
 automated_agents
 autoplay_button
+booking_system
 contextual_prompts
+cost_analyst_agent_enabled
 coverage_agent_enabled
 documentation_agent_enabled
+fullscreen_button
+localization_agent_enabled
 maintenance_mode
 mood_discovery
 performance_agent_enabled
@@ -92,6 +133,7 @@ randomized_order
 related_stories
 seasonal_surfacing
 security_agent_enabled
+sms_booking_confirmation
 story_freshness
 story_sharing
 surprise_me
@@ -103,42 +145,18 @@ user_story_suggestions
 
 | File | Last Modified |
 |------|--------------|
-| CLAUDE.md | 2026-01-31 |
+| CLAUDE.md | 2026-02-06 |
 | README.md | 2026-01-31 |
 
 ---
 
-## Changes Made This Run (2026-02-01)
+## Health Status
 
-### Feature Flags Added to `docs/project/features.md`
+**Status**: ✅ **GREEN** — Documentation is up-to-date and comprehensive
 
-Reorganized Feature Flags Reference into categorized sections and added 9 previously undocumented flags:
+**Summary**: All feature flags and core functionality are properly documented. Added clarifications for MCP tools and webhooks.
 
-**Experience Flags:**
-- `autoplay_button` — Play/pause button for auto-play in story viewer
-
-**Social Flags:**
-- `user_story_suggestions` — "Suggest a Place" button for visitor submissions
-
-**Voice Flags:**
-- `visitor_voice_agent` — Voice agent access (whitelisted emails only)
-
-**System Flags:**
-- `maintenance_mode` — Shows maintenance page instead of the main app
-- `automated_agents` — Master toggle for all automated CI/CD agents
-- `coverage_agent_enabled` — Coverage agent (runs daily at 2:00 AM)
-- `security_agent_enabled` — Security agent (runs weekly on Monday)
-- `documentation_agent_enabled` — Docs freshness agent (runs weekly on Sunday)
-- `performance_agent_enabled` — Performance agent (runs weekly on Saturday)
-- `qa_agent_enabled` — QA agent for LLM response quality testing
-
-### API Routes Not Documented
-
-The following API routes were identified but intentionally **not documented** as they are internal admin/system routes:
-- All `admin/*` routes — Internal admin panel APIs
-- `chat`, `chat/stream` — Internal chat flow APIs (already described in features.md)
-- `favorites`, `feature-flags`, `suggestions` — Internal data APIs
-- `webhooks/supabase` — Internal webhook endpoint (already described in features.md)
+---
 
 ---
 

@@ -120,50 +120,18 @@ log_info "Metrics collected, invoking Claude for analysis..." | tee -a "$LOG_FIL
 
 # Fetch the prompt from the feature flag config
 AGENT_PROMPT=$(get_agent_prompt "security_agent_enabled" 2>/dev/null) || {
-  log_warn "Could not fetch prompt from config, using default" | tee -a "$LOG_FILE"
-  AGENT_PROMPT="You are the Paisaxe Security Agent. Your job is to analyze security vulnerabilities and provide actionable remediation guidance.
-
-STEPS:
-1. Review the vulnerability scan results
-2. Assess the severity and exploitability of each vulnerability
-3. Check license compliance — list package names for any flagged licenses
-4. Review CI/CD security automation status
-5. Check security headers configuration
-6. Identify outdated packages with security implications
-7. Write a comprehensive report to docs/agents/security-report.md
-
-ANALYSIS FOCUS:
-- Exploitability first: Lead with whether vulnerabilities are actually exploitable in this codebase
-- Critical/High vulnerabilities: What's the attack vector? Read the affected code to assess real risk
-- Dependency chains: Which of our direct deps bring in vulnerable transitive deps?
-- Fixable issues: What can be fixed with npm audit fix vs manual intervention?
-- License risks: Name the specific packages with MPL/LGPL/GPL/UNLICENSED licenses
-- Security headers: Are CSP, HSTS, X-Frame-Options, X-Content-Type-Options configured?
-- CI/CD gaps: Is automated security scanning in place?
-
-REPORT STRUCTURE:
-1. Health status (green/yellow/red) — base on EXPLOITABLE vulnerabilities, not raw counts
-2. Executive summary — lead with exploitability: 'X advisories detected, Y exploitable' not 'X vulnerabilities found'
-3. Vulnerability table with: Severity, Package, Advisory (GHSA + CVE if available), Attack Vector, Fixable, Risk Assessment
-4. Detailed exploitability analysis for high/critical issues
-5. Prioritized remediation steps
-6. License compliance — list actual package names, not just license types
-7. Security headers status
-8. CI/CD automation status (Dependabot, Renovate, Gitleaks, npm audit in pipelines)
-9. Outdated packages with security implications
-
-CVE CROSS-REFERENCE:
-- When listing vulnerabilities, include both GHSA and CVE identifiers where available
-- CVE format: CVE-YYYY-NNNNN (look up from GHSA advisory if not in npm audit output)
-
-RULES:
-- Exploitability trumps severity: A non-exploitable critical is less urgent than an exploitable moderate
-- Be specific about attack vectors and why they do/don't apply to this codebase
-- Include exact commands for fixes where possible
-- Note if vulnerabilities are in dev-only dependencies (lower risk)
-- Distinguish between fixable and unfixable issues
-- Name packages explicitly — 'argon2 uses LGPL-3.0' not 'LGPL-3.0: 1 package'"
+  log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
+  AGENT_PROMPT=$(get_default_prompt "security_agent_enabled" 2>/dev/null) || {
+    log_error "No prompt available for security_agent_enabled" | tee -a "$LOG_FILE"
+    exit 1
+  }
 }
+
+# Read shared context from other agents
+log_info "Reading shared context..." | tee -a "$LOG_FILE"
+SHARED_CONTEXT=$(read_shared_context "security_agent_enabled")
+SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" read 2>/dev/null || echo "")
+SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
 # Run Claude to analyze and write report
 "$CLAUDE_BIN" -p \
@@ -178,9 +146,35 @@ Additional context:
 
 Security metrics:
 $(cat "$METRICS_FILE")
+
+$SHARED_CONTEXT_READ
+
+$SHARED_CONTEXT
+
+$SHARED_CONTEXT_WRITE
 PROMPT
 
 log_success "Claude analysis complete" | tee -a "$LOG_FILE"
+
+# Extract and write shared context
+REPORT_CONTENT=$(cat "$REPORT_FILE")
+CONTEXT_BLOCK=$(echo "$REPORT_CONTENT" | sed -n '/SHARED_CONTEXT_START/,/SHARED_CONTEXT_END/p' | sed '1d;$d')
+
+if [[ -n "$CONTEXT_BLOCK" ]]; then
+  write_shared_context "security_agent_enabled" "$CONTEXT_BLOCK"
+  log_success "Shared context updated" | tee -a "$LOG_FILE"
+
+  # Strip the shared context block from the report
+  python3 -c "
+import re, sys
+content = sys.stdin.read()
+cleaned = re.sub(r'\n?SHARED_CONTEXT_START\n.*?SHARED_CONTEXT_END\n?', '', content, flags=re.DOTALL)
+sys.stdout.write(cleaned)
+" < "$REPORT_FILE" > "${REPORT_FILE}.tmp"
+  mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
+else
+  log_info "No shared context block found in report" | tee -a "$LOG_FILE"
+fi
 
 # Cleanup
 rm -f "$METRICS_FILE"

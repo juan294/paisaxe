@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "./route";
+import packageJson from "../../../../package.json";
 
 // Mock the supabase client
 vi.mock("@/lib/supabase", () => ({
@@ -89,7 +90,7 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(data.version).toBe("0.1.0");
+    expect(data.version).toBe(packageJson.version);
   });
 
   it("should include services.supabase field with status", async () => {
@@ -124,20 +125,20 @@ describe("GET /api/health", () => {
     expect(typeof data.uptime).toBe("number");
   });
 
-  it('should return status "degraded" when supabase check fails', async () => {
+  it('should return 503 with status "degraded" when supabase check fails', async () => {
     mockSupabaseError("Connection refused");
     mockDatabaseSize(DB_SIZE_BYTES);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     expect(data.status).toBe("degraded");
     expect(data.services.supabase.status).toBe("error");
     expect(data.services.supabase.error).toBe("Connection refused");
   });
 
-  it("should still return 200 even when supabase throws an exception", async () => {
+  it("should return 503 when supabase throws an exception", async () => {
     vi.mocked(supabase.from).mockImplementation(() => {
       throw new Error("Unexpected failure");
     });
@@ -146,7 +147,7 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     expect(data.status).toBe("degraded");
     expect(data.services.supabase.status).toBe("error");
   });

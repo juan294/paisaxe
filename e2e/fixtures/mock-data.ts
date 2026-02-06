@@ -25,6 +25,18 @@ export const MOCK_CHAT_RESPONSE = {
   ],
 };
 
+export const MOCK_CHAT_RESPONSE_FOLLOWUP = {
+  message:
+    "La Senda del Cares es una ruta de senderismo espectacular que recorre el desfiladero del río Cares entre Caín y Poncebos.",
+  sources: [
+    {
+      title: "Rutas de Senderismo en Asturias",
+      section: "Senda del Cares",
+    },
+  ],
+  images: [],
+};
+
 export const MOCK_FEATURE_FLAGS = {
   data: [
     { flagKey: "randomized_order", enabled: false },
@@ -37,6 +49,45 @@ export const MOCK_FEATURE_FLAGS = {
     { flagKey: "contextual_prompts", enabled: false },
     { flagKey: "story_sharing", enabled: false },
     { flagKey: "asturianu_touches", enabled: false },
+    { flagKey: "user_story_suggestions", enabled: false },
+    { flagKey: "fullscreen_button", enabled: false },
+    { flagKey: "visitor_voice_agent", enabled: false },
+    { flagKey: "booking_system", enabled: false },
+    { flagKey: "autoplay_button", enabled: false },
+    { flagKey: "sms_booking_confirmation", enabled: false },
   ],
 };
 
+/**
+ * Create a feature flags mock with specific overrides.
+ * All flags default to `false` unless overridden.
+ *
+ * @example
+ * withFeatureFlags({ user_story_suggestions: true, fullscreen_button: true })
+ */
+export function withFeatureFlags(
+  overrides: Record<string, boolean>
+): typeof MOCK_FEATURE_FLAGS {
+  return {
+    data: MOCK_FEATURE_FLAGS.data.map((flag) => ({
+      ...flag,
+      enabled: overrides[flag.flagKey] ?? flag.enabled,
+    })),
+  };
+}
+
+export const MOCK_SUGGESTION_RESPONSE = {
+  data: {
+    id: "suggestion-1",
+    userId: null,
+    placeName: "Playa del Silencio",
+    comment: "A hidden gem on the western coast",
+    location: "western",
+    attribution: "A visitor",
+    status: "pending",
+    adminNotes: null,
+    convertedStoryId: null,
+    createdAt: "2026-01-15T10:00:00Z",
+    updatedAt: "2026-01-15T10:00:00Z",
+  },
+};

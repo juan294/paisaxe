@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { LanguageProvider } from "@/lib/i18n";
 import ImmersiveError from "./error";
 
 // Mock next/link to render a plain anchor
@@ -19,6 +20,12 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+function renderWithI18n(ui: React.ReactElement) {
+  return render(
+    <LanguageProvider initialLocale="es">{ui}</LanguageProvider>
+  );
+}
+
 describe("ImmersiveError", () => {
   const consoleSpy = vi
     .spyOn(console, "error")
@@ -34,14 +41,14 @@ describe("ImmersiveError", () => {
   };
 
   it("renders the error message", () => {
-    render(<ImmersiveError {...defaultProps} />);
+    renderWithI18n(<ImmersiveError {...defaultProps} />);
     expect(
       screen.getByText("No se pudo cargar la experiencia")
     ).toBeInTheDocument();
   });
 
   it("renders the error description", () => {
-    render(<ImmersiveError {...defaultProps} />);
+    renderWithI18n(<ImmersiveError {...defaultProps} />);
     expect(
       screen.getByText(
         "Algo falló al cargar las historias. Inténtalo de nuevo."
@@ -50,7 +57,7 @@ describe("ImmersiveError", () => {
   });
 
   it("renders a retry button", () => {
-    render(<ImmersiveError {...defaultProps} />);
+    renderWithI18n(<ImmersiveError {...defaultProps} />);
     expect(
       screen.getByRole("button", { name: "Reintentar" })
     ).toBeInTheDocument();
@@ -58,19 +65,19 @@ describe("ImmersiveError", () => {
 
   it("calls reset when retry button is clicked", () => {
     const reset = vi.fn();
-    render(<ImmersiveError error={new Error("fail")} reset={reset} />);
+    renderWithI18n(<ImmersiveError error={new Error("fail")} reset={reset} />);
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(reset).toHaveBeenCalledTimes(1);
   });
 
   it("logs the error to console.error", () => {
     const error = new Error("Immersive error for logging");
-    render(<ImmersiveError error={error} reset={vi.fn()} />);
+    renderWithI18n(<ImmersiveError error={error} reset={vi.fn()} />);
     expect(consoleSpy).toHaveBeenCalledWith(error);
   });
 
   it("has fixed full-screen dark background", () => {
-    const { container } = render(<ImmersiveError {...defaultProps} />);
+    const { container } = renderWithI18n(<ImmersiveError {...defaultProps} />);
     const wrapper = container.firstChild as HTMLElement;
     expect(wrapper.className).toContain("fixed");
     expect(wrapper.className).toContain("inset-0");
@@ -78,7 +85,7 @@ describe("ImmersiveError", () => {
   });
 
   it("renders a home link", () => {
-    render(<ImmersiveError {...defaultProps} />);
+    renderWithI18n(<ImmersiveError {...defaultProps} />);
     const link = screen.getByRole("link", { name: "Volver al inicio" });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "/");

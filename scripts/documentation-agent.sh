@@ -195,27 +195,18 @@ if [[ -n "$UNDOCUMENTED_ROUTES" ]] || [[ -n "$UNDOCUMENTED_FLAGS" ]]; then
 
   # Fetch the prompt from the feature flag config
   AGENT_PROMPT=$(get_agent_prompt "documentation_agent_enabled" 2>/dev/null) || {
-    log_warn "Could not fetch prompt from config, using default" | tee -a "$LOG_FILE"
-    AGENT_PROMPT="You are the Paisaxe Documentation Agent. Your job is to keep documentation accurate and complete.
-
-STEPS:
-1. Read CLAUDE.md and docs/project/features.md to understand current documentation structure
-2. Review the gaps provided (undocumented API routes, feature flags)
-3. For undocumented feature flags:
-   - Add them to the Feature Flags Reference table in docs/project/features.md
-   - Include a brief description of what each flag controls
-   - Read the source code to understand the flag's purpose
-4. For API routes: Only document if they are meant for external consumption (most are internal)
-5. Update docs/agents/documentation-report.md with a 'Changes Made This Run' section listing what was added
-
-RULES:
-- Documentation is safe to update autonomously - the user will review via git diff
-- Keep descriptions concise (1 line per item)
-- Follow the existing documentation style and formatting
-- Do NOT delete or restructure existing content
-- Do NOT document internal implementation details
-- Commit nothing. The user will review and commit manually."
+    log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
+    AGENT_PROMPT=$(get_default_prompt "documentation_agent_enabled" 2>/dev/null) || {
+      log_error "No prompt available for documentation_agent_enabled" | tee -a "$LOG_FILE"
+      exit 1
+    }
   }
+
+  # Read shared context from other agents
+  log_info "Reading shared context..." | tee -a "$LOG_FILE"
+  SHARED_CONTEXT=$(read_shared_context "documentation_agent_enabled")
+  SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" read 2>/dev/null || echo "")
+  SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
   # Capture docs state before (check both CLAUDE.md and features.md)
   FEATURES_MD="$PROJECT_DIR/docs/project/features.md"
@@ -237,6 +228,12 @@ Additional context:
 
 Contents of gaps file:
 $(cat "$GAPS_FILE")
+
+$SHARED_CONTEXT_READ
+
+$SHARED_CONTEXT
+
+$SHARED_CONTEXT_WRITE
 PROMPT
 
   # Check if any documentation was modified
@@ -245,6 +242,26 @@ PROMPT
     log_success "Claude updated documentation" | tee -a "$LOG_FILE"
   else
     log_info "No documentation changes made" | tee -a "$LOG_FILE"
+  fi
+
+  # Extract and write shared context
+  REPORT_CONTENT=$(cat "$REPORT_FILE")
+  CONTEXT_BLOCK=$(echo "$REPORT_CONTENT" | sed -n '/SHARED_CONTEXT_START/,/SHARED_CONTEXT_END/p' | sed '1d;$d')
+
+  if [[ -n "$CONTEXT_BLOCK" ]]; then
+    write_shared_context "documentation_agent_enabled" "$CONTEXT_BLOCK"
+    log_success "Shared context updated" | tee -a "$LOG_FILE"
+
+    # Strip the shared context block from the report
+    python3 -c "
+import re, sys
+content = sys.stdin.read()
+cleaned = re.sub(r'\n?SHARED_CONTEXT_START\n.*?SHARED_CONTEXT_END\n?', '', content, flags=re.DOTALL)
+sys.stdout.write(cleaned)
+" < "$REPORT_FILE" > "${REPORT_FILE}.tmp"
+    mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
+  else
+    log_info "No shared context block found in report" | tee -a "$LOG_FILE"
   fi
 
   # Cleanup temp file

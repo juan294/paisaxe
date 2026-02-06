@@ -36,6 +36,51 @@ develop   # Active development (DEFAULT)
 2. Never commit directly to `main`
 3. Merge `develop` → `main` only when releasing to production
 4. Always run tests before committing
+5. **No PRs** — solo developer workflow. Commit/merge directly to `develop`, verify CI, done
+
+### Worktree-First Development (MANDATORY)
+
+**Every feature, refactor, bug fix, or change MUST be done in its own git worktree. No exceptions.**
+
+This is the default way of working — you do NOT need to be told to create a worktree. Always create one automatically at the start of any task.
+
+#### Workflow
+
+```bash
+# 1. CREATE — Start every task by creating a worktree
+git worktree add -b feature/short-name ../paisaxe-short-name develop
+
+# 2. WORK — All changes happen in the worktree directory
+cd ../paisaxe-short-name
+# ... write tests first, then implement, then commit
+
+# 3. MERGE — After tests pass, merge back into develop
+cd /Users/juan/Documents/GenAI_Projects/paisaxe
+git merge feature/short-name
+
+# 4. CLEAN UP — Always remove the worktree and branch after merge
+git worktree remove ../paisaxe-short-name
+git branch -d feature/short-name
+```
+
+#### Branch Naming Convention
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| Feature | `feature/short-name` | `feature/booking-calendar` |
+| Bug fix | `fix/short-name` | `fix/sse-buffer-overflow` |
+| Refactor | `refactor/short-name` | `refactor/auth-middleware` |
+| Chore | `chore/short-name` | `chore/update-deps` |
+
+#### Rules
+
+1. **Auto-create**: When the user asks for any code change, immediately create a worktree. Do not ask — just do it.
+2. **Isolate**: Each worktree = one logical change. Never mix unrelated changes.
+3. **Test in worktree**: Run `npm run test && npm run typecheck && npm run lint` inside the worktree before merging.
+4. **Merge cleanly**: Merge the feature branch into `develop` from the main repo directory.
+5. **Always clean up**: Remove the worktree directory AND delete the branch after a successful merge. Never leave stale worktrees.
+6. **Parallel work**: Multiple agents can work in separate worktrees simultaneously — this is one of the key benefits.
+7. **If merge conflicts arise**: Resolve them in the main repo during merge, never in the worktree.
 
 ## Push Accountability (MANDATORY — Background)
 
@@ -54,13 +99,22 @@ The main terminal continues working on the next task immediately after pushing. 
 
 **This is non-negotiable.** You own the outcome of your push until CI is green and deployment is healthy. If you break the build, you fix the build — automatically in the background.
 
-## Test-Driven Development
+## Test-Driven Development (MANDATORY)
 
-**NO feature ships without a test written first. No exceptions.**
+**NO code is written without a failing test first. No exceptions. Not even "small" changes.**
 
-1. **Red**: Write a failing test FIRST
-2. **Green**: Write minimal code to pass
+This is non-negotiable. Every feature, bug fix, and refactor follows this exact sequence:
+
+1. **Red**: Write a failing test FIRST — before touching any implementation code
+2. **Green**: Write the minimum code to make the test pass
 3. **Refactor**: Clean up while tests stay green
+
+#### Rules
+
+- **Tests before code, always.** If you catch yourself writing implementation code without a test, stop and write the test first.
+- **Bug fixes need a regression test.** Before fixing a bug, write a test that reproduces it. Then fix the code so the test passes.
+- **Refactors need existing tests.** Before refactoring, ensure tests exist that cover the current behavior. If they don't, write them first.
+- **No "I'll add tests later."** There is no later. Tests are written in the same worktree, in the same commit sequence, before the implementation.
 
 ## Key Commands
 
@@ -228,3 +282,108 @@ From 37 PDFs in `content/pdfs/`:
 - Culture: pre-Romanesque art, museums, festivals
 - Gastronomy: sidra, fabada, local dishes
 - Camino de Santiago planning
+
+## Debug Mode (Agent Team)
+
+**Trigger:** User says "enter debug mode", "debug this", or "let's debug this"
+
+When triggered, create a team of parallel investigators to diagnose the issue:
+
+1. **Assess complexity** — Simple bugs (single component, clear error): 3 investigators. Cross-cutting issues (multiple systems, intermittent): up to 5.
+
+2. **Create team** called "debug-squad" with investigators, each assigned a different hypothesis:
+   - Each investigator focuses on a different area (API / client / database / config / dependencies / etc.)
+   - Each investigator must state their hypothesis upfront, then gather evidence
+   - Investigators should actively try to disprove their own hypothesis
+   - Time-boxed: if no evidence found after thorough investigation, report "hypothesis unlikely" and stop
+
+3. **Synthesize findings** — After all investigators complete:
+   - Rank hypotheses by evidence strength
+   - Present the most likely root cause with supporting evidence
+   - Propose a specific fix with code changes
+
+4. **Do NOT auto-apply fixes** — Present the diagnosis and proposed fix to the user for approval. Only implement after the user confirms.
+
+**Example team for a "chat responses are empty" bug:**
+- Investigator 1: API route — check if the Claude API is being called correctly, verify request/response
+- Investigator 2: Client-side — check if SSE parsing is working, verify state updates
+- Investigator 3: Database/RAG — check if embeddings are being retrieved, verify search results
+
+## Large Refactoring (Agent Team)
+
+**Trigger:** Auto-detected when a refactoring operation will touch 5+ files. Claude proposes using a team; proceeds only with user agreement.
+
+When triggered, create a team called "refactor" with 4 sequential specialists:
+
+### Phase 1 (Parallel)
+1. **architect** — Plan the refactoring: define target architecture, sequence of changes, identify risks. Produces a step-by-step plan.
+2. **dependency-analyst** — Map all imports/exports of affected modules, trace all consumers, list all tests that cover the affected code. Produces a dependency map.
+
+### Phase 2 (Sequential, after Phase 1)
+3. **implementer** — Execute the refactoring changes following the architect's plan. After each file change, run `npm run typecheck` to catch errors early. Does NOT run tests (that's the test-updater's job).
+
+### Phase 3 (Sequential, after Phase 2)
+4. **test-updater** — Update all affected tests based on the dependency analyst's map. Run `npm run test` after each test file update. Fix any failures. Run the full suite at the end.
+
+### Final Verification
+After all specialists complete, the lead runs:
+```bash
+npm run test && npm run typecheck && npm run lint
+```
+
+**Do NOT commit** — present the full diff to the user for review. The user decides whether to commit.
+
+## Code Quality Deep-Dive (Agent Team)
+
+**Trigger:** User says "run a code quality audit" or "deep dive on code quality"
+
+Create a team called "code-quality" with 3 parallel specialists:
+
+1. **dead-code-hunter**
+   - Run `npx knip` to find unused exports, files, and dependencies
+   - Check for commented-out code blocks
+   - Find unused CSS classes or Tailwind utilities
+   - Look for TODO/FIXME/HACK comments older than 30 days
+   - Produce a prioritized list of dead code to remove
+
+2. **pattern-enforcer**
+   - Check for consistent naming conventions across the codebase
+   - Verify all API routes follow the same auth pattern
+   - Check that all components follow the same file structure
+   - Look for duplicated logic that could be consolidated
+   - Verify error handling patterns are consistent
+   - Check for consistent use of TypeScript types vs `any`
+
+3. **complexity-analyst**
+   - Identify functions longer than 50 lines
+   - Find files larger than 300 lines
+   - Look for deeply nested conditionals (3+ levels)
+   - Check for functions with more than 4 parameters
+   - Identify components with too many responsibilities
+   - Suggest specific simplification strategies
+
+### Output
+
+Write the final report to `docs/agents/code-quality-report.md`:
+
+```
+# Code Quality Report
+> Generated on [date]
+
+## Summary
+- Dead code items found: [N]
+- Pattern violations: [N]
+- Complexity hotspots: [N]
+
+## Dead Code
+[Prioritized list from dead-code-hunter]
+
+## Pattern Violations
+[Findings from pattern-enforcer]
+
+## Complexity Hotspots
+[Findings from complexity-analyst with simplification suggestions]
+
+## Recommended Actions
+[Top 5 most impactful improvements, ordered by effort-to-impact ratio]
+```
