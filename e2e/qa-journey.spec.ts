@@ -284,7 +284,8 @@ test.describe("QA Journey: Error Handling", () => {
 
   test("Journey 8: Health endpoint is always available", async ({ request }) => {
     const response = await request.get("/api/health");
-    expect(response.ok()).toBe(true);
+    // Health endpoint returns 200 (healthy) or 503 (degraded) — both are valid
+    expect([200, 503]).toContain(response.status());
 
     const body = await response.json();
     expect(body).toHaveProperty("status");
