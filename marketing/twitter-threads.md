@@ -12,7 +12,7 @@ Here's what I learned building it: 🧵
 ---
 
 **Tweet 2:**
-The problem with travel planning in 2024:
+The problem with travel planning in 2026:
 
 • Generic "top 10" listicles
 • ChatGPT hallucinating restaurant names
@@ -23,14 +23,14 @@ I wanted something that actually knew a place deeply.
 ---
 
 **Tweet 3:**
-So I built Paisaxe—an AI you can chat with (or talk to by voice) that only knows Asturias, Spain.
+So I built Paisaxe—an AI guide that only knows Asturias, Spain.
 
-Ask it anything:
-• "Best 3-day hiking route in Picos de Europa"
-• "Non-touristy sidrería in Oviedo"
-• "What's the deal with pre-Romanesque churches"
+Free text chat: ask anything.
+€1.99/day Voice Pass: Pelayo checks live weather, finds restaurants, and calls to book your table.
 
-paisaxe.com
+Yes, a real phone call. On your behalf.
+
+paisaxe.es
 
 ---
 
@@ -40,8 +40,8 @@ The tech stack:
 • Voyage AI for embeddings (512 dim Matryoshka)
 • pgvector for hybrid search
 • Two-stage retrieval: fetch 10 → rerank to top 3
-• Claude for generation
-• ElevenLabs for voice
+• Claude for text chat
+• ElevenLabs + Twilio for voice agent with real-world actions
 
 ---
 
@@ -55,12 +55,12 @@ Two-stage reranking was the unlock.
 ---
 
 **Tweet 6:**
-Second lesson: voice changes how people ask questions.
+Second lesson: voice + tools = concierge.
 
-Typed: "restaurants oviedo"
-Spoken: "Hey, I'm looking for somewhere to eat dinner tonight in Oviedo, maybe something with local food but not too fancy?"
+Text chat: "restaurants oviedo" → get a list
+Voice (Pelayo): "Find me somewhere for dinner tonight in Oviedo, local food, not too fancy" → finds a place, shows hours and ratings, calls to book a table
 
-Different UX entirely.
+Not a different UX. A different product.
 
 ---
 
@@ -78,13 +78,13 @@ It deserves more attention.
 ---
 
 **Tweet 8:**
-Paisaxe is free. No ads. No login.
+Paisaxe: free text chat. No ads. No login.
 
-If you're planning a Spain trip or just curious about RAG implementations, check it out:
+€1.99/day unlocks Pelayo—live weather, restaurant search, phone bookings.
 
-paisaxe.com
+If you're planning a Spain trip or curious about building AI agents with real-world actions, check it out:
 
-Happy to answer questions about the build.
+paisaxe.es
 
 ---
 
@@ -92,13 +92,13 @@ Happy to answer questions about the build.
 
 **For #buildinpublic:**
 ```
-Shipped a voice-powered travel guide for Asturias, Spain.
+Shipped an AI travel guide for Asturias, Spain.
 
-Stack: Next.js + Supabase + Claude + ElevenLabs
+Free text chat + €1.99/day voice agent that checks weather, finds restaurants, and calls to book your table.
 
-The retrieval pipeline took longer than the UI.
+Stack: Next.js + Supabase + Claude + ElevenLabs + Twilio
 
-paisaxe.com
+paisaxe.es
 ```
 
 **For travel audience:**
@@ -107,7 +107,8 @@ Hot take: Asturias is the most underrated region in Europe for hiking.
 
 Picos de Europa + zero crowds + cider culture + beach access
 
-I built a free AI guide if you want to plan a trip: paisaxe.com
+I built an AI guide to help plan trips: paisaxe.es
+Free to chat. €1.99/day for a voice guide who books restaurants for you.
 ```
 
 **For AI/LLM audience:**

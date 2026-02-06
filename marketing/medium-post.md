@@ -30,7 +30,7 @@ Pick one:
 ## Post Content
 
 ### Subtitle/Kicker
-*A deep dive into building Paisaxe—a voice-powered travel guide for northern Spain*
+*A deep dive into building Paisaxe—an AI travel guide that checks the weather, finds restaurants, and calls ahead to book your table*
 
 ---
 
@@ -50,7 +50,7 @@ For travel—especially to less-documented places—that's a problem. You don't 
 
 ### Building a Specialist
 
-I built [Paisaxe](https://paisaxe.com) (Asturian for "landscape") as an experiment in hyper-local AI. Instead of trying to answer questions about the whole world, it only answers questions about Asturias.
+I built [Paisaxe](https://paisaxe.es) (Asturian for "landscape") as an experiment in hyper-local AI. Instead of trying to answer questions about the whole world, it only answers questions about Asturias.
 
 The technical approach:
 
@@ -73,15 +73,21 @@ The model doesn't need to "remember" anything about Asturias. It just needs to r
 
 Every answer cites where it came from. If the system doesn't have good information on something, it says so instead of making things up.
 
-**4. Voice as a first-class interface**
+**4. Voice as a concierge, not just an interface**
 
-This was the surprising part. I added voice agents (via ElevenLabs) almost as an afterthought, but they changed everything.
+This was the surprising part. I started with voice as a different input method. But once you give a voice agent real tools, it becomes something else entirely.
+
+Meet Pelayo—the voice guide you unlock for €1.99/day. He doesn't just answer questions differently than the free text chat. He can do things the text chat can't:
+
+- Check **live weather** before your hike to Lagos de Covadonga
+- Search for **restaurants with real-time hours**, ratings, and phone numbers
+- **Call the restaurant directly** and book a table on your behalf—a real phone call, with his voice
 
 When people type, they write search queries: "restaurants oviedo."
 
-When people talk, they ask human questions: "Hey, I'm looking for somewhere to have dinner tonight in Oviedo. We want local food but nothing too fancy—any ideas?"
+When people talk to Pelayo, they say: "Hey, I want to have dinner tonight in Oviedo, something local but not too fancy—can you find a place and book it for us?"
 
-The voice interface unlocked a more natural way of getting travel advice. Like calling a friend who lives there.
+That's not a chatbot. That's a concierge.
 
 ### What I Learned
 
@@ -109,9 +115,11 @@ We've spent years making AI systems that try to know everything. Maybe some of t
 
 ---
 
-Paisaxe is free to use at [paisaxe.com](https://paisaxe.com). No login, no ads. You can chat with it by text or talk to it by voice.
+Paisaxe is free to explore at [paisaxe.es](https://paisaxe.es). No login, no ads. Text chat is unlimited—ask anything about Asturias.
 
-If you're interested in the technical implementation (Voyage AI embeddings, pgvector, reranking strategies), I'm happy to discuss in the comments.
+For €1.99/day, you can unlock Pelayo, the voice guide. Live weather, real-time restaurant search, and actual phone bookings on your behalf. It's the part I'm most proud of building.
+
+If you're interested in the technical implementation (Voyage AI embeddings, pgvector, reranking strategies, ElevenLabs + Twilio for outbound calls), I'm happy to discuss in the comments.
 
 And if you've never heard of Asturias—now you have. It's worth the visit.
 

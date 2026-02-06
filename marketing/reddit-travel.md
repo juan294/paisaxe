@@ -29,7 +29,7 @@ I've been obsessed with Asturias for a while now, and I'm surprised it doesn't c
 
 Best time to visit is May-September (it rains a lot otherwise—they call it "the land of eternal drizzle"). Fly into Oviedo or Gijón, or take a train from Madrid. Renting a car helps for the smaller villages and coastal drives.
 
-I actually built a site to help people plan trips there: [paisaxe.com](https://paisaxe.com). It has an AI chat that knows all the local spots, hiking routes, and restaurant recommendations. You can even talk to it by voice if you want. Free to use.
+I actually built a site to help people plan trips there: [paisaxe.es](https://paisaxe.es). It has a free AI chat that knows all the local spots, hiking routes, and restaurant recommendations. And for €1.99/day, you can talk to Pelayo—a voice guide who checks live weather, finds restaurants with real-time hours, and even calls ahead to book your table.
 
 Happy to answer questions if anyone's considering it!
 

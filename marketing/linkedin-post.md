@@ -37,12 +37,14 @@ So I built the opposite: an AI that knows ONE place deeply.
 
 → 37 curated PDFs of local guides and documentation
 → Vector search + reranking to find relevant context
-→ Voice agents you can actually talk to
 → Source citations so you know it's not making things up
+→ Voice Pass (€1.99/day): talk to Pelayo, your AI local guide
 
-The result is Paisaxe (paisaxe.com)—free to use, no login required.
+The result is Paisaxe (paisaxe.es)—free to chat with, no login required.
 
-Biggest lesson: Depth beats breadth. A specialist AI that knows everything about somewhere is more useful than a generalist that knows something about everywhere.
+But here's where it gets interesting. For €1.99/day, you unlock Pelayo—a voice guide who doesn't just answer questions. He checks live weather before your hike, finds restaurants with real-time hours and ratings, and actually calls ahead to book your table. A real phone call, on your behalf.
+
+That's the shift I didn't expect: the most useful AI travel assistant isn't the one that tells you about a place. It's the one that does things for you while you're there.
 
 If you're building with RAG or interested in hyper-local AI applications, happy to share more about the technical approach.
 
@@ -50,14 +52,14 @@ If you're building with RAG or interested in hyper-local AI applications, happy 
 
 ## Post Version 2: Technical/Builder Angle
 
-Shipped a side project: an AI travel guide you can talk to.
+Shipped something different: an AI travel guide that doesn't just talk—it acts.
 
 The stack:
 • Next.js + Supabase (Postgres + pgvector)
 • Voyage AI for embeddings (512-dim Matryoshka)
 • Two-stage retrieval: vector search → rerank top 3
-• Claude for generation
-• ElevenLabs for voice agents
+• Claude for text chat generation
+• ElevenLabs + Twilio for voice agent with real-world actions
 
 Key learnings:
 
@@ -65,9 +67,11 @@ Key learnings:
 
 2. Two-stage reranking matters. Initial vector search gets you in the ballpark. Reranking with a cross-encoder gets you the answer.
 
-3. Voice changes everything. When people type, they write search queries. When they talk, they ask human questions. Different UX entirely.
+3. Voice unlocks actions, not just conversation. When you give a voice agent tools—live weather, restaurant search, the ability to make phone calls—it becomes a concierge, not a chatbot.
 
-The project: Paisaxe (paisaxe.com)—a voice-powered guide for Asturias, Spain. Free, no login.
+The project: Paisaxe (paisaxe.es)—an AI guide for Asturias, Spain.
+
+Free text chat to explore. For €1.99/day, unlock Pelayo—a voice guide who checks live weather, finds restaurants with real-time hours, and calls ahead to book your table.
 
 Built it because I was tired of AI travel advice that hallucinates restaurants and hiking trails. Trained on 37 verified local PDFs instead of the open internet.
 
@@ -89,13 +93,14 @@ So I went deep instead of wide:
 → 37 local PDFs
 → Vector search + reranking
 → Source citations
-→ Voice agents you can actually talk to
+→ Voice Pass: Pelayo checks weather, finds places, and books your table
 
-Paisaxe: paisaxe.com
+Paisaxe: paisaxe.es
 
-Free. No login. No ads.
+Free text chat. No login. No ads.
+€1.99/day unlocks Pelayo—a voice guide who calls restaurants and books for you.
 
-Sometimes the most useful AI is the one that knows less—but knows it well.
+Sometimes the most useful AI is the one that knows less—but does more with what it knows.
 
 ---
 
