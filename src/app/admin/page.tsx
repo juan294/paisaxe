@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdminRole } from "@/hooks/use-admin-role";
 import { StoryGrid } from "@/components/admin/story-grid";
@@ -8,11 +9,6 @@ import { StoryEditorDialog } from "@/components/admin/story-editor-dialog";
 import { CreateStoryDialog } from "@/components/admin/create-story-dialog";
 import { SelectionToolbar } from "@/components/admin/selection-toolbar";
 import { AdminTabs, TABS, type AdminTab } from "@/components/admin/admin-tabs";
-import { FeatureTogglesPanel } from "@/components/admin/feature-toggles-panel";
-import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
-import { MarketingDashboard } from "@/components/admin/marketing-dashboard";
-import { SuggestionsPanel } from "@/components/admin/suggestions-panel";
-import { AgentsDashboard } from "@/components/admin/agents-dashboard";
 import { AdminThemeProvider } from "@/components/admin/theme-provider";
 import { ThemeToggle } from "@/components/admin/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -37,6 +33,41 @@ import { Input } from "@/components/ui/input";
 import type { AdminStory, CurationStatus, CreateStoryResponse } from "@/types/admin";
 import type { StoryMetadata, StoryLocale, TranslationStatus } from "@/types/immersive";
 import { cn } from "@/lib/utils";
+
+// Lazy-load tab panel components to reduce initial bundle size
+function TabPanelFallback() {
+  return (
+    <div className="flex min-h-[400px] flex-col items-center justify-center rounded-3xl bg-white dark:bg-[#252320]">
+      <Loader2 className="h-6 w-6 animate-spin text-[#a39e98]" />
+      <p className="mt-4 text-sm text-[#6b6560] dark:text-[#a39e98]">Loading...</p>
+    </div>
+  );
+}
+
+const FeatureTogglesPanel = dynamic(
+  () => import("@/components/admin/feature-toggles-panel").then(m => ({ default: m.FeatureTogglesPanel })),
+  { ssr: false, loading: TabPanelFallback }
+);
+
+const AnalyticsDashboard = dynamic(
+  () => import("@/components/admin/analytics-dashboard").then(m => ({ default: m.AnalyticsDashboard })),
+  { ssr: false, loading: TabPanelFallback }
+);
+
+const MarketingDashboard = dynamic(
+  () => import("@/components/admin/marketing-dashboard").then(m => ({ default: m.MarketingDashboard })),
+  { ssr: false, loading: TabPanelFallback }
+);
+
+const SuggestionsPanel = dynamic(
+  () => import("@/components/admin/suggestions-panel").then(m => ({ default: m.SuggestionsPanel })),
+  { ssr: false, loading: TabPanelFallback }
+);
+
+const AgentsDashboard = dynamic(
+  () => import("@/components/admin/agents-dashboard").then(m => ({ default: m.AgentsDashboard })),
+  { ssr: false, loading: TabPanelFallback }
+);
 
 type FilterType = "all" | CurationStatus | "missing_translations";
 

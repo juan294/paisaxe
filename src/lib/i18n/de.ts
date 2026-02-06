@@ -257,6 +257,17 @@ export const de: Translations = {
     got_it: 'Verstanden',
   },
 
+  errors: {
+    generic_title: 'Etwas ist schiefgelaufen',
+    generic_description: 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
+    retry: 'Erneut versuchen',
+    go_home: 'Zurück zur Startseite',
+    not_found_title: 'Seite nicht gefunden',
+    not_found_description: 'Die gesuchte Seite existiert nicht oder wurde verschoben.',
+    immersive_title: 'Erlebnis konnte nicht geladen werden',
+    immersive_description: 'Beim Laden der Geschichten ist ein Fehler aufgetreten. Versuchen Sie es erneut.',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

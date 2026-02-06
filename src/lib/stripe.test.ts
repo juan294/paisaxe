@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Mock server-only (stripe.ts imports it to prevent client-side usage)
+vi.mock("server-only", () => ({}));
+
 // Define mock functions that will be set up in vi.mock
 const mockCreate = vi.fn();
 const mockConstructEvent = vi.fn();

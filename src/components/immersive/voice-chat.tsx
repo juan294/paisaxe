@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import { Story } from "@/types/immersive";
 import { ImageResult } from "@/types";
@@ -16,6 +16,7 @@ import { ChatUpsellCTA } from "./chat-upsell-cta";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
 import {
@@ -54,9 +55,12 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const [useElevenLabs, setUseElevenLabs] = useState(false);
   const [hasSetDefaultMode, setHasSetDefaultMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const { t, locale } = useTranslation();
   const localizedStory = getLocalizedStory(story, locale);
   const posthog = usePostHog();
+  const stableOnClose = useMemo(() => onClose, [onClose]);
+  useFocusTrap(dialogRef, open, stableOnClose);
 
   // Check for voice access (whitelisted OR paid)
   const {
@@ -294,6 +298,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-end justify-center p-4 md:items-center"
       role="dialog"
       aria-label={t("accessibility.chat_dialog").replace("{title}", localizedStory.title)}

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { LanguageProvider } from "@/lib/i18n";
 import NotFound from "./not-found";
 
 // Mock next/link to render a plain anchor
@@ -19,21 +20,27 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+function renderWithI18n(ui: React.ReactElement) {
+  return render(
+    <LanguageProvider initialLocale="es">{ui}</LanguageProvider>
+  );
+}
+
 describe("NotFound", () => {
   it("renders the 404 heading", () => {
-    render(<NotFound />);
+    renderWithI18n(<NotFound />);
     expect(screen.getByText("404")).toBeInTheDocument();
   });
 
   it("renders a friendly Spanish message", () => {
-    render(<NotFound />);
+    renderWithI18n(<NotFound />);
     expect(
       screen.getByText("Página no encontrada")
     ).toBeInTheDocument();
   });
 
   it("renders a description in Spanish", () => {
-    render(<NotFound />);
+    renderWithI18n(<NotFound />);
     expect(
       screen.getByText(
         "La página que buscas no existe o ha sido movida."
@@ -42,20 +49,20 @@ describe("NotFound", () => {
   });
 
   it("renders a link back to home", () => {
-    render(<NotFound />);
+    renderWithI18n(<NotFound />);
     const link = screen.getByRole("link", { name: "Volver al inicio" });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "/");
   });
 
   it("has a dark background", () => {
-    const { container } = render(<NotFound />);
+    const { container } = renderWithI18n(<NotFound />);
     const wrapper = container.firstChild as HTMLElement;
     expect(wrapper.className).toContain("bg-black");
   });
 
   it("uses min-h-screen for full page coverage", () => {
-    const { container } = render(<NotFound />);
+    const { container } = renderWithI18n(<NotFound />);
     const wrapper = container.firstChild as HTMLElement;
     expect(wrapper.className).toContain("min-h-screen");
   });

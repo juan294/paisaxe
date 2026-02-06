@@ -244,7 +244,24 @@ async function initiateCall(
   }
 }
 
+function validateMcpSecret(request: Request): boolean {
+  const secret = process.env.MCP_API_SECRET?.trim();
+  if (!secret) {
+    // If no secret is configured, reject all requests
+    return false;
+  }
+  const provided = request.headers.get("x-mcp-secret");
+  return provided === secret;
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
+  if (!validateMcpSecret(request)) {
+    return NextResponse.json(
+      { success: false, message: "Unauthorized", status: "failed" },
+      { status: 401 }
+    );
+  }
+
   try {
     const body = await request.json();
 
