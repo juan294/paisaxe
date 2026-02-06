@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
-import { fetchAgentsSummary, fetchFeatureFlags, updateFeatureFlag } from "@/lib/admin-api";
+import { useCallback, useState, useEffect, useRef } from "react";
+import { fetchAgentsSummary, fetchFeatureFlags, updateFeatureFlag, triggerAgentRun, fetchRunningAgents } from "@/lib/admin-api";
 import { useAnalyticsData } from "./analytics-cache-context";
 import { AnalyticsCacheProvider } from "./analytics-cache-context";
 import { AgentConfigPanel } from "./agent-config-panel";
-import { AlertCircle, Loader2, Settings } from "lucide-react";
+import { AlertCircle, Loader2, Play, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FeatureFlag } from "@/types/feature-flags";
 import type {
@@ -67,7 +67,7 @@ const HEALTH_LABELS: Record<AgentHealthStatus, string> = {
 
 function AgentsDashboardInner() {
   const fetchFn = useCallback(() => fetchAgentsSummary(), []);
-  const { data, isLoading, isRefreshing, error } = useAnalyticsData(
+  const { data, isLoading, isRefreshing, error, refresh } = useAnalyticsData(
     "agents",
     fetchFn,
     "{}",
@@ -78,6 +78,10 @@ function AgentsDashboardInner() {
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
+  // On-demand agent runner state
+  const [runningAgents, setRunningAgents] = useState<Set<string>>(new Set());
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     fetchFeatureFlags().then((result) => {
       if (result.data) {
@@ -85,6 +89,44 @@ function AgentsDashboardInner() {
       }
     });
   }, []);
+
+  // Poll running agents when any are active
+  useEffect(() => {
+    if (runningAgents.size === 0) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
+
+    const poll = async () => {
+      const result = await fetchRunningAgents();
+      if (!result.data) return;
+
+      const stillRunning = new Set(Object.keys(result.data.running));
+      const justFinished = [...runningAgents].filter((k) => !stillRunning.has(k));
+
+      if (justFinished.length > 0) {
+        refresh();
+      }
+
+      setRunningAgents(stillRunning);
+    };
+
+    pollingRef.current = setInterval(poll, 10_000);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runningAgents.size]);
+
+  const handleRunAgent = async (agentKey: string) => {
+    const result = await triggerAgentRun(agentKey);
+    if (result.data?.started) {
+      setRunningAgents((prev) => new Set([...prev, agentKey]));
+    }
+  };
 
   const handleToggle = async (flag: FeatureFlag) => {
     setUpdatingKey(flag.flagKey);
@@ -224,7 +266,12 @@ function AgentsDashboardInner() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {data.agents.map((agent) => (
-            <AgentCard key={agent.flagKey} agent={agent} />
+            <AgentCard
+              key={agent.flagKey}
+              agent={agent}
+              isRunning={runningAgents.has(agent.flagKey)}
+              onRun={() => handleRunAgent(agent.flagKey)}
+            />
           ))}
         </div>
       </section>
@@ -285,7 +332,7 @@ function OverallHealthBanner({ health, agents }: { health: AgentHealthStatus; ag
   );
 }
 
-function AgentCard({ agent }: { agent: AgentStatus }) {
+function AgentCard({ agent, isRunning, onRun }: { agent: AgentStatus; isRunning: boolean; onRun: () => void }) {
   return (
     <div className="rounded-2xl bg-white p-5 dark:bg-[#252320]">
       <div className="flex items-start justify-between">
@@ -297,10 +344,33 @@ function AgentCard({ agent }: { agent: AgentStatus }) {
             {agent.schedule}
           </p>
         </div>
-        <div className={`mt-1 h-2.5 w-2.5 rounded-full ${HEALTH_COLORS[agent.health]}`} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onRun}
+            disabled={isRunning}
+            className={cn(
+              "rounded-full p-1 transition-colors",
+              isRunning
+                ? "cursor-not-allowed text-[#a39e98]"
+                : "text-[#a39e98] hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]",
+            )}
+            aria-label={isRunning ? `${agent.name} is running` : `Run ${agent.name}`}
+          >
+            {isRunning ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <div className={cn(
+            "mt-0 h-2.5 w-2.5 rounded-full",
+            HEALTH_COLORS[agent.health],
+            isRunning && "animate-pulse",
+          )} />
+        </div>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-[#6b6560] dark:text-[#a39e98]">
-        {agent.healthSummary}
+        {isRunning ? "Running..." : agent.healthSummary}
       </p>
       <p className="mt-3 font-mono text-[10px] text-[#a39e98] dark:text-[#6b6560]">
         {relativeTime(agent.lastRun)}
