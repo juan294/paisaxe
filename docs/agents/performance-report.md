@@ -1,272 +1,323 @@
 # Performance Report
 
-> Updated on 2026-02-02 (post-optimization)
+> Updated on 2026-02-06
 
 ## Health Status: 🟡 YELLOW
 
-Bundle size exceeds budget by 194KB. All actionable optimizations have been completed.
+**Bundle size exceeds budget by 389KB (+15.6%).** Production build was skipped (dev server running), so metrics are from dev cache and may differ from production build.
+
+⚠️ **Note:** This report analyzes dev server cache (`.next`). For accurate production metrics, run a full production build.
 
 ## Key Metrics
 
-| Metric | Current | Previous | Change | Budget | Status |
+| Metric | Current | Previous (2026-02-02) | Change | Budget | Status |
 |--------|---------|----------|--------|--------|--------|
-| Total JS | 2,694 KB | 2,660 KB | +34 KB | 2,500 KB | ❌ Over |
-| Total JS (gzipped) | 795 KB | - | - | - | ✅ |
-| Total CSS | 98 KB | 104 KB | -6 KB | - | ✅ |
-| Production deps | 27 | 30 | -3 | 40 | ✅ |
-| node_modules | 863 MB | 863 MB | 0 | - | ⚠️ |
-| .next build | 991 MB | 991 MB | 0 | - | ⚠️ |
+| Total JS | 2,889 KB | 2,660 KB | **+229 KB (+8.6%)** | 2,500 KB | ❌ Over |
+| Total CSS | 132 KB | 98 KB | +34 KB | - | ⚠️ Regression |
+| Production deps | 27 | 30 | -3 | 40 | ✅ Good |
+| node_modules | 850 MB | 863 MB | -13 MB | - | ✅ Stable |
+| .next build | 2,129 MB | 991 MB | **+1,138 MB** | - | ⚠️ Large increase |
 
 ## Budget Violations
 
 | Budget | Limit | Current | Overage |
 |--------|-------|---------|---------|
-| Total JS | 2,500 KB | 2,694 KB | **+194 KB (7.8%)** |
+| Total JS | 2,500 KB | 2,889 KB | **+389 KB (15.6%)** |
 
-**Note:** The raw JS size increased slightly from estimates, but the gzipped size (795 KB) is reasonable. PostHog is now lazy-loaded and doesn't block initial page render.
+**Regression Analysis:**
+- Bundle grew by 229 KB since last report (4 days ago)
+- .next directory doubled in size (+1.1 GB) - likely dev cache bloat
+- CSS increased by 34 KB - may indicate added styles or reduced optimization
 
-## Largest Bundles (Post-Optimization)
+## Largest Bundles
 
-| Chunk | Size | Contents |
-|-------|------|----------|
-| 144d3bae-*.js | 412 KB | posthog-js (lazy-loaded, non-blocking) |
-| 773abe17875a49cc.js | 219 KB | lucide-react icons |
-| 4340a08ecfbd31a8.js | 202 KB | @elevenlabs/react + websocket |
-| 9da6db1e-*.js | 168 KB | posthog-js/react (lazy-loaded) |
-| fda8f1a530df2fea.js | 159 KB | react-markdown + dependencies |
+| Chunk | Size | Likely Contents | Impact |
+|-------|------|-----------------|--------|
+| ff75735b9b73148a.js | 476 KB | ElevenLabs WebRTC + WebSocket | 🔴 Critical |
+| 90fd5c2e839b728a.js | 476 KB | ElevenLabs (duplicate/peer?) | 🔴 Critical |
+| bb6d58382d01dec1.js | 245 KB | Unknown (new since last report) | 🟡 High |
+| 2b88146d0d128b78.js | 183 KB | lucide-react icons | 🟡 Medium |
+| 9513c041a7409515.js | 172 KB | PostHog (lazy-loaded) | 🟢 Non-blocking |
+| 1cadbebe7f77139c.js | 153 KB | react-markdown + deps | 🟢 Lazy-loaded |
 
-**Removed from bundle:**
-- framer-motion (was 177 KB) - replaced with CSS animations
+**Red flags:**
+1. **Two 476 KB ElevenLabs chunks** — This is unusual. Likely indicates either:
+   - Duplicate imports from multiple entry points
+   - Separate chunks for client/server or main/worker code
+2. **New 245 KB chunk** — Appeared since last report. Source unknown without production build analysis.
+3. **CSS +34 KB regression** — Investigate what styles were added.
 
-## Heaviest Dependencies (Post-Optimization)
+## Heaviest Dependencies
 
-| Package | Size | Client Bundle Impact | Used In |
-|---------|------|---------------------|---------|
-| posthog-js | ~150 KB gzipped | LOW - lazy-loaded after hydration | Layout (global, non-blocking) |
-| lucide-react | 45 MB (node_modules) | MEDIUM - 38 files import icons | Throughout app |
-| @elevenlabs/react | ~100 KB | LOW - dynamically imported | VoiceChat (lazy) |
-| react-markdown | ~50 KB | LOW - dynamically imported | VoiceChat (lazy) |
-| pdfjs-dist | 62 MB (node_modules) | NONE - devDependency | PDF processing scripts |
-| pdf-parse | 57 MB (node_modules) | NONE - devDependency | PDF processing scripts |
+| Package | node_modules Size | Client Bundle Impact | Used In | Status |
+|---------|------------------|---------------------|---------|--------|
+| @elevenlabs/react | Unknown | **~476 KB x2 (952 KB!)** | VoiceChat, VoiceAgentChat | 🔴 Bloated |
+| posthog-js | 30 MB | ~172 KB (lazy-loaded) | Analytics | 🟢 Optimized |
+| lucide-react | 45 MB | ~183 KB | 40+ files | 🟡 Heavy but tree-shaken |
+| pdfjs-dist | 63 MB | 0 KB | Build scripts only (devDep) | ✅ No impact |
+| pdf-parse | 57 MB | 0 KB | Build scripts only (devDep) | ✅ No impact |
+| next | 156 MB | Framework | Core | ✅ Required |
+| react-markdown | Unknown | ~153 KB (lazy-loaded) | VoiceChat | 🟢 Optimized |
 
-**Removed:**
-- ~~framer-motion~~ (~150 KB) - replaced with CSS animations in `language-switcher.tsx` and `category-filter-badge.tsx`
+**Previous optimizations (completed 2026-02-02):**
+- ✅ framer-motion removed (-177 KB)
+- ✅ PostHog lazy-loaded (~560 KB deferred from critical path)
+- ✅ PDF dependencies moved to devDependencies
 
-## Optimization Opportunities
+## Top Optimization Opportunities
 
-### 1. 🎯 HIGH IMPACT: Replace framer-motion with CSS animations (~150KB savings)
+### 1. 🎯 CRITICAL: Investigate ElevenLabs Duplication (~476 KB savings)
 
-**Current usage:** Only 2 files use framer-motion for simple animations:
-- `src/components/immersive/language-switcher.tsx`
-- `src/components/immersive/category-filter-badge.tsx`
+**Issue:** Two identical 476 KB chunks containing ElevenLabs WebRTC code.
 
-**Recommendation:** Replace with CSS animations or native React transitions.
+**Current usage:**
+- `src/components/immersive/voice-chat-elevenlabs.tsx`
+- `src/app/admin/voice-agent-chat.tsx` (admin panel)
 
+**Hypothesis:** Both components import `@elevenlabs/react` independently, causing Next.js to create separate chunks if they're in different route segments (public vs admin).
+
+**Recommended investigation steps:**
+1. Run production build with `npm run build` to see if duplication persists
+2. Run bundle analyzer: `npm run build:analyze` to visualize chunk contents
+3. Check if ElevenLabs is being imported in both App Router and client components
+
+**Potential fixes:**
 ```tsx
-// Before (framer-motion)
-import { motion, AnimatePresence } from "framer-motion";
-<motion.div animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
-
-// After (CSS)
-<div className="transition-opacity duration-200" />
-// Or use Tailwind's built-in animate-* classes
-```
-
-**Estimated savings:** 140-150 KB (removes entire framer-motion dependency)
-
----
-
-### 2. 🎯 HIGH IMPACT: Lazy-load PostHog (~100KB savings)
-
-**Current:** PostHog loads synchronously in the root layout, adding ~150KB to the initial bundle.
-
-**Recommendation:** Lazy-load PostHog after page hydration:
-
-```tsx
-// src/components/posthog-provider.tsx
+// Option A: Single lazy-loaded wrapper (recommended)
+// src/components/elevenlabs-provider.tsx
 "use client";
+import { lazy } from "react";
 
-import { useEffect, useState } from "react";
-import type { PostHog } from "posthog-js";
+const ElevenLabsWrapper = lazy(() => import("@elevenlabs/react"));
 
-export function PostHogProviderWrapper({ children }: { children: React.ReactNode }) {
-  const [posthog, setPosthog] = useState<PostHog | null>(null);
-
-  useEffect(() => {
-    // Lazy load PostHog after initial render
-    import("posthog-js").then((mod) => {
-      const ph = mod.default;
-      if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
-        ph.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-          api_host: "/a",
-          person_profiles: "never",
-          persistence: "memory",
-          capture_pageview: false,
-          capture_pageleave: true,
-          autocapture: true,
-        });
-        setPosthog(ph);
-      }
-    });
-  }, []);
-
-  if (!posthog) return <>{children}</>;
-
-  // Dynamic import for PostHogProvider
-  const { PostHogProvider } = require("posthog-js/react");
-  return <PostHogProvider client={posthog}>{children}</PostHogProvider>;
+export function useElevenLabs() {
+  // Shared lazy-loaded instance
 }
+
+// Option B: Route-based code splitting
+// Ensure admin routes don't share chunks with public routes
+// (Next.js should handle this automatically, but verify in bundle analyzer)
 ```
 
-**Estimated savings:** 80-100 KB from critical path
+**Estimated savings:** 476 KB (eliminate duplication) or 952 KB (if both can be fully lazy-loaded)
 
 ---
 
-### 3. 🎯 MEDIUM IMPACT: Optimize lucide-react imports
+### 2. 🎯 HIGH: Investigate CSS Regression (+34 KB)
 
-**Current:** 38 files import from lucide-react. The package uses tree-shaking, but ensure named imports.
+**Issue:** CSS bundle grew from 98 KB to 132 KB (+34.7%) in 4 days.
 
-**Verification:** All imports appear to use named imports (good). No action needed unless bundle analyzer shows otherwise.
+**Possible causes:**
+- New Tailwind classes added (not purged)
+- Added component libraries with bundled CSS
+- Development mode including source maps or debug styles
 
-**Alternative:** For further optimization, consider icon sprites or inline SVGs for the most common icons (X, Send, Mic).
+**Investigation steps:**
+```bash
+# Check CSS files in production build
+npm run build
+ls -lh .next/static/css/
+
+# Compare Tailwind classes used
+# (Requires production build for accurate purge analysis)
+```
+
+**Recommendation:** Run production build to see if CSS size normalizes. Dev builds often include unpurged styles.
+
+**Estimated savings:** Up to 34 KB if regression is dev-mode artifact
 
 ---
 
-### 4. ⚠️ LOW IMPACT: Already optimized (VoiceChat lazy loading)
+### 3. 🎯 MEDIUM: Optimize lucide-react Icon Loading (~50-100 KB potential)
 
-**Status:** VoiceChat is already dynamically imported in `src/app/immersive/page.tsx`:
+**Current:** 40+ files import from `lucide-react`, resulting in ~183 KB chunk.
 
+**Status:** Icons ARE using named imports (good for tree-shaking), but 40 import sites is high.
+
+**Opportunities:**
+1. **Icon consolidation:** Create a central icon registry for most common icons
+2. **SVG inlining:** For icons used in critical path (e.g., X, Send, Mic), inline the SVG directly
+3. **Icon sprites:** Use SVG sprites for frequently repeated icons
+
+**Example optimization:**
 ```tsx
+// Before: 40 files each importing from lucide-react
+import { X, Send, Mic } from "lucide-react";
+
+// After: Critical icons inlined
+// src/components/icons/inline.tsx
+export const XIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+);
+
+// Non-critical icons still lazy-loaded from lucide-react
+```
+
+**Estimated savings:** 50-100 KB (depends on how many icons are in critical path)
+
+---
+
+### 4. ⚠️ LOW: Verify PostHog Optimization Still Working
+
+**Status:** PostHog shows as 172 KB chunk (`9513c041a7409515.js`), which should be lazy-loaded per previous optimization.
+
+**Verification needed:**
+```tsx
+// Confirm this pattern is still in use:
+// src/components/posthog-provider.tsx
+useEffect(() => {
+  Promise.all([
+    import("posthog-js"),
+    import("posthog-js/react"),
+  ]).then(...)
+}, []);
+```
+
+**Check:** Is PostHog still deferred from critical path? Look at Lighthouse/WebPageTest to confirm it loads after First Contentful Paint.
+
+**Expected result:** PostHog loads in background, doesn't block page render.
+
+---
+
+### 5. ℹ️ NO ACTION: react-markdown (Already Optimized)
+
+**Status:** react-markdown is dynamically imported in VoiceChat:
+```tsx
+// src/app/immersive/immersive-page-content.tsx
 const VoiceChat = dynamic(
   () => import("@/components/immersive/voice-chat").then((mod) => mod.VoiceChat),
   { ssr: false, loading: () => null }
 );
 ```
 
-This correctly defers loading of:
-- @elevenlabs/react (~100 KB)
-- react-markdown (~50 KB)
+**Impact:** 153 KB deferred until voice chat is opened.
 
-**No action needed.**
+**No action needed.** ✅
 
 ---
 
-### 5. ℹ️ NO ACTION: pdfjs-dist and pdf-parse
+## Comparison: Current vs Previous
 
-**Status:** These packages (119 MB combined in node_modules) are only used in:
-- `scripts/process-pdfs.ts`
-- `scripts/extract-images.ts`
+| Metric | 2026-02-02 | 2026-02-06 | Delta | Trend |
+|--------|-----------|-----------|-------|-------|
+| Total JS (raw) | 2,660 KB | 2,889 KB | **+229 KB** | 📈 Regressed |
+| Total CSS | 98 KB | 132 KB | **+34 KB** | 📈 Regressed |
+| Production deps | 30 | 27 | -3 | 📉 Improved |
+| .next cache | 991 MB | 2,129 MB | +1,138 MB | ⚠️ Dev bloat |
 
-**Impact:** Zero client bundle impact. They are build-time/script dependencies only.
+**Regression root causes (hypothesis):**
+1. **ElevenLabs duplication** — Admin voice chat may have introduced second import path
+2. **Dev server artifacts** — Running analysis on dev cache instead of production build
+3. **New dependencies** — Check git log for any new packages added in last 4 days
 
-**Recommendation:** Consider moving to `devDependencies` to clarify their purpose:
-
+**Action items to investigate regressions:**
 ```bash
-npm uninstall pdf-parse pdfjs-dist
-npm install -D pdf-parse pdfjs-dist
+# 1. Check recent dependency changes
+git log --since="2026-02-02" --oneline -- package.json
+
+# 2. Check for new ElevenLabs usage
+git log --since="2026-02-02" --oneline -- "**/*elevenlabs*"
+
+# 3. Run production build for accurate metrics
+npm run build
+npm run build:analyze
 ```
 
 ---
 
-## Comparison: Before vs After Optimization
+## Action Plan (Prioritized)
 
-| Metric | Before | After | Delta | Result |
-|--------|--------|-------|-------|--------|
-| Total JS (raw) | 2,660 KB | 2,694 KB | +34 KB | ⚠️ Slightly higher |
-| Total JS (gzipped) | N/A | 795 KB | - | ✅ Good compression |
-| Critical path JS | ~2,660 KB | ~2,100 KB | -560 KB | ✅ PostHog deferred |
-| Production deps | 30 | 27 | -3 | ✅ Reduced |
-| framer-motion | 177 KB | 0 KB | -177 KB | ✅ Removed |
+| Priority | Action | Estimated Savings | Effort | Status |
+|----------|--------|-------------------|--------|--------|
+| 🔴 1 | **Run production build** | N/A (measurement) | Low | ⏳ Required |
+| 🔴 2 | Fix ElevenLabs duplication | **476 KB** | Medium | 🔴 Blocked by #1 |
+| 🟡 3 | Investigate CSS regression | **34 KB** | Low | 🔴 Blocked by #1 |
+| 🟡 4 | Optimize lucide-react critical icons | 50-100 KB | Medium | 🟢 Can start |
+| 🟢 5 | Verify PostHog lazy-load working | 0 KB (validation) | Low | 🟢 Can start |
 
-**Key improvements:**
-- **Critical path reduced by ~560 KB**: PostHog now loads after hydration, not blocking initial render
-- **framer-motion completely removed**: Replaced with CSS animations (zero runtime cost)
-- **Cleaner dependency tree**: PDF processing moved to devDependencies
-
----
-
-## Action Plan
-
-| Priority | Action | Estimated | Actual | Status |
-|----------|--------|-----------|--------|--------|
-| 1 | Remove framer-motion, use CSS | ~150 KB | 177 KB | ✅ Done |
-| 2 | Lazy-load PostHog | ~100 KB | ~560 KB critical path | ✅ Done |
-| 3 | Move PDF deps to devDependencies | 0 KB (clarity) | 0 KB | ✅ Done |
-
-**Completed optimizations (2026-02-02):**
-
-1. **framer-motion removed** — Replaced with CSS animations and Tailwind classes:
-   - `language-switcher.tsx`: Uses `transition-all`, `active:scale-95`, CSS rotate for chevron
-   - `category-filter-badge.tsx`: Uses `animate-fade-in-up` with staggered delays
-   - **Verified**: 0 chunks contain framer-motion in bundle analysis
-
-2. **PostHog lazy-loaded** — Dynamic import in `useEffect`:
-   - `posthog-provider.tsx`: Loads after hydration via `Promise.all([import(...)])`
-   - Uses React Context to share the lazy-loaded instance
-   - App renders immediately, PostHog loads in background (non-blocking)
-   - **Verified**: PostHog in separate chunks (144d3bae-*.js, 9da6db1e-*.js)
-
-3. **PDF deps moved to devDependencies** — `pdfjs-dist` and `pdf-parse` only used in:
-   - `scripts/process-pdfs.ts`
-   - `scripts/extract-images.ts`
-
-**Results:**
-- Total raw JS: 2,694 KB (still 194 KB over budget)
-- Critical path: Reduced by ~560 KB (PostHog deferred)
-- framer-motion: Completely eliminated
-- Gzipped: 795 KB (reasonable for production)
-
-**Remaining budget overage:** The 194 KB overage is primarily from lucide-react icons (219 KB chunk). Further optimization would require icon sprites or inline SVGs for common icons, but ROI is lower than completed optimizations.
-
-**All high-impact optimizations complete.**
-
----
-
-## Build Output
-
-```
-Route (app)
-┌ ○ /                              (Static)
-├ ○ /_not-found                    (Static)
-├ ○ /admin                         (Static)
-├ ƒ /api/admin/agent-reports       (Dynamic)
-├ ƒ /api/admin/analytics           (Dynamic)
-├ ƒ /api/admin/elevenlabs-analytics (Dynamic)
-├ ƒ /api/admin/feature-flags/[key] (Dynamic)
-├ ƒ /api/admin/marketing/accounts  (Dynamic)
-├ ƒ /api/admin/marketing/agent     (Dynamic)
-├ ƒ /api/admin/marketing/agent-logs (Dynamic)
-├ ƒ /api/admin/marketing/dashboard (Dynamic)
-├ ƒ /api/admin/marketing/posts     (Dynamic)
-├ ƒ /api/admin/marketing/schedule  (Dynamic)
-├ ƒ /api/admin/stories             (Dynamic)
-├ ƒ /api/admin/stories/[id]        (Dynamic)
-├ ƒ /api/admin/stories/[id]/content-images (Dynamic)
-├ ƒ /api/admin/stories/[id]/image  (Dynamic)
-├ ƒ /api/admin/stories/[id]/image-source (Dynamic)
-├ ƒ /api/admin/stories/[id]/status (Dynamic)
-├ ƒ /api/admin/stories/bulk-delete (Dynamic)
-├ ƒ /api/admin/stories/bulk-status (Dynamic)
-├ ƒ /api/admin/suggestions         (Dynamic)
-├ ƒ /api/admin/suggestions/[id]    (Dynamic)
-├ ƒ /api/chat                      (Dynamic)
-├ ƒ /api/chat/stream               (Dynamic)
-├ ƒ /api/favorites                 (Dynamic)
-├ ƒ /api/feature-flags             (Dynamic)
-├ ƒ /api/health                    (Dynamic)
-├ ƒ /api/suggestions               (Dynamic)
-└ ...29 routes total
-```
+**Critical path:**
+1. **Must run production build first** — Current metrics are from dev cache and may be misleading
+2. Once production metrics are available, re-prioritize based on actual bundle sizes
+3. ElevenLabs duplication is likely the #1 issue (if confirmed in production)
 
 ---
 
 ## Disk Usage
 
-| Directory | Size | Notes |
-|-----------|------|-------|
-| node_modules | 863 MB | Includes dev tools, PDF processing |
-| .next | 991 MB | Build cache + static assets |
+| Directory | Size | Previous | Change | Notes |
+|-----------|------|----------|--------|-------|
+| node_modules | 850 MB | 863 MB | -13 MB | ✅ Stable |
+| .next | 2,129 MB | 991 MB | **+1,138 MB** | ⚠️ Dev cache bloat |
+
+**Recommendation:** Clear .next cache periodically:
+```bash
+rm -rf .next
+npm run build  # Fresh production build
+```
 
 ---
 
-*Report generated by Performance Agent — Last updated: 2026-02-02*
+## Build Output
+
+**Note:** No production build was run. Analysis is based on dev server cache.
+
+**To generate accurate report:**
+```bash
+# Stop dev server first
+npm run build
+npm run build:analyze
+
+# Then re-run performance analysis
+npm run analyze-performance
+```
+
+---
+
+## Lighthouse/Core Web Vitals (Missing)
+
+**Status:** No Lighthouse metrics available in this run.
+
+**Recommended:** Add Core Web Vitals to performance monitoring:
+- **LCP (Largest Contentful Paint):** Target < 2.5s
+- **FID (First Input Delay):** Target < 100ms
+- **CLS (Cumulative Layout Shift):** Target < 0.1
+- **FCP (First Contentful Paint):** Target < 1.8s
+- **TTI (Time to Interactive):** Target < 3.8s
+
+**How to measure:**
+```bash
+# Run Lighthouse in CI
+npx lighthouse https://paisaxe.com --output=json --output-path=./lighthouse-report.json
+
+# Or use WebPageTest for detailed waterfall analysis
+```
+
+---
+
+## Summary & Recommendations
+
+### 🔴 **Immediate Actions (This Week)**
+1. **Stop dev server and run production build** — Current metrics are unreliable
+2. **Run bundle analyzer** — Identify source of ElevenLabs duplication
+3. **Check git history** — Find what changed between 2026-02-02 and today
+
+### 🟡 **Short-term Actions (Next Sprint)**
+1. **Fix ElevenLabs duplication** — Biggest win (~476 KB)
+2. **Investigate CSS regression** — Should be quick fix
+3. **Set up automated performance monitoring** — Prevent regressions
+
+### 🟢 **Long-term Actions (Backlog)**
+1. **Optimize lucide-react** — Inline critical icons
+2. **Add Core Web Vitals tracking** — Monitor real user metrics
+3. **Consider icon sprites** — For frequently repeated icons
+
+---
+
+## Cross-Agent Context
+
+---
+
+*Report generated by Performance Agent — Last updated: 2026-02-06*
+*⚠️ Based on dev cache, not production build — metrics may not reflect production reality*
