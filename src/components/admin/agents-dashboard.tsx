@@ -107,8 +107,16 @@ function AgentsDashboardInner() {
   const [terminalLogs, setTerminalLogs] = useState<AgentLogLine[]>([]);
   const [terminalOffset, setTerminalOffset] = useState(0);
   const [terminalFinished, setTerminalFinished] = useState(false);
+  const [terminalExitCode, setTerminalExitCode] = useState<number | null>(null);
+  const [terminalStoppedByUser, setTerminalStoppedByUser] = useState(false);
   const [terminalStartedAt, setTerminalStartedAt] = useState<string | null>(null);
   const logPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Track last run results per agent for card display
+  const [lastRunResults, setLastRunResults] = useState<Record<string, {
+    status: "success" | "error" | "stopped";
+    time: string;
+  }>>({});
 
   useEffect(() => {
     fetchFeatureFlags().then((result) => {
@@ -174,6 +182,18 @@ function AgentsDashboardInner() {
 
       if (result.data.finished) {
         setTerminalFinished(true);
+        setTerminalExitCode(result.data.exitCode);
+        setTerminalStoppedByUser(result.data.stoppedByUser);
+
+        // Record last run result for the card
+        const status = result.data.stoppedByUser
+          ? "stopped" as const
+          : (result.data.exitCode === 0 ? "success" as const : "error" as const);
+        setLastRunResults((prev) => ({
+          ...prev,
+          [activeTerminal]: { status, time: new Date().toISOString() },
+        }));
+
         if (logPollRef.current) {
           clearInterval(logPollRef.current);
           logPollRef.current = null;
@@ -199,6 +219,8 @@ function AgentsDashboardInner() {
       setTerminalLogs([]);
       setTerminalOffset(0);
       setTerminalFinished(false);
+      setTerminalExitCode(null);
+      setTerminalStoppedByUser(false);
       setTerminalStartedAt(result.data.startedAt);
       setActiveTerminal(agentKey);
     }
@@ -219,6 +241,8 @@ function AgentsDashboardInner() {
     setTerminalLogs([]);
     setTerminalOffset(0);
     setTerminalFinished(false);
+    setTerminalExitCode(null);
+    setTerminalStoppedByUser(false);
     setTerminalStartedAt(null);
   };
 
@@ -364,6 +388,7 @@ function AgentsDashboardInner() {
               key={agent.flagKey}
               agent={agent}
               isRunning={runningAgents.has(agent.flagKey)}
+              lastRunResult={lastRunResults[agent.flagKey]}
               onRun={() => handleRunAgent(agent.flagKey)}
               onStop={() => handleStopAgent(agent.flagKey)}
             />
@@ -378,6 +403,8 @@ function AgentsDashboardInner() {
           agentName={AGENT_NAMES[activeTerminal] ?? activeTerminal}
           logs={terminalLogs}
           finished={terminalFinished}
+          exitCode={terminalExitCode}
+          stoppedByUser={terminalStoppedByUser}
           startedAt={terminalStartedAt}
           onClose={handleCloseTerminal}
         />
@@ -442,14 +469,40 @@ function OverallHealthBanner({ health, agents }: { health: AgentHealthStatus; ag
 function AgentCard({
   agent,
   isRunning,
+  lastRunResult,
   onRun,
   onStop,
 }: {
   agent: AgentStatus;
   isRunning: boolean;
+  lastRunResult?: { status: "success" | "error" | "stopped"; time: string };
   onRun: () => void;
   onStop: () => void;
 }) {
+  // Determine what to show: running state > recent run result > report data
+  const showLastRun = lastRunResult && !isRunning;
+  const healthDot = isRunning
+    ? "bg-[#c9a55c] animate-pulse"
+    : showLastRun
+      ? lastRunResult.status === "success" ? "bg-[#7a9e7a]" : lastRunResult.status === "error" ? "bg-[#c97a7a]" : "bg-[#c9a55c]"
+      : HEALTH_COLORS[agent.health];
+
+  const summaryText = isRunning
+    ? "Running..."
+    : showLastRun
+      ? lastRunResult.status === "error"
+        ? "Last run failed"
+        : lastRunResult.status === "stopped"
+          ? "Last run stopped by user"
+          : "Last run completed successfully"
+      : agent.healthSummary;
+
+  const summaryColor = showLastRun && lastRunResult.status === "error"
+    ? "text-[#c97a7a]"
+    : "text-[#6b6560] dark:text-[#a39e98]";
+
+  const timeText = showLastRun ? relativeTime(lastRunResult.time) : relativeTime(agent.lastRun);
+
   return (
     <div className="rounded-2xl bg-white p-5 dark:bg-[#252320]">
       <div className="flex items-start justify-between">
@@ -479,18 +532,14 @@ function AgentCard({
               <Play className="h-3.5 w-3.5" />
             </button>
           )}
-          <div className={cn(
-            "mt-0 h-2.5 w-2.5 rounded-full",
-            HEALTH_COLORS[agent.health],
-            isRunning && "animate-pulse",
-          )} />
+          <div className={cn("mt-0 h-2.5 w-2.5 rounded-full", healthDot)} />
         </div>
       </div>
-      <p className="mt-3 text-xs leading-relaxed text-[#6b6560] dark:text-[#a39e98]">
-        {isRunning ? "Running..." : agent.healthSummary}
+      <p className={cn("mt-3 text-xs leading-relaxed", summaryColor)}>
+        {summaryText}
       </p>
       <p className="mt-3 font-mono text-[10px] text-[#a39e98] dark:text-[#6b6560]">
-        {relativeTime(agent.lastRun)}
+        {timeText}
       </p>
     </div>
   );
@@ -501,6 +550,8 @@ function AgentTerminal({
   agentName,
   logs,
   finished,
+  exitCode,
+  stoppedByUser,
   startedAt,
   onClose,
 }: {
@@ -508,6 +559,8 @@ function AgentTerminal({
   agentName: string;
   logs: AgentLogLine[];
   finished: boolean;
+  exitCode: number | null;
+  stoppedByUser: boolean;
   startedAt: string | null;
   onClose: () => void;
 }) {
@@ -538,9 +591,21 @@ function AgentTerminal({
     }
   }, [finished, startedAt]);
 
-  const status = finished ? "Completed" : "Running...";
-  const lastLog = logs.length > 0 ? logs[logs.length - 1] : null;
-  const stoppedByUser = lastLog?.text === "Process stopped by user";
+  const failed = finished && exitCode !== null && exitCode !== 0;
+  const statusLabel = !finished
+    ? "Running..."
+    : stoppedByUser
+      ? "Stopped"
+      : failed
+        ? `Failed (exit ${exitCode})`
+        : "Completed";
+  const statusColor = !finished
+    ? "text-[#c9a55c]"
+    : stoppedByUser
+      ? "text-[#c9a55c]"
+      : failed
+        ? "text-[#c97a7a]"
+        : "text-[#7a9e7a]";
 
   return (
     <section>
@@ -549,14 +614,9 @@ function AgentTerminal({
         <div className="flex items-center justify-between bg-[#1a1a1a] px-4 py-3">
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-[#e5e3de]">{agentName}</span>
-            <span className={cn(
-              "flex items-center gap-1.5 font-mono text-xs",
-              finished
-                ? stoppedByUser ? "text-[#c9a55c]" : "text-[#7a9e7a]"
-                : "text-[#c9a55c]",
-            )}>
+            <span className={cn("flex items-center gap-1.5 font-mono text-xs", statusColor)}>
               {!finished && <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#c9a55c]" />}
-              {stoppedByUser ? "Stopped" : status}
+              {statusLabel}
             </span>
             <span className="font-mono text-xs text-[#6b6560]">{elapsed}</span>
           </div>

@@ -68,4 +68,6 @@ export interface AgentLogsResponse {
   logs: AgentLogLine[];
   offset: number;
   finished: boolean;
+  exitCode: number | null;
+  stoppedByUser: boolean;
 }
