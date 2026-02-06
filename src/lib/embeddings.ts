@@ -13,11 +13,6 @@ const MAX_BATCH_SIZE = 128;
 
 const embeddingCache = new EmbeddingCache();
 
-export interface EmbeddingResult {
-  embedding: number[];
-  tokens: number;
-}
-
 export interface BatchEmbeddingResult {
   embeddings: number[][];
   totalTokens: number;

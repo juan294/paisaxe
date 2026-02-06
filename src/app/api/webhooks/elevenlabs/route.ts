@@ -288,7 +288,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // ElevenLabs sends different event types - only handle post_call_transcription
     const eventType = body.event_type || body.type;
     if (eventType && eventType !== "post_call_transcription") {
-      console.log(`[elevenlabs-webhook] Ignoring event type: ${eventType}`);
       return NextResponse.json({ success: true, ignored: true });
     }
 
@@ -333,10 +332,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       transcript: body.transcript,
     });
 
-    console.log(
-      `[elevenlabs-webhook] Booking ${booking.id} outcome: ${outcome}`
-    );
-
     // Build SMS message
     const smsMessage = getSMSMessage(booking as PendingBooking, outcome);
 
@@ -355,10 +350,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           smsResult.error
         );
       }
-    } else {
-      console.log(
-        `[elevenlabs-webhook] SMS disabled, skipping for booking ${booking.id}`
-      );
     }
 
     // Update booking status in database

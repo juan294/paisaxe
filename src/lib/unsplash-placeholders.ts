@@ -2,7 +2,7 @@ import type { StoryCategory } from "@/types/immersive";
 
 export const PLACEHOLDER_PREFIX = "unsplash-placeholder:";
 
-export interface UnsplashImage {
+interface UnsplashImage {
   url: string;
   author: string;
   authorUrl: string;

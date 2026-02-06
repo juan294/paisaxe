@@ -14,7 +14,7 @@ const USE_CURL = process.env.NODE_ENV !== "production";
  * Stream text chunks from the Anthropic API.
  * Uses curl in development (Turbopack workaround), SDK in production.
  */
-export async function* streamAnthropicAPI(
+async function* streamAnthropicAPI(
   system: string,
   messages: AnthropicMessage[],
   model: string,

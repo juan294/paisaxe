@@ -52,21 +52,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const { storyId, locales, forceRetranslate } = body;
 
-    console.log(`[translate-webhook] Starting translation for story ${storyId}`);
-
     // Run translation (this may take a few seconds)
     const result = await translateStory(storyId, {
       locales: locales as import("@/types/immersive").StoryLocale[] | undefined,
       forceRetranslate,
     });
 
-    if (result.success) {
-      console.log(
-        `[translate-webhook] Successfully translated story ${storyId}: ${result.successCount}/${
-          (result.successCount || 0) + (result.failedCount || 0)
-        } locales`
-      );
-    } else {
+    if (!result.success) {
       console.error(
         `[translate-webhook] Translation failed for story ${storyId}: ${result.error}`
       );

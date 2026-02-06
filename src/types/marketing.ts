@@ -365,16 +365,6 @@ export function rowToMarketingAgentLog(
 // API REQUEST/RESPONSE TYPES
 // =============================================================================
 
-/** Request to create a new post */
-export interface CreatePostRequest {
-  platform: MarketingPlatform;
-  content: string;
-  mediaUrls?: string[];
-  scheduledFor?: string;
-  storyId?: string;
-  contentTheme?: ContentTheme;
-}
-
 /** Request to update account credentials */
 export interface UpdateAccountCredentialsRequest {
   platform: MarketingPlatform;
@@ -420,24 +410,6 @@ export interface PlatformStats {
 // =============================================================================
 // AGENT CONFIGURATION TYPES
 // =============================================================================
-
-/** Configuration for a marketing agent */
-export interface MarketingAgentConfig {
-  platform: MarketingPlatform;
-  enabled: boolean;
-  voiceGuidelines: string;
-  hashtags: {
-    always: string[];
-    sometimes: string[];
-    location: string[];
-  };
-  postingRules: {
-    maxPostsPerDay: number;
-    minHoursBetweenPosts: number;
-    preferredTimes: string[]; // HH:MM format
-    avoidTopics: string[];
-  };
-}
 
 /** Default voice guidelines from CLAUDE.md */
 export const DEFAULT_VOICE_GUIDELINES = `

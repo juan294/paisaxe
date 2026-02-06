@@ -12,11 +12,6 @@ export interface ElevenLabsConversation {
   rating?: number;
 }
 
-export interface ElevenLabsAgent {
-  agent_id: string;
-  name: string;
-}
-
 export interface ElevenLabsAnalyticsSummary {
   totalConversations: number;
   completedConversations: number;

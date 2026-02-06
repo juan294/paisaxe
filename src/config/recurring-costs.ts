@@ -1,6 +1,6 @@
 import type { CostCategory } from "@/types/costs-analytics";
 
-export interface RecurringSubscription {
+interface RecurringSubscription {
   serviceId: string;
   serviceName: string;
   category: CostCategory;
