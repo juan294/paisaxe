@@ -139,6 +139,8 @@ export const mockTranslations: Record<string, string> = {
   "accessibility.send_message": "Enviar mensaje",
   "accessibility.chat_messages": "Mensajes del chat",
   "accessibility.story_progress": "Progreso de historias",
+  "accessibility.more_options": "Más opciones",
+  "accessibility.story_controls": "Controles de historias",
 };
 
 export function createMockT() {
