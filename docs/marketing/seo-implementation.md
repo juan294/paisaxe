@@ -12,7 +12,6 @@ Added explicit allow rules for AI search crawlers:
 - anthropic-ai (Claude)
 - Claude-Web
 - PerplexityBot
-- Bytespider (TikTok)
 - Google-Extended (Bard/Gemini)
 
 All crawlers are allowed to index public content while `/api/`, `/admin/`, and `/auth/` paths remain blocked.
@@ -208,15 +207,6 @@ Based on the Paisaxe charter, your messaging should feel like **a local friend s
   - Keyword-rich descriptions (Pinterest is a search engine)
   - Link pins to Paisaxe stories
 
-##### Tertiary: TikTok
-- **Why**: The discovery platform for travel in 2025 (16.9M posts under #TikTokTravel)
-- **Content**: Raw, authentic short videos (15-60 seconds)
-- **Posting frequency**: 2-3x/week when you have good content
-- **Tactics**:
-  - Use trending sounds
-  - Hook in first 2 seconds
-  - End with curiosity ("wait until you see the view")
-
 ---
 
 #### 3. Content Calendar Framework
@@ -237,7 +227,6 @@ With limited time, focus on quality over quantity. X is easiest to maintain dail
 - **X**: 5-7 posts/week (quick photos + commentary, threads occasionally)
 - **Instagram**: 2 posts/week (1 Reel, 1 carousel/image)
 - **Pinterest**: 3-5 pins/week (schedule in bulk, repurpose Instagram content)
-- Skip TikTok initially - add later if capacity grows
 - IG Stories only when you have natural moments to share
 
 **Pro tip**: X content can be quick and spontaneous. Post a beautiful view with a one-liner while you're out. Save polished content for Instagram.
@@ -474,7 +463,6 @@ This is the emerging frontier. Key insights:
 - [ ] Analyze what content performs across platforms
 - [ ] Double down on winners
 - [ ] Build X threads for popular topics
-- [ ] Consider TikTok if capacity grows
 - [ ] Track AI search visibility (manual checks monthly)
 
 ---

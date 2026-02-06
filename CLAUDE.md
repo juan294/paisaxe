@@ -137,8 +137,8 @@ QA_ALERT_PHONE=                         # Phone for critical alerts (E.164: +346
 5. Render with markdown + source attribution
 
 ### Voice Agents
-- Four agents: Xander, Iris, Penny, Tiko (in `src/config/elevenlabs-agents.ts`)
-- Gated by `visitor_voice_agent` feature flag
+- **Pelayo**: Visitor-facing tourism guide (gated by `visitor_voice_agent` feature flag)
+- Xander, Iris, Penny: Admin-only social media marketing agents (in `src/agents/index.ts`)
 
 ### Admin Auth
 - Supabase Auth (Google OAuth) + `user_profiles.role = 'admin'`

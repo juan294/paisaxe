@@ -300,7 +300,6 @@ Access the marketing dashboard at `/admin` and click the "Marketing" tab to see:
 - **X**: Access tokens don't expire, but can be revoked
 - **Instagram**: Long-lived tokens expire after 60 days (auto-refresh needed)
 - **Pinterest**: Tokens expire, use refresh token to renew
-- **TikTok**: Tokens expire after 24 hours (auto-refresh needed)
 
 ### Common Issues
 
