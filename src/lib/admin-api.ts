@@ -22,7 +22,7 @@ import type {
   ManualCostEntry,
   UpdateManualCostRequest,
 } from "@/types/costs-analytics";
-import type { AgentsDashboardData } from "@/types/agents-dashboard";
+import type { AgentsDashboardData, AgentRunStatus } from "@/types/agents-dashboard";
 
 const API_BASE = "/api/admin";
 
@@ -743,6 +743,50 @@ export async function fetchAgentsSummary(): Promise<AdminApiResponse<AgentsDashb
     return await response.json();
   } catch (error) {
     console.error("Error fetching agents summary:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Trigger an on-demand agent run
+ */
+export async function triggerAgentRun(
+  agentKey: string,
+): Promise<AdminApiResponse<{ started: boolean; agentKey: string; startedAt: string }>> {
+  try {
+    const response = await fetch(`${API_BASE}/agents/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentKey }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to start agent" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error triggering agent run:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Check which agents are currently running
+ */
+export async function fetchRunningAgents(): Promise<AdminApiResponse<AgentRunStatus>> {
+  try {
+    const response = await fetch(`${API_BASE}/agents/run`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to fetch running agents" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching running agents:", error);
     return { error: "Network error" };
   }
 }
