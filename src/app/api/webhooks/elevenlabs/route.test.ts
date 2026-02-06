@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { createHmac } from "crypto";
 
@@ -44,22 +44,34 @@ const mockBooking = {
   updated_at: "2024-01-01T10:00:00Z",
 };
 
-function createSignature(payload: string): string {
+/**
+ * Create an ElevenLabs-format signature header: t=timestamp,v0=hmac
+ * The HMAC signs "${timestamp}.${payload}" with SHA-256.
+ */
+function createSignatureHeader(
+  payload: string,
+  timestamp?: number
+): string {
+  const ts = timestamp ?? Math.floor(Date.now() / 1000);
+  const message = `${ts}.${payload}`;
   const hmac = createHmac("sha256", WEBHOOK_SECRET);
-  hmac.update(payload);
-  return hmac.digest("hex");
+  hmac.update(message);
+  const sig = hmac.digest("hex");
+  return `t=${ts},v0=${sig}`;
 }
 
-function createRequest(
+function createSignedRequest(
   body: unknown,
-  headers: Record<string, string> = {}
+  overrideHeaders?: Record<string, string>
 ): NextRequest {
   const payload = JSON.stringify(body);
+  const sigHeader = createSignatureHeader(payload);
   return new NextRequest("http://localhost:3000/api/webhooks/elevenlabs", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...headers,
+      "elevenlabs-signature": sigHeader,
+      ...overrideHeaders,
     },
     body: payload,
   });
@@ -114,46 +126,105 @@ describe("POST /api/webhooks/elevenlabs", () => {
     process.env = originalEnv;
   });
 
-  it("should return 401 when signature header is missing", async () => {
-    const payload = { conversation_id: "conv_456" };
-    const request = createRequest(payload);
+  describe("signature verification", () => {
+    it("should return 401 when signature header is missing", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/webhooks/elevenlabs",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversation_id: "conv_456" }),
+        }
+      );
 
-    const response = await POST(request);
-    const data = await response.json();
+      const response = await POST(request);
+      const data = await response.json();
 
-    expect(response.status).toBe(401);
-    expect(data.error).toBe("Missing signature");
-  });
-
-  it("should return 401 when signature is invalid", async () => {
-    const payload = { conversation_id: "conv_456" };
-    const request = createRequest(payload, {
-      "x-elevenlabs-signature": "invalid-signature",
+      expect(response.status).toBe(401);
+      expect(data.error).toBe("Missing signature");
     });
 
-    const response = await POST(request);
-    const data = await response.json();
+    it("should return 401 when signature format is invalid", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/webhooks/elevenlabs",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "elevenlabs-signature": "invalid-format",
+          },
+          body: JSON.stringify({ conversation_id: "conv_456" }),
+        }
+      );
 
-    expect(response.status).toBe(401);
-    expect(data.error).toBe("Invalid signature");
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toBe("Invalid signature");
+    });
+
+    it("should return 401 when HMAC does not match", async () => {
+      const now = Math.floor(Date.now() / 1000);
+      const request = new NextRequest(
+        "http://localhost:3000/api/webhooks/elevenlabs",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "elevenlabs-signature": `t=${now},v0=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef`,
+          },
+          body: JSON.stringify({ conversation_id: "conv_456" }),
+        }
+      );
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toBe("Invalid signature");
+    });
+
+    it("should return 401 when timestamp is too old (>30 min)", async () => {
+      const oldTimestamp = Math.floor(Date.now() / 1000) - 31 * 60; // 31 minutes ago
+      const payload = JSON.stringify({ conversation_id: "conv_456" });
+      const sigHeader = createSignatureHeader(payload, oldTimestamp);
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/webhooks/elevenlabs",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "elevenlabs-signature": sigHeader,
+          },
+          body: payload,
+        }
+      );
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toBe("Signature expired");
+    });
+
+    it("should accept valid signature with current timestamp", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: "Perfecto, le esperamos.",
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+    });
   });
 
   it("should ignore non-post_call_transcription events", async () => {
-    const payload = { event_type: "call_started", conversation_id: "conv_456" };
-    const body = JSON.stringify(payload);
-    const signature = createSignature(body);
-
-    const request = new NextRequest(
-      "http://localhost:3000/api/webhooks/elevenlabs",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-elevenlabs-signature": signature,
-        },
-        body,
-      }
-    );
+    const request = createSignedRequest({
+      event_type: "call_started",
+      conversation_id: "conv_456",
+    });
 
     const response = await POST(request);
     const data = await response.json();
@@ -164,21 +235,9 @@ describe("POST /api/webhooks/elevenlabs", () => {
   });
 
   it("should return 400 when conversation_id is missing", async () => {
-    const payload = { event_type: "post_call_transcription" };
-    const body = JSON.stringify(payload);
-    const signature = createSignature(body);
-
-    const request = new NextRequest(
-      "http://localhost:3000/api/webhooks/elevenlabs",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-elevenlabs-signature": signature,
-        },
-        body,
-      }
-    );
+    const request = createSignedRequest({
+      event_type: "post_call_transcription",
+    });
 
     const response = await POST(request);
     const data = await response.json();
@@ -194,21 +253,9 @@ describe("POST /api/webhooks/elevenlabs", () => {
       }),
     });
 
-    const payload = { conversation_id: "unknown_conv" };
-    const body = JSON.stringify(payload);
-    const signature = createSignature(body);
-
-    const request = new NextRequest(
-      "http://localhost:3000/api/webhooks/elevenlabs",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-elevenlabs-signature": signature,
-        },
-        body,
-      }
-    );
+    const request = createSignedRequest({
+      conversation_id: "unknown_conv",
+    });
 
     const response = await POST(request);
     const data = await response.json();
@@ -219,25 +266,11 @@ describe("POST /api/webhooks/elevenlabs", () => {
   });
 
   it("should detect confirmed outcome from transcript", async () => {
-    const payload = {
+    const request = createSignedRequest({
       conversation_id: "conv_456",
       transcript: "Perfecto, le esperamos a las nueve.",
       analysis: { call_successful: true },
-    };
-    const body = JSON.stringify(payload);
-    const signature = createSignature(body);
-
-    const request = new NextRequest(
-      "http://localhost:3000/api/webhooks/elevenlabs",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-elevenlabs-signature": signature,
-        },
-        body,
-      }
-    );
+    });
 
     const response = await POST(request);
     const data = await response.json();
@@ -249,25 +282,11 @@ describe("POST /api/webhooks/elevenlabs", () => {
   });
 
   it("should detect denied outcome from transcript", async () => {
-    const payload = {
+    const request = createSignedRequest({
       conversation_id: "conv_456",
       transcript: "Lo siento, estamos completo esta noche.",
       analysis: { call_successful: true },
-    };
-    const body = JSON.stringify(payload);
-    const signature = createSignature(body);
-
-    const request = new NextRequest(
-      "http://localhost:3000/api/webhooks/elevenlabs",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-elevenlabs-signature": signature,
-        },
-        body,
-      }
-    );
+    });
 
     const response = await POST(request);
     const data = await response.json();
@@ -277,24 +296,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
   });
 
   it("should detect no_answer when call_successful is false", async () => {
-    const payload = {
+    const request = createSignedRequest({
       conversation_id: "conv_456",
       analysis: { call_successful: false },
-    };
-    const body = JSON.stringify(payload);
-    const signature = createSignature(body);
-
-    const request = new NextRequest(
-      "http://localhost:3000/api/webhooks/elevenlabs",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-elevenlabs-signature": signature,
-        },
-        body,
-      }
-    );
+    });
 
     const response = await POST(request);
     const data = await response.json();
@@ -304,25 +309,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
   });
 
   it("should detect no_answer from voicemail keywords", async () => {
-    const payload = {
+    const request = createSignedRequest({
       conversation_id: "conv_456",
-      transcript: "Has llegado al buzón de voz. Deja tu mensaje después del tono.",
+      transcript:
+        "Has llegado al buzón de voz. Deja tu mensaje después del tono.",
       analysis: { call_successful: true },
-    };
-    const body = JSON.stringify(payload);
-    const signature = createSignature(body);
-
-    const request = new NextRequest(
-      "http://localhost:3000/api/webhooks/elevenlabs",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-elevenlabs-signature": signature,
-        },
-        body,
-      }
-    );
+    });
 
     const response = await POST(request);
     const data = await response.json();
@@ -334,24 +326,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
   it("should not send SMS when feature flag is disabled", async () => {
     vi.mocked(isFeatureFlagEnabled).mockResolvedValue(false);
 
-    const payload = {
+    const request = createSignedRequest({
       conversation_id: "conv_456",
       transcript: "Perfecto, le esperamos.",
-    };
-    const body = JSON.stringify(payload);
-    const signature = createSignature(body);
-
-    const request = new NextRequest(
-      "http://localhost:3000/api/webhooks/elevenlabs",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-elevenlabs-signature": signature,
-        },
-        body,
-      }
-    );
+    });
 
     const response = await POST(request);
     const data = await response.json();
@@ -362,24 +340,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
   });
 
   it("should update booking status in database", async () => {
-    const payload = {
+    const request = createSignedRequest({
       conversation_id: "conv_456",
       transcript: "Confirmado, le esperamos.",
-    };
-    const body = JSON.stringify(payload);
-    const signature = createSignature(body);
-
-    const request = new NextRequest(
-      "http://localhost:3000/api/webhooks/elevenlabs",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-elevenlabs-signature": signature,
-        },
-        body,
-      }
-    );
+    });
 
     await POST(request);
 
@@ -395,24 +359,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
       error: "Invalid phone number",
     });
 
-    const payload = {
+    const request = createSignedRequest({
       conversation_id: "conv_456",
       transcript: "Confirmado, le esperamos.",
-    };
-    const body = JSON.stringify(payload);
-    const signature = createSignature(body);
-
-    const request = new NextRequest(
-      "http://localhost:3000/api/webhooks/elevenlabs",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-elevenlabs-signature": signature,
-        },
-        body,
-      }
-    );
+    });
 
     const response = await POST(request);
     const data = await response.json();
@@ -423,6 +373,3 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.smsError).toBe("Invalid phone number");
   });
 });
-
-// Export afterEach for cleanup
-import { afterEach } from "vitest";
