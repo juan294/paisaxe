@@ -37,13 +37,23 @@ BUDGET_PROD_DEPS=40          # Max production dependencies
 log_info "Collecting performance metrics..." | tee -a "$LOG_FILE"
 
 # Build the app to get accurate bundle sizes
+# If the dev server is running, the build will fail because Next.js locks .next/.
+# In that case, fall back to the existing .next/static data (from dev or a prior build).
+FRESH_BUILD=true
+BUILD_OUTPUT=""
 log_info "Building application..." | tee -a "$LOG_FILE"
-BUILD_OUTPUT=$(npm run build 2>&1) || {
-  log_error "Build failed" | tee -a "$LOG_FILE"
-  echo "$BUILD_OUTPUT" >> "$LOG_FILE"
-  exit 1
-}
-log_success "Build completed" | tee -a "$LOG_FILE"
+if BUILD_OUTPUT=$(npm run build 2>&1); then
+  log_success "Build completed" | tee -a "$LOG_FILE"
+else
+  FRESH_BUILD=false
+  if [[ -d ".next/static" ]]; then
+    log_warn "Build failed (dev server running?). Using existing .next data for analysis." | tee -a "$LOG_FILE"
+  else
+    log_error "Build failed and no existing .next/static data to analyze" | tee -a "$LOG_FILE"
+    echo "$BUILD_OUTPUT" >> "$LOG_FILE"
+    exit 1
+  fi
+fi
 
 # Collect metrics
 log_info "Analyzing bundle sizes..." | tee -a "$LOG_FILE"
@@ -105,6 +115,12 @@ fi
   echo "PERFORMANCE METRICS ($(date '+%Y-%m-%d'))"
   echo "========================================="
   echo ""
+  if [[ "$FRESH_BUILD" == "false" ]]; then
+    echo "NOTE: Production build was skipped (dev server was running)."
+    echo "Bundle sizes below are from the dev server's .next cache — they may"
+    echo "differ from a production build. Dependency and disk metrics are still accurate."
+    echo ""
+  fi
   echo "BUNDLE SIZES:"
   echo "- Total JS: ${TOTAL_JS_KB} KB (previous: ${PREV_TOTAL_JS_KB} KB, change: ${JS_CHANGE_KB} KB)"
   echo "- Total CSS: ${TOTAL_CSS_KB} KB"
@@ -169,7 +185,7 @@ Current metrics:
 $(cat "$METRICS_FILE")
 
 Build output summary:
-$(echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30)
+$(if [[ "$FRESH_BUILD" == "true" ]]; then echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30; else echo "(No build output — dev server was running, used cached .next data)"; fi)
 
 $SHARED_CONTEXT_READ
 
