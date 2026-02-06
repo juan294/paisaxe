@@ -22,6 +22,7 @@ import type {
   ManualCostEntry,
   UpdateManualCostRequest,
 } from "@/types/costs-analytics";
+import type { AgentsDashboardData } from "@/types/agents-dashboard";
 
 const API_BASE = "/api/admin";
 
@@ -723,6 +724,25 @@ export async function deleteManualCostEntry(
     return await response.json();
   } catch (error) {
     console.error("Error deleting cost entry:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Fetch agents dashboard summary
+ */
+export async function fetchAgentsSummary(): Promise<AdminApiResponse<AgentsDashboardData>> {
+  try {
+    const response = await fetch(`${API_BASE}/agents-summary`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to fetch agents summary" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching agents summary:", error);
     return { error: "Network error" };
   }
 }

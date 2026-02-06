@@ -239,3 +239,108 @@ From 37 PDFs in `content/pdfs/`:
 - Culture: pre-Romanesque art, museums, festivals
 - Gastronomy: sidra, fabada, local dishes
 - Camino de Santiago planning
+
+## Debug Mode (Agent Team)
+
+**Trigger:** User says "enter debug mode", "debug this", or "let's debug this"
+
+When triggered, create a team of parallel investigators to diagnose the issue:
+
+1. **Assess complexity** — Simple bugs (single component, clear error): 3 investigators. Cross-cutting issues (multiple systems, intermittent): up to 5.
+
+2. **Create team** called "debug-squad" with investigators, each assigned a different hypothesis:
+   - Each investigator focuses on a different area (API / client / database / config / dependencies / etc.)
+   - Each investigator must state their hypothesis upfront, then gather evidence
+   - Investigators should actively try to disprove their own hypothesis
+   - Time-boxed: if no evidence found after thorough investigation, report "hypothesis unlikely" and stop
+
+3. **Synthesize findings** — After all investigators complete:
+   - Rank hypotheses by evidence strength
+   - Present the most likely root cause with supporting evidence
+   - Propose a specific fix with code changes
+
+4. **Do NOT auto-apply fixes** — Present the diagnosis and proposed fix to the user for approval. Only implement after the user confirms.
+
+**Example team for a "chat responses are empty" bug:**
+- Investigator 1: API route — check if the Claude API is being called correctly, verify request/response
+- Investigator 2: Client-side — check if SSE parsing is working, verify state updates
+- Investigator 3: Database/RAG — check if embeddings are being retrieved, verify search results
+
+## Large Refactoring (Agent Team)
+
+**Trigger:** Auto-detected when a refactoring operation will touch 5+ files. Claude proposes using a team; proceeds only with user agreement.
+
+When triggered, create a team called "refactor" with 4 sequential specialists:
+
+### Phase 1 (Parallel)
+1. **architect** — Plan the refactoring: define target architecture, sequence of changes, identify risks. Produces a step-by-step plan.
+2. **dependency-analyst** — Map all imports/exports of affected modules, trace all consumers, list all tests that cover the affected code. Produces a dependency map.
+
+### Phase 2 (Sequential, after Phase 1)
+3. **implementer** — Execute the refactoring changes following the architect's plan. After each file change, run `npm run typecheck` to catch errors early. Does NOT run tests (that's the test-updater's job).
+
+### Phase 3 (Sequential, after Phase 2)
+4. **test-updater** — Update all affected tests based on the dependency analyst's map. Run `npm run test` after each test file update. Fix any failures. Run the full suite at the end.
+
+### Final Verification
+After all specialists complete, the lead runs:
+```bash
+npm run test && npm run typecheck && npm run lint
+```
+
+**Do NOT commit** — present the full diff to the user for review. The user decides whether to commit.
+
+## Code Quality Deep-Dive (Agent Team)
+
+**Trigger:** User says "run a code quality audit" or "deep dive on code quality"
+
+Create a team called "code-quality" with 3 parallel specialists:
+
+1. **dead-code-hunter**
+   - Run `npx knip` to find unused exports, files, and dependencies
+   - Check for commented-out code blocks
+   - Find unused CSS classes or Tailwind utilities
+   - Look for TODO/FIXME/HACK comments older than 30 days
+   - Produce a prioritized list of dead code to remove
+
+2. **pattern-enforcer**
+   - Check for consistent naming conventions across the codebase
+   - Verify all API routes follow the same auth pattern
+   - Check that all components follow the same file structure
+   - Look for duplicated logic that could be consolidated
+   - Verify error handling patterns are consistent
+   - Check for consistent use of TypeScript types vs `any`
+
+3. **complexity-analyst**
+   - Identify functions longer than 50 lines
+   - Find files larger than 300 lines
+   - Look for deeply nested conditionals (3+ levels)
+   - Check for functions with more than 4 parameters
+   - Identify components with too many responsibilities
+   - Suggest specific simplification strategies
+
+### Output
+
+Write the final report to `docs/agents/code-quality-report.md`:
+
+```
+# Code Quality Report
+> Generated on [date]
+
+## Summary
+- Dead code items found: [N]
+- Pattern violations: [N]
+- Complexity hotspots: [N]
+
+## Dead Code
+[Prioritized list from dead-code-hunter]
+
+## Pattern Violations
+[Findings from pattern-enforcer]
+
+## Complexity Hotspots
+[Findings from complexity-analyst with simplification suggestions]
+
+## Recommended Actions
+[Top 5 most impactful improvements, ordered by effort-to-impact ratio]
+```

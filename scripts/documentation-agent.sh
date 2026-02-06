@@ -202,6 +202,12 @@ if [[ -n "$UNDOCUMENTED_ROUTES" ]] || [[ -n "$UNDOCUMENTED_FLAGS" ]]; then
     }
   }
 
+  # Read shared context from other agents
+  log_info "Reading shared context..." | tee -a "$LOG_FILE"
+  SHARED_CONTEXT=$(read_shared_context "documentation_agent_enabled")
+  SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" read 2>/dev/null || echo "")
+  SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
+
   # Capture docs state before (check both CLAUDE.md and features.md)
   FEATURES_MD="$PROJECT_DIR/docs/project/features.md"
   DOCS_STATE_BEFORE=$(cat "$CLAUDE_MD" "$FEATURES_MD" 2>/dev/null | md5 -q)
@@ -222,6 +228,12 @@ Additional context:
 
 Contents of gaps file:
 $(cat "$GAPS_FILE")
+
+$SHARED_CONTEXT_READ
+
+$SHARED_CONTEXT
+
+$SHARED_CONTEXT_WRITE
 PROMPT
 
   # Check if any documentation was modified
@@ -230,6 +242,26 @@ PROMPT
     log_success "Claude updated documentation" | tee -a "$LOG_FILE"
   else
     log_info "No documentation changes made" | tee -a "$LOG_FILE"
+  fi
+
+  # Extract and write shared context
+  REPORT_CONTENT=$(cat "$REPORT_FILE")
+  CONTEXT_BLOCK=$(echo "$REPORT_CONTENT" | sed -n '/SHARED_CONTEXT_START/,/SHARED_CONTEXT_END/p' | sed '1d;$d')
+
+  if [[ -n "$CONTEXT_BLOCK" ]]; then
+    write_shared_context "documentation_agent_enabled" "$CONTEXT_BLOCK"
+    log_success "Shared context updated" | tee -a "$LOG_FILE"
+
+    # Strip the shared context block from the report
+    python3 -c "
+import re, sys
+content = sys.stdin.read()
+cleaned = re.sub(r'\n?SHARED_CONTEXT_START\n.*?SHARED_CONTEXT_END\n?', '', content, flags=re.DOTALL)
+sys.stdout.write(cleaned)
+" < "$REPORT_FILE" > "${REPORT_FILE}.tmp"
+    mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
+  else
+    log_info "No shared context block found in report" | tee -a "$LOG_FILE"
   fi
 
   # Cleanup temp file

@@ -2,19 +2,20 @@
 
 import { cn } from "@/lib/utils";
 
-export type AdminTab = "stories" | "suggestions" | "toggles" | "analytics" | "marketing";
+export type AdminTab = "stories" | "suggestions" | "features" | "analytics" | "marketing" | "agents";
 
 interface AdminTabsProps {
   activeTab: AdminTab;
   onTabChange: (tab: AdminTab) => void;
 }
 
-export const TABS: { value: AdminTab; label: string; number: string }[] = [
-  { value: "stories", label: "Stories", number: "01" },
-  { value: "toggles", label: "Toggles", number: "02" },
-  { value: "analytics", label: "Analytics", number: "03" },
-  { value: "marketing", label: "Marketing", number: "04" },
-  { value: "suggestions", label: "Suggestions", number: "05" },
+export const TABS: { value: AdminTab; label: string }[] = [
+  { value: "analytics", label: "Analytics" },
+  { value: "stories", label: "Stories" },
+  { value: "features", label: "Features" },
+  { value: "marketing", label: "Marketing" },
+  { value: "suggestions", label: "Suggestions" },
+  { value: "agents", label: "Agents" },
 ];
 
 export function AdminTabs({ activeTab, onTabChange }: AdminTabsProps) {
@@ -36,9 +37,6 @@ export function AdminTabs({ activeTab, onTabChange }: AdminTabsProps) {
               : "text-[#a39e98] hover:text-[#6b6560] dark:hover:text-[#a39e98]"
           )}
         >
-          <span className="tabular-nums text-[#a39e98] group-hover:text-[#a39e98] dark:text-[#6b6560]">
-            {tab.number}
-          </span>
           {tab.label}
           <kbd className="inline-flex items-center justify-center rounded bg-[#f5f3ee] px-1.5 py-0.5 font-sans text-[10px] font-medium text-[#a39e98] dark:bg-[#3d3a36] dark:text-[#6b6560]">
             ⌘{index + 1}

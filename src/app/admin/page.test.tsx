@@ -90,11 +90,19 @@ vi.mock("@/components/admin/image-editor-dialog", () => ({
 vi.mock("@/components/admin/admin-tabs", () => ({
   AdminTabs: ({ activeTab, onTabChange }: { activeTab: string; onTabChange: (tab: string) => void }) => (
     <div data-testid="admin-tabs">
-      <button onClick={() => onTabChange("stories")} data-active={activeTab === "stories"}>Stories</button>
-      <button onClick={() => onTabChange("toggles")} data-active={activeTab === "toggles"}>Toggles</button>
       <button onClick={() => onTabChange("analytics")} data-active={activeTab === "analytics"}>Analytics</button>
+      <button onClick={() => onTabChange("stories")} data-active={activeTab === "stories"}>Stories</button>
+      <button onClick={() => onTabChange("features")} data-active={activeTab === "features"}>Features</button>
     </div>
   ),
+  TABS: [
+    { value: "analytics", label: "Analytics" },
+    { value: "stories", label: "Stories" },
+    { value: "features", label: "Features" },
+    { value: "marketing", label: "Marketing" },
+    { value: "suggestions", label: "Suggestions" },
+    { value: "agents", label: "Agents" },
+  ],
 }));
 
 // Mock FeatureTogglesPanel and AnalyticsDashboard
@@ -326,8 +334,18 @@ describe("AdminPage", () => {
       setupAdminAuth();
     });
 
+    // Helper: default tab is now Analytics, so navigate to Stories tab first
+    async function navigateToStories() {
+      const { container } = render(<AdminPage />);
+      // Click "Stories" tab in mock AdminTabs
+      await act(async () => {
+        fireEvent.click(screen.getByText("Stories"));
+      });
+      return container;
+    }
+
     it("shows stories grid after successful load", async () => {
-      render(<AdminPage />);
+      await navigateToStories();
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -339,7 +357,7 @@ describe("AdminPage", () => {
     });
 
     it("calls fetchStories without adminKey parameter", async () => {
-      render(<AdminPage />);
+      await navigateToStories();
 
       await waitFor(() => {
         expect(mockFetchStories).toHaveBeenCalledWith(undefined);
@@ -347,7 +365,7 @@ describe("AdminPage", () => {
     });
 
     it("shows Paisaxe title", async () => {
-      render(<AdminPage />);
+      await navigateToStories();
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -359,7 +377,7 @@ describe("AdminPage", () => {
     it("shows 'No stories found' when empty", async () => {
       mockFetchStories.mockResolvedValue({ data: [] });
 
-      render(<AdminPage />);
+      await navigateToStories();
 
       await waitFor(() => {
         expect(screen.getByText("No stories found")).toBeInTheDocument();
@@ -371,7 +389,7 @@ describe("AdminPage", () => {
         error: "Something went wrong",
       });
 
-      render(<AdminPage />);
+      await navigateToStories();
 
       await waitFor(() => {
         expect(screen.getByText("Something went wrong")).toBeInTheDocument();
@@ -379,7 +397,7 @@ describe("AdminPage", () => {
     });
 
     it("shows story counts in metric cards (total, pending, approved, missing i18n)", async () => {
-      render(<AdminPage />);
+      await navigateToStories();
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -394,7 +412,7 @@ describe("AdminPage", () => {
     });
 
     it("logout calls signOut", async () => {
-      render(<AdminPage />);
+      await navigateToStories();
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -409,7 +427,7 @@ describe("AdminPage", () => {
     });
 
     it("refresh button re-fetches stories", async () => {
-      render(<AdminPage />);
+      await navigateToStories();
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -437,7 +455,11 @@ describe("AdminPage", () => {
       });
       mockFetchStories.mockReturnValue(promise);
 
+      // Navigate to stories — but need to handle the loading case specially
       render(<AdminPage />);
+      await act(async () => {
+        fireEvent.click(screen.getByText("Stories"));
+      });
 
       expect(screen.getByText("Loading stories...")).toBeInTheDocument();
 
@@ -450,7 +472,7 @@ describe("AdminPage", () => {
     });
 
     it("stat cards work as filter buttons (Pending, Approved, Total)", async () => {
-      render(<AdminPage />);
+      await navigateToStories();
 
       await waitFor(() => {
         expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -515,7 +537,7 @@ describe("AdminPage", () => {
 
     describe("Search functionality", () => {
       it("shows search input on stories tab", async () => {
-        render(<AdminPage />);
+        await navigateToStories();
 
         await waitFor(() => {
           expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -525,7 +547,7 @@ describe("AdminPage", () => {
       });
 
       it("filters stories by title", async () => {
-        render(<AdminPage />);
+        await navigateToStories();
 
         await waitFor(() => {
           expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -545,7 +567,7 @@ describe("AdminPage", () => {
       });
 
       it("filters stories by subtitle (case-insensitive)", async () => {
-        render(<AdminPage />);
+        await navigateToStories();
 
         await waitFor(() => {
           expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -573,7 +595,7 @@ describe("AdminPage", () => {
       });
 
       it("filters stories by description", async () => {
-        render(<AdminPage />);
+        await navigateToStories();
 
         await waitFor(() => {
           expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -593,7 +615,7 @@ describe("AdminPage", () => {
       });
 
       it("filters stories by category", async () => {
-        render(<AdminPage />);
+        await navigateToStories();
 
         await waitFor(() => {
           expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -613,7 +635,7 @@ describe("AdminPage", () => {
       });
 
       it("combines search with status filter", async () => {
-        render(<AdminPage />);
+        await navigateToStories();
 
         await waitFor(() => {
           expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -649,7 +671,7 @@ describe("AdminPage", () => {
       });
 
       it("shows all stories when search is cleared", async () => {
-        render(<AdminPage />);
+        await navigateToStories();
 
         await waitFor(() => {
           expect(screen.getByTestId("story-grid")).toBeInTheDocument();
@@ -688,7 +710,7 @@ describe("AdminPage", () => {
       });
 
       it("shows 'No stories match this filter' when search has no results", async () => {
-        render(<AdminPage />);
+        await navigateToStories();
 
         await waitFor(() => {
           expect(screen.getByTestId("story-grid")).toBeInTheDocument();
