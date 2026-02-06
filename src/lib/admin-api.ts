@@ -765,7 +765,7 @@ export async function triggerAgentRun(
       return { error: error.error || "Failed to start agent" };
     }
 
-    return await response.json();
+    return { data: await response.json() };
   } catch (error) {
     console.error("Error triggering agent run:", error);
     return { error: "Network error" };
@@ -784,7 +784,7 @@ export async function fetchRunningAgents(): Promise<AdminApiResponse<AgentRunSta
       return { error: error.error || "Failed to fetch running agents" };
     }
 
-    return await response.json();
+    return { data: await response.json() };
   } catch (error) {
     console.error("Error fetching running agents:", error);
     return { error: "Network error" };
@@ -807,7 +807,7 @@ export async function stopAgent(agentKey: string): Promise<AdminApiResponse<{ st
       return { error: error.error || "Failed to stop agent" };
     }
 
-    return await response.json();
+    return { data: await response.json() };
   } catch (error) {
     console.error("Error stopping agent:", error);
     return { error: "Network error" };
