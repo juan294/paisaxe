@@ -75,7 +75,7 @@ export function StoryViewer({
   const { t, locale } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
 
-  const { requiresAuth } = useFavorites();
+  const { requiresAuth, isFavorite, toggleFavorite } = useFavorites();
 
   const { signInWithGoogle } = useAuth();
   const router = useRouter();
@@ -552,11 +552,12 @@ export function StoryViewer({
 
         {/* Fullscreen - shows on iOS/iPadOS and desktop when enabled */}
         {isEnabled("fullscreen_button") && <FullscreenButton />}
-        {/* Bookmark - always visible, navigates to /favorites */}
+        {/* Bookmark - always visible, toggles favorite for current story */}
         <BookmarkButton
-          isNavigationMode
           requiresAuth={requiresAuth}
           onAuthRequired={signInWithGoogle}
+          isFavorite={story ? isFavorite(story.id) : false}
+          onToggle={() => story && toggleFavorite(story.id)}
         />
         {/* Auth - always visible */}
         <AuthButton />
