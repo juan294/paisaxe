@@ -1,7 +1,7 @@
 // Platform Costs Analytics Types
 
 export type CostCategory = "ai" | "infrastructure" | "communications" | "analytics" | "payments";
-export type CostSource = "api" | "estimate" | "manual";
+export type CostSource = "api" | "estimate" | "manual" | "recurring";
 
 export interface ServiceCost {
   serviceId: string;
@@ -30,6 +30,30 @@ export interface CostsByDay {
   costUsd: number;
 }
 
+export interface UsageMetrics {
+  visitors: number;
+  chatConversations: number;
+  voiceConversations: number;
+  voiceMinutes: number;
+  periodDays: number;
+  posthogEvents?: number;
+}
+
+export interface ForecastScenario {
+  label: string;
+  multiplier: number;
+  visitors: number;
+  chats: number;
+  voiceConversations: number;
+  voiceMinutes: number;
+  estimatedMonthlyCost: number;
+  breakdown: {
+    infrastructure: number;
+    ai: number;
+    voice: number;
+  };
+}
+
 export interface CostsAnalyticsDashboardData {
   summary: CostsAnalyticsSummary;
   services: ServiceCost[];
@@ -38,6 +62,7 @@ export interface CostsAnalyticsDashboardData {
     from: string;
     to: string;
   };
+  usageMetrics?: UsageMetrics;
 }
 
 export interface ManualCostEntry {
@@ -140,5 +165,13 @@ export const PLATFORM_SERVICES = {
     category: "payments" as CostCategory,
     hasApi: true, // Shows fees, not costs
     dashboardUrl: "https://dashboard.stripe.com/balance",
+  },
+  awsDomains: {
+    id: "aws-domains",
+    name: "AWS Domains",
+    category: "infrastructure" as CostCategory,
+    hasApi: false,
+    dashboardUrl:
+      "https://console.aws.amazon.com/route53/home#DomainListing:",
   },
 } as const;

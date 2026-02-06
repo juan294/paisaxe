@@ -22,32 +22,38 @@ const SUB_TABS: {
     value: "visitors",
     label: "Visitors",
     icon: <Users className="h-4 w-4" />,
-    shortcut: "v",
-  },
-  {
-    value: "revenue",
-    label: "Revenue",
-    icon: <DollarSign className="h-4 w-4" />,
-    shortcut: "r",
+    shortcut: "u",
   },
   {
     value: "voice",
     label: "Voice",
     icon: <Mic className="h-4 w-4" />,
-    shortcut: "e",
+    shortcut: "i",
   },
   {
     value: "costs",
     label: "Costs",
     icon: <Receipt className="h-4 w-4" />,
-    shortcut: "c",
+    shortcut: "o",
+  },
+  {
+    value: "revenue",
+    label: "Revenue",
+    icon: <DollarSign className="h-4 w-4" />,
+    shortcut: "p",
   },
 ];
 
 export function AnalyticsTabs({ activeTab, onTabChange, children }: AnalyticsTabsProps) {
-  // Keyboard shortcuts: v for visitors, r for revenue, e for voice (elevenlabs)
+  // Keyboard shortcuts: Cmd+U/I/O/P for tab switching
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Require Cmd (Mac) or Ctrl (Windows/Linux)
+      if (!e.metaKey && !e.ctrlKey) return;
+
+      // Skip if other modifiers are also pressed
+      if (e.altKey || e.shiftKey) return;
+
       // Skip if user is typing in an input
       if (
         e.target instanceof HTMLInputElement ||
@@ -55,9 +61,6 @@ export function AnalyticsTabs({ activeTab, onTabChange, children }: AnalyticsTab
       ) {
         return;
       }
-
-      // Skip if modifier keys are pressed
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const key = e.key.toLowerCase();
       const tab = SUB_TABS.find((t) => t.shortcut === key);
@@ -106,7 +109,7 @@ export function AnalyticsTabs({ activeTab, onTabChange, children }: AnalyticsTab
                 ? "bg-[#1a1917] text-[#a39e98] dark:bg-[#e5e3de] dark:text-[#6b6560]"
                 : "bg-[#e5e3de] text-[#6b6560] dark:bg-[#3d3a36] dark:text-[#a39e98]"
             )}>
-              {tab.shortcut.toUpperCase()}
+              {"⌘" + tab.shortcut.toUpperCase()}
             </span>
           </button>
         ))}

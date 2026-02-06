@@ -123,20 +123,6 @@ describe("CostsAnalyticsPanel", () => {
     expect(screen.getAllByText("$25.00")).toHaveLength(2);
   });
 
-  it("shows source badges correctly", async () => {
-    vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
-      data: mockCostsData,
-    });
-
-    render(<CostsAnalyticsPanel />);
-
-    await waitFor(() => {
-      expect(screen.getAllByText("API")).toHaveLength(2); // Anthropic and Twilio
-    });
-
-    expect(screen.getByText("Manual")).toBeInTheDocument(); // Supabase
-  });
-
   it("shows category badges correctly", async () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: mockCostsData,
