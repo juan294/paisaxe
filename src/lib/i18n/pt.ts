@@ -127,6 +127,8 @@ export const pt: Translations = {
     chat_messages: 'Mensagens do chat',
     story_progress: 'Progresso das histórias',
     suggested_questions: 'Perguntas sugeridas',
+    more_options: 'Mais opções',
+    story_controls: 'Controles das histórias',
   },
 
   auth: {

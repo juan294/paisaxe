@@ -663,9 +663,20 @@ function AgentTerminal({
   );
 }
 
-/** Convert basic markdown (headings, bold, list items) to HTML. Content is from our own agents, not user input. */
-function renderMarkdown(md: string): string {
-  return md
+/** Escape HTML entities to prevent XSS when rendering markdown with dangerouslySetInnerHTML. */
+export function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/** Convert basic markdown (headings, bold, list items) to HTML. Input is escaped first for safety. */
+export function renderMarkdown(md: string): string {
+  const escaped = escapeHtml(md);
+  return escaped
     .split("\n\n")
     .map((block) => {
       const lines = block.split("\n").map((line) => {
