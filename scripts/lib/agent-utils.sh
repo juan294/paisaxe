@@ -260,3 +260,124 @@ get_agent_config() {
     return 1
   fi
 }
+
+# Read shared context, excluding this agent's own entries
+# Usage: read_shared_context "agent_flag_key"
+# Outputs: The shared context minus own entries, suitable for injection into prompt
+read_shared_context() {
+  local agent_flag="$1"
+  local shared_file="$PROJECT_DIR/docs/agents/shared-context.md"
+
+  if [[ ! -f "$shared_file" ]]; then
+    echo ""
+    return 0
+  fi
+
+  # Use Python to filter out this agent's own entries
+  python3 -c "
+import sys, re
+
+agent = sys.argv[1]
+content = sys.stdin.read()
+
+# Split into entries using the HTML comment delimiters
+entries = re.split(r'(<!-- ENTRY:START[^>]*-->)', content)
+
+result = []
+skip = False
+for i, part in enumerate(entries):
+    if part.startswith('<!-- ENTRY:START'):
+        if f'agent={agent}' in part:
+            skip = True
+        else:
+            skip = False
+            result.append(part)
+    elif not skip:
+        # Remove ENTRY:END markers from output
+        cleaned = re.sub(r'<!-- ENTRY:END -->\n?', '', part)
+        result.append(cleaned)
+
+output = ''.join(result).strip()
+if output:
+    print(output)
+" "$agent_flag" < "$shared_file"
+}
+
+# Write shared context entry for this agent
+# Usage: write_shared_context "agent_flag_key" "summary_content"
+write_shared_context() {
+  local agent_flag="$1"
+  local summary="$2"
+  local shared_file="$PROJECT_DIR/docs/agents/shared-context.md"
+  local timestamp
+  timestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+  # Create file if it doesn't exist
+  if [[ ! -f "$shared_file" ]]; then
+    cat > "$shared_file" << 'HEADER'
+# Agent Shared Context
+> Cross-agent intelligence — agents read this before running and write findings after finishing.
+> Pruned automatically to keep the last 3 entries per agent.
+
+HEADER
+  fi
+
+  # Append the new entry
+  {
+    echo ""
+    echo "<!-- ENTRY:START agent=$agent_flag timestamp=$timestamp -->"
+    echo "$summary"
+    echo "<!-- ENTRY:END -->"
+  } >> "$shared_file"
+
+  # Prune to keep only last 3 entries per agent
+  prune_shared_context "$shared_file"
+}
+
+# Prune shared context to keep last 3 entries per agent
+# Usage: prune_shared_context "/path/to/shared-context.md"
+prune_shared_context() {
+  local shared_file="$1"
+
+  python3 -c "
+import re, sys
+
+filepath = sys.argv[1]
+with open(filepath, 'r') as f:
+    content = f.read()
+
+# Extract header (everything before first ENTRY:START)
+first_entry = content.find('<!-- ENTRY:START')
+if first_entry == -1:
+    sys.exit(0)
+
+header = content[:first_entry]
+body = content[first_entry:]
+
+# Parse all entries
+pattern = r'(<!-- ENTRY:START agent=(\S+) timestamp=(\S+) -->.*?<!-- ENTRY:END -->)'
+entries = re.findall(pattern, body, re.DOTALL)
+
+# Group by agent, keep last 3 per agent
+from collections import defaultdict
+agent_entries = defaultdict(list)
+for full_match, agent, timestamp in entries:
+    agent_entries[agent].append((timestamp, full_match))
+
+# Sort each agent's entries by timestamp, keep last 3
+pruned = []
+for agent in agent_entries:
+    sorted_entries = sorted(agent_entries[agent], key=lambda x: x[0])
+    for ts, entry in sorted_entries[-3:]:
+        pruned.append((ts, entry))
+
+# Sort all pruned entries by timestamp
+pruned.sort(key=lambda x: x[0])
+
+# Write back
+with open(filepath, 'w') as f:
+    f.write(header)
+    for ts, entry in pruned:
+        f.write('\n' + entry + '\n')
+" "$shared_file"
+}

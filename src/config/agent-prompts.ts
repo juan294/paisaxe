@@ -326,3 +326,38 @@ RULES:
 - Be thorough but pragmatic about edge cases.`,
   },
 };
+
+/**
+ * Instructions injected into agent prompts for shared context consumption.
+ * Read by agents before running to understand other agents' recent findings.
+ */
+export const SHARED_CONTEXT_READ_INSTRUCTION = `
+SHARED CONTEXT FROM OTHER AGENTS:
+The following are recent findings from other automated agents. Use this context to:
+- Avoid duplicating work already reported by other agents
+- Cross-reference findings (e.g., if Security found a vulnerable dep, consider its performance impact)
+- Add cross-agent recommendations in your report when relevant
+
+If the shared context is empty, no other agents have reported recently.
+`;
+
+/**
+ * Instructions injected into agent prompts for shared context output.
+ * Agents produce a summary block that gets extracted and written to shared-context.md.
+ */
+export const SHARED_CONTEXT_WRITE_INSTRUCTION = `
+SHARED CONTEXT OUTPUT:
+At the very end of your report, include a summary block for other agents wrapped in these exact markers:
+
+SHARED_CONTEXT_START
+## [Your Agent Name] — [Date]
+- [Key finding 1]
+- [Key finding 2]
+
+**Cross-agent recommendations:**
+- [Agent Name]: [Recommendation]
+SHARED_CONTEXT_END
+
+This block will be extracted from your report and shared with other agents on their next run.
+Keep it concise (5-10 lines max). Focus on findings that other agents would benefit from knowing.
+`;

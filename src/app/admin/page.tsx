@@ -12,6 +12,7 @@ import { FeatureTogglesPanel } from "@/components/admin/feature-toggles-panel";
 import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
 import { MarketingDashboard } from "@/components/admin/marketing-dashboard";
 import { SuggestionsPanel } from "@/components/admin/suggestions-panel";
+import { AgentsDashboard } from "@/components/admin/agents-dashboard";
 import { AdminThemeProvider } from "@/components/admin/theme-provider";
 import { ThemeToggle } from "@/components/admin/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -80,7 +81,7 @@ function AdminPageContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [editingStory, setEditingStory] = useState<AdminStory | null>(null);
-  const [activeTab, setActiveTab] = useState<AdminTab>("stories");
+  const [activeTab, setActiveTab] = useState<AdminTab>("analytics");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -516,7 +517,7 @@ function AdminPageContent() {
           </>
         )}
 
-        {activeTab === "toggles" && (
+        {activeTab === "features" && (
           <FeatureTogglesPanel />
         )}
 
@@ -530,6 +531,10 @@ function AdminPageContent() {
 
         {activeTab === "suggestions" && (
           <SuggestionsPanel />
+        )}
+
+        {activeTab === "agents" && (
+          <AgentsDashboard />
         )}
       </main>
 
