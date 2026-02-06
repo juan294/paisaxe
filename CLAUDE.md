@@ -37,33 +37,22 @@ develop   # Active development (DEFAULT)
 3. Merge `develop` → `main` only when releasing to production
 4. Always run tests before committing
 
-## Push Accountability (MANDATORY)
+## Push Accountability (MANDATORY — Background)
 
 **Every push requires CI verification. No exceptions. No matter how small the change.**
 
-After ANY `git push`, you MUST:
+**This runs as a background agent so the terminal stays unblocked.** After ANY `git push`, immediately spawn a background task (using `run_in_background: true`) that:
 
-1. **Check CI status** — Run `gh run list --limit 5` to see workflow status
-2. **Wait for completion** — If "in_progress", wait and check again with `gh run watch`
-3. **If CI fails** — Immediately investigate with `gh run view <run-id> --log-failed`
-4. **Fix and re-push** — Do not move on until all checks pass
-5. **Verify deployment** — For `main` branch, confirm Vercel deployment succeeds
+1. **Polls CI status** — `gh run list --limit 5` until the run completes
+2. **If CI passes** — Log success, no interruption needed
+3. **If CI fails** — Investigate with `gh run view <run-id> --log-failed`, fix the issue, and re-push — all in the background
+4. **Verify deployment** — For `main` branch, confirm Vercel deployment succeeds
 
-```bash
-# Check CI status after push
-gh run list --limit 5
+The main terminal continues working on the next task immediately after pushing. The background agent owns the push outcome until CI is green.
 
-# Watch a specific run
-gh run watch
+**If a background fix requires changes that conflict with current work**, notify the user before applying fixes.
 
-# View failed logs
-gh run view <run-id> --log-failed
-
-# Check Vercel deployment status
-vercel ls --limit 5
-```
-
-**This is non-negotiable.** Pushing code and walking away is not acceptable. You own the outcome of your push until CI is green and deployment is healthy. If you break the build, you fix the build — immediately, not later.
+**This is non-negotiable.** You own the outcome of your push until CI is green and deployment is healthy. If you break the build, you fix the build — automatically in the background.
 
 ## Test-Driven Development
 
