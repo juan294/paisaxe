@@ -2,16 +2,27 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToolbarOverflowMenu, ToolbarOverflowItem } from "./toolbar-overflow-menu";
+import { createMockT } from "@/test/i18n-mock";
+
+// Mock i18n
+const mockT = createMockT();
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 describe("ToolbarOverflowMenu", () => {
-  it("renders the toggle button", () => {
+  it("renders the toggle button with localized aria-label", () => {
     render(
       <ToolbarOverflowMenu>
         <div>Menu content</div>
       </ToolbarOverflowMenu>
     );
 
-    expect(screen.getByLabelText("More options")).toBeInTheDocument();
+    expect(screen.getByLabelText("Más opciones")).toBeInTheDocument();
   });
 
   it("does not show menu content initially", () => {
@@ -32,7 +43,7 @@ describe("ToolbarOverflowMenu", () => {
       </ToolbarOverflowMenu>
     );
 
-    await user.click(screen.getByLabelText("More options"));
+    await user.click(screen.getByLabelText("Más opciones"));
 
     expect(screen.getByText("Menu content")).toBeInTheDocument();
   });
@@ -45,7 +56,7 @@ describe("ToolbarOverflowMenu", () => {
       </ToolbarOverflowMenu>
     );
 
-    const toggleBtn = screen.getByLabelText("More options");
+    const toggleBtn = screen.getByLabelText("Más opciones");
     await user.click(toggleBtn);
     expect(screen.getByText("Menu content")).toBeInTheDocument();
 
@@ -61,7 +72,7 @@ describe("ToolbarOverflowMenu", () => {
       </ToolbarOverflowMenu>
     );
 
-    const toggleBtn = screen.getByLabelText("More options");
+    const toggleBtn = screen.getByLabelText("Más opciones");
     expect(toggleBtn).toHaveAttribute("aria-expanded", "false");
 
     await user.click(toggleBtn);
@@ -76,7 +87,7 @@ describe("ToolbarOverflowMenu", () => {
       </ToolbarOverflowMenu>
     );
 
-    await user.click(screen.getByLabelText("More options"));
+    await user.click(screen.getByLabelText("Más opciones"));
     expect(screen.getByText("Menu content")).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
@@ -94,11 +105,117 @@ describe("ToolbarOverflowMenu", () => {
     );
 
     const user = userEvent.setup();
-    await user.click(screen.getByLabelText("More options"));
+    await user.click(screen.getByLabelText("Más opciones"));
     expect(screen.getByText("Menu content")).toBeInTheDocument();
 
     fireEvent.mouseDown(screen.getByText("Outside"));
     expect(screen.queryByText("Menu content")).not.toBeInTheDocument();
+  });
+
+  it("has role=menu on the menu container when open", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="Action 1" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
+  it("focuses first menu item when menu opens", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="First Action" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Second Action" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+
+    const firstItem = screen.getByText("First Action").closest("button");
+    expect(document.activeElement).toBe(firstItem);
+  });
+
+  it("navigates with ArrowDown key", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="First" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Second" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Third" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+
+    // First item should be focused
+    const firstBtn = screen.getByText("First").closest("button")!;
+    expect(document.activeElement).toBe(firstBtn);
+
+    // ArrowDown → second item
+    await user.keyboard("{ArrowDown}");
+    const secondBtn = screen.getByText("Second").closest("button")!;
+    expect(document.activeElement).toBe(secondBtn);
+
+    // ArrowDown → third item
+    await user.keyboard("{ArrowDown}");
+    const thirdBtn = screen.getByText("Third").closest("button")!;
+    expect(document.activeElement).toBe(thirdBtn);
+
+    // ArrowDown wraps → first item
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(firstBtn);
+  });
+
+  it("navigates with ArrowUp key", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="First" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Second" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+
+    // First item should be focused
+    const firstBtn = screen.getByText("First").closest("button")!;
+    expect(document.activeElement).toBe(firstBtn);
+
+    // ArrowUp wraps → last item
+    await user.keyboard("{ArrowUp}");
+    const secondBtn = screen.getByText("Second").closest("button")!;
+    expect(document.activeElement).toBe(secondBtn);
+
+    // ArrowUp → first item
+    await user.keyboard("{ArrowUp}");
+    expect(document.activeElement).toBe(firstBtn);
+  });
+
+  it("traps focus with Tab key", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="First" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Second" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+
+    const firstBtn = screen.getByText("First").closest("button")!;
+    const secondBtn = screen.getByText("Second").closest("button")!;
+
+    // Tab → second item
+    await user.keyboard("{Tab}");
+    expect(document.activeElement).toBe(secondBtn);
+
+    // Tab wraps → first item
+    await user.keyboard("{Tab}");
+    expect(document.activeElement).toBe(firstBtn);
   });
 });
 
@@ -140,7 +257,7 @@ describe("ToolbarOverflowItem", () => {
       />
     );
 
-    const button = screen.getByRole("button");
+    const button = screen.getByRole("menuitem");
     expect(button).toHaveClass("bg-white/10");
   });
 
@@ -153,8 +270,19 @@ describe("ToolbarOverflowItem", () => {
       />
     );
 
-    const button = screen.getByRole("button");
+    const button = screen.getByRole("menuitem");
     expect(button).not.toHaveClass("bg-white/10");
+  });
+
+  it("has role=menuitem", () => {
+    render(
+      <ToolbarOverflowItem
+        icon={<span>I</span>}
+        label="Test"
+      />
+    );
+
+    expect(screen.getByRole("menuitem")).toBeInTheDocument();
   });
 
   it("handles missing onClick gracefully", async () => {

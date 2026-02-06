@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 
 interface ToolbarOverflowMenuProps {
   children: React.ReactNode;
@@ -11,6 +12,9 @@ interface ToolbarOverflowMenuProps {
 export function ToolbarOverflowMenu({ children }: ToolbarOverflowMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuListRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const { t } = useTranslation();
 
   // Close on outside click
   useEffect(() => {
@@ -29,11 +33,12 @@ export function ToolbarOverflowMenu({ children }: ToolbarOverflowMenuProps) {
     };
   }, [isOpen]);
 
-  // Close on Escape key
+  // Close on Escape key and return focus to trigger
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsOpen(false);
+        triggerRef.current?.focus();
       }
     };
 
@@ -46,15 +51,59 @@ export function ToolbarOverflowMenu({ children }: ToolbarOverflowMenuProps) {
     };
   }, [isOpen]);
 
+  // Focus first menu item when menu opens
+  useEffect(() => {
+    if (isOpen && menuListRef.current) {
+      const firstItem = menuListRef.current.querySelector<HTMLElement>(
+        'button, [role="menuitem"]'
+      );
+      firstItem?.focus();
+    }
+  }, [isOpen]);
+
+  // Arrow key navigation and focus trapping
+  const handleMenuKeyDown = useCallback((event: React.KeyboardEvent) => {
+    const menu = menuListRef.current;
+    if (!menu) return;
+
+    const items = Array.from(
+      menu.querySelectorAll<HTMLElement>('button, [role="menuitem"]')
+    );
+    if (items.length === 0) return;
+
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      const next = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+      items[next].focus();
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      const prev = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+      items[prev].focus();
+    } else if (event.key === "Tab") {
+      event.preventDefault();
+      if (event.shiftKey) {
+        const prev = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+        items[prev].focus();
+      } else {
+        const next = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+        items[next].focus();
+      }
+    }
+  }, []);
+
   return (
     <div ref={menuRef} className="relative md:hidden">
       <button
+        ref={triggerRef}
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        aria-label="More options"
+        aria-label={t("accessibility.more_options")}
         aria-expanded={isOpen}
+        aria-haspopup="true"
         className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
       >
         <MoreVertical className="h-5 w-5 text-white" />
@@ -67,8 +116,10 @@ export function ToolbarOverflowMenu({ children }: ToolbarOverflowMenuProps) {
             "animate-in fade-in-0 slide-in-from-top-2 duration-200"
           )}
           onClick={(e) => e.stopPropagation()}
+          role="menu"
+          onKeyDown={handleMenuKeyDown}
         >
-          <div className="flex flex-col gap-1 px-2">
+          <div ref={menuListRef} className="flex flex-col gap-1 px-2">
             {children}
           </div>
         </div>
@@ -87,6 +138,7 @@ interface ToolbarOverflowItemProps {
 export function ToolbarOverflowItem({ icon, label, onClick, active }: ToolbarOverflowItemProps) {
   return (
     <button
+      role="menuitem"
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
