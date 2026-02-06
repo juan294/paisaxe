@@ -37,8 +37,50 @@ develop   # Active development (DEFAULT)
 3. Merge `develop` → `main` only when releasing to production
 4. Always run tests before committing
 5. **No PRs** — solo developer workflow. Commit/merge directly to `develop`, verify CI, done
-6. For multi-file features, use git worktrees: `git worktree add -b feature/name ../paisaxe-name develop`
-7. After merge, clean up: `git worktree remove` + `git branch -d`
+
+### Worktree-First Development (MANDATORY)
+
+**Every feature, refactor, bug fix, or change MUST be done in its own git worktree. No exceptions.**
+
+This is the default way of working — you do NOT need to be told to create a worktree. Always create one automatically at the start of any task.
+
+#### Workflow
+
+```bash
+# 1. CREATE — Start every task by creating a worktree
+git worktree add -b feature/short-name ../paisaxe-short-name develop
+
+# 2. WORK — All changes happen in the worktree directory
+cd ../paisaxe-short-name
+# ... write tests first, then implement, then commit
+
+# 3. MERGE — After tests pass, merge back into develop
+cd /Users/juan/Documents/GenAI_Projects/paisaxe
+git merge feature/short-name
+
+# 4. CLEAN UP — Always remove the worktree and branch after merge
+git worktree remove ../paisaxe-short-name
+git branch -d feature/short-name
+```
+
+#### Branch Naming Convention
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| Feature | `feature/short-name` | `feature/booking-calendar` |
+| Bug fix | `fix/short-name` | `fix/sse-buffer-overflow` |
+| Refactor | `refactor/short-name` | `refactor/auth-middleware` |
+| Chore | `chore/short-name` | `chore/update-deps` |
+
+#### Rules
+
+1. **Auto-create**: When the user asks for any code change, immediately create a worktree. Do not ask — just do it.
+2. **Isolate**: Each worktree = one logical change. Never mix unrelated changes.
+3. **Test in worktree**: Run `npm run test && npm run typecheck && npm run lint` inside the worktree before merging.
+4. **Merge cleanly**: Merge the feature branch into `develop` from the main repo directory.
+5. **Always clean up**: Remove the worktree directory AND delete the branch after a successful merge. Never leave stale worktrees.
+6. **Parallel work**: Multiple agents can work in separate worktrees simultaneously — this is one of the key benefits.
+7. **If merge conflicts arise**: Resolve them in the main repo during merge, never in the worktree.
 
 ## Push Accountability (MANDATORY)
 
@@ -68,13 +110,22 @@ vercel ls --limit 5
 
 **This is non-negotiable.** Pushing code and walking away is not acceptable. You own the outcome of your push until CI is green and deployment is healthy. If you break the build, you fix the build — immediately, not later.
 
-## Test-Driven Development
+## Test-Driven Development (MANDATORY)
 
-**NO feature ships without a test written first. No exceptions.**
+**NO code is written without a failing test first. No exceptions. Not even "small" changes.**
 
-1. **Red**: Write a failing test FIRST
-2. **Green**: Write minimal code to pass
+This is non-negotiable. Every feature, bug fix, and refactor follows this exact sequence:
+
+1. **Red**: Write a failing test FIRST — before touching any implementation code
+2. **Green**: Write the minimum code to make the test pass
 3. **Refactor**: Clean up while tests stay green
+
+#### Rules
+
+- **Tests before code, always.** If you catch yourself writing implementation code without a test, stop and write the test first.
+- **Bug fixes need a regression test.** Before fixing a bug, write a test that reproduces it. Then fix the code so the test passes.
+- **Refactors need existing tests.** Before refactoring, ensure tests exist that cover the current behavior. If they don't, write them first.
+- **No "I'll add tests later."** There is no later. Tests are written in the same worktree, in the same commit sequence, before the implementation.
 
 ## Key Commands
 
