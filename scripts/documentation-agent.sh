@@ -195,26 +195,11 @@ if [[ -n "$UNDOCUMENTED_ROUTES" ]] || [[ -n "$UNDOCUMENTED_FLAGS" ]]; then
 
   # Fetch the prompt from the feature flag config
   AGENT_PROMPT=$(get_agent_prompt "documentation_agent_enabled" 2>/dev/null) || {
-    log_warn "Could not fetch prompt from config, using default" | tee -a "$LOG_FILE"
-    AGENT_PROMPT="You are the Paisaxe Documentation Agent. Your job is to keep documentation accurate and complete.
-
-STEPS:
-1. Read CLAUDE.md and docs/project/features.md to understand current documentation structure
-2. Review the gaps provided (undocumented API routes, feature flags)
-3. For undocumented feature flags:
-   - Add them to the Feature Flags Reference table in docs/project/features.md
-   - Include a brief description of what each flag controls
-   - Read the source code to understand the flag's purpose
-4. For API routes: Only document if they are meant for external consumption (most are internal)
-5. Update docs/agents/documentation-report.md with a 'Changes Made This Run' section listing what was added
-
-RULES:
-- Documentation is safe to update autonomously - the user will review via git diff
-- Keep descriptions concise (1 line per item)
-- Follow the existing documentation style and formatting
-- Do NOT delete or restructure existing content
-- Do NOT document internal implementation details
-- Commit nothing. The user will review and commit manually."
+    log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
+    AGENT_PROMPT=$(get_default_prompt "documentation_agent_enabled" 2>/dev/null) || {
+      log_error "No prompt available for documentation_agent_enabled" | tee -a "$LOG_FILE"
+      exit 1
+    }
   }
 
   # Capture docs state before (check both CLAUDE.md and features.md)
