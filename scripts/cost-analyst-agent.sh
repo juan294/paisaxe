@@ -30,8 +30,11 @@ cd "$PROJECT_DIR"
 # Fetch the prompt from the feature flag config
 log_info "Fetching agent prompt from config..." | tee -a "$LOG_FILE"
 AGENT_PROMPT=$(get_agent_prompt "cost_analyst_agent_enabled" 2>/dev/null) || {
-  log_warn "Could not fetch prompt from config, using default" | tee -a "$LOG_FILE"
-  AGENT_PROMPT="You are the Paisaxe Cost Analyst Agent. Analyze platform costs and write a financial health report to $DOC_FILE."
+  log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
+  AGENT_PROMPT=$(get_default_prompt "cost_analyst_agent_enabled" 2>/dev/null) || {
+    log_error "No prompt available for cost_analyst_agent_enabled" | tee -a "$LOG_FILE"
+    exit 1
+  }
 }
 
 # Run the cost analyst agent via Claude CLI in non-interactive mode

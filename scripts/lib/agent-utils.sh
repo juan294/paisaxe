@@ -210,6 +210,28 @@ except Exception as e:
   fi
 }
 
+# Get the default prompt for an agent from the shared TypeScript config
+# Usage: get_default_prompt "agent_flag_key"
+# Outputs: The default prompt string
+# Falls back to this when the feature-flags API is unreachable
+get_default_prompt() {
+  local agent_flag="$1"
+  local prompt
+
+  prompt=$(npx tsx "$PROJECT_DIR/scripts/lib/print-default-prompt.ts" "$agent_flag" 2>/dev/null) || {
+    log_error "Failed to read default prompt for '$agent_flag' from shared config" >&2
+    return 1
+  }
+
+  if [[ -n "$prompt" ]]; then
+    echo "$prompt"
+    return 0
+  else
+    log_error "Empty default prompt for '$agent_flag'" >&2
+    return 1
+  fi
+}
+
 # Get a config value for an agent from its feature flag config
 # Usage: get_agent_config "agent_flag_key" "config_key"
 # Outputs: The config value, or empty if not found
