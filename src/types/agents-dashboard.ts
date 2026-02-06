@@ -54,3 +54,7 @@ export interface AgentsDashboardData {
   /** Recent activity timeline */
   recentActivity: AgentActivityItem[];
 }
+
+export interface AgentRunStatus {
+  running: Record<string, { startedAt: string }>;
+}
