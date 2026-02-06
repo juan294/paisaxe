@@ -68,31 +68,39 @@ function parseHealthSummary(content: string): string {
   // Try executive summary first
   const execMatch = content.match(/##\s*Executive\s*Summary\s*\n+(.+)/i);
   if (execMatch) {
-    // Strip markdown bold/italic markers and take first sentence
-    const clean = execMatch[1].replace(/\*+/g, "").trim();
-    const firstSentence = clean.split(/\.\s/)[0];
-    return firstSentence.length > 120 ? firstSentence.slice(0, 117) + "..." : firstSentence + ".";
+    return extractFirstSentence(execMatch[1]);
   }
 
-  // Try line right after health status
-  const afterHealth = content.match(/health\s*status\s*:\s*\w+[^\n]*\n+(.+)/i);
+  // Try line right after health status (strip emojis so \w+ can match the status word)
+  const stripped = content.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]/gu, "");
+  const afterHealth = stripped.match(/health\s*status\s*:\s*\w+[^\n]*\n+(.+)/i);
   if (afterHealth) {
     const clean = afterHealth[1].replace(/\*+/g, "").replace(/^[-#>\s]+/, "").trim();
     if (clean.length > 5) {
-      const firstSentence = clean.split(/\.\s/)[0];
-      return firstSentence.length > 120 ? firstSentence.slice(0, 117) + "..." : firstSentence + ".";
+      return extractFirstSentence(clean);
     }
   }
 
   // Try summary section
   const summaryMatch = content.match(/##\s*Summary\s*\n+(.+)/i);
   if (summaryMatch) {
-    const clean = summaryMatch[1].replace(/\*+/g, "").replace(/^[-|>\s]+/, "").trim();
-    const firstSentence = clean.split(/\.\s/)[0];
-    return firstSentence.length > 120 ? firstSentence.slice(0, 117) + "..." : firstSentence + ".";
+    return extractFirstSentence(summaryMatch[1]);
+  }
+
+  // Fallback: first non-empty paragraph after any ## heading that isn't a table or code
+  const fallback = content.match(/^##\s+.+\n+(?:>[^\n]*\n+)?([^#|`\n][^\n]{10,})/m);
+  if (fallback) {
+    return extractFirstSentence(fallback[1]);
   }
 
   return "No summary available.";
+}
+
+function extractFirstSentence(raw: string): string {
+  const clean = raw.replace(/\*+/g, "").replace(/^[-|>\s]+/, "").trim();
+  const firstSentence = clean.split(/\.\s/)[0];
+  if (firstSentence.length > 120) return firstSentence.slice(0, 117) + "...";
+  return firstSentence.endsWith(".") ? firstSentence : firstSentence + ".";
 }
 
 /**

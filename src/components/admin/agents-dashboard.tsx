@@ -5,7 +5,7 @@ import { fetchAgentsSummary, fetchFeatureFlags, updateFeatureFlag, triggerAgentR
 import { useAnalyticsData } from "./analytics-cache-context";
 import { AnalyticsCacheProvider } from "./analytics-cache-context";
 import { AgentConfigPanel } from "./agent-config-panel";
-import { AlertCircle, Loader2, Play, Square, Settings, X } from "lucide-react";
+import { AlertCircle, Check, Copy, Loader2, Play, Square, Settings, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FeatureFlag } from "@/types/feature-flags";
 import type {
@@ -566,6 +566,7 @@ function AgentTerminal({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [elapsed, setElapsed] = useState("0:00");
+  const [copied, setCopied] = useState(false);
 
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
@@ -620,13 +621,28 @@ function AgentTerminal({
             </span>
             <span className="font-mono text-xs text-[#6b6560]">{elapsed}</span>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-[#6b6560] transition-colors hover:bg-[#3d3a36] hover:text-[#e5e3de]"
-            aria-label="Close terminal"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => {
+                const text = logs.map((l) => `${new Date(l.timestamp).toLocaleTimeString()}  ${l.text}`).join("\n");
+                navigator.clipboard.writeText(text).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                });
+              }}
+              className="rounded p-1 text-[#6b6560] transition-colors hover:bg-[#3d3a36] hover:text-[#e5e3de]"
+              aria-label="Copy terminal output"
+            >
+              {copied ? <Check className="h-4 w-4 text-[#7a9e7a]" /> : <Copy className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded p-1 text-[#6b6560] transition-colors hover:bg-[#3d3a36] hover:text-[#e5e3de]"
+              aria-label="Close terminal"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         {/* Log content */}
         <div
