@@ -177,4 +177,120 @@ describe("ShareButton", () => {
       expect(screen.getByRole("status")).toHaveClass("opacity-100");
     });
   });
+
+  it("stops event propagation on click", async () => {
+    const parentClick = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <div onClick={parentClick}>
+        <ShareButton story={mockStory} />
+      </div>
+    );
+
+    await user.click(screen.getByTitle("Compartir"));
+
+    expect(parentClick).not.toHaveBeenCalled();
+  });
+
+  it("falls back to clipboard when native share throws non-AbortError", async () => {
+    const shareFn = vi.fn().mockRejectedValue(new Error("Share failed"));
+    Object.defineProperty(navigator, "share", {
+      value: shareFn,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      value: () => true,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(window, "matchMedia", {
+      value: (query: string) => ({
+        matches: query === "(pointer: coarse)",
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      }),
+      writable: true,
+      configurable: true,
+    });
+
+    const user = userEvent.setup();
+    render(<ShareButton story={mockStory} />);
+
+    await user.click(screen.getByTitle("Compartir"));
+
+    // After share fails with non-AbortError, it should fall back to clipboard
+    // and show the toast
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveClass("opacity-100");
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Enlace copiado");
+  });
+
+  it("does not fallback to clipboard when user cancels share (AbortError)", async () => {
+    const abortError = new Error("User cancelled");
+    abortError.name = "AbortError";
+    const shareFn = vi.fn().mockRejectedValue(abortError);
+    Object.defineProperty(navigator, "share", {
+      value: shareFn,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      value: () => true,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(window, "matchMedia", {
+      value: (query: string) => ({
+        matches: query === "(pointer: coarse)",
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      }),
+      writable: true,
+      configurable: true,
+    });
+
+    const user = userEvent.setup();
+    render(<ShareButton story={mockStory} />);
+
+    await user.click(screen.getByTitle("Compartir"));
+
+    // Wait a tick for the error handler to run
+    await waitFor(() => {
+      expect(shareFn).toHaveBeenCalled();
+    });
+
+    // Toast should NOT appear for AbortError (user cancelled)
+    expect(screen.getByRole("status")).toHaveClass("opacity-0");
+  });
+
+  it("renders and works when slug is not available", async () => {
+    const storyWithoutSlug: Story = {
+      ...mockStory,
+      slug: undefined,
+    };
+
+    const user = userEvent.setup();
+    render(<ShareButton story={storyWithoutSlug} />);
+
+    await user.click(screen.getByTitle("Compartir"));
+
+    // Should still show the toast (copy succeeded using story.id as fallback)
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveClass("opacity-100");
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Enlace copiado");
+  });
 });

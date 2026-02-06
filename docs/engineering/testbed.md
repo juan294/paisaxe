@@ -323,6 +323,234 @@ Unusual but possible scenarios.
 
 ---
 
+## 15. Story Viewer & Navigation 🖥️
+
+Test the immersive story viewer UI, navigation, and display.
+
+> **Browser testable**: All tests can be run via browser automation.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 15.1 | **Story title renders** | Load `/immersive` | Story title (h1) is visible | | |
+| 15.2 | **Story description renders** | Load `/immersive` | Story description text visible below title | | |
+| 15.3 | **Story image displays** | Load `/immersive` | Full-screen background image loads | | |
+| 15.4 | **Category badge visible** | Load `/immersive` | Color-coded category tag shown | | |
+| 15.5 | **Right arrow navigates** | Click right arrow button | Story changes to next story | | |
+| 15.6 | **Left arrow navigates** | Click left arrow button (when not on first) | Story changes to previous story | | |
+| 15.7 | **Left arrow disabled on first story** | Load first story | Left arrow disabled or not clickable | | |
+| 15.8 | **Keyboard ArrowRight** | Press ArrowRight key | Navigates to next story | | |
+| 15.9 | **Keyboard ArrowLeft** | Press ArrowLeft key | Navigates to previous story | | |
+| 15.10 | **Info toggle with 'i' key** | Press 'i' key | Info overlay toggles visibility | | |
+
+---
+
+## 16. Story Filters Panel 🖥️
+
+Test the collapsible filters panel for stories.
+
+> **Browser testable**: All tests can be run via browser automation.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 16.1 | **Filters panel opens** | Click filters button/icon | Filters panel slides open | | |
+| 16.2 | **Category filters display** | Open filters panel | Shows: Nature, Cities, Food, Culture, Activities | | |
+| 16.3 | **Location filters display** | Open filters panel | Shows: Eastern, Central, Western Asturias | | |
+| 16.4 | **Duration filters display** | Open filters panel | Shows: Day-trip, Weekend, Week-long | | |
+| 16.5 | **Category filter toggles** | Click a category filter | Filter activates (visual highlight), stories update | | |
+| 16.6 | **Active filter count badge** | Activate 2+ filters | Badge shows count of active filters | | |
+| 16.7 | **Clear all filters** | Activate filters, click "Clear all" | All filters deactivated, badge removed | | |
+| 16.8 | **Multiple filters combine** | Activate category + location | Stories filtered by both criteria | | |
+| 16.9 | **Filters panel closes** | Click outside or close button | Panel collapses | | |
+
+---
+
+## 17. Toolbar Actions 🖥️
+
+Test the toolbar buttons on the story viewer (bookmark, share, surprise me, fullscreen, auth).
+
+> **Browser testable**: Most tests can be run via browser automation. Auth OAuth flow is manual.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 17.1 | **Bookmark button toggles** | Click bookmark icon | Icon changes state (filled/outline), toast shown | | |
+| 17.2 | **Favorite button toggles** | Click heart/favorite icon | Heart fills/unfills | | |
+| 17.3 | **Share button (desktop)** | Click share icon on desktop | URL copied to clipboard, toast confirmation | | |
+| 17.4 | **Surprise Me button** | Click shuffle/surprise icon | Jumps to a different random story | | |
+| 17.5 | **Fullscreen button (desktop)** | Click fullscreen icon | Page enters fullscreen mode | | |
+| 17.6 | **Auth button shows login state** | View toolbar while logged out | Login icon visible | | |
+| 17.7 | **Overflow menu (mobile)** | View toolbar on narrow viewport | MoreVertical icon visible, opens additional actions | | |
+| 17.8 | **Bookmark persists** | Bookmark a story, navigate away and back | Story still bookmarked | | |
+| 17.9 | **Suggest a Place button** | Click lightbulb icon (if feature flag enabled) | Opens suggestion dialog or sign-in prompt | | |
+
+---
+
+## 18. Favorites Page 🖥️
+
+Test the `/favorites` page with gallery view, sync, and interactions.
+
+> **Browser testable**: All tests can be run via browser automation.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 18.1 | **Empty state displays** | Visit `/favorites` with no bookmarks | Shows "No saved places yet" with explore CTA | | |
+| 18.2 | **Back link works** | Click back button in header | Returns to `/immersive` | | |
+| 18.3 | **Sync banner (logged out)** | Visit while not signed in | Shows amber banner: "bookmarks only saved locally" | | |
+| 18.4 | **Gallery grid responsive** | Resize from mobile to desktop | Grid: 1col mobile, 2col tablet, 3col desktop | | |
+| 18.5 | **Featured first item** | Have 2+ favorites | First item has wider aspect ratio (21:9) | | |
+| 18.6 | **Hover reveals metadata** | Hover over gallery item | Gradient overlay with title, category appears | | |
+| 18.7 | **Delete button on hover** | Hover over gallery item | Trash icon appears | | |
+| 18.8 | **Delete removes favorite** | Click trash icon on a favorite | Item removed from gallery, toast confirmation | | |
+| 18.9 | **Click navigates to story** | Click a gallery item | Returns to `/immersive` showing that story | | |
+| 18.10 | **Bookmark count in header** | Have multiple favorites | Header shows correct count | | |
+
+---
+
+## 19. Language Switcher 🖥️
+
+Test the language switcher component and i18n behavior.
+
+> **Browser testable**: All tests can be run via browser automation.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 19.1 | **Switcher dropdown opens** | Click language flag icon | Dropdown expands showing all 6 languages | | |
+| 19.2 | **Languages listed** | Open dropdown | Shows: ES, AST, EN, FR, DE, PT with flags | | |
+| 19.3 | **Language changes on selection** | Select English (EN) | UI text switches to English | | |
+| 19.4 | **Persists across navigation** | Change language, navigate to another page | Language stays selected | | |
+| 19.5 | **Persists across reload** | Change language, reload page | Language stays selected | | |
+| 19.6 | **Escape closes dropdown** | Open dropdown, press Escape | Dropdown closes | | |
+| 19.7 | **Click-outside closes dropdown** | Open dropdown, click elsewhere | Dropdown closes | | |
+| 19.8 | **Asturianu option** | Select AST | Asturian text/labels appear where available | | |
+
+---
+
+## 20. Mood Discovery Overlay 🖥️
+
+Test the mood-based story filtering overlay shown on first visit.
+
+> **Browser testable**: Requires `mood_discovery` feature flag enabled.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 20.1 | **Overlay appears on first visit** | Clear session, visit `/immersive` with flag enabled | Modal asking "How do you feel today?" | | |
+| 20.2 | **Four mood options shown** | View overlay | Relaxing, Adventurous, Cultural, Delicious with emojis | | |
+| 20.3 | **Selecting mood filters stories** | Click "Adventurous" | Overlay closes, stories filtered to adventure category | | |
+| 20.4 | **Session dismissal** | Dismiss/select mood, navigate away and back | Overlay does NOT reappear in same session | | |
+| 20.5 | **New session shows overlay again** | Close browser, reopen | Overlay appears again | | |
+
+---
+
+## 21. Chat UI & Upsell Banners 🖥️
+
+Test the text chat panel UI and voice upsell features.
+
+> **Browser testable**: Chat panel open/close, upsell display. Actual chat responses need manual verification.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 21.1 | **Chat panel opens** | Click "Ask" / chat button | Chat panel slides open with input field | | |
+| 21.2 | **Chat panel closes** | Click close (X) button | Panel closes smoothly | | |
+| 21.3 | **Privacy notice on first use** | Open chat for first time | Privacy acknowledgment prompt appears | | |
+| 21.4 | **Privacy notice dismisses** | Accept privacy notice | Notice disappears, input becomes usable | | |
+| 21.5 | **Contextual question prompts** | View story with prompts enabled | Up to 3 clickable question buttons below story | | |
+| 21.6 | **Prompt click prefills chat** | Click a question prompt | Chat opens with that question pre-filled | | |
+| 21.7 | **Voice upsell banner** | Use text chat (if `visitor_voice_agent` flag on) | Upsell banner suggesting "Try Voice" for €1.99 | | |
+| 21.8 | **Upsell banner dismissible** | Click dismiss on upsell | Banner disappears, doesn't reappear frequently | | |
+| 21.9 | **Chat input validation** | Submit empty message | No submission, input stays focused | | |
+| 21.10 | **Message renders with markdown** | Receive response with lists/headers | Rendered as formatted HTML, not raw markdown | | |
+
+---
+
+## 22. Pricing & VoicePass Pages 🖥️
+
+Test the pricing page display and success page (not payment processing).
+
+> **Browser testable**: Page display and layout. Payment flow is manual (section 11).
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 22.1 | **Pricing page loads** | Visit `/pricing` | Page renders with Day Pass offer | | |
+| 22.2 | **Price displayed correctly** | View pricing card | Shows €1.99 | | |
+| 22.3 | **Feature list visible** | View pricing card | Shows: 24-hour duration, booking capability, real-time info | | |
+| 22.4 | **Back button works** | Click back arrow | Returns to `/immersive` | | |
+| 22.5 | **FAQ section visible** | Scroll pricing page | FAQ questions and answers visible | | |
+| 22.6 | **Login required message** | View pricing while logged out | Sign-in prompt shown for purchase | | |
+| 22.7 | **Success page layout** | Visit `/pricing/success` | Shows success icon, status message, CTA button | | |
+| 22.8 | **Animated hero** | Load pricing page | Animated sound bars icon visible | | |
+
+---
+
+## 23. Related Stories & Story Badges 🖥️
+
+Test related stories section and story metadata badges.
+
+> **Browser testable**: Requires respective feature flags enabled.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 23.1 | **Related stories section** | View story with `related_stories` flag on | Collapsible section with related story thumbnails | | |
+| 23.2 | **Related story click** | Click a related story thumbnail | Navigates to that story | | |
+| 23.3 | **Related stories grid responsive** | Resize browser | 2 columns mobile, 3 columns desktop | | |
+| 23.4 | **Freshness badge** | View recently updated story with `story_freshness` flag | "Recently updated" green badge visible | | |
+| 23.5 | **User submitted badge** | View community-contributed story | "User submitted" badge visible | | |
+
+---
+
+## 24. Legal Pages 🖥️
+
+Test that privacy policy and terms of service pages render correctly.
+
+> **Browser testable**: All tests can be run via browser automation.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 24.1 | **Privacy policy loads** | Visit `/privacy` | Page loads with full Spanish privacy text | | |
+| 24.2 | **Privacy policy sections** | Scroll through page | Covers: data collection, third parties, cookies, GDPR rights | | |
+| 24.3 | **Terms of service loads** | Visit `/terms` | Page loads with full Spanish terms text | | |
+| 24.4 | **Terms sections** | Scroll through page | Covers: service description, VoicePass, liability, IP | | |
+| 24.5 | **Contact email visible** | Check both legal pages | Contact email address present | | |
+
+---
+
+## 25. Responsive Design Matrix 🖥️
+
+Test all key pages at mobile (375px), tablet (768px), and desktop (1280px).
+
+> **Browser testable**: All tests can be run via browser automation with resize.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 25.1 | **Immersive - mobile 375px** | Resize to 375px, load `/immersive` | No horizontal scroll, story fills viewport, toolbar usable | | |
+| 25.2 | **Immersive - tablet 768px** | Resize to 768px | Layout adjusts, filters may show differently | | |
+| 25.3 | **Immersive - desktop 1280px** | Resize to 1280px | Full desktop layout with all toolbar items visible | | |
+| 25.4 | **Favorites - mobile 375px** | Resize to 375px, load `/favorites` | Single column gallery, no overflow | | |
+| 25.5 | **Favorites - tablet 768px** | Resize to 768px | Two column gallery grid | | |
+| 25.6 | **Favorites - desktop 1280px** | Resize to 1280px | Three column gallery grid | | |
+| 25.7 | **Pricing - mobile 375px** | Resize to 375px, load `/pricing` | Card stacks vertically, readable | | |
+| 25.8 | **Pricing - tablet 768px** | Resize to 768px | Centered card layout | | |
+| 25.9 | **Pricing - desktop 1280px** | Resize to 1280px | Full desktop layout | | |
+| 25.10 | **Chat panel - mobile 375px** | Open chat at 375px | Panel fills screen, input accessible | | |
+| 25.11 | **Chat panel - desktop 1280px** | Open chat at 1280px | Side panel, doesn't cover full screen | | |
+| 25.12 | **Legal pages - mobile 375px** | Load `/privacy` at 375px | Text wraps, readable, no overflow | | |
+
+---
+
+## 26. Maintenance / Coming Soon Page 🖥️
+
+Test the splash page shown during maintenance mode.
+
+> **Browser testable**: Requires `maintenance_mode` feature flag enabled in admin.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 26.1 | **Coming soon page renders** | Enable `maintenance_mode`, visit site | Gradient background with glassmorphic card | | |
+| 26.2 | **Logo displayed** | View coming soon page | Paisaxe logo visible | | |
+| 26.3 | **Tagline displayed** | View coming soon page | "Look. Ask. Discover." tagline | | |
+| 26.4 | **Status message** | View coming soon page | "Próximamente" or configured message | | |
+| 26.5 | **Animated background** | Observe page | Gradient animation with noise texture | | |
+
+---
+
 ## Results Summary
 
 | Category | Total | Passed | Failed | Needs Review |
@@ -341,7 +569,19 @@ Unusual but possible scenarios.
 | 12. Restaurant Bookings | 13 | | | |
 | 13. SMS Notifications | 9 | | | |
 | 14. Stress & Edge | 8 | | | |
-| **TOTAL** | **126** | | | |
+| 15. Story Viewer & Nav | 10 | | | |
+| 16. Story Filters | 9 | | | |
+| 17. Toolbar Actions | 9 | | | |
+| 18. Favorites Page | 10 | | | |
+| 19. Language Switcher | 8 | | | |
+| 20. Mood Discovery | 5 | | | |
+| 21. Chat UI & Upsell | 10 | | | |
+| 22. Pricing & VoicePass | 8 | | | |
+| 23. Related Stories & Badges | 5 | | | |
+| 24. Legal Pages | 5 | | | |
+| 25. Responsive Design | 12 | | | |
+| 26. Maintenance Page | 5 | | | |
+| **TOTAL** | **222** | | | |
 
 ---
 
@@ -355,5 +595,5 @@ Unusual but possible scenarios.
 
 ---
 
-*Last updated: 2026-02-05*
+*Last updated: 2026-02-05 — Updated with sections 15-26 covering front-end UI features*
 *Tested by: [NAME]*
