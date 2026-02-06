@@ -1,6 +1,6 @@
 {
   "name": "paisaxe",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -82,6 +82,7 @@
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@vitejs/plugin-react": "^5.1.2",
     "@vitest/coverage-v8": "^4.0.0",
+    "canvas": "^3.2.1",
     "dotenv": "^17.2.4",
     "eslint": "^9.18.0",
     "eslint-plugin-react": "^7.37.5",
