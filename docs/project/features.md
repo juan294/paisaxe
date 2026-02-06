@@ -519,6 +519,7 @@ All flags are managed from the admin panel and take effect within approximately 
 | `related_stories` | Related stories carousel |
 | `contextual_prompts` | Suggested question prompts below story description |
 | `asturianu_touches` | Asturian language labels and titles |
+| `fullscreen_button` | Fullscreen button in toolbar (native fullscreen on desktop, Add to Home Screen on iOS/iPad) |
 
 ### Social Flags
 
@@ -531,6 +532,8 @@ All flags are managed from the admin panel and take effect within approximately 
 | Flag | Controls |
 |------|----------|
 | `visitor_voice_agent` | Voice agent access (whitelisted emails only) |
+| `booking_system` | Master toggle for Pelayo's outbound booking calls to restaurants/hotels |
+| `sms_booking_confirmation` | SMS confirmation to customers via Twilio after booking calls complete |
 
 ### System Flags
 
@@ -543,3 +546,4 @@ All flags are managed from the admin panel and take effect within approximately 
 | `documentation_agent_enabled` | Documentation agent (runs weekly on Sunday) |
 | `performance_agent_enabled` | Performance agent (runs weekly on Saturday) |
 | `qa_agent_enabled` | QA agent for LLM response quality testing |
+| `localization_agent_enabled` | Localization agent (runs weekly on Sunday) — ensures 100% translation coverage |
