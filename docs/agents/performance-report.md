@@ -2,21 +2,21 @@
 
 > Updated on 2026-02-06
 
-## Health Status: 🟡 YELLOW
+## Health Status: YELLOW
 
 **Bundle size exceeds budget by 389KB (+15.6%).** Production build was skipped (dev server running), so metrics are from dev cache and may differ from production build.
 
-⚠️ **Note:** This report analyzes dev server cache (`.next`). For accurate production metrics, run a full production build.
+**Note:** This report analyzes dev server cache (`.next`). For accurate production metrics, run a full production build.
 
 ## Key Metrics
 
 | Metric | Current | Previous (2026-02-02) | Change | Budget | Status |
 |--------|---------|----------|--------|--------|--------|
-| Total JS | 2,889 KB | 2,660 KB | **+229 KB (+8.6%)** | 2,500 KB | ❌ Over |
-| Total CSS | 132 KB | 98 KB | +34 KB | - | ⚠️ Regression |
-| Production deps | 27 | 30 | -3 | 40 | ✅ Good |
-| node_modules | 850 MB | 863 MB | -13 MB | - | ✅ Stable |
-| .next build | 2,129 MB | 991 MB | **+1,138 MB** | - | ⚠️ Large increase |
+| Total JS | 2,889 KB | 2,660 KB | **+229 KB (+8.6%)** | 2,500 KB | Over budget |
+| Total CSS | 132 KB | 98 KB | +34 KB | - | Regression |
+| Production deps | 27 | 30 | -3 | 40 | Good |
+| node_modules | 850 MB | 863 MB | -13 MB | - | Stable |
+| .next build | 2,129 MB | 991 MB | **+1,138 MB** | - | Large increase |
 
 ## Budget Violations
 
@@ -33,12 +33,12 @@
 
 | Chunk | Size | Likely Contents | Impact |
 |-------|------|-----------------|--------|
-| ff75735b9b73148a.js | 476 KB | ElevenLabs WebRTC + WebSocket | 🔴 Critical |
-| 90fd5c2e839b728a.js | 476 KB | ElevenLabs (duplicate/peer?) | 🔴 Critical |
-| bb6d58382d01dec1.js | 245 KB | Unknown (new since last report) | 🟡 High |
-| 2b88146d0d128b78.js | 183 KB | lucide-react icons | 🟡 Medium |
-| 9513c041a7409515.js | 172 KB | PostHog (lazy-loaded) | 🟢 Non-blocking |
-| 1cadbebe7f77139c.js | 153 KB | react-markdown + deps | 🟢 Lazy-loaded |
+| ff75735b9b73148a.js | 476 KB | ElevenLabs WebRTC + WebSocket | Critical |
+| 90fd5c2e839b728a.js | 476 KB | ElevenLabs (duplicate/peer?) | Critical |
+| bb6d58382d01dec1.js | 245 KB | Unknown (new since last report) | High |
+| 2b88146d0d128b78.js | 183 KB | lucide-react icons | Medium |
+| 9513c041a7409515.js | 172 KB | PostHog (lazy-loaded) | Non-blocking |
+| 1cadbebe7f77139c.js | 153 KB | react-markdown + deps | Lazy-loaded |
 
 **Red flags:**
 1. **Two 476 KB ElevenLabs chunks** — This is unusual. Likely indicates either:
@@ -51,22 +51,22 @@
 
 | Package | node_modules Size | Client Bundle Impact | Used In | Status |
 |---------|------------------|---------------------|---------|--------|
-| @elevenlabs/react | Unknown | **~476 KB x2 (952 KB!)** | VoiceChat, VoiceAgentChat | 🔴 Bloated |
-| posthog-js | 30 MB | ~172 KB (lazy-loaded) | Analytics | 🟢 Optimized |
-| lucide-react | 45 MB | ~183 KB | 40+ files | 🟡 Heavy but tree-shaken |
-| pdfjs-dist | 63 MB | 0 KB | Build scripts only (devDep) | ✅ No impact |
-| pdf-parse | 57 MB | 0 KB | Build scripts only (devDep) | ✅ No impact |
-| next | 156 MB | Framework | Core | ✅ Required |
-| react-markdown | Unknown | ~153 KB (lazy-loaded) | VoiceChat | 🟢 Optimized |
+| @elevenlabs/react | Unknown | **~476 KB x2 (952 KB!)** | VoiceChat, VoiceAgentChat | Bloated |
+| posthog-js | 30 MB | ~172 KB (lazy-loaded) | Analytics | Optimized |
+| lucide-react | 45 MB | ~183 KB | 40+ files | Heavy but tree-shaken |
+| pdfjs-dist | 63 MB | 0 KB | Build scripts only (devDep) | No impact |
+| pdf-parse | 57 MB | 0 KB | Build scripts only (devDep) | No impact |
+| next | 156 MB | Framework | Core | Required |
+| react-markdown | Unknown | ~153 KB (lazy-loaded) | VoiceChat | Optimized |
 
 **Previous optimizations (completed 2026-02-02):**
-- ✅ framer-motion removed (-177 KB)
-- ✅ PostHog lazy-loaded (~560 KB deferred from critical path)
-- ✅ PDF dependencies moved to devDependencies
+- framer-motion removed (-177 KB)
+- PostHog lazy-loaded (~560 KB deferred from critical path)
+- PDF dependencies moved to devDependencies
 
 ## Top Optimization Opportunities
 
-### 1. 🎯 CRITICAL: Investigate ElevenLabs Duplication (~476 KB savings)
+### 1. CRITICAL: Investigate ElevenLabs Duplication (~476 KB savings)
 
 **Issue:** Two identical 476 KB chunks containing ElevenLabs WebRTC code.
 
@@ -103,7 +103,7 @@ export function useElevenLabs() {
 
 ---
 
-### 2. 🎯 HIGH: Investigate CSS Regression (+34 KB)
+### 2. HIGH: Investigate CSS Regression (+34 KB)
 
 **Issue:** CSS bundle grew from 98 KB to 132 KB (+34.7%) in 4 days.
 
@@ -128,7 +128,7 @@ ls -lh .next/static/css/
 
 ---
 
-### 3. 🎯 MEDIUM: Optimize lucide-react Icon Loading (~50-100 KB potential)
+### 3. MEDIUM: Optimize lucide-react Icon Loading (~50-100 KB potential)
 
 **Current:** 40+ files import from `lucide-react`, resulting in ~183 KB chunk.
 
@@ -159,7 +159,7 @@ export const XIcon = () => (
 
 ---
 
-### 4. ⚠️ LOW: Verify PostHog Optimization Still Working
+### 4. LOW: Verify PostHog Optimization Still Working
 
 **Status:** PostHog shows as 172 KB chunk (`9513c041a7409515.js`), which should be lazy-loaded per previous optimization.
 
@@ -181,7 +181,7 @@ useEffect(() => {
 
 ---
 
-### 5. ℹ️ NO ACTION: react-markdown (Already Optimized)
+### 5. NO ACTION: react-markdown (Already Optimized)
 
 **Status:** react-markdown is dynamically imported in VoiceChat:
 ```tsx
@@ -194,7 +194,7 @@ const VoiceChat = dynamic(
 
 **Impact:** 153 KB deferred until voice chat is opened.
 
-**No action needed.** ✅
+**No action needed.**
 
 ---
 
@@ -202,10 +202,10 @@ const VoiceChat = dynamic(
 
 | Metric | 2026-02-02 | 2026-02-06 | Delta | Trend |
 |--------|-----------|-----------|-------|-------|
-| Total JS (raw) | 2,660 KB | 2,889 KB | **+229 KB** | 📈 Regressed |
-| Total CSS | 98 KB | 132 KB | **+34 KB** | 📈 Regressed |
-| Production deps | 30 | 27 | -3 | 📉 Improved |
-| .next cache | 991 MB | 2,129 MB | +1,138 MB | ⚠️ Dev bloat |
+| Total JS (raw) | 2,660 KB | 2,889 KB | **+229 KB** | Regressed |
+| Total CSS | 98 KB | 132 KB | **+34 KB** | Regressed |
+| Production deps | 30 | 27 | -3 | Improved |
+| .next cache | 991 MB | 2,129 MB | +1,138 MB | Dev bloat |
 
 **Regression root causes (hypothesis):**
 1. **ElevenLabs duplication** — Admin voice chat may have introduced second import path
@@ -231,11 +231,11 @@ npm run build:analyze
 
 | Priority | Action | Estimated Savings | Effort | Status |
 |----------|--------|-------------------|--------|--------|
-| 🔴 1 | **Run production build** | N/A (measurement) | Low | ⏳ Required |
-| 🔴 2 | Fix ElevenLabs duplication | **476 KB** | Medium | 🔴 Blocked by #1 |
-| 🟡 3 | Investigate CSS regression | **34 KB** | Low | 🔴 Blocked by #1 |
-| 🟡 4 | Optimize lucide-react critical icons | 50-100 KB | Medium | 🟢 Can start |
-| 🟢 5 | Verify PostHog lazy-load working | 0 KB (validation) | Low | 🟢 Can start |
+| P0 | **Run production build** | N/A (measurement) | Low | Required |
+| P0 | Fix ElevenLabs duplication | **476 KB** | Medium | Blocked by #1 |
+| P1 | Investigate CSS regression | **34 KB** | Low | Blocked by #1 |
+| P1 | Optimize lucide-react critical icons | 50-100 KB | Medium | Can start |
+| P2 | Verify PostHog lazy-load working | 0 KB (validation) | Low | Can start |
 
 **Critical path:**
 1. **Must run production build first** — Current metrics are from dev cache and may be misleading
@@ -248,8 +248,8 @@ npm run build:analyze
 
 | Directory | Size | Previous | Change | Notes |
 |-----------|------|----------|--------|-------|
-| node_modules | 850 MB | 863 MB | -13 MB | ✅ Stable |
-| .next | 2,129 MB | 991 MB | **+1,138 MB** | ⚠️ Dev cache bloat |
+| node_modules | 850 MB | 863 MB | -13 MB | Stable |
+| .next | 2,129 MB | 991 MB | **+1,138 MB** | Dev cache bloat |
 
 **Recommendation:** Clear .next cache periodically:
 ```bash
@@ -298,17 +298,17 @@ npx lighthouse https://paisaxe.com --output=json --output-path=./lighthouse-repo
 
 ## Summary & Recommendations
 
-### 🔴 **Immediate Actions (This Week)**
+### **Immediate Actions (This Week)**
 1. **Stop dev server and run production build** — Current metrics are unreliable
 2. **Run bundle analyzer** — Identify source of ElevenLabs duplication
 3. **Check git history** — Find what changed between 2026-02-02 and today
 
-### 🟡 **Short-term Actions (Next Sprint)**
+### **Short-term Actions (Next Sprint)**
 1. **Fix ElevenLabs duplication** — Biggest win (~476 KB)
 2. **Investigate CSS regression** — Should be quick fix
 3. **Set up automated performance monitoring** — Prevent regressions
 
-### 🟢 **Long-term Actions (Backlog)**
+### **Long-term Actions (Backlog)**
 1. **Optimize lucide-react** — Inline critical icons
 2. **Add Core Web Vitals tracking** — Monitor real user metrics
 3. **Consider icon sprites** — For frequently repeated icons
@@ -320,4 +320,4 @@ npx lighthouse https://paisaxe.com --output=json --output-path=./lighthouse-repo
 ---
 
 *Report generated by Performance Agent — Last updated: 2026-02-06*
-*⚠️ Based on dev cache, not production build — metrics may not reflect production reality*
+*Based on dev cache, not production build — metrics may not reflect production reality*

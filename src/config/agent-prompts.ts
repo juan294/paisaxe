@@ -360,4 +360,9 @@ SHARED_CONTEXT_END
 
 This block will be extracted from your report and shared with other agents on their next run.
 Keep it concise (5-10 lines max). Focus on findings that other agents would benefit from knowing.
+
+FORMATTING RULES:
+- Do NOT use emojis or pictographic characters anywhere in reports or shared context.
+- Use plain text only. Rich text formatting (bold, italic, bullet points) is fine.
+- Instead of checkmarks or status emojis, use words: "Pass", "Fail", "Complete", "Incomplete".
 `;
