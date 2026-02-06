@@ -174,4 +174,11 @@ export const PLATFORM_SERVICES = {
     dashboardUrl:
       "https://console.aws.amazon.com/route53/home#DomainListing:",
   },
+  githubPro: {
+    id: "github-pro",
+    name: "GitHub Pro",
+    category: "infrastructure" as CostCategory,
+    hasApi: false,
+    dashboardUrl: "https://github.com/settings/billing/summary",
+  },
 } as const;
