@@ -358,6 +358,30 @@ describe("Accessibility: StoryViewer", () => {
     });
   });
 
+  describe("keyboard hints visibility classes", () => {
+    it("should have desktop-pointer-only class on keyboard hints to hide on touch devices", async () => {
+      const { container } = await renderWithAuth(
+        <StoryViewer {...getDefaultProps()} />
+      );
+
+      const keyboardHints = container.querySelector(".desktop-pointer-only");
+      expect(keyboardHints).toBeInTheDocument();
+      expect(keyboardHints?.textContent).toContain("←");
+      expect(keyboardHints?.textContent).toContain("→");
+    });
+
+    it("should pair hidden/md:block with desktop-pointer-only for correct responsive+touch behavior", async () => {
+      const { container } = await renderWithAuth(
+        <StoryViewer {...getDefaultProps()} />
+      );
+
+      const keyboardHints = container.querySelector(".desktop-pointer-only");
+      expect(keyboardHints).toBeInTheDocument();
+      expect(keyboardHints?.className).toContain("hidden");
+      expect(keyboardHints?.className).toContain("md:block");
+    });
+  });
+
   describe("progress bar accessibility", () => {
     it("should have an accessible role on the progress bar", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
