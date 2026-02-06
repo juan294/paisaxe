@@ -131,6 +131,8 @@ export const en: Translations = {
     chat_messages: 'Chat messages',
     story_progress: 'Story progress',
     suggested_questions: 'Suggested questions',
+    more_options: 'More options',
+    story_controls: 'Story controls',
   },
 
   auth: {

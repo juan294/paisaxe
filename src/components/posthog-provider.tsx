@@ -8,7 +8,7 @@ import type { PostHog } from "posthog-js";
 const PostHogContext = createContext<PostHog | null>(null);
 
 // Hook to access PostHog instance (may be null if not yet loaded)
-export function usePostHog(): PostHog | null {
+function usePostHog(): PostHog | null {
   return useContext(PostHogContext);
 }
 

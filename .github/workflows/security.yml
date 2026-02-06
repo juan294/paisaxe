@@ -28,4 +28,6 @@ jobs:
         run: npm ci
 
       - name: Run security audit
+        # Using critical level until voyageai fixes qs vulnerability (GHSA-6rw7-vpxm-498p)
+        # TODO: Change back to --audit-level=high once upstream fix is available
         run: npm audit --audit-level=critical

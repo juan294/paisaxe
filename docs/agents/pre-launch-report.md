@@ -1,129 +1,223 @@
 # Pre-Launch Audit Report
-> Generated on 2026-02-06 by 6-specialist agent team
+
+> Generated on 2026-02-06 (launch eve) by 6-specialist agent team
 
 ## Verdict: CONDITIONAL
 
-No critical blockers prevent deployment. However, several warnings — particularly around i18n gaps in the admin panel and error pages, unauthenticated MCP endpoints, and missing HSTS header — should be addressed within the first week post-launch.
+The codebase is in **strong shape for launch**. All 2,766 unit tests pass, all 118 E2E tests pass, CI is green on both `develop` and `main`, Vercel deployments are healthy, and the security posture is solid. There is 1 minor blocker (missing test file for an admin-only endpoint) and several warnings that should be addressed within the first week post-launch.
+
+**Blocker count: 1** (admin-only, low user impact)
+**Warning count: 19**
+**Recommendation count: 15**
 
 ---
 
 ## Blockers (must fix before deploy)
 
-None.
+| # | Finding | Source | Risk |
+|---|---------|--------|------|
+| B1 | **Missing test file for `src/app/api/admin/agents/run/route.ts`** — 0% coverage, no test file exists. This is a write endpoint that triggers agent execution. | QA | Low (admin-only) |
 
 ---
 
-## Warnings (should fix soon)
-
-### i18n & UX
-1. **Spanish admin section is untranslated** — `src/lib/i18n/es.ts` lines 267-333 contain English text identical to `en.ts`. Spanish-speaking admins see English UI. All other locales (fr, de, pt, ast) are properly translated.
-2. **Error/404 pages are hardcoded in Spanish only** — `src/app/error.tsx`, `global-error.tsx`, `immersive/error.tsx`, `not-found.tsx` don't use the i18n system. International visitors hitting errors see untranslated Spanish.
-3. **Skip link hardcoded in Spanish** — `src/components/a11y/skip-link.tsx` uses "Ir al contenido principal" instead of the existing `accessibility.skip_to_content` translation key.
-4. **Asturian locale missing from i18n test suite** — `translations.test.ts` validates es, en, fr, de, pt but not `ast`. Key mismatches would go undetected.
-5. **Chat dialog lacks focus trap** — `voice-chat.tsx` renders a `role="dialog"` but users can Tab out into the background page.
+## Warnings (should fix within 1 week)
 
 ### Security
-6. **MCP endpoints lack authentication** — `/api/mcp/make-booking` can trigger outbound phone calls without any auth. `/api/mcp/weather` and `/api/mcp/places` have no rate limiting and consume paid API quotas.
-7. **Missing HSTS header** — `Strict-Transport-Security` not configured in `next.config.ts`. While Vercel enforces HTTPS at the edge, an explicit HSTS header protects against protocol downgrade attacks.
-8. **CSP includes `unsafe-eval`** — `script-src` allows `'unsafe-eval'` which weakens XSS protection. May have been added for HMR during development.
-9. **Checkout error detail leakage** — `/api/checkout/day-pass` returns `details: errorMessage` in error responses, potentially exposing internal implementation details in production.
-10. **npm audit: 2 high severity in `qs`** — DoS via memory exhaustion in `qs` < 6.14.1, transitive via `voyageai` SDK. Low exploitability (only used for SDK API calls, not user input parsing). No upstream fix available yet.
+| # | Finding | Source |
+|---|---------|--------|
+| W1 | `qs` high-severity vulnerability (GHSA-6rw7-vpxm-498p) in `voyageai` dependency — DoS via memory exhaustion. Low exploitability since voyageai is server-side only. No upstream fix available yet. | Security |
+| W2 | `dangerouslySetInnerHTML` + `renderMarkdown` without sanitization in `agents-dashboard.tsx:784` — admin-only but should add DOMPurify. | Security |
 
-### Architecture & Dependencies
-11. **Unused dependency: `@elevenlabs/client`** — Listed in `package.json` but never imported. Only `@elevenlabs/react` is used.
-12. **Unused dependency: `eslint-config-next`** — Project uses flat ESLint config with `@next/eslint-plugin-next` directly.
-13. **`lint-staged` installed but not wired up** — Pre-commit hook runs full suite instead. Either configure lint-staged (faster commits) or remove it.
-14. **`dotenv` in dependencies instead of devDependencies** — Only used in `scripts/`, not in `src/`.
-15. **Unused file: `src/components/admin/agent-chat.tsx`** — Not imported anywhere.
-16. **`src/lib/stripe.ts` missing `server-only` guard** — Could leak Stripe SDK into client bundle if accidentally imported from a client component.
+### Quality Assurance
+| # | Finding | Source |
+|---|---------|--------|
+| W3 | `src/lib/claude.ts` — 40% coverage. Core AI pipeline needs better error/streaming path tests. | QA |
+| W4 | `src/lib/posting-service.ts` — 0% coverage. Social media posting with external API calls. | QA |
+| W5 | `src/lib/admin-api.ts` — 20% coverage. Large admin client surface (839 lines). | QA |
+| W6 | `src/hooks/use-voice-access.ts` — 0% coverage. Older voice access hook still in use. | QA |
+| W7 | Feature flag E2E gaps — only 2 of 26 flags have E2E gating tests. Visitor-facing flags like `visitor_voice_agent`, `booking_system` untested. | QA |
+| W8 | `src/config/agent-prompts.ts` — 0% coverage (348 lines). Agent prompt config should have snapshot/validation tests. | QA |
 
-### DevOps
-17. **`.env.example` missing 6 required variables** — `WEBHOOK_SECRET`, `NEXT_PUBLIC_SITE_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `QA_ALERT_PHONE`.
-18. **No Node.js version pinned at project root** — CI uses Node 20, local dev runs Node 23. No `.nvmrc` or `engines` field.
-19. **Health endpoint always returns HTTP 200** — Even when status is "degraded". Monitoring tools need non-2xx to trigger alerts.
+### Architecture
+| # | Finding | Source |
+|---|---------|--------|
+| W9 | 17 unused exports + 17 unused types detected by knip. Includes deferred features (X posting) shipping dead code. | Architect |
+| W10 | 6 large files (1,000-1,500 lines) — all admin components. Maintenance risk. | Architect |
+| W11 | 5 outdated dependencies — `@anthropic-ai/sdk`, `@elevenlabs/react`, `@supabase/supabase-js`, `posthog-js`. Patch updates available. | Architect |
+| W12 | Unlisted dependency `canvas` in `scripts/extract-images.ts`. | Architect |
 
 ### Performance
-20. **Admin page has no code splitting (728KB SSR chunk)** — All 7 tab panels are eagerly imported. Could use `next/dynamic` per tab panel.
+| # | Finding | Source |
+|---|---------|--------|
+| W13 | Protobuf chunk at 465KB (close to 500KB threshold) — `@bufbuild/protobuf` from Supabase Realtime. Monitor for growth. | Performance |
+| W14 | Lighthouse CI only triggers on PRs, but dev workflow uses direct commits — Lighthouse may never run. | Performance |
 
-### QA
-21. **4 API routes have 0% test coverage** — `agents-summary`, `costs-analytics`, `costs-analytics/[id]`, `tunnel` routes.
-22. **42 recently-changed source files lack test files** — Concentrated in admin dashboard components.
+### DevOps
+| # | Finding | Source |
+|---|---------|--------|
+| W15 | `.env.example` incomplete — missing `CREDENTIALS_ENCRYPTION_KEY`, `ELEVENLABS_WEBHOOK_SECRET`, `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`. | DevOps |
+| W16 | No error monitoring service (Sentry, etc.) — production errors only discoverable via Vercel logs. | DevOps |
+| W17 | In-memory rate limiting resets on serverless cold starts — largely ineffective on Vercel. | DevOps |
+
+### UX & Accessibility
+| # | Finding | Source |
+|---|---------|--------|
+| W18 | 2 hardcoded English `aria-label`s in visitor-facing components (`toolbar-overflow-menu.tsx`, `story-viewer.tsx`). | UX |
+| W19 | Toolbar overflow menu lacks keyboard focus management — keyboard users can't navigate into open menu. | UX |
 
 ---
 
 ## Recommendations (nice to have)
 
-- **Distributed rate limiting** — Move from in-memory to Redis/Upstash for rate limiting at scale.
-- **CSP reporting** — Add `report-uri` or `report-to` directive to monitor CSP violations.
-- **CODEOWNERS file** — Auto-assign reviewers by directory/file pattern.
-- **Knip enforcement** — Currently runs in report-only mode (`--no-exit-code`). Enable enforcement to prevent regressions.
-- **Add `APP_VERSION` from package.json** — Health endpoint hardcodes "0.1.0".
-- **17 unused exports + 17 unused types** — Mostly shadcn defaults and agent utilities. Low priority but good hygiene.
+1. **CSP nonce-based scripts** — Replace `'unsafe-inline'` in `script-src` with nonce-based CSP for stronger XSS protection (Security)
+2. **Persistent rate limiting** — Migrate to Vercel KV or Upstash Redis for cross-instance rate limiting (DevOps/Security)
+3. **Bump version to 1.0.0** — `package.json` shows `0.1.0`; signal production readiness (DevOps)
+4. **Add Lighthouse CI on push** — Add `push` trigger to `lighthouse.yml` for `develop`/`main` branches (Performance)
+5. **Clean up unused exports** — Remove the 34 unused exports/types flagged by knip (Architecture)
+6. **Remove `STORIES` backward-compat alias** — Dead export in `stories-data.ts` (Architecture)
+7. **Reduce console.log noise** — 17 server-side console.log/debug calls across 8 files (Architecture)
+8. **PostHog loading optimization** — Defer PostHog load to after first user interaction (Performance)
+9. **Vercel function region** — Consider `cdg1` (Paris) or `mad1` (Madrid) for lower latency to Spanish users (DevOps)
+10. **Security scan level** — Change `npm audit --audit-level=critical` to `--audit-level=high` (DevOps)
+11. **Enforce knip in CI** — Remove `--no-exit-code` from knip workflow (DevOps)
+12. **Add `motion-reduce:` variants to coming-soon page** — Respects `prefers-reduced-motion` (UX)
+13. **Privacy/Terms translations** — Pages are Spanish-only; consider English translation or language notice (UX)
+14. **Add dedicated "toggle info" button** in story viewer for assistive tech (UX)
+15. **Disaster recovery runbook** — Document Supabase backup/recovery procedures (DevOps)
 
 ---
 
 ## Detailed Findings
 
-### Architecture
-**Reviewer: architect**
+### Architecture (architect)
 
-- **TypeScript**: `npm run typecheck` passes cleanly. Zero type errors.
-- **tsconfig.json**: `strict: true` enabled. `isolatedModules`, `bundler` module resolution correctly set.
-- **next.config.ts**: Comprehensive security headers, proper image config (AVIF + WebP, 30-day cache), bundle analyzer gated behind `ANALYZE` env var. `serverExternalPackages` correctly excludes `@anthropic-ai/sdk` and `sharp`.
-- **proxy.ts**: Well-structured. Maintenance mode with 30s revalidation, explicit CORS allowlist, auth session refresh via `getUser()`. Correct matcher pattern for static assets.
-- **Circular dependencies**: None detected. Clean dependency graph.
-- **Dead code (knip)**: 1 unused file, 3 unused dependencies, 17 unused exports, 17 unused types, 1 duplicate export (`FALLBACK_STORIES`/`STORIES` in `stories-data.ts`).
+**Overall: Strong** — No blockers.
 
-### Quality Assurance
-**Reviewer: qa-lead**
+- **TypeScript**: Compiles cleanly, strict mode enabled, zero errors
+- **ESLint**: Zero errors
+- **Tests**: 196 files, 2,766 tests passing, 1 skipped
+- **Circular dependencies**: None (verified with madge across 438 files)
+- **Peer dependencies**: All satisfied
+- **Next.js config**: Production-ready with comprehensive security headers, image optimization (AVIF + WebP, 30-day cache), PostHog reverse proxy
+- **Proxy (`src/proxy.ts`)**: Well-structured with maintenance mode, CORS, auth refresh. No `middleware.ts` (correct for Next.js 16)
+- **`tsconfig.json`**: Strict mode, bundler resolution, proper path aliases
+- **Dead code (knip)**: 17 unused exports, 17 unused types, 1 duplicate export, 1 unlisted dependency
 
-- **Unit tests**: 192 files, **2705 passed**, 1 skipped, 0 failures.
-- **E2E tests**: 140 Playwright tests across 9 spec files (Playwright v1.58.0).
-- **Coverage**: 66.46% statements, 60.29% branches, 61.64% functions, 67.13% lines.
-- **Feature flag mocking**: 18 test files properly mock feature flags.
-- **Gaps**: Admin components have thin coverage (marketing-dashboard 2.36%, suggestions-panel 3.48%, voice-agent-chat 1.26%, story-editor-dialog 0%). Visitor-facing critical paths (stories, chat, suggestions, payments) have solid coverage.
-- **Recently changed files**: 119 of 161 changed files have tests. 42 lack test coverage, concentrated in admin dashboard components.
+---
 
-### Security
-**Reviewer: security-reviewer**
+### Quality Assurance (qa-lead)
 
-- **Hardcoded secrets**: None found in source code. All API keys read from env vars with `.trim()`.
-- **Auth flows**: `validateAdminAuth()` correctly uses `getUser()` (server-side validation) + role check. Consistently called across 15+ admin routes.
-- **RLS policies**: All tables have RLS enabled. User-scoped favorites, admin-only marketing tables, service-role-only pending bookings. Migration 049 added RLS performance optimizations. All SECURITY DEFINER functions have explicit `SET search_path = ''`.
-- **CORS**: Explicit domain allowlist, no wildcard `*`, localhost only in dev. Preflight handled correctly.
-- **XSS**: `dangerouslySetInnerHTML` only used for JSON-LD structured data (safe pattern). `chat-safety.ts` provides prompt injection detection, input sanitization, and output leak detection.
-- **CSP**: Comprehensive but weakened by `unsafe-inline`/`unsafe-eval` in `script-src` (common Next.js requirement).
-- **.gitignore**: Properly excludes `.env*`, `.vercel/`, sensitive files.
+**Overall: Strong** — 1 blocker (missing test file).
 
-### Performance
-**Reviewer: performance-eng**
+- **Unit tests**: 2,766 passed, 0 failed, 1 skipped (24.9s)
+- **E2E tests**: 118 passed, 22 skipped, 0 failed (47.7s)
+- **Coverage**: 67.02% statements, 60.26% branches, 62.23% functions, 67.74% lines
 
-- **Build**: Succeeds cleanly. Total client static assets: 3.3MB.
-- **Chunk sizes**: Largest client chunks 468KB x2 (below 500KB threshold). Admin SSR chunk 728KB (not client-shipped).
-- **Code splitting**: VoiceChat dynamically imported with `ssr: false`. PostHog lazy-loaded. `@anthropic-ai/sdk` and `sharp` in `serverExternalPackages`.
-- **Image optimization**: All production components use `next/image`. Raw `<img>` only in test mocks. Proper `sizes`, `priority` on hero image, prefetching for adjacent stories.
-- **Lighthouse CI**: Configured with Perf >= 60%, A11y >= 80%, LCP < 4s, CLS < 0.25, TBT < 500ms. Runs on PRs with 3-run median.
-- **Tree shaking**: lucide-react uses named imports. No bundle bloat from icon libraries.
+**Critical path coverage:**
 
-### UX & Accessibility
-**Reviewer: ux-reviewer**
+| Path | Coverage | Status |
+|------|----------|--------|
+| Payments (Stripe) | 95%+ | Excellent |
+| Auth (Supabase + OAuth) | 73-100% | Good |
+| Webhooks (all 5 endpoints) | 80-100% | Good |
+| Chat/RAG search + embeddings | 100% | Excellent |
+| Chat safety + config | 100% | Excellent |
+| Core Claude integration | 40% | Needs improvement |
+| Voice chat components | 80-82% | Good |
+| Feature flags (server + client) | Covered | Good |
 
-- **ARIA patterns**: Well-structured — `role="progressbar"` with aria-value*, `role="log"` with `aria-live="polite"`, `role="tablist"` + `role="tab"` in admin.
-- **Keyboard navigation**: Arrow keys, Space, `i` key, Escape all properly handled. Disabled when chat is open. Admin story cards have `tabIndex={0}` + `onKeyDown`.
-- **Reduced motion**: 36 occurrences across 13 components. `useReducedMotion()` hook disables Ken Burns and auto-play. Above average for the industry.
-- **Image alt text**: Uses meaningful story titles. Fallback to localized `t("chat.image_alt")`. No empty `alt=""` on informational images.
-- **Responsive design**: Mobile-first Tailwind patterns. Safe area insets for notched devices. Overflow menu for mobile toolbar.
-- **LangSync**: `<html lang>` attribute synced with locale for screen readers.
-- **Gaps**: Admin i18n (Spanish untranslated), error pages (Spanish-only), skip link (hardcoded Spanish), Asturian locale untested, focus trap missing in chat dialog, some hardcoded English aria-labels.
+---
 
-### DevOps & Infrastructure
-**Reviewer: devops**
+### Security (security-reviewer)
 
-- **CI/CD**: 8 GitHub Actions workflows — CI, E2E, Security scan, Bundle analysis, Lighthouse, Knip, License compliance, Claude review. All green.
-- **Dependabot**: Configured for npm + Actions with weekly schedule and grouped updates.
-- **Vercel config**: Proper domain redirects (paisaxe.com/www → paisaxe.es canonical). 301 permanent redirects.
-- **Security headers**: All present (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy, CSP).
-- **Proxy**: Correct Next.js 16 pattern (proxy.ts, not middleware.ts). No conflicts.
-- **.gitignore**: Comprehensive — .env*, .vercel/, node_modules/, .next/, coverage, IDE files.
-- **Robots.txt**: Admin, API, auth routes disallowed. AI crawlers explicitly allowed.
-- **Gaps**: .env.example incomplete (6 missing vars), no Node.js version pin, health endpoint always 200, knip in report-only mode, no branch protection (free plan limitation).
+**Overall: Solid** — No blockers.
+
+- **Hardcoded secrets**: None found. All API keys from `process.env` with `.trim()`
+- **Auth**: Two-layer admin auth (Supabase JWT + role check), all 53 admin routes protected
+- **Public API routes**: Rate-limited, input validated, injection detection, sanitization
+- **MCP routes**: Protected by `MCP_API_SECRET` header validation
+- **Webhooks**: All 3 webhook endpoints verify signatures (Stripe, Supabase, ElevenLabs)
+- **RLS**: All tables have appropriate policies with performance optimizations
+- **CORS**: Properly restrictive — only `paisaxe.es`, `paisaxe.com` + variants
+- **CSP**: Comprehensive — `default-src 'self'`, `frame-ancestors 'none'`, `form-action 'self'`
+- **HSTS**: 2 years, includeSubDomains, preload
+- **Rate limiting**: In-memory, 10 req/60s per IP on chat routes
+- **Input validation**: Injection detection, sanitization, prompt leakage detection
+- **Error disclosure**: Generic errors in production, detailed only in development
+
+---
+
+### Performance (performance-eng)
+
+**Overall: Excellent** — No blockers.
+
+- **Build**: Clean, 7.8s compile (Turbopack), 49 routes, no warnings
+- **Largest chunk**: 465KB (protobuf) — under 500KB threshold
+- **Code splitting**: Admin panels (5x `next/dynamic`), VoiceChat, PostHog all lazy-loaded
+- **API route dynamic imports**: Heavy server deps loaded inside handler functions
+- **Images**: All production images use `next/image` with AVIF + WebP, 30-day cache
+- **Fonts**: Self-hosted via `next/font/google` (no render-blocking)
+- **Loading states**: All major routes have `loading.tsx`
+- **Lighthouse CI**: Configured with budgets (Perf >= 60%, A11y >= 80%, LCP < 4s)
+- **Preconnects**: Supabase storage, fonts, Unsplash
+
+---
+
+### UX & Accessibility (ux-reviewer)
+
+**Overall: Excellent** — No blockers.
+
+- **ARIA labels**: Comprehensive across all interactive elements with localized `t()` calls
+- **Images**: All use `next/image` with meaningful alt text
+- **i18n**: 6 locales (es, en, fr, de, pt, ast) with automated parity tests (~160 keys each)
+- **Responsive**: Mobile-first with proper `sm:`, `md:`, `lg:` breakpoints
+- **Skip-to-content**: Implemented and functional
+- **Focus-visible rings**: Consistent pattern across all interactive elements
+- **Motion-reduce**: Comprehensive `motion-reduce:` variants on all animations (except coming-soon page)
+- **Error states**: All localized, user-friendly, with retry actions
+- **Heading hierarchy**: Correct across all pages
+- **Live regions**: `aria-live="polite"` for story changes (screen reader friendly)
+
+---
+
+### DevOps & Infrastructure (devops)
+
+**Overall: Healthy** — No blockers.
+
+- **CI**: All 3 core workflows green on both `develop` and `main` (CI, E2E, Security)
+- **Additional CI**: 5 PR-triggered workflows (Lighthouse, bundle size, knip, license, Claude review)
+- **Vercel**: All deployments `Ready`, 1-2 minute build times
+- **Health endpoint**: Checks Supabase connectivity + DB size, returns 200/503
+- **Domains**: `paisaxe.com` -> `paisaxe.es` redirects (301 permanent)
+- **Dependabot**: Configured for npm + Actions with weekly schedule
+- **`.gitignore`**: Comprehensive — .env*, .vercel/, node_modules/, .next/, coverage
+
+---
+
+## Pre-Launch Checklist
+
+- [x] All unit tests pass (2,766/2,766)
+- [x] All E2E tests pass (118/118)
+- [x] TypeScript compiles cleanly (zero errors)
+- [x] ESLint reports zero errors
+- [x] CI green on `develop` and `main`
+- [x] Vercel deployments healthy
+- [x] No hardcoded secrets in source
+- [x] Auth flows properly secured (admin + public + webhooks)
+- [x] RLS policies on all Supabase tables
+- [x] Webhook signature verification on all endpoints
+- [x] CORS properly restrictive
+- [x] Security headers comprehensive (HSTS, CSP, X-Frame-Options, etc.)
+- [x] No circular dependencies
+- [x] No chunks > 500KB
+- [x] Images optimized (AVIF + WebP via next/image)
+- [x] Code splitting on heavy components
+- [x] i18n complete across 6 locales with automated parity tests
+- [x] Error pages localized with retry actions
+- [x] Heading hierarchy correct
+- [x] Motion-reduce support across animations
+- [x] Skip-to-content navigation
+- [x] Domain redirects configured (canonical paisaxe.es)
+- [ ] Add test file for `api/admin/agents/run` (B1)
+- [ ] Set up error monitoring service (W16)
+- [ ] Update `.env.example` with missing vars (W15)

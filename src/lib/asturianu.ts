@@ -3,7 +3,7 @@
  * When the asturianu_touches feature is enabled, these replace
  * the default Spanish labels in the interface.
  */
-export const ASTURIANU_LABELS: Record<string, { es: string; ast: string }> = {
+const ASTURIANU_LABELS: Record<string, { es: string; ast: string }> = {
   ask_about: { es: "Preguntar sobre esto", ast: "Entrugame sobre esto" },
   saved: { es: "Guardados", ast: "Guardaos" },
   surprise: { es: "Sorpresa", ast: "Sorpresa" },

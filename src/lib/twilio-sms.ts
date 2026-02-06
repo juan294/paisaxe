@@ -76,7 +76,6 @@ export async function sendSMS(to: string, body: string): Promise<SendSMSResult> 
       };
     }
 
-    console.log(`[twilio-sms] SMS sent to ${to}: ${data.sid}`);
     return {
       success: true,
       sid: data.sid,

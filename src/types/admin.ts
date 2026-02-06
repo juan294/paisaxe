@@ -50,20 +50,6 @@ export function rowToAdminStory(row: AdminStoryRow): AdminStory {
   };
 }
 
-// API request/response types
-export interface GetStoriesParams {
-  filter?: CurationStatus;
-}
-
-export interface UpdateImageRequest {
-  imageUrl?: string;
-  // File upload handled separately via FormData
-}
-
-export interface UpdateStatusRequest {
-  status: CurationStatus;
-}
-
 export interface AdminApiResponse<T> {
   data?: T;
   error?: string;
