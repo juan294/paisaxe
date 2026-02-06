@@ -672,6 +672,36 @@ function AgentTerminal({
   );
 }
 
+/** Convert basic markdown (headings, bold, list items) to HTML. Content is from our own agents, not user input. */
+function renderMarkdown(md: string): string {
+  return md
+    .split("\n\n")
+    .map((block) => {
+      const lines = block.split("\n").map((line) => {
+        // Headings → bold text
+        if (/^#{1,3}\s+/.test(line)) {
+          const text = line.replace(/^#{1,3}\s+/, "");
+          return `<strong class="text-[#2d2a26] dark:text-[#f5f3ee]">${text}</strong>`;
+        }
+        // List items → bullet
+        if (/^[-*]\s+/.test(line)) {
+          const text = line.replace(/^[-*]\s+/, "");
+          return `<li>${text}</li>`;
+        }
+        return line;
+      });
+
+      // Wrap consecutive <li> items in <ul>
+      const html = lines.join("\n")
+        .replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul class="list-disc pl-4 space-y-0.5">$1</ul>');
+
+      return `<div>${html}</div>`;
+    })
+    .join("")
+    // Bold
+    .replace(/\*\*([^*]+)\*\*/g, '<strong class="text-[#2d2a26] dark:text-[#f5f3ee]">$1</strong>');
+}
+
 function SharedContextCard({ entry }: { entry: SharedContextEntry }) {
   return (
     <div className="rounded-2xl bg-white p-5 dark:bg-[#252320]">
@@ -683,9 +713,10 @@ function SharedContextCard({ entry }: { entry: SharedContextEntry }) {
           {relativeTime(entry.timestamp)}
         </span>
       </div>
-      <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-[#6b6560] dark:text-[#a39e98]">
-        {entry.content}
-      </p>
+      <div
+        className="mt-2 space-y-2 text-xs leading-relaxed text-[#6b6560] dark:text-[#a39e98] [&_ul]:mt-1"
+        dangerouslySetInnerHTML={{ __html: renderMarkdown(entry.content) }}
+      />
     </div>
   );
 }
