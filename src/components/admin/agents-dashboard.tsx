@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useState, useEffect, useRef } from "react";
-import { fetchAgentsSummary, fetchFeatureFlags, updateFeatureFlag, triggerAgentRun, fetchRunningAgents } from "@/lib/admin-api";
+import { fetchAgentsSummary, fetchFeatureFlags, updateFeatureFlag, triggerAgentRun, fetchRunningAgents, stopAgent, fetchAgentLogs } from "@/lib/admin-api";
 import { useAnalyticsData } from "./analytics-cache-context";
 import { AnalyticsCacheProvider } from "./analytics-cache-context";
 import { AgentConfigPanel } from "./agent-config-panel";
-import { AlertCircle, Loader2, Play, Settings } from "lucide-react";
+import { AlertCircle, Loader2, Play, Square, Settings, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FeatureFlag } from "@/types/feature-flags";
 import type {
@@ -13,6 +13,7 @@ import type {
   AgentStatus,
   SharedContextEntry,
   AgentActivityItem,
+  AgentLogLine,
 } from "@/types/agents-dashboard";
 
 const AGENT_FLAG_KEYS = [
@@ -26,6 +27,17 @@ const AGENT_FLAG_KEYS = [
   "cost_analyst_agent_enabled",
 ] as const;
 
+/** Map flag keys to display names for the terminal header. */
+const AGENT_NAMES: Record<string, string> = {
+  coverage_agent_enabled: "Coverage Agent",
+  security_agent_enabled: "Security Agent",
+  documentation_agent_enabled: "Documentation Agent",
+  performance_agent_enabled: "Performance Agent",
+  qa_agent_enabled: "QA Agent",
+  localization_agent_enabled: "Localization Agent",
+  cost_analyst_agent_enabled: "Cost Analyst Agent",
+};
+
 function relativeTime(isoDate: string | null): string {
   if (!isoDate) return "Never";
   const diff = Date.now() - new Date(isoDate).getTime();
@@ -35,6 +47,14 @@ function relativeTime(isoDate: string | null): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+function formatElapsed(startedAt: string): string {
+  const diff = Date.now() - new Date(startedAt).getTime();
+  const seconds = Math.floor(diff / 1000);
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 const HEALTH_COLORS: Record<AgentHealthStatus, string> = {
@@ -82,6 +102,14 @@ function AgentsDashboardInner() {
   const [runningAgents, setRunningAgents] = useState<Set<string>>(new Set());
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Terminal state
+  const [activeTerminal, setActiveTerminal] = useState<string | null>(null);
+  const [terminalLogs, setTerminalLogs] = useState<AgentLogLine[]>([]);
+  const [terminalOffset, setTerminalOffset] = useState(0);
+  const [terminalFinished, setTerminalFinished] = useState(false);
+  const [terminalStartedAt, setTerminalStartedAt] = useState<string | null>(null);
+  const logPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     fetchFeatureFlags().then((result) => {
       if (result.data) {
@@ -121,11 +149,77 @@ function AgentsDashboardInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runningAgents.size]);
 
+  // Poll logs for the active terminal
+  useEffect(() => {
+    if (!activeTerminal) {
+      if (logPollRef.current) {
+        clearInterval(logPollRef.current);
+        logPollRef.current = null;
+      }
+      return;
+    }
+
+    // Use a ref-stable offset for incremental fetching
+    let currentOffset = terminalOffset;
+
+    const pollLogs = async () => {
+      const result = await fetchAgentLogs(activeTerminal, currentOffset);
+      if (!result.data) return;
+
+      if (result.data.logs.length > 0) {
+        setTerminalLogs((prev) => [...prev, ...result.data!.logs]);
+        currentOffset = result.data.offset;
+        setTerminalOffset(result.data.offset);
+      }
+
+      if (result.data.finished) {
+        setTerminalFinished(true);
+        if (logPollRef.current) {
+          clearInterval(logPollRef.current);
+          logPollRef.current = null;
+        }
+      }
+    };
+
+    // Immediate first fetch
+    pollLogs();
+    logPollRef.current = setInterval(pollLogs, 2_000);
+
+    return () => {
+      if (logPollRef.current) clearInterval(logPollRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTerminal]);
+
   const handleRunAgent = async (agentKey: string) => {
     const result = await triggerAgentRun(agentKey);
     if (result.data?.started) {
       setRunningAgents((prev) => new Set([...prev, agentKey]));
+      // Open terminal for this agent
+      setTerminalLogs([]);
+      setTerminalOffset(0);
+      setTerminalFinished(false);
+      setTerminalStartedAt(result.data.startedAt);
+      setActiveTerminal(agentKey);
     }
+  };
+
+  const handleStopAgent = async (agentKey: string) => {
+    await stopAgent(agentKey);
+    setRunningAgents((prev) => {
+      const next = new Set(prev);
+      next.delete(agentKey);
+      return next;
+    });
+    // Terminal will pick up "finished" on next poll
+  };
+
+  const handleCloseTerminal = () => {
+    setActiveTerminal(null);
+    setTerminalLogs([]);
+    setTerminalOffset(0);
+    setTerminalFinished(false);
+    setTerminalStartedAt(null);
   };
 
   const handleToggle = async (flag: FeatureFlag) => {
@@ -223,7 +317,7 @@ function AgentsDashboardInner() {
                         )}
                       </td>
                       <td className="py-4 pr-4 align-top text-sm text-[#6b6560] dark:text-[#a39e98]">
-                        {flag.description || "—"}
+                        {flag.description || "\u2014"}
                       </td>
                       <td className="w-20 py-4 pr-5 text-center align-top">
                         <button
@@ -271,10 +365,23 @@ function AgentsDashboardInner() {
               agent={agent}
               isRunning={runningAgents.has(agent.flagKey)}
               onRun={() => handleRunAgent(agent.flagKey)}
+              onStop={() => handleStopAgent(agent.flagKey)}
             />
           ))}
         </div>
       </section>
+
+      {/* Agent Terminal */}
+      {activeTerminal && (
+        <AgentTerminal
+          agentKey={activeTerminal}
+          agentName={AGENT_NAMES[activeTerminal] ?? activeTerminal}
+          logs={terminalLogs}
+          finished={terminalFinished}
+          startedAt={terminalStartedAt}
+          onClose={handleCloseTerminal}
+        />
+      )}
 
       {/* Cross-Agent Insights */}
       {data.sharedContext.length > 0 && (
@@ -332,7 +439,17 @@ function OverallHealthBanner({ health, agents }: { health: AgentHealthStatus; ag
   );
 }
 
-function AgentCard({ agent, isRunning, onRun }: { agent: AgentStatus; isRunning: boolean; onRun: () => void }) {
+function AgentCard({
+  agent,
+  isRunning,
+  onRun,
+  onStop,
+}: {
+  agent: AgentStatus;
+  isRunning: boolean;
+  onRun: () => void;
+  onStop: () => void;
+}) {
   return (
     <div className="rounded-2xl bg-white p-5 dark:bg-[#252320]">
       <div className="flex items-start justify-between">
@@ -345,23 +462,23 @@ function AgentCard({ agent, isRunning, onRun }: { agent: AgentStatus; isRunning:
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={onRun}
-            disabled={isRunning}
-            className={cn(
-              "rounded-full p-1 transition-colors",
-              isRunning
-                ? "cursor-not-allowed text-[#a39e98]"
-                : "text-[#a39e98] hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]",
-            )}
-            aria-label={isRunning ? `${agent.name} is running` : `Run ${agent.name}`}
-          >
-            {isRunning ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
+          {isRunning ? (
+            <button
+              onClick={onStop}
+              className="rounded-full p-1 text-[#c97a7a] transition-colors hover:bg-[#c97a7a]/10"
+              aria-label={`Stop ${agent.name}`}
+            >
+              <Square className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <button
+              onClick={onRun}
+              className="rounded-full p-1 text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
+              aria-label={`Run ${agent.name}`}
+            >
               <Play className="h-3.5 w-3.5" />
-            )}
-          </button>
+            </button>
+          )}
           <div className={cn(
             "mt-0 h-2.5 w-2.5 rounded-full",
             HEALTH_COLORS[agent.health],
@@ -376,6 +493,106 @@ function AgentCard({ agent, isRunning, onRun }: { agent: AgentStatus; isRunning:
         {relativeTime(agent.lastRun)}
       </p>
     </div>
+  );
+}
+
+function AgentTerminal({
+  agentKey: _agentKey,
+  agentName,
+  logs,
+  finished,
+  startedAt,
+  onClose,
+}: {
+  agentKey: string;
+  agentName: string;
+  logs: AgentLogLine[];
+  finished: boolean;
+  startedAt: string | null;
+  onClose: () => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [elapsed, setElapsed] = useState("0:00");
+
+  // Auto-scroll to bottom when new logs arrive
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [logs.length]);
+
+  // Update elapsed time every second while running
+  useEffect(() => {
+    if (!startedAt || finished) return;
+
+    const tick = () => setElapsed(formatElapsed(startedAt));
+    tick();
+    const interval = setInterval(tick, 1_000);
+    return () => clearInterval(interval);
+  }, [startedAt, finished]);
+
+  // Compute final elapsed when finished
+  useEffect(() => {
+    if (finished && startedAt) {
+      setElapsed(formatElapsed(startedAt));
+    }
+  }, [finished, startedAt]);
+
+  const status = finished ? "Completed" : "Running...";
+  const lastLog = logs.length > 0 ? logs[logs.length - 1] : null;
+  const stoppedByUser = lastLog?.text === "Process stopped by user";
+
+  return (
+    <section>
+      <div className="overflow-hidden rounded-2xl border border-[#3d3a36]">
+        {/* Header bar */}
+        <div className="flex items-center justify-between bg-[#1a1a1a] px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-[#e5e3de]">{agentName}</span>
+            <span className={cn(
+              "flex items-center gap-1.5 font-mono text-xs",
+              finished
+                ? stoppedByUser ? "text-[#c9a55c]" : "text-[#7a9e7a]"
+                : "text-[#c9a55c]",
+            )}>
+              {!finished && <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#c9a55c]" />}
+              {stoppedByUser ? "Stopped" : status}
+            </span>
+            <span className="font-mono text-xs text-[#6b6560]">{elapsed}</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded p-1 text-[#6b6560] transition-colors hover:bg-[#3d3a36] hover:text-[#e5e3de]"
+            aria-label="Close terminal"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {/* Log content */}
+        <div
+          ref={scrollRef}
+          className="max-h-[400px] overflow-y-auto bg-[#111] p-4 font-mono text-xs leading-relaxed"
+        >
+          {logs.length === 0 ? (
+            <p className="text-[#6b6560]">Waiting for output...</p>
+          ) : (
+            logs.map((line, i) => (
+              <div key={i} className="flex gap-3">
+                <span className="shrink-0 select-none text-[#4a4540]">
+                  {new Date(line.timestamp).toLocaleTimeString()}
+                </span>
+                <span className={cn(
+                  "whitespace-pre-wrap break-all",
+                  line.text.startsWith("[stderr]") ? "text-[#c97a7a]" : "text-[#d4d0ca]",
+                )}>
+                  {line.text}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -22,7 +22,7 @@ import type {
   ManualCostEntry,
   UpdateManualCostRequest,
 } from "@/types/costs-analytics";
-import type { AgentsDashboardData, AgentRunStatus } from "@/types/agents-dashboard";
+import type { AgentsDashboardData, AgentRunStatus, AgentLogsResponse } from "@/types/agents-dashboard";
 
 const API_BASE = "/api/admin";
 
@@ -787,6 +787,55 @@ export async function fetchRunningAgents(): Promise<AdminApiResponse<AgentRunSta
     return await response.json();
   } catch (error) {
     console.error("Error fetching running agents:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Stop a running agent
+ */
+export async function stopAgent(agentKey: string): Promise<AdminApiResponse<{ stopped: boolean; agentKey: string }>> {
+  try {
+    const response = await fetch(`${API_BASE}/agents/run`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentKey }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to stop agent" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error stopping agent:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Fetch logs for a running (or recently finished) agent
+ */
+export async function fetchAgentLogs(
+  agentKey: string,
+  since?: number,
+): Promise<AdminApiResponse<AgentLogsResponse>> {
+  try {
+    const url = new URL(`${API_BASE}/agents/run`, window.location.origin);
+    url.searchParams.set("agentKey", agentKey);
+    if (since !== undefined) url.searchParams.set("since", String(since));
+
+    const response = await fetch(url.toString());
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to fetch agent logs" };
+    }
+
+    return { data: await response.json() };
+  } catch (error) {
+    console.error("Error fetching agent logs:", error);
     return { error: "Network error" };
   }
 }
