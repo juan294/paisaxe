@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
 
     const suggestions = data as StorySuggestionRow[];
 
-    // Get unique user IDs
-    const userIds = [...new Set(suggestions.map((s) => s.user_id))];
+    // Get unique user IDs (filter out nulls for anonymous submissions)
+    const userIds = [...new Set(suggestions.map((s) => s.user_id).filter(Boolean))] as string[];
 
     // Fetch user emails from auth.users
     // Using admin client to query user metadata
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     const adminSuggestions = suggestions.map((row) => {
       return rowToAdminStorySuggestion({
         ...row,
-        user_email: userEmails[row.user_id],
+        user_email: row.user_id ? userEmails[row.user_id] : undefined,
       });
     });
 

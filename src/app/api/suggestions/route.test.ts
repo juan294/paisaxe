@@ -38,10 +38,14 @@ import { createServerClient } from "@supabase/ssr";
 const mockCreateServerClient = vi.mocked(createServerClient);
 
 describe("Suggestions API", () => {
+  let requestCounter = 0;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    requestCounter++;
   });
 
+  // Each request gets a unique IP to avoid rate limit collisions across tests
   const createRequest = (
     method: string,
     options: {
@@ -50,9 +54,13 @@ describe("Suggestions API", () => {
     } = {}
   ) => {
     const url = new URL("http://localhost:3000/api/suggestions");
+    const headers: Record<string, string> = {
+      "x-forwarded-for": `10.0.0.${requestCounter}`,
+      ...(options.headers || {}),
+    };
     return new NextRequest(url, {
       method,
-      headers: options.headers || {},
+      headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
   };
@@ -171,30 +179,51 @@ describe("Suggestions API", () => {
   });
 
   describe("POST /api/suggestions", () => {
-    it("should return 401 when not authenticated", async () => {
+    it("should accept anonymous submissions (no auth required)", async () => {
+      const createdSuggestion = {
+        id: "sug-anon",
+        user_id: null,
+        place_name: "Anonymous Place",
+        comment: null,
+        location: null,
+        attribution: "A Visitor",
+        status: "pending",
+        admin_notes: null,
+        converted_story_id: null,
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+      };
+
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn(),
+        },
+        from: vi.fn(() => ({
+          insert: vi.fn(() => ({
+            select: vi.fn(() => ({
+              single: vi.fn(() =>
+                Promise.resolve({ data: createdSuggestion, error: null })
+              ),
+            })),
+          })),
+        })),
+      } as never);
+
       const request = createRequest("POST", {
-        body: { placeName: "Test Place" },
+        body: { placeName: "Anonymous Place", attribution: "A Visitor" },
       });
       const response = await POST(request);
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(201);
+      const json = await response.json();
+      expect(json.data.placeName).toBe("Anonymous Place");
+      expect(json.data.userId).toBeNull();
     });
 
     it("should return 400 for invalid JSON body", async () => {
-      mockCreateServerClient.mockReturnValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: "user-123" } },
-            error: null,
-          }),
-        },
-        from: vi.fn(),
-      } as never);
-
       const url = new URL("http://localhost:3000/api/suggestions");
       const request = new NextRequest(url, {
         method: "POST",
-        headers: { Authorization: "Bearer valid-token" },
         body: "not-json",
       });
       const response = await POST(request);
@@ -205,18 +234,7 @@ describe("Suggestions API", () => {
     });
 
     it("should return 400 when placeName is missing", async () => {
-      mockCreateServerClient.mockReturnValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: "user-123" } },
-            error: null,
-          }),
-        },
-        from: vi.fn(),
-      } as never);
-
       const request = createRequest("POST", {
-        headers: { Authorization: "Bearer valid-token" },
         body: {},
       });
       const response = await POST(request);
@@ -227,18 +245,7 @@ describe("Suggestions API", () => {
     });
 
     it("should return 400 when placeName is too short", async () => {
-      mockCreateServerClient.mockReturnValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: "user-123" } },
-            error: null,
-          }),
-        },
-        from: vi.fn(),
-      } as never);
-
       const request = createRequest("POST", {
-        headers: { Authorization: "Bearer valid-token" },
         body: { placeName: "AB" },
       });
       const response = await POST(request);
@@ -249,18 +256,7 @@ describe("Suggestions API", () => {
     });
 
     it("should return 400 when placeName is too long", async () => {
-      mockCreateServerClient.mockReturnValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: "user-123" } },
-            error: null,
-          }),
-        },
-        from: vi.fn(),
-      } as never);
-
       const request = createRequest("POST", {
-        headers: { Authorization: "Bearer valid-token" },
         body: { placeName: "A".repeat(101) },
       });
       const response = await POST(request);
@@ -269,18 +265,7 @@ describe("Suggestions API", () => {
     });
 
     it("should return 400 when comment is too long", async () => {
-      mockCreateServerClient.mockReturnValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: "user-123" } },
-            error: null,
-          }),
-        },
-        from: vi.fn(),
-      } as never);
-
       const request = createRequest("POST", {
-        headers: { Authorization: "Bearer valid-token" },
         body: { placeName: "Valid Place", comment: "A".repeat(501) },
       });
       const response = await POST(request);
@@ -291,18 +276,7 @@ describe("Suggestions API", () => {
     });
 
     it("should return 400 for invalid location", async () => {
-      mockCreateServerClient.mockReturnValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: "user-123" } },
-            error: null,
-          }),
-        },
-        from: vi.fn(),
-      } as never);
-
       const request = createRequest("POST", {
-        headers: { Authorization: "Bearer valid-token" },
         body: { placeName: "Valid Place", location: "invalid" },
       });
       const response = await POST(request);
@@ -315,18 +289,7 @@ describe("Suggestions API", () => {
     });
 
     it("should return 400 when attribution is too long", async () => {
-      mockCreateServerClient.mockReturnValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: "user-123" } },
-            error: null,
-          }),
-        },
-        from: vi.fn(),
-      } as never);
-
       const request = createRequest("POST", {
-        headers: { Authorization: "Bearer valid-token" },
         body: { placeName: "Valid Place", attribution: "A".repeat(101) },
       });
       const response = await POST(request);

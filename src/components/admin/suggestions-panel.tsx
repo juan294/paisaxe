@@ -288,7 +288,7 @@ export function SuggestionsPanel() {
                       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#a39e98]">
                         <span className="flex items-center gap-1">
                           <User className="h-3 w-3" />
-                          {suggestion.userEmail || "Unknown user"}
+                          {suggestion.userId ? (suggestion.userEmail || "Unknown user") : "Anonymous"}
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
@@ -448,7 +448,7 @@ export function SuggestionsPanel() {
       )}
 
       <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
-        Suggestions from logged-in visitors
+        Suggestions from visitors
       </p>
 
       {/* Create Story Dialog for conversions */}

@@ -27,7 +27,6 @@ vi.mock("@/lib/i18n", () => ({
         "suggestions.submitting": "Submitting...",
         "suggestions.success_title": "Thank you!",
         "suggestions.success_message": "We'll review your suggestion",
-        "suggestions.error_not_signed_in": "Please sign in first",
         "suggestions.error_place_name_length": "Place name must be 3-100 characters",
         "suggestions.error_rate_limit": "Too many requests. Try again later.",
         "suggestions.error_generic": "Something went wrong",
@@ -35,16 +34,6 @@ vi.mock("@/lib/i18n", () => ({
       return translations[key] || key;
     },
     language: "en",
-  }),
-}));
-
-// Mock useAuth hook
-const mockSignInWithGoogle = vi.fn();
-vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({
-    session: { access_token: "test-token" },
-    user: { id: "user-123", email: "test@example.com" },
-    signInWithGoogle: mockSignInWithGoogle,
   }),
 }));
 
@@ -133,7 +122,7 @@ describe("SuggestPlaceDialog", () => {
     expect(screen.getByText("15/500 characters")).toBeInTheDocument();
   });
 
-  it("submits form with correct data", async () => {
+  it("submits form without auth header (anonymous)", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ id: "suggestion-1" }),
@@ -156,7 +145,6 @@ describe("SuggestPlaceDialog", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer test-token",
         },
         body: JSON.stringify({
           placeName: "Lago Enol",
@@ -244,29 +232,5 @@ describe("SuggestPlaceDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
 
     expect(screen.getByText("Submitting...")).toBeInTheDocument();
-  });
-});
-
-describe("SuggestPlaceDialog without session", () => {
-  it("shows error when user is not signed in", async () => {
-    // This test is handled by the API validation on the server side
-    // The component requires a session to submit, which is validated in handleSubmit
-    // Testing by mocking the fetch response for unauthorized access
-    const mockOnClose = vi.fn();
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      json: async () => ({ error: "Not authenticated" }),
-    });
-
-    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
-
-    const placeNameInput = screen.getByLabelText(/Place Name/);
-    fireEvent.change(placeNameInput, { target: { value: "Lago Enol" } });
-    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Not authenticated")).toBeInTheDocument();
-    });
   });
 });

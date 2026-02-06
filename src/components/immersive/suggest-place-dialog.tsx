@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +31,6 @@ interface SuggestPlaceDialogProps {
 type SubmitState = "idle" | "loading" | "success" | "error";
 
 export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps) {
-  const { session } = useAuth();
   const { t } = useTranslation();
 
   const [placeName, setPlaceName] = useState("");
@@ -44,12 +42,6 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!session?.access_token) {
-      setSubmitState("error");
-      setErrorMessage(t("suggestions.error_not_signed_in"));
-      return;
-    }
 
     const trimmedPlaceName = placeName.trim();
     if (trimmedPlaceName.length < 3 || trimmedPlaceName.length > 100) {
@@ -66,7 +58,6 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           placeName: trimmedPlaceName,
