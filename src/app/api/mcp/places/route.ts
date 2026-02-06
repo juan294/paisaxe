@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
  * MCP-compatible Places API endpoint for ElevenLabs voice agents.
@@ -8,6 +9,13 @@ import { NextResponse } from "next/server";
  * GET /api/mcp/places?query=fabada&type=restaurant&city=Oviedo
  * POST /api/mcp/places (MCP tool call format)
  */
+
+// Rate limit: 20 requests per minute per IP (Google Places API is expensive)
+const PLACES_RATE_LIMIT = {
+  windowMs: 60_000,
+  maxRequests: 20,
+  maxEntries: 10_000,
+};
 
 // Places API (New) response types
 interface PlacesApiPlace {
@@ -263,7 +271,27 @@ async function searchPlaces(
   };
 }
 
+function getClientIp(request: Request): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
 export async function GET(request: Request): Promise<NextResponse> {
+  const ip = getClientIp(request);
+  const rateCheck = checkRateLimit(`mcp-places:${ip}`, PLACES_RATE_LIMIT);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateCheck.retryAfter) },
+      }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("query");
   const type = searchParams.get("type") || undefined;
@@ -297,6 +325,18 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const ip = getClientIp(request);
+  const rateCheck = checkRateLimit(`mcp-places:${ip}`, PLACES_RATE_LIMIT);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateCheck.retryAfter) },
+      }
+    );
+  }
+
   if (!process.env.GOOGLE_PLACES_API_KEY) {
     return NextResponse.json(
       { error: "Places API not configured" },

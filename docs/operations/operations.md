@@ -199,6 +199,7 @@ Local agents run via macOS launchd and are controllable via feature flags in the
 | `performance_agent_enabled` | Performance Agent | Disabled |
 | `qa_agent_enabled` | QA Agent | Disabled |
 | `localization_agent_enabled` | Localization Agent | Disabled |
+| `cost_analyst_agent_enabled` | Cost Analyst Agent | Disabled |
 
 Disable the master toggle to stop all agents. Individual flags control each agent independently.
 
@@ -212,6 +213,7 @@ Disable the master toggle to stop all agents. Individual flags control each agen
 | Performance | `scripts/performance-agent.sh` | Weekly Saturday 10:00 AM | `docs/agents/performance-report.md` |
 | QA | `scripts/qa-agent.sh` | Weekly Sunday 8:00 AM | `docs/agents/qa-report.md` |
 | Localization | `scripts/localization-agent.sh` | Weekly Sunday 7:00 AM | `docs/agents/localization-report.md` |
+| Cost Analyst | `scripts/cost-analyst-agent.sh` | Daily 3:00 AM | `docs/agents/cost-analyst-report.md` |
 
 Shared utilities in `scripts/lib/agent-utils.sh` provide feature flag checking, logging, and startup logic.
 
@@ -224,6 +226,7 @@ Located in `~/Library/LaunchAgents/`:
 - `com.paisaxe.performance-agent.plist`
 - `com.paisaxe.qa-agent.plist`
 - `com.paisaxe.localization-agent.plist`
+- `com.paisaxe.cost-analyst-agent.plist`
 
 Load/unload agents:
 ```bash
@@ -247,6 +250,7 @@ Unlike cron, launchd runs missed jobs when the Mac wakes from sleep. Logs writte
 - **Performance Agent**: Runs weekly. Analyzes bundle sizes, Lighthouse scores, Core Web Vitals, dependency counts, and disk usage.
 - **QA Agent**: Runs weekly. Automated LLM testing for RAG quality, safety, content boundaries, and response quality. Budget-conscious sampling (configurable via `testsPerCategory` in feature flag config). See `docs/testbed.md` for full test catalog.
 - **Localization Agent**: Runs weekly. Ensures 100% translation coverage across all 5 locales (es, en, fr, de, pt). Detects missing UI strings and story translations, then auto-fills gaps. Spanish is source of truth.
+- **Cost Analyst Agent**: Runs daily. Queries billing APIs (Anthropic, ElevenLabs, Twilio), analyzes spending trends, detects anomalies (>20% spikes, tier proximity), forecasts costs at 1x/3x/10x growth, and writes a structured financial health report.
 
 ## CI/CD Workflows
 

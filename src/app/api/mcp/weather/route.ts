@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
  * MCP-compatible Weather API endpoint for ElevenLabs voice agents.
@@ -7,6 +8,13 @@ import { NextResponse } from "next/server";
  * GET /api/mcp/weather?city=Oviedo
  * POST /api/mcp/weather (MCP tool call format)
  */
+
+// Rate limit: 30 requests per minute per IP (weather API is relatively cheap)
+const WEATHER_RATE_LIMIT = {
+  windowMs: 60_000,
+  maxRequests: 30,
+  maxEntries: 10_000,
+};
 
 interface OpenWeatherResponse {
   name: string;
@@ -113,7 +121,27 @@ async function fetchWeather(city: string): Promise<WeatherResponse> {
   };
 }
 
+function getClientIp(request: Request): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
 export async function GET(request: Request): Promise<NextResponse> {
+  const ip = getClientIp(request);
+  const rateCheck = checkRateLimit(`mcp-weather:${ip}`, WEATHER_RATE_LIMIT);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateCheck.retryAfter) },
+      }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const city = searchParams.get("city");
 
@@ -150,6 +178,18 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const ip = getClientIp(request);
+  const rateCheck = checkRateLimit(`mcp-weather:${ip}`, WEATHER_RATE_LIMIT);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateCheck.retryAfter) },
+      }
+    );
+  }
+
   if (!process.env.OPENWEATHERMAP_API_KEY) {
     return NextResponse.json(
       { error: "Weather API not configured" },

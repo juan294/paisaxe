@@ -12,18 +12,15 @@ import {
   Mic,
   Cog,
   Search,
-  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 import { VisitorVoiceConfigPanel } from "./visitor-voice-config-panel";
-import { AgentConfigPanel } from "./agent-config-panel";
 import { MaintenanceConfigPanel } from "./maintenance-config-panel";
 import { TunnelTableRow } from "./tunnel-control-panel";
-import { Bot } from "lucide-react";
 
 // Feature flag categories
-type FlagCategory = "discovery" | "experience" | "social" | "voice" | "system" | "agents";
+type FlagCategory = "discovery" | "experience" | "social" | "voice" | "system";
 
 interface CategoryConfig {
   key: FlagCategory;
@@ -63,16 +60,10 @@ const CATEGORIES: CategoryConfig[] = [
     icon: <Cog className="h-4 w-4" />,
     description: "System settings and maintenance",
   },
-  {
-    key: "agents",
-    label: "Agents",
-    icon: <Bot className="h-4 w-4" />,
-    description: "Automated background agents",
-  },
 ];
 
 // Map each flag to its category
-const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
+const FLAG_CATEGORIES: Partial<Record<FeatureFlagKey, FlagCategory>> = {
   // Discovery - help users find stories
   contextual_prompts: "discovery",
   related_stories: "discovery",
@@ -95,37 +86,13 @@ const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
   sms_booking_confirmation: "voice",
   // System - settings and maintenance
   maintenance_mode: "system",
-  // Agents - automated background agents
-  automated_agents: "agents",
-  coverage_agent_enabled: "agents",
-  security_agent_enabled: "agents",
-  documentation_agent_enabled: "agents",
-  performance_agent_enabled: "agents",
-  qa_agent_enabled: "agents",
-  localization_agent_enabled: "agents",
 };
 
 // Flags that have configurable settings
 const CONFIGURABLE_FLAGS = [
   "visitor_voice_agent",
-  "coverage_agent_enabled",
-  "security_agent_enabled",
-  "documentation_agent_enabled",
-  "performance_agent_enabled",
-  "qa_agent_enabled",
-  "localization_agent_enabled",
   "maintenance_mode",
 ];
-
-// Map agent flag keys to their report files
-const AGENT_REPORT_FILES: Record<string, string> = {
-  coverage_agent_enabled: "coverage-report.md",
-  security_agent_enabled: "security-report.md",
-  documentation_agent_enabled: "documentation-report.md",
-  performance_agent_enabled: "performance-report.md",
-  qa_agent_enabled: "qa-report.md",
-  localization_agent_enabled: "localization-report.md",
-};
 
 export function FeatureTogglesPanel() {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
@@ -133,9 +100,8 @@ export function FeatureTogglesPanel() {
   const [error, setError] = useState("");
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<FlagCategory>("agents");
+  const [activeCategory, setActiveCategory] = useState<FlagCategory>("discovery");
   const [searchQuery, setSearchQuery] = useState("");
-  const [agentLastRuns, setAgentLastRuns] = useState<Record<string, string>>({});
   // Track tunnel running state (always count as available in system category)
   const [tunnelRunning, setTunnelRunning] = useState(false);
 
@@ -152,22 +118,9 @@ export function FeatureTogglesPanel() {
     setIsLoading(false);
   }, []);
 
-  const loadAgentLastRuns = useCallback(async () => {
-    try {
-      const response = await fetch("/api/admin/agent-reports");
-      if (response.ok) {
-        const data = await response.json();
-        setAgentLastRuns(data.lastRuns || {});
-      }
-    } catch {
-      // Silently fail - last run times are optional
-    }
-  }, []);
-
   useEffect(() => {
     loadFlags();
-    loadAgentLastRuns();
-  }, [loadFlags, loadAgentLastRuns]);
+  }, [loadFlags]);
 
   const handleToggle = async (flag: FeatureFlag) => {
     setUpdatingKey(flag.flagKey);
@@ -194,24 +147,6 @@ export function FeatureTogglesPanel() {
   };
 
   const isConfigurable = (flagKey: string) => CONFIGURABLE_FLAGS.includes(flagKey);
-  const isAgent = (flagKey: string) => flagKey in AGENT_REPORT_FILES;
-
-  // Format relative time for last run
-  const formatLastRun = (isoDate: string): string => {
-    const date = new Date(isoDate);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
 
   // Group flags by category
   const flagsByCategory = useMemo(() => {
@@ -221,7 +156,6 @@ export function FeatureTogglesPanel() {
       social: [],
       voice: [],
       system: [],
-      agents: [],
     };
 
     flags.forEach((flag) => {
@@ -243,7 +177,6 @@ export function FeatureTogglesPanel() {
       social: { enabled: 0, total: 0 },
       voice: { enabled: 0, total: 0 },
       system: { enabled: 0, total: 0 },
-      agents: { enabled: 0, total: 0 },
     };
 
     flags.forEach((flag) => {
@@ -307,7 +240,7 @@ export function FeatureTogglesPanel() {
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Admin / Settings</p>
           <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
-            Feature Toggles
+            Features
           </h1>
         </div>
         <div className="flex items-center gap-6">
@@ -392,10 +325,9 @@ export function FeatureTogglesPanel() {
             <tr className="border-b border-[#e5e3de] text-left dark:border-[#3d3a36]">
               <th className="w-12 pb-3 text-center font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">#</th>
               <th className="w-[240px] pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
-                {activeCategory === "agents" ? "Agent" : activeCategory === "system" ? "Setting" : "Feature"}
+                {activeCategory === "system" ? "Setting" : "Feature"}
               </th>
               <th className="pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Description</th>
-              <th className="w-24 pb-3 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Last Run</th>
               <th className="w-20 pb-3 text-center font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Status</th>
               <th className="w-16 pb-3 text-center font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Toggle</th>
             </tr>
@@ -424,19 +356,6 @@ export function FeatureTogglesPanel() {
                   </td>
                   <td className="py-5 pr-4 align-top text-sm text-[#6b6560] dark:text-[#a39e98]">
                     {flag.description || "—"}
-                  </td>
-                  <td className="py-5 align-top">
-                    {isAgent(flag.flagKey) && agentLastRuns[flag.flagKey] ? (
-                      <span
-                        className="inline-flex items-center gap-1 text-xs text-[#a39e98]"
-                        title={new Date(agentLastRuns[flag.flagKey]).toLocaleString()}
-                      >
-                        <Clock className="h-3 w-3" />
-                        {formatLastRun(agentLastRuns[flag.flagKey])}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-[#a39e98]">—</span>
-                    )}
                   </td>
                   <td className="py-5 text-center align-top">
                     {flag.enabled ? (
@@ -482,12 +401,6 @@ export function FeatureTogglesPanel() {
                     <td colSpan={6} className="px-12 pb-6">
                       {flag.flagKey === "visitor_voice_agent" && (
                         <VisitorVoiceConfigPanel
-                          flag={flag}
-                          onUpdate={handleFlagUpdate}
-                        />
-                      )}
-                      {flag.flagKey.endsWith("_agent_enabled") && (
-                        <AgentConfigPanel
                           flag={flag}
                           onUpdate={handleFlagUpdate}
                         />

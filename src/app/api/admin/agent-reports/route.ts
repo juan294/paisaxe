@@ -10,6 +10,7 @@ const AGENT_REPORTS: Record<string, string> = {
   documentation_agent_enabled: "documentation-report.md",
   performance_agent_enabled: "performance-report.md",
   qa_agent_enabled: "qa-report.md",
+  cost_analyst_agent_enabled: "cost-analyst-report.md",
 };
 
 export async function GET() {

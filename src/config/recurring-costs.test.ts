@@ -63,4 +63,14 @@ describe("RECURRING_SUBSCRIPTIONS config", () => {
     expect(aws!.notes).toContain("paisaxe.es");
     expect(aws!.notes).toContain("paisaxe.com");
   });
+
+  it("should include GitHub Pro subscription", () => {
+    const github = RECURRING_SUBSCRIPTIONS.find(
+      (s) => s.serviceId === "github-pro"
+    );
+    expect(github).toBeDefined();
+    expect(github!.costUsd).toBe(4);
+    expect(github!.category).toBe("infrastructure");
+    expect(github!.serviceName).toBe("GitHub Pro");
+  });
 });

@@ -58,4 +58,7 @@ logs/
 # Supabase local
 supabase/.temp/
 .claude/
+!.claude/commands/
 .performance-history.json
+.agent-context.json
+.agent-alerts.json

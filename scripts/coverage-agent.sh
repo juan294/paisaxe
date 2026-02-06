@@ -30,26 +30,18 @@ cd "$PROJECT_DIR"
 # Fetch the prompt from the feature flag config
 log_info "Fetching agent prompt from config..." | tee -a "$LOG_FILE"
 AGENT_PROMPT=$(get_agent_prompt "coverage_agent_enabled" 2>/dev/null) || {
-  log_warn "Could not fetch prompt from config, using default" | tee -a "$LOG_FILE"
-  AGENT_PROMPT="You are the Paisaxe Coverage Agent. Your job is to maintain high test coverage.
-
-STEPS:
-1. Run: npx vitest run --coverage 2>&1
-2. Parse the coverage table. Identify files below 100% statement coverage.
-3. For each file under 100%:
-   a. Read the source file and its test file (if one exists).
-   b. Write or update tests to cover the missing lines.
-   c. Run the specific test file to confirm it passes.
-4. After writing all tests, run the full suite: npx vitest run --coverage 2>&1
-5. Update $DOC_FILE with a coverage summary.
-
-RULES:
-- Do NOT modify source code, only test files.
-- Do NOT break existing tests.
-- If a line is genuinely untestable in jsdom/vitest, document it rather than forcing a brittle test.
-- Commit nothing. The user will review and commit manually.
-- Be thorough but pragmatic."
+  log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
+  AGENT_PROMPT=$(get_default_prompt "coverage_agent_enabled" 2>/dev/null) || {
+    log_error "No prompt available for coverage_agent_enabled" | tee -a "$LOG_FILE"
+    exit 1
+  }
 }
+
+# Read shared context from other agents
+log_info "Reading shared context..." | tee -a "$LOG_FILE"
+SHARED_CONTEXT=$(read_shared_context "coverage_agent_enabled")
+SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" read 2>/dev/null || echo "")
+SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
 # Run the coverage agent via Claude CLI in non-interactive mode
 "$CLAUDE_BIN" -p \
@@ -61,6 +53,32 @@ Additional context:
 - Project directory: $PROJECT_DIR
 - Output file: $DOC_FILE
 - Date: $(date '+%Y-%m-%d')
+
+$SHARED_CONTEXT_READ
+
+$SHARED_CONTEXT
+
+$SHARED_CONTEXT_WRITE
 PROMPT
+
+# Extract and write shared context
+REPORT_CONTENT=$(cat "$DOC_FILE")
+CONTEXT_BLOCK=$(echo "$REPORT_CONTENT" | sed -n '/SHARED_CONTEXT_START/,/SHARED_CONTEXT_END/p' | sed '1d;$d')
+
+if [[ -n "$CONTEXT_BLOCK" ]]; then
+  write_shared_context "coverage_agent_enabled" "$CONTEXT_BLOCK"
+  log_success "Shared context updated" | tee -a "$LOG_FILE"
+
+  # Strip the shared context block from the report
+  python3 -c "
+import re, sys
+content = sys.stdin.read()
+cleaned = re.sub(r'\n?SHARED_CONTEXT_START\n.*?SHARED_CONTEXT_END\n?', '', content, flags=re.DOTALL)
+sys.stdout.write(cleaned)
+" < "$DOC_FILE" > "${DOC_FILE}.tmp"
+  mv "${DOC_FILE}.tmp" "$DOC_FILE"
+else
+  log_info "No shared context block found in report" | tee -a "$LOG_FILE"
+fi
 
 echo "=== Coverage Agent finished at $(date) ===" | tee -a "$LOG_FILE"

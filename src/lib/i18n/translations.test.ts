@@ -4,6 +4,7 @@ import { en } from './en';
 import { fr } from './fr';
 import { de } from './de';
 import { pt } from './pt';
+import { ast } from './ast';
 import type { Translations } from './types';
 
 /**
@@ -43,6 +44,7 @@ const allLocales = {
   fr: { name: 'French', data: fr },
   de: { name: 'German', data: de },
   pt: { name: 'Portuguese', data: pt },
+  ast: { name: 'Asturian', data: ast },
 };
 
 const allLocaleKeys = Object.fromEntries(

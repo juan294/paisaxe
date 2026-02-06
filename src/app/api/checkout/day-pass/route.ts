@@ -71,10 +71,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ url: checkoutUrl });
   } catch (error) {
     console.error("[checkout/day-pass] Error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json(
-      { error: "Failed to create checkout session", details: errorMessage },
-      { status: 500 }
-    );
+    const body: { error: string; details?: string } = {
+      error: "Failed to create checkout session",
+    };
+    if (process.env.NODE_ENV === "development") {
+      body.details = error instanceof Error ? error.message : "Unknown error";
+    }
+    return NextResponse.json(body, { status: 500 });
   }
 }

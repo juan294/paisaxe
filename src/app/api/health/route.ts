@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { readFileSync } from "fs";
+import { join } from "path";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = JSON.parse(
+  readFileSync(join(process.cwd(), "package.json"), "utf-8")
+).version as string;
 
 interface SupabaseServiceStatus {
   status: "connected" | "error";
@@ -108,8 +112,10 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
       },
     };
 
+    const httpStatus = overallStatus === "healthy" ? 200 : 503;
+
     return NextResponse.json(body, {
-      status: 200,
+      status: httpStatus,
       headers: {
         "Cache-Control": "no-store, max-age=0",
         "Content-Type": "application/json",
@@ -134,7 +140,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     };
 
     return NextResponse.json(body, {
-      status: 200,
+      status: 503,
       headers: {
         "Cache-Control": "no-store, max-age=0",
         "Content-Type": "application/json",

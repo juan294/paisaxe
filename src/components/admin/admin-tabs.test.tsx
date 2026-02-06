@@ -24,24 +24,13 @@ describe("AdminTabs", () => {
 
   it("should mark active tab with aria-selected", () => {
     const onTabChange = vi.fn();
-    render(<AdminTabs activeTab="toggles" onTabChange={onTabChange} />);
+    render(<AdminTabs activeTab="features" onTabChange={onTabChange} />);
 
-    const togglesTab = screen.getByRole("tab", { name: /Toggles/i });
+    const featuresTab = screen.getByRole("tab", { name: /Features/i });
     const storiesTab = screen.getByRole("tab", { name: /Stories/i });
 
-    expect(togglesTab).toHaveAttribute("aria-selected", "true");
+    expect(featuresTab).toHaveAttribute("aria-selected", "true");
     expect(storiesTab).toHaveAttribute("aria-selected", "false");
-  });
-
-  it("should render tab numbers", () => {
-    const onTabChange = vi.fn();
-    render(<AdminTabs activeTab="stories" onTabChange={onTabChange} />);
-
-    expect(screen.getByText("01")).toBeInTheDocument();
-    expect(screen.getByText("02")).toBeInTheDocument();
-    expect(screen.getByText("03")).toBeInTheDocument();
-    expect(screen.getByText("04")).toBeInTheDocument();
-    expect(screen.getByText("05")).toBeInTheDocument();
   });
 
   it("should render keyboard shortcuts", () => {

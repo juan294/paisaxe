@@ -21,7 +21,8 @@ test.describe("Smoke tests", () => {
 
   test("health endpoint responds with JSON", async ({ request }) => {
     const response = await request.get("/api/health");
-    expect(response.ok()).toBe(true);
+    // Health endpoint returns 200 (healthy) or 503 (degraded) — both are valid
+    expect([200, 503]).toContain(response.status());
 
     const body = await response.json();
     expect(body).toHaveProperty("status");

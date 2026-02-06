@@ -257,6 +257,17 @@ export const fr: Translations = {
     got_it: 'Compris',
   },
 
+  errors: {
+    generic_title: 'Une erreur est survenue',
+    generic_description: 'Une erreur inattendue est survenue. Veuillez réessayer.',
+    retry: 'Réessayer',
+    go_home: 'Retour à l\'accueil',
+    not_found_title: 'Page introuvable',
+    not_found_description: 'La page que vous recherchez n\'existe pas ou a été déplacée.',
+    immersive_title: 'Impossible de charger l\'expérience',
+    immersive_description: 'Une erreur est survenue lors du chargement des histoires. Réessayez.',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

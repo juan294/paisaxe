@@ -264,6 +264,17 @@ export const ast: Translations = {
     got_it: 'Entendío',
   },
 
+  errors: {
+    generic_title: 'Algo salió mal',
+    generic_description: 'Hebo un error inesperáu. Por favor, inténtalo otra vuelta.',
+    retry: 'Reintentar',
+    go_home: 'Tornar al aniciu',
+    not_found_title: 'Páxina non atopada',
+    not_found_description: 'La páxina que buses nun esiste o foi movida.',
+    immersive_title: 'Nun se pudo cargar la esperiencia',
+    immersive_description: 'Algo falló al cargar les histories. Inténtalo otra vuelta.',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

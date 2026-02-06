@@ -25,6 +25,8 @@ vi.mock("@/lib/supabase", () => ({
 const originalEnv = process.env;
 
 describe("/api/mcp/make-booking", () => {
+  const MCP_SECRET = "test-mcp-secret";
+
   beforeEach(() => {
     vi.resetAllMocks();
     // Default: Feature flags enabled, ElevenLabs outbound not configured
@@ -36,6 +38,7 @@ describe("/api/mcp/make-booking", () => {
     // Default: DB insert succeeds
     mockInsert.mockResolvedValue({ error: null });
     process.env = { ...originalEnv };
+    process.env.MCP_API_SECRET = MCP_SECRET;
     delete process.env.ELEVENLABS_API_KEY;
     delete process.env.ELEVENLABS_PHONE_NUMBER_ID;
     delete process.env.ELEVENLABS_BOOKING_AGENT_ID;
@@ -74,6 +77,28 @@ describe("/api/mcp/make-booking", () => {
   });
 
   describe("POST", () => {
+    it("should return 401 when x-mcp-secret header is missing", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ venue_name: "Test" }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(401);
+    });
+
+    it("should return 401 when x-mcp-secret header is wrong", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": "wrong-secret" },
+        body: JSON.stringify({ venue_name: "Test" }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(401);
+    });
+
     it("should return fallback message when booking_system flag is disabled", async () => {
       mockIsFeatureFlagEnabled.mockImplementation((key: string) => {
         if (key === "booking_system") return Promise.resolve(false);
@@ -82,7 +107,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -109,7 +134,7 @@ describe("/api/mcp/make-booking", () => {
     it("should return 400 for missing required fields", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           // Missing other required fields
@@ -127,7 +152,7 @@ describe("/api/mcp/make-booking", () => {
     it("should return 400 for invalid Spanish phone number", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "123-456-7890", // US format, not Spanish
@@ -150,7 +175,7 @@ describe("/api/mcp/make-booking", () => {
     it("should accept valid Spanish phone number in national format", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "985 88 77 97", // National format
@@ -174,7 +199,7 @@ describe("/api/mcp/make-booking", () => {
     it("should accept valid Spanish phone number in international format", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97", // International format
@@ -195,7 +220,7 @@ describe("/api/mcp/make-booking", () => {
     it("should support MCP tool call format", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           tool: "make_booking",
           arguments: {
@@ -235,7 +260,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -282,7 +307,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -315,7 +340,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -359,7 +384,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -394,7 +419,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -436,7 +461,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -473,7 +498,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -506,7 +531,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",

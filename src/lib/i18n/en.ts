@@ -264,6 +264,17 @@ export const en: Translations = {
     got_it: 'Got it',
   },
 
+  errors: {
+    generic_title: 'Something went wrong',
+    generic_description: 'An unexpected error occurred. Please try again.',
+    retry: 'Retry',
+    go_home: 'Back to home',
+    not_found_title: 'Page not found',
+    not_found_description: 'The page you are looking for does not exist or has been moved.',
+    immersive_title: 'Could not load the experience',
+    immersive_description: 'Something went wrong loading the stories. Try again.',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

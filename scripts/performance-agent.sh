@@ -36,14 +36,53 @@ BUDGET_PROD_DEPS=40          # Max production dependencies
 # Initialize metrics collection
 log_info "Collecting performance metrics..." | tee -a "$LOG_FILE"
 
-# Build the app to get accurate bundle sizes
+# Build the app to get accurate bundle sizes.
+# If the dev server is running, stop it first, build, then restart it.
+FRESH_BUILD=true
+BUILD_OUTPUT=""
+DEV_SERVER_PID=""
+RESTART_DEV_SERVER=false
+
+# Detect if the dev server is running on port 3000
+DEV_SERVER_PID=$(lsof -ti :3000 2>/dev/null | head -1)
+if [[ -n "$DEV_SERVER_PID" ]]; then
+  log_info "Dev server detected (PID $DEV_SERVER_PID) — stopping for production build..." | tee -a "$LOG_FILE"
+  kill "$DEV_SERVER_PID" 2>/dev/null
+  # Wait for the process to exit (up to 10 seconds)
+  for i in $(seq 1 20); do
+    if ! kill -0 "$DEV_SERVER_PID" 2>/dev/null; then
+      break
+    fi
+    sleep 0.5
+  done
+  # Force kill if still alive
+  if kill -0 "$DEV_SERVER_PID" 2>/dev/null; then
+    kill -9 "$DEV_SERVER_PID" 2>/dev/null
+    sleep 1
+  fi
+  RESTART_DEV_SERVER=true
+  log_success "Dev server stopped" | tee -a "$LOG_FILE"
+fi
+
 log_info "Building application..." | tee -a "$LOG_FILE"
-BUILD_OUTPUT=$(npm run build 2>&1) || {
-  log_error "Build failed" | tee -a "$LOG_FILE"
-  echo "$BUILD_OUTPUT" >> "$LOG_FILE"
-  exit 1
-}
-log_success "Build completed" | tee -a "$LOG_FILE"
+if BUILD_OUTPUT=$(npm run build 2>&1); then
+  log_success "Build completed" | tee -a "$LOG_FILE"
+else
+  FRESH_BUILD=false
+  if [[ -d ".next/static" ]]; then
+    log_warn "Build failed. Using existing .next data for analysis." | tee -a "$LOG_FILE"
+  else
+    log_error "Build failed and no existing .next/static data to analyze" | tee -a "$LOG_FILE"
+    echo "$BUILD_OUTPUT" >> "$LOG_FILE"
+    # Still try to restart dev server before exiting
+    if [[ "$RESTART_DEV_SERVER" == "true" ]]; then
+      log_info "Restarting dev server..." | tee -a "$LOG_FILE"
+      cd "$PROJECT_DIR" && nohup npm run dev > /dev/null 2>&1 &
+      log_success "Dev server restarted" | tee -a "$LOG_FILE"
+    fi
+    exit 1
+  fi
+fi
 
 # Collect metrics
 log_info "Analyzing bundle sizes..." | tee -a "$LOG_FILE"
@@ -105,6 +144,12 @@ fi
   echo "PERFORMANCE METRICS ($(date '+%Y-%m-%d'))"
   echo "========================================="
   echo ""
+  if [[ "$FRESH_BUILD" == "false" ]]; then
+    echo "NOTE: Production build was skipped (dev server was running)."
+    echo "Bundle sizes below are from the dev server's .next cache — they may"
+    echo "differ from a production build. Dependency and disk metrics are still accurate."
+    echo ""
+  fi
   echo "BUNDLE SIZES:"
   echo "- Total JS: ${TOTAL_JS_KB} KB (previous: ${PREV_TOTAL_JS_KB} KB, change: ${JS_CHANGE_KB} KB)"
   echo "- Total CSS: ${TOTAL_CSS_KB} KB"
@@ -141,36 +186,18 @@ log_info "Metrics collected, invoking Claude for analysis..." | tee -a "$LOG_FIL
 
 # Fetch the prompt from the feature flag config
 AGENT_PROMPT=$(get_agent_prompt "performance_agent_enabled" 2>/dev/null) || {
-  log_warn "Could not fetch prompt from config, using default" | tee -a "$LOG_FILE"
-  AGENT_PROMPT="You are the Paisaxe Performance Agent. Your job is to analyze performance metrics and provide actionable optimization recommendations.
-
-STEPS:
-1. Read the metrics file to understand current performance state
-2. Identify the largest bundles and what might be causing them
-3. Check package.json to understand which dependencies might be heavy
-4. Look for optimization opportunities (lazy loading, tree shaking, code splitting)
-5. Write a comprehensive report to docs/agents/performance-report.md
-
-ANALYSIS FOCUS:
-- Large JS chunks: What's in them? Can they be split or lazy-loaded?
-- Heavy dependencies: Are there lighter alternatives?
-- Bundle growth: Is the bundle getting larger over time?
-- Quick wins: What can be optimized with minimal effort?
-
-REPORT STRUCTURE:
-1. Summary with health status (green/yellow/red based on budgets)
-2. Key metrics table
-3. Budget status (which are exceeded)
-4. Top optimization opportunities (prioritized by impact)
-5. Specific recommendations with code examples where helpful
-6. Comparison to previous run (regressions/improvements)
-
-RULES:
-- Be specific: 'framer-motion adds 150KB' not 'some packages are large'
-- Be actionable: 'Add dynamic import for ElevenLabs' not 'consider lazy loading'
-- Prioritize by impact: Biggest savings first
-- Include code snippets for complex recommendations"
+  log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
+  AGENT_PROMPT=$(get_default_prompt "performance_agent_enabled" 2>/dev/null) || {
+    log_error "No prompt available for performance_agent_enabled" | tee -a "$LOG_FILE"
+    exit 1
+  }
 }
+
+# Read shared context from other agents
+log_info "Reading shared context..." | tee -a "$LOG_FILE"
+SHARED_CONTEXT=$(read_shared_context "performance_agent_enabled")
+SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" read 2>/dev/null || echo "")
+SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
 # Run Claude to analyze and write report
 "$CLAUDE_BIN" -p \
@@ -187,10 +214,36 @@ Current metrics:
 $(cat "$METRICS_FILE")
 
 Build output summary:
-$(echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30)
+$(if [[ "$FRESH_BUILD" == "true" ]]; then echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30; else echo "(No build output — dev server was running, used cached .next data)"; fi)
+
+$SHARED_CONTEXT_READ
+
+$SHARED_CONTEXT
+
+$SHARED_CONTEXT_WRITE
 PROMPT
 
 log_success "Claude analysis complete" | tee -a "$LOG_FILE"
+
+# Extract and write shared context
+REPORT_CONTENT=$(cat "$REPORT_FILE")
+CONTEXT_BLOCK=$(echo "$REPORT_CONTENT" | sed -n '/SHARED_CONTEXT_START/,/SHARED_CONTEXT_END/p' | sed '1d;$d')
+
+if [[ -n "$CONTEXT_BLOCK" ]]; then
+  write_shared_context "performance_agent_enabled" "$CONTEXT_BLOCK"
+  log_success "Shared context updated" | tee -a "$LOG_FILE"
+
+  # Strip the shared context block from the report
+  python3 -c "
+import re, sys
+content = sys.stdin.read()
+cleaned = re.sub(r'\n?SHARED_CONTEXT_START\n.*?SHARED_CONTEXT_END\n?', '', content, flags=re.DOTALL)
+sys.stdout.write(cleaned)
+" < "$REPORT_FILE" > "${REPORT_FILE}.tmp"
+  mv "${REPORT_FILE}.tmp" "$REPORT_FILE"
+else
+  log_info "No shared context block found in report" | tee -a "$LOG_FILE"
+fi
 
 # Update history file
 log_info "Updating performance history..." | tee -a "$LOG_FILE"
@@ -213,6 +266,13 @@ fi
 
 # Cleanup
 rm -f "$METRICS_FILE"
+
+# Restart dev server if we stopped it
+if [[ "$RESTART_DEV_SERVER" == "true" ]]; then
+  log_info "Restarting dev server..." | tee -a "$LOG_FILE"
+  cd "$PROJECT_DIR" && nohup npm run dev > /dev/null 2>&1 &
+  log_success "Dev server restarted" | tee -a "$LOG_FILE"
+fi
 
 log_success "Performance report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== Performance Agent finished ===" | tee -a "$LOG_FILE"

@@ -5,87 +5,18 @@ import { Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { updateFeatureFlagConfig } from "@/lib/admin-api";
 import type { FeatureFlag, AgentConfig, FeatureFlagKey } from "@/types/feature-flags";
 import { cn } from "@/lib/utils";
+import { AGENT_PROMPT_DEFAULTS } from "@/config/agent-prompts";
 
-// Default prompts for each agent
-const DEFAULT_PROMPTS: Record<string, string> = {
-  coverage_agent_enabled: `You are the Paisaxe Coverage Agent. Your job is to maintain high test coverage.
-
-STEPS:
-1. Run: npx vitest run --coverage 2>&1
-2. Parse the coverage table. Identify files below 100% statement coverage.
-3. For each file under 100%:
-   a. Read the source file and its test file (if one exists).
-   b. Write or update tests to cover the missing lines.
-   c. Run the specific test file to confirm it passes.
-4. After writing all tests, run the full suite: npx vitest run --coverage 2>&1
-5. Update docs/agents/coverage-report.md with a coverage summary.
-
-RULES:
-- Do NOT modify source code, only test files.
-- Do NOT break existing tests.
-- If a line is genuinely untestable in jsdom/vitest, document it rather than forcing a brittle test.
-- Commit nothing. The user will review and commit manually.
-- Be thorough but pragmatic.`,
-
-  security_agent_enabled: `You are the Paisaxe Security Agent. Your job is to identify security vulnerabilities and license issues.
-
-STEPS:
-1. Run npm audit and analyze the results
-2. Run license-checker to verify no copyleft licenses
-3. Check for outdated packages with known vulnerabilities
-4. Review any high or critical severity issues
-5. Update docs/agents/security-report.md with findings and recommendations
-
-FOCUS AREAS:
-- Critical and high severity vulnerabilities
-- Copyleft licenses (GPL, AGPL, LGPL)
-- Outdated dependencies with security patches available
-- Transitive dependency risks`,
-
-  documentation_agent_enabled: `You are the Paisaxe Documentation Agent. Your job is to identify stale documentation.
-
-STEPS:
-1. Compare CLAUDE.md structure with actual codebase
-2. Find files modified since docs were last updated
-3. Check for undocumented API routes
-4. Check for undocumented feature flags
-5. Update docs/agents/documentation-report.md with findings
-
-CHECK FOR:
-- New migrations not documented
-- New API endpoints missing from docs
-- Feature flags added but not described
-- Modified scripts without doc updates`,
-
-  performance_agent_enabled: `You are the Paisaxe Performance Agent. Your job is to monitor performance metrics.
-
-STEPS:
-1. Build the application for production
-2. Analyze bundle sizes in .next/static
-3. Run Lighthouse if available
-4. Check dependency counts
-5. Update docs/agents/performance-report.md with metrics
-
-TRACK:
-- Total JS bundle size
-- Largest bundles
-- Core Web Vitals (FCP, LCP, CLS, TBT)
-- Dependency growth over time`,
-};
-
-const SCHEDULE_INFO: Record<string, string> = {
-  coverage_agent_enabled: "Daily at 2:00 AM",
-  security_agent_enabled: "Weekly on Monday at 9:00 AM",
-  documentation_agent_enabled: "Weekly on Sunday at 6:00 AM",
-  performance_agent_enabled: "Weekly on Saturday at 10:00 AM",
-};
-
-const OUTPUT_FILES: Record<string, string> = {
-  coverage_agent_enabled: "docs/agents/coverage-report.md",
-  security_agent_enabled: "docs/agents/security-report.md",
-  documentation_agent_enabled: "docs/agents/documentation-report.md",
-  performance_agent_enabled: "docs/agents/performance-report.md",
-};
+// Derive lookup records from the shared config
+const DEFAULT_PROMPTS: Record<string, string> = Object.fromEntries(
+  Object.entries(AGENT_PROMPT_DEFAULTS).map(([k, v]) => [k, v.prompt])
+);
+const SCHEDULE_INFO: Record<string, string> = Object.fromEntries(
+  Object.entries(AGENT_PROMPT_DEFAULTS).map(([k, v]) => [k, v.schedule])
+);
+const OUTPUT_FILES: Record<string, string> = Object.fromEntries(
+  Object.entries(AGENT_PROMPT_DEFAULTS).map(([k, v]) => [k, v.outputFile])
+);
 
 interface AgentConfigPanelProps {
   flag: FeatureFlag;
