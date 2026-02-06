@@ -1,16 +1,16 @@
 # Test Coverage Report
 
-> Last updated: 2026-02-05
+> Last updated: 2026-02-06
 > Scheduled: nightly at 2:00 CET via `scripts/coverage-agent.sh`
 
 ## Summary
 
-- **Total tests:** 2488
-- **Test files:** 171
-- **Statement coverage:** ~72%
-- **Branch coverage:** ~65%
-- **Function coverage:** ~80%
-- **Line coverage:** ~71%
+- **Total tests:** 2630
+- **Test files:** 184
+- **Statement coverage:** 67.45%
+- **Branch coverage:** 61.45%
+- **Function coverage:** 63.25%
+- **Line coverage:** 68.07%
 
 *Note: Coverage percentages appear lower due to expanded coverage scope that now includes more previously-uncovered files.*
 
@@ -39,7 +39,10 @@
 | `src/app/api/admin/stories/[id]/image-source/route.ts` | API |
 | `src/app/api/chat/stream/route.ts` | API |
 | `src/app/api/feature-flags/route.ts` | API |
+| `src/app/api/health/db/route.ts` | API |
 | `src/app/coming-soon/page.tsx` | App |
+| `src/app/privacy/page.tsx` | App |
+| `src/app/terms/page.tsx` | App |
 | `src/app/favorites/error.tsx` | App |
 | `src/app/favorites/layout.tsx` | App |
 | `src/app/favorites/loading.tsx` | App |
@@ -58,6 +61,7 @@
 | `src/components/admin/story-grid.tsx` | Admin |
 | `src/components/admin/visitor-voice-config-panel.tsx` | Admin |
 | `src/components/auth/sign-in-prompt.tsx` | Auth |
+| `src/components/immersive/chat-upsell-cta.tsx` | Immersive |
 | `src/components/immersive/favorite-button.tsx` | Immersive |
 | `src/components/immersive/privacy-notice.tsx` | Immersive |
 | `src/components/immersive/related-stories.tsx` | Immersive |
@@ -74,6 +78,7 @@
 | `src/components/ui/skeleton.tsx` | UI |
 | `src/components/ui/tooltip.tsx` | UI |
 | `src/config/elevenlabs-agents.ts` | Config |
+| `src/config/location.ts` | Config |
 | `src/hooks/use-admin-role.ts` | Hooks |
 | `src/hooks/use-auth.ts` | Hooks |
 | `src/hooks/use-favorites.ts` | Hooks |
@@ -99,6 +104,7 @@
 | `src/lib/unsplash-placeholders.ts` | Lib |
 | `src/lib/utils.ts` | Lib |
 | `src/lib/validation.ts` | Lib |
+| `src/lib/costs/twilio-costs.ts` | Costs |
 | `src/lib/i18n/de.ts` | i18n |
 | `src/lib/i18n/en.ts` | i18n |
 | `src/lib/i18n/es.ts` | i18n |
