@@ -475,14 +475,14 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // Find the upper-right controls nav by its aria-label
-      const controlsNav = screen.getByRole("navigation", { name: "Story controls" });
+      const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
       expect(controlsNav).toHaveClass("opacity-100");
     });
 
     it("should hide upper-right toolbar controls when toggling info off with i key", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const controlsNav = screen.getByRole("navigation", { name: "Story controls" });
+      const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
       expect(controlsNav).toHaveClass("opacity-100");
 
       fireEvent.keyDown(window, { key: "i" });
@@ -494,7 +494,7 @@ describe("StoryViewer", () => {
     it("should hide upper-right toolbar controls when clicking screen", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const controlsNav = screen.getByRole("navigation", { name: "Story controls" });
+      const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
       const mainContainer = screen.getByRole("main");
 
       fireEvent.click(mainContainer);
@@ -506,7 +506,7 @@ describe("StoryViewer", () => {
     it("should show upper-right toolbar controls again when toggling info back on", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const controlsNav = screen.getByRole("navigation", { name: "Story controls" });
+      const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
 
       // First toggle off
       fireEvent.keyDown(window, { key: "i" });
@@ -520,7 +520,7 @@ describe("StoryViewer", () => {
     it("should have pointer-events-none on upper-right toolbar when hidden", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const controlsNav = screen.getByRole("navigation", { name: "Story controls" });
+      const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
 
       fireEvent.keyDown(window, { key: "i" });
 
