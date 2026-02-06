@@ -58,3 +58,14 @@ export interface AgentsDashboardData {
 export interface AgentRunStatus {
   running: Record<string, { startedAt: string }>;
 }
+
+export interface AgentLogLine {
+  timestamp: string;
+  text: string;
+}
+
+export interface AgentLogsResponse {
+  logs: AgentLogLine[];
+  offset: number;
+  finished: boolean;
+}
