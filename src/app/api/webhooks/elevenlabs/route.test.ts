@@ -77,6 +77,20 @@ function createSignedRequest(
   });
 }
 
+/**
+ * Helper to build an ElevenLabs-format transcript array from messages.
+ * Alternates user/agent roles starting with "agent".
+ */
+function buildTranscript(
+  ...messages: Array<{ role: "user" | "agent"; message: string }>
+) {
+  return messages.map((m, i) => ({
+    role: m.role,
+    message: m.message,
+    time_in_call_secs: i * 5,
+  }));
+}
+
 describe("POST /api/webhooks/elevenlabs", () => {
   let mockSelect: ReturnType<typeof vi.fn>;
   let mockUpdate: ReturnType<typeof vi.fn>;
@@ -186,7 +200,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
     });
 
     it("should return 401 when timestamp is too old (>30 min)", async () => {
-      const oldTimestamp = Math.floor(Date.now() / 1000) - 31 * 60; // 31 minutes ago
+      const oldTimestamp = Math.floor(Date.now() / 1000) - 31 * 60;
       const payload = JSON.stringify({ conversation_id: "conv_456" });
       const sigHeader = createSignatureHeader(payload, oldTimestamp);
 
@@ -212,7 +226,11 @@ describe("POST /api/webhooks/elevenlabs", () => {
     it("should accept valid signature with current timestamp", async () => {
       const request = createSignedRequest({
         conversation_id: "conv_456",
-        transcript: "Perfecto, le esperamos.",
+        transcript: buildTranscript(
+          { role: "agent", message: "Hola, llamo para hacer una reserva." },
+          { role: "user", message: "Perfecto, le esperamos." }
+        ),
+        analysis: { call_successful: "success" },
       });
 
       const response = await POST(request);
@@ -265,62 +283,133 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.ignored).toBe(true);
   });
 
-  it("should detect confirmed outcome from transcript", async () => {
-    const request = createSignedRequest({
-      conversation_id: "conv_456",
-      transcript: "Perfecto, le esperamos a las nueve.",
-      analysis: { call_successful: true },
+  describe("outcome detection with ElevenLabs payload format", () => {
+    it("should detect confirmed from transcript array messages", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: buildTranscript(
+          { role: "agent", message: "Hola, llamo de parte de Juan García para reservar mesa para 4 personas." },
+          { role: "user", message: "Sí, perfecto, le esperamos a las nueve." },
+          { role: "agent", message: "Muchas gracias, hasta luego." }
+        ),
+        analysis: {
+          call_successful: "success",
+          transcript_summary: "Booking confirmed for 4 people at 9pm.",
+        },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.outcome).toBe("confirmed");
+      expect(data.smsSent).toBe(true);
     });
 
-    const response = await POST(request);
-    const data = await response.json();
+    it("should detect confirmed from analysis summary when transcript has no keywords", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: buildTranscript(
+          { role: "agent", message: "Hola, quería hacer una reserva." },
+          { role: "user", message: "Sí, vale, a las nueve." },
+          { role: "agent", message: "Gracias." }
+        ),
+        analysis: {
+          call_successful: "success",
+          transcript_summary: "Reserva confirmada para 4 personas a las 21:00.",
+        },
+      });
 
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.outcome).toBe("confirmed");
-    expect(data.smsSent).toBe(true);
-  });
+      const response = await POST(request);
+      const data = await response.json();
 
-  it("should detect denied outcome from transcript", async () => {
-    const request = createSignedRequest({
-      conversation_id: "conv_456",
-      transcript: "Lo siento, estamos completo esta noche.",
-      analysis: { call_successful: true },
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("confirmed");
     });
 
-    const response = await POST(request);
-    const data = await response.json();
+    it("should detect denied from transcript array", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: buildTranscript(
+          { role: "agent", message: "Hola, llamo para reservar mesa." },
+          { role: "user", message: "Lo siento, estamos completo esta noche." },
+          { role: "agent", message: "Entendido, gracias." }
+        ),
+        analysis: { call_successful: "success" },
+      });
 
-    expect(response.status).toBe(200);
-    expect(data.outcome).toBe("denied");
-  });
+      const response = await POST(request);
+      const data = await response.json();
 
-  it("should detect no_answer when call_successful is false", async () => {
-    const request = createSignedRequest({
-      conversation_id: "conv_456",
-      analysis: { call_successful: false },
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("denied");
     });
 
-    const response = await POST(request);
-    const data = await response.json();
+    it("should detect no_answer when call_successful is 'failure'", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: [],
+        analysis: { call_successful: "failure" },
+      });
 
-    expect(response.status).toBe(200);
-    expect(data.outcome).toBe("no_answer");
-  });
+      const response = await POST(request);
+      const data = await response.json();
 
-  it("should detect no_answer from voicemail keywords", async () => {
-    const request = createSignedRequest({
-      conversation_id: "conv_456",
-      transcript:
-        "Has llegado al buzón de voz. Deja tu mensaje después del tono.",
-      analysis: { call_successful: true },
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("no_answer");
     });
 
-    const response = await POST(request);
-    const data = await response.json();
+    it("should detect no_answer from voicemail keywords in transcript array", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: buildTranscript(
+          { role: "user", message: "Has llegado al buzón de voz. Deja tu mensaje después del tono." }
+        ),
+        analysis: { call_successful: "success" },
+      });
 
-    expect(response.status).toBe(200);
-    expect(data.outcome).toBe("no_answer");
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("no_answer");
+    });
+
+    it("should use analysis.call_successful 'success' with keyword matching", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: buildTranscript(
+          { role: "agent", message: "Buenos días, quería reservar." },
+          { role: "user", message: "De acuerdo, sin problema." }
+        ),
+        analysis: { call_successful: "success" },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("confirmed");
+    });
+
+    it("should default to failed when call_successful is 'unknown' and no keywords match", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: buildTranscript(
+          { role: "agent", message: "Hola." },
+          { role: "user", message: "Hola, dígame." },
+          { role: "agent", message: "Se cortó la llamada." }
+        ),
+        analysis: { call_successful: "unknown" },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("failed");
+    });
   });
 
   it("should not send SMS when feature flag is disabled", async () => {
@@ -328,7 +417,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
 
     const request = createSignedRequest({
       conversation_id: "conv_456",
-      transcript: "Perfecto, le esperamos.",
+      transcript: buildTranscript(
+        { role: "user", message: "Perfecto, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
     });
 
     const response = await POST(request);
@@ -342,7 +434,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
   it("should update booking status in database", async () => {
     const request = createSignedRequest({
       conversation_id: "conv_456",
-      transcript: "Confirmado, le esperamos.",
+      transcript: buildTranscript(
+        { role: "user", message: "Confirmado, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
     });
 
     await POST(request);
@@ -361,7 +456,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
 
     const request = createSignedRequest({
       conversation_id: "conv_456",
-      transcript: "Confirmado, le esperamos.",
+      transcript: buildTranscript(
+        { role: "user", message: "Confirmado, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
     });
 
     const response = await POST(request);
