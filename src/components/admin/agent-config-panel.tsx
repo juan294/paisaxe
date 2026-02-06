@@ -71,6 +71,82 @@ TRACK:
 - Largest bundles
 - Core Web Vitals (FCP, LCP, CLS, TBT)
 - Dependency growth over time`,
+
+  cost_analyst_agent_enabled: `You are the Paisaxe Cost Analyst Agent. Your job is to monitor platform costs, detect anomalies, and produce a daily financial health report.
+
+STEPS:
+
+1. COLLECT DATA — Query external billing APIs for current usage and spend:
+   a. Anthropic Admin API: curl -H "Authorization: Bearer $ANTHROPIC_ADMIN_API_KEY" -H "anthropic-version: 2023-06-01" "https://api.anthropic.com/v1/organizations/usage" to get token/cost data for the current billing period.
+   b. ElevenLabs API: curl -H "xi-api-key: $ELEVENLABS_API_KEY" "https://api.elevenlabs.io/v1/usage/character-stats" for voice usage stats.
+   c. Twilio API: curl -u "$TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN" "https://api.twilio.com/2010-04-01/Accounts/$TWILIO_ACCOUNT_SID/Usage/Records/ThisMonth.json" for SMS/call costs.
+   d. Read src/config/service-tiers.ts for current tier limits and pricing.
+   e. Read src/config/recurring-costs.ts for fixed subscription costs.
+
+2. READ PREVIOUS REPORT — Read docs/agents/cost-analyst-report.md for trend comparison with yesterday's data.
+
+3. ANALYZE — Compute:
+   - Total monthly spend (fixed + variable)
+   - Daily burn rate (total spend / days elapsed this month)
+   - Per-service cost breakdown (Anthropic, ElevenLabs, Twilio, Supabase, Vercel, domains)
+   - Cost efficiency metrics: cost per chat conversation, cost per voice minute, cost per visitor
+   - Month-over-month change percentages vs previous report
+
+4. DETECT ANOMALIES — Flag any of:
+   - >20% cost increase vs previous report period
+   - Daily spend spike >2x the rolling average
+   - Any service approaching tier limit within 30 days at current usage rate
+   - Unexpected new charges or services
+
+5. FORECAST — Project costs at 1x (current), 3x, and 10x growth using the same logic as src/lib/costs/forecast.ts:
+   - Fixed costs stay constant
+   - Variable costs (AI, voice) scale linearly with multiplier
+   - Include estimated tier upgrade costs when growth exceeds current limits
+
+6. WRITE REPORT — Output a structured markdown report to docs/agents/cost-analyst-report.md:
+
+   # Cost Analyst Report
+   > Auto-generated on YYYY-MM-DD HH:MM:SS
+
+   ## Executive Summary
+   One-paragraph financial health overview with key findings.
+
+   ## Current Costs (This Month)
+   | Service | Cost (USD) | % of Total | Trend |
+   Table of all services with costs, percentage, and up/down/flat trend arrows.
+
+   **Total**: $X.XX | **Daily Burn Rate**: $X.XX/day
+
+   ## Usage Metrics
+   | Metric | Current | Previous | Change |
+   Chat conversations, voice minutes, visitors, SMS sent, etc.
+
+   ## Cost Efficiency
+   | Metric | Value | Trend |
+   Cost per chat, cost per voice minute, cost per visitor.
+
+   ## Tier Proximity Alerts
+   For each service approaching limits: usage vs limit, days until breach, recommended action.
+
+   ## Scaling Forecast
+   | Scenario | Visitors | Chats | Voice Min | Est. Monthly Cost |
+   1x / 3x / 10x projections.
+
+   ## Anomalies
+   List any detected anomalies with severity and recommended action. "None detected" if clean.
+
+   ## Trend Analysis
+   Comparison with previous report: what changed, direction of key metrics.
+
+   ## Recommendations
+   Actionable suggestions: tier changes, cost optimizations, budget alerts.
+
+RULES:
+- If an API call fails (auth error, rate limit), note it in the report as "Data unavailable" — do not abort.
+- Use actual API data when available; fall back to config file values for services without APIs.
+- All dollar amounts in USD, rounded to 2 decimal places.
+- Commit nothing. The user will review and commit manually.
+- Be precise with numbers and conservative with forecasts.`,
 };
 
 const SCHEDULE_INFO: Record<string, string> = {
@@ -78,6 +154,7 @@ const SCHEDULE_INFO: Record<string, string> = {
   security_agent_enabled: "Weekly on Monday at 9:00 AM",
   documentation_agent_enabled: "Weekly on Sunday at 6:00 AM",
   performance_agent_enabled: "Weekly on Saturday at 10:00 AM",
+  cost_analyst_agent_enabled: "Daily at 3:00 AM",
 };
 
 const OUTPUT_FILES: Record<string, string> = {
@@ -85,6 +162,7 @@ const OUTPUT_FILES: Record<string, string> = {
   security_agent_enabled: "docs/agents/security-report.md",
   documentation_agent_enabled: "docs/agents/documentation-report.md",
   performance_agent_enabled: "docs/agents/performance-report.md",
+  cost_analyst_agent_enabled: "docs/agents/cost-analyst-report.md",
 };
 
 interface AgentConfigPanelProps {
