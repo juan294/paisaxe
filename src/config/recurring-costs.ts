@@ -44,4 +44,14 @@ export const RECURRING_SUBSCRIPTIONS: RecurringSubscription[] = [
       "https://console.aws.amazon.com/route53/home#DomainListing:",
     startDate: "2025-01-01",
   },
+  {
+    serviceId: "github-pro",
+    serviceName: "GitHub Pro",
+    category: "infrastructure",
+    costUsd: 4,
+    billingCycle: "monthly",
+    notes: "Pro plan for CI/CD minutes and features",
+    dashboardUrl: "https://github.com/settings/billing/summary",
+    startDate: "2026-02-06",
+  },
 ];
