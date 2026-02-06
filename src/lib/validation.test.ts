@@ -112,4 +112,36 @@ describe("validateChatRequest", () => {
     expect(result.valid).toBe(true);
     expect(result.sanitizedContext).toBe("some context");
   });
+
+  describe("messageIndex", () => {
+    it("defaults to 0 when not provided", () => {
+      const result = validateChatRequest({ message: "hello" });
+      expect(result.valid).toBe(true);
+      expect(result.messageIndex).toBe(0);
+    });
+
+    it("accepts a valid messageIndex", () => {
+      const result = validateChatRequest({ message: "hello", messageIndex: 3 });
+      expect(result.valid).toBe(true);
+      expect(result.messageIndex).toBe(3);
+    });
+
+    it("defaults to 0 for negative messageIndex", () => {
+      const result = validateChatRequest({ message: "hello", messageIndex: -1 });
+      expect(result.valid).toBe(true);
+      expect(result.messageIndex).toBe(0);
+    });
+
+    it("defaults to 0 for non-integer messageIndex", () => {
+      const result = validateChatRequest({ message: "hello", messageIndex: 2.5 });
+      expect(result.valid).toBe(true);
+      expect(result.messageIndex).toBe(0);
+    });
+
+    it("defaults to 0 for non-number messageIndex", () => {
+      const result = validateChatRequest({ message: "hello", messageIndex: "abc" });
+      expect(result.valid).toBe(true);
+      expect(result.messageIndex).toBe(0);
+    });
+  });
 });

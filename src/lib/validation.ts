@@ -18,6 +18,7 @@ export interface ValidationResult {
   error?: string;
   sanitizedMessage?: string;
   sanitizedContext?: string;
+  messageIndex?: number;
 }
 
 export function validateChatRequest(body: unknown): ValidationResult {
@@ -25,7 +26,7 @@ export function validateChatRequest(body: unknown): ValidationResult {
     return { valid: false, error: 'Invalid request body' };
   }
 
-  const { message, context } = body as Record<string, unknown>;
+  const { message, context, messageIndex } = body as Record<string, unknown>;
 
   // Validate message
   if (message === undefined || message === null) {
@@ -61,9 +62,20 @@ export function validateChatRequest(body: unknown): ValidationResult {
     }
   }
 
+  // Validate messageIndex (optional, defaults to 0)
+  let validatedMessageIndex = 0;
+  if (messageIndex !== undefined) {
+    if (typeof messageIndex !== 'number' || !Number.isInteger(messageIndex) || messageIndex < 0) {
+      validatedMessageIndex = 0;
+    } else {
+      validatedMessageIndex = messageIndex;
+    }
+  }
+
   return {
     valid: true,
     sanitizedMessage,
     sanitizedContext,
+    messageIndex: validatedMessageIndex,
   };
 }

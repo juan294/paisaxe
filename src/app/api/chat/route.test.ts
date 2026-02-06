@@ -138,6 +138,7 @@ describe("POST /api/chat", () => {
       valid: true,
       sanitizedMessage: "What is this?",
       sanitizedContext: "User is viewing Lagos de Covadonga",
+      messageIndex: 0,
     });
     vi.mocked(generateEmbedding).mockResolvedValue(mockEmbedding);
     vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
@@ -157,7 +158,8 @@ describe("POST /api/chat", () => {
     expect(generateChatResponse).toHaveBeenCalledWith(
       expect.stringContaining("Lagos de Covadonga"),
       expect.any(Array),
-      false
+      false,
+      0
     );
   });
 

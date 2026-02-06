@@ -323,9 +323,9 @@ async function callWithCurl(
   throw lastError || new Error("Max retries exceeded");
 }
 
-// LOCATION-SPECIFIC: Import system prompt from chat-config.ts
+// LOCATION-SPECIFIC: Import system prompt builder from chat-config.ts
 // This is the canonical location for the guide persona prompt
-import { PELAYO_SYSTEM_PROMPT } from "./chat-config";
+import { buildSystemPrompt } from "./chat-config";
 
 // Maximum context size to keep Claude requests focused
 const MAX_CONTEXT_LENGTH = 4000;
@@ -360,7 +360,8 @@ function buildContextText(context: Chunk[]): string {
 export async function generateChatResponse(
   userMessage: string,
   context: Chunk[],
-  asturianEnabled: boolean = false
+  asturianEnabled: boolean = false,
+  messageIndex: number = 0
 ): Promise<string> {
   const contextText = buildContextText(context);
 
@@ -368,9 +369,10 @@ export async function generateChatResponse(
     ? `<context>\n${contextText}\n</context>\n\n<user_question>\n${userMessage}\n</user_question>`
     : `<user_question>\n${userMessage}\n</user_question>`;
 
+  const basePrompt = buildSystemPrompt(messageIndex);
   const systemPrompt = asturianEnabled
-    ? PELAYO_SYSTEM_PROMPT + ASTURIANU_PROMPT_ADDITION
-    : PELAYO_SYSTEM_PROMPT;
+    ? basePrompt + ASTURIANU_PROMPT_ADDITION
+    : basePrompt;
 
   const response = await callAnthropicAPI(
     systemPrompt,
@@ -392,7 +394,8 @@ export async function generateChatResponse(
 export async function* streamChatResponse(
   userMessage: string,
   context: Chunk[],
-  asturianEnabled: boolean = false
+  asturianEnabled: boolean = false,
+  messageIndex: number = 0
 ): AsyncGenerator<string, void, unknown> {
   const contextText = buildContextText(context);
 
@@ -400,9 +403,10 @@ export async function* streamChatResponse(
     ? `<context>\n${contextText}\n</context>\n\n<user_question>\n${userMessage}\n</user_question>`
     : `<user_question>\n${userMessage}\n</user_question>`;
 
+  const basePrompt = buildSystemPrompt(messageIndex);
   const systemPrompt = asturianEnabled
-    ? PELAYO_SYSTEM_PROMPT + ASTURIANU_PROMPT_ADDITION
-    : PELAYO_SYSTEM_PROMPT;
+    ? basePrompt + ASTURIANU_PROMPT_ADDITION
+    : basePrompt;
 
   yield* streamAnthropicAPI(
     systemPrompt,

@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { sanitizedMessage: message, sanitizedContext: context } = validation;
+    const { sanitizedMessage: message, sanitizedContext: context, messageIndex } = validation;
 
     // === SECURITY PRE-PROCESSING ===
 
@@ -151,7 +151,8 @@ export async function POST(request: NextRequest) {
     const responseText = await generateChatResponse(
       enrichedMessage,
       chunks,
-      asturianEnabled
+      asturianEnabled,
+      messageIndex
     );
 
     // === SECURITY POST-PROCESSING ===
