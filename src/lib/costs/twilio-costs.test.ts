@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchTwilioCosts } from "./twilio-costs";
+import { fetchTwilioCosts, fetchTwilioCostsByDay } from "./twilio-costs";
 
 describe("twilio-costs", () => {
   const originalEnv = process.env;
@@ -153,6 +153,112 @@ describe("twilio-costs", () => {
             Authorization: expect.stringMatching(/^Basic /),
           }),
         })
+      );
+    });
+  });
+
+  describe("fetchTwilioCostsByDay", () => {
+    it("returns empty array when credentials are missing", async () => {
+      delete process.env.TWILIO_ACCOUNT_SID;
+      delete process.env.TWILIO_AUTH_TOKEN;
+
+      const result = await fetchTwilioCostsByDay("2024-01-01", "2024-01-31");
+      expect(result).toEqual([]);
+    });
+
+    it("returns daily costs on successful API response", async () => {
+      process.env.TWILIO_ACCOUNT_SID = "AC123";
+      process.env.TWILIO_AUTH_TOKEN = "token123";
+
+      const mockResponse = {
+        usage_records: [
+          { category: "sms", description: "SMS", price: "2.50", price_unit: "USD", count: "50", usage: "50", usage_unit: "messages" },
+          { category: "voice", description: "Voice", price: "3.00", price_unit: "USD", count: "10", usage: "10", usage_unit: "minutes" },
+        ],
+        end: 0,
+        first_page_uri: "",
+        next_page_uri: null,
+        page: 0,
+        page_size: 50,
+        previous_page_uri: null,
+        start: 0,
+        uri: "",
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await fetchTwilioCostsByDay("2024-01-15", "2024-01-15");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].costUsd).toBe(5.5); // 2.50 + 3.00
+      expect(result[0].date).toBe("2024-01-15");
+    });
+
+    it("returns empty array when API returns error", async () => {
+      process.env.TWILIO_ACCOUNT_SID = "AC123";
+      process.env.TWILIO_AUTH_TOKEN = "token123";
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+      });
+
+      const result = await fetchTwilioCostsByDay("2024-01-01", "2024-01-31");
+      expect(result).toEqual([]);
+    });
+
+    it("returns empty array when fetch throws", async () => {
+      process.env.TWILIO_ACCOUNT_SID = "AC123";
+      process.env.TWILIO_AUTH_TOKEN = "token123";
+
+      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
+
+      const result = await fetchTwilioCostsByDay("2024-01-01", "2024-01-31");
+      expect(result).toEqual([]);
+    });
+
+    it("handles empty usage records", async () => {
+      process.env.TWILIO_ACCOUNT_SID = "AC123";
+      process.env.TWILIO_AUTH_TOKEN = "token123";
+
+      const mockResponse = {
+        usage_records: [],
+        end: 0,
+        first_page_uri: "",
+        next_page_uri: null,
+        page: 0,
+        page_size: 50,
+        previous_page_uri: null,
+        start: 0,
+        uri: "",
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await fetchTwilioCostsByDay("2024-01-01", "2024-01-31");
+      expect(result).toEqual([]);
+    });
+
+    it("calls the Daily endpoint URL", async () => {
+      process.env.TWILIO_ACCOUNT_SID = "AC123";
+      process.env.TWILIO_AUTH_TOKEN = "token123";
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ usage_records: [] }),
+      });
+
+      await fetchTwilioCostsByDay("2024-01-01", "2024-01-31");
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("Usage/Records/Daily.json"),
+        expect.any(Object)
       );
     });
   });

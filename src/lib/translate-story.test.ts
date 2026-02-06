@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { translateStory, parseTranslationResponse, buildTranslationPrompt } from "./translate-story";
+import { translateStory, parseTranslationResponse, buildTranslationPrompt, updateStoryTranslation, getStoryTranslations } from "./translate-story";
 import type { StoryTranslation } from "@/types/immersive";
 
 // Mock the claude module
@@ -426,6 +426,215 @@ describe("translate-story", () => {
 
       expect(callAnthropicAPI).toHaveBeenCalled();
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe("updateStoryTranslation", () => {
+    it("should return error when story is not found", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: null, error: { message: "Not found" } }),
+            })),
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      const translation: StoryTranslation = {
+        title: "Test Title",
+        subtitle: "Test Subtitle",
+        description: "Test Description",
+      };
+
+      const result = await updateStoryTranslation("non-existent", "en", translation);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Story not found");
+    });
+
+    it("should update translation successfully", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: { metadata: { translations: {}, translation_status: {} } },
+                error: null,
+              }),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      const translation: StoryTranslation = {
+        title: "Lakes of Covadonga",
+        subtitle: "Glacial paradise",
+        description: "Two glacial lakes.",
+      };
+
+      const result = await updateStoryTranslation("story-1", "en", translation);
+
+      expect(result.success).toBe(true);
+    });
+
+    it("should return error when update fails", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: { metadata: {} },
+                error: null,
+              }),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({ error: { message: "Update failed" } }),
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      const translation: StoryTranslation = {
+        title: "Test",
+        subtitle: "Test",
+        description: "Test",
+      };
+
+      const result = await updateStoryTranslation("story-1", "en", translation);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Failed to update translation");
+    });
+
+    it("should handle story with no existing metadata", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: { metadata: null },
+                error: null,
+              }),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      const translation: StoryTranslation = {
+        title: "Test",
+        subtitle: "Test",
+        description: "Test",
+      };
+
+      const result = await updateStoryTranslation("story-1", "fr", translation);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("getStoryTranslations", () => {
+    it("should return error when story is not found", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: null, error: { message: "Not found" } }),
+            })),
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      const result = await getStoryTranslations("non-existent");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Story not found");
+    });
+
+    it("should return translations for a story", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const enTranslation: StoryTranslation = {
+        title: "Lakes of Covadonga",
+        subtitle: "Glacial paradise",
+        description: "Two glacial lakes.",
+      };
+
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: {
+                  title: "Lagos de Covadonga",
+                  subtitle: "Paraíso glaciar",
+                  description: "Dos lagos de origen glaciar.",
+                  metadata: {
+                    translations: { en: enTranslation },
+                    translation_status: { en: { status: "complete", updatedAt: "2024-01-01" } },
+                    last_translated_at: "2024-01-01T00:00:00Z",
+                  },
+                },
+                error: null,
+              }),
+            })),
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      const result = await getStoryTranslations("story-1");
+
+      expect(result.success).toBe(true);
+      expect(result.data?.original.title).toBe("Lagos de Covadonga");
+      expect(result.data?.translations.en?.title).toBe("Lakes of Covadonga");
+      expect(result.data?.status.en?.status).toBe("complete");
+      expect(result.data?.lastTranslatedAt).toBe("2024-01-01T00:00:00Z");
+    });
+
+    it("should handle story with empty metadata", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: {
+                  title: "Test",
+                  subtitle: null,
+                  description: null,
+                  metadata: null,
+                },
+                error: null,
+              }),
+            })),
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      const result = await getStoryTranslations("story-1");
+
+      expect(result.success).toBe(true);
+      expect(result.data?.original.title).toBe("Test");
+      expect(result.data?.original.subtitle).toBe("");
+      expect(result.data?.original.description).toBe("");
+      expect(result.data?.translations).toEqual({});
+      expect(result.data?.status).toEqual({});
     });
   });
 });
