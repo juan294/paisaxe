@@ -1,0 +1,76 @@
+import { useEffect, type RefObject } from 'react';
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Traps keyboard focus within the referenced element while active.
+ * When the user presses Tab at the last focusable element, focus wraps to the first.
+ * When the user presses Shift+Tab at the first, focus wraps to the last.
+ * Also handles Escape key to call onEscape if provided.
+ */
+export function useFocusTrap(
+  ref: RefObject<HTMLElement | null>,
+  active: boolean,
+  onEscape?: () => void
+) {
+  useEffect(() => {
+    if (!active) return;
+
+    const container = ref.current;
+    if (!container) return;
+
+    // Store the element that had focus before the trap activated
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    // Focus the first focusable element only if focus is not already inside
+    const focusFirstIfNeeded = () => {
+      if (!container.contains(document.activeElement)) {
+        const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+        if (focusable.length > 0) {
+          focusable[0].focus();
+        }
+      }
+    };
+
+    // Delay initial focus slightly to allow render
+    const raf = requestAnimationFrame(focusFirstIfNeeded);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onEscape) {
+        e.preventDefault();
+        onEscape();
+        return;
+      }
+
+      if (e.key !== 'Tab') return;
+
+      const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    container.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      container.removeEventListener('keydown', handleKeyDown);
+      // Restore focus when trap is deactivated
+      previouslyFocused?.focus();
+    };
+  }, [ref, active, onEscape]);
+}

@@ -3,6 +3,11 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import GlobalError from "./global-error";
 
+// Mock resolveLocale to return 'es' (jsdom defaults to 'en-US')
+vi.mock("@/lib/i18n/detect-language", () => ({
+  resolveLocale: vi.fn(() => "es"),
+}));
+
 describe("GlobalError", () => {
   const consoleSpy = vi
     .spyOn(console, "error")

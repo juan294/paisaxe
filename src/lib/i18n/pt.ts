@@ -257,6 +257,17 @@ export const pt: Translations = {
     got_it: 'Entendido',
   },
 
+  errors: {
+    generic_title: 'Algo correu mal',
+    generic_description: 'Ocorreu um erro inesperado. Por favor, tente novamente.',
+    retry: 'Tentar novamente',
+    go_home: 'Voltar ao início',
+    not_found_title: 'Página não encontrada',
+    not_found_description: 'A página que procura não existe ou foi movida.',
+    immersive_title: 'Não foi possível carregar a experiência',
+    immersive_description: 'Algo falhou ao carregar as histórias. Tente novamente.',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
