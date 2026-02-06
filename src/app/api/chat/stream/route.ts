@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { sanitizedMessage: message, sanitizedContext: context } = validation;
+    const { sanitizedMessage: message, sanitizedContext: context, messageIndex } = validation;
 
     // Security checks
     if (message && message.length > MAX_INPUT_LENGTH) {
@@ -120,7 +120,8 @@ export async function POST(request: NextRequest) {
           for await (const chunk of streamChatResponse(
             enrichedMessage,
             chunks,
-            asturianEnabled
+            asturianEnabled,
+            messageIndex
           )) {
             // Send text chunk as SSE event
             const event = `data: ${JSON.stringify({ type: "text", content: chunk })}\n\n`;
