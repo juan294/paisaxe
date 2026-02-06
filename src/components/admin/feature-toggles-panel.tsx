@@ -103,6 +103,7 @@ const FLAG_CATEGORIES: Record<FeatureFlagKey, FlagCategory> = {
   performance_agent_enabled: "agents",
   qa_agent_enabled: "agents",
   localization_agent_enabled: "agents",
+  cost_analyst_agent_enabled: "agents",
 };
 
 // Flags that have configurable settings
@@ -114,6 +115,7 @@ const CONFIGURABLE_FLAGS = [
   "performance_agent_enabled",
   "qa_agent_enabled",
   "localization_agent_enabled",
+  "cost_analyst_agent_enabled",
   "maintenance_mode",
 ];
 
@@ -125,6 +127,7 @@ const AGENT_REPORT_FILES: Record<string, string> = {
   performance_agent_enabled: "performance-report.md",
   qa_agent_enabled: "qa-report.md",
   localization_agent_enabled: "localization-report.md",
+  cost_analyst_agent_enabled: "cost-analyst-report.md",
 };
 
 export function FeatureTogglesPanel() {
