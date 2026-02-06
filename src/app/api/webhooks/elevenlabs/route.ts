@@ -144,26 +144,62 @@ function verifySignature(
   }
 }
 
+// ElevenLabs transcript entry format
+interface TranscriptEntry {
+  role: "user" | "agent";
+  message: string;
+  time_in_call_secs?: number;
+}
+
+/**
+ * Extract plain text from ElevenLabs transcript array.
+ * Transcript is an array of {role, message} objects, not a plain string.
+ */
+function extractTranscriptText(
+  transcript: TranscriptEntry[] | string | undefined
+): string {
+  if (!transcript) return "";
+  // Handle legacy string format (backwards compatibility)
+  if (typeof transcript === "string") return transcript;
+  // Handle array format (actual ElevenLabs payload)
+  if (Array.isArray(transcript)) {
+    return transcript
+      .map((entry) => entry.message || "")
+      .join(" ");
+  }
+  return "";
+}
+
 /**
  * Analyze call transcript/analysis to determine booking outcome.
+ *
+ * ElevenLabs payload format:
+ * - transcript: array of {role, message, time_in_call_secs} objects
+ * - analysis.call_successful: "success" | "failure" | "unknown" (string enum, NOT boolean)
+ * - analysis.transcript_summary: string
  */
 function analyzeOutcome(webhookData: {
   analysis?: {
-    call_successful?: boolean;
+    call_successful?: string | boolean;
     transcript_summary?: string;
   };
-  transcript?: string;
+  transcript?: TranscriptEntry[] | string;
 }): BookingOutcome {
   const { analysis, transcript } = webhookData;
 
   // If call wasn't successful at all, it's a no_answer or failed
-  if (analysis?.call_successful === false) {
+  // ElevenLabs uses string enum: "success" | "failure" | "unknown"
+  if (
+    analysis?.call_successful === "failure" ||
+    analysis?.call_successful === false
+  ) {
     return "no_answer";
   }
 
-  // Combine transcript and summary for keyword matching
+  // Extract text from transcript array and combine with summary
+  const transcriptText = extractTranscriptText(transcript);
   const textToAnalyze = [
-    transcript || "",
+    transcriptText,
     analysis?.transcript_summary || "",
   ]
     .join(" ")
