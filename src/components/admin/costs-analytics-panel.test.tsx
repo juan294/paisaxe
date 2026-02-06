@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { CostsAnalyticsPanel } from "./costs-analytics-panel";
+import { AnalyticsCacheProvider } from "./analytics-cache-context";
+
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+  <AnalyticsCacheProvider>{children}</AnalyticsCacheProvider>
+);
 
 // Mock the admin-api module
 vi.mock("@/lib/admin-api", () => ({
@@ -76,7 +81,7 @@ describe("CostsAnalyticsPanel", () => {
       () => new Promise(() => {}) // Never resolves - keeps loading
     );
 
-    render(<CostsAnalyticsPanel />);
+    render(<CostsAnalyticsPanel />, { wrapper });
 
     // Should show loading skeleton
     expect(screen.getByText("Loading...")).toBeInTheDocument();
@@ -87,7 +92,7 @@ describe("CostsAnalyticsPanel", () => {
       data: mockCostsData,
     });
 
-    render(<CostsAnalyticsPanel />);
+    render(<CostsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("$125.75")).toBeInTheDocument();
@@ -107,7 +112,7 @@ describe("CostsAnalyticsPanel", () => {
       data: mockCostsData,
     });
 
-    render(<CostsAnalyticsPanel />);
+    render(<CostsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       // Services may appear in both table and dashboard links
@@ -128,7 +133,7 @@ describe("CostsAnalyticsPanel", () => {
       data: mockCostsData,
     });
 
-    render(<CostsAnalyticsPanel />);
+    render(<CostsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("ai")).toBeInTheDocument();
@@ -143,7 +148,7 @@ describe("CostsAnalyticsPanel", () => {
       error: "Failed to fetch costs",
     });
 
-    render(<CostsAnalyticsPanel />);
+    render(<CostsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Failed to fetch costs")).toBeInTheDocument();
@@ -165,7 +170,7 @@ describe("CostsAnalyticsPanel", () => {
       },
     });
 
-    render(<CostsAnalyticsPanel />);
+    render(<CostsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("No cost data yet")).toBeInTheDocument();
@@ -179,7 +184,7 @@ describe("CostsAnalyticsPanel", () => {
       data: mockCostsData,
     });
 
-    render(<CostsAnalyticsPanel />);
+    render(<CostsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Add Cost")).toBeInTheDocument();
@@ -191,7 +196,7 @@ describe("CostsAnalyticsPanel", () => {
       data: mockCostsData,
     });
 
-    render(<CostsAnalyticsPanel />);
+    render(<CostsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       // Date inputs are rendered with a separator
@@ -204,7 +209,7 @@ describe("CostsAnalyticsPanel", () => {
       data: mockCostsData,
     });
 
-    render(<CostsAnalyticsPanel />);
+    render(<CostsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Refresh")).toBeInTheDocument();

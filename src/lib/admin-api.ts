@@ -626,12 +626,14 @@ export async function generateStoryTranslations(
  */
 export async function fetchCostsAnalytics(
   from?: string,
-  to?: string
+  to?: string,
+  options?: { includeUsage?: boolean }
 ): Promise<AdminApiResponse<CostsAnalyticsDashboardData>> {
   try {
     const url = new URL(`${API_BASE}/costs-analytics`, window.location.origin);
     if (from) url.searchParams.set("from", from);
     if (to) url.searchParams.set("to", to);
+    if (options?.includeUsage) url.searchParams.set("includeUsage", "true");
 
     const response = await fetch(url.toString());
 

@@ -34,6 +34,12 @@ vi.mock("@/hooks/use-voice-access", () => ({
   useVoiceAccess: () => mockVoiceAccess,
 }));
 
+// Mock PostHog
+const mockCapture = vi.fn();
+vi.mock("posthog-js/react", () => ({
+  usePostHog: () => ({ capture: mockCapture }),
+}));
+
 // Mock Supabase browser client
 vi.mock("@/lib/supabase-browser", () => ({
   createSupabaseBrowserClient: () => ({
@@ -143,6 +149,7 @@ const resetMockVoiceAccess = () => {
 describe("VoiceChat", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    mockCapture.mockReset();
     localStorageMock.clear();
     resetMockVoiceAccess();
   });
@@ -631,6 +638,85 @@ describe("VoiceChat", () => {
       expect(
         screen.queryByText(/Tus preguntas se procesan con inteligencia artificial/)
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("PostHog chat tracking", () => {
+    it("should fire chat_conversation_started on first message", async () => {
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Response"));
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "First question");
+
+      const form = input.closest("form");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        expect(mockCapture).toHaveBeenCalledWith("chat_conversation_started", {
+          story_id: "story-1",
+        });
+      });
+    });
+
+    it("should fire chat_message_sent on every message", async () => {
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Response"));
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "My question");
+
+      const form = input.closest("form");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        expect(mockCapture).toHaveBeenCalledWith("chat_message_sent", {
+          story_id: "story-1",
+          message_index: 0,
+        });
+      });
+    });
+
+    it("should not fire chat_conversation_started on subsequent messages", async () => {
+      // First message
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("First response"));
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "First");
+
+      const form = input.closest("form");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText("First response")).toBeInTheDocument();
+      });
+
+      // Second message
+      mockCapture.mockClear();
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Second response"));
+
+      await userEvent.type(input, "Second");
+      if (form) {
+        fireEvent.submit(form);
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText("Second response")).toBeInTheDocument();
+      });
+
+      // Should have chat_message_sent but NOT chat_conversation_started
+      expect(mockCapture).toHaveBeenCalledWith("chat_message_sent", expect.any(Object));
+      expect(mockCapture).not.toHaveBeenCalledWith("chat_conversation_started", expect.any(Object));
     });
   });
 

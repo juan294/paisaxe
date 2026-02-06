@@ -243,6 +243,10 @@ export async function GET(request: NextRequest) {
         recentConversations,
         dateRange: { from: fromParam, to: toParam },
       },
+    }, {
+      headers: {
+        "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
+      },
     });
   } catch (error) {
     console.error("ElevenLabs analytics API error:", error);

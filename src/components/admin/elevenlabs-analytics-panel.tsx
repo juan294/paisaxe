@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { fetchElevenLabsAnalytics } from "@/lib/admin-api";
+import { useAnalyticsData } from "./analytics-cache-context";
 import { AlertCircle, Mic, Clock, MessageSquare, Star } from "lucide-react";
 import type {
   ElevenLabsAnalyticsDashboardData,
@@ -12,33 +13,20 @@ import type {
 } from "@/types/elevenlabs-analytics";
 
 export function ElevenLabsAnalyticsPanel() {
-  const [data, setData] = useState<ElevenLabsAnalyticsDashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
   const [dateRange, setDateRange] = useState({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     to: new Date().toISOString().split("T")[0],
   });
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
+  const fromISO = new Date(dateRange.from).toISOString();
+  const toISO = new Date(dateRange.to + "T23:59:59").toISOString();
 
-    const fromISO = new Date(dateRange.from).toISOString();
-    const toISO = new Date(dateRange.to + "T23:59:59").toISOString();
-
-    const result = await fetchElevenLabsAnalytics(fromISO, toISO);
-    if (result.error) {
-      setError(result.error);
-    } else if (result.data) {
-      setData(result.data);
-    }
-    setIsLoading(false);
-  }, [dateRange]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const params = JSON.stringify({ from: dateRange.from, to: dateRange.to });
+  const { data, isLoading, isRefreshing, error, refresh } = useAnalyticsData(
+    "voice",
+    useCallback(() => fetchElevenLabsAnalytics(fromISO, toISO), [fromISO, toISO]),
+    params
+  );
 
   return (
     <div className="space-y-12">
@@ -64,11 +52,11 @@ export function ElevenLabsAnalyticsPanel() {
             />
           </div>
           <button
-            onClick={loadData}
+            onClick={refresh}
             disabled={isLoading}
             className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
           >
-            {isLoading ? "Loading..." : "Refresh"}
+            {isLoading ? "Loading..." : isRefreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </div>
@@ -95,6 +83,10 @@ export function ElevenLabsAnalyticsPanel() {
         </div>
       )}
 
+      {isRefreshing && (
+        <div className="h-0.5 w-full animate-pulse rounded-full bg-blue-500/30" />
+      )}
+
       {error && (
         <div className="flex items-center gap-3 font-mono text-xs text-red-600">
           <AlertCircle className="h-4 w-4" />
@@ -102,7 +94,7 @@ export function ElevenLabsAnalyticsPanel() {
         </div>
       )}
 
-      {isLoading && !data ? (
+      {isLoading ? (
         <SkeletonVoiceDashboard />
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[200px] flex-col items-center justify-center gap-4">

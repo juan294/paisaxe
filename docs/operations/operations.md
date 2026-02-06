@@ -331,6 +331,8 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe
 
 Revenue analytics are available in the admin panel under Analytics → Revenue tab, pulling data directly from Stripe's API.
 
+**Caching** — All analytics API routes (`/api/admin/analytics`, `/api/admin/elevenlabs-analytics`, `/api/admin/stripe-analytics`, `/api/admin/costs-analytics`) return `Cache-Control: private, max-age=120, stale-while-revalidate=300`. The client-side `AnalyticsCacheProvider` maintains an in-memory cache with a 2-minute stale time. Cache is invalidated on manual refresh or after CRUD mutations (costs panel).
+
 ## ElevenLabs Voice Agents
 
 Voice agents for the Paisaxe experience, configured in `src/config/elevenlabs-agents.ts`.

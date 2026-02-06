@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { fetchAnalytics } from "@/lib/admin-api";
+import { useAnalyticsData } from "./analytics-cache-context";
 import { AlertCircle } from "lucide-react";
 import type {
   AnalyticsDashboardData,
@@ -41,9 +42,6 @@ function getStoredDevToggle(): boolean {
 }
 
 export function VisitorsAnalyticsPanel() {
-  const [data, setData] = useState<AnalyticsDashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
   const [isInitialized, setIsInitialized] = useState(false);
   const [includeLocalhost, setIncludeLocalhost] = useState(false);
   const [dateRange, setDateRange] = useState({
@@ -65,28 +63,16 @@ export function VisitorsAnalyticsPanel() {
     }
   }, [includeLocalhost, isInitialized]);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
+  const fromISO = new Date(dateRange.from).toISOString();
+  const toISO = new Date(dateRange.to + "T23:59:59").toISOString();
 
-    const fromISO = new Date(dateRange.from).toISOString();
-    const toISO = new Date(dateRange.to + "T23:59:59").toISOString();
-
-    const result = await fetchAnalytics(fromISO, toISO, includeLocalhost);
-    if (result.error) {
-      setError(result.error);
-    } else if (result.data) {
-      setData(result.data);
-    }
-    setIsLoading(false);
-  }, [dateRange, includeLocalhost]);
-
-  // Only fetch data after initialization is complete
-  useEffect(() => {
-    if (isInitialized) {
-      loadData();
-    }
-  }, [loadData, isInitialized]);
+  const params = JSON.stringify({ from: dateRange.from, to: dateRange.to, includeLocalhost });
+  const { data, isLoading, isRefreshing, error, refresh } = useAnalyticsData(
+    "visitors",
+    useCallback(() => fetchAnalytics(fromISO, toISO, includeLocalhost), [fromISO, toISO, includeLocalhost]),
+    params,
+    { enabled: isInitialized }
+  );
 
   return (
     <div className="space-y-12">
@@ -135,14 +121,18 @@ export function VisitorsAnalyticsPanel() {
             />
           </div>
           <button
-            onClick={loadData}
+            onClick={refresh}
             disabled={isLoading}
             className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
           >
-            {isLoading ? "Loading..." : "Refresh"}
+            {isLoading ? "Loading..." : isRefreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </div>
+
+      {isRefreshing && (
+        <div className="h-0.5 w-full animate-pulse rounded-full bg-blue-500/30" />
+      )}
 
       {error && (
         <div className="flex items-center gap-3 font-mono text-xs text-red-600">
@@ -151,7 +141,7 @@ export function VisitorsAnalyticsPanel() {
         </div>
       )}
 
-      {isLoading && !data ? (
+      {isLoading ? (
         <SkeletonDashboard />
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[300px] flex-col items-center justify-center gap-4">
@@ -384,7 +374,7 @@ function TimeSeriesChart({ data }: TimeSeriesChartProps) {
     <div className="overflow-x-auto">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="w-full max-w-3xl"
+        className="w-full"
         preserveAspectRatio="xMidYMid meet"
       >
         {/* Grid lines */}
