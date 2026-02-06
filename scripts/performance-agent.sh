@@ -36,21 +36,50 @@ BUDGET_PROD_DEPS=40          # Max production dependencies
 # Initialize metrics collection
 log_info "Collecting performance metrics..." | tee -a "$LOG_FILE"
 
-# Build the app to get accurate bundle sizes
-# If the dev server is running, the build will fail because Next.js locks .next/.
-# In that case, fall back to the existing .next/static data (from dev or a prior build).
+# Build the app to get accurate bundle sizes.
+# If the dev server is running, stop it first, build, then restart it.
 FRESH_BUILD=true
 BUILD_OUTPUT=""
+DEV_SERVER_PID=""
+RESTART_DEV_SERVER=false
+
+# Detect if the dev server is running on port 3000
+DEV_SERVER_PID=$(lsof -ti :3000 2>/dev/null | head -1)
+if [[ -n "$DEV_SERVER_PID" ]]; then
+  log_info "Dev server detected (PID $DEV_SERVER_PID) — stopping for production build..." | tee -a "$LOG_FILE"
+  kill "$DEV_SERVER_PID" 2>/dev/null
+  # Wait for the process to exit (up to 10 seconds)
+  for i in $(seq 1 20); do
+    if ! kill -0 "$DEV_SERVER_PID" 2>/dev/null; then
+      break
+    fi
+    sleep 0.5
+  done
+  # Force kill if still alive
+  if kill -0 "$DEV_SERVER_PID" 2>/dev/null; then
+    kill -9 "$DEV_SERVER_PID" 2>/dev/null
+    sleep 1
+  fi
+  RESTART_DEV_SERVER=true
+  log_success "Dev server stopped" | tee -a "$LOG_FILE"
+fi
+
 log_info "Building application..." | tee -a "$LOG_FILE"
 if BUILD_OUTPUT=$(npm run build 2>&1); then
   log_success "Build completed" | tee -a "$LOG_FILE"
 else
   FRESH_BUILD=false
   if [[ -d ".next/static" ]]; then
-    log_warn "Build failed (dev server running?). Using existing .next data for analysis." | tee -a "$LOG_FILE"
+    log_warn "Build failed. Using existing .next data for analysis." | tee -a "$LOG_FILE"
   else
     log_error "Build failed and no existing .next/static data to analyze" | tee -a "$LOG_FILE"
     echo "$BUILD_OUTPUT" >> "$LOG_FILE"
+    # Still try to restart dev server before exiting
+    if [[ "$RESTART_DEV_SERVER" == "true" ]]; then
+      log_info "Restarting dev server..." | tee -a "$LOG_FILE"
+      cd "$PROJECT_DIR" && nohup npm run dev > /dev/null 2>&1 &
+      log_success "Dev server restarted" | tee -a "$LOG_FILE"
+    fi
     exit 1
   fi
 fi
@@ -237,6 +266,13 @@ fi
 
 # Cleanup
 rm -f "$METRICS_FILE"
+
+# Restart dev server if we stopped it
+if [[ "$RESTART_DEV_SERVER" == "true" ]]; then
+  log_info "Restarting dev server..." | tee -a "$LOG_FILE"
+  cd "$PROJECT_DIR" && nohup npm run dev > /dev/null 2>&1 &
+  log_success "Dev server restarted" | tee -a "$LOG_FILE"
+fi
 
 log_success "Performance report written to $REPORT_FILE" | tee -a "$LOG_FILE"
 log_info "=== Performance Agent finished ===" | tee -a "$LOG_FILE"

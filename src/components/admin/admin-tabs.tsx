@@ -9,7 +9,7 @@ interface AdminTabsProps {
   onTabChange: (tab: AdminTab) => void;
 }
 
-export const TABS: { value: AdminTab; label: string }[] = [
+const ALL_TABS: { value: AdminTab; label: string }[] = [
   { value: "analytics", label: "Analytics" },
   { value: "stories", label: "Stories" },
   { value: "features", label: "Features" },
@@ -17,6 +17,11 @@ export const TABS: { value: AdminTab; label: string }[] = [
   { value: "suggestions", label: "Suggestions" },
   { value: "agents", label: "Agents" },
 ];
+
+/** Agents tab is only available in development — agent scripts run locally, not on Vercel. */
+export const TABS = process.env.NODE_ENV === "development"
+  ? ALL_TABS
+  : ALL_TABS.filter((t) => t.value !== "agents");
 
 export function AdminTabs({ activeTab, onTabChange }: AdminTabsProps) {
   return (
