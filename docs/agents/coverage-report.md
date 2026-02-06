@@ -1,18 +1,19 @@
 # Test Coverage Report
 
-> Last updated: 2026-02-06
+> Last updated: 2026-02-06 (16:15 UTC)
 > Scheduled: nightly at 2:00 CET via `scripts/coverage-agent.sh`
 
 ## Summary
 
-- **Total tests:** 2630
-- **Test files:** 184
-- **Statement coverage:** 67.45%
-- **Branch coverage:** 61.45%
-- **Function coverage:** 63.25%
-- **Line coverage:** 68.07%
+- **Total tests:** 2754 passed, 1 skipped
+- **Test files:** 196 passed (100%)
+- **Statement coverage:** 66.91%
+- **Branch coverage:** 60.07%
+- **Function coverage:** 62.27%
+- **Line coverage:** 67.63%
+- **TypeScript:** ✅ No errors
 
-*Note: Coverage percentages appear lower due to expanded coverage scope that now includes more previously-uncovered files.*
+*Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
 
 ## Files at 100%
 
@@ -278,8 +279,13 @@ Run manually anytime:
     - **src/app/pricing/page.tsx**: 57% → 100% (+43%)
     - **src/app/api/mcp/make-booking/status/route.ts**: 0% → 100% (+100%)
   - Documented admin/tunnel/route.ts as untestable (child_process/shell operations)
-- **2026-02-06**: Coverage Agent run -- 2630 tests, 184 files (+82 tests, +7 files, +2.04% statement coverage)
+- **2026-02-06 (morning)**: Coverage Agent run -- 2630 tests, 184 files (+82 tests, +7 files, +2.04% statement coverage)
   - Created 7 new test files: location config, privacy/terms pages, health/db route, manual-costs CRUD, toolbar-overflow-menu, chat-upsell-cta
   - Enhanced 3 existing test files: twilio-costs (+6), translate-story (+7), share-button (+4)
   - 6 files reached 100%: location, privacy/page, terms/page, health/db, twilio-costs, chat-upsell-cta
   - 4 files significantly improved: manual-costs (0→93%), overflow-menu (52→96%), share-button (79→96%), translate-story (66→86%)
+- **2026-02-06 (afternoon)**: Coverage Agent verification run -- 2754 tests, 196 files (✅ all passing)
+  - **Fixed**: Test setup for `NEXT_PUBLIC_SITE_URL` env var (was causing 13 test failures in layout/SEO tests)
+  - **Fixed**: Proxy test NODE_ENV mocking issue (added `vi.unstubAllEnvs()` to cleanup)
+  - **Verified**: TypeScript type safety (0 errors)
+  - **Status**: Test suite is healthy and stable

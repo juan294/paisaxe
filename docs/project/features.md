@@ -125,6 +125,12 @@ RAG settings: Multilingual embeddings, 5 chunks max, 15K character limit, 0.40 d
 - Language detection (auto-detect visitor's language)
 - End conversation (graceful goodbyes)
 
+**Custom MCP tools** (via `/api/mcp/*` endpoints):
+- `search_places`: Find businesses, attractions, hotels, restaurants by name/type/location
+- `get_weather`: Current weather for Asturian cities and towns
+- `make_booking`: Initiate outbound voice call to make restaurant/hotel reservations (gated by `booking_system` flag)
+- `check_booking_status`: Check status of a pending booking request
+
 See `docs/operations/elevenlabs-pelayo-config.md` for full configuration details.
 
 **Suggested questions** — Up to three contextual question prompts appear below the story description (e.g., "Can I visit in winter?", "Best time to hike here?"). These are populated from each story's `question_prompts` metadata. Controlled by the `contextual_prompts` feature flag.
@@ -613,11 +619,16 @@ Paisaxe runs on Supabase Pro ($25/month) with generous resource limits:
 
 Additionally, Upptime pings the health endpoint every 5 minutes, which queries the database.
 
-**Database webhooks** — Using the `pg_net` extension, database triggers automatically call the Next.js API (`POST /api/webhooks/supabase`) when data changes. This enables:
-- Cache invalidation when stories are updated (revalidates `/immersive` and `/sitemap.xml`)
-- Cache invalidation when feature flags are toggled (revalidates `/api/feature-flags`)
+**Webhooks** — Paisaxe receives webhooks from multiple external services:
 
-Webhook payloads include the table name, operation type, and changed record. Authentication uses a shared secret in the `x-webhook-secret` header.
+| Endpoint | Source | Purpose |
+|----------|--------|---------|
+| `POST /api/webhooks/supabase` | Supabase (pg_net) | Cache invalidation when stories/flags change |
+| `POST /api/webhooks/stripe` | Stripe | Payment status updates for Voice Pass purchases |
+| `POST /api/webhooks/elevenlabs` | ElevenLabs | Post-call transcripts for booking confirmations, triggers SMS to customer |
+| `POST /api/webhooks/translate` | External translation service | Story translation completion notifications |
+
+All webhooks verify signatures or shared secrets. Supabase webhooks are triggered via pg_net from database triggers.
 
 **Realtime subscriptions** — Supabase Realtime (free: 200 concurrent connections, 2M messages/month) provides live updates:
 - Feature flags: When an admin toggles a flag, all active browser sessions pick up the change instantly via `useRealtimeFeatureFlags` hook
