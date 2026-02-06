@@ -24,6 +24,16 @@ A complete catalog of everything Paisaxe can do, organized by audience.
     - [Visitors Analytics](#visitors-analytics)
     - [Revenue Analytics](#revenue-analytics)
     - [Voice Analytics](#voice-analytics)
+  - [Agents Dashboard](#agents-dashboard)
+    - [Agent Toggles](#agent-toggles)
+    - [Agent Status Grid](#agent-status-grid)
+    - [Cross-Agent Insights](#cross-agent-insights)
+    - [Recent Activity Timeline](#recent-activity-timeline)
+- [Automated Agents](#automated-agents)
+  - [Scheduled Agents](#scheduled-agents)
+  - [Shared Context System](#shared-context-system)
+  - [Agent Team Skills](#agent-team-skills)
+  - [Agent Team Rules](#agent-team-rules)
 - [SEO & Social](#seo--social)
 - [Infrastructure](#infrastructure)
 - [Feature Flags Reference](#feature-flags-reference)
@@ -233,15 +243,16 @@ All UI labels, buttons, hints, error messages, empty states, and filter names ar
 
 ## Admin Panel
 
-The admin panel is accessible at `/admin`. It has five main tabs:
+The admin panel is accessible at `/admin`. Analytics is the default landing page. It has six main tabs:
 
 | Tab | Shortcut | Purpose |
 |-----|----------|---------|
-| Stories | `Cmd+1` | Manage story content and images |
-| Toggles | `Cmd+2` | Control feature flags |
-| Analytics | `Cmd+3` | View visitor, revenue, and voice metrics |
+| Analytics | `Cmd+1` | View visitor, revenue, and voice metrics |
+| Stories | `Cmd+2` | Manage story content and images |
+| Features | `Cmd+3` | Control feature flags by category |
 | Marketing | `Cmd+4` | Social media automation |
 | Suggestions | `Cmd+5` | Review visitor-submitted place suggestions |
+| Agents | `Cmd+6` | Monitor automated agents and toggle agent flags |
 
 ### Access & Authentication
 
@@ -307,9 +318,21 @@ Uploaded files are stored in the `story-images` Supabase Storage bucket with a u
 
 ### Feature Flags
 
-The Feature Toggles tab shows all 10 feature flags with toggle switches.
+The Features tab organizes 17 feature flags into five categories, each with a search input and category tab bar.
 
-Each flag shows its label, optional description, and current enabled/disabled state. Clicking a toggle sends an API request to update the flag in the database. A note reminds admins that "Changes take effect within 1 minute" (due to client-side caching).
+| Category | Description | Flag count |
+|----------|-------------|------------|
+| Discovery | Help visitors find and explore stories | 7 |
+| Experience | Enhance the viewing experience | 4 |
+| Social | Community and sharing features | 2 |
+| Voice | Voice assistant features | 3 |
+| System | System settings and maintenance | 1 |
+
+Each flag shows its label, description, current on/off status, and a toggle switch. A global search filters flags by label or description across the active category. A header displays the overall enabled/total count (e.g., "12/18 Active" — the tunnel counts as one extra in System).
+
+Some flags have expandable configuration panels (gear icon): `visitor_voice_agent` opens voice agent settings, and `maintenance_mode` opens maintenance message settings.
+
+Agent-related flags (master toggle + 7 individual agents) are managed separately in the [Agents Dashboard](#agents-dashboard).
 
 See [Feature Flags Reference](#feature-flags-reference) below for the full list.
 
@@ -410,6 +433,129 @@ Voice agent metrics from ElevenLabs Conversational AI.
 
 **Configuration** — Requires `ELEVENLABS_API_KEY` environment variable. Only shows data for agents with names starting with "Paisaxe".
 
+### Agents Dashboard
+
+The Agents tab provides a unified view of all 7 automated CI/CD agents. Data is fetched from `GET /api/admin/agents-summary`, which reads agent report files from `docs/agents/` and the shared context file. Uses the same `AnalyticsCacheProvider` caching as the Analytics tabs.
+
+The dashboard has five sections:
+
+#### Overall Health Banner
+
+A color-coded banner showing system-wide health status:
+
+| Color | Meaning |
+|-------|---------|
+| Green | All agents reporting healthy |
+| Yellow | Some agents have warnings or unknown status |
+| Red | At least one agent has critical issues |
+
+Displays the count of healthy agents (e.g., "5/7 agents healthy").
+
+#### Agent Toggles
+
+Eight toggle switches for controlling automated agents:
+
+| Flag | Controls |
+|------|----------|
+| `automated_agents` | Master toggle — disables all agents when off |
+| `coverage_agent_enabled` | Coverage agent (daily at 2:00 AM) |
+| `security_agent_enabled` | Security agent (weekly Monday 9:00 AM) |
+| `documentation_agent_enabled` | Documentation agent (weekly Sunday 6:00 AM) |
+| `performance_agent_enabled` | Performance agent (weekly Saturday 10:00 AM) |
+| `qa_agent_enabled` | QA agent (weekly Sunday 8:00 AM) |
+| `localization_agent_enabled` | Localization agent (weekly Sunday 7:00 AM) |
+| `cost_analyst_agent_enabled` | Cost Analyst agent (daily at 3:00 AM) |
+
+Individual agent toggles have an expandable configuration panel (gear icon) for adjusting agent-specific settings like schedule and prompt parameters.
+
+#### Agent Status Grid
+
+A responsive card grid (2-4 columns) showing each agent's current state:
+
+- **Agent name** and schedule description
+- **Health indicator** — colored dot (green/yellow/red/gray)
+- **Health summary** — one-line description parsed from the agent's last report
+- **Last run** — relative time (e.g., "2h ago", "3d ago")
+
+Health status is parsed from each agent's report file using multiple format patterns (e.g., "Health Status: GREEN", "Status: HEALTHY").
+
+#### Cross-Agent Insights
+
+Displays parsed entries from `docs/agents/shared-context.md` — findings that agents have flagged for cross-team awareness. Each entry shows the agent name, timestamp, and the markdown content of their shared insight.
+
+#### Recent Activity Timeline
+
+A chronological timeline of agent runs with health-colored dots, agent names, timestamps, and key findings. Sorted by most recent first.
+
+---
+
+## Automated Agents
+
+Paisaxe runs 7 automated quality agents on launchd schedules. Each agent uses the Claude CLI (`claude -p`) in non-interactive mode to analyze the codebase and produce a markdown report in `docs/agents/`.
+
+### Scheduled Agents
+
+| Agent | Schedule | Report File | Focus |
+|-------|----------|-------------|-------|
+| Coverage | Daily 2:00 AM | `coverage-report.md` | Test coverage gaps |
+| Security | Weekly Mon 9:00 AM | `security-report.md` | Vulnerabilities, secrets, OWASP |
+| Documentation | Weekly Sun 6:00 AM | `documentation-report.md` | Doc freshness and accuracy |
+| Performance | Weekly Sat 10:00 AM | `performance-report.md` | Bundle size, Lighthouse, bottlenecks |
+| QA | Weekly Sun 8:00 AM | `qa-report.md` | LLM response quality, test gaps |
+| Localization | Weekly Sun 7:00 AM | `localization-report.md` | Translation coverage |
+| Cost Analyst | Daily 3:00 AM | `cost-analyst-report.md` | API spend tracking |
+
+Each agent checks its feature flag before running. If the flag is disabled (or the master `automated_agents` flag is off), the agent exits immediately.
+
+### Shared Context System
+
+Agents share findings with each other through `docs/agents/shared-context.md`. This enables cross-pollination — for example, the Security agent finds a vulnerable dependency, the Cost agent factors in upgrade costs, and the QA agent adds tests for the affected area.
+
+**How it works:**
+
+1. Before running, each agent reads `shared-context.md` and injects other agents' recent findings into its Claude prompt
+2. After running, the agent extracts cross-agent recommendations from its report and appends them to `shared-context.md`
+3. A pruning function keeps only the last 3 entries per agent to prevent the file from growing unbounded
+
+**Entry format:**
+```
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-02-06T09:00:00Z -->
+## Security Agent — 2026-02-06
+- Key findings and cross-agent recommendations
+<!-- ENTRY:END -->
+```
+
+Shell functions in `scripts/lib/agent-utils.sh`: `read_shared_context`, `write_shared_context`, `prune_shared_context`.
+
+### Agent Team Skills
+
+Four slash commands that create multi-agent teams for specific workflows. These use Claude Code's Agent Teams feature (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
+
+| Skill | Command | Team Size | Purpose |
+|-------|---------|-----------|---------|
+| Pre-Launch Audit | `/pre-launch` | 6 specialists | Full system review before production deploy |
+| PR Review | `/review-pr [number]` | 3-4 reviewers | Multi-perspective code review |
+| Dependency Upgrade | `/upgrade-deps [package]` | 3 specialists | Coordinated dependency upgrades |
+| Incident Response | `/incident [description]` | 3 specialists | Production incident diagnosis |
+
+**`/pre-launch`** — Creates architect, qa-lead, security-reviewer, performance-eng, ux-reviewer, and devops teammates. Each investigates their area in parallel. Produces `docs/agents/pre-launch-report.md` with a verdict (READY / CONDITIONAL / NOT READY).
+
+**`/review-pr`** — Creates security-reviewer, qa-reviewer, arch-reviewer, and optionally perf-reviewer (for large PRs). Accepts a PR number or auto-detects from the current branch.
+
+**`/upgrade-deps`** — Creates compatibility-analyst, implementer, and test-runner in sequence. Accepts a package name or runs `npm outdated` to propose candidates. Produces `docs/agents/upgrade-report.md`.
+
+**`/incident`** — Creates health-checker, log-analyst, and rollback-assessor. Accepts an optional incident description. Outputs diagnosis, probable cause, and rollback commands.
+
+### Agent Team Rules
+
+Three patterns defined in `CLAUDE.md` that trigger agent teams automatically or on command:
+
+| Rule | Trigger | Team |
+|------|---------|------|
+| Debug Mode | "enter debug mode" or "debug this" | 3-5 parallel investigators with competing hypotheses |
+| Large Refactoring | Auto-detected when refactoring touches 5+ files | architect + dependency-analyst (parallel), then implementer, then test-updater |
+| Code Quality Audit | "run a code quality audit" | dead-code-hunter + pattern-enforcer + complexity-analyst (parallel) |
+
 ---
 
 ## SEO & Social
@@ -502,32 +648,37 @@ Scheduled via pg_cron + pg_net and deployed with `supabase functions deploy keep
 
 ## Feature Flags Reference
 
-All flags are managed from the admin panel and take effect within approximately 1 minute of toggling.
+All flags are managed from the admin panel and take effect within approximately 1 minute of toggling. Feature flags are split across two tabs: the Features tab (17 flags in 5 categories) and the Agents tab (8 agent flags).
 
-### Experience Flags
+### Discovery Flags (Features tab)
+
+| Flag | Controls |
+|------|----------|
+| `contextual_prompts` | Suggested question prompts below story description |
+| `related_stories` | Related stories carousel |
+| `randomized_order` | Session-based story shuffle |
+| `surprise_me` | Surprise Me button visibility |
+| `seasonal_surfacing` | Boost stories matching the current month |
+| `mood_discovery` | Mood overlay on first visit |
+| `story_freshness` | "NEW" badge on stories less than 14 days old |
+
+### Experience Flags (Features tab)
 
 | Flag | Controls |
 |------|----------|
 | `ambient_discovery` | Ambient mode (slow auto-play with cinematic transitions) |
 | `autoplay_button` | Play/pause button for auto-play in story viewer |
-| `mood_discovery` | Mood overlay on first visit |
-| `randomized_order` | Session-based story shuffle |
-| `seasonal_surfacing` | Boost stories matching the current month |
-| `surprise_me` | Surprise Me button visibility |
-| `story_sharing` | Share button visibility |
-| `story_freshness` | "NEW" badge on stories less than 14 days old |
-| `related_stories` | Related stories carousel |
-| `contextual_prompts` | Suggested question prompts below story description |
 | `asturianu_touches` | Asturian language labels and titles |
 | `fullscreen_button` | Fullscreen button in toolbar (native fullscreen on desktop, Add to Home Screen on iOS/iPad) |
 
-### Social Flags
+### Social Flags (Features tab)
 
 | Flag | Controls |
 |------|----------|
+| `story_sharing` | Share button visibility |
 | `user_story_suggestions` | "Suggest a Place" button for visitor submissions |
 
-### Voice Flags
+### Voice Flags (Features tab)
 
 | Flag | Controls |
 |------|----------|
@@ -535,15 +686,21 @@ All flags are managed from the admin panel and take effect within approximately 
 | `booking_system` | Master toggle for Pelayo's outbound booking calls to restaurants/hotels |
 | `sms_booking_confirmation` | SMS confirmation to customers via Twilio after booking calls complete |
 
-### System Flags
+### System Flags (Features tab)
 
 | Flag | Controls |
 |------|----------|
 | `maintenance_mode` | Shows maintenance page instead of the main app |
+
+### Agent Flags (Agents tab)
+
+| Flag | Controls |
+|------|----------|
 | `automated_agents` | Master toggle for all automated CI/CD agents |
-| `coverage_agent_enabled` | Coverage agent (runs daily at 2:00 AM) |
-| `security_agent_enabled` | Security agent (runs weekly on Monday) |
-| `documentation_agent_enabled` | Documentation agent (runs weekly on Sunday) |
-| `performance_agent_enabled` | Performance agent (runs weekly on Saturday) |
-| `qa_agent_enabled` | QA agent for LLM response quality testing |
-| `localization_agent_enabled` | Localization agent (runs weekly on Sunday) — ensures 100% translation coverage |
+| `coverage_agent_enabled` | Coverage agent (daily at 2:00 AM) |
+| `security_agent_enabled` | Security agent (weekly Monday 9:00 AM) |
+| `documentation_agent_enabled` | Documentation agent (weekly Sunday 6:00 AM) |
+| `performance_agent_enabled` | Performance agent (weekly Saturday 10:00 AM) |
+| `qa_agent_enabled` | QA agent (weekly Sunday 8:00 AM) |
+| `localization_agent_enabled` | Localization agent (weekly Sunday 7:00 AM) |
+| `cost_analyst_agent_enabled` | Cost Analyst agent (daily at 3:00 AM) |
