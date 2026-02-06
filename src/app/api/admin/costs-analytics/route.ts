@@ -7,6 +7,7 @@ import {
   fetchElevenLabsCosts,
   fetchManualCosts,
   createManualCost,
+  generateRecurringCosts,
 } from "@/lib/costs";
 import type {
   CostsAnalyticsDashboardData,
@@ -14,7 +15,9 @@ import type {
   ServiceCost,
   CostsByDay,
   CreateManualCostRequest,
+  UsageMetrics,
 } from "@/types/costs-analytics";
+import { queryPostHog } from "@/lib/posthog-query";
 
 function formatUsd(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -80,6 +83,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Add recurring costs for services not already covered by API or manual
+    const coveredServiceIds = new Set(services.map((s) => s.serviceId));
+    const recurringCosts = generateRecurringCosts(fromParam, toParam);
+    for (const recurringCost of recurringCosts) {
+      if (!coveredServiceIds.has(recurringCost.serviceId)) {
+        services.push(recurringCost);
+      }
+    }
+
     // Sort by cost descending
     services.sort((a, b) => b.costUsd - a.costUsd);
 
@@ -134,6 +146,12 @@ export async function GET(request: NextRequest) {
       automatedServices,
     };
 
+    // Optionally fetch usage metrics for forecast
+    let usageMetrics: UsageMetrics | undefined;
+    if (url.searchParams.get("includeUsage") === "true") {
+      usageMetrics = await fetchUsageMetrics(fromParam, toParam);
+    }
+
     const data: CostsAnalyticsDashboardData = {
       summary,
       services,
@@ -142,6 +160,7 @@ export async function GET(request: NextRequest) {
         from: fromParam,
         to: toParam,
       },
+      usageMetrics,
     };
 
     return NextResponse.json({ data });
@@ -151,6 +170,124 @@ export async function GET(request: NextRequest) {
       { error: "Failed to fetch costs data" },
       { status: 500 }
     );
+  }
+}
+
+const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
+
+/**
+ * Fetch usage metrics from PostHog and ElevenLabs for forecast computation.
+ * Gracefully returns undefined on failure.
+ */
+async function fetchUsageMetrics(
+  from: string,
+  to: string
+): Promise<UsageMetrics | undefined> {
+  try {
+    const projectId = process.env.POSTHOG_PROJECT_ID?.trim();
+    const posthogKey = process.env.POSTHOG_PERSONAL_API_KEY?.trim();
+    const elevenLabsKey = process.env.ELEVENLABS_API_KEY?.trim();
+
+    const periodDays = Math.max(
+      1,
+      Math.ceil(
+        (new Date(to).getTime() - new Date(from).getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1
+    );
+
+    let visitors = 0;
+    let chatConversations = 0;
+    let voiceConversations = 0;
+    let voiceMinutes = 0;
+    let posthogEvents = 0;
+
+    // Fetch PostHog metrics (visitors + chat conversations + total events)
+    if (projectId && posthogKey) {
+      const formatForHogQL = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toISOString().slice(0, 19).replace("T", " ");
+      };
+      const hogFrom = formatForHogQL(from);
+      const hogTo = formatForHogQL(to);
+
+      try {
+        const [visitorsResult, chatsResult, eventsResult] = await Promise.all([
+          queryPostHog(
+            `SELECT count(DISTINCT distinct_id) FROM events WHERE event = '$pageview' AND timestamp >= '${hogFrom}' AND timestamp <= '${hogTo}' AND properties.$current_url NOT LIKE '%localhost%'`,
+            projectId,
+            posthogKey
+          ),
+          queryPostHog(
+            `SELECT count() FROM events WHERE event = 'chat_conversation_started' AND timestamp >= '${hogFrom}' AND timestamp <= '${hogTo}'`,
+            projectId,
+            posthogKey
+          ),
+          queryPostHog(
+            `SELECT count() FROM events WHERE timestamp >= '${hogFrom}' AND timestamp <= '${hogTo}'`,
+            projectId,
+            posthogKey
+          ),
+        ]);
+
+        visitors = Number(visitorsResult.results[0]?.[0] || 0);
+        chatConversations = Number(chatsResult.results[0]?.[0] || 0);
+        posthogEvents = Number(eventsResult.results[0]?.[0] || 0);
+      } catch (error) {
+        console.warn("Failed to fetch PostHog usage metrics:", error);
+      }
+    }
+
+    // Fetch ElevenLabs voice metrics
+    if (elevenLabsKey) {
+      try {
+        const response = await fetch(
+          `${ELEVENLABS_API_BASE}/convai/conversations?page_size=100`,
+          {
+            headers: {
+              "xi-api-key": elevenLabsKey,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const conversations = data.conversations || [];
+
+          const fromTs = new Date(from).getTime() / 1000;
+          const toTs = new Date(to).getTime() / 1000;
+
+          const filtered = conversations.filter(
+            (c: { start_time_unix_secs?: number }) => {
+              const ts = c.start_time_unix_secs || 0;
+              return ts >= fromTs && ts <= toTs;
+            }
+          );
+
+          voiceConversations = filtered.length;
+          voiceMinutes = filtered.reduce(
+            (sum: number, c: { call_duration_secs?: number }) =>
+              sum + (c.call_duration_secs || 0) / 60,
+            0
+          );
+          voiceMinutes = Math.round(voiceMinutes * 10) / 10;
+        }
+      } catch (error) {
+        console.warn("Failed to fetch ElevenLabs usage metrics:", error);
+      }
+    }
+
+    return {
+      visitors,
+      chatConversations,
+      voiceConversations,
+      voiceMinutes,
+      periodDays,
+      posthogEvents,
+    };
+  } catch (error) {
+    console.warn("Failed to fetch usage metrics:", error);
+    return undefined;
   }
 }
 
