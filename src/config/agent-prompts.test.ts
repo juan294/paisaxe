@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  AGENT_PROMPT_DEFAULTS,
-  SHARED_CONTEXT_READ_INSTRUCTION,
-  SHARED_CONTEXT_WRITE_INSTRUCTION,
-  type AgentPromptConfig,
-} from "./agent-prompts";
+import { AGENT_PROMPT_DEFAULTS } from "./agent-prompts";
 
 describe("AGENT_PROMPT_DEFAULTS", () => {
   const agentKeys = Object.keys(AGENT_PROMPT_DEFAULTS);
@@ -15,28 +10,28 @@ describe("AGENT_PROMPT_DEFAULTS", () => {
 
   it("all agents have non-empty prompt", () => {
     for (const key of agentKeys) {
-      const config: AgentPromptConfig = AGENT_PROMPT_DEFAULTS[key];
+      const config = AGENT_PROMPT_DEFAULTS[key];
       expect(config.prompt.trim().length, `${key} has empty prompt`).toBeGreaterThan(0);
     }
   });
 
   it("all agents have non-empty schedule", () => {
     for (const key of agentKeys) {
-      const config: AgentPromptConfig = AGENT_PROMPT_DEFAULTS[key];
+      const config = AGENT_PROMPT_DEFAULTS[key];
       expect(config.schedule.trim().length, `${key} has empty schedule`).toBeGreaterThan(0);
     }
   });
 
   it("all agents have non-empty outputFile", () => {
     for (const key of agentKeys) {
-      const config: AgentPromptConfig = AGENT_PROMPT_DEFAULTS[key];
+      const config = AGENT_PROMPT_DEFAULTS[key];
       expect(config.outputFile.trim().length, `${key} has empty outputFile`).toBeGreaterThan(0);
     }
   });
 
   it("no whitespace-only system prompts", () => {
     for (const key of agentKeys) {
-      const config: AgentPromptConfig = AGENT_PROMPT_DEFAULTS[key];
+      const config = AGENT_PROMPT_DEFAULTS[key];
       // A prompt that is only whitespace (spaces, newlines, tabs)
       expect(config.prompt.trim(), `${key} prompt is whitespace-only`).not.toBe("");
     }
@@ -52,7 +47,7 @@ describe("AGENT_PROMPT_DEFAULTS", () => {
 
   it("all output files end with .md", () => {
     for (const key of agentKeys) {
-      const config: AgentPromptConfig = AGENT_PROMPT_DEFAULTS[key];
+      const config = AGENT_PROMPT_DEFAULTS[key];
       expect(config.outputFile, `${key} outputFile should end with .md`).toMatch(/\.md$/);
     }
   });
@@ -128,19 +123,3 @@ describe("AGENT_PROMPT_DEFAULTS", () => {
   });
 });
 
-describe("shared context instructions", () => {
-  it("SHARED_CONTEXT_READ_INSTRUCTION is a non-empty string", () => {
-    expect(typeof SHARED_CONTEXT_READ_INSTRUCTION).toBe("string");
-    expect(SHARED_CONTEXT_READ_INSTRUCTION.trim().length).toBeGreaterThan(0);
-  });
-
-  it("SHARED_CONTEXT_WRITE_INSTRUCTION is a non-empty string", () => {
-    expect(typeof SHARED_CONTEXT_WRITE_INSTRUCTION).toBe("string");
-    expect(SHARED_CONTEXT_WRITE_INSTRUCTION.trim().length).toBeGreaterThan(0);
-  });
-
-  it("SHARED_CONTEXT_WRITE_INSTRUCTION contains required markers", () => {
-    expect(SHARED_CONTEXT_WRITE_INSTRUCTION).toContain("SHARED_CONTEXT_START");
-    expect(SHARED_CONTEXT_WRITE_INSTRUCTION).toContain("SHARED_CONTEXT_END");
-  });
-});
