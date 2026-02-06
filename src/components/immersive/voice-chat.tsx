@@ -161,6 +161,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
           message: userMessage,
           context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
           locale,
+          messageIndex: messages.filter((m) => m.role === "user").length,
         }),
       });
 

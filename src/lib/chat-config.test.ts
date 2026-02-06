@@ -5,6 +5,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  buildSystemPrompt,
   PELAYO_SYSTEM_PROMPT,
   GENERIC_REDIRECT_RESPONSE,
   GENERIC_REDIRECT_RESPONSE_ES,
@@ -122,9 +123,9 @@ describe("PELAYO_SYSTEM_PROMPT", () => {
     });
   });
 
-  describe("tone and style guidelines", () => {
-    it("should be warm and enthusiastic", () => {
-      expect(PELAYO_SYSTEM_PROMPT).toContain("Warm and enthusiastic");
+  describe("personality and tone", () => {
+    it("should be warm and curious", () => {
+      expect(PELAYO_SYSTEM_PROMPT).toContain("Warm and curious");
     });
 
     it("should avoid tourism clichés", () => {
@@ -134,6 +135,15 @@ describe("PELAYO_SYSTEM_PROMPT", () => {
 
     it("should speak in first person", () => {
       expect(PELAYO_SYSTEM_PROMPT).toContain("first person");
+    });
+
+    it("should mention sensory details", () => {
+      expect(PELAYO_SYSTEM_PROMPT).toContain("sensory details");
+    });
+
+    it("should list banned phrases from Pelayo voice agent", () => {
+      expect(PELAYO_SYSTEM_PROMPT).toContain("bucket list");
+      expect(PELAYO_SYSTEM_PROMPT).toContain("picture perfect");
     });
   });
 
@@ -145,6 +155,55 @@ describe("PELAYO_SYSTEM_PROMPT", () => {
     it("should include Asturian/bable words", () => {
       expect(PELAYO_SYSTEM_PROMPT).toContain("Asturian/bable");
     });
+  });
+});
+
+describe("buildSystemPrompt", () => {
+  it("should return a string for any messageIndex", () => {
+    expect(typeof buildSystemPrompt(0)).toBe("string");
+    expect(typeof buildSystemPrompt(5)).toBe("string");
+  });
+
+  describe("first message (messageIndex=0)", () => {
+    const prompt = buildSystemPrompt(0);
+
+    it("should indicate this is message #1", () => {
+      expect(prompt).toContain("message #1");
+    });
+
+    it("should instruct to greet warmly", () => {
+      expect(prompt).toContain("greet the visitor warmly");
+    });
+
+    it("should NOT contain follow-up instructions", () => {
+      expect(prompt).not.toContain("Do NOT greet again");
+    });
+  });
+
+  describe("follow-up messages (messageIndex>0)", () => {
+    const prompt = buildSystemPrompt(3);
+
+    it("should indicate the correct message number", () => {
+      expect(prompt).toContain("message #4");
+    });
+
+    it("should instruct NOT to greet again", () => {
+      expect(prompt).toContain("Do NOT greet again");
+    });
+
+    it("should list specific greetings to avoid", () => {
+      expect(prompt).toContain("¡Hola!");
+      expect(prompt).toContain("Hello!");
+      expect(prompt).toContain("Welcome!");
+    });
+
+    it("should NOT contain first-message greeting instruction", () => {
+      expect(prompt).not.toContain("greet the visitor warmly");
+    });
+  });
+
+  it("should be backward-compatible with PELAYO_SYSTEM_PROMPT constant", () => {
+    expect(PELAYO_SYSTEM_PROMPT).toBe(buildSystemPrompt(0));
   });
 });
 
