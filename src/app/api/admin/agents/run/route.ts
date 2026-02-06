@@ -22,6 +22,8 @@ interface RunningAgent {
   logs: AgentLogLine[];
   process: ChildProcess;
   finished: boolean;
+  exitCode: number | null;
+  stoppedByUser: boolean;
 }
 
 /** In-memory tracking of running agent processes. */
@@ -112,6 +114,8 @@ export async function POST(request: NextRequest) {
     logs: [],
     process: child,
     finished: false,
+    exitCode: null,
+    stoppedByUser: false,
   };
 
   // Listen to stdout/stderr and push to ring buffer
@@ -142,6 +146,7 @@ export async function POST(request: NextRequest) {
     if (stdoutBuffer.trim()) appendLog(agent, stdoutBuffer);
     if (stderrBuffer.trim()) appendLog(agent, `[stderr] ${stderrBuffer}`);
     appendLog(agent, `Process exited with code ${code ?? "unknown"}`);
+    agent.exitCode = code ?? null;
     agent.finished = true;
   });
 
@@ -178,6 +183,8 @@ export async function GET(request: NextRequest) {
       logs,
       offset: agent.logs.length,
       finished: agent.finished,
+      exitCode: agent.exitCode,
+      stoppedByUser: agent.stoppedByUser,
     });
   }
 
@@ -236,6 +243,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   appendLog(agent, "Process stopped by user");
+  agent.stoppedByUser = true;
   agent.finished = true;
 
   return NextResponse.json({ stopped: true, agentKey });
