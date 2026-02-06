@@ -145,6 +145,15 @@ QA_ALERT_PHONE=                         # Phone for critical alerts (E.164: +346
 - Server: `validateAdminAuth()` checks cookies
 - Client: `useAdminRole()` hook
 
+### Analytics Dashboard Caching
+- **CSS visibility**: All 4 panels (Visitors, Voice, Costs, Revenue) stay mounted via `display:none` — no remount/refetch on tab switch
+- **In-memory SWR**: `AnalyticsCacheProvider` + `useAnalyticsData` hook in `analytics-cache-context.tsx`
+- Cache key = `${tabKey}:${JSON.stringify(params)}`, stale after 2 minutes
+- Background revalidation shows thin blue pulse bar, never blocks UI
+- `refresh()` invalidates cache (used after CRUD mutations in costs panel)
+- **HTTP Cache-Control**: `private, max-age=120, stale-while-revalidate=300` on all 4 admin analytics API routes
+- No external dependencies — pure React Context + `useRef<Map>`
+
 ### Proxy (NOT Middleware)
 **IMPORTANT: This project uses `src/proxy.ts`, NOT `middleware.ts`.**
 

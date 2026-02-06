@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   fetchCostsAnalytics,
   createManualCostEntry,
   updateManualCostEntry,
   deleteManualCostEntry,
 } from "@/lib/admin-api";
+import { useAnalyticsData } from "./analytics-cache-context";
 import {
   AlertCircle,
   Receipt,
@@ -35,9 +36,7 @@ import type { AlertLevel } from "@/config/service-tiers";
 import type { TierAlert } from "@/lib/costs/tier-alerts";
 
 export function CostsAnalyticsPanel() {
-  const [data, setData] = useState<CostsAnalyticsDashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [mutationError, setMutationError] = useState("");
   const [dateRange, setDateRange] = useState(() => {
     const now = new Date();
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -49,30 +48,23 @@ export function CostsAnalyticsPanel() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCost, setEditingCost] = useState<ServiceCost | null>(null);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
+  const params = JSON.stringify({ from: dateRange.from, to: dateRange.to });
+  const { data, isLoading, isRefreshing, error: fetchError, refresh } = useAnalyticsData(
+    "costs",
+    useCallback(() => fetchCostsAnalytics(dateRange.from, dateRange.to), [dateRange.from, dateRange.to]),
+    params
+  );
 
-    const result = await fetchCostsAnalytics(dateRange.from, dateRange.to);
-    if (result.error) {
-      setError(result.error);
-    } else if (result.data) {
-      setData(result.data);
-    }
-    setIsLoading(false);
-  }, [dateRange]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const error = mutationError || fetchError;
 
   const handleAddCost = async (formData: CreateManualCostRequest) => {
     const result = await createManualCostEntry(formData);
     if (result.error) {
-      setError(result.error);
+      setMutationError(result.error);
     } else {
       setShowAddModal(false);
-      loadData();
+      setMutationError("");
+      refresh();
     }
   };
 
@@ -82,9 +74,10 @@ export function CostsAnalyticsPanel() {
     }
     const result = await deleteManualCostEntry(id);
     if (result.error) {
-      setError(result.error);
+      setMutationError(result.error);
     } else {
-      loadData();
+      setMutationError("");
+      refresh();
     }
   };
 
@@ -116,14 +109,18 @@ export function CostsAnalyticsPanel() {
             />
           </div>
           <button
-            onClick={loadData}
+            onClick={refresh}
             disabled={isLoading}
             className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
           >
-            {isLoading ? "Loading..." : "Refresh"}
+            {isLoading ? "Loading..." : isRefreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </div>
+
+      {isRefreshing && (
+        <div className="h-0.5 w-full animate-pulse rounded-full bg-blue-500/30" />
+      )}
 
       {error && (
         <div className="flex items-center gap-3 font-mono text-xs text-red-600">
@@ -132,7 +129,7 @@ export function CostsAnalyticsPanel() {
         </div>
       )}
 
-      {isLoading && !data ? (
+      {isLoading ? (
         <SkeletonCostsDashboard />
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[300px] flex-col items-center justify-center gap-4">
@@ -256,10 +253,11 @@ export function CostsAnalyticsPanel() {
           onSave={async (id, updates) => {
             const result = await updateManualCostEntry(id, updates);
             if (result.error) {
-              setError(result.error);
+              setMutationError(result.error);
             } else {
               setEditingCost(null);
-              loadData();
+              setMutationError("");
+              refresh();
             }
           }}
         />

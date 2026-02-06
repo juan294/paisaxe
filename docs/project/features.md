@@ -315,15 +315,16 @@ See [Feature Flags Reference](#feature-flags-reference) below for the full list.
 
 ### Analytics Dashboard
 
-The Analytics tab organizes metrics into three sub-tabs, each focused on a specific data source. Switch between sub-tabs using the pill buttons or keyboard shortcuts (`v`, `r`, `e`).
+The Analytics tab organizes metrics into four sub-tabs, each focused on a specific data source. Switch between sub-tabs using the pill buttons or keyboard shortcuts.
 
 | Sub-tab | Shortcut | Data Source | Default Date Range |
 |---------|----------|-------------|-------------------|
 | Visitors | `v` | PostHog | Last 7 days |
 | Revenue | `r` | Stripe | Last 30 days |
 | Voice | `e` | ElevenLabs | Last 30 days |
+| Costs | `c` | Anthropic, Twilio, ElevenLabs, manual | Current month |
 
-Each sub-tab loads data lazily—API calls are only made when a tab becomes active.
+**Caching architecture** — All four panels are mounted simultaneously (CSS `display:none` for inactive tabs) so they fetch data in parallel on first load. An in-memory stale-while-revalidate cache (`AnalyticsCacheProvider`) ensures tab switches are instant. Data becomes stale after 2 minutes, triggering a background refresh that shows a subtle blue indicator bar. API routes also set `Cache-Control: private, max-age=120, stale-while-revalidate=300` for browser-level caching.
 
 #### Visitors Analytics
 

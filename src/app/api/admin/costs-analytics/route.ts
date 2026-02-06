@@ -163,7 +163,11 @@ export async function GET(request: NextRequest) {
       usageMetrics,
     };
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ data }, {
+      headers: {
+        "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
+      },
+    });
   } catch (error) {
     console.error("Costs analytics API error:", error);
     return NextResponse.json(

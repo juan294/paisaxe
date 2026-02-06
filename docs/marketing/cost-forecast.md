@@ -13,7 +13,7 @@
 | Service | Purpose | Current Tier |
 |---------|---------|--------------|
 | **Supabase** | Database (PostgreSQL + pgvector), Auth, Storage, Realtime | Pro ($25/mo) |
-| **Vercel** | Hosting, Edge Functions, CDN | Pro ($20/mo) |
+| **Vercel** | Hosting, Edge Functions, CDN | Hobby (Free) |
 | **Claude API (Anthropic)** | Chat responses | Pay-as-you-go |
 | **Voyage AI** | Embeddings + Reranking | Pay-as-you-go |
 | **ElevenLabs** | Voice agents | Starter ($5/mo) |
@@ -32,10 +32,11 @@
   - Realtime: Free up to 200 concurrent connections, 2M messages/month
   - Edge Functions: 500K invocations/month included
 
-### Vercel (Pro Tier)
-- **Base**: $20/month per team member
-- **Includes**: Unlimited bandwidth, 100 GB-hours serverless, 1TB edge bandwidth
-- **Overages**: $0.15/GB bandwidth, $0.18/GB-hour serverless
+### Vercel (Hobby Tier)
+- **Base**: Free
+- **Includes**: 100 GB bandwidth, 100 GB-hours serverless, 10s function timeout
+- **Limits**: Single team member, no spend management, 10s serverless timeout
+- **Note**: Hobby tier is sufficient for Low/Medium traffic. At High traffic (50K+ visitors), upgrade to Pro ($20/mo) recommended for increased bandwidth and 60s function timeout.
 
 ### Claude API (Anthropic)
 Using Claude 4.5 Sonnet (balanced cost/performance):
@@ -108,12 +109,12 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 | Service | Calculation | Monthly Cost |
 |---------|-------------|--------------|
 | Supabase Pro | Base plan | $25.00 |
-| Vercel Pro | Base plan (1 member) | $20.00 |
+| Vercel Hobby | Free tier | $0.00 |
 | Claude API | 100 chats × 2.5K tokens = 250K tokens ≈ $1 | $1.00 |
 | Voyage AI | Within free tier (200M tokens) | $0.00 |
 | ElevenLabs | 20 × 3 min = 60 min (Starter ~45 min included, may need upgrade) | $5.00 |
 | PostHog | 2K events (within 1M free) | $0.00 |
-| **TOTAL** | | **$51.00/mo** |
+| **TOTAL** | | **$31.00/mo** |
 
 ### Recommended Budget Limits
 - ElevenLabs: Start with Starter ($5/mo), upgrade to Creator ($22/mo) if exceeding ~40 min
@@ -140,12 +141,12 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 | Service | Calculation | Monthly Cost |
 |---------|-------------|--------------|
 | Supabase Pro | Base plan (storage still under 8GB) | $25.00 |
-| Vercel Pro | Base plan (bandwidth under limits) | $20.00 |
+| Vercel Hobby | Free tier (bandwidth under 100 GB) | $0.00 |
 | Claude API | 1,500 × 2.5K = 3.75M tokens | $15.00 |
 | Voyage AI | Still within free tier | $0.00 |
 | ElevenLabs | 300 × 3 min = 900 min (Pro ~500 min + overage ~$32) | $131.00 |
 | PostHog | 20K events (within 1M free) | $0.00 |
-| **TOTAL** | | **$191.00/mo** |
+| **TOTAL** | | **$171.00/mo** |
 
 ### Recommended Budget Limits
 - ElevenLabs: Pro tier ($99/mo) with overage cap at $150/mo total
@@ -170,7 +171,7 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 | Service | Calculation | Monthly Cost |
 |---------|-------------|--------------|
 | Supabase Pro | Base + potential compute upgrade | $35.00 |
-| Vercel Pro | Base + potential bandwidth overage | $30.00 |
+| Vercel Pro | Upgrade recommended at this scale ($20/mo + bandwidth) | $30.00 |
 | Claude API | 15K × 2.5K = 37.5M tokens | $150.00 |
 | Voyage AI | Reranking may exceed free tier (~$5) | $5.00 |
 | ElevenLabs | 3K × 3 min = 9,000 min (Scale ~2,000 min + 7,000 min overage @ $0.08) | $890.00 |
@@ -268,8 +269,8 @@ Set up alerts for:
 
 | Scenario | Monthly Visitors | Monthly Cost | Key Driver |
 |----------|------------------|--------------|------------|
-| **Low** (Soft Launch) | 500 | ~$51 | Base infrastructure |
-| **Medium** (Growing) | 5,000 | ~$191 | Voice agents |
+| **Low** (Soft Launch) | 500 | ~$31 | Base infrastructure |
+| **Medium** (Growing) | 5,000 | ~$171 | Voice agents |
 | **High** (Viral) | 50,000 | ~$1,110 | Voice agents (overage) |
 
 **The voice agent (ElevenLabs) is the most expensive variable cost.** Consider gating it behind authentication or limiting availability if costs need to be controlled.

@@ -115,8 +115,8 @@ export function AnalyticsTabs({ activeTab, onTabChange, children }: AnalyticsTab
         ))}
       </nav>
 
-      {/* Tab content */}
-      <div role="tabpanel">{children}</div>
+      {/* Tab content — each panel provides its own tabpanel role */}
+      {children}
     </div>
   );
 }

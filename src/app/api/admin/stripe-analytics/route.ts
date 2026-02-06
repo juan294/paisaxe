@@ -211,6 +211,10 @@ export async function GET(request: NextRequest) {
         productBreakdown,
         dateRange: { from: fromParam, to: toParam },
       },
+    }, {
+      headers: {
+        "Cache-Control": "private, max-age=120, stale-while-revalidate=300",
+      },
     });
   } catch (error) {
     console.error("Stripe analytics API error:", error);

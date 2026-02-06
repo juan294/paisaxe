@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { fetchStripeAnalytics } from "@/lib/admin-api";
+import { useAnalyticsData } from "./analytics-cache-context";
 import {
   AlertCircle,
   DollarSign,
@@ -16,38 +17,31 @@ import type {
 } from "@/types/stripe-analytics";
 
 export function StripeAnalyticsPanel() {
-  const [data, setData] = useState<StripeAnalyticsDashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
   const [dateRange, setDateRange] = useState({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     to: new Date().toISOString().split("T")[0],
   });
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
-    setWarning("");
+  const fromISO = new Date(dateRange.from).toISOString();
+  const toISO = new Date(dateRange.to + "T23:59:59").toISOString();
 
-    const fromISO = new Date(dateRange.from).toISOString();
-    const toISO = new Date(dateRange.to + "T23:59:59").toISOString();
-
+  const params = JSON.stringify({ from: dateRange.from, to: dateRange.to });
+  const fetchFn = useCallback(async () => {
     const result = await fetchStripeAnalytics(fromISO, toISO);
-    if (result.error) {
-      setError(result.error);
-    } else if (result.data) {
-      setData(result.data);
-      if (result.warning) {
-        setWarning(result.warning);
-      }
+    if (result.warning) {
+      setWarning(result.warning);
+    } else {
+      setWarning("");
     }
-    setIsLoading(false);
-  }, [dateRange]);
+    return result;
+  }, [fromISO, toISO]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const { data, isLoading, isRefreshing, error, refresh } = useAnalyticsData(
+    "revenue",
+    fetchFn,
+    params
+  );
 
   return (
     <div className="space-y-12">
@@ -73,11 +67,11 @@ export function StripeAnalyticsPanel() {
             />
           </div>
           <button
-            onClick={loadData}
+            onClick={refresh}
             disabled={isLoading}
             className="font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
           >
-            {isLoading ? "Loading..." : "Refresh"}
+            {isLoading ? "Loading..." : isRefreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </div>
@@ -98,6 +92,10 @@ export function StripeAnalyticsPanel() {
         </div>
       )}
 
+      {isRefreshing && (
+        <div className="h-0.5 w-full animate-pulse rounded-full bg-blue-500/30" />
+      )}
+
       {error && (
         <div className="flex items-center gap-3 font-mono text-xs text-red-600">
           <AlertCircle className="h-4 w-4" />
@@ -105,7 +103,7 @@ export function StripeAnalyticsPanel() {
         </div>
       )}
 
-      {isLoading && !data ? (
+      {isLoading ? (
         <SkeletonRevenueDashboard />
       ) : data && isEmptyData(data) ? (
         <div className="flex min-h-[300px] flex-col items-center justify-center gap-4">

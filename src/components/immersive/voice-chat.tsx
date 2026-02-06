@@ -27,6 +27,7 @@ import {
   recordUpsellShown,
   recordUpsellDismissed,
 } from "@/lib/chat-upsell-throttle";
+import { usePostHog } from "posthog-js/react";
 
 interface VoiceChatProps {
   story: Story;
@@ -55,6 +56,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { t, locale } = useTranslation();
   const localizedStory = getLocalizedStory(story, locale);
+  const posthog = usePostHog();
 
   // Check for voice access (whitelisted OR paid)
   const {
@@ -133,9 +135,19 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     if (!inputValue.trim() || isLoading) return;
 
     const userMessage = inputValue.trim();
+    const isFirstMessage = messages.length === 0;
     setInputValue("");
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
+
+    // Track chat events in PostHog
+    if (isFirstMessage) {
+      posthog?.capture("chat_conversation_started", { story_id: story.id });
+    }
+    posthog?.capture("chat_message_sent", {
+      story_id: story.id,
+      message_index: messages.length,
+    });
 
     // Add empty assistant message that will be streamed into
     const assistantIndex = messages.length + 1; // +1 for the user message we just added

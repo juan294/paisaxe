@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ElevenLabsAnalyticsPanel } from "./elevenlabs-analytics-panel";
+import { AnalyticsCacheProvider } from "./analytics-cache-context";
 import * as adminApi from "@/lib/admin-api";
+
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+  <AnalyticsCacheProvider>{children}</AnalyticsCacheProvider>
+);
 
 vi.mock("@/lib/admin-api", () => ({
   fetchElevenLabsAnalytics: vi.fn(),
@@ -59,7 +64,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       () => new Promise(() => {})
     );
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
@@ -69,7 +74,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       data: mockData,
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("25")).toBeInTheDocument();
@@ -89,7 +94,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       data: mockData,
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("01 — By Agent")).toBeInTheDocument();
@@ -106,7 +111,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       data: mockData,
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("02 — By Language")).toBeInTheDocument();
@@ -121,7 +126,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       data: mockData,
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("04 — Recent Conversations")).toBeInTheDocument();
@@ -153,7 +158,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       },
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("No conversations yet")).toBeInTheDocument();
@@ -169,7 +174,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       error: "Failed to fetch data",
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Failed to fetch data")).toBeInTheDocument();
@@ -182,7 +187,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       data: mockData,
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Refresh")).toBeInTheDocument();
@@ -198,7 +203,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       data: mockData,
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("4.2")).toBeInTheDocument();
@@ -216,7 +221,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       },
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("—")).toBeInTheDocument();
@@ -228,7 +233,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       data: mockData,
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Voice Analytics")).toBeInTheDocument();
@@ -240,7 +245,7 @@ describe("ElevenLabsAnalyticsPanel", () => {
       data: mockData,
     });
 
-    render(<ElevenLabsAnalyticsPanel />);
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Active calls: 2")).toBeInTheDocument();
