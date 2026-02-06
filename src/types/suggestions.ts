@@ -5,7 +5,7 @@ export type SuggestionStatus = "pending" | "reviewed" | "converted" | "rejected"
 // Database row type
 export interface StorySuggestionRow {
   id: string;
-  user_id: string;
+  user_id: string | null;
   place_name: string;
   comment: string | null;
   location: string | null;
@@ -20,7 +20,7 @@ export interface StorySuggestionRow {
 // Application type
 export interface StorySuggestion {
   id: string;
-  userId: string;
+  userId: string | null;
   placeName: string;
   comment: string | null;
   location: StoryLocation | null;

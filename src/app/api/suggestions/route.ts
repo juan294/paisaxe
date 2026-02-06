@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 import type { CreateSuggestionRequest, StorySuggestionRow } from "@/types/suggestions";
 import { rowToStorySuggestion } from "@/types/suggestions";
 
-// In-memory rate limiting (per user)
+// In-memory rate limiting (per user ID or IP)
 const rateLimitMap = new Map<string, number>();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 
@@ -55,9 +55,18 @@ async function getUserFromRequest(request: NextRequest) {
   return user;
 }
 
-function isRateLimited(userId: string): boolean {
+function getRateLimitKey(request: NextRequest, userId: string | null): string {
+  if (userId) return `user:${userId}`;
+  // For anonymous users, rate limit by IP
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")
+    || "unknown";
+  return `ip:${ip}`;
+}
+
+function isRateLimited(key: string): boolean {
   const now = Date.now();
-  const lastSubmission = rateLimitMap.get(userId);
+  const lastSubmission = rateLimitMap.get(key);
 
   if (lastSubmission && now - lastSubmission < RATE_LIMIT_WINDOW_MS) {
     return true;
@@ -66,21 +75,21 @@ function isRateLimited(userId: string): boolean {
   return false;
 }
 
-function recordSubmission(userId: string): void {
-  rateLimitMap.set(userId, Date.now());
+function recordSubmission(key: string): void {
+  rateLimitMap.set(key, Date.now());
 
   // Clean up old entries periodically (every 100 entries)
   if (rateLimitMap.size > 100) {
     const now = Date.now();
-    for (const [key, timestamp] of rateLimitMap.entries()) {
+    for (const [k, timestamp] of rateLimitMap.entries()) {
       if (now - timestamp > RATE_LIMIT_WINDOW_MS * 5) {
-        rateLimitMap.delete(key);
+        rateLimitMap.delete(k);
       }
     }
   }
 }
 
-// GET /api/suggestions - Get user's own suggestions
+// GET /api/suggestions - Get user's own suggestions (requires auth)
 export async function GET(request: NextRequest) {
   const user = await getUserFromRequest(request);
 
@@ -111,19 +120,14 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ data: suggestions });
 }
 
-// POST /api/suggestions - Submit a new suggestion
+// POST /api/suggestions - Submit a new suggestion (auth optional)
 export async function POST(request: NextRequest) {
+  // Auth is optional - anonymous users can submit too
   const user = await getUserFromRequest(request);
-
-  if (!user) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
-  }
+  const rateLimitKey = getRateLimitKey(request, user?.id ?? null);
 
   // Check rate limit
-  if (isRateLimited(user.id)) {
+  if (isRateLimited(rateLimitKey)) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please wait before submitting another suggestion." },
       { status: 429 }
@@ -182,7 +186,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from("story_suggestions")
     .insert({
-      user_id: user.id,
+      user_id: user?.id ?? null,
       place_name: placeName,
       comment,
       location,
@@ -201,7 +205,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Record the submission for rate limiting
-  recordSubmission(user.id);
+  recordSubmission(rateLimitKey);
 
   const suggestion = rowToStorySuggestion(data as StorySuggestionRow);
   return NextResponse.json({ data: suggestion }, { status: 201 });
