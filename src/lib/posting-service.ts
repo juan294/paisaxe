@@ -7,8 +7,7 @@
  */
 
 import { createAdminClient } from "./supabase";
-import { getDecryptedCredentials } from "./credentials";
-import { createPlatformClient, validateContent } from "./platforms";
+import { validateContent } from "./platforms";
 import type {
   MarketingPlatform,
   MarketingPost,
@@ -33,14 +32,6 @@ export interface CreateDraftResult {
   post?: MarketingPost;
   error?: string;
   validationErrors?: string[];
-}
-
-export interface PostNowResult {
-  success: boolean;
-  postId?: string;
-  postUrl?: string;
-  error?: string;
-  errorCode?: string;
 }
 
 export interface MarkAsPostedInput {
@@ -146,132 +137,6 @@ export async function getDrafts(
   }
 
   return (data as MarketingPostRow[]).map(rowToPost);
-}
-
-/**
- * Get scheduled posts that are ready to be posted
- */
-export async function getScheduledPostsDue(): Promise<MarketingPost[]> {
-  const supabase = createAdminClient();
-
-  const { data, error } = await supabase
-    .from("marketing_posts")
-    .select("*")
-    .eq("status", "scheduled")
-    .lte("scheduled_for", new Date().toISOString())
-    .order("scheduled_for", { ascending: true });
-
-  if (error) {
-    console.error("Failed to fetch scheduled posts:", error);
-    return [];
-  }
-
-  return (data as MarketingPostRow[]).map(rowToPost);
-}
-
-/**
- * Post content immediately using the platform API
- * Requires paid API access for some platforms (e.g., X)
- */
-export async function postNow(postId: string): Promise<PostNowResult> {
-  const supabase = createAdminClient();
-
-  // Get the post
-  const { data: post, error: postError } = await supabase
-    .from("marketing_posts")
-    .select("*, marketing_accounts(*)")
-    .eq("id", postId)
-    .single();
-
-  if (postError || !post) {
-    return { success: false, error: "Post not found" };
-  }
-
-  const account = post.marketing_accounts;
-  if (!account || !account.credentials) {
-    return { success: false, error: "Account credentials not found" };
-  }
-
-  // Decrypt credentials
-  let credentials;
-  try {
-    credentials = getDecryptedCredentials(account);
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to decrypt credentials",
-    };
-  }
-
-  if (!credentials) {
-    return { success: false, error: "No credentials available" };
-  }
-
-  // Update status to posting
-  await supabase
-    .from("marketing_posts")
-    .update({ status: "posting" })
-    .eq("id", postId);
-
-  try {
-    // Create platform client and post
-    const client = createPlatformClient(post.platform, credentials);
-    const result = await client.post(post.content, {
-      mediaUrls: post.media_urls,
-      linkUrl: post.link_url,
-    });
-
-    if (result.success) {
-      // Update post as successfully posted
-      await supabase
-        .from("marketing_posts")
-        .update({
-          status: "posted",
-          platform_post_id: result.postId,
-          post_url: result.postUrl,
-          posted_at: new Date().toISOString(),
-          error_message: null,
-        })
-        .eq("id", postId);
-
-      return {
-        success: true,
-        postId: result.postId,
-        postUrl: result.postUrl,
-      };
-    } else {
-      // Update post as failed
-      await supabase
-        .from("marketing_posts")
-        .update({
-          status: "failed",
-          error_message: result.error,
-        })
-        .eq("id", postId);
-
-      return {
-        success: false,
-        error: result.error,
-        errorCode: result.errorCode,
-      };
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-    // Update post as failed
-    await supabase
-      .from("marketing_posts")
-      .update({
-        status: "failed",
-        error_message: errorMessage,
-      })
-      .eq("id", postId);
-
-    return {
-      success: false,
-      error: errorMessage,
-    };
-  }
 }
 
 /**

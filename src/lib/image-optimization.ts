@@ -41,7 +41,6 @@ export const FORMAT_SETTINGS = {
 export const IMAGE_SIZES = [640, 1200, 2048] as const;
 
 export type ImageFormat = "avif" | "webp" | "jpeg";
-export type ImageSize = (typeof IMAGE_SIZES)[number];
 
 export interface OptimizedImage {
   buffer: Buffer;
