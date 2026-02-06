@@ -151,6 +151,139 @@ describe("GET /api/admin/agents-summary", () => {
     expect(data.data.overallHealth).toBe("red");
   });
 
+  it("should infer green health for coverage reports without explicit health status", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("coverage-report.md")) {
+        return [
+          "# Test Coverage Report",
+          "",
+          "> Last updated: 2026-02-06",
+          "",
+          "## Summary",
+          "",
+          "- **Total tests:** 2754 passed, 1 skipped",
+          "- **TypeScript:** No errors",
+          "- **Statement coverage:** 66.91%",
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const coverageAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "coverage_agent_enabled"
+    );
+    expect(coverageAgent.health).toBe("green");
+  });
+
+  it("should infer green health for documentation reports without explicit health status", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("documentation-report.md")) {
+        return [
+          "# Documentation Freshness Report",
+          "> Auto-generated on 2026-02-06",
+          "",
+          "## Changes Made This Run",
+          "",
+          "### Features Documentation",
+          "Added MCP tools documentation.",
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const docAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "documentation_agent_enabled"
+    );
+    expect(docAgent.health).toBe("green");
+  });
+
+  it("should detect yellow health for coverage reports with failures", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("coverage-report.md")) {
+        return [
+          "# Test Coverage Report",
+          "",
+          "## Summary",
+          "",
+          "- **Total tests:** 2750 passed, 4 failures",
+          "- **TypeScript:** 3 errors",
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const coverageAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "coverage_agent_enabled"
+    );
+    expect(coverageAgent.health).toBe("yellow");
+  });
+
+  it("should resolve short agent names in shared context entries", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockStat.mockRejectedValue(new Error("ENOENT"));
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) {
+        return [
+          "<!-- ENTRY:START agent=coverage_agent timestamp=2026-02-06T16:00:00Z -->",
+          "Test coverage at 67%.",
+          "<!-- ENTRY:END -->",
+          "",
+          "<!-- ENTRY:START agent=localization_agent timestamp=2026-02-06T15:00:00Z -->",
+          "100% translation coverage.",
+          "<!-- ENTRY:END -->",
+        ].join("\n");
+      }
+      throw new Error("ENOENT");
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.data.sharedContext).toHaveLength(2);
+    expect(data.data.sharedContext[0].agentName).toBe("Coverage");
+    expect(data.data.sharedContext[1].agentName).toBe("Localization");
+  });
+
   it("should set Cache-Control header", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,
