@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   fetchCostsAnalytics,
   createManualCostEntry,
@@ -213,26 +213,6 @@ export function CostsAnalyticsPanel() {
 
           {/* Tier Upgrade Alerts */}
           <TierAlertsSection dateRange={dateRange} />
-
-          {/* External Dashboard Links */}
-          <div className="flex justify-center pt-8">
-            <div className="flex flex-wrap gap-3">
-              {Object.values(PLATFORM_SERVICES)
-                .slice(0, 4)
-                .map((service) => (
-                  <a
-                    key={service.id}
-                    href={service.dashboardUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-full border border-[#e5e3de] bg-white px-4 py-2 text-xs font-medium text-[#6b6560] transition-colors hover:border-[#2d2a26] hover:text-[#2d2a26] dark:border-[#3d3a36] dark:bg-[#252320] dark:text-[#a39e98] dark:hover:border-[#f5f3ee] dark:hover:text-[#f5f3ee]"
-                  >
-                    {service.name}
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                ))}
-            </div>
-          </div>
         </>
       ) : null}
 
@@ -887,7 +867,7 @@ interface ScalingForecastSectionProps {
 }
 
 function ScalingForecastSection({ services, dateRange }: ScalingForecastSectionProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const [forecasts, setForecasts] = useState<ForecastScenario[] | null>(null);
   const [isLoadingUsage, setIsLoadingUsage] = useState(false);
@@ -908,6 +888,13 @@ function ScalingForecastSection({ services, dateRange }: ScalingForecastSectionP
       setIsLoadingUsage(false);
     }
   }, [dateRange.from, dateRange.to, services]);
+
+  // Auto-load usage data on mount (expanded by default)
+  useEffect(() => {
+    if (!usageMetrics && !isLoadingUsage) {
+      loadUsageData();
+    }
+  }, [loadUsageData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggle = () => {
     const willExpand = !isExpanded;
@@ -1158,11 +1145,11 @@ interface TierAlertsSectionProps {
 }
 
 function TierAlertsSection({ dateRange }: TierAlertsSectionProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const [alerts, setAlerts] = useState<TierAlert[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(true);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -1190,6 +1177,13 @@ function TierAlertsSection({ dateRange }: TierAlertsSectionProps) {
       setIsLoading(false);
     }
   }, [dateRange.from, dateRange.to]);
+
+  // Auto-load usage data on mount (expanded by default)
+  useEffect(() => {
+    if (!usageMetrics && !isLoading) {
+      loadData();
+    }
+  }, [loadData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggle = () => {
     const willExpand = !isExpanded;
@@ -1325,11 +1319,27 @@ function TierAlertRow({ alert }: { alert: TierAlert }) {
   const formatNum = (n: number) =>
     n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
 
+  const platformService = Object.values(PLATFORM_SERVICES).find(
+    (s) => s.id === alert.serviceId
+  );
+
   return (
     <tr>
       <td className="py-2 text-sm text-[#4d4944] dark:text-[#a39e98]">
         <div className="flex flex-col">
-          <span>{alert.serviceName}</span>
+          <span className="flex items-center gap-1">
+            {alert.serviceName}
+            {platformService?.dashboardUrl && (
+              <a
+                href={platformService.dashboardUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#a39e98] hover:text-[#4d4944] dark:hover:text-[#f5f3ee]"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </span>
           <span className="text-xs text-[#a39e98]">{alert.currentTierName}</span>
         </div>
       </td>
