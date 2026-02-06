@@ -123,13 +123,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
       imagePath = urlData.publicUrl;
 
-      // Log optimization stats
-      const originalSize = file.size;
-      const optimizedSize = optimizedBuffer.length;
-      const savings = Math.round((1 - optimizedSize / originalSize) * 100);
-      console.log(
-        `Image optimized: ${file.name} (${Math.round(originalSize / 1024)}KB -> ${Math.round(optimizedSize / 1024)}KB, ${savings}% reduction)`
-      );
     } else {
       // Handle JSON with URL (no optimization for external URLs)
       const body = await request.json();

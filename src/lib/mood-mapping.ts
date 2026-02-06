@@ -7,7 +7,7 @@ export type Mood = "relajante" | "aventurero" | "cultural" | "delicioso";
  * A story matches if its category is in the mood's category list,
  * OR if it has a mood_tag in its metadata.
  */
-export const MOOD_CATEGORY_MAP: Record<Mood, StoryCategory[]> = {
+const MOOD_CATEGORY_MAP: Record<Mood, StoryCategory[]> = {
   relajante: ["nature"],
   aventurero: ["activities", "nature"],
   cultural: ["culture", "cities"],

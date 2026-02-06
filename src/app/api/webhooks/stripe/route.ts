@@ -33,7 +33,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Only handle checkout.session.completed events
     if (event.type !== "checkout.session.completed") {
-      console.log(`[stripe-webhook] Ignoring event: ${event.type}`);
       return NextResponse.json({ received: true });
     }
 
@@ -68,19 +67,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (insertError) {
       // Handle duplicate order (idempotency)
       if (insertError.code === "23505") {
-        console.log(
-          `[stripe-webhook] Duplicate payment ${paymentProviderId}, ignoring`
-        );
         return NextResponse.json({ success: true, duplicate: true });
       }
 
       console.error("[stripe-webhook] Failed to insert purchase:", insertError);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
-
-    console.log(
-      `[stripe-webhook] Created day_pass for user ${userId}, expires ${expiresAt.toISOString()}`
-    );
 
     return NextResponse.json({
       success: true,

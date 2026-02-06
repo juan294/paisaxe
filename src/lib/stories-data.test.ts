@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  STORIES,
   FALLBACK_STORIES,
   getStoriesByCategory,
   getStoriesByLocation,
@@ -47,18 +46,13 @@ const mockStoryRow = {
 };
 
 describe("stories-data", () => {
-  describe("STORIES and FALLBACK_STORIES", () => {
+  describe("FALLBACK_STORIES", () => {
     it("should have at least one story", () => {
-      expect(STORIES.length).toBeGreaterThan(0);
       expect(FALLBACK_STORIES.length).toBeGreaterThan(0);
     });
 
-    it("should have STORIES equal to FALLBACK_STORIES", () => {
-      expect(STORIES).toEqual(FALLBACK_STORIES);
-    });
-
     it("should have valid story structure", () => {
-      STORIES.forEach((story) => {
+      FALLBACK_STORIES.forEach((story) => {
         expect(story.id).toBeDefined();
         expect(story.title).toBeDefined();
         expect(story.subtitle).toBeDefined();
@@ -70,7 +64,7 @@ describe("stories-data", () => {
     });
 
     it("should have unique story IDs", () => {
-      const ids = STORIES.map((s) => s.id);
+      const ids = FALLBACK_STORIES.map((s) => s.id);
       const uniqueIds = new Set(ids);
       expect(uniqueIds.size).toBe(ids.length);
     });

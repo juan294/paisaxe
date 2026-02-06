@@ -6,11 +6,6 @@
  */
 
 export * from "./types";
-export { XClient, checkXPostingAvailable } from "./x-client";
-
-// Future exports:
-// export { InstagramClient } from "./instagram-client";
-// export { PinterestClient } from "./pinterest-client";
 
 import type { MarketingPlatform, MarketingCredentials } from "@/types/marketing";
 import type { PlatformClient } from "./types";

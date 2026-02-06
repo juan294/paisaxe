@@ -55,18 +55,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { table_name, operation } = body;
+    const { table_name } = body;
     const pathsToRevalidate = REVALIDATION_MAP[table_name] ?? [];
 
     for (const path of pathsToRevalidate) {
       revalidatePath(path);
     }
-
-    console.log(
-      `[webhook] ${table_name}.${operation} — revalidated: ${
-        pathsToRevalidate.length > 0 ? pathsToRevalidate.join(", ") : "none"
-      }`
-    );
 
     return NextResponse.json(
       { success: true, revalidated: pathsToRevalidate },
