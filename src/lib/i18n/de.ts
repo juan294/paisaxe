@@ -77,6 +77,8 @@ export const de: Translations = {
     show_hide: 'ein-/ausblenden',
     space: 'Leertaste',
     next: 'nächste',
+    hint_previous: 'Zurück',
+    hint_next: 'Weiter',
   },
 
   share: {

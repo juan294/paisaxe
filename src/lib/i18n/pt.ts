@@ -77,6 +77,8 @@ export const pt: Translations = {
     show_hide: 'mostrar/ocultar',
     space: 'espaço',
     next: 'seguinte',
+    hint_previous: 'Anterior',
+    hint_next: 'Seguinte',
   },
 
   share: {

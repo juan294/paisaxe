@@ -102,7 +102,6 @@
     position: absolute !important;
     top: 0 !important;
     height: 100% !important;
-    width: 5rem !important;
     transform: none !important;
     padding: 1rem !important;
     border-radius: 0 !important;
@@ -114,9 +113,11 @@
   }
   .touch-nav-reset.touch-nav-left {
     left: 0 !important;
+    width: 30% !important;
   }
   .touch-nav-reset.touch-nav-right {
     right: 0 !important;
+    width: 70% !important;
   }
 }
 

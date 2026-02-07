@@ -27,6 +27,7 @@ import { FullscreenButton } from "./fullscreen-button";
 import { getLabel } from "@/lib/asturianu";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
+import { NavigationHint } from "./navigation-hint";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -200,7 +201,12 @@ export function StoryViewer({
   return (
     <main
       className="relative h-dvh w-screen overflow-hidden bg-black cursor-pointer"
-      onClick={() => setShowInfo((prev) => !prev)}
+      onClick={() => {
+        // Only toggle info on desktop (pointer: fine) — on mobile, tap zones handle navigation
+        if (window.matchMedia("(pointer: fine)").matches) {
+          setShowInfo((prev) => !prev);
+        }
+      }}
     >
       {/* Screen reader announcement for story changes */}
       <div
@@ -304,6 +310,10 @@ export function StoryViewer({
 
       {/* Main content */}
       <article
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowInfo((prev) => !prev);
+        }}
         className={cn(
           "absolute bottom-0 left-0 right-0 p-8 pb-[max(2rem,env(safe-area-inset-bottom))] md:p-12 z-10 transition-all duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 motion-reduce:translate-y-0"
@@ -573,6 +583,9 @@ export function StoryViewer({
       >
         ← → {t("nav.navigate")} · i {t("nav.show_hide")} · {t("nav.space")} {t("nav.next")}
       </div>
+
+      {/* First-visit navigation hint for mobile users */}
+      <NavigationHint />
     </main>
   );
 }
