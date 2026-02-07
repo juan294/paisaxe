@@ -45,11 +45,11 @@ Before connecting any platform, you need:
 
 ### 3. API Tier
 
-- **Free tier**: Read-only access, cannot post via API
-- **Basic tier ($100/month)**: 1,500 posts/month, posting enabled
-- **Pro tier ($5,000/month)**: 10,000+ posts/month
+- **Free tier**: Write-only access — 1,500 posts/month, no read access (can't fetch engagement or user info)
+- **Basic tier ($200/month)**: 50,000 posts + 15,000 reads/month
+- **Pro tier ($5,000/month)**: 300,000 posts + 1,000,000 reads/month
 
-**Note:** Posting via API requires at least Basic tier. The free tier only allows reading posts and user info. For manual posting workflow (recommended to start), no paid tier is needed.
+**Note:** The free tier supports posting via API (up to 1,500 tweets/month). Read operations (engagement metrics, user lookup) require Basic tier. Ensure app permissions are set to "Read and Write" in the X Developer Portal, and regenerate tokens after changing permissions.
 
 ### 4. Save Credentials
 

@@ -47,6 +47,10 @@ class XClientAdapter implements PlatformClient {
 
   async verifyCredentials() {
     const info = await this.client.verifyCredentials();
+    if (!info) {
+      // Free tier: read endpoint blocked, but posting still works
+      return null;
+    }
     return {
       id: info.id,
       username: info.username,
