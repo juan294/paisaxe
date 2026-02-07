@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "./route";
 
 // Mock dependencies
@@ -16,6 +16,11 @@ import { supabase } from "@/lib/supabase";
 import { getEnvironment } from "@/lib/environment";
 
 describe("GET /api/feature-flags", () => {
+  // Real Supabase anon keys are JWTs starting with 'eyJ' — use a fake JWT
+  // so the route doesn't skip the Supabase call in these tests
+  const FAKE_JWT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test";
+  let originalKey: string | undefined;
+
   const mockFlagRows = [
     {
       id: "flag-1",
@@ -43,6 +48,16 @@ describe("GET /api/feature-flags", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    originalKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = FAKE_JWT_KEY;
+  });
+
+  afterEach(() => {
+    if (originalKey !== undefined) {
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = originalKey;
+    } else {
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    }
   });
 
   it("should return all feature flags for current environment", async () => {
@@ -146,5 +161,40 @@ describe("GET /api/feature-flags", () => {
 
     expect(response.status).toBe(200);
     expect(data.data).toEqual([]);
+  });
+
+  describe("with dummy Supabase credentials (CI/E2E)", () => {
+    it("should return empty flags when anon key is not a valid JWT", async () => {
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "dummy_key_for_e2e";
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data).toEqual([]);
+      // Should NOT have called supabase.from — skipped entirely
+      expect(supabase.from).not.toHaveBeenCalled();
+    });
+
+    it("should return empty flags when anon key is undefined", async () => {
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data).toEqual([]);
+      expect(supabase.from).not.toHaveBeenCalled();
+    });
+
+    it("should include Cache-Control header even with dummy credentials", async () => {
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "dummy_key_for_e2e";
+
+      const response = await GET();
+
+      expect(response.headers.get("Cache-Control")).toBe(
+        "public, max-age=60, stale-while-revalidate=120"
+      );
+    });
   });
 });
