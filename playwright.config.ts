@@ -6,30 +6,34 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: isCI ? 2 : 0,
-  workers: isCI ? 1 : undefined,
+  retries: isCI ? 1 : 0,
+  workers: isCI ? 2 : undefined,
   reporter: isCI ? [["html"], ["github"]] : [["html"]],
+  timeout: isCI ? 15_000 : 30_000,
 
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: isCI ? "off" : "retain-on-failure",
   },
 
   projects: [
     {
       name: "desktop",
       use: { ...devices["Desktop Chrome"] },
+      testIgnore: "**/qa-journey.spec.ts",
     },
     {
       name: "mobile",
       use: { ...devices["Pixel 7"] },
+      testIgnore: "**/qa-journey.spec.ts",
     },
     {
       name: "qa-journey",
       use: { ...devices["Desktop Chrome"] },
       testMatch: "qa-journey.spec.ts",
+      timeout: 30_000,
     },
   ],
 
