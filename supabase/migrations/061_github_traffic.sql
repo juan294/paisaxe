@@ -10,7 +10,7 @@
 -- SETUP:
 --   1. Add GITHUB_TOKEN env var to Vercel (GitHub PAT with `repo` scope)
 --   2. Verify pg_cron + pg_net are enabled (done in migrations 011 + 014)
---   3. Update app.supabase_functions_url and app.service_role_key if not set
+--   3. Ensure webhook_config table has base_url and secret (done in migration 025)
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -101,16 +101,18 @@ CREATE POLICY "Service role full access on github_traffic_paths"
 -- ---------------------------------------------------------------------------
 -- pg_cron: Sync GitHub traffic every 12 days at 3 AM UTC
 -- Calls the Next.js sync endpoint via pg_net
+-- Uses webhook_config table (migration 025) instead of app.* GUC settings
+-- which require ALTER DATABASE SET permissions that Supabase restricts.
 -- ---------------------------------------------------------------------------
 SELECT cron.schedule(
   'github-traffic-sync',
   '0 3 */12 * *',
   $$
   SELECT net.http_post(
-    url := current_setting('app.site_url', true) || '/api/cron/github-traffic-sync',
+    url := (SELECT value FROM public.webhook_config WHERE key = 'base_url') || '/api/cron/github-traffic-sync',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'x-webhook-secret', current_setting('app.webhook_secret', true)
+      'x-webhook-secret', (SELECT value FROM public.webhook_config WHERE key = 'secret')
     ),
     body := '{}'::jsonb
   );
