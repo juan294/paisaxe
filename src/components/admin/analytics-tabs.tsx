@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Users, DollarSign, Mic, Receipt } from "lucide-react";
+import { Users, DollarSign, Mic, Receipt, GitBranch } from "lucide-react";
 
-export type AnalyticsSubTab = "visitors" | "revenue" | "voice" | "costs";
+export type AnalyticsSubTab = "visitors" | "revenue" | "voice" | "costs" | "github";
 
 interface AnalyticsTabsProps {
   activeTab: AnalyticsSubTab;
@@ -31,16 +31,22 @@ const SUB_TABS: {
     shortcut: "i",
   },
   {
+    value: "github",
+    label: "GitHub",
+    icon: <GitBranch className="h-4 w-4" />,
+    shortcut: "o",
+  },
+  {
     value: "costs",
     label: "Costs",
     icon: <Receipt className="h-4 w-4" />,
-    shortcut: "o",
+    shortcut: "p",
   },
   {
     value: "revenue",
     label: "Revenue",
     icon: <DollarSign className="h-4 w-4" />,
-    shortcut: "p",
+    shortcut: "l",
   },
 ];
 

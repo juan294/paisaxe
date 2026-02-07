@@ -7,6 +7,7 @@ import { VisitorsAnalyticsPanel } from "./visitors-analytics-panel";
 import { StripeAnalyticsPanel } from "./stripe-analytics-panel";
 import { ElevenLabsAnalyticsPanel } from "./elevenlabs-analytics-panel";
 import { CostsAnalyticsPanel } from "./costs-analytics-panel";
+import { GitHubAnalyticsPanel } from "./github-analytics-panel";
 
 /**
  * Analytics Dashboard with sub-tabs for Visitors, Revenue, Voice, and Costs analytics.
@@ -32,6 +33,13 @@ export function AnalyticsDashboard() {
           style={{ display: activeSubTab === "voice" ? "block" : "none" }}
         >
           <ElevenLabsAnalyticsPanel />
+        </div>
+        <div
+          role="tabpanel"
+          aria-hidden={activeSubTab !== "github"}
+          style={{ display: activeSubTab === "github" ? "block" : "none" }}
+        >
+          <GitHubAnalyticsPanel />
         </div>
         <div
           role="tabpanel"
