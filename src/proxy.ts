@@ -240,8 +240,9 @@ async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Skip if Supabase not configured
-  if (!supabaseUrl || !supabaseKey) {
+  // Skip if Supabase not configured or using dummy credentials (CI/E2E).
+  // Real Supabase anon keys are JWTs that start with 'eyJ'.
+  if (!supabaseUrl || !supabaseKey || !supabaseKey.startsWith("eyJ")) {
     return response;
   }
 

@@ -430,10 +430,13 @@ describe("shouldBypassMaintenanceMode", () => {
 });
 
 describe("Auth session refresh timeout", () => {
+  // Real Supabase anon keys are JWTs starting with 'eyJ' (base64 JWT header)
+  const FAKE_JWT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test";
+
   beforeEach(() => {
     process.env.MAINTENANCE_MODE = "false";
-    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "dummy_key";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test-project.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = FAKE_JWT_KEY;
     mockFetch.mockReset();
   });
 
@@ -492,6 +495,19 @@ describe("Auth session refresh timeout", () => {
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
     // No fetch should have been called
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("should skip auth refresh when Supabase key is not a valid JWT", async () => {
+    // Dummy keys used in CI/E2E don't start with 'eyJ'
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "dummy_key_for_e2e";
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    // Should not have attempted any fetch — skipped immediately
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
