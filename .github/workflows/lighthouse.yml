@@ -44,6 +44,7 @@ jobs:
           VOYAGE_API_KEY: dummy_key_for_build
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
+          MAINTENANCE_MODE: "false"
 
       - name: Upload Lighthouse results
         if: always()
