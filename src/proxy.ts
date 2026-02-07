@@ -293,7 +293,39 @@ async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
   return response;
 }
 
+/**
+ * Rewrite /story/:slug to /immersive?story=:slug.
+ *
+ * The /story/[slug] route exists for SEO-friendly sharing URLs, but the
+ * server-component redirect() there triggers a React hydration error (#310)
+ * because LanguageProvider's early return changes the hook count.
+ *
+ * By rewriting at the proxy level (before React renders), we avoid the
+ * hydration mismatch entirely. Uses 308 (permanent redirect, preserves method).
+ */
+function handleStoryRewrite(request: NextRequest): NextResponse | null {
+  const { pathname } = request.nextUrl;
+  const match = pathname.match(/^\/story\/([^/]+)$/);
+
+  if (!match || !match[1]) {
+    return null;
+  }
+
+  const slug = match[1];
+  const url = request.nextUrl.clone();
+  url.pathname = "/immersive";
+  url.searchParams.set("story", slug);
+
+  return NextResponse.redirect(url, 308);
+}
+
 export async function proxy(request: NextRequest) {
+  // 0. Rewrite /story/:slug → /immersive?story=:slug (before maintenance check)
+  const storyRewrite = handleStoryRewrite(request);
+  if (storyRewrite) {
+    return storyRewrite;
+  }
+
   // 1. Check maintenance mode first (applies to all routes)
   const maintenanceResponse = await handleMaintenanceMode(request);
   if (maintenanceResponse) {
