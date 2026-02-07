@@ -46,9 +46,15 @@ function createPlacesApiResponse(places: Array<{
 }
 
 describe("/api/mcp/places", () => {
+  const MCP_SECRET = "test-mcp-secret";
+
   beforeEach(() => {
     vi.resetAllMocks();
-    process.env = { ...originalEnv, GOOGLE_PLACES_API_KEY: "test-api-key" };
+    process.env = {
+      ...originalEnv,
+      GOOGLE_PLACES_API_KEY: "test-api-key",
+      MCP_API_SECRET: MCP_SECRET,
+    };
   });
 
   afterEach(() => {
@@ -56,6 +62,34 @@ describe("/api/mcp/places", () => {
   });
 
   describe("GET", () => {
+    it("should return 401 when x-mcp-secret header is missing", async () => {
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=fabada"
+      );
+      const response = await GET(request);
+      expect(response.status).toBe(401);
+    });
+
+    it("should return 401 when x-mcp-secret header is wrong", async () => {
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=fabada",
+        { headers: { "x-mcp-secret": "wrong-secret" } }
+      );
+      const response = await GET(request);
+      expect(response.status).toBe(401);
+    });
+
+    it("should return 401 when MCP_API_SECRET env var is not set", async () => {
+      delete process.env.MCP_API_SECRET;
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=fabada",
+        { headers: { "x-mcp-secret": "any-value" } }
+      );
+      const response = await GET(request);
+      expect(response.status).toBe(401);
+    });
+
     it("should return places for a valid search query", async () => {
       const mockPlacesResponse = createPlacesApiResponse([
         {
@@ -92,7 +126,8 @@ describe("/api/mcp/places", () => {
       });
 
       const request = new Request(
-        "http://localhost:3000/api/mcp/places?query=fabada+asturias"
+        "http://localhost:3000/api/mcp/places?query=fabada+asturias",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
       );
       const response = await GET(request);
       const data = await response.json();
@@ -113,7 +148,9 @@ describe("/api/mcp/places", () => {
     });
 
     it("should return 400 if query parameter is missing", async () => {
-      const request = new Request("http://localhost:3000/api/mcp/places");
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        headers: { "x-mcp-secret": MCP_SECRET },
+      });
       const response = await GET(request);
 
       expect(response.status).toBe(400);
@@ -125,7 +162,8 @@ describe("/api/mcp/places", () => {
       delete process.env.GOOGLE_PLACES_API_KEY;
 
       const request = new Request(
-        "http://localhost:3000/api/mcp/places?query=restaurants"
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
       );
       const response = await GET(request);
 
@@ -141,7 +179,8 @@ describe("/api/mcp/places", () => {
       });
 
       const request = new Request(
-        "http://localhost:3000/api/mcp/places?query=cider&type=bar"
+        "http://localhost:3000/api/mcp/places?query=cider&type=bar",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
       );
       await GET(request);
 
@@ -162,7 +201,8 @@ describe("/api/mcp/places", () => {
       });
 
       const request = new Request(
-        "http://localhost:3000/api/mcp/places?query=restaurants"
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
       );
       await GET(request);
 
@@ -179,7 +219,8 @@ describe("/api/mcp/places", () => {
       });
 
       const request = new Request(
-        "http://localhost:3000/api/mcp/places?query=restaurants&city=Gijón"
+        "http://localhost:3000/api/mcp/places?query=restaurants&city=Gijón",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
       );
       await GET(request);
 
@@ -191,6 +232,28 @@ describe("/api/mcp/places", () => {
   });
 
   describe("POST", () => {
+    it("should return 401 when x-mcp-secret header is missing", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "sidra" }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(401);
+    });
+
+    it("should return 401 when x-mcp-secret header is wrong", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": "wrong-secret" },
+        body: JSON.stringify({ query: "sidra" }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(401);
+    });
+
     it("should support MCP tool call format", async () => {
       const mockPlacesResponse = createPlacesApiResponse([
         {
@@ -212,7 +275,7 @@ describe("/api/mcp/places", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/places", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           tool: "search_places",
           arguments: {
@@ -233,7 +296,7 @@ describe("/api/mcp/places", () => {
     it("should return 400 for invalid MCP request", async () => {
       const request = new Request("http://localhost:3000/api/mcp/places", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({ invalid: "request" }),
       });
 
