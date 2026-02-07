@@ -451,7 +451,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                                 {image.caption}
                               </figcaption>
                             )}
-                            <p className="mt-0.5 text-xs text-white/40">
+                            <p className="mt-0.5 text-xs text-white/60">
                               {t("chat.source")}: {image.sourcePdf}
                             </p>
                           </figure>
@@ -489,7 +489,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                 placeholder={t("chat.placeholder")}
                 aria-label={t("chat.placeholder")}
                 disabled={isLoading}
-                className="flex-1 h-10 bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                className="flex-1 h-10 bg-white/10 border-white/20 text-white placeholder:text-white/60"
               />
               <Button
                 type="submit"

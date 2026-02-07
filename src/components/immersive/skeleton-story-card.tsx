@@ -1,10 +1,14 @@
+"use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/lib/i18n";
 
 export function StoryCardSkeleton() {
+  const { t } = useTranslation();
   return (
     <div
       role="status"
-      aria-label="Loading"
+      aria-label={t("common.loading")}
       data-testid="skeleton-story-card"
       className="fixed inset-0 overflow-hidden bg-black"
     >

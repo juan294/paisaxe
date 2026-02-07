@@ -196,5 +196,22 @@ describe("StoryFilters", () => {
       expect(screen.getByRole("group", { name: new RegExp(mockT("stories.filters.location"), "i") })).toBeInTheDocument();
       expect(screen.getByRole("group", { name: new RegExp(mockT("stories.filters.duration"), "i") })).toBeInTheDocument();
     });
+
+    it("should render filter chips with aria-pressed=false when not selected", () => {
+      render(<StoryFilters {...defaultProps} />);
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
+
+      const chips = screen.getAllByRole("button", { pressed: false });
+      // 5 categories + 3 locations + 3 durations = 11 filter chips
+      expect(chips.length).toBe(11);
+    });
+
+    it("should render selected filter chip with aria-pressed=true", () => {
+      render(<StoryFilters {...defaultProps} selectedCategory="nature" />);
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(mockT("stories.filters.title"), "i") }));
+
+      const pressedChips = screen.getAllByRole("button", { pressed: true });
+      expect(pressedChips.length).toBe(1);
+    });
   });
 });

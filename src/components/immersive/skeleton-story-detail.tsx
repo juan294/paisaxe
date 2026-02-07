@@ -1,10 +1,14 @@
+"use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/lib/i18n";
 
 export function StoryDetailSkeleton() {
+  const { t } = useTranslation();
   return (
     <div
       role="status"
-      aria-label="Loading"
+      aria-label={t("common.loading")}
       className="absolute bottom-0 left-0 right-0 p-8 md:p-12 z-10"
     >
       {/* Subtitle skeleton */}

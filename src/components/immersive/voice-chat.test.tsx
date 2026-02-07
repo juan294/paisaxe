@@ -331,7 +331,7 @@ describe("VoiceChat", () => {
         // Should show a skeleton message bubble with role="status"
         const skeleton = screen.getByRole("status");
         expect(skeleton).toBeInTheDocument();
-        expect(skeleton).toHaveAttribute("aria-label", "Loading");
+        expect(skeleton).toHaveAttribute("aria-label", "Cargando...");
       });
 
       // Resolve and wait for state update to complete

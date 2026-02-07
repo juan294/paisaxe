@@ -1,10 +1,14 @@
+"use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/lib/i18n";
 
 export function ChatMessageSkeleton() {
+  const { t } = useTranslation();
   return (
     <div
       role="status"
-      aria-label="Loading"
+      aria-label={t("common.loading")}
       className="max-w-[85%] p-3 rounded-2xl bg-white/20"
     >
       <div className="space-y-2">
