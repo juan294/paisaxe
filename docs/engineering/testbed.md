@@ -337,11 +337,29 @@ Test the immersive story viewer UI, navigation, and display.
 | 15.3 | **Story image displays** | Load `/immersive` | Full-screen background image loads | | |
 | 15.4 | **Category badge visible** | Load `/immersive` | Color-coded category tag shown | | |
 | 15.5 | **Right arrow navigates** | Click right arrow button | Story changes to next story | | |
-| 15.6 | **Left arrow navigates** | Click left arrow button (when not on first) | Story changes to previous story | | |
-| 15.7 | **Left arrow disabled on first story** | Load first story | Left arrow disabled or not clickable | | |
-| 15.8 | **Keyboard ArrowRight** | Press ArrowRight key | Navigates to next story | | |
-| 15.9 | **Keyboard ArrowLeft** | Press ArrowLeft key | Navigates to previous story | | |
-| 15.10 | **Info toggle with 'i' key** | Press 'i' key | Info overlay toggles visibility | | |
+| 15.6 | **Left arrow navigates** | Click left arrow button | Story changes to previous story | | |
+| 15.7 | **Wrap-around: left on first** | Navigate left on first story | Wraps to last story (infinite carousel) | | |
+| 15.8 | **Wrap-around: right on last** | Navigate right on last story | Wraps to first story (infinite carousel) | | |
+| 15.9 | **Keyboard ArrowRight** | Press ArrowRight key | Navigates to next story | | |
+| 15.10 | **Keyboard ArrowLeft** | Press ArrowLeft key | Navigates to previous story | | |
+| 15.11 | **Keyboard Spacebar** | Press Space key | Navigates to next story | | |
+| 15.12 | **Info toggle with 'i' key** | Press 'i' key | Info overlay toggles visibility | | |
+| 15.13 | **Progress bar jump** | Click a progress bar segment | Jumps directly to that story index | | |
+| 15.14 | **Image source attribution** | View story with `imageSource` | Small camera icon + source text below description | | |
+| 15.15 | **Mobile tap zones (right 70%)** | On phone, tap right side of screen | Advances to next story (no dead zone) | | |
+| 15.16 | **Mobile tap zones (left 30%)** | On phone, tap left side of screen | Goes to previous story (no dead zone) | | |
+| 15.17 | **Mobile: no center dead zone** | On phone, tap anywhere on screen | Every tap either navigates left or right — no accidental info toggle | | |
+| 15.18 | **Mobile: article tap toggles info** | On phone, tap the text content area | Info overlay toggles (only when tapping the text, not the background) | | |
+| 15.19 | **Desktop: click background toggles info** | On desktop, click the background image | Info overlay toggles visibility (desktop-only behavior) | | |
+| 15.20 | **Navigation hint on first visit** | Clear localStorage, visit on phone | Pulsing chevron hints ("Anterior" / "Siguiente") appear for ~3 seconds | | |
+| 15.21 | **Navigation hint auto-dismisses** | Wait 3 seconds on first visit | Hint fades out automatically | | |
+| 15.22 | **Navigation hint tap-to-dismiss** | Tap screen while hint is showing | Hint disappears immediately | | |
+| 15.23 | **Navigation hint only once** | Revisit after hint was shown | Hint does NOT appear again (persisted in localStorage) | | |
+| 15.24 | **Navigation hint mobile-only** | Load on desktop | Hint does NOT appear (only `pointer: coarse` devices) | | |
+| 15.25 | **Auto-play advances stories** | Toggle auto-play on | Stories auto-advance every 6 seconds | | |
+| 15.26 | **Auto-play pause** | Toggle auto-play off | Stories stop auto-advancing | | |
+| 15.27 | **Auto-play paused during chat** | Open chat while auto-play is on | Auto-play pauses; resumes when chat closes | | |
+| 15.28 | **Ambient mode (if enabled)** | Toggle ambient mode on | Slower Ken Burns zoom, 12-second intervals | | |
 
 ---
 
@@ -570,7 +588,7 @@ Test the splash page shown during maintenance mode.
 | 12. Restaurant Bookings | 13 | | | |
 | 13. SMS Notifications | 9 | | | |
 | 14. Stress & Edge | 8 | | | |
-| 15. Story Viewer & Nav | 10 | | | |
+| 15. Story Viewer & Nav | 28 | | | |
 | 16. Story Filters | 9 | | | |
 | 17. Toolbar Actions | 9 | | | |
 | 18. Favorites Page | 10 | | | |
@@ -582,7 +600,7 @@ Test the splash page shown during maintenance mode.
 | 24. Legal Pages | 5 | | | |
 | 25. Responsive Design | 12 | | | |
 | 26. Maintenance Page | 5 | | | |
-| **TOTAL** | **222** | | | |
+| **TOTAL** | **240** | | | |
 
 ---
 
@@ -596,5 +614,5 @@ Test the splash page shown during maintenance mode.
 
 ---
 
-*Last updated: 2026-02-06 — Voice testing scoped to Pelayo only; removed TikTok/Tiko references*
+*Last updated: 2026-02-07 — Added mobile tap zones, navigation onboarding hint, auto-play, wrap-around, progress bar, and image attribution tests*
 *Tested by: [NAME]*
