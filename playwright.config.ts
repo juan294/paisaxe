@@ -16,6 +16,7 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: isCI ? "off" : "retain-on-failure",
+    storageState: "e2e/storage-state.json",
   },
 
   projects: [
