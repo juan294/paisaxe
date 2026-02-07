@@ -506,6 +506,79 @@ describe("/story/[slug] rewrite", () => {
   });
 });
 
+describe("Canonical domain redirect", () => {
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  it("redirects paisaxe.com to paisaxe.es preserving path", async () => {
+    const request = new NextRequest("https://paisaxe.com/immersive");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(
+      "https://paisaxe.es/immersive"
+    );
+  });
+
+  it("redirects www.paisaxe.com to paisaxe.es preserving path", async () => {
+    const request = new NextRequest("https://www.paisaxe.com/some-page");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(
+      "https://paisaxe.es/some-page"
+    );
+  });
+
+  it("redirects www.paisaxe.es to paisaxe.es preserving path", async () => {
+    const request = new NextRequest("https://www.paisaxe.es/immersive");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(
+      "https://paisaxe.es/immersive"
+    );
+  });
+
+  it("preserves query params on canonical redirect", async () => {
+    const request = new NextRequest("https://paisaxe.com/immersive?story=oviedo-catedral");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(
+      "https://paisaxe.es/immersive?story=oviedo-catedral"
+    );
+  });
+
+  it("redirects paisaxe.com root to paisaxe.es root (single hop)", async () => {
+    const request = new NextRequest("https://paisaxe.com/");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe("https://paisaxe.es/");
+  });
+
+  it("does not redirect requests already on paisaxe.es", async () => {
+    const request = new NextRequest("https://paisaxe.es/immersive");
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("does not redirect localhost in development", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+});
+
 describe("Auth session refresh timeout", () => {
   // Real Supabase anon keys are JWTs starting with 'eyJ' (base64 JWT header)
   const FAKE_JWT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test";
