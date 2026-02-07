@@ -429,6 +429,83 @@ describe("shouldBypassMaintenanceMode", () => {
   });
 });
 
+describe("/story/[slug] rewrite", () => {
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  it("rewrites /story/oviedo-catedral to /immersive?story=oviedo-catedral", async () => {
+    const request = new NextRequest("http://localhost:3000/story/oviedo-catedral");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/immersive?story=oviedo-catedral"
+    );
+  });
+
+  it("rewrites /story/lagos-de-covadonga to /immersive?story=lagos-de-covadonga", async () => {
+    const request = new NextRequest("http://localhost:3000/story/lagos-de-covadonga");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/immersive?story=lagos-de-covadonga"
+    );
+  });
+
+  it("does not rewrite /story without a slug", async () => {
+    const request = new NextRequest("http://localhost:3000/story");
+    const response = await proxy(request);
+
+    // Should pass through normally (no redirect)
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("does not rewrite /story/ with trailing slash but no slug", async () => {
+    const request = new NextRequest("http://localhost:3000/story/");
+    const response = await proxy(request);
+
+    // Should pass through normally (no redirect)
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("does not rewrite /stories or other similar paths", async () => {
+    const request = new NextRequest("http://localhost:3000/stories/test");
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("preserves existing query params on /story/ redirect", async () => {
+    const request = new NextRequest("http://localhost:3000/story/oviedo-catedral?ref=twitter");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    const location = response.headers.get("location")!;
+    expect(location).toContain("/immersive");
+    expect(location).toContain("story=oviedo-catedral");
+    expect(location).toContain("ref=twitter");
+  });
+
+  it("works during maintenance mode (story routes are redirected before maintenance check)", async () => {
+    process.env.MAINTENANCE_MODE = "true";
+    const request = new NextRequest("http://localhost:3000/story/oviedo-catedral");
+    const response = await proxy(request);
+
+    // Should redirect to immersive, not to coming-soon
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/immersive?story=oviedo-catedral"
+    );
+  });
+});
+
 describe("Auth session refresh timeout", () => {
   // Real Supabase anon keys are JWTs starting with 'eyJ' (base64 JWT header)
   const FAKE_JWT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test";
