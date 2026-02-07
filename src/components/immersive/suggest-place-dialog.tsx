@@ -150,9 +150,9 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
                 maxLength={100}
                 required
                 disabled={submitState === "loading"}
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-white/40"
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
               />
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-white/60">
                 {placeName.length}/100 {t("suggestions.characters")}
               </p>
             </div>
@@ -195,9 +195,9 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
                 maxLength={500}
                 rows={3}
                 disabled={submitState === "loading"}
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-white/40 resize-none"
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40 resize-none"
               />
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-white/60">
                 {comment.length}/500 {t("suggestions.characters")}
               </p>
             </div>
@@ -214,9 +214,9 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
                 placeholder={t("suggestions.attribution_placeholder")}
                 maxLength={100}
                 disabled={submitState === "loading"}
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-white/40"
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
               />
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-white/60">
                 {t("suggestions.attribution_hint")}
               </p>
             </div>
