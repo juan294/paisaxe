@@ -27,6 +27,7 @@ import { FullscreenButton } from "./fullscreen-button";
 import { getLabel } from "@/lib/asturianu";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
+import { NavigationHint } from "./navigation-hint";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -573,6 +574,9 @@ export function StoryViewer({
       >
         ← → {t("nav.navigate")} · i {t("nav.show_hide")} · {t("nav.space")} {t("nav.next")}
       </div>
+
+      {/* First-visit navigation hint for mobile users */}
+      <NavigationHint />
     </main>
   );
 }

@@ -64,6 +64,8 @@ export const mockTranslations: Record<string, string> = {
   "nav.show_hide": "mostrar/ocultar",
   "nav.space": "espacio",
   "nav.next": "siguiente",
+  "nav.hint_previous": "Anterior",
+  "nav.hint_next": "Siguiente",
 
   // Favorites
   "favorites.title": "Guardados",
