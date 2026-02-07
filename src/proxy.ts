@@ -331,6 +331,21 @@ function handleCanonicalDomain(request: NextRequest): NextResponse | null {
 }
 
 /**
+ * Redirect root path to /immersive.
+ *
+ * This replaces the next.config.ts redirect (which ran at CDN level
+ * before the proxy, bypassing canonical domain checks).
+ * Uses 307 (temporary) since the root path may change in the future.
+ */
+function handleRootRedirect(request: NextRequest): NextResponse | null {
+  if (request.nextUrl.pathname !== "/") return null;
+
+  const url = request.nextUrl.clone();
+  url.pathname = "/immersive";
+  return NextResponse.redirect(url, 307);
+}
+
+/**
  * Rewrite /story/:slug to /immersive?story=:slug.
  *
  * The /story/[slug] route exists for SEO-friendly sharing URLs, but the
@@ -369,13 +384,20 @@ export async function proxy(request: NextRequest) {
     return storyRewrite;
   }
 
-  // 1. Check maintenance mode first (applies to all routes)
+  // 1. Check maintenance mode (applies to all routes)
   const maintenanceResponse = await handleMaintenanceMode(request);
   if (maintenanceResponse) {
     return maintenanceResponse;
   }
 
-  // 2. Handle CORS preflight for API routes
+  // 2. Redirect root path to /immersive (replaces next.config.ts redirect
+  //    which ran at CDN level before proxy, bypassing canonical domain checks)
+  const rootRedirect = handleRootRedirect(request);
+  if (rootRedirect) {
+    return rootRedirect;
+  }
+
+  // 3. Handle CORS preflight for API routes
   const corsResponse = handleCORS(request);
   if (corsResponse) {
     return corsResponse;

@@ -143,7 +143,7 @@ describe("Maintenance mode", () => {
     });
 
     it("allows all requests through", async () => {
-      const request = new NextRequest("http://localhost:3000/");
+      const request = new NextRequest("http://localhost:3000/favorites");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -296,7 +296,7 @@ describe("Maintenance mode", () => {
         json: () => Promise.resolve([{ enabled: false }]),
       });
 
-      const request = new NextRequest("http://localhost:3000/");
+      const request = new NextRequest("http://localhost:3000/favorites");
       const response = await proxy(request);
 
       expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -323,7 +323,7 @@ describe("Maintenance mode", () => {
         status: 500,
       });
 
-      const request = new NextRequest("http://localhost:3000/");
+      const request = new NextRequest("http://localhost:3000/favorites");
       const response = await proxy(request);
 
       // Should default to off when database fails
@@ -336,7 +336,7 @@ describe("Maintenance mode", () => {
         json: () => Promise.resolve([]),
       });
 
-      const request = new NextRequest("http://localhost:3000/");
+      const request = new NextRequest("http://localhost:3000/favorites");
       const response = await proxy(request);
 
       // Should default to off when flag not found
@@ -346,7 +346,7 @@ describe("Maintenance mode", () => {
     it("allows requests when fetch throws error", async () => {
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
-      const request = new NextRequest("http://localhost:3000/");
+      const request = new NextRequest("http://localhost:3000/favorites");
       const response = await proxy(request);
 
       // Should default to off when fetch fails
@@ -373,7 +373,7 @@ describe("Maintenance mode", () => {
     });
 
     it("allows requests when Supabase is not configured", async () => {
-      const request = new NextRequest("http://localhost:3000/");
+      const request = new NextRequest("http://localhost:3000/favorites");
       const response = await proxy(request);
 
       // Should default to off when no Supabase config
@@ -556,8 +556,16 @@ describe("Canonical domain redirect", () => {
     );
   });
 
-  it("redirects paisaxe.com root to paisaxe.es root (single hop)", async () => {
+  it("redirects paisaxe.com root to paisaxe.es root", async () => {
     const request = new NextRequest("https://paisaxe.com/");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe("https://paisaxe.es/");
+  });
+
+  it("redirects www.paisaxe.com root to paisaxe.es root", async () => {
+    const request = new NextRequest("https://www.paisaxe.com/");
     const response = await proxy(request);
 
     expect(response.status).toBe(308);
@@ -573,6 +581,51 @@ describe("Canonical domain redirect", () => {
 
   it("does not redirect localhost in development", async () => {
     const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+});
+
+describe("Root path redirect", () => {
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  it("redirects / to /immersive on canonical domain", async () => {
+    const request = new NextRequest("https://paisaxe.es/");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://paisaxe.es/immersive"
+    );
+  });
+
+  it("redirects / to /immersive on localhost", async () => {
+    const request = new NextRequest("http://localhost:3000/");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/immersive"
+    );
+  });
+
+  it("does not redirect non-root paths", async () => {
+    const request = new NextRequest("https://paisaxe.es/favorites");
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("does not redirect /immersive", async () => {
+    const request = new NextRequest("https://paisaxe.es/immersive");
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
