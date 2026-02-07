@@ -132,9 +132,20 @@ async function verifyCredentials(credentials: Credentials): Promise<void> {
   });
 
   console.log("Verifying credentials with /users/me endpoint...");
-  const { data } = await client.v2.me();
-  console.log(`✅ Authenticated as: @${data.username} (${data.name})`);
-  console.log(`   User ID: ${data.id}\n`);
+  console.log("  (Note: This read endpoint may fail on the free tier — that's OK, posting still works)\n");
+  try {
+    const { data } = await client.v2.me();
+    console.log(`✅ Authenticated as: @${data.username} (${data.name})`);
+    console.log(`   User ID: ${data.id}\n`);
+  } catch (error: unknown) {
+    const statusCode = error && typeof error === "object" && "code" in error ? (error as { code: number }).code : undefined;
+    if (statusCode === 403) {
+      console.log("⚠️  /users/me returned 403 — expected on free tier (write-only access)");
+      console.log("   Posting should still work. Proceeding...\n");
+    } else {
+      throw error;
+    }
+  }
 }
 
 async function main() {

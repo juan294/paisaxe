@@ -154,6 +154,19 @@ describe("NavigationHint", () => {
     expect(hint).toHaveClass("z-30");
   });
 
+  it("disables pointer events while fading", () => {
+    render(<NavigationHint />);
+
+    const hint = screen.getByTestId("navigation-hint");
+    expect(hint).not.toHaveClass("pointer-events-none");
+
+    fireEvent.click(hint);
+
+    // While fading, pointer-events should be disabled
+    expect(hint).toHaveClass("pointer-events-none");
+    expect(hint).toHaveClass("opacity-0");
+  });
+
   it("renders chevron icons", () => {
     const { container } = render(<NavigationHint />);
 

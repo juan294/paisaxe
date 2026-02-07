@@ -216,9 +216,19 @@ function addCORSHeaders(request: NextRequest, response: NextResponse): void {
 }
 
 /**
+ * Timeout for auth session refresh in milliseconds.
+ * Prevents the proxy from hanging when Supabase is unreachable.
+ * Exported for testing.
+ */
+export const AUTH_REFRESH_TIMEOUT_MS = 3_000;
+
+/**
  * Refresh Supabase auth session if expired.
  * This ensures the client and server auth states stay in sync.
  * Returns a response with updated cookies if session was refreshed.
+ *
+ * Includes a timeout to prevent hanging when Supabase is unreachable
+ * (e.g., during CI with dummy credentials, or production outages).
  */
 async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({
@@ -230,8 +240,9 @@ async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Skip if Supabase not configured
-  if (!supabaseUrl || !supabaseKey) {
+  // Skip if Supabase not configured or using dummy credentials (CI/E2E).
+  // Real Supabase anon keys are JWTs that start with 'eyJ'.
+  if (!supabaseUrl || !supabaseKey || !supabaseKey.startsWith("eyJ")) {
     return response;
   }
 
@@ -257,11 +268,26 @@ async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // This will refresh the session if expired and update cookies
-    await supabase.auth.getUser();
+    // Race getUser() against a timeout to prevent hanging
+    // when Supabase is unreachable (DNS hang, network issues)
+    await Promise.race([
+      supabase.auth.getUser(),
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Auth refresh timeout")),
+          AUTH_REFRESH_TIMEOUT_MS
+        )
+      ),
+    ]);
   } catch (error) {
-    // Log but don't fail the request if session refresh fails
-    console.error("Error refreshing auth session:", error);
+    // Timeout or connection error — continue without refreshing.
+    // Only log actual errors, not timeouts (expected in CI).
+    if (
+      error instanceof Error &&
+      error.message !== "Auth refresh timeout"
+    ) {
+      console.error("Error refreshing auth session:", error);
+    }
   }
 
   return response;
