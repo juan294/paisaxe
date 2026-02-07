@@ -200,7 +200,12 @@ export function StoryViewer({
   return (
     <main
       className="relative h-dvh w-screen overflow-hidden bg-black cursor-pointer"
-      onClick={() => setShowInfo((prev) => !prev)}
+      onClick={() => {
+        // Only toggle info on desktop (pointer: fine) — on mobile, tap zones handle navigation
+        if (window.matchMedia("(pointer: fine)").matches) {
+          setShowInfo((prev) => !prev);
+        }
+      }}
     >
       {/* Screen reader announcement for story changes */}
       <div
@@ -304,6 +309,10 @@ export function StoryViewer({
 
       {/* Main content */}
       <article
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowInfo((prev) => !prev);
+        }}
         className={cn(
           "absolute bottom-0 left-0 right-0 p-8 pb-[max(2rem,env(safe-area-inset-bottom))] md:p-12 z-10 transition-all duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 motion-reduce:translate-y-0"
