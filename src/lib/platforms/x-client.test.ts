@@ -124,6 +124,18 @@ describe("XClient", () => {
 
       await expect(client.verifyCredentials()).rejects.toThrow("API Error");
     });
+
+    it("returns null gracefully on free tier (read endpoint blocked)", async () => {
+      const apiError = new Error("Forbidden") as any;
+      apiError.code = 403;
+      apiError.data = {};
+      mockMe.mockRejectedValue(apiError);
+
+      const client = new XClient(validCredentials);
+      const result = await client.verifyCredentials();
+
+      expect(result).toBeNull();
+    });
   });
 
   describe("postTweet", () => {
@@ -281,7 +293,7 @@ describe("XClient", () => {
   });
 
   describe("error handling", () => {
-    it("handles CreditsDepleted error", async () => {
+    it("handles CreditsDepleted error as free tier write limit", async () => {
       const apiError = new Error("Credits depleted") as any;
       apiError.data = { title: "CreditsDepleted" };
       mockTweet.mockRejectedValue(apiError);
@@ -290,7 +302,7 @@ describe("XClient", () => {
       const result = await client.postTweet("Hello");
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("paid subscription");
+      expect(result.error).toContain("1,500 posts/month");
       expect(result.errorCode).toBe("CREDITS_DEPLETED");
     });
 
@@ -346,10 +358,16 @@ describe("checkXPostingAvailable", () => {
     expect(result.reason).toBeUndefined();
   });
 
-  // Note: Testing error paths for checkXPostingAvailable with dynamic mocking is complex
-  // because vi.mock is hoisted and the mock functions don't share scope.
-  // The error handling paths are already covered by the XClient tests.
-  // The function is a thin wrapper around XClient.verifyCredentials.
+  it("returns available on free tier even when v2.me fails", async () => {
+    const apiError = new Error("Forbidden") as any;
+    apiError.code = 403;
+    apiError.data = {};
+    mockMe.mockRejectedValue(apiError);
+
+    const result = await checkXPostingAvailable(validCredentials);
+
+    expect(result.available).toBe(true);
+  });
 
   it("handles unknown errors", async () => {
     mockMe.mockRejectedValue("Unknown error");

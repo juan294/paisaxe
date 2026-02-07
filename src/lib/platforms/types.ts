@@ -62,8 +62,8 @@ export interface PlatformClient {
   /** The platform this client handles */
   platform: MarketingPlatform;
 
-  /** Verify credentials are valid and get user info */
-  verifyCredentials(): Promise<PlatformUserInfo>;
+  /** Verify credentials are valid and get user info. Returns null on free tier (read blocked). */
+  verifyCredentials(): Promise<PlatformUserInfo | null>;
 
   /** Post content to the platform */
   post(content: string, options?: PostOptions): Promise<PostResult>;

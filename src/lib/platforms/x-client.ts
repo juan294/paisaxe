@@ -4,8 +4,9 @@
  * Handles posting, deleting, and fetching engagement for X/Twitter.
  * Uses OAuth 1.0a authentication with user context.
  *
- * Note: Posting requires X API Basic tier ($100/month) or higher.
- * Free tier only allows read operations.
+ * Free tier: write-only (1,500 posts/month), no read access.
+ * Basic tier ($200/month): 50k posts + 15k reads.
+ * Pro tier ($5,000/month): 300k posts + 1M reads.
  */
 
 import { TwitterApi, type ApiResponseError } from "twitter-api-v2";
@@ -63,9 +64,13 @@ export class XClient {
   }
 
   /**
-   * Verify credentials and get authenticated user info
+   * Verify credentials and get authenticated user info.
+   *
+   * Uses v2.me() which is a read endpoint — not available on the free tier.
+   * Returns null instead of throwing when the read endpoint is blocked (403),
+   * since the free tier is write-only and posting can still work.
    */
-  async verifyCredentials(): Promise<XUserInfo> {
+  async verifyCredentials(): Promise<XUserInfo | null> {
     try {
       const { data } = await this.client.v2.me();
       this.username = data.username;
@@ -75,6 +80,14 @@ export class XClient {
         name: data.name,
       };
     } catch (error) {
+      // On the free tier, read endpoints return 403 — this is expected.
+      // Return null so callers know verification wasn't possible but posting may still work.
+      if (error instanceof Error) {
+        const apiError = error as ApiResponseError;
+        if (apiError.code === 403 || apiError.data?.title === "Forbidden") {
+          return null;
+        }
+      }
       throw this.handleError(error, "Failed to verify credentials");
     }
   }
@@ -253,10 +266,10 @@ export class XClient {
           errors?: Array<{ message: string }>;
         };
 
-        // Handle credits depleted (requires paid tier)
+        // Handle credits depleted (free tier: 1,500 posts/month limit reached)
         if (data.title === "CreditsDepleted") {
           return {
-            message: "X API requires a paid subscription (Basic tier: $100/month) to post tweets",
+            message: "X API free tier limit reached (1,500 posts/month). Upgrade to Basic ($200/month) for 50k posts.",
             code: "CREDITS_DEPLETED",
           };
         }
@@ -291,8 +304,11 @@ export class XClient {
 }
 
 /**
- * Check if posting is available (not credits depleted)
- * Useful for UI to show appropriate messaging
+ * Check if posting is available.
+ *
+ * On the free tier, verifyCredentials() returns null (read endpoint blocked)
+ * but posting is still available (write-only access). We only report unavailable
+ * for actual auth failures or unknown errors.
  */
 export async function checkXPostingAvailable(
   credentials: MarketingCredentials
@@ -300,20 +316,12 @@ export async function checkXPostingAvailable(
   const client = new XClient(credentials);
 
   try {
-    // Verify credentials first
+    // verifyCredentials returns null on free tier (403 on read endpoint).
+    // That's fine — posting still works on the free tier.
     await client.verifyCredentials();
-
-    // Try a dry-run style check - we can't actually test posting without posting
-    // So we just verify credentials work and assume posting might work
     return { available: true };
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes("paid subscription")) {
-        return {
-          available: false,
-          reason: "X API requires Basic tier ($100/month) for posting",
-        };
-      }
       return { available: false, reason: error.message };
     }
     return { available: false, reason: "Unknown error" };
