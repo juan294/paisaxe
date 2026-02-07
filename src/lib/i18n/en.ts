@@ -80,6 +80,8 @@ export const en: Translations = {
     show_hide: 'show/hide',
     space: 'space',
     next: 'next',
+    hint_previous: 'Previous',
+    hint_next: 'Next',
   },
 
   share: {
