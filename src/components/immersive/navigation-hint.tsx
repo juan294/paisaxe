@@ -38,7 +38,7 @@ export function NavigationHint() {
     <div
       className={cn(
         "absolute inset-0 z-30 flex items-center justify-between px-8 transition-opacity duration-500",
-        fading ? "opacity-0" : "opacity-100"
+        fading ? "opacity-0 pointer-events-none" : "opacity-100"
       )}
       onClick={dismiss}
       onTouchStart={dismiss}
