@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { proxy, shouldBypassMaintenanceMode } from "./proxy";
+import { proxy, shouldBypassMaintenanceMode, AUTH_REFRESH_TIMEOUT_MS } from "./proxy";
 import { NextRequest } from "next/server";
 
 // Mock global fetch for database checks
@@ -426,5 +426,72 @@ describe("shouldBypassMaintenanceMode", () => {
     expect(shouldBypassMaintenanceMode("/immersive")).toBe(true);
     expect(shouldBypassMaintenanceMode("/pricing")).toBe(true);
     expect(shouldBypassMaintenanceMode("/pricing/success")).toBe(true);
+  });
+});
+
+describe("Auth session refresh timeout", () => {
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "dummy_key";
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  });
+
+  it("should return response within timeout when Supabase auth hangs", async () => {
+    // Simulate a hanging fetch (never resolves) — e.g., DNS resolution hang
+    mockFetch.mockImplementation(() => new Promise(() => {}));
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+
+    const startTime = Date.now();
+    const response = await proxy(request);
+    const elapsed = Date.now() - startTime;
+
+    // Should have returned a valid response (not hung)
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+
+    // Should complete within AUTH_REFRESH_TIMEOUT_MS + 1s buffer
+    expect(elapsed).toBeLessThan(AUTH_REFRESH_TIMEOUT_MS + 1000);
+  }, 10_000); // test timeout: 10s
+
+  it("should return response normally when Supabase responds quickly", async () => {
+    // Simulate a fast auth response (getUser call succeeds)
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: { user: null }, error: null }),
+    });
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("should return response when Supabase auth returns an error", async () => {
+    // Simulate a connection error
+    mockFetch.mockRejectedValue(new TypeError("fetch failed"));
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("should skip auth refresh when Supabase is not configured", async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    // No fetch should have been called
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
