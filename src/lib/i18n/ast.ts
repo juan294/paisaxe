@@ -80,6 +80,8 @@ export const ast: Translations = {
     show_hide: 'amosar/anubrir',
     space: 'espaciu',
     next: 'siguiente',
+    hint_previous: 'Anterior',
+    hint_next: 'Siguiente',
   },
 
   share: {

@@ -180,6 +180,17 @@ describe("StoryViewer", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    // Reset matchMedia mock to default (matches: false for all queries)
+    vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
   });
 
   describe("rendering", () => {
@@ -468,20 +479,59 @@ describe("StoryViewer", () => {
   });
 
   describe("info toggle", () => {
-    it("should toggle info visibility when clicking screen", async () => {
+    it("should toggle info visibility when clicking screen on desktop (pointer: fine)", async () => {
+      // Simulate desktop device with pointer: fine
+      vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+        matches: query === "(pointer: fine)",
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const container = screen.getByText("Lagos de Covadonga").closest(".relative.h-screen");
+      const mainContainer = screen.getByRole("main");
+      fireEvent.click(mainContainer);
 
-      if (container) {
-        fireEvent.click(container);
+      // After clicking on desktop, info should be hidden
+      const bottomContent = screen
+        .getByText("Lagos de Covadonga")
+        .closest("article[class*='bottom-0']");
+      expect(bottomContent).toHaveClass("opacity-0");
+    });
 
-        // After clicking, info should be hidden
-        const bottomContent = screen
-          .getByText("Lagos de Covadonga")
-          .closest("article[class*='bottom-0']");
-        expect(bottomContent).toHaveClass("opacity-0");
-      }
+    it("should NOT toggle info when clicking main on mobile (pointer: coarse)", async () => {
+      // Default matchMedia mock returns matches: false for all queries,
+      // simulating a touch/coarse device where (pointer: fine) is false
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const mainContainer = screen.getByRole("main");
+      fireEvent.click(mainContainer);
+
+      // On mobile, clicking main should NOT toggle info — tap zones handle navigation
+      const bottomContent = screen
+        .getByText("Lagos de Covadonga")
+        .closest("article[class*='bottom-0']");
+      expect(bottomContent).toHaveClass("opacity-100");
+    });
+
+    it("should toggle info when clicking the article content area", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // The article element is the content overlay at the bottom
+      const article = screen
+        .getByText("Lagos de Covadonga")
+        .closest("article[class*='bottom-0']");
+      expect(article).not.toBeNull();
+
+      fireEvent.click(article!);
+
+      // After clicking article content, info should be hidden
+      expect(article).toHaveClass("opacity-0");
     });
 
     it("should show upper-right toolbar controls initially", async () => {
@@ -504,7 +554,19 @@ describe("StoryViewer", () => {
       expect(controlsNav).toHaveClass("opacity-0");
     });
 
-    it("should hide upper-right toolbar controls when clicking screen", async () => {
+    it("should hide upper-right toolbar controls when clicking screen on desktop", async () => {
+      // Simulate desktop device with pointer: fine
+      vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+        matches: query === "(pointer: fine)",
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
@@ -512,7 +574,7 @@ describe("StoryViewer", () => {
 
       fireEvent.click(mainContainer);
 
-      // After clicking, upper-right controls should be hidden
+      // After clicking on desktop, upper-right controls should be hidden
       expect(controlsNav).toHaveClass("opacity-0");
     });
 
@@ -539,6 +601,45 @@ describe("StoryViewer", () => {
 
       // When hidden, should have pointer-events-none to prevent interaction
       expect(controlsNav).toHaveClass("pointer-events-none");
+    });
+  });
+
+  describe("mobile tap zones", () => {
+    it("should have left nav button with touch-nav-left class for 30% width", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const prevButton = screen.getAllByRole("button").find(
+        (btn) => btn.classList.contains("touch-nav-left")
+      );
+      expect(prevButton).toBeDefined();
+      expect(prevButton).toHaveClass("left-0");
+    });
+
+    it("should have right nav button with touch-nav-right class for 70% width", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const nextButton = screen.getAllByRole("button").find(
+        (btn) => btn.classList.contains("touch-nav-right")
+      );
+      expect(nextButton).toBeDefined();
+      expect(nextButton).toHaveClass("right-0");
+    });
+
+    it("should not toggle info when clicking nav buttons (stopPropagation)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const nextButton = screen.getAllByRole("button").find(
+        (btn) => btn.classList.contains("touch-nav-right")
+      );
+      expect(nextButton).toBeDefined();
+
+      fireEvent.click(nextButton!);
+
+      // Info should still be visible — nav button click should not toggle info
+      const bottomContent = screen
+        .getByText("Lagos de Covadonga")
+        .closest("article[class*='bottom-0']");
+      expect(bottomContent).toHaveClass("opacity-100");
     });
   });
 
