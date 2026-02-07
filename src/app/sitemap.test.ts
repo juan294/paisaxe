@@ -90,4 +90,27 @@ describe("sitemap", () => {
       }
     });
   });
+
+  describe("trims NEXT_PUBLIC_SITE_URL to prevent newlines in URLs", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("trims trailing newline from env var", async () => {
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://paisaxe.es\n");
+      const entries = await sitemap();
+      for (const entry of entries) {
+        expect(entry.url).not.toContain("\n");
+        expect(entry.url).toMatch(/^https:\/\/paisaxe\.es(\/|$)/);
+      }
+    });
+
+    it("trims trailing whitespace from env var", async () => {
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://paisaxe.es  ");
+      const entries = await sitemap();
+      for (const entry of entries) {
+        expect(entry.url).not.toContain("  ");
+      }
+    });
+  });
 });

@@ -294,6 +294,43 @@ async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
 }
 
 /**
+ * Canonical domain: redirect alternate/www domains to the primary domain.
+ *
+ * Prevents double-redirect chains like:
+ *   paisaxe.com/ → 307 → paisaxe.com/immersive → 308 → paisaxe.es/immersive
+ * Instead:
+ *   paisaxe.com/ → 308 → paisaxe.es/
+ *
+ * Uses 308 (permanent, preserves method).
+ */
+function handleCanonicalDomain(request: NextRequest): NextResponse | null {
+  const canonicalDomain = LOCATION_CONFIG.domain; // paisaxe.es
+  const hostname = request.nextUrl.hostname;
+
+  // Already on canonical domain
+  if (hostname === canonicalDomain) return null;
+
+  // Don't redirect localhost (development)
+  if (hostname === "localhost" || hostname === "127.0.0.1") return null;
+
+  // Check if this is an alternate domain we should redirect
+  const alternateDomains = [
+    `www.${canonicalDomain}`,
+    LOCATION_CONFIG.alternateDomain,
+    LOCATION_CONFIG.alternateDomain ? `www.${LOCATION_CONFIG.alternateDomain}` : null,
+  ].filter(Boolean);
+
+  if (!alternateDomains.includes(hostname)) return null;
+
+  const url = request.nextUrl.clone();
+  url.host = canonicalDomain;
+  url.port = "";
+  url.protocol = "https";
+
+  return NextResponse.redirect(url, 308);
+}
+
+/**
  * Rewrite /story/:slug to /immersive?story=:slug.
  *
  * The /story/[slug] route exists for SEO-friendly sharing URLs, but the
@@ -320,7 +357,13 @@ function handleStoryRewrite(request: NextRequest): NextResponse | null {
 }
 
 export async function proxy(request: NextRequest) {
-  // 0. Rewrite /story/:slug → /immersive?story=:slug (before maintenance check)
+  // 0a. Redirect alternate domains to canonical domain (single hop)
+  const canonicalRedirect = handleCanonicalDomain(request);
+  if (canonicalRedirect) {
+    return canonicalRedirect;
+  }
+
+  // 0b. Rewrite /story/:slug → /immersive?story=:slug (before maintenance check)
   const storyRewrite = handleStoryRewrite(request);
   if (storyRewrite) {
     return storyRewrite;
