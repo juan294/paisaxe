@@ -14,6 +14,7 @@ import { filterByMood, type Mood } from "@/lib/mood-mapping";
 import { MoodOverlay } from "@/components/immersive/mood-overlay";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
+import { ComponentErrorBoundary } from "@/components/ui/component-error-boundary";
 
 // Dynamically import VoiceChat - only loads when chat is opened
 // This saves ~15KB+ from initial bundle
@@ -176,31 +177,35 @@ export function ImmersivePageContent({ serverShuffleSeed }: ImmersivePageContent
         <MoodOverlay onSelectMood={handleMoodSelect} onDismiss={handleMoodDismiss} />
       )}
 
-      <StoryViewer
-        stories={filteredStories}
-        allStories={allStories}
-        currentIndex={currentIndex}
-        onIndexChange={setCurrentIndex}
-        onAskAbout={handleAskAbout}
-        chatOpen={chatOpen}
-        selectedCategory={selectedCategory}
-        selectedLocation={selectedLocation}
-        selectedDuration={selectedDuration}
-        onCategoryChange={setSelectedCategory}
-        onLocationChange={setSelectedLocation}
-        onDurationChange={setSelectedDuration}
-        onClearFilters={clearAll}
-        viewedIndices={viewedIndices}
-      />
+      <ComponentErrorBoundary>
+        <StoryViewer
+          stories={filteredStories}
+          allStories={allStories}
+          currentIndex={currentIndex}
+          onIndexChange={setCurrentIndex}
+          onAskAbout={handleAskAbout}
+          chatOpen={chatOpen}
+          selectedCategory={selectedCategory}
+          selectedLocation={selectedLocation}
+          selectedDuration={selectedDuration}
+          onCategoryChange={setSelectedCategory}
+          onLocationChange={setSelectedLocation}
+          onDurationChange={setSelectedDuration}
+          onClearFilters={clearAll}
+          viewedIndices={viewedIndices}
+        />
+      </ComponentErrorBoundary>
       {/* Only render VoiceChat when opened - lazy loaded */}
       {chatOpen && (
         <Suspense fallback={null}>
-          <VoiceChat
-            story={currentStory}
-            open={chatOpen}
-            onClose={handleCloseChat}
-            initialMessage={initialMessage}
-          />
+          <ComponentErrorBoundary>
+            <VoiceChat
+              story={currentStory}
+              open={chatOpen}
+              onClose={handleCloseChat}
+              initialMessage={initialMessage}
+            />
+          </ComponentErrorBoundary>
         </Suspense>
       )}
     </>
