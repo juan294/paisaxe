@@ -8,6 +8,10 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@anthropic-ai/sdk", "sharp"],
+  experimental: {
+    // Tree-shake barrel exports — avoids bundling all 1,000+ lucide icons
+    optimizePackageImports: ["lucide-react"],
+  },
   // Exclude heavy directories from serverless function tracing.
   // Routes using fs + process.cwd() (agents-summary, agents/run) cause
   // Next.js to trace the entire project root, pulling in content/images
