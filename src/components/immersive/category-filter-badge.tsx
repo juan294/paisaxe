@@ -76,7 +76,7 @@ export function CategoryFilterBadge({
     <div
       ref={containerRef}
       className={cn(
-        "absolute top-16 left-6 z-20 transition-all duration-500",
+        "absolute top-16 left-6 z-30 transition-all duration-500",
         visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 pointer-events-none"
       )}
     >
