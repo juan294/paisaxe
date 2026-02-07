@@ -25,15 +25,9 @@ const nextConfig: NextConfig = {
       "./marketing/**",
     ],
   },
-  // Server-level redirect: root to /immersive
-  // This runs before any React code, avoiding client-side hydration issues
-  redirects: async () => [
-    {
-      source: "/",
-      destination: "/immersive",
-      permanent: false,
-    },
-  ],
+  // Root redirect (/ → /immersive) is handled in proxy.ts, NOT here.
+  // next.config.ts redirects run at CDN level before proxy.ts,
+  // which would bypass canonical domain checks (paisaxe.com → paisaxe.es).
   // Reverse proxy for PostHog to avoid ad blockers
   rewrites: async () => [
     {
