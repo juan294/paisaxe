@@ -73,7 +73,7 @@ export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
 
         <button
           onClick={handleDismiss}
-          className="mt-6 text-sm text-white/40 hover:text-white/60 transition-colors"
+          className="mt-6 text-sm text-white/60 hover:text-white/80 transition-colors"
         >
           {t("mood.show_all")}
         </button>

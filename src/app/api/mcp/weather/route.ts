@@ -121,6 +121,15 @@ async function fetchWeather(city: string): Promise<WeatherResponse> {
   };
 }
 
+function validateMcpSecret(request: Request): boolean {
+  const secret = process.env.MCP_API_SECRET?.trim();
+  if (!secret) {
+    return false;
+  }
+  const provided = request.headers.get("x-mcp-secret");
+  return provided === secret;
+}
+
 function getClientIp(request: Request): string {
   return (
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -130,6 +139,13 @@ function getClientIp(request: Request): string {
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
+  if (!validateMcpSecret(request)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
   const ip = getClientIp(request);
   const rateCheck = checkRateLimit(`mcp-weather:${ip}`, WEATHER_RATE_LIMIT);
   if (!rateCheck.allowed) {
@@ -178,6 +194,13 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  if (!validateMcpSecret(request)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
   const ip = getClientIp(request);
   const rateCheck = checkRateLimit(`mcp-weather:${ip}`, WEATHER_RATE_LIMIT);
   if (!rateCheck.allowed) {

@@ -9,9 +9,15 @@ global.fetch = mockFetch;
 const originalEnv = process.env;
 
 describe("/api/mcp/weather", () => {
+  const MCP_SECRET = "test-mcp-secret";
+
   beforeEach(() => {
     vi.resetAllMocks();
-    process.env = { ...originalEnv, OPENWEATHERMAP_API_KEY: "test-api-key" };
+    process.env = {
+      ...originalEnv,
+      OPENWEATHERMAP_API_KEY: "test-api-key",
+      MCP_API_SECRET: MCP_SECRET,
+    };
   });
 
   afterEach(() => {
@@ -19,6 +25,34 @@ describe("/api/mcp/weather", () => {
   });
 
   describe("GET", () => {
+    it("should return 401 when x-mcp-secret header is missing", async () => {
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Oviedo"
+      );
+      const response = await GET(request);
+      expect(response.status).toBe(401);
+    });
+
+    it("should return 401 when x-mcp-secret header is wrong", async () => {
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": "wrong-secret" } }
+      );
+      const response = await GET(request);
+      expect(response.status).toBe(401);
+    });
+
+    it("should return 401 when MCP_API_SECRET env var is not set", async () => {
+      delete process.env.MCP_API_SECRET;
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": "any-value" } }
+      );
+      const response = await GET(request);
+      expect(response.status).toBe(401);
+    });
+
     it("should return weather data for a valid city", async () => {
       const mockWeatherResponse = {
         name: "Oviedo",
@@ -37,7 +71,8 @@ describe("/api/mcp/weather", () => {
       });
 
       const request = new Request(
-        "http://localhost:3000/api/mcp/weather?city=Oviedo"
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
       );
       const response = await GET(request);
       const data = await response.json();
@@ -54,7 +89,9 @@ describe("/api/mcp/weather", () => {
     });
 
     it("should return 400 if city parameter is missing", async () => {
-      const request = new Request("http://localhost:3000/api/mcp/weather");
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        headers: { "x-mcp-secret": MCP_SECRET },
+      });
       const response = await GET(request);
 
       expect(response.status).toBe(400);
@@ -66,7 +103,8 @@ describe("/api/mcp/weather", () => {
       delete process.env.OPENWEATHERMAP_API_KEY;
 
       const request = new Request(
-        "http://localhost:3000/api/mcp/weather?city=Oviedo"
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
       );
       const response = await GET(request);
 
@@ -82,7 +120,8 @@ describe("/api/mcp/weather", () => {
       });
 
       const request = new Request(
-        "http://localhost:3000/api/mcp/weather?city=InvalidCity123"
+        "http://localhost:3000/api/mcp/weather?city=InvalidCity123",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
       );
       const response = await GET(request);
 
@@ -104,7 +143,8 @@ describe("/api/mcp/weather", () => {
       });
 
       const request = new Request(
-        "http://localhost:3000/api/mcp/weather?city=Gijón"
+        "http://localhost:3000/api/mcp/weather?city=Gijón",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
       );
       await GET(request);
 
@@ -115,6 +155,28 @@ describe("/api/mcp/weather", () => {
   });
 
   describe("POST", () => {
+    it("should return 401 when x-mcp-secret header is missing", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(401);
+    });
+
+    it("should return 401 when x-mcp-secret header is wrong", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": "wrong-secret" },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(401);
+    });
+
     it("should support MCP tool call format", async () => {
       const mockWeatherResponse = {
         name: "Avilés",
@@ -134,7 +196,7 @@ describe("/api/mcp/weather", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/weather", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({
           tool: "get_weather",
           arguments: { city: "Avilés" },
@@ -151,7 +213,7 @@ describe("/api/mcp/weather", () => {
     it("should return 400 for invalid MCP request", async () => {
       const request = new Request("http://localhost:3000/api/mcp/weather", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
         body: JSON.stringify({ invalid: "request" }),
       });
 
