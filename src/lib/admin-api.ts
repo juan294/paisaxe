@@ -23,6 +23,7 @@ import type {
   UpdateManualCostRequest,
 } from "@/types/costs-analytics";
 import type { AgentsDashboardData, AgentRunStatus, AgentLogsResponse } from "@/types/agents-dashboard";
+import type { GitHubAnalyticsDashboardData } from "@/types/github-analytics";
 
 const API_BASE = "/api/admin";
 
@@ -810,6 +811,56 @@ export async function stopAgent(agentKey: string): Promise<AdminApiResponse<{ st
     return { data: await response.json() };
   } catch (error) {
     console.error("Error stopping agent:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Fetch GitHub repository traffic analytics
+ */
+export async function fetchGithubAnalytics(
+  from?: string,
+  to?: string
+): Promise<AdminApiResponse<GitHubAnalyticsDashboardData>> {
+  try {
+    const url = new URL(`${API_BASE}/github-analytics`, window.location.origin);
+    if (from) url.searchParams.set("from", from);
+    if (to) url.searchParams.set("to", to);
+
+    const response = await fetch(url.toString());
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to fetch GitHub analytics" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching GitHub analytics:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
+ * Trigger a manual GitHub traffic sync
+ */
+export async function syncGithubTraffic(): Promise<AdminApiResponse<{ synced: boolean; syncedAt: string }>> {
+  try {
+    const response = await fetch("/api/cron/github-traffic-sync", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to sync GitHub traffic" };
+    }
+
+    return { data: await response.json() };
+  } catch (error) {
+    console.error("Error syncing GitHub traffic:", error);
     return { error: "Network error" };
   }
 }

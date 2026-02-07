@@ -33,10 +33,37 @@ develop   # Active development (DEFAULT)
 ```
 
 1. All development happens on `develop`
-2. Never commit directly to `main`
-3. Merge `develop` → `main` only when releasing to production
+2. Never commit directly to `main` — it is protected with required status checks
+3. Release to production via PR: `develop` → `main` (see Production Release below)
 4. Always run tests before committing
-5. **No PRs** — solo developer workflow. Commit/merge directly to `develop`, verify CI, done
+5. **No PRs for `develop`** — commit/merge directly, verify CI, done
+6. **PRs required for `main`** — branch protection enforces CI must pass before merge
+
+### Production Release (develop → main)
+
+`main` is protected with branch protection rules:
+- **Required status checks**: `lint-and-typecheck`, `test`, `build`, `e2e` must all pass
+- **Force pushes blocked**, **deletion blocked**
+- **PRs required** (0 approvals — solo dev can self-merge after CI passes)
+
+```bash
+# 1. Ensure develop is up to date and CI is green
+git push origin develop
+
+# 2. Create a PR from develop → main
+gh pr create --base main --head develop --title "Release: description of changes"
+
+# 3. Wait for all 4 status checks to pass
+gh pr checks
+
+# 4. Merge once CI is green
+gh pr merge --merge
+
+# 5. Verify Vercel production deployment
+vercel ls --limit 5
+```
+
+**Never bypass branch protection.** If CI fails on the PR, fix on `develop` first, push, and let the PR update.
 
 ### Worktree-First Development (MANDATORY)
 
@@ -152,6 +179,7 @@ Required in `.env.local`:
 ANTHROPIC_API_KEY=       # Claude API
 VOYAGE_API_KEY=          # Voyage AI embeddings
 ELEVENLABS_API_KEY=      # Voice agents (optional)
+GITHUB_TOKEN=            # GitHub PAT with `repo` scope (traffic analytics)
 
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
