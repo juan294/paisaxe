@@ -286,6 +286,13 @@ describe("CategoryFilterBadge", () => {
     expect(outerDiv.className).toContain("opacity-100");
   });
 
+  it("renders with z-30 to sit above navigation tap zones", () => {
+    const { container } = renderBadge({ visible: true });
+
+    const outerDiv = container.firstChild as HTMLElement;
+    expect(outerDiv).toHaveClass("z-30");
+  });
+
   it("shows filter count of 3 when all filter types active", () => {
     renderBadge({
       selectedCategory: "nature",
