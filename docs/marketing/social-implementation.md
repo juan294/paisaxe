@@ -110,7 +110,7 @@ await client.deleteTweet(tweetId);
 const engagement = await client.getEngagement(tweetId);
 ```
 
-**Note:** Posting requires X API Basic tier ($100/month). Free tier only allows read operations.
+**Note:** Free tier supports posting (1,500/month). Read operations (engagement, user info) require Basic tier ($200/month).
 
 ### 4. Platform Abstraction (`src/lib/platforms/types.ts`)
 
@@ -215,8 +215,8 @@ This provides all the AI content generation benefits without API costs.
 
 ### X (@elpaisaxe)
 - **Status**: Connected, credentials encrypted
-- **Posting**: Requires Basic tier ($100/month)
-- **Verification**: Credentials verified working (read access confirmed)
+- **Posting**: Available on free tier (1,500 posts/month)
+- **Read access**: Requires Basic tier ($200/month) for engagement metrics
 
 ### Pinterest
 - **Status**: Connected, credentials encrypted (Trial access)
@@ -332,10 +332,10 @@ npx tsx scripts/test-x-credentials.ts --delete <tweet_id>
 
 ### Deferred
 
-11. **X API Paid Tier**
-    - Subscribe to Basic ($100/month) when ready for automation
-    - Enables `postNow()` to work for X
-    - 1,500 tweets/month limit on free tier won't work anyway
+11. **X API Basic Tier (for read access)**
+    - Subscribe to Basic ($200/month) when engagement analytics are needed
+    - Free tier already supports posting via `postNow()` (1,500/month)
+    - Basic adds read access for engagement metrics and user lookups
 
 12. **Privacy Policy & Terms Pages**
     - Create `https://paisaxe.es/privacy`
