@@ -34,6 +34,14 @@ describe("Security headers in next.config.ts", () => {
       const mediaSrc = mediaSrcMatch![1];
       expect(mediaSrc).toContain("blob:");
     });
+
+    it("should include Vercel Analytics domains in connect-src", () => {
+      const connectSrcMatch = configContent.match(/"connect-src ([^"]+)"/);
+      expect(connectSrcMatch).toBeTruthy();
+      const connectSrc = connectSrcMatch![1];
+      expect(connectSrc).toContain("https://vitals.vercel-insights.com");
+      expect(connectSrc).toContain("https://va.vercel-scripts.com");
+    });
   });
 
   describe("Deprecated headers", () => {

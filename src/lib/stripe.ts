@@ -76,7 +76,7 @@ export function verifyWebhookSignature(
   signature: string
 ): Stripe.Event {
   const stripe = getStripeClient();
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
 
   if (!secret) {
     throw new Error("STRIPE_WEBHOOK_SECRET not configured");
