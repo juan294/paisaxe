@@ -94,9 +94,8 @@ describe("SignInPrompt", () => {
       render(<SignInPrompt {...defaultProps} />);
 
       const backdrop = document.querySelector(".fixed.inset-0.z-50");
-      if (backdrop) {
-        fireEvent.click(backdrop);
-      }
+      expect(backdrop).toBeTruthy();
+      fireEvent.click(backdrop!);
 
       expect(defaultProps.onClose).toHaveBeenCalled();
     });
@@ -105,9 +104,8 @@ describe("SignInPrompt", () => {
       render(<SignInPrompt {...defaultProps} />);
 
       const modalContent = screen.getByText(mockT("auth.sync_favorites_title")).closest("div");
-      if (modalContent) {
-        fireEvent.click(modalContent);
-      }
+      expect(modalContent).toBeTruthy();
+      fireEvent.click(modalContent!);
 
       // onClose should only be called once from the backdrop click setup, not from modal content
       expect(defaultProps.onClose).not.toHaveBeenCalled();

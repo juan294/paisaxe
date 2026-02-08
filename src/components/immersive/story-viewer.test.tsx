@@ -299,13 +299,11 @@ describe("StoryViewer", () => {
       expect(prevButton).toBeDefined();
       expect(prevButton).not.toBeDisabled();
 
-      if (prevButton) {
-        fireEvent.click(prevButton);
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
-        expect(onIndexChange).toHaveBeenCalledWith(2); // last story index
-      }
+      fireEvent.click(prevButton!);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(onIndexChange).toHaveBeenCalledWith(2); // last story index
     });
 
     it("should wrap to first story when pressing next on last story", async () => {
@@ -318,45 +316,43 @@ describe("StoryViewer", () => {
       expect(nextButton).toBeDefined();
       expect(nextButton).not.toBeDisabled();
 
-      if (nextButton) {
-        fireEvent.click(nextButton);
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
-        expect(onIndexChange).toHaveBeenCalledWith(0); // first story index
-      }
+      fireEvent.click(nextButton!);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(onIndexChange).toHaveBeenCalledWith(0); // first story index
     });
 
     it("should call onIndexChange when clicking next", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
+      // Use base class right-0 (not sm:right-4 which jsdom can't match)
       const nextButton = screen.getAllByRole("button").find(
-        (btn) => btn.classList.contains("right-4") && btn.classList.contains("top-1/2")
+        (btn) => btn.classList.contains("right-0")
       );
+      expect(nextButton).toBeDefined();
 
-      if (nextButton) {
-        fireEvent.click(nextButton);
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
-        expect(onIndexChange).toHaveBeenCalledWith(1);
-      }
+      fireEvent.click(nextButton!);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(onIndexChange).toHaveBeenCalledWith(1);
     });
 
     it("should call onIndexChange when clicking prev", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
+      // Use base class left-0 (not sm:left-4 which jsdom can't match)
       const prevButton = screen.getAllByRole("button").find(
-        (btn) => btn.classList.contains("left-4")
+        (btn) => btn.classList.contains("left-0")
       );
+      expect(prevButton).toBeDefined();
 
-      if (prevButton) {
-        fireEvent.click(prevButton);
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
-        expect(onIndexChange).toHaveBeenCalledWith(0);
-      }
+      fireEvent.click(prevButton!);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(onIndexChange).toHaveBeenCalledWith(0);
     });
 
     it("should navigate with keyboard right arrow", async () => {
@@ -450,60 +446,85 @@ describe("StoryViewer", () => {
     });
   });
 
-  describe("auto-play", () => {
+  describe("auto-play (non-ambient)", () => {
+    beforeEach(() => {
+      // Enable autoplay_button but NOT ambient_discovery — tests the simple toggle path
+      mockIsEnabled.mockImplementation((flag: string) => flag === "autoplay_button");
+    });
+
+    afterEach(() => {
+      mockIsEnabled.mockReturnValue(false);
+    });
+
     it("should auto-advance when auto-play is enabled", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // Find and click the auto-play toggle
       const autoPlayButton = screen.getAllByRole("button").find(
-        (btn) => btn.classList.contains("top-16") && btn.classList.contains("right-6")
+        (btn) => btn.querySelector(".lucide-play")
       );
+      expect(autoPlayButton).toBeDefined();
 
-      if (autoPlayButton) {
-        fireEvent.click(autoPlayButton);
+      fireEvent.click(autoPlayButton!);
 
-        // Advance time by 6 seconds (auto-play interval)
-        act(() => {
-          vi.advanceTimersByTime(6000);
-        });
+      // Advance time by 6 seconds (non-ambient interval)
+      act(() => {
+        vi.advanceTimersByTime(6000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
 
-        // Wait for transition timeout
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
-
-        expect(onIndexChange).toHaveBeenCalledWith(1);
-      }
+      expect(onIndexChange).toHaveBeenCalledWith(1);
     });
-  });
 
-  describe("auto-play looping", () => {
     it("should wrap to first story when auto-play reaches the end", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 2 })} />
       );
 
-      // Find and click the auto-play toggle in the top-right controls area
-      const controlsArea = screen.getAllByRole("button");
-      const autoPlayButton = controlsArea.find(
-        (btn) => btn.querySelector("svg.lucide-play")
+      const autoPlayButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
       );
+      expect(autoPlayButton).toBeDefined();
 
-      if (autoPlayButton) {
-        fireEvent.click(autoPlayButton);
+      fireEvent.click(autoPlayButton!);
 
-        // Advance time by auto-play interval
-        act(() => {
-          vi.advanceTimersByTime(6000);
-        });
+      act(() => {
+        vi.advanceTimersByTime(6000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
 
-        // Wait for transition timeout
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
+      expect(onIndexChange).toHaveBeenCalledWith(0);
+    });
 
-        expect(onIndexChange).toHaveBeenCalledWith(0);
-      }
+    it("should stop auto-play on second click and show play icon", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const autoPlayButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
+      );
+      expect(autoPlayButton).toBeDefined();
+
+      // Start
+      fireEvent.click(autoPlayButton!);
+      expect(autoPlayButton!.querySelector(".lucide-pause")).toBeTruthy();
+
+      // Stop
+      fireEvent.click(autoPlayButton!);
+      expect(autoPlayButton!.querySelector(".lucide-play")).toBeTruthy();
+
+      // Should NOT auto-advance
+      onIndexChange.mockClear();
+      act(() => {
+        vi.advanceTimersByTime(6000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(onIndexChange).not.toHaveBeenCalled();
     });
   });
 
