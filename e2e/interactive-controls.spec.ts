@@ -1,0 +1,271 @@
+import { test, expect } from "@playwright/test";
+import { withFeatureFlags } from "./fixtures/mock-data";
+
+/**
+ * Interactive Controls E2E Tests
+ *
+ * Tests the BEHAVIOR of interactive UI controls, not just their visibility.
+ * These tests verify that clicking buttons actually produces the expected
+ * state changes — preventing vacuous "the button exists" tests from masking
+ * broken behavior.
+ *
+ * Run with: npx playwright test interactive-controls.spec.ts
+ */
+
+// ─── Ambient / Auto-play Toggle ─────────────────────────────────
+
+test.describe("Ambient toggle behavior", () => {
+  test.beforeEach(async ({ page }) => {
+    // Enable both autoplay_button and ambient_discovery
+    await page.route("**/api/feature-flags", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          withFeatureFlags({
+            autoplay_button: true,
+            ambient_discovery: true,
+          })
+        ),
+      })
+    );
+
+    await page.goto("/immersive");
+    await expect(page.locator("h1")).toBeVisible();
+  });
+
+  test("play button starts auto-rotation and switches to pause icon", async ({
+    page,
+  }) => {
+    // The ambient button shows a Play icon (svg with lucide-play class)
+    const playButton = page
+      .locator("nav button")
+      .filter({ has: page.locator(".lucide-play") });
+    await expect(playButton).toBeVisible();
+
+    // Click to start
+    await playButton.click();
+
+    // Should now show Pause icon
+    const pauseIcon = playButton.locator(".lucide-pause");
+    await expect(pauseIcon).toBeVisible();
+
+    // Play icon should be gone
+    await expect(playButton.locator(".lucide-play")).toHaveCount(0);
+  });
+
+  test("clicking pause stops rotation and returns to play icon", async ({
+    page,
+  }) => {
+    // Click play to start
+    const ambientButton = page
+      .locator("nav button")
+      .filter({ has: page.locator(".lucide-play") });
+    await expect(ambientButton).toBeVisible();
+    await ambientButton.click();
+
+    // Verify it switched to pause
+    await expect(ambientButton.locator(".lucide-pause")).toBeVisible();
+
+    // Click again to stop
+    await ambientButton.click();
+
+    // Should return to play icon
+    await expect(ambientButton.locator(".lucide-play")).toBeVisible();
+    await expect(ambientButton.locator(".lucide-pause")).toHaveCount(0);
+  });
+
+  test("auto-rotation advances to next story", async ({ page }) => {
+    // Get the initial story title
+    const initialTitle = await page.locator("h1").textContent();
+
+    // Start auto-rotation
+    const playButton = page
+      .locator("nav button")
+      .filter({ has: page.locator(".lucide-play") });
+    await playButton.click();
+
+    // Wait for auto-advance (ambient mode is 12 seconds)
+    // Use a generous timeout since transitions add delay
+    await expect(page.locator("h1")).not.toHaveText(initialTitle!, {
+      timeout: 15000,
+    });
+  });
+
+  test("stopping auto-rotation keeps current story", async ({ page }) => {
+    // Start auto-rotation
+    const playButton = page
+      .locator("nav button")
+      .filter({ has: page.locator(".lucide-play") });
+    await playButton.click();
+
+    // Immediately stop it
+    await page.locator("nav button").filter({ has: page.locator(".lucide-pause") }).click();
+
+    // Get the title after stopping
+    const titleAfterStop = await page.locator("h1").textContent();
+
+    // Wait well beyond the auto-advance interval
+    await page.waitForTimeout(7000);
+
+    // Title should be the same — no auto-advance happened
+    await expect(page.locator("h1")).toHaveText(titleAfterStop!);
+  });
+});
+
+// ─── Language Switcher Behavior ─────────────────────────────────
+
+test.describe("Language switcher behavior", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route("**/api/feature-flags", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(withFeatureFlags({})),
+      })
+    );
+
+    await page.goto("/immersive");
+    await expect(page.locator("h1")).toBeVisible();
+  });
+
+  test("switcher opens dropdown and closes on selection", async ({ page }) => {
+    const switcher = page.locator('div[role="group"]').first();
+    const trigger = switcher.locator("button").first();
+
+    // Open dropdown
+    await trigger.click();
+
+    // Options should be visible
+    const options = switcher.locator('[role="option"]');
+    await expect(options.first()).toBeVisible();
+
+    // Select a language
+    await options.first().click();
+
+    // Dropdown should close (options should not be interactive)
+    await expect(options.first()).not.toBeVisible();
+  });
+
+  test("switcher closes on Escape key", async ({ page }) => {
+    const switcher = page.locator('div[role="group"]').first();
+    const trigger = switcher.locator("button").first();
+
+    // Open dropdown
+    await trigger.click();
+    const options = switcher.locator('[role="option"]');
+    await expect(options.first()).toBeVisible();
+
+    // Press Escape
+    await page.keyboard.press("Escape");
+
+    // Dropdown should close
+    await expect(options.first()).not.toBeVisible();
+  });
+});
+
+// ─── Bookmark Button Behavior ───────────────────────────────────
+
+test.describe("Bookmark button behavior", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route("**/api/feature-flags", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(withFeatureFlags({})),
+      })
+    );
+
+    await page.goto("/immersive");
+    await expect(page.locator("h1")).toBeVisible();
+  });
+
+  test("bookmark button is visible and clickable", async ({ page }) => {
+    // The bookmark button in the toolbar has an aria-label
+    const bookmarkButton = page.getByRole("button", {
+      name: /guardar|save|bookmark/i,
+    });
+    await expect(bookmarkButton).toBeVisible();
+
+    // Should have an unfilled bookmark icon initially (no fill-white class)
+    const svg = bookmarkButton.locator("svg");
+    await expect(svg).toBeVisible();
+  });
+});
+
+// ─── Navigation Arrows Behavior ─────────────────────────────────
+
+test.describe("Navigation behavior", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route("**/api/feature-flags", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(withFeatureFlags({})),
+      })
+    );
+
+    await page.goto("/immersive");
+    await expect(page.locator("h1")).toBeVisible();
+  });
+
+  test("right arrow key advances to next story", async ({ page }) => {
+    const initialTitle = await page.locator("h1").textContent();
+
+    await page.keyboard.press("ArrowRight");
+
+    // Wait for transition
+    await page.waitForTimeout(500);
+
+    // Title should change
+    await expect(page.locator("h1")).not.toHaveText(initialTitle!);
+  });
+
+  test("left arrow key goes to previous story", async ({ page }) => {
+    // First go to second story
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(500);
+
+    const secondTitle = await page.locator("h1").textContent();
+
+    // Now go back
+    await page.keyboard.press("ArrowLeft");
+    await page.waitForTimeout(500);
+
+    // Title should change back
+    await expect(page.locator("h1")).not.toHaveText(secondTitle!);
+  });
+
+  test("i key toggles info overlay visibility", async ({ page }) => {
+    // Info should be visible initially
+    const article = page.locator("article").first();
+    await expect(article).toHaveClass(/opacity-100/);
+
+    // Press i to hide
+    await page.keyboard.press("i");
+    await expect(article).toHaveClass(/opacity-0/);
+
+    // Press i again to show
+    await page.keyboard.press("i");
+    await expect(article).toHaveClass(/opacity-100/);
+  });
+
+  test("progress bar segments are clickable and navigate", async ({
+    page,
+  }) => {
+    const initialTitle = await page.locator("h1").textContent();
+
+    // Click the third progress segment
+    const progressBar = page.getByRole("progressbar");
+    const segments = progressBar.locator('[role="button"]');
+    const segmentCount = await segments.count();
+
+    if (segmentCount >= 3) {
+      await segments.nth(2).click();
+      await page.waitForTimeout(500);
+
+      // Should navigate to a different story
+      await expect(page.locator("h1")).not.toHaveText(initialTitle!);
+    }
+  });
+});

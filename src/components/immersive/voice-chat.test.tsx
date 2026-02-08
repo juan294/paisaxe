@@ -232,10 +232,9 @@ describe("VoiceChat", () => {
         return svg?.classList.contains("lucide-x");
       });
 
-      if (closeButton) {
-        fireEvent.click(closeButton);
-        expect(onClose).toHaveBeenCalled();
-      }
+      expect(closeButton).toBeDefined();
+      fireEvent.click(closeButton!);
+      expect(onClose).toHaveBeenCalled();
     });
 
     it("should call onClose when clicking backdrop", () => {
@@ -243,10 +242,9 @@ describe("VoiceChat", () => {
       render(<VoiceChat story={mockStory} open={true} onClose={onClose} />);
 
       const backdrop = document.querySelector(".bg-black\\/60");
-      if (backdrop) {
-        fireEvent.click(backdrop);
-        expect(onClose).toHaveBeenCalled();
-      }
+      expect(backdrop).toBeTruthy();
+      fireEvent.click(backdrop!);
+      expect(onClose).toHaveBeenCalled();
     });
   });
 
@@ -260,9 +258,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Tell me about the lakes");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith("/api/chat/stream", {
@@ -282,9 +279,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "My question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(screen.getByText("My question")).toBeInTheDocument();
@@ -300,9 +296,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(screen.getByText("This is the AI response")).toBeInTheDocument();
@@ -323,9 +318,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         // Should show a skeleton message bubble with role="status"
@@ -351,9 +345,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(
@@ -385,9 +378,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(
@@ -402,9 +394,8 @@ describe("VoiceChat", () => {
       const input = screen.getByPlaceholderText("Escribe tu pregunta...");
       const form = input.closest("form");
 
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -416,9 +407,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "   ");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -432,9 +422,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "My question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(input.value).toBe("");
@@ -450,9 +439,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
@@ -475,9 +463,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(screen.getByText("First response")).toBeInTheDocument();
@@ -536,9 +523,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         const submitButton = screen
@@ -564,9 +550,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(
@@ -586,9 +571,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "User message");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         const userMsg = screen.getByText("User message");
@@ -651,9 +635,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "First question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(mockCapture).toHaveBeenCalledWith("chat_conversation_started", {
@@ -671,9 +654,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "My question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(mockCapture).toHaveBeenCalledWith("chat_message_sent", {
@@ -693,9 +675,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "First");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(screen.getByText("First response")).toBeInTheDocument();
@@ -706,9 +687,8 @@ describe("VoiceChat", () => {
       mockFetch.mockResolvedValueOnce(createStreamingResponse("Second response"));
 
       await userEvent.type(input, "Second");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(screen.getByText("Second response")).toBeInTheDocument();
@@ -739,9 +719,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Show me the lakes");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         const img = screen.getByRole("img", { name: "Lagos de Covadonga at sunset" });
@@ -768,9 +747,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(screen.getByText("Picos de Europa mountain view")).toBeInTheDocument();
@@ -795,9 +773,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(screen.getByText(/hiking-guide\.pdf/)).toBeInTheDocument();
@@ -828,9 +805,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Show me views");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         const images = screen.getAllByRole("img");
@@ -849,9 +825,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(screen.getByText("No images for this response.")).toBeInTheDocument();
@@ -868,9 +843,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         expect(screen.getByText("Empty images array.")).toBeInTheDocument();
@@ -895,9 +869,8 @@ describe("VoiceChat", () => {
       await userEvent.type(input, "Question");
 
       const form = input.closest("form");
-      if (form) {
-        fireEvent.submit(form);
-      }
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
 
       await waitFor(() => {
         const img = screen.getByRole("img");
@@ -967,9 +940,7 @@ describe("VoiceChat with voice access", () => {
     });
 
     expect(toggleButton).toBeInTheDocument();
-    if (toggleButton) {
-      fireEvent.click(toggleButton);
-    }
+    fireEvent.click(toggleButton!);
 
     // Now voice chat should be gone and text input should appear
     await waitFor(() => {
