@@ -200,11 +200,12 @@ test.describe("Bookmark button behavior", () => {
   });
 
   test("bookmark button is visible and clickable", async ({ page }) => {
-    // The bookmark button aria-label is "Agregar a guardados" (ES) or
-    // "Add to saved" (EN). "guardar" != "guardados" so match "guardad".
-    const bookmarkButton = page.getByRole("button", {
-      name: /guardad|saved|bookmark/i,
-    });
+    // The bookmark button in the toolbar nav has aria-label "Agregar a
+    // guardados" (ES) or "Add to saved" (EN). Scope to nav to avoid matching
+    // the separate "Bookmarks" panel button in the article section.
+    const bookmarkButton = page
+      .locator("nav")
+      .getByRole("button", { name: /guardad|saved/i });
     await expect(bookmarkButton).toBeVisible();
 
     // Should have an unfilled bookmark icon initially (no fill-white class)
