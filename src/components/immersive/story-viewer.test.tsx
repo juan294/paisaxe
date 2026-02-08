@@ -836,4 +836,141 @@ describe("StoryViewer", () => {
       expect(mockToggleFavorite).toHaveBeenCalledWith("story-2");
     });
   });
+
+  describe("author pill", () => {
+    it("should render the pill with initial '</> JG' text", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+    });
+
+    it("should render the pill with aria-label for accessibility", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      expect(screen.getByLabelText("Made by Juan González")).toBeInTheDocument();
+    });
+
+    it("should render blinking cursor", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // The cursor character ▌ is inside a span with animate-cursor-blink
+      const pillContainer = screen.getByLabelText("Made by Juan González");
+      const cursorSpan = pillContainer.querySelector(".animate-cursor-blink");
+      expect(cursorSpan).toBeInTheDocument();
+    });
+
+    it("should not animate cursor when prefers-reduced-motion is enabled", async () => {
+      // Override useReducedMotion mock
+      const reducedMotionModule = await import("@/hooks/use-reduced-motion");
+      vi.spyOn(reducedMotionModule, "useReducedMotion").mockReturnValue(true);
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const pillContainer = screen.getByLabelText("Made by Juan González");
+      // When reduced motion is preferred, cursor should NOT have animation class
+      const cursorSpan = pillContainer.querySelector(".animate-cursor-blink");
+      expect(cursorSpan).toBeNull();
+
+      // Restore
+      vi.restoreAllMocks();
+    });
+
+    it("should render social links in the popover", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const xLink = screen.getByLabelText("X (Twitter)");
+      const linkedinLink = screen.getByLabelText("LinkedIn");
+      const mediumLink = screen.getByLabelText("Medium");
+
+      expect(xLink).toHaveAttribute("href", "https://x.com/JuanG294");
+      expect(linkedinLink).toHaveAttribute("href", "https://www.linkedin.com/in/juanagonzalezp/");
+      expect(mediumLink).toHaveAttribute("href", "https://medium.com/@juang294");
+    });
+
+    it("should open social links in new tab", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const xLink = screen.getByLabelText("X (Twitter)");
+      const linkedinLink = screen.getByLabelText("LinkedIn");
+      const mediumLink = screen.getByLabelText("Medium");
+
+      expect(xLink).toHaveAttribute("target", "_blank");
+      expect(linkedinLink).toHaveAttribute("target", "_blank");
+      expect(mediumLink).toHaveAttribute("target", "_blank");
+    });
+
+    it("should have noopener noreferrer on social links", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const xLink = screen.getByLabelText("X (Twitter)");
+      expect(xLink).toHaveAttribute("rel", "noopener noreferrer");
+    });
+
+    it("should display author name in popover", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // The author name is rendered with HTML entity
+      expect(screen.getByText("Juan González")).toBeInTheDocument();
+    });
+
+    it("should stop click propagation to prevent info toggle", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const pillContainer = screen.getByLabelText("Made by Juan González");
+      // Click the pill's parent group div
+      const groupDiv = pillContainer.closest(".group");
+      expect(groupDiv).not.toBeNull();
+
+      fireEvent.click(groupDiv!);
+
+      // Info should still be visible — pill click should NOT toggle info
+      const bottomContent = screen
+        .getByText("Lagos de Covadonga")
+        .closest("article[class*='bottom-0']");
+      expect(bottomContent).toHaveClass("opacity-100");
+    });
+
+    it("should clean up typewriter timers on unmount", async () => {
+      const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+      const { unmount } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Unmounting should call clearTimeout to prevent leaked timers
+      unmount();
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it("should show static text when prefers-reduced-motion is enabled", async () => {
+      // The module is already mocked at top level — override the return value
+      const reducedMotionModule = await import("@/hooks/use-reduced-motion");
+      vi.spyOn(reducedMotionModule, "useReducedMotion").mockReturnValue(true);
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // With reduced motion, typewriter stays at initial "</> JG" — no animation
+      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+
+      // Advance time — should NOT cycle
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(35_000);
+      });
+
+      // Still shows initial text
+      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+
+      // Restore
+      vi.restoreAllMocks();
+    });
+
+    it("should be hidden on mobile (has md:block and hidden classes)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const pillContainer = screen.getByLabelText("Made by Juan González");
+      const outerDiv = pillContainer.closest(".group");
+      expect(outerDiv).toHaveClass("hidden");
+      expect(outerDiv).toHaveClass("md:block");
+    });
+  });
 });

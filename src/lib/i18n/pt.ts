@@ -81,6 +81,18 @@ export const pt: Translations = {
     hint_next: 'Seguinte',
   },
 
+  author_pill: {
+    made_with_love: 'feito com \u2665 nas Ast\u00farias',
+    fueled_by_sidra: 'movido a sidra',
+    buen_camino: '\u00a1buen Camino!',
+    probably_hiking: 'provavelmente \ud83c\udfd4\ufe0f rn',
+    out_cycling: 'provavelmente \ud83d\udeb4\ud83c\udffb rn',
+    scaling_rocks: 'a escalar alguma rocha',
+    sleep_not_found: '404: sono n\u00e3o encontrado',
+    works_on_my_machine: 'funciona na minha m\u00e1quina\u2122',
+    bug_free: 'sem bugs* (*quase)',
+  },
+
   share: {
     share: 'Partilhar',
     link_copied: 'Link copiado',

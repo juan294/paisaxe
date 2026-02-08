@@ -81,6 +81,18 @@ export const de: Translations = {
     hint_next: 'Weiter',
   },
 
+  author_pill: {
+    made_with_love: 'mit \u2665 in Asturien gemacht',
+    fueled_by_sidra: 'angetrieben von Sidra',
+    buen_camino: '\u00a1buen Camino!',
+    probably_hiking: 'wahrscheinlich \ud83c\udfd4\ufe0f rn',
+    out_cycling: 'wahrscheinlich \ud83d\udeb4\ud83c\udffb rn',
+    scaling_rocks: 'gerade am Klettern',
+    sleep_not_found: '404: Schlaf nicht gefunden',
+    works_on_my_machine: 'l\u00e4uft bei mir\u2122',
+    bug_free: 'bugfrei* (*meistens)',
+  },
+
   share: {
     share: 'Teilen',
     link_copied: 'Link kopiert',
