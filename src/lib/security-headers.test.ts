@@ -51,8 +51,10 @@ describe("Security headers in next.config.ts", () => {
   });
 
   describe("Required security headers", () => {
-    it("should include Strict-Transport-Security", () => {
+    it("should include Strict-Transport-Security only in production", () => {
       expect(configContent).toContain("Strict-Transport-Security");
+      // HSTS must be conditional on NODE_ENV to avoid poisoning localhost in browsers
+      expect(configContent).toMatch(/process\.env\.NODE_ENV\s*===?\s*["']production["']/);
     });
 
     it("should include X-Content-Type-Options", () => {
