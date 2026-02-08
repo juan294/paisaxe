@@ -369,7 +369,9 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         {canUseVoice && hoursUntilExpiry !== null && hoursUntilExpiry < 6 && expiresAt && (
           <div className="mx-4 mt-4 flex items-center gap-3 rounded-lg bg-amber-500/10 p-3 border border-amber-500/20">
             <p className="text-xs text-amber-200">
-              Your voice pass expires in {Math.ceil(hoursUntilExpiry)}h ({expiresAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+              {t("premium.voice_pass_expiry")
+                .replace("{hours}", String(Math.ceil(hoursUntilExpiry)))
+                .replace("{time}", expiresAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}
             </p>
           </div>
         )}
