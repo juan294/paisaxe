@@ -256,28 +256,44 @@ export function StoryViewer({
             aria-valuemax={stories.length}
             className="absolute top-0 left-0 right-0 z-20 flex items-center gap-1 p-4"
           >
-            {Array.from({ length: segmentCount }, (_, i) => (
-              <div
-                key={i}
-                className="flex-1 h-1 rounded-full bg-white/30 overflow-hidden cursor-pointer transition-all duration-300 motion-reduce:transition-none"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Jump to the story this segment represents in the current cycle
-                  const base = currentIndex - fillPosition;
-                  const targetIndex = base + i;
-                  if (targetIndex >= 0 && targetIndex < stories.length) {
-                    onIndexChange(targetIndex);
-                  }
-                }}
-              >
+            {Array.from({ length: segmentCount }, (_, i) => {
+              const base = currentIndex - fillPosition;
+              const targetIndex = base + i;
+              const handleJump = () => {
+                if (targetIndex >= 0 && targetIndex < stories.length) {
+                  onIndexChange(targetIndex);
+                }
+              };
+              return (
                 <div
-                  className={cn(
-                    "h-full bg-white transition-all duration-300 motion-reduce:transition-none",
-                    i <= fillPosition ? "w-full" : "w-0"
-                  )}
-                />
-              </div>
-            ))}
+                  key={i}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t("accessibility.go_to_story")
+                    .replace("{current}", String(targetIndex + 1))
+                    .replace("{total}", String(stories.length))}
+                  className="flex-1 h-1 rounded-full bg-white/30 overflow-hidden cursor-pointer transition-all duration-300 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleJump();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleJump();
+                    }
+                  }}
+                >
+                  <div
+                    className={cn(
+                      "h-full bg-white transition-all duration-300 motion-reduce:transition-none",
+                      i <= fillPosition ? "w-full" : "w-0"
+                    )}
+                  />
+                </div>
+              );
+            })}
           </div>
         );
       })()}

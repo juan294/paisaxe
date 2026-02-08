@@ -135,6 +135,9 @@ export const ast: Translations = {
     suggested_questions: 'Entrugues suxeríes',
     more_options: 'Más opciones',
     story_controls: 'Controles de histories',
+    go_back: 'Tornar',
+    loading: 'Cargando',
+    go_to_story: 'Dir a la historia {current} de {total}',
   },
 
   auth: {
