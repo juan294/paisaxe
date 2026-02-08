@@ -206,9 +206,8 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // With 3 stories (< PAGE_SIZE), should show 3 segments
-      const progressBars = screen.getAllByRole("generic").filter(
-        (el) => el.classList.contains("flex-1") && el.classList.contains("h-1")
-      );
+      const progressbar = screen.getByRole("progressbar");
+      const progressBars = progressbar.querySelectorAll('[role="button"]');
       expect(progressBars).toHaveLength(3);
     });
 
@@ -216,9 +215,8 @@ describe("StoryViewer", () => {
       // At index 1 of 3 stories, position 1 should be filled (segments 0 and 1)
       await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
-      const progressBars = screen.getAllByRole("generic").filter(
-        (el) => el.classList.contains("flex-1") && el.classList.contains("h-1")
-      );
+      const progressbar = screen.getByRole("progressbar");
+      const progressBars = progressbar.querySelectorAll('[role="button"]');
 
       // First two segments should have filled inner div (w-full)
       const filled0 = progressBars[0]?.querySelector("div");
@@ -401,9 +399,8 @@ describe("StoryViewer", () => {
     it("should jump to specific story when clicking progress bar", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const progressBars = screen.getAllByRole("generic").filter(
-        (el) => el.classList.contains("flex-1") && el.classList.contains("h-1")
-      );
+      const progressbar = screen.getByRole("progressbar");
+      const progressBars = progressbar.querySelectorAll('[role="button"]');
 
       if (progressBars[2]) {
         fireEvent.click(progressBars[2]);
