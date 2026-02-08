@@ -55,10 +55,12 @@ test.describe("Author pill", () => {
     const xLink = page.locator('a[aria-label="X (Twitter)"]');
     const linkedinLink = page.locator('a[aria-label="LinkedIn"]');
     const mediumLink = page.locator('a[aria-label="Medium"]');
+    const githubLink = page.locator('a[aria-label="GitHub"]');
 
     await expect(xLink).toBeVisible();
     await expect(linkedinLink).toBeVisible();
     await expect(mediumLink).toBeVisible();
+    await expect(githubLink).toBeVisible();
   });
 
   test("social links have correct hrefs", async ({ page, isMobile }) => {
@@ -69,10 +71,12 @@ test.describe("Author pill", () => {
     const xLink = page.locator('a[aria-label="X (Twitter)"]');
     const linkedinLink = page.locator('a[aria-label="LinkedIn"]');
     const mediumLink = page.locator('a[aria-label="Medium"]');
+    const githubLink = page.locator('a[aria-label="GitHub"]');
 
     await expect(xLink).toHaveAttribute("href", "https://x.com/JuanG294");
     await expect(linkedinLink).toHaveAttribute("href", "https://www.linkedin.com/in/juanagonzalezp/");
     await expect(mediumLink).toHaveAttribute("href", "https://medium.com/@juang294");
+    await expect(githubLink).toHaveAttribute("href", "https://github.com/juan294");
   });
 
   test("social links open in new tab", async ({ page, isMobile }) => {
