@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
@@ -19,6 +19,8 @@ export function LanguageSwitcher() {
   const { locale, setLocale, t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listboxRef = useRef<HTMLDivElement>(null);
 
   const currentLanguage = languages.find((lang) => lang.code === locale) || languages[0];
 
@@ -36,11 +38,12 @@ export function LanguageSwitcher() {
     }
   }, [isExpanded]);
 
-  // Close on escape
+  // Close on escape and return focus to trigger
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsExpanded(false);
+        triggerRef.current?.focus();
       }
     }
 
@@ -50,10 +53,50 @@ export function LanguageSwitcher() {
     }
   }, [isExpanded]);
 
-  const handleLanguageSelect = (langCode: Locale) => {
+  // Focus first option when dropdown opens
+  useEffect(() => {
+    if (isExpanded && listboxRef.current) {
+      const firstOption = listboxRef.current.querySelector<HTMLElement>('[role="option"]');
+      firstOption?.focus();
+    }
+  }, [isExpanded]);
+
+  const handleLanguageSelect = useCallback((langCode: Locale) => {
     setLocale(langCode);
     setIsExpanded(false);
-  };
+  }, [setLocale]);
+
+  // Arrow key navigation within the listbox
+  const handleListboxKeyDown = useCallback((event: React.KeyboardEvent) => {
+    const listbox = listboxRef.current;
+    if (!listbox) return;
+
+    const options = Array.from(listbox.querySelectorAll<HTMLElement>('[role="option"]'));
+    if (options.length === 0) return;
+
+    const currentIndex = options.indexOf(document.activeElement as HTMLElement);
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      const next = currentIndex < options.length - 1 ? currentIndex + 1 : 0;
+      options[next].focus();
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      const prev = currentIndex > 0 ? currentIndex - 1 : options.length - 1;
+      options[prev].focus();
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      options[0].focus();
+    } else if (event.key === "End") {
+      event.preventDefault();
+      options[options.length - 1].focus();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (currentIndex >= 0) {
+        handleLanguageSelect(languages[currentIndex].code);
+      }
+    }
+  }, [handleLanguageSelect]);
 
   return (
     <div
@@ -64,11 +107,13 @@ export function LanguageSwitcher() {
     >
       {/* Toggle Button */}
       <button
+        ref={triggerRef}
         onClick={(e) => {
           e.stopPropagation();
           setIsExpanded(!isExpanded);
         }}
         aria-expanded={isExpanded}
+        aria-haspopup="listbox"
         className={cn(
           "flex items-center gap-1.5 px-3 py-1.5 rounded-full",
           "text-xs font-medium text-white",
@@ -99,11 +144,17 @@ export function LanguageSwitcher() {
             : "opacity-0 -translate-y-2 scale-95 pointer-events-none"
         )}
         onClick={(e) => e.stopPropagation()}
+        role="listbox"
+        aria-label={t("accessibility.language_switcher")}
+        onKeyDown={handleListboxKeyDown}
       >
-        <div className="flex flex-col gap-1">
+        <div ref={listboxRef} className="flex flex-col gap-1">
           {languages.map((lang, index) => (
             <button
               key={lang.code}
+              role="option"
+              aria-selected={locale === lang.code}
+              tabIndex={-1}
               onClick={(e) => {
                 e.stopPropagation();
                 handleLanguageSelect(lang.code);
@@ -115,6 +166,7 @@ export function LanguageSwitcher() {
                 "px-3 py-1.5 rounded-lg text-xs font-medium text-left",
                 "transition-all duration-200",
                 "active:scale-95",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
                 locale === lang.code
                   ? "bg-white text-black"
                   : "bg-white/10 text-white/80 hover:text-white hover:bg-white/15",

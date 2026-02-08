@@ -135,6 +135,9 @@ export const en: Translations = {
     suggested_questions: 'Suggested questions',
     more_options: 'More options',
     story_controls: 'Story controls',
+    go_back: 'Go back',
+    loading: 'Loading',
+    go_to_story: 'Go to story {current} of {total}',
   },
 
   auth: {

@@ -131,6 +131,9 @@ export const de: Translations = {
     suggested_questions: 'Vorgeschlagene Fragen',
     more_options: 'Mehr Optionen',
     story_controls: 'Steuerung der Geschichten',
+    go_back: 'Zurück',
+    loading: 'Laden',
+    go_to_story: 'Gehe zu Geschichte {current} von {total}',
   },
 
   auth: {

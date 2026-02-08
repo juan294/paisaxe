@@ -48,10 +48,12 @@ vi.mock("next/link", () => ({
   default: ({
     children,
     href,
+    ...rest
   }: {
     children: React.ReactNode;
     href: string;
-  }) => <a href={href}>{children}</a>,
+    [key: string]: unknown;
+  }) => <a href={href} {...rest}>{children}</a>,
 }));
 
 describe("PricingPage", () => {
@@ -187,7 +189,7 @@ describe("PricingPage", () => {
   it("should render back link to immersive page", () => {
     render(<PricingPage />);
 
-    const backLink = screen.getByRole("link", { name: "" });
+    const backLink = screen.getByRole("link", { name: "accessibility.go_back" });
     expect(backLink).toHaveAttribute("href", "/immersive");
   });
 
@@ -346,6 +348,36 @@ describe("PricingPage", () => {
     expect(screen.getByText("Premium Access")).toBeInTheDocument();
     // Should NOT show expiration date
     expect(screen.queryByText(/premium.success_expires/)).not.toBeInTheDocument();
+  });
+
+  describe("accessibility", () => {
+    it("should have aria-label on the back button", () => {
+      render(<PricingPage />);
+
+      const backLink = screen.getByRole("link", { name: "accessibility.go_back" });
+      expect(backLink).toBeInTheDocument();
+      expect(backLink).toHaveAttribute("href", "/immersive");
+    });
+
+    it("should have aria-label on the loading spinner", () => {
+      mockUseVoiceAccess.mockReturnValue({
+        hasAccess: false,
+        isWhitelisted: false,
+        canUseVoice: false,
+        needsSignIn: false,
+        needsPurchase: true,
+        expiresAt: null,
+        hoursUntilExpiry: null,
+        agentId: "test-agent",
+        isLoading: true,
+        refresh: mockRefresh,
+      });
+
+      render(<PricingPage />);
+
+      const spinner = screen.getByRole("status", { name: "accessibility.loading" });
+      expect(spinner).toBeInTheDocument();
+    });
   });
 
   it("should show loading state on purchase button while checkout is in progress", async () => {
