@@ -15,11 +15,17 @@ Hi [Name],
 
 I came across your post on [specific article title]—[specific detail from the post that shows you actually read it, e.g., "your tip about the lesser-known viewpoint at Covadonga was spot-on"].
 
-I've been working on a project called Paisaxe (paisaxe.es)—it's an AI-powered travel guide specifically for Asturias. You can chat with it for free about hiking routes, local restaurants, cultural sites—anything about the region. The AI is trained on local guides and actually cites its sources.
+I've been working on a passion project called Paisaxe (paisaxe.es)—"landscape" in the Asturian language. It's a different way to experience Asturias: instead of reading about places, you talk to them. By chat or by voice.
 
-There's also a Voice Pass (€1.99/day) that unlocks Pelayo, a voice guide who goes beyond Q&A—he checks live weather before your hike, finds restaurants with real-time hours and ratings, and calls ahead to book your table on your behalf.
+A monument, a beach, a mountain trail, a restaurant—pick any place and start a conversation. It's like talking to a local who knows the spot deeply:
 
-Would you be interested in checking it out? No pressure to write about it—I'd just genuinely value feedback from someone who knows the region. And if you do find it useful, feel free to share it however makes sense.
+"Is this worth seeing on a rainy day?"
+"What should I notice when I'm here?"
+"Where should I go next if I have 2 hours?"
+
+I built it in 2 weeks of nights and weekends because I felt like Asturias already has incredible information out there—it just needed a different way to discover it.
+
+Would you be interested in trying it? No pressure to write about it—I'd just genuinely value feedback from someone who knows the region. And if you do find it useful, feel free to share it however makes sense.
 
 Either way, thanks for the content you put out. It's helped shape my own understanding of the region.
 
@@ -60,7 +66,7 @@ Hi [Name],
 
 Just floating this back up in case it got buried. Totally understand if it's not a fit—no pressure either way.
 
-Quick summary: Paisaxe is an AI travel guide for Asturias—free text chat, plus a €1.99/day voice guide that books restaurants for you. Would love your take if you have 5 minutes.
+Quick summary: Paisaxe is a way to discover Asturias by talking to the places—by chat or voice. Free, no signup. Would love your take if you have 5 minutes: paisaxe.es
 
 Thanks!
 [Your name]

@@ -9,103 +9,92 @@
 
 For 1200x627 (landscape):
 ```
-Split composition: left side shows misty green mountains of Asturias, Spain with traditional stone architecture and Atlantic coast visible; right side shows subtle, elegant digital interface elements suggesting AI chat. Soft morning light, cinematic photography blended with clean UI design. Professional, modern, trustworthy feeling. 1.91:1 aspect ratio.
+Misty green mountains of Asturias, Spain. Traditional stone village in a valley, Atlantic coastline in the distance. Soft morning light through clouds, cinematic photography. Warm, inviting, timeless feeling. No text, no digital elements. 1.91:1 aspect ratio.
 ```
 
 For 1200x1200 (square):
 ```
-Aerial view of Picos de Europa mountains meeting the green valleys of Asturias, Spain. Dramatic cliffs, winding roads through villages, Atlantic ocean in distance. Overlay of subtle glowing connection lines suggesting AI/digital mapping. Golden hour lighting. Modern travel photography. Square format.
+Aerial view of Picos de Europa mountains meeting the green valleys of Asturias, Spain. Dramatic cliffs, winding roads through villages, Atlantic ocean in distance. Golden hour lighting. Warm travel photography. Square format.
 ```
 
 ---
 
 ## Post Version 1: Storytelling Angle
 
-I spent months building an AI travel guide for a region most people have never heard of.
+I spent 2 weeks—nights and weekends—building a new way to experience Asturias.
 
-Not a startup play. Not trying to scale to every destination.
+Not a travel guide. Not another "top 10" list.
 
-Just Asturias—a corner of northern Spain with mountains that rival the Alps, cider culture instead of wine, and UNESCO sites older than most countries.
+A different way to feel a place while you explore it.
 
-Here's why I did it:
+Asturias is a corner of northern Spain most people have never heard of. Mountains that rival the Alps. Cider culture instead of wine. UNESCO sites older than most countries. And almost no crowds.
 
-Generic AI travel advice is broken. Ask ChatGPT for restaurant recommendations and half of them don't exist. The "hidden gems" are hallucinated. The hiking routes are Frankenstein mashups of different trails.
+It already has incredible websites with photos, recommendations, and stories. So I didn't want to add more information.
 
-Large language models know a little about everything. For travel to less-documented places, that's useless.
+I wanted to change the rhythm of discovery.
 
-So I built the opposite: an AI that knows ONE place deeply.
+The idea behind Paisaxe ("landscape" in the local Asturian language) is simple: don't just read about places—talk to them. By chat or by voice.
 
-→ 37 curated PDFs of local guides and documentation
-→ Vector search + reranking to find relevant context
-→ Source citations so you know it's not making things up
-→ Voice Pass (€1.99/day): talk to Pelayo, your AI local guide
+A monument. A cathedral. A beach. A mountain pass. A restaurant. A cable car. If it's part of the story, start a conversation and discover it naturally.
 
-The result is Paisaxe (paisaxe.es)—free to chat with, no login required.
+Try it like you'd talk to a local:
+"Is this worth seeing on a rainy day?"
+"What should I notice when I'm here?"
+"Where should I go next if I have 2 hours?"
 
-But here's where it gets interesting. For €1.99/day, you unlock Pelayo—a voice guide who doesn't just answer questions. He checks live weather before your hike, finds restaurants with real-time hours and ratings, and actually calls ahead to book your table. A real phone call, on your behalf.
+Less planning. More wandering with purpose.
+Less checklist. More connection.
 
-That's the shift I didn't expect: the most useful AI travel assistant isn't the one that tells you about a place. It's the one that does things for you while you're there.
-
-If you're building with RAG or interested in hyper-local AI applications, happy to share more about the technical approach.
+If you try it, tell me what you spoke to first.
+Link in comments.
 
 ---
 
-## Post Version 2: Technical/Builder Angle
+## Post Version 2: Experience Angle
 
-Shipped something different: an AI travel guide that doesn't just talk—it acts.
+What if you could talk to a place before you visited it?
 
-The stack:
-• Next.js + Supabase (Postgres + pgvector)
-• Voyage AI for embeddings (512-dim Matryoshka)
-• Two-stage retrieval: vector search → rerank top 3
-• Claude for text chat generation
-• ElevenLabs + Twilio for voice agent with real-world actions
+Not read about it. Not watch a video. Talk to it.
 
-Key learnings:
+That's the idea behind Paisaxe—"landscape" in the Asturian language.
 
-1. Retrieval quality > model quality. A smaller model with great retrieval beats a bigger model with mediocre retrieval.
+I spent 2 weeks (nights and weekends) building a different kind of travel experience for Asturias, a region in northern Spain that deserves far more attention than it gets.
 
-2. Two-stage reranking matters. Initial vector search gets you in the ballpark. Reranking with a cross-encoder gets you the answer.
+It's not about more information. Asturias already has beautiful websites for that.
 
-3. Voice unlocks actions, not just conversation. When you give a voice agent tools—live weather, restaurant search, the ability to make phone calls—it becomes a concierge, not a chatbot.
+It's about changing how you discover a place:
+→ Talk to the cathedral before you walk through it
+→ Ask the mountain trail what to expect today
+→ Let a voice guide you through the next step of your journey
 
-The project: Paisaxe (paisaxe.es)—an AI guide for Asturias, Spain.
+Chat or voice. Your pace. Your curiosity.
 
-Free text chat to explore. For €1.99/day, unlock Pelayo—a voice guide who checks live weather, finds restaurants with real-time hours, and calls ahead to book your table.
+For anyone who wants travel to feel less like research and more like a conversation.
 
-Built it because I was tired of AI travel advice that hallucinates restaurants and hiking trails. Trained on 37 verified local PDFs instead of the open internet.
-
-Link in comments if you want to try it.
+paisaxe.es — Link in comments.
 
 ---
 
 ## Post Version 3: Short & Punchy
 
-I built an AI that only knows one place.
+I built something for Asturias in 2 weeks of nights and weekends.
 
-Not everywhere. Just Asturias, Spain.
+Not a guide. Not a list. Not an app.
 
-Why?
+A conversation.
 
-Because generic AI travel advice hallucinates. Restaurant closed in 2019. "Hidden gem" doesn't exist. Hiking route is a mashup of 3 different trails.
+PAISAXE ("landscape" in Asturian) lets you talk to the places you're about to visit. By chat or by voice.
 
-So I went deep instead of wide:
-→ 37 local PDFs
-→ Vector search + reranking
-→ Source citations
-→ Voice Pass: Pelayo checks weather, finds places, and books your table
+A beach. A peak. A hidden village. A restaurant. A 1,000-year-old church.
 
-Paisaxe: paisaxe.es
+Stop browsing. Start discovering.
 
-Free text chat. No login. No ads.
-€1.99/day unlocks Pelayo—a voice guide who calls restaurants and books for you.
-
-Sometimes the most useful AI is the one that knows less—but does more with what it knows.
+paisaxe.es — Link in comments.
 
 ---
 
 ## Hashtags
-#AI #MachineLearning #RAG #SideProject #Travel #BuildInPublic #SoftwareEngineering #TechForGood
+#SideProject #Travel #BuildInPublic #Spain #Asturias #Discovery #PassionProject
 
 (Use 3-5 max on LinkedIn—too many looks spammy)
 
@@ -119,6 +108,6 @@ Sometimes the most useful AI is the one that knows less—but does more with wha
 
 3. **Engage with comments in the first hour**—this signals to the algorithm that it's a good post.
 
-4. **Tag relevant people** (if you know anyone in AI/travel space) but don't over-tag.
+4. **Tag relevant people** (if you know anyone in travel/Spain space) but don't over-tag.
 
 5. **Reply to your own post** with additional context after a few hours to bump it.
