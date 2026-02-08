@@ -170,6 +170,7 @@ export function StoryViewer({
         setAutoPlay(true);
       } else {
         ambientStartRef.current = null;
+        setAutoPlay(false);
       }
       return newValue;
     });

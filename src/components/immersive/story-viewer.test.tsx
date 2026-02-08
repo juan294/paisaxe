@@ -30,12 +30,13 @@ vi.mock("@/lib/supabase-browser", () => ({
   }),
 }));
 
-// Mock feature flags - all disabled by default
+// Mock feature flags - all disabled by default, controllable per-test
+const mockIsEnabled = vi.fn().mockReturnValue(false);
 vi.mock("@/hooks/use-feature-flags", () => ({
   useFeatureFlags: () => ({
     flags: [],
     isLoading: false,
-    isEnabled: () => false,
+    isEnabled: (...args: unknown[]) => mockIsEnabled(...args),
   }),
 }));
 
@@ -701,6 +702,75 @@ describe("StoryViewer", () => {
 
       // Multiple elements may have category text (story badge + filter dropdown)
       expect(screen.getAllByText("Gastronomia").length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("ambient toggle", () => {
+    beforeEach(() => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "autoplay_button" || flag === "ambient_discovery"
+      );
+    });
+
+    afterEach(() => {
+      mockIsEnabled.mockReturnValue(false);
+    });
+
+    it("should start auto-rotation and show pause icon on first click", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Find the ambient button by its Play icon
+      const ambientButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
+      );
+      expect(ambientButton).toBeDefined();
+
+      fireEvent.click(ambientButton!);
+
+      // After clicking, should show Pause icon (auto-play started)
+      expect(ambientButton!.querySelector(".lucide-pause")).toBeTruthy();
+      expect(ambientButton!.querySelector(".lucide-play")).toBeFalsy();
+
+      // Stories should auto-advance after the interval
+      act(() => {
+        vi.advanceTimersByTime(12000); // ambient uses 12s interval
+      });
+      act(() => {
+        vi.advanceTimersByTime(300); // transition delay
+      });
+
+      expect(onIndexChange).toHaveBeenCalledWith(1);
+    });
+
+    it("should stop auto-rotation and show play icon on second click", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const ambientButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
+      );
+      expect(ambientButton).toBeDefined();
+
+      // First click — start
+      fireEvent.click(ambientButton!);
+      expect(ambientButton!.querySelector(".lucide-pause")).toBeTruthy();
+
+      // Second click — stop
+      fireEvent.click(ambientButton!);
+
+      // Should show Play icon again (auto-play stopped)
+      expect(ambientButton!.querySelector(".lucide-play")).toBeTruthy();
+      expect(ambientButton!.querySelector(".lucide-pause")).toBeFalsy();
+
+      // Stories should NOT auto-advance after the interval
+      onIndexChange.mockClear();
+      act(() => {
+        vi.advanceTimersByTime(12000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(onIndexChange).not.toHaveBeenCalled();
     });
   });
 
