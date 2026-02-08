@@ -11,23 +11,25 @@ describe("Security headers in next.config.ts", () => {
   const configContent = readFileSync(configPath, "utf-8");
 
   describe("Content-Security-Policy", () => {
-    it("should not include blob: in script-src", () => {
-      // Extract script-src directive
-      const scriptSrcMatch = configContent.match(/script-src\s+([^"]+)/);
+    it("should include blob: in script-src for AudioWorklet support", () => {
+      // ElevenLabs SDK loads rawAudioProcessor as a blob: AudioWorklet module.
+      // AudioWorklets are governed by script-src (not worker-src) per the CSP spec.
+      // Match the actual CSP directive string (inside quotes), not TODO comments.
+      const scriptSrcMatch = configContent.match(/"script-src ([^"]+)"/);
       expect(scriptSrcMatch).toBeTruthy();
       const scriptSrc = scriptSrcMatch![1];
-      expect(scriptSrc).not.toContain("blob:");
+      expect(scriptSrc).toContain("blob:");
     });
 
     it("should include blob: in worker-src", () => {
-      const workerSrcMatch = configContent.match(/worker-src\s+([^"]+)/);
+      const workerSrcMatch = configContent.match(/"worker-src ([^"]+)"/);
       expect(workerSrcMatch).toBeTruthy();
       const workerSrc = workerSrcMatch![1];
       expect(workerSrc).toContain("blob:");
     });
 
     it("should include blob: in media-src", () => {
-      const mediaSrcMatch = configContent.match(/media-src\s+([^"]+)/);
+      const mediaSrcMatch = configContent.match(/"media-src ([^"]+)"/);
       expect(mediaSrcMatch).toBeTruthy();
       const mediaSrc = mediaSrcMatch![1];
       expect(mediaSrc).toContain("blob:");
