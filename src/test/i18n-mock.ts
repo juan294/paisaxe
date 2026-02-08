@@ -126,6 +126,17 @@ export const mockTranslations: Record<string, string> = {
   "fullscreen.step_open": "Abre Paisaxe desde tu pantalla de inicio",
   "fullscreen.got_it": "Entendido",
 
+  // Author pill
+  "author_pill.made_with_love": "hecho con \u2665 en Asturias",
+  "author_pill.fueled_by_sidra": "alimentado por sidra",
+  "author_pill.buen_camino": "\u00a1buen Camino!",
+  "author_pill.probably_hiking": "seguramente \ud83c\udfd4\ufe0f rn",
+  "author_pill.out_cycling": "seguramente \ud83d\udeb4\ud83c\udffb rn",
+  "author_pill.scaling_rocks": "escalando alguna roca",
+  "author_pill.sleep_not_found": "404: sue\u00f1o no encontrado",
+  "author_pill.works_on_my_machine": "funciona en mi m\u00e1quina\u2122",
+  "author_pill.bug_free": "sin bugs* (*casi)",
+
   // Accessibility
   "accessibility.language_switcher": "Cambiar idioma",
   "accessibility.related_stories": "Historias relacionadas",

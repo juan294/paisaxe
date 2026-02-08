@@ -76,6 +76,10 @@ export default {
           from: { opacity: "0", transform: "translateY(10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "cursor-blink": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0" },
+        },
       },
       animation: {
         soundbar: "soundbar 0.8s ease-in-out infinite",
@@ -85,6 +89,7 @@ export default {
         "fade-in-up-delay-1": "fade-in-up 0.8s ease-out 0.1s forwards",
         "fade-in-up-delay-2": "fade-in-up 0.8s ease-out 0.2s forwards",
         "fade-in-up-delay-3": "fade-in-up 0.8s ease-out 0.4s forwards",
+        "cursor-blink": "cursor-blink 1.06s step-end infinite",
       },
     },
   },
