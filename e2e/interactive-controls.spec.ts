@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { withFeatureFlags } from "./fixtures/mock-data";
+import {
+  withFeatureFlags,
+  MOCK_SUGGESTION_RESPONSE,
+} from "./fixtures/mock-data";
 
 /**
  * Interactive Controls E2E Tests
@@ -300,5 +303,75 @@ test.describe("Navigation behavior", () => {
       // Should navigate to a different story
       await expect(page.locator("h1")).not.toHaveText(initialTitle!);
     }
+  });
+});
+
+// ─── Keyboard Shortcuts Suppressed in Form Inputs ────────────────
+
+test.describe("Keyboard shortcuts suppressed in form inputs", () => {
+  test.beforeEach(async ({ page, isMobile }) => {
+    test.skip(isMobile, "Keyboard shortcuts are desktop-only");
+
+    await page.route("**/api/feature-flags", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          withFeatureFlags({ user_story_suggestions: true })
+        ),
+      })
+    );
+
+    // Mock the suggestion API so form submission doesn't fail
+    await page.route("**/api/suggestions", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_SUGGESTION_RESPONSE),
+      })
+    );
+
+    await page.goto("/immersive");
+    await expect(page.locator("h1")).toBeVisible();
+  });
+
+  test("space bar types a space in input instead of advancing story", async ({
+    page,
+  }) => {
+    const initialTitle = await page.locator("h1").textContent();
+
+    // Open the suggest place dialog
+    const suggestButton = page.locator("[data-suggest-place-trigger]");
+    await expect(suggestButton).toBeVisible();
+    await suggestButton.click();
+
+    // Wait for the dialog to open
+    const placeInput = page.locator("#place-name");
+    await expect(placeInput).toBeVisible();
+
+    // Type into the input including a space
+    await placeInput.fill("Playa del");
+    // Verify the space is in the input value
+    await expect(placeInput).toHaveValue("Playa del");
+
+    // Also verify story did NOT advance (title unchanged)
+    await expect(page.locator("h1")).toHaveText(initialTitle!);
+  });
+
+  test("space bar in textarea does not advance story", async ({ page }) => {
+    const initialTitle = await page.locator("h1").textContent();
+
+    // Open the suggest place dialog
+    await page.locator("[data-suggest-place-trigger]").click();
+
+    const commentArea = page.locator("#comment");
+    await expect(commentArea).toBeVisible();
+
+    // Type into textarea including spaces
+    await commentArea.fill("Great hidden beach");
+    await expect(commentArea).toHaveValue("Great hidden beach");
+
+    // Story should NOT have advanced
+    await expect(page.locator("h1")).toHaveText(initialTitle!);
   });
 });
