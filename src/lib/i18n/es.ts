@@ -51,8 +51,8 @@ export const es: Translations = {
     filters: {
       title: 'Filtros',
       category: 'Categoria',
-      location: 'Ubicacion',
-      duration: 'Duracion',
+      location: 'Ubicación',
+      duration: 'Duración',
       clear: 'Limpiar filtros',
     },
     categories: {
@@ -139,7 +139,7 @@ export const es: Translations = {
 
   auth: {
     user: 'Usuario',
-    sign_out: 'Cerrar sesion',
+    sign_out: 'Cerrar sesión',
     sign_in: 'Entrar',
     sync_favorites_title: 'Sincroniza tus favoritos',
     sync_favorites_description: 'Inicia sesion para guardar tus favoritos en la nube y acceder desde cualquier dispositivo.',
@@ -148,7 +148,7 @@ export const es: Translations = {
   },
 
   mood: {
-    title: 'Que tipo de experiencia buscas?',
+    title: '¿Qué tipo de experiencia buscas?',
     subtitle: 'Elige tu estado de animo y te mostraremos las historias perfectas',
     relaxing: 'Relajante',
     adventurous: 'Aventurero',
@@ -254,7 +254,8 @@ export const es: Translations = {
     faq_what_included_answer: '24 horas con Pelayo. Pregúntale el tiempo antes de ir a los Lagos, dónde comer la mejor fabada, qué sidrería visitar —',
     faq_what_included_highlight: '¡y él llama para hacer la reserva por ti!',
     faq_how_long: 'Cuanto dura?',
-    faq_how_long_answer: '24 horas desde la compra. Perfecto para planear un dia de viaje o explorar.',
+    faq_how_long_answer: '24 horas desde la compra. Perfecto para planear un día de viaje o explorar.',
+    voice_pass_expiry: 'Tu pase de voz expira en {hours}h ({time})',
   },
 
   fullscreen: {

@@ -255,6 +255,7 @@ export const en: Translations = {
     faq_what_included_highlight: 'and he calls ahead to book your table!',
     faq_how_long: 'How long does it last?',
     faq_how_long_answer: '24 hours from purchase. Perfect for a day of trip planning or exploring.',
+    voice_pass_expiry: 'Your voice pass expires in {hours}h ({time})',
   },
 
   fullscreen: {
