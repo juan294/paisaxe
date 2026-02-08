@@ -15,8 +15,15 @@ test.describe("Author pill", () => {
     await expect(page.locator("h1")).toBeVisible();
   });
 
-  test("renders the pill with initial text on desktop", async ({ page }) => {
-    // Set desktop viewport
+  test("renders the pill with initial text on desktop", async ({
+    page,
+    isMobile,
+  }) => {
+    // The pill uses desktop-pointer-only which applies display:none on touch
+    // devices via @media (pointer: coarse). Pixel 7 has hasTouch: true so the
+    // pill is hidden even at desktop viewport widths.
+    test.skip(isMobile, "Pill uses desktop-pointer-only — hidden on touch devices");
+
     await page.setViewportSize({ width: 1280, height: 800 });
 
     const pill = page.locator('[aria-label="Made by Juan González"]');
@@ -31,7 +38,12 @@ test.describe("Author pill", () => {
     await expect(pill).toBeHidden();
   });
 
-  test("shows popover with social links on hover", async ({ page }) => {
+  test("shows popover with social links on hover", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "Pill uses desktop-pointer-only — hidden on touch devices");
+
     await page.setViewportSize({ width: 1280, height: 800 });
 
     const pillGroup = page.locator('[aria-label="Made by Juan González"]').locator("..");
@@ -49,7 +61,9 @@ test.describe("Author pill", () => {
     await expect(mediumLink).toBeVisible();
   });
 
-  test("social links have correct hrefs", async ({ page }) => {
+  test("social links have correct hrefs", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Pill uses desktop-pointer-only — hidden on touch devices");
+
     await page.setViewportSize({ width: 1280, height: 800 });
 
     const xLink = page.locator('a[aria-label="X (Twitter)"]');
@@ -61,7 +75,9 @@ test.describe("Author pill", () => {
     await expect(mediumLink).toHaveAttribute("href", "https://medium.com/@juang294");
   });
 
-  test("social links open in new tab", async ({ page }) => {
+  test("social links open in new tab", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Pill uses desktop-pointer-only — hidden on touch devices");
+
     await page.setViewportSize({ width: 1280, height: 800 });
 
     const xLink = page.locator('a[aria-label="X (Twitter)"]');
@@ -69,7 +85,12 @@ test.describe("Author pill", () => {
     await expect(xLink).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  test("clicking pill does not toggle story info", async ({ page }) => {
+  test("clicking pill does not toggle story info", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "Pill uses desktop-pointer-only — hidden on touch devices");
+
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Verify info is visible initially
@@ -87,7 +108,9 @@ test.describe("Author pill", () => {
     await expect(bottomPanel).toHaveCSS("opacity", "1");
   });
 
-  test("pill has blinking cursor", async ({ page }) => {
+  test("pill has blinking cursor", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Pill uses desktop-pointer-only — hidden on touch devices");
+
     await page.setViewportSize({ width: 1280, height: 800 });
 
     const pill = page.locator('[aria-label="Made by Juan González"]');
@@ -96,7 +119,9 @@ test.describe("Author pill", () => {
     await expect(cursor).toBeVisible();
   });
 
-  test("displays author name in popover", async ({ page }) => {
+  test("displays author name in popover", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Pill uses desktop-pointer-only — hidden on touch devices");
+
     await page.setViewportSize({ width: 1280, height: 800 });
 
     const pillGroup = page.locator('[aria-label="Made by Juan González"]').locator("..");
