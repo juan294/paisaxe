@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { validateMcpSecret } from "@/lib/mcp-auth";
 
 /**
  * MCP-compatible Places API endpoint for ElevenLabs voice agents.
@@ -269,15 +270,6 @@ async function searchPlaces(
     city: city || null,
     type: type || null,
   };
-}
-
-function validateMcpSecret(request: Request): boolean {
-  const secret = process.env.MCP_API_SECRET?.trim();
-  if (!secret) {
-    return false;
-  }
-  const provided = request.headers.get("x-mcp-secret");
-  return provided === secret;
 }
 
 function getClientIp(request: Request): string {
