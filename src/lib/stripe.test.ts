@@ -192,5 +192,25 @@ describe("stripe", () => {
         "whsec_123"
       );
     });
+
+    it("should trim STRIPE_WEBHOOK_SECRET to handle invisible characters", () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_WEBHOOK_SECRET", "  whsec_123\n");
+
+      const mockEvent = {
+        type: "checkout.session.completed",
+        data: { object: {} },
+      };
+      mockConstructEvent.mockReturnValue(mockEvent);
+
+      verifyWebhookSignature("payload", "sig123");
+
+      // Should be called with trimmed secret, not the raw value with whitespace
+      expect(mockConstructEvent).toHaveBeenCalledWith(
+        "payload",
+        "sig123",
+        "whsec_123"
+      );
+    });
   });
 });
