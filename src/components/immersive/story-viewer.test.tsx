@@ -881,10 +881,12 @@ describe("StoryViewer", () => {
       const xLink = screen.getByLabelText("X (Twitter)");
       const linkedinLink = screen.getByLabelText("LinkedIn");
       const mediumLink = screen.getByLabelText("Medium");
+      const githubLink = screen.getByLabelText("GitHub");
 
       expect(xLink).toHaveAttribute("href", "https://x.com/JuanG294");
       expect(linkedinLink).toHaveAttribute("href", "https://www.linkedin.com/in/juanagonzalezp/");
       expect(mediumLink).toHaveAttribute("href", "https://medium.com/@juang294");
+      expect(githubLink).toHaveAttribute("href", "https://github.com/juan294");
     });
 
     it("should open social links in new tab", async () => {
@@ -893,10 +895,12 @@ describe("StoryViewer", () => {
       const xLink = screen.getByLabelText("X (Twitter)");
       const linkedinLink = screen.getByLabelText("LinkedIn");
       const mediumLink = screen.getByLabelText("Medium");
+      const githubLink = screen.getByLabelText("GitHub");
 
       expect(xLink).toHaveAttribute("target", "_blank");
       expect(linkedinLink).toHaveAttribute("target", "_blank");
       expect(mediumLink).toHaveAttribute("target", "_blank");
+      expect(githubLink).toHaveAttribute("target", "_blank");
     });
 
     it("should have noopener noreferrer on social links", async () => {
