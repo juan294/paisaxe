@@ -31,9 +31,9 @@ describe("LanguageSwitcher", () => {
       expect(within(toggleButton).getByText("ES")).toBeInTheDocument();
 
       // Dropdown is hidden via CSS (opacity-0, pointer-events-none)
-      // The buttons exist in DOM but are not visible/clickable
-      const allButtons = screen.getAllByRole("button");
-      expect(allButtons).toHaveLength(7); // 1 toggle + 6 language options (hidden)
+      // The options exist in DOM but are not visible/clickable
+      const allOptions = screen.getAllByRole("option");
+      expect(allOptions).toHaveLength(6); // 6 language options (hidden)
     });
 
     it("should show FR when locale is fr", () => {
@@ -86,9 +86,9 @@ describe("LanguageSwitcher", () => {
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
 
-      // All language options should now be visible
-      const allButtons = screen.getAllByRole("button");
-      expect(allButtons).toHaveLength(7); // 1 toggle + 6 language options
+      // All language options should be present
+      const allOptions = screen.getAllByRole("option");
+      expect(allOptions).toHaveLength(6); // 6 language options
     });
 
     it("should highlight the current language in the dropdown", () => {
@@ -99,12 +99,11 @@ describe("LanguageSwitcher", () => {
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
 
-      // ES button in dropdown should have selected styling (there are 2 ES buttons, get all)
-      const esButtons = screen.getAllByRole("button", { name: /^ES$/i });
-      // The dropdown button (one without aria-expanded) should have selected styling
-      const dropdownEsButton = esButtons.find(btn => !btn.hasAttribute("aria-expanded"));
-      expect(dropdownEsButton?.className).toContain("bg-white");
-      expect(dropdownEsButton?.className).toContain("text-black");
+      // ES option in dropdown should have selected styling and aria-selected
+      const esOption = screen.getByRole("option", { name: "ES" });
+      expect(esOption).toHaveAttribute("aria-selected", "true");
+      expect(esOption.className).toContain("bg-white");
+      expect(esOption.className).toContain("text-black");
     });
 
     it("should call setLocale when a different language is clicked", () => {
@@ -115,9 +114,9 @@ describe("LanguageSwitcher", () => {
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
 
-      // Click EN (the dropdown button, not the toggle)
-      const enButton = screen.getByRole("button", { name: "EN" });
-      fireEvent.click(enButton);
+      // Click EN option
+      const enOption = screen.getByRole("option", { name: "EN" });
+      fireEvent.click(enOption);
 
       expect(mockSetLocale).toHaveBeenCalledWith("en");
     });
@@ -128,7 +127,7 @@ describe("LanguageSwitcher", () => {
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("button", { name: "FR" }));
+      fireEvent.click(screen.getByRole("option", { name: "FR" }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("fr");
     });
@@ -139,7 +138,7 @@ describe("LanguageSwitcher", () => {
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("button", { name: "DE" }));
+      fireEvent.click(screen.getByRole("option", { name: "DE" }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("de");
     });
@@ -150,7 +149,7 @@ describe("LanguageSwitcher", () => {
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("button", { name: "PT" }));
+      fireEvent.click(screen.getByRole("option", { name: "PT" }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("pt");
     });
@@ -161,7 +160,7 @@ describe("LanguageSwitcher", () => {
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("button", { name: "AST" }));
+      fireEvent.click(screen.getByRole("option", { name: "AST" }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("ast");
     });
@@ -173,10 +172,9 @@ describe("LanguageSwitcher", () => {
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
 
-      // Find ES dropdown button (not the toggle)
-      const esButtons = screen.getAllByRole("button", { name: /^ES$/i });
-      const dropdownEsButton = esButtons.find(btn => !btn.hasAttribute("aria-expanded"));
-      fireEvent.click(dropdownEsButton!);
+      // Find ES option
+      const esOption = screen.getByRole("option", { name: "ES" });
+      fireEvent.click(esOption);
 
       expect(mockSetLocale).toHaveBeenCalledWith("es");
     });
@@ -234,7 +232,7 @@ describe("LanguageSwitcher", () => {
       fireEvent.click(toggleButton);
 
       // Select a language
-      fireEvent.click(screen.getByRole("button", { name: "EN" }));
+      fireEvent.click(screen.getByRole("option", { name: "EN" }));
 
       // Dropdown should be hidden via CSS
       const groupContainer = screen.getByRole("group");
@@ -268,7 +266,7 @@ describe("LanguageSwitcher", () => {
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("button", { name: "EN" }));
+      fireEvent.click(screen.getByRole("option", { name: "EN" }));
 
       expect(parentHandler).not.toHaveBeenCalled();
     });
@@ -295,6 +293,151 @@ describe("LanguageSwitcher", () => {
       // After click, expanded
       fireEvent.click(toggleButton);
       expect(toggleButton).toHaveAttribute("aria-expanded", "true");
+    });
+  });
+
+  describe("keyboard navigation", () => {
+    it("should move focus down with ArrowDown", () => {
+      render(<LanguageSwitcher />);
+
+      // Open the dropdown
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      // Get the listbox
+      const listbox = screen.getByRole("listbox");
+
+      // First option should be focused after open
+      const options = screen.getAllByRole("option");
+      options[0].focus();
+
+      // Press ArrowDown
+      fireEvent.keyDown(listbox, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(options[1]);
+    });
+
+    it("should move focus up with ArrowUp", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const listbox = screen.getByRole("listbox");
+      const options = screen.getAllByRole("option");
+      options[1].focus();
+
+      fireEvent.keyDown(listbox, { key: "ArrowUp" });
+      expect(document.activeElement).toBe(options[0]);
+    });
+
+    it("should wrap from last to first with ArrowDown", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const listbox = screen.getByRole("listbox");
+      const options = screen.getAllByRole("option");
+      const lastOption = options[options.length - 1];
+      lastOption.focus();
+
+      fireEvent.keyDown(listbox, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(options[0]);
+    });
+
+    it("should wrap from first to last with ArrowUp", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const listbox = screen.getByRole("listbox");
+      const options = screen.getAllByRole("option");
+      options[0].focus();
+
+      fireEvent.keyDown(listbox, { key: "ArrowUp" });
+      expect(document.activeElement).toBe(options[options.length - 1]);
+    });
+
+    it("should jump to first item with Home key", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const listbox = screen.getByRole("listbox");
+      const options = screen.getAllByRole("option");
+      options[3].focus();
+
+      fireEvent.keyDown(listbox, { key: "Home" });
+      expect(document.activeElement).toBe(options[0]);
+    });
+
+    it("should jump to last item with End key", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const listbox = screen.getByRole("listbox");
+      const options = screen.getAllByRole("option");
+      options[0].focus();
+
+      fireEvent.keyDown(listbox, { key: "End" });
+      expect(document.activeElement).toBe(options[options.length - 1]);
+    });
+
+    it("should select language and close on Enter", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const listbox = screen.getByRole("listbox");
+      const options = screen.getAllByRole("option");
+      // Focus on EN (index 2)
+      options[2].focus();
+
+      fireEvent.keyDown(listbox, { key: "Enter" });
+      expect(mockSetLocale).toHaveBeenCalledWith("en");
+    });
+
+    it("should close dropdown and return focus to trigger on Escape", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      // Press Escape
+      fireEvent.keyDown(document, { key: "Escape" });
+
+      // Dropdown should close
+      expect(toggleButton).toHaveAttribute("aria-expanded", "false");
+      // Focus should return to the toggle button
+      expect(document.activeElement).toBe(toggleButton);
+    });
+
+    it("should focus first option when dropdown opens", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const options = screen.getAllByRole("option");
+      expect(document.activeElement).toBe(options[0]);
+    });
+
+    it("should have aria-selected on the current language option", () => {
+      mockLocale = "en";
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const options = screen.getAllByRole("option");
+      // EN is index 2 in the languages array
+      expect(options[2]).toHaveAttribute("aria-selected", "true");
+      expect(options[0]).toHaveAttribute("aria-selected", "false");
     });
   });
 });

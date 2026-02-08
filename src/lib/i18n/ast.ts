@@ -135,6 +135,9 @@ export const ast: Translations = {
     suggested_questions: 'Entrugues suxeríes',
     more_options: 'Más opciones',
     story_controls: 'Controles de histories',
+    go_back: 'Tornar',
+    loading: 'Cargando',
+    go_to_story: 'Dir a la historia {current} de {total}',
   },
 
   auth: {
@@ -255,6 +258,7 @@ export const ast: Translations = {
     faq_what_included_highlight: '¡y él llama pa facete la reserva!',
     faq_how_long: 'Cuánto dura?',
     faq_how_long_answer: '24 hores dende la compra. Perfectu pa planiar un día de viaxe o esplorar.',
+    voice_pass_expiry: 'El to pase de voz caduca en {hours}h ({time})',
   },
 
   fullscreen: {

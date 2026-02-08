@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { validateMcpSecret } from "@/lib/mcp-auth";
 
 /**
  * MCP-compatible Weather API endpoint for ElevenLabs voice agents.
@@ -119,15 +120,6 @@ async function fetchWeather(city: string): Promise<WeatherResponse> {
     icon: data.weather[0]?.icon || "01d",
     units: "metric",
   };
-}
-
-function validateMcpSecret(request: Request): boolean {
-  const secret = process.env.MCP_API_SECRET?.trim();
-  if (!secret) {
-    return false;
-  }
-  const provided = request.headers.get("x-mcp-secret");
-  return provided === secret;
 }
 
 function getClientIp(request: Request): string {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { createAdminClient } from "@/lib/supabase";
+import { validateMcpSecret } from "@/lib/mcp-auth";
 
 /**
  * MCP-compatible Make Booking API endpoint for ElevenLabs voice agents.
@@ -235,16 +236,6 @@ async function initiateCall(
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
-}
-
-function validateMcpSecret(request: Request): boolean {
-  const secret = process.env.MCP_API_SECRET?.trim();
-  if (!secret) {
-    // If no secret is configured, reject all requests
-    return false;
-  }
-  const provided = request.headers.get("x-mcp-secret");
-  return provided === secret;
 }
 
 export async function POST(request: Request): Promise<NextResponse> {

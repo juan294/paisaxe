@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { readFileSync } from "fs";
-import { join } from "path";
+import packageJson from "../../../../package.json";
 
-const APP_VERSION = JSON.parse(
-  readFileSync(join(process.cwd(), "package.json"), "utf-8")
-).version as string;
+const APP_VERSION: string = packageJson.version;
 
 interface SupabaseServiceStatus {
   status: "connected" | "error";

@@ -94,14 +94,16 @@ const renderWithAuth = async (ui: ReactNode) => {
   return result!;
 };
 
-// Mock next/image
+// Mock next/image — captures blur placeholder props for verification
 vi.mock("next/image", () => ({
-  default: ({ src, alt, className, fill, priority }: {
+  default: ({ src, alt, className, fill, priority, placeholder, blurDataURL }: {
     src: string;
     alt: string;
     className?: string;
     fill?: boolean;
     priority?: boolean;
+    placeholder?: string;
+    blurDataURL?: string;
   }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -110,6 +112,8 @@ vi.mock("next/image", () => ({
       className={className}
       data-fill={fill}
       data-priority={priority}
+      data-placeholder={placeholder}
+      data-blur-data-url={blurDataURL}
     />
   ),
 }));
@@ -206,9 +210,8 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // With 3 stories (< PAGE_SIZE), should show 3 segments
-      const progressBars = screen.getAllByRole("generic").filter(
-        (el) => el.classList.contains("flex-1") && el.classList.contains("h-1")
-      );
+      const progressbar = screen.getByRole("progressbar");
+      const progressBars = progressbar.querySelectorAll('[role="button"]');
       expect(progressBars).toHaveLength(3);
     });
 
@@ -216,9 +219,8 @@ describe("StoryViewer", () => {
       // At index 1 of 3 stories, position 1 should be filled (segments 0 and 1)
       await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
-      const progressBars = screen.getAllByRole("generic").filter(
-        (el) => el.classList.contains("flex-1") && el.classList.contains("h-1")
-      );
+      const progressbar = screen.getByRole("progressbar");
+      const progressBars = progressbar.querySelectorAll('[role="button"]');
 
       // First two segments should have filled inner div (w-full)
       const filled0 = progressBars[0]?.querySelector("div");
@@ -255,6 +257,33 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       expect(screen.getByText(/navegar/)).toBeInTheDocument();
+    });
+
+    it("should render story image with blur placeholder", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const img = screen.getByAltText("Lagos de Covadonga");
+      expect(img).toHaveAttribute("data-placeholder", "blur");
+    });
+
+    it("should use darkPlaceholder fallback when story has no blurDataUrl", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const img = screen.getByAltText("Lagos de Covadonga");
+      // Should use the dark SVG placeholder as fallback
+      expect(img.getAttribute("data-blur-data-url")).toMatch(/^data:image\/svg\+xml/);
+    });
+
+    it("should use story blurDataUrl when available", async () => {
+      const storiesWithBlur = mockStories.map((s, i) =>
+        i === 0 ? { ...s, blurDataUrl: "data:image/webp;base64,mockblur" } : s
+      );
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ stories: storiesWithBlur })} />
+      );
+
+      const img = screen.getByAltText("Lagos de Covadonga");
+      expect(img).toHaveAttribute("data-blur-data-url", "data:image/webp;base64,mockblur");
     });
   });
 
@@ -401,9 +430,8 @@ describe("StoryViewer", () => {
     it("should jump to specific story when clicking progress bar", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const progressBars = screen.getAllByRole("generic").filter(
-        (el) => el.classList.contains("flex-1") && el.classList.contains("h-1")
-      );
+      const progressbar = screen.getByRole("progressbar");
+      const progressBars = progressbar.querySelectorAll('[role="button"]');
 
       if (progressBars[2]) {
         fireEvent.click(progressBars[2]);
