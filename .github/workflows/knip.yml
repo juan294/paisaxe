@@ -22,17 +22,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Report dead code but do not fail the build.
-      # --no-exit-code is intentional for the initial rollout so the team can
-      # review results without blocking PRs.  Once the codebase is clean,
-      # remove --no-exit-code to enforce strict dead code prevention.
-      - name: Run Knip (report mode)
-        run: npx knip --no-exit-code
+      - name: Run Knip (dead code detection)
+        run: npx knip
 
-      # Check for unused and unlisted dependencies separately.
-      # Using --no-exit-code during initial rollout because the codebase has
-      # pre-existing dependency issues to address.  Once cleaned up, remove
-      # --no-exit-code to enforce strict dependency hygiene and fail the build
-      # on unused or unlisted dependencies.
-      - name: Check unused dependencies (report mode)
-        run: npx knip --dependencies --no-exit-code
+      - name: Check unused dependencies
+        run: npx knip --dependencies
