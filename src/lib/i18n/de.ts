@@ -86,7 +86,7 @@ export const de: Translations = {
     fueled_by_sidra: 'angetrieben von Sidra',
     buen_camino: '\u00a1buen Camino!',
     probably_hiking: 'wahrscheinlich \ud83c\udfd4\ufe0f rn',
-    out_cycling: 'wahrscheinlich \ud83d\udeb4\ud83c\udffb rn',
+    out_cycling: 'wahrscheinlich \ud83d\udeb4 rn',
     scaling_rocks: 'gerade am Klettern',
     sleep_not_found: '404: Schlaf nicht gefunden',
     works_on_my_machine: 'l\u00e4uft bei mir\u2122',

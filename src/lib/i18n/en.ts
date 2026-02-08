@@ -89,7 +89,7 @@ export const en: Translations = {
     fueled_by_sidra: 'fueled by sidra',
     buen_camino: '\u00a1buen Camino!',
     probably_hiking: 'probably \ud83c\udfd4\ufe0f rn',
-    out_cycling: 'probably \ud83d\udeb4\ud83c\udffb rn',
+    out_cycling: 'probably \ud83d\udeb4 rn',
     scaling_rocks: 'scaling some rock',
     sleep_not_found: '404: sleep not found',
     works_on_my_machine: 'works on my machine\u2122',
