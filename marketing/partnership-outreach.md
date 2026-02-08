@@ -4,26 +4,29 @@
 
 **Target:** Asturias regional tourism office, local tourism associations
 
-**Subject:** AI travel guide for Asturias visitors—free chat + voice concierge
+**Subject:** A new way for visitors to experience Asturias—talk to the places as they explore
 
 ---
 
 Hi,
 
-I've built a travel guide for Asturias called Paisaxe (paisaxe.es) that I think could be useful for visitors to the region.
+I've built a passion project for Asturias called Paisaxe (paisaxe.es)—"landscape" in the Asturian language—that I think could be interesting for visitors to the region.
 
 **What it is:**
-- A free AI text chat that answers questions about Asturias—hiking routes, restaurants, cultural sites, practical travel tips
-- Trained on local guides and tourism content, with source citations
-- Voice Pass (€1.99/day): visitors can talk to Pelayo, a voice guide who checks live weather, finds restaurants with real-time hours, and calls ahead to book tables on their behalf
+- A free experience where visitors can talk to the places of Asturias—by chat or by voice
+- A monument, a beach, a mountain, a restaurant—they pick a place and start a conversation
+- It's like having a local guide for every spot: "Is this worth seeing on a rainy day?" "Where should I go next?"
+
+**The idea:**
+Asturias already has incredible websites with photos and recommendations. Paisaxe doesn't add more information—it offers a different way to discover what's already there. Less planning, more wandering with purpose.
 
 **Why I'm reaching out:**
 I'm not looking for money or official partnership—just awareness. If you think it's useful, I'd appreciate:
 - A mention on your resources page or social media
-- Feedback on accuracy (I want to get it right)
-- Suggestions for content gaps I should address
+- Feedback on the experience (I want it to feel authentic to the region)
+- Suggestions for places or stories I should include
 
-The text chat is completely free for visitors, no ads, no data selling. The voice guide is an affordable add-on for visitors who want real-time help on the ground.
+It's completely free for visitors, no ads, no data selling.
 
 Happy to jump on a call or answer any questions.
 
@@ -36,26 +39,29 @@ Best regards,
 
 ## Tourism Board Template (Spanish)
 
-**Subject:** Guía de viaje con IA para visitantes de Asturias—chat gratis + guía por voz
+**Subject:** Una forma nueva de descubrir Asturias para visitantes—hablar con los lugares mientras exploran
 
 ---
 
 Hola,
 
-He creado una guía de viaje para Asturias llamada Paisaxe (paisaxe.es) que creo puede ser útil para los visitantes de la región.
+He creado un proyecto personal para Asturias llamado Paisaxe (paisaxe.es)—"paisaje" en asturiano—que creo puede ser interesante para los visitantes de la región.
 
 **Qué es:**
-- Un chat de texto con IA gratuito que responde preguntas sobre Asturias: rutas de senderismo, restaurantes, lugares culturales, consejos prácticos
-- Entrenado con guías locales y contenido turístico, con citas de fuentes
-- Pase de Voz (1,99€/día): los visitantes pueden hablar con Pelayo, un guía por voz que consulta el tiempo en directo, busca restaurantes con horarios actualizados y llama para reservar mesa en su nombre
+- Una experiencia gratuita donde los visitantes pueden hablar con los lugares de Asturias—por chat o por voz
+- Un monumento, una playa, una montaña, un restaurante—eligen un lugar y empiezan una conversación
+- Es como tener un guía local para cada sitio: "¿Merece la pena verlo un día de lluvia?" "¿Dónde debería ir después?"
+
+**La idea:**
+Asturias ya tiene webs increíbles con fotos y recomendaciones. Paisaxe no añade más información—ofrece una forma diferente de descubrir lo que ya existe. Menos planificación, más pasear con propósito.
 
 **Por qué os escribo:**
 No busco dinero ni partnership oficial—solo visibilidad. Si os parece útil, agradecería:
 - Una mención en vuestra página de recursos o redes sociales
-- Feedback sobre la precisión (quiero que sea correcto)
-- Sugerencias sobre contenido que falte
+- Feedback sobre la experiencia (quiero que se sienta auténtica)
+- Sugerencias de lugares o historias que debería incluir
 
-El chat de texto es completamente gratuito para visitantes, sin anuncios ni venta de datos. El guía por voz es un complemento asequible para visitantes que quieren ayuda en tiempo real sobre el terreno.
+Es completamente gratuito para visitantes, sin anuncios ni venta de datos.
 
 Encantado de hacer una llamada o responder cualquier pregunta.
 
@@ -68,24 +74,25 @@ Un saludo,
 
 ## Local Business Template (Hotels, Tour Operators)
 
-**Subject:** AI travel guide your guests can use to explore Asturias
+**Subject:** A different way for your guests to discover Asturias
 
 ---
 
 Hi [Business name],
 
-I run an AI travel guide for Asturias (paisaxe.es) and thought it might be useful for your guests.
+I've built a passion project called Paisaxe (paisaxe.es)—"landscape" in Asturian—and thought it might be interesting for your guests.
 
-The free text chat answers questions like:
-- "What's a good day hike near Cangas de Onís?"
-- "Where should I eat in Oviedo tonight?"
-- "What's the weather like in Picos in September?"
+Instead of handing them a map or a list of recommendations, imagine if they could talk to the places themselves:
 
-For €1.99/day, guests can also unlock Pelayo—a voice guide who checks live weather, finds restaurants with real-time hours, and even calls ahead to book a table on their behalf.
+- "What's the best route to walk from here today?"
+- "Is this beach good for kids?"
+- "Where should I have dinner tonight—somewhere local, not too fancy?"
 
-It's trained on local knowledge and gives specific, accurate recommendations—not generic AI responses.
+Chat or voice. Free. No signup.
 
-If you find it useful, feel free to share the link with guests. No affiliate anything—just trying to help more people discover Asturias.
+It's a different way to discover Asturias—less like planning and more like wandering with a purpose.
+
+If you find it useful, feel free to share the link with guests. No affiliate anything—just trying to help more people connect with Asturias.
 
 Let me know if you have any questions or feedback.
 
