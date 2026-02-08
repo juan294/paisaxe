@@ -82,6 +82,12 @@ export function PostHogProviderWrapper({ children }: PostHogProviderWrapperProps
           capture_pageview: false, // We handle this manually for Next.js routing
           capture_pageleave: true,
           autocapture: true,
+          // Core Web Vitals (LCP, FID, CLS, FCP) are captured automatically
+          // when enabled in the PostHog dashboard:
+          //   Project Settings > Autocapture > Web vitals autocapture > Enable
+          // The SDK reads this setting via remote config — no client-side
+          // code change needed. Requires posthog-js >= 1.141.2 (we have 1.342.1).
+          // Metrics appear under the $web_vitals event in PostHog.
         });
       }
 
