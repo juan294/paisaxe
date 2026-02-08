@@ -244,6 +244,17 @@ export function StoryViewer({
     if (chatOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept keys when user is typing in a form element
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        (e.target as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+
       if (e.key === "ArrowRight" || e.key === " ") {
         e.preventDefault();
         goToNext();
