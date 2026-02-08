@@ -44,7 +44,9 @@ export default function PricingPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center">
-        <RefreshCw className="h-5 w-5 animate-spin text-neutral-500" />
+        <div role="status" aria-label={t("accessibility.loading")}>
+          <RefreshCw className="h-5 w-5 animate-spin text-neutral-500" />
+        </div>
       </div>
     );
   }
@@ -56,6 +58,7 @@ export default function PricingPage() {
         <div className="mx-auto flex h-14 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
           <Link
             href="/immersive"
+            aria-label={t("accessibility.go_back")}
             className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />

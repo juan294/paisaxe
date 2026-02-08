@@ -88,6 +88,60 @@ describe('locale files', () => {
     });
   }
 
+  describe('diacritics are correct', () => {
+    it('French has correct diacritics in premium section', () => {
+      const p = fr.premium as Record<string, string>;
+      expect(p.voice_title).toContain('à');
+      expect(p.feature_24h).toContain('illimitées');
+      expect(p.secure_payment).toContain('sécurisé');
+      expect(p.success_title).toContain('prêt');
+      expect(p.success_cta).toContain('à');
+      expect(p.faq_how_long).toContain('ça');
+      expect(p.faq_how_long_answer).toContain('à partir');
+      expect(p.faq_how_long_answer).toContain('journée');
+    });
+
+    it('German has correct umlauts in premium section', () => {
+      const p = de.premium as Record<string, string>;
+      expect(p.feature_24h).toContain('Gespräche');
+      expect(p.secure_payment).toContain('über');
+      expect(p.success_expires).toContain('gültig');
+      expect(p.pricing_title).toContain('Sprachgespräche');
+      expect(p.faq_how_long_answer).toContain('für');
+    });
+
+    it('Portuguese has correct diacritics in premium section', () => {
+      const p = pt.premium as Record<string, string>;
+      expect(p.voice_locked).toContain('função');
+      expect(p.voice_locked).toContain('é uma');
+      expect(p.get_day_pass).toContain('Diário');
+      expect(p.sign_in_to_purchase).toContain('sessão');
+      expect(p.success_expires).toContain('é válido até');
+      expect(p.success_cta).toContain('Começar');
+      expect(p.faq_what_included).toContain('está incluído');
+    });
+
+    it('Spanish has correct diacritics', () => {
+      const filters = (es.stories as Record<string, unknown>).filters as Record<string, string>;
+      expect(filters.location).toBe('Ubicación');
+      expect(filters.duration).toBe('Duración');
+
+      const auth = es.auth as Record<string, string>;
+      expect(auth.sign_out).toContain('sesión');
+
+      const mood = es.mood as Record<string, string>;
+      expect(mood.title).toContain('¿Qué');
+    });
+  });
+
+  describe('voice pass expiry key exists in all locales', () => {
+    it('all locales have premium.voice_pass_expiry key', () => {
+      for (const [code, keys] of Object.entries(allLocaleKeys)) {
+        expect(keys, `Missing premium.voice_pass_expiry in ${code}`).toContain('premium.voice_pass_expiry');
+      }
+    });
+  });
+
   describe('essential keys exist', () => {
     const essentialKeys = [
       'common.loading',
@@ -141,6 +195,9 @@ describe('locale files', () => {
       'favorites.remove_from_saved',
       'accessibility.related_stories',
       'accessibility.language_switcher',
+      'accessibility.go_back',
+      'accessibility.loading',
+      'accessibility.go_to_story',
       'auth.user',
       'auth.sign_out',
       'auth.sign_in',
