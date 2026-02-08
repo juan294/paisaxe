@@ -34,6 +34,14 @@ describe("Security headers in next.config.ts", () => {
       const mediaSrc = mediaSrcMatch![1];
       expect(mediaSrc).toContain("blob:");
     });
+
+    it("should include Vercel Analytics domains in connect-src", () => {
+      const connectSrcMatch = configContent.match(/"connect-src ([^"]+)"/);
+      expect(connectSrcMatch).toBeTruthy();
+      const connectSrc = connectSrcMatch![1];
+      expect(connectSrc).toContain("https://vitals.vercel-insights.com");
+      expect(connectSrc).toContain("https://va.vercel-scripts.com");
+    });
   });
 
   describe("Deprecated headers", () => {
@@ -43,8 +51,10 @@ describe("Security headers in next.config.ts", () => {
   });
 
   describe("Required security headers", () => {
-    it("should include Strict-Transport-Security", () => {
+    it("should include Strict-Transport-Security only in production", () => {
       expect(configContent).toContain("Strict-Transport-Security");
+      // HSTS must be conditional on NODE_ENV to avoid poisoning localhost in browsers
+      expect(configContent).toMatch(/process\.env\.NODE_ENV\s*===?\s*["']production["']/);
     });
 
     it("should include X-Content-Type-Options", () => {

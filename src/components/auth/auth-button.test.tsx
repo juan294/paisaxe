@@ -165,9 +165,8 @@ describe("AuthButton", () => {
 
       // Click backdrop to close
       const backdrop = document.querySelector(".fixed.inset-0.z-40");
-      if (backdrop) {
-        fireEvent.click(backdrop);
-      }
+      expect(backdrop).toBeTruthy();
+      fireEvent.click(backdrop!);
 
       expect(screen.queryByText(mockT("auth.sign_out"))).not.toBeInTheDocument();
     });

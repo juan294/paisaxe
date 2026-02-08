@@ -228,22 +228,21 @@ describe("ImmersivePageContent", () => {
       await waitForLoaded();
 
       // Find next button and click it
+      // Use base class right-0 (not sm:right-4 which jsdom can't match)
       const nextButton = screen.getAllByRole("button").find(
-        (btn) =>
-          btn.classList.contains("right-4") && btn.classList.contains("top-1/2")
+        (btn) => btn.classList.contains("right-0")
       );
+      expect(nextButton).toBeDefined();
 
-      if (nextButton) {
-        fireEvent.click(nextButton);
+      fireEvent.click(nextButton!);
 
-        // Wait for transition
-        await waitFor(
-          () => {
-            expect(screen.getByText("Catedral de Oviedo")).toBeInTheDocument();
-          },
-          { timeout: 1000 }
-        );
-      }
+      // Wait for transition
+      await waitFor(
+        () => {
+          expect(screen.getByText("Catedral de Oviedo")).toBeInTheDocument();
+        },
+        { timeout: 1000 }
+      );
     });
   });
 

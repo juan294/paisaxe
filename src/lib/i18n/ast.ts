@@ -84,6 +84,18 @@ export const ast: Translations = {
     hint_next: 'Siguiente',
   },
 
+  author_pill: {
+    made_with_love: 'fecho con \u2665 n\u2019Asturies',
+    fueled_by_sidra: 'a base de sidra',
+    buen_camino: '\u00a1bon Cam\u00edn!',
+    probably_hiking: 'seguramente \ud83c\udfd4\ufe0f rn',
+    out_cycling: 'seguramente \ud83d\udeb4 rn',
+    scaling_rocks: 'escalando dalguna pe\u00f1a',
+    sleep_not_found: '404: sue\u00f1u non atop\u00e1u',
+    works_on_my_machine: 'na mio m\u00e1quina funciona\u2122',
+    bug_free: 'ensin bugs* (*cuasi)',
+  },
+
   share: {
     share: 'Compartir',
     link_copied: 'Enllaz copiao',
