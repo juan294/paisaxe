@@ -3,6 +3,7 @@
 > Generated on 2026-02-08 (post-launch verification) by 6-specialist agent team
 > Previous audit: 2026-02-07 (launch day)
 > Recommendations sprint: 2026-02-08 — 6 parallel agents resolved all 16 recommendations + 5 actionable warnings
+> CSP hotfix: 2026-02-08 — Restored `blob:` in CSP `script-src` for ElevenLabs AudioWorklet support
 
 ## Verdict: READY
 
@@ -33,7 +34,7 @@ None. All previous blockers remain resolved.
 |---|---------|--------|--------|
 | 1 | `twitter-api-v2` unused dependency | ACCEPTED | No free-tier write access; remove when X API pricing changes |
 | 2 | npm audit: `qs` high-severity via `voyageai` | ACCEPTED | No upstream fix available; low exploitability (server-side, controlled inputs). CI uses `--audit-level=critical` |
-| 3 | CSP `unsafe-inline` for `script-src` | ACCEPTED | Required by Next.js for hydration; known trade-off. `unsafe-eval` NOT present |
+| 3 | CSP `unsafe-inline` + `blob:` for `script-src` | ACCEPTED | `unsafe-inline` required by Next.js for hydration; `blob:` required by ElevenLabs AudioWorklet. `unsafe-eval` NOT present |
 | ~~4~~ | ~~French translations missing diacritics~~ | **RESOLVED** | Fixed in `fix/i18n-diacritics` — all accents corrected |
 | ~~5~~ | ~~German translations missing umlauts~~ | **RESOLVED** | Fixed in `fix/i18n-diacritics` — all umlauts corrected |
 | ~~6~~ | ~~Portuguese translations missing diacritics~~ | **RESOLVED** | Fixed in `fix/i18n-diacritics` — all accents corrected |
@@ -131,7 +132,7 @@ None. All previous blockers remain resolved.
 | CORS | PASS | Strict origin whitelist, no wildcards |
 | RLS | PASS | All Supabase tables have RLS enabled with proper policies |
 | XSS vectors | PASS | `dangerouslySetInnerHTML` properly escaped (escapeHtml, JSON.stringify) |
-| CSP | ACCEPTED | `unsafe-inline` in script-src (Next.js requirement), no `unsafe-eval` |
+| CSP | ACCEPTED | `unsafe-inline` + `blob:` in script-src (Next.js hydration + ElevenLabs AudioWorklet), no `unsafe-eval` |
 | Security headers | PASS | HSTS 2yr + preload, X-Frame-Options DENY, X-Content-Type-Options nosniff |
 | Webhook auth | PASS | HMAC + timingSafeEqual on all webhook endpoints |
 | Rate limiting | PASS | Applied to public endpoints |

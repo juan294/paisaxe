@@ -64,7 +64,7 @@ const nextConfig: NextConfig = {
           key: "Content-Security-Policy",
           value: [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline'",
+            "script-src 'self' 'unsafe-inline' blob:",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://picsum.photos https://*.googleusercontent.com",
             "font-src 'self' data:",
