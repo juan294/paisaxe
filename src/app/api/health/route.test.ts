@@ -204,4 +204,14 @@ describe("GET /api/health", () => {
 
     expect(supabase.rpc).toHaveBeenCalledWith("get_database_size");
   });
+
+  it("should not use readFileSync to read package.json at runtime", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const routeSource = fs.readFileSync(
+      path.resolve(__dirname, "route.ts"),
+      "utf-8"
+    );
+    expect(routeSource).not.toContain("readFileSync");
+  });
 });
