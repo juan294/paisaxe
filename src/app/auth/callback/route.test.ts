@@ -59,6 +59,37 @@ describe("Auth Callback Route", () => {
       expect(response.headers.get("location")).toContain("/favorites");
     });
 
+    it("should reject open redirect via //evil.com in next param", async () => {
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({
+        code: "valid-auth-code",
+        next: "//evil.com",
+      });
+      const response = await GET(request);
+
+      expect(response.status).toBe(307);
+      const location = response.headers.get("location") || "";
+      // Should NOT redirect to evil.com — should fall back to /immersive
+      expect(location).not.toContain("evil.com");
+      expect(location).toContain("/immersive");
+    });
+
+    it("should reject open redirect via https://evil.com in next param", async () => {
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({
+        code: "valid-auth-code",
+        next: "https://evil.com",
+      });
+      const response = await GET(request);
+
+      expect(response.status).toBe(307);
+      const location = response.headers.get("location") || "";
+      expect(location).not.toContain("evil.com");
+      expect(location).toContain("/immersive");
+    });
+
     it("should redirect to /immersive when code is missing", async () => {
       const request = createRequest({});
       const response = await GET(request);

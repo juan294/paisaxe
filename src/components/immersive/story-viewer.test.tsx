@@ -30,12 +30,13 @@ vi.mock("@/lib/supabase-browser", () => ({
   }),
 }));
 
-// Mock feature flags - all disabled by default
+// Mock feature flags - all disabled by default, controllable per-test
+const mockIsEnabled = vi.fn().mockReturnValue(false);
 vi.mock("@/hooks/use-feature-flags", () => ({
   useFeatureFlags: () => ({
     flags: [],
     isLoading: false,
-    isEnabled: () => false,
+    isEnabled: (...args: unknown[]) => mockIsEnabled(...args),
   }),
 }));
 
@@ -298,13 +299,11 @@ describe("StoryViewer", () => {
       expect(prevButton).toBeDefined();
       expect(prevButton).not.toBeDisabled();
 
-      if (prevButton) {
-        fireEvent.click(prevButton);
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
-        expect(onIndexChange).toHaveBeenCalledWith(2); // last story index
-      }
+      fireEvent.click(prevButton!);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(onIndexChange).toHaveBeenCalledWith(2); // last story index
     });
 
     it("should wrap to first story when pressing next on last story", async () => {
@@ -317,45 +316,43 @@ describe("StoryViewer", () => {
       expect(nextButton).toBeDefined();
       expect(nextButton).not.toBeDisabled();
 
-      if (nextButton) {
-        fireEvent.click(nextButton);
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
-        expect(onIndexChange).toHaveBeenCalledWith(0); // first story index
-      }
+      fireEvent.click(nextButton!);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(onIndexChange).toHaveBeenCalledWith(0); // first story index
     });
 
     it("should call onIndexChange when clicking next", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
+      // Use base class right-0 (not sm:right-4 which jsdom can't match)
       const nextButton = screen.getAllByRole("button").find(
-        (btn) => btn.classList.contains("right-4") && btn.classList.contains("top-1/2")
+        (btn) => btn.classList.contains("right-0")
       );
+      expect(nextButton).toBeDefined();
 
-      if (nextButton) {
-        fireEvent.click(nextButton);
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
-        expect(onIndexChange).toHaveBeenCalledWith(1);
-      }
+      fireEvent.click(nextButton!);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(onIndexChange).toHaveBeenCalledWith(1);
     });
 
     it("should call onIndexChange when clicking prev", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
+      // Use base class left-0 (not sm:left-4 which jsdom can't match)
       const prevButton = screen.getAllByRole("button").find(
-        (btn) => btn.classList.contains("left-4")
+        (btn) => btn.classList.contains("left-0")
       );
+      expect(prevButton).toBeDefined();
 
-      if (prevButton) {
-        fireEvent.click(prevButton);
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
-        expect(onIndexChange).toHaveBeenCalledWith(0);
-      }
+      fireEvent.click(prevButton!);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(onIndexChange).toHaveBeenCalledWith(0);
     });
 
     it("should navigate with keyboard right arrow", async () => {
@@ -449,60 +446,85 @@ describe("StoryViewer", () => {
     });
   });
 
-  describe("auto-play", () => {
+  describe("auto-play (non-ambient)", () => {
+    beforeEach(() => {
+      // Enable autoplay_button but NOT ambient_discovery — tests the simple toggle path
+      mockIsEnabled.mockImplementation((flag: string) => flag === "autoplay_button");
+    });
+
+    afterEach(() => {
+      mockIsEnabled.mockReturnValue(false);
+    });
+
     it("should auto-advance when auto-play is enabled", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // Find and click the auto-play toggle
       const autoPlayButton = screen.getAllByRole("button").find(
-        (btn) => btn.classList.contains("top-16") && btn.classList.contains("right-6")
+        (btn) => btn.querySelector(".lucide-play")
       );
+      expect(autoPlayButton).toBeDefined();
 
-      if (autoPlayButton) {
-        fireEvent.click(autoPlayButton);
+      fireEvent.click(autoPlayButton!);
 
-        // Advance time by 6 seconds (auto-play interval)
-        act(() => {
-          vi.advanceTimersByTime(6000);
-        });
+      // Advance time by 6 seconds (non-ambient interval)
+      act(() => {
+        vi.advanceTimersByTime(6000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
 
-        // Wait for transition timeout
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
-
-        expect(onIndexChange).toHaveBeenCalledWith(1);
-      }
+      expect(onIndexChange).toHaveBeenCalledWith(1);
     });
-  });
 
-  describe("auto-play looping", () => {
     it("should wrap to first story when auto-play reaches the end", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 2 })} />
       );
 
-      // Find and click the auto-play toggle in the top-right controls area
-      const controlsArea = screen.getAllByRole("button");
-      const autoPlayButton = controlsArea.find(
-        (btn) => btn.querySelector("svg.lucide-play")
+      const autoPlayButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
       );
+      expect(autoPlayButton).toBeDefined();
 
-      if (autoPlayButton) {
-        fireEvent.click(autoPlayButton);
+      fireEvent.click(autoPlayButton!);
 
-        // Advance time by auto-play interval
-        act(() => {
-          vi.advanceTimersByTime(6000);
-        });
+      act(() => {
+        vi.advanceTimersByTime(6000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
 
-        // Wait for transition timeout
-        act(() => {
-          vi.advanceTimersByTime(300);
-        });
+      expect(onIndexChange).toHaveBeenCalledWith(0);
+    });
 
-        expect(onIndexChange).toHaveBeenCalledWith(0);
-      }
+    it("should stop auto-play on second click and show play icon", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const autoPlayButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
+      );
+      expect(autoPlayButton).toBeDefined();
+
+      // Start
+      fireEvent.click(autoPlayButton!);
+      expect(autoPlayButton!.querySelector(".lucide-pause")).toBeTruthy();
+
+      // Stop
+      fireEvent.click(autoPlayButton!);
+      expect(autoPlayButton!.querySelector(".lucide-play")).toBeTruthy();
+
+      // Should NOT auto-advance
+      onIndexChange.mockClear();
+      act(() => {
+        vi.advanceTimersByTime(6000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(onIndexChange).not.toHaveBeenCalled();
     });
   });
 
@@ -704,6 +726,75 @@ describe("StoryViewer", () => {
     });
   });
 
+  describe("ambient toggle", () => {
+    beforeEach(() => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "autoplay_button" || flag === "ambient_discovery"
+      );
+    });
+
+    afterEach(() => {
+      mockIsEnabled.mockReturnValue(false);
+    });
+
+    it("should start auto-rotation and show pause icon on first click", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Find the ambient button by its Play icon
+      const ambientButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
+      );
+      expect(ambientButton).toBeDefined();
+
+      fireEvent.click(ambientButton!);
+
+      // After clicking, should show Pause icon (auto-play started)
+      expect(ambientButton!.querySelector(".lucide-pause")).toBeTruthy();
+      expect(ambientButton!.querySelector(".lucide-play")).toBeFalsy();
+
+      // Stories should auto-advance after the interval
+      act(() => {
+        vi.advanceTimersByTime(12000); // ambient uses 12s interval
+      });
+      act(() => {
+        vi.advanceTimersByTime(300); // transition delay
+      });
+
+      expect(onIndexChange).toHaveBeenCalledWith(1);
+    });
+
+    it("should stop auto-rotation and show play icon on second click", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const ambientButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
+      );
+      expect(ambientButton).toBeDefined();
+
+      // First click — start
+      fireEvent.click(ambientButton!);
+      expect(ambientButton!.querySelector(".lucide-pause")).toBeTruthy();
+
+      // Second click — stop
+      fireEvent.click(ambientButton!);
+
+      // Should show Play icon again (auto-play stopped)
+      expect(ambientButton!.querySelector(".lucide-play")).toBeTruthy();
+      expect(ambientButton!.querySelector(".lucide-pause")).toBeFalsy();
+
+      // Stories should NOT auto-advance after the interval
+      onIndexChange.mockClear();
+      act(() => {
+        vi.advanceTimersByTime(12000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(onIndexChange).not.toHaveBeenCalled();
+    });
+  });
+
   describe("bookmark toggle", () => {
     beforeEach(() => {
       mockToggleFavorite.mockClear();
@@ -743,6 +834,143 @@ describe("StoryViewer", () => {
       fireEvent.click(bookmarkBtn);
 
       expect(mockToggleFavorite).toHaveBeenCalledWith("story-2");
+    });
+  });
+
+  describe("author pill", () => {
+    it("should render the pill with initial '</> JG' text", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+    });
+
+    it("should render the pill with aria-label for accessibility", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      expect(screen.getByLabelText("Made by Juan González")).toBeInTheDocument();
+    });
+
+    it("should render blinking cursor", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // The cursor character ▌ is inside a span with animate-cursor-blink
+      const pillContainer = screen.getByLabelText("Made by Juan González");
+      const cursorSpan = pillContainer.querySelector(".animate-cursor-blink");
+      expect(cursorSpan).toBeInTheDocument();
+    });
+
+    it("should not animate cursor when prefers-reduced-motion is enabled", async () => {
+      // Override useReducedMotion mock
+      const reducedMotionModule = await import("@/hooks/use-reduced-motion");
+      vi.spyOn(reducedMotionModule, "useReducedMotion").mockReturnValue(true);
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const pillContainer = screen.getByLabelText("Made by Juan González");
+      // When reduced motion is preferred, cursor should NOT have animation class
+      const cursorSpan = pillContainer.querySelector(".animate-cursor-blink");
+      expect(cursorSpan).toBeNull();
+
+      // Restore
+      vi.restoreAllMocks();
+    });
+
+    it("should render social links in the popover", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const xLink = screen.getByLabelText("X (Twitter)");
+      const linkedinLink = screen.getByLabelText("LinkedIn");
+      const mediumLink = screen.getByLabelText("Medium");
+
+      expect(xLink).toHaveAttribute("href", "https://x.com/JuanG294");
+      expect(linkedinLink).toHaveAttribute("href", "https://www.linkedin.com/in/juanagonzalezp/");
+      expect(mediumLink).toHaveAttribute("href", "https://medium.com/@juang294");
+    });
+
+    it("should open social links in new tab", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const xLink = screen.getByLabelText("X (Twitter)");
+      const linkedinLink = screen.getByLabelText("LinkedIn");
+      const mediumLink = screen.getByLabelText("Medium");
+
+      expect(xLink).toHaveAttribute("target", "_blank");
+      expect(linkedinLink).toHaveAttribute("target", "_blank");
+      expect(mediumLink).toHaveAttribute("target", "_blank");
+    });
+
+    it("should have noopener noreferrer on social links", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const xLink = screen.getByLabelText("X (Twitter)");
+      expect(xLink).toHaveAttribute("rel", "noopener noreferrer");
+    });
+
+    it("should display author name in popover", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // The author name is rendered with HTML entity
+      expect(screen.getByText("Juan González")).toBeInTheDocument();
+    });
+
+    it("should stop click propagation to prevent info toggle", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const pillContainer = screen.getByLabelText("Made by Juan González");
+      // Click the pill's parent group div
+      const groupDiv = pillContainer.closest(".group");
+      expect(groupDiv).not.toBeNull();
+
+      fireEvent.click(groupDiv!);
+
+      // Info should still be visible — pill click should NOT toggle info
+      const bottomContent = screen
+        .getByText("Lagos de Covadonga")
+        .closest("article[class*='bottom-0']");
+      expect(bottomContent).toHaveClass("opacity-100");
+    });
+
+    it("should clean up typewriter timers on unmount", async () => {
+      const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+      const { unmount } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Unmounting should call clearTimeout to prevent leaked timers
+      unmount();
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it("should show static text when prefers-reduced-motion is enabled", async () => {
+      // The module is already mocked at top level — override the return value
+      const reducedMotionModule = await import("@/hooks/use-reduced-motion");
+      vi.spyOn(reducedMotionModule, "useReducedMotion").mockReturnValue(true);
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // With reduced motion, typewriter stays at initial "</> JG" — no animation
+      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+
+      // Advance time — should NOT cycle
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(35_000);
+      });
+
+      // Still shows initial text
+      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+
+      // Restore
+      vi.restoreAllMocks();
+    });
+
+    it("should be hidden on mobile (has md:block and hidden classes)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const pillContainer = screen.getByLabelText("Made by Juan González");
+      const outerDiv = pillContainer.closest(".group");
+      expect(outerDiv).toHaveClass("hidden");
+      expect(outerDiv).toHaveClass("md:block");
     });
   });
 });

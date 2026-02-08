@@ -47,7 +47,11 @@ const nextConfig: NextConfig = {
     {
       source: "/(.*)",
       headers: [
-        { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+        // HSTS only in production — sending it on localhost poisons Chrome's HSTS cache
+        // and makes http://localhost:3000 unreachable (ERR_CONNECTION_REFUSED).
+        ...(process.env.NODE_ENV === "production"
+          ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }]
+          : []),
         { key: "X-Content-Type-Options", value: "nosniff" },
         { key: "X-Frame-Options", value: "DENY" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -68,7 +72,7 @@ const nextConfig: NextConfig = {
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://picsum.photos https://*.googleusercontent.com",
             "font-src 'self' data:",
-            "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://*.elevenlabs.io",
+            "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://*.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com",
             "media-src 'self' blob:",
             "worker-src 'self' blob:",
             "frame-ancestors 'none'",

@@ -71,6 +71,9 @@ export function StoryViewer({
   const [showInfo, setShowInfo] = useState(true);
   const [autoPlay, setAutoPlay] = useState(false);
   const [ambientMode, setAmbientMode] = useState(false);
+  const [typewriterText, setTypewriterText] = useState("</> JG");
+
+  const typewriterRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { isEnabled } = useFeatureFlags();
   const { t, locale } = useTranslation();
@@ -84,6 +87,109 @@ export function StoryViewer({
   const story = stories[currentIndex];
   const prefetchedUrls = useRef<Set<string>>(new Set());
   const ambientStartRef = useRef<number | null>(null);
+
+  // Terminal typewriter animation for the author pill
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+
+    const messages = [
+      "</> JG",
+      t("author_pill.made_with_love"),
+      t("author_pill.fueled_by_sidra"),
+      "npm run explore",
+      t("author_pill.buen_camino"),
+      t("author_pill.probably_hiking"),
+      t("author_pill.out_cycling"),
+      t("author_pill.scaling_rocks"),
+      t("author_pill.sleep_not_found"),
+      t("author_pill.works_on_my_machine"),
+      t("author_pill.bug_free"),
+    ];
+    const HOME = messages[0];
+    const CHAR_DELAY = 80;
+    const EMPTY_PAUSE = 300;
+    const HOME_HOLD = 30_000;
+    const MSG_HOLD = 4000;
+
+    let messageIndex = 0;
+    let cancelled = false;
+
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        typewriterRef.current = setTimeout(() => {
+          if (!cancelled) resolve();
+        }, ms);
+      });
+
+    const eraseText = async (text: string) => {
+      for (let i = text.length; i >= 0; i--) {
+        if (cancelled) return;
+        setTypewriterText(text.slice(0, i));
+        if (i > 0) await wait(CHAR_DELAY);
+      }
+    };
+
+    const typeText = async (text: string) => {
+      for (let i = 0; i <= text.length; i++) {
+        if (cancelled) return;
+        setTypewriterText(text.slice(0, i));
+        if (i < text.length) await wait(CHAR_DELAY);
+      }
+    };
+
+    const cycle = async () => {
+      // Start at home, wait
+      setTypewriterText(HOME);
+      await wait(HOME_HOLD);
+
+      while (!cancelled) {
+        // Move to next non-home message
+        messageIndex = (messageIndex + 1) % messages.length;
+        if (messageIndex === 0) messageIndex = 1; // skip home in rotation
+
+        const nextMsg = messages[messageIndex];
+        const currentText = HOME;
+
+        // Erase current text
+        await eraseText(currentText);
+        if (cancelled) return;
+
+        // Brief pause when empty
+        await wait(EMPTY_PAUSE);
+        if (cancelled) return;
+
+        // Type the new message
+        await typeText(nextMsg);
+        if (cancelled) return;
+
+        // Hold the message
+        await wait(MSG_HOLD);
+        if (cancelled) return;
+
+        // Erase the message
+        await eraseText(nextMsg);
+        if (cancelled) return;
+
+        // Brief pause when empty
+        await wait(EMPTY_PAUSE);
+        if (cancelled) return;
+
+        // Type home back
+        await typeText(HOME);
+        if (cancelled) return;
+
+        // Hold at home
+        await wait(HOME_HOLD);
+      }
+    };
+
+    cycle();
+
+    return () => {
+      cancelled = true;
+      if (typewriterRef.current) clearTimeout(typewriterRef.current);
+    };
+  }, [prefersReducedMotion, t]);
 
   // Prefetch adjacent images for smoother navigation
   useEffect(() => {
@@ -170,6 +276,7 @@ export function StoryViewer({
         setAutoPlay(true);
       } else {
         ambientStartRef.current = null;
+        setAutoPlay(false);
       }
       return newValue;
     });
@@ -598,6 +705,79 @@ export function StoryViewer({
         aria-hidden="true"
       >
         ← → {t("nav.navigate")} · i {t("nav.show_hide")} · {t("nav.space")} {t("nav.next")}
+      </div>
+
+      {/* "Made by" pill with vertical popover — desktop only */}
+      <div
+        className="group hidden md:block desktop-pointer-only absolute bottom-10 right-4 z-20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Popover card — appears above the pill on hover */}
+        <div
+          className="absolute bottom-full right-0 pb-2 opacity-0 translate-y-2 scale-95 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)]"
+        >
+        <div
+          className="p-3 rounded-xl bg-white/10 backdrop-blur-xl border border-white/15"
+        >
+          <p className="text-[11px] text-white/60 font-medium whitespace-nowrap mb-2 select-none">
+            Juan Gonz&aacute;lez
+          </p>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://x.com/JuanG294"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
+              aria-label="X (Twitter)"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </svg>
+            </a>
+            <a
+              href="https://www.linkedin.com/in/juanagonzalezp/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
+              aria-label="LinkedIn"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+              </svg>
+            </a>
+            <a
+              href="https://medium.com/@juang294"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
+              aria-label="Medium"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M13.54 12a6.8 6.8 0 0 1-6.77 6.82A6.8 6.8 0 0 1 0 12a6.8 6.8 0 0 1 6.77-6.82A6.8 6.8 0 0 1 13.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z" />
+              </svg>
+            </a>
+          </div>
+        </div>
+        </div>
+
+        {/* Trigger pill (always visible) — terminal typewriter */}
+        <div
+          className="flex items-center h-6 min-w-[3.5rem] px-2.5 rounded-full bg-white/10 hover:bg-white/15 backdrop-blur-sm cursor-default transition-all duration-150"
+          aria-label="Made by Juan González"
+        >
+          <span className="text-[10px] font-mono text-white/45 group-hover:text-white/60 transition-colors duration-300 select-none whitespace-nowrap">
+            {typewriterText}
+            <span
+              className={cn(
+                "text-white/30 ml-px",
+                !prefersReducedMotion && "animate-cursor-blink"
+              )}
+              aria-hidden="true"
+            >
+              &#9612;
+            </span>
+          </span>
+        </div>
       </div>
 
       {/* First-visit navigation hint for mobile users */}

@@ -6,7 +6,12 @@ import type { NextRequest } from "next/server";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/immersive";
+  const rawNext = searchParams.get("next") ?? "/immersive";
+
+  // Prevent open redirect: only allow relative paths starting with /
+  // Reject protocol-relative URLs (//evil.com) and absolute URLs (https://evil.com)
+  const next =
+    rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/immersive";
 
   if (code) {
     const cookieStore = await cookies();
