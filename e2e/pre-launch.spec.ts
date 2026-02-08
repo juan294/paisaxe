@@ -314,7 +314,7 @@ test.describe("Language switching", () => {
     await switcher.locator("button").first().click();
 
     // Click ES in the dropdown
-    const esButton = page.locator('div[role="group"]').getByRole("button", { name: "ES", exact: true });
+    const esButton = page.locator('div[role="group"]').getByRole("option", { name: "ES", exact: true });
     await esButton.click();
     await page.waitForTimeout(300);
 
@@ -338,13 +338,13 @@ test.describe("Language switching", () => {
 
     // Switch to ES first
     await switcher.locator("button").first().click();
-    const esButton = page.locator('div[role="group"]').getByRole("button", { name: "ES", exact: true });
+    const esButton = page.locator('div[role="group"]').getByRole("option", { name: "ES", exact: true });
     await esButton.click();
     await page.waitForTimeout(300);
 
     // Now switch back to EN
     await switcher.locator("button").first().click();
-    const enButton = page.locator('div[role="group"]').getByRole("button", { name: "EN", exact: true });
+    const enButton = page.locator('div[role="group"]').getByRole("option", { name: "EN", exact: true });
     await enButton.click();
     await page.waitForTimeout(300);
 
@@ -366,7 +366,7 @@ test.describe("Language switching", () => {
     // Switch to ES (different from default EN)
     const switcher = page.locator('div[role="group"]').first();
     await switcher.locator("button").first().click();
-    const esButton = page.locator('div[role="group"]').getByRole("button", { name: "ES", exact: true });
+    const esButton = page.locator('div[role="group"]').getByRole("option", { name: "ES", exact: true });
     await esButton.click();
     await page.waitForTimeout(300);
 
@@ -406,7 +406,7 @@ test.describe("Language switching", () => {
     // Switch to ES
     const switcher = page.locator('div[role="group"]').first();
     await switcher.locator("button").first().click();
-    const esButton = page.locator('div[role="group"]').getByRole("button", { name: "ES", exact: true });
+    const esButton = page.locator('div[role="group"]').getByRole("option", { name: "ES", exact: true });
     await esButton.click();
     await page.waitForTimeout(300);
 
