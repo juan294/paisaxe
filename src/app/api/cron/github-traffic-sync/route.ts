@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
-import { createClient } from "@supabase/supabase-js";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { createAdminClient } from "@/lib/supabase";
 
 const GITHUB_API_BASE = "https://api.github.com";
 const REPO = "juan294/paisaxe";
@@ -76,16 +76,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY?.trim();
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return NextResponse.json(
-      { error: "Missing Supabase configuration" },
-      { status: 500 }
-    );
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createAdminClient();
 
   try {
     // Fetch all 4 GitHub Traffic endpoints in parallel

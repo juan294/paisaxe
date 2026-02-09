@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase";
 import type {
   ManualCostEntry,
   CreateManualCostRequest,
@@ -8,17 +8,6 @@ import type {
 } from "@/types/costs-analytics";
 import { PLATFORM_SERVICES } from "@/types/costs-analytics";
 
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY;
-
-  if (!url || !serviceKey) {
-    throw new Error("Missing Supabase credentials");
-  }
-
-  return createClient(url, serviceKey);
-}
-
 /**
  * Fetches all manual cost entries for a date range.
  */
@@ -27,7 +16,7 @@ export async function fetchManualCosts(
   endDate: string
 ): Promise<ServiceCost[]> {
   try {
-    const supabase = getSupabaseAdmin();
+    const supabase = createAdminClient();
 
     const { data, error } = await supabase
       .from("platform_costs")
@@ -67,7 +56,7 @@ export async function createManualCost(
   userId?: string
 ): Promise<ManualCostEntry | null> {
   try {
-    const supabase = getSupabaseAdmin();
+    const supabase = createAdminClient();
 
     const { data, error } = await supabase
       .from("platform_costs")
@@ -104,7 +93,7 @@ export async function updateManualCost(
   request: UpdateManualCostRequest
 ): Promise<ManualCostEntry | null> {
   try {
-    const supabase = getSupabaseAdmin();
+    const supabase = createAdminClient();
 
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
@@ -141,7 +130,7 @@ export async function updateManualCost(
  */
 export async function deleteManualCost(id: string): Promise<boolean> {
   try {
-    const supabase = getSupabaseAdmin();
+    const supabase = createAdminClient();
 
     const { error } = await supabase
       .from("platform_costs")
@@ -165,7 +154,7 @@ export async function deleteManualCost(id: string): Promise<boolean> {
  */
 export async function getManualCost(id: string): Promise<ManualCostEntry | null> {
   try {
-    const supabase = getSupabaseAdmin();
+    const supabase = createAdminClient();
 
     const { data, error } = await supabase
       .from("platform_costs")
