@@ -1,11 +1,16 @@
 'use client';
 
-import { useContext } from 'react';
+import { useContext, useMemo, useRef } from 'react';
 import { LanguageContext } from './provider';
 import type { LanguageContextValue } from './provider';
+import { es } from './es';
+import { resolveTranslation } from './resolve';
 
 /**
  * Hook to access translation function and locale management.
+ *
+ * Returns a fallback with Spanish translations if called outside LanguageProvider
+ * (e.g. during HMR, error boundary cascades, or SSR edge cases).
  *
  * @example
  * const { t, locale, setLocale } = useTranslation();
@@ -13,8 +18,20 @@ import type { LanguageContextValue } from './provider';
  */
 export function useTranslation(): LanguageContextValue {
   const context = useContext(LanguageContext);
-  if (!context) {
-    throw new Error('useTranslation must be used within a LanguageProvider');
+  const hasWarned = useRef(false);
+
+  const fallback = useMemo<LanguageContextValue>(() => ({
+    locale: 'es',
+    setLocale: () => {},
+    t: (key: string) => resolveTranslation(key, es),
+  }), []);
+
+  if (!context && !hasWarned.current) {
+    hasWarned.current = true;
+    console.warn(
+      'useTranslation: LanguageProvider not found, using fallback. This may indicate a rendering issue.'
+    );
   }
-  return context;
+
+  return context ?? fallback;
 }

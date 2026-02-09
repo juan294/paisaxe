@@ -7,7 +7,7 @@ import { getEnvironment } from "@/lib/environment";
 export async function GET() {
   // Skip database call when using dummy/invalid Supabase credentials (CI/E2E).
   // Real Supabase anon keys are JWTs that start with 'eyJ'.
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!supabaseKey || !supabaseKey.startsWith("eyJ")) {
     return NextResponse.json({ data: [] }, {
       headers: {

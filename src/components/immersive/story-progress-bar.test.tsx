@@ -1,182 +1,137 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { StoryViewer } from "./story-viewer";
-import type { Story } from "@/types/immersive";
-
-// Mock all heavy dependencies
-vi.mock("next/image", () => ({
-  default: ({ alt, ...props }: { alt: string; [key: string]: unknown }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img alt={alt} {...props} />
-  ),
-}));
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}));
-
-vi.mock("@/lib/i18n", () => ({
-  useTranslation: () => ({
-    locale: "en",
-    setLocale: vi.fn(),
-    t: (key: string) => key,
-  }),
-}));
-
-vi.mock("@/hooks/use-feature-flags", () => ({
-  useFeatureFlags: () => ({
-    isEnabled: () => false,
-  }),
-}));
-
-vi.mock("@/hooks/use-reduced-motion", () => ({
-  useReducedMotion: () => false,
-}));
-
-vi.mock("@/hooks/use-favorites", () => ({
-  useFavorites: () => ({
-    requiresAuth: false,
-    isFavorite: () => false,
-    toggleFavorite: vi.fn(),
-  }),
-}));
-
-vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({
-    user: null,
-    session: null,
-    signInWithGoogle: vi.fn(),
-  }),
-}));
-
-vi.mock("@/lib/related-stories", () => ({
-  getRelatedStories: () => [],
-}));
-
-vi.mock("@/lib/localize-story", () => ({
-  getLocalizedStory: (story: Story) => ({
-    title: story.title,
-    subtitle: story.subtitle,
-    description: story.description,
-  }),
-}));
-
-vi.mock("@/lib/asturianu", () => ({
-  getLabel: () => null,
-}));
-
-// Mock child components to reduce complexity
-vi.mock("./bookmark-button", () => ({
-  BookmarkButton: () => null,
-}));
-vi.mock("./category-filter-badge", () => ({
-  CategoryFilterBadge: () => null,
-}));
-vi.mock("@/components/auth/auth-button", () => ({
-  AuthButton: () => null,
-}));
-vi.mock("./related-stories", () => ({
-  RelatedStories: () => null,
-}));
-vi.mock("./question-prompts", () => ({
-  QuestionPrompts: () => null,
-}));
-vi.mock("./surprise-me-button", () => ({
-  SurpriseMeButton: () => null,
-}));
-vi.mock("./freshness-badge", () => ({
-  FreshnessBadge: () => null,
-}));
-vi.mock("./share-button", () => ({
-  ShareButton: () => null,
-}));
-vi.mock("./language-switcher", () => ({
-  LanguageSwitcher: () => null,
-}));
-vi.mock("./suggest-place-button", () => ({
-  SuggestPlaceButton: () => null,
-}));
-vi.mock("./user-submitted-badge", () => ({
-  UserSubmittedBadge: () => null,
-}));
-vi.mock("./toolbar-overflow-menu", () => ({
-  ToolbarOverflowMenu: () => null,
-  ToolbarOverflowItem: () => null,
-}));
-vi.mock("./fullscreen-button", () => ({
-  FullscreenButton: () => null,
-}));
-vi.mock("./navigation-hint", () => ({
-  NavigationHint: () => null,
-}));
-
-function makeStory(id: string, title: string): Story {
-  return {
-    id,
-    title,
-    subtitle: `Subtitle for ${title}`,
-    description: `Description for ${title}`,
-    image: `/images/${id}.jpg`,
-    category: "nature",
-    sourcePdf: "test.pdf",
-  };
-}
-
-const stories = [
-  makeStory("1", "Story One"),
-  makeStory("2", "Story Two"),
-  makeStory("3", "Story Three"),
-  makeStory("4", "Story Four"),
-  makeStory("5", "Story Five"),
-];
+import { StoryProgressBar } from "./story-progress-bar";
 
 const defaultProps = {
-  stories,
-  allStories: stories,
+  storiesLength: 5,
   currentIndex: 2,
   onIndexChange: vi.fn(),
-  onAskAbout: vi.fn(),
-  chatOpen: false,
-  selectedCategory: null,
-  selectedLocation: null,
-  selectedDuration: null,
-  onCategoryChange: vi.fn(),
-  onLocationChange: vi.fn(),
-  onDurationChange: vi.fn(),
-  onClearFilters: vi.fn(),
+  t: (key: string) => key,
 };
 
-describe("StoryViewer progress bar segments keyboard accessibility", () => {
+describe("StoryProgressBar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
 
-    // Mock matchMedia for the component
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      value: vi.fn().mockImplementation((query: string) => ({
-        matches: query === "(pointer: fine)",
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
+  // -------------------------------------------------------------------------
+  // Segment count
+  // -------------------------------------------------------------------------
+  it("renders correct number of segments (min of PAGE_SIZE and storiesLength)", () => {
+    render(<StoryProgressBar {...defaultProps} />);
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    expect(segments.length).toBe(5); // 5 stories < 20 PAGE_SIZE
+  });
+
+  it("caps segments at PAGE_SIZE (20) for large story counts", () => {
+    render(<StoryProgressBar {...defaultProps} storiesLength={50} />);
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    expect(segments.length).toBe(20);
+  });
+
+  // -------------------------------------------------------------------------
+  // Click handler via event delegation
+  // -------------------------------------------------------------------------
+  it("calls onIndexChange when a segment is clicked", () => {
+    const onIndexChange = vi.fn();
+    render(
+      <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
+    );
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    // base = 2 - (2 % 5) = 0, targetIndex = 0 + 0 = 0
+    fireEvent.click(segments[0]);
+    expect(onIndexChange).toHaveBeenCalledWith(0);
+  });
+
+  it("calls onIndexChange with correct index for non-first segment", () => {
+    const onIndexChange = vi.fn();
+    render(
+      <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
+    );
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    fireEvent.click(segments[3]);
+    expect(onIndexChange).toHaveBeenCalledWith(3);
+  });
+
+  // -------------------------------------------------------------------------
+  // Keyboard navigation (Enter/Space) via event delegation
+  // -------------------------------------------------------------------------
+  it("triggers onIndexChange when Enter is pressed on a segment", () => {
+    const onIndexChange = vi.fn();
+    render(
+      <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
+    );
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    fireEvent.keyDown(segments[0], { key: "Enter" });
+    expect(onIndexChange).toHaveBeenCalledWith(0);
+  });
+
+  it("triggers onIndexChange when Space is pressed on a segment", () => {
+    const onIndexChange = vi.fn();
+    render(
+      <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
+    );
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    fireEvent.keyDown(segments[1], { key: " " });
+    expect(onIndexChange).toHaveBeenCalledWith(1);
+  });
+
+  it("does not trigger onIndexChange for other keys", () => {
+    const onIndexChange = vi.fn();
+    render(
+      <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
+    );
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    fireEvent.keyDown(segments[0], { key: "Tab" });
+    expect(onIndexChange).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Event delegation works on inner fill div
+  // -------------------------------------------------------------------------
+  it("event delegation works when clicking inner fill div", () => {
+    const onIndexChange = vi.fn();
+    render(
+      <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
+    );
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    const innerDiv = segments[0].querySelector("div");
+    expect(innerDiv).toBeTruthy();
+    fireEvent.click(innerDiv!);
+    expect(onIndexChange).toHaveBeenCalledWith(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Accessibility attributes
+  // -------------------------------------------------------------------------
+  it("has proper progressbar ARIA attributes", () => {
+    render(<StoryProgressBar {...defaultProps} />);
+    const progressbar = screen.getByRole("progressbar");
+    expect(progressbar).toHaveAttribute("aria-valuenow", "3"); // currentIndex + 1
+    expect(progressbar).toHaveAttribute("aria-valuemin", "1");
+    expect(progressbar).toHaveAttribute("aria-valuemax", "5");
+  });
+
+  it("segments have descriptive aria-labels", () => {
+    render(<StoryProgressBar {...defaultProps} />);
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    segments.forEach((segment) => {
+      expect(segment).toHaveAttribute("aria-label");
+      expect(segment.getAttribute("aria-label")).toBeTruthy();
     });
   });
 
-  it("should have role='button' on progress bar segments", () => {
-    render(<StoryViewer {...defaultProps} />);
-
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
-    expect(segments.length).toBe(5); // 5 stories = 5 segments
-  });
-
-  it("should have tabIndex={0} on progress bar segments", () => {
-    render(<StoryViewer {...defaultProps} />);
-
+  it("segments have tabIndex 0 for keyboard focus", () => {
+    render(<StoryProgressBar {...defaultProps} />);
     const progressbar = screen.getByRole("progressbar");
     const segments = progressbar.querySelectorAll('[role="button"]');
     segments.forEach((segment) => {
@@ -184,40 +139,34 @@ describe("StoryViewer progress bar segments keyboard accessibility", () => {
     });
   });
 
-  it("should have descriptive aria-labels on progress bar segments", () => {
-    render(<StoryViewer {...defaultProps} />);
-
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
-    // Segment labels should describe position (using translation key)
-    segments.forEach((segment) => {
-      expect(segment).toHaveAttribute("aria-label");
-      const label = segment.getAttribute("aria-label");
-      expect(label).toBeTruthy();
-    });
+  // -------------------------------------------------------------------------
+  // React.memo prevents unnecessary re-renders
+  // -------------------------------------------------------------------------
+  it("React.memo prevents re-render when props are unchanged", () => {
+    const { rerender } = render(<StoryProgressBar {...defaultProps} />);
+    const progressbar1 = screen.getByRole("progressbar");
+    rerender(<StoryProgressBar {...defaultProps} />);
+    const progressbar2 = screen.getByRole("progressbar");
+    expect(progressbar1).toBe(progressbar2);
   });
 
-  it("should trigger onIndexChange when Enter is pressed on a segment", () => {
-    const onIndexChange = vi.fn();
-    render(<StoryViewer {...defaultProps} onIndexChange={onIndexChange} />);
-
+  // -------------------------------------------------------------------------
+  // Fill position (visual correctness)
+  // -------------------------------------------------------------------------
+  it("applies correct fill classes based on currentIndex", () => {
+    // currentIndex=2, storiesLength=5: fillPosition = 2 % 5 = 2
+    // Segments 0,1,2 should have w-full; segments 3,4 should have w-0
+    render(<StoryProgressBar {...defaultProps} />);
     const progressbar = screen.getByRole("progressbar");
     const segments = progressbar.querySelectorAll('[role="button"]');
-
-    // Press Enter on the first segment
-    fireEvent.keyDown(segments[0], { key: "Enter" });
-    expect(onIndexChange).toHaveBeenCalled();
-  });
-
-  it("should trigger onIndexChange when Space is pressed on a segment", () => {
-    const onIndexChange = vi.fn();
-    render(<StoryViewer {...defaultProps} onIndexChange={onIndexChange} />);
-
-    const progressbar = screen.getByRole("progressbar");
-    const segments = progressbar.querySelectorAll('[role="button"]');
-
-    // Press Space on the first segment
-    fireEvent.keyDown(segments[0], { key: " " });
-    expect(onIndexChange).toHaveBeenCalled();
+    for (let i = 0; i < 5; i++) {
+      const fillDiv = segments[i].querySelector("div");
+      expect(fillDiv).toBeTruthy();
+      if (i <= 2) {
+        expect(fillDiv!.className).toContain("w-full");
+      } else {
+        expect(fillDiv!.className).toContain("w-0");
+      }
+    }
   });
 });

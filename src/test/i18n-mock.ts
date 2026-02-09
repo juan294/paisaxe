@@ -137,6 +137,17 @@ export const mockTranslations: Record<string, string> = {
   "author_pill.works_on_my_machine": "funciona en mi m\u00e1quina\u2122",
   "author_pill.bug_free": "sin bugs* (*casi)",
 
+  // Footer
+  "footer.terms": "Condiciones de Uso",
+  "footer.privacy": "Politica de Privacidad",
+  "footer.content_attribution": "Contenido parcialmente basado en materiales disponibles gratuitamente en turismoasturias.es",
+  "footer.ai_disclaimer": "Las respuestas son generadas por IA y deben verificarse",
+
+  // Info Menu
+  "info_menu.about": "Acerca de Paisaxe",
+  "info_menu.saved_places": "Guardados",
+  "info_menu.sign_in": "Iniciar sesion",
+
   // Accessibility
   "accessibility.language_switcher": "Cambiar idioma",
   "accessibility.related_stories": "Historias relacionadas",

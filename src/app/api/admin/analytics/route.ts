@@ -17,7 +17,8 @@ import type {
   NewVsReturning,
 } from "@/types/analytics";
 
-import { queryPostHog } from "@/lib/posthog-query";
+import { queryPostHog, formatForHogQL } from "@/lib/posthog-query";
+import { buildDomainFilter } from "@/lib/analytics-filter";
 
 function getEmptyData(fromParam: string, toParam: string) {
   return {
@@ -67,20 +68,15 @@ export async function GET(request: NextRequest) {
     const fromParam = url.searchParams.get("from") ||
       new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const toParam = url.searchParams.get("to") || new Date().toISOString();
-    const includeLocalhost = url.searchParams.get("includeLocalhost") === "true";
+    const includeDev = url.searchParams.get("includeLocalhost") === "true";
 
-    // Format dates for HogQL: 'YYYY-MM-DD HH:MM:SS' (no milliseconds, no timezone)
-    // PostHog EU uses DateTime64 with Europe/Madrid timezone, simpler format works better
-    const formatForHogQL = (isoString: string) => {
-      const date = new Date(isoString);
-      return date.toISOString().slice(0, 19).replace("T", " ");
-    };
     const from = formatForHogQL(fromParam);
     const to = formatForHogQL(toParam);
 
-    // Filter out localhost/development data from analytics by default
-    // When includeLocalhost is true, show all data including development traffic
-    const excludeLocalhost = includeLocalhost ? "" : "AND properties.$current_url NOT LIKE '%localhost%'";
+    // When includeDev is false, filter to only production domains (paisaxe.es, paisaxe.com).
+    // This excludes localhost, tunnel domains, and any other non-production traffic.
+    // When includeDev is true, show all data including development traffic.
+    const excludeLocalhost = buildDomainFilter(includeDev);
 
     // Run all queries in parallel
     const [

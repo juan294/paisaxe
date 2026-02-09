@@ -7,15 +7,8 @@ import {
   type CurationStatus,
   type CreateStoryRequest,
 } from "@/types/admin";
+import { VALID_CATEGORIES } from "@/types/immersive";
 import type { StoryCategory } from "@/types/immersive";
-
-const VALID_CATEGORIES: StoryCategory[] = [
-  "nature",
-  "cities",
-  "food",
-  "culture",
-  "activities",
-];
 
 /**
  * Generate a URL-safe slug from a title.

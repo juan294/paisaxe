@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   ELEVENLABS_AGENT_IDS,
+  ELEVENLABS_API_BASE,
   areAgentsConfigured,
   getElevenLabsAgentId,
 } from "./elevenlabs-agents";
@@ -18,6 +19,16 @@ describe("ElevenLabs Agent Configuration", () => {
       for (const value of Object.values(ELEVENLABS_AGENT_IDS)) {
         expect(typeof value).toBe("string");
       }
+    });
+  });
+
+  describe("ELEVENLABS_API_BASE", () => {
+    it("should be the ElevenLabs v1 API base URL", () => {
+      expect(ELEVENLABS_API_BASE).toBe("https://api.elevenlabs.io/v1");
+    });
+
+    it("should not have a trailing slash", () => {
+      expect(ELEVENLABS_API_BASE.endsWith("/")).toBe(false);
     });
   });
 

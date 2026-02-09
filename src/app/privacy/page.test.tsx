@@ -1,50 +1,79 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
-import PrivacyPage, { metadata } from "./page";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import PrivacyPage from './page';
 
-describe("PrivacyPage", () => {
-  it("should export correct metadata", () => {
-    expect(metadata.title).toBe("Política de Privacidad | Paisaxe");
-    expect(metadata.description).toBe("Política de privacidad de Paisaxe");
+const mockT = vi.fn((key: string) => key);
+vi.mock('@/lib/i18n', () => ({
+  useTranslation: () => ({ t: mockT, locale: 'en', setLocale: vi.fn() }),
+}));
+
+describe('PrivacyPage', () => {
+  beforeEach(() => {
+    mockT.mockImplementation((key: string) => key);
   });
 
-  it("should render the privacy policy heading", () => {
+  it('renders the page heading', () => {
     render(<PrivacyPage />);
-    expect(screen.getByRole("heading", { level: 1, name: "Política de Privacidad" })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('privacy.title');
   });
 
-  it("should render all main sections", () => {
+  it('renders the last updated date', () => {
     render(<PrivacyPage />);
-    expect(screen.getByText("1. Información que recopilamos")).toBeInTheDocument();
-    expect(screen.getByText("2. Cómo usamos tu información")).toBeInTheDocument();
-    expect(screen.getByText("3. Servicios de terceros")).toBeInTheDocument();
-    expect(screen.getByText("4. Cookies")).toBeInTheDocument();
-    expect(screen.getByText("5. Retención de datos")).toBeInTheDocument();
-    expect(screen.getByText("6. Tus derechos")).toBeInTheDocument();
-    expect(screen.getByText("7. Seguridad")).toBeInTheDocument();
-    expect(screen.getByText("8. Cambios a esta política")).toBeInTheDocument();
-    expect(screen.getByText("9. Contacto")).toBeInTheDocument();
+    expect(screen.getByText('privacy.last_updated')).toBeInTheDocument();
   });
 
-  it("should list third-party services", () => {
+  it('renders all 9 sections', () => {
     render(<PrivacyPage />);
-    expect(screen.getByText("Supabase")).toBeInTheDocument();
-    expect(screen.getByText("Google")).toBeInTheDocument();
-    expect(screen.getByText("Stripe")).toBeInTheDocument();
-    expect(screen.getByText("Anthropic (Claude)")).toBeInTheDocument();
-    expect(screen.getByText("ElevenLabs")).toBeInTheDocument();
-    expect(screen.getByText("Twilio")).toBeInTheDocument();
+    expect(screen.getByText('privacy.section1_title')).toBeInTheDocument();
+    expect(screen.getByText('privacy.section2_title')).toBeInTheDocument();
+    expect(screen.getByText('privacy.section3_title')).toBeInTheDocument();
+    expect(screen.getByText('privacy.section4_title')).toBeInTheDocument();
+    expect(screen.getByText('privacy.section5_title')).toBeInTheDocument();
+    expect(screen.getByText('privacy.section6_title')).toBeInTheDocument();
+    expect(screen.getByText('privacy.section7_title')).toBeInTheDocument();
+    expect(screen.getByText('privacy.section8_title')).toBeInTheDocument();
+    expect(screen.getByText('privacy.section9_title')).toBeInTheDocument();
   });
 
-  it("should have a contact email link", () => {
+  it('renders third-party service names', () => {
     render(<PrivacyPage />);
-    const link = screen.getByRole("link", { name: "thecreativetoken@gmail.com" });
-    expect(link).toHaveAttribute("href", "mailto:thecreativetoken@gmail.com");
+    expect(screen.getByText('Supabase')).toBeInTheDocument();
+    expect(screen.getByText('Google')).toBeInTheDocument();
+    expect(screen.getByText('Stripe')).toBeInTheDocument();
+    expect(screen.getByText('Anthropic (Claude)')).toBeInTheDocument();
+    expect(screen.getByText('ElevenLabs')).toBeInTheDocument();
+    expect(screen.getByText('Twilio')).toBeInTheDocument();
   });
 
-  it("should render in a semantic main/article structure", () => {
+  it('has a contact email link', () => {
     render(<PrivacyPage />);
-    expect(screen.getByRole("main")).toBeInTheDocument();
-    expect(screen.getByRole("article")).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /support@paisaxe.es/ });
+    expect(link).toHaveAttribute('href', 'mailto:support@paisaxe.es');
+  });
+
+  it('renders in a semantic main structure', () => {
+    render(<PrivacyPage />);
+    expect(screen.getByRole('main')).toBeInTheDocument();
+  });
+
+  it('uses the immersive dark background', () => {
+    const { container } = render(<PrivacyPage />);
+    const outerDiv = container.firstElementChild;
+    expect(outerDiv?.className).toContain('bg-neutral-950');
+  });
+
+  it('renders a back navigation link to /immersive', () => {
+    render(<PrivacyPage />);
+    const backLink = screen.getByLabelText('privacy.back');
+    expect(backLink).toBeInTheDocument();
+    expect(backLink.closest('a')).toHaveAttribute('href', '/immersive');
+  });
+
+  it('renders footer links to terms and about pages', () => {
+    render(<PrivacyPage />);
+    const termsLink = screen.getByText('privacy.footer_terms');
+    expect(termsLink.closest('a')).toHaveAttribute('href', '/terms');
+    const aboutLink = screen.getByText('privacy.footer_about');
+    expect(aboutLink.closest('a')).toHaveAttribute('href', '/about');
   });
 });
