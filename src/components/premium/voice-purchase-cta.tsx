@@ -47,7 +47,7 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
           onClick={handlePurchase}
           className="px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-medium rounded-full hover:from-amber-400 hover:to-yellow-400 transition-all text-sm flex items-center gap-2"
         >
-          {t("premium.get_day_pass")} - \u20ac1.99
+          {t("premium.get_day_pass")} - €1.99
         </button>
       </div>
     );
@@ -98,7 +98,7 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
 
       {/* Price */}
       <div className="mb-4">
-        <span className="text-3xl font-bold text-white">\u20ac1.99</span>
+        <span className="text-3xl font-bold text-white">€1.99</span>
         <span className="text-white/60 ml-2">{t("premium.per_day")}</span>
       </div>
 

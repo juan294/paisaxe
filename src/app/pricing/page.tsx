@@ -112,10 +112,10 @@ export default function PricingPage() {
             {/* Price */}
             <div className="p-6 text-center border-b border-neutral-800">
               <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-3">
-                Voice Pass \u00b7 24h
+                Voice Pass · 24h
               </p>
               <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-semibold text-white">\u20ac1.99</span>
+                <span className="text-4xl font-semibold text-white">€1.99</span>
               </div>
             </div>
 
