@@ -254,6 +254,8 @@ export const fr: Translations = {
     success_expires: 'Votre accès est valide jusqu\'à',
     success_cta: 'Commencer à Parler',
     success_retry_hint: 'Si votre accès ne s\'affiche pas, veuillez patienter un moment et actualiser.',
+    checkout_title: 'Paiement',
+    checkout_back_to_pricing: 'Retour aux tarifs',
     pricing_title: 'Conversations Vocales',
     pricing_subtitle: 'Sans taper. Vraies réponses. Vraies réservations.',
     pricing_cta: 'Obtenir un Pass Jour',

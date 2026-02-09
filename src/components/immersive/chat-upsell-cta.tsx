@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Cloud, Phone, Clock, Zap, X, Loader2 } from "lucide-react";
+import { Cloud, Phone, Clock, Zap, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTranslation } from "@/lib/i18n";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { UpsellReason } from "@/lib/chat-upsell-detection";
 
@@ -31,36 +31,18 @@ const REASON_ICONS: Record<UpsellReason, typeof Cloud> = {
 export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAProps) {
   const { user, session, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
-  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+  const router = useRouter();
 
   const Icon = REASON_ICONS[reason];
 
-  const handlePurchase = async () => {
+  const handlePurchase = () => {
     if (!user || !session) {
       signInWithGoogle();
       return;
     }
 
-    setIsCheckoutLoading(true);
-
-    try {
-      const response = await fetch("/api/checkout/day-pass", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create checkout session");
-      }
-
-      const { url } = await response.json();
-      window.location.href = url;
-    } catch (error) {
-      console.error("[chat-upsell-cta] Checkout error:", error);
-      setIsCheckoutLoading(false);
-    }
+    // Navigate to embedded checkout page
+    router.push("/pricing/checkout");
   };
 
   return (
@@ -91,18 +73,15 @@ export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAPro
           {/* CTA Button */}
           <button
             onClick={handlePurchase}
-            disabled={isCheckoutLoading}
             className={cn(
               "mt-2.5 px-4 py-1.5 text-xs font-medium rounded-full",
               "bg-gradient-to-r from-amber-500 to-yellow-500 text-black",
               "hover:from-amber-400 hover:to-yellow-400",
               "transition-all duration-200",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
               "flex items-center gap-1.5"
             )}
           >
-            {isCheckoutLoading && <Loader2 className="h-3 w-3 animate-spin" />}
-            {t("upsell.try_voice")} - €1.99
+            {t("upsell.try_voice")} - \u20ac1.99
           </button>
         </div>
 

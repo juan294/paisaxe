@@ -261,6 +261,8 @@ export const en: Translations = {
     success_expires: 'Your access is valid until',
     success_cta: 'Start Talking',
     success_retry_hint: 'If your access is not showing, please wait a moment and refresh.',
+    checkout_title: 'Checkout',
+    checkout_back_to_pricing: 'Back to pricing',
     pricing_title: 'Voice Conversations',
     pricing_subtitle: 'No typing. Real answers. Real reservations.',
     pricing_cta: 'Get Day Pass',

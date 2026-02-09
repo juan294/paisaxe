@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTranslation } from "@/lib/i18n";
-import { Mic, Clock, Sparkles, MapPin, Phone, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Mic, Clock, Sparkles, MapPin, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VoicePurchaseCTAProps {
@@ -16,40 +16,24 @@ interface VoicePurchaseCTAProps {
 
 /**
  * Call-to-action component for voice pass purchase.
- * Shows pricing and redirects to Stripe checkout.
+ * Navigates to embedded checkout page on paisaxe.es.
  */
 export function VoicePurchaseCTA({ compact = false, returnTo, className }: VoicePurchaseCTAProps) {
   const { user, session, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
-  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+  const router = useRouter();
 
-  const handlePurchase = async () => {
+  const handlePurchase = () => {
     if (!user || !session) {
       signInWithGoogle();
       return;
     }
 
-    setIsCheckoutLoading(true);
-
-    try {
-      const response = await fetch("/api/checkout/day-pass", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ...(returnTo ? { returnTo } : {}) }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create checkout session");
-      }
-
-      const { url } = await response.json();
-      window.location.href = url;
-    } catch (error) {
-      console.error("[voice-purchase-cta] Checkout error:", error);
-      setIsCheckoutLoading(false);
-    }
+    // Navigate to embedded checkout page
+    const checkoutUrl = returnTo
+      ? `/pricing/checkout?returnTo=${returnTo}`
+      : "/pricing/checkout";
+    router.push(checkoutUrl);
   };
 
   if (compact) {
@@ -61,11 +45,9 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
         </div>
         <button
           onClick={handlePurchase}
-          disabled={isCheckoutLoading}
-          className="px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-medium rounded-full hover:from-amber-400 hover:to-yellow-400 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-medium rounded-full hover:from-amber-400 hover:to-yellow-400 transition-all text-sm flex items-center gap-2"
         >
-          {isCheckoutLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-          {t("premium.get_day_pass")} - €1.99
+          {t("premium.get_day_pass")} - \u20ac1.99
         </button>
       </div>
     );
@@ -116,17 +98,15 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
 
       {/* Price */}
       <div className="mb-4">
-        <span className="text-3xl font-bold text-white">€1.99</span>
+        <span className="text-3xl font-bold text-white">\u20ac1.99</span>
         <span className="text-white/60 ml-2">{t("premium.per_day")}</span>
       </div>
 
       {/* CTA Button */}
       <button
         onClick={handlePurchase}
-        disabled={isCheckoutLoading}
-        className="w-full max-w-xs px-6 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-semibold rounded-full hover:from-amber-400 hover:to-yellow-400 transition-all shadow-lg shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full max-w-xs px-6 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-semibold rounded-full hover:from-amber-400 hover:to-yellow-400 transition-all shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2"
       >
-        {isCheckoutLoading && <Loader2 className="h-4 w-4 animate-spin" />}
         {user ? t("premium.get_day_pass") : t("premium.sign_in_to_purchase")}
       </button>
 

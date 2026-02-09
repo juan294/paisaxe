@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ChatUpsellCTA } from "./chat-upsell-cta";
 import { createMockT } from "@/test/i18n-mock";
@@ -28,6 +28,19 @@ vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => mockAuthValues,
 }));
 
+// Mock next/navigation
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}));
+
 describe("ChatUpsellCTA", () => {
   const defaultProps = {
     reason: "weather" as const,
@@ -36,9 +49,9 @@ describe("ChatUpsellCTA", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPush.mockReset();
     mockAuthValues.user = null;
     mockAuthValues.session = null;
-    global.fetch = vi.fn();
   });
 
   it("renders the upsell CTA with reason-specific messaging", () => {
@@ -73,63 +86,16 @@ describe("ChatUpsellCTA", () => {
     expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
   });
 
-  it("initiates checkout when user is logged in", async () => {
+  it("navigates to embedded checkout when user is logged in", async () => {
     mockAuthValues.user = { id: "user-1", email: "test@example.com" };
     mockAuthValues.session = { access_token: "token-123" };
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ url: "https://checkout.stripe.com/session" }),
-    });
-    global.fetch = mockFetch;
-
-    const user = userEvent.setup();
-    render(<ChatUpsellCTA {...defaultProps} />);
-
-    // Mock window.location
-    const originalLocation = window.location;
-    Object.defineProperty(window, "location", {
-      value: { ...originalLocation, href: "" },
-      writable: true,
-      configurable: true,
-    });
-
-    await user.click(screen.getByRole("button", { name: /1\.99/ }));
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith("/api/checkout/day-pass", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-    });
-
-    Object.defineProperty(window, "location", {
-      value: originalLocation,
-      writable: true,
-      configurable: true,
-    });
-  });
-
-  it("handles checkout error gracefully", async () => {
-    mockAuthValues.user = { id: "user-1", email: "test@example.com" };
-    mockAuthValues.session = { access_token: "token-123" };
-
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-    });
-
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const user = userEvent.setup();
     render(<ChatUpsellCTA {...defaultProps} />);
 
     await user.click(screen.getByRole("button", { name: /1\.99/ }));
 
-    await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalled();
-    });
-
-    consoleSpy.mockRestore();
+    expect(mockPush).toHaveBeenCalledWith("/pricing/checkout");
   });
 
   it("renders with different upsell reasons", () => {
