@@ -3,6 +3,7 @@
 import {
   createContext,
   useState,
+  useEffect,
   useCallback,
   useMemo,
   type ReactNode,
@@ -10,15 +11,33 @@ import {
 import type { Locale } from './types';
 import { es } from './es';
 import { en } from './en';
-import { fr } from './fr';
-import { de } from './de';
-import { pt } from './pt';
-import { ast } from './ast';
 import { resolveTranslation } from './resolve';
 import { resolveLocale, storeLocale } from './detect-language';
 import type { Translations } from './types';
 
-const locales: Record<Locale, Translations> = { es, en, fr, de, pt, ast };
+// Module-level cache — es and en are always available (static imports)
+const translationCache = new Map<Locale, Translations>();
+translationCache.set('es', es);
+translationCache.set('en', en);
+
+// Lazy loaders for other locales (~14KB each, loaded on demand)
+const localeLoaders: Record<Locale, () => Promise<Translations>> = {
+  es: () => Promise.resolve(es),
+  en: () => Promise.resolve(en),
+  fr: () => import('./fr').then(m => m.fr),
+  de: () => import('./de').then(m => m.de),
+  pt: () => import('./pt').then(m => m.pt),
+  ast: () => import('./ast').then(m => m.ast),
+};
+
+/** Reset cache to only static locales. Test-only. */
+export function _resetTranslationCacheForTesting(): void {
+  const keep = new Map<Locale, Translations>();
+  keep.set('es', es);
+  keep.set('en', en);
+  translationCache.clear();
+  for (const [k, v] of keep) translationCache.set(k, v);
+}
 
 export interface LanguageContextValue {
   locale: Locale;
@@ -39,6 +58,19 @@ export function LanguageProvider({ children, initialLocale }: LanguageProviderPr
     if (typeof window === 'undefined') return initialLocale ?? 'es';
     return initialLocale ?? resolveLocale();
   });
+  const [loadGeneration, setLoadGeneration] = useState(0);
+
+  // Load translations for the current locale if not cached
+  useEffect(() => {
+    if (translationCache.has(locale)) return;
+    let cancelled = false;
+    localeLoaders[locale]().then(translations => {
+      if (cancelled) return;
+      translationCache.set(locale, translations);
+      setLoadGeneration(n => n + 1);
+    });
+    return () => { cancelled = true; };
+  }, [locale]);
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);
@@ -47,9 +79,11 @@ export function LanguageProvider({ children, initialLocale }: LanguageProviderPr
 
   const t = useCallback(
     (key: string): string => {
-      return resolveTranslation(key, locales[locale]);
+      const translations = translationCache.get(locale) ?? es;
+      return resolveTranslation(key, translations);
     },
-    [locale]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locale, loadGeneration]
   );
 
   const value = useMemo<LanguageContextValue>(
