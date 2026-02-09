@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
+import { promises as fs } from "fs";
+import pathModule from "path";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { SERVICE_REGISTRY } from "@/config/service-registry";
 import {
@@ -60,6 +62,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     const markdownReport = generateReport(result);
+
+    // Persist report to disk so the agents-summary API can read it
+    const reportPath = pathModule.join(
+      process.cwd(),
+      "docs/agents/subscription-optimizer-report.md"
+    );
+    try {
+      await fs.writeFile(reportPath, markdownReport, "utf-8");
+    } catch {
+      // Serverless environments may not have write access — continue gracefully
+    }
 
     // Count actionable items (anything other than "keep")
     const actionableCount = result.recommendations.filter(
