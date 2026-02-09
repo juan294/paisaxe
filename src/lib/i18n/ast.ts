@@ -295,6 +295,10 @@ export const ast: Translations = {
     not_found_description: 'La páxina que buses nun esiste o foi movida.',
     immersive_title: 'Nun se pudo cargar la esperiencia',
     immersive_description: 'Algo falló al cargar les histories. Inténtalo otra vuelta.',
+    favorites_title: 'Nun se pudieron cargar los tos guardaos',
+    favorites_description: 'Hebo un error. Inténtalo otra vuelta.',
+    admin_title: 'Error nel panel d\'alministración',
+    admin_description: 'Hebo un error inesperáu. Por favor, inténtalo otra vuelta.',
   },
 
   footer: {
