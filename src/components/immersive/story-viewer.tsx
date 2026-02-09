@@ -565,7 +565,7 @@ export function StoryViewer({
       </div>
 
       {/* "Made by" pill with vertical popover — desktop only */}
-      <AuthorTypewriter prefersReducedMotion={prefersReducedMotion} t={t} />
+      <AuthorTypewriter prefersReducedMotion={prefersReducedMotion} t={t} visible={showInfo} />
 
       {/* First-visit navigation hint for mobile users */}
       <NavigationHint />
