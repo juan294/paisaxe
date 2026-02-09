@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     return auth.error;
   }
 
-  const apiKey = process.env.ELEVENLABS_API_KEY;
+  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
 
   if (!apiKey) {
     console.error("Missing ELEVENLABS_API_KEY");

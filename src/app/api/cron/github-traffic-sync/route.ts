@@ -53,28 +53,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const secret = request.headers.get("x-webhook-secret");
   const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
 
-  let isAuthorized = false;
-
   // Check webhook secret first (for pg_cron calls)
-  if (
-    secret &&
-    expectedSecret &&
+  const hasValidSecret =
+    !!secret &&
+    !!expectedSecret &&
     secret.length === expectedSecret.length &&
-    timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret))
-  ) {
-    isAuthorized = true;
-  }
+    timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
 
   // Fallback: check admin session (for manual sync from admin panel)
-  if (!isAuthorized) {
+  if (!hasValidSecret) {
     const auth = await validateAdminAuth();
-    if (auth.valid) {
-      isAuthorized = true;
+    if (!auth.valid) {
+      return auth.error;
     }
-  }
-
-  if (!isAuthorized) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const githubToken = process.env.GITHUB_TOKEN?.trim();
