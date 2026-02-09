@@ -1,0 +1,71 @@
+name: Feature Request
+description: Propose new functionality for Paisaxe
+labels: ["type: feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the feature you'd like to see in Paisaxe.
+
+  - type: textarea
+    id: user-story
+    attributes:
+      label: User Story
+      description: Who benefits and what do they get?
+      placeholder: "As a [visitor/admin], I want [feature] so that [benefit]."
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Detailed description of the feature.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: How do we know when this is done?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the system does this belong to?
+      options:
+        - Chat (text chat, RAG, Claude API)
+        - Voice (ElevenLabs, Pelayo)
+        - Payments (Stripe, day pass)
+        - Admin (dashboard, analytics)
+        - Content (PDFs, embeddings, stories)
+        - Infrastructure (CI, Vercel, Supabase)
+        - Marketing (SEO, social media)
+        - Authentication (login, OAuth)
+        - UX (design, accessibility)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this?
+      options:
+        - High (core to the product)
+        - Medium (valuable improvement)
+        - Low (nice to have)
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any other approaches you've thought about?

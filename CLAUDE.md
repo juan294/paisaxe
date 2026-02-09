@@ -368,6 +368,33 @@ Only ask for manual intervention when genuinely required (OAuth consent, billing
 
 Agent autonomy applies to **development work on `develop`**. Production is user-controlled.
 
+## Issue Tracking (GitHub Issues)
+
+**GitHub Issues is the single source of truth for all planned work.** See @docs/project/issue-workflow.md for the full workflow.
+
+### Quick Reference
+
+Every issue gets **one type label** + **one priority label** + **area label(s)**:
+
+- **Type**: `type: bug`, `type: feature`, `type: enhancement`, `type: chore`, `type: security`, `type: docs`
+- **Priority**: `priority: critical`, `priority: high`, `priority: medium`, `priority: low`
+- **Area**: `area: chat`, `area: voice`, `area: payments`, `area: admin`, `area: content`, `area: infra`, `area: marketing`, `area: auth`, `area: ux`
+
+### Agent Rules for Issues
+
+1. **Discover work → create an issue.** If you find a bug or needed improvement while working, create a GitHub issue to track it.
+2. **Reference issues in commits.** Use `Fixes #N` or `Refs #N` in commit messages.
+3. **Don't close issues prematurely.** Issues stay open until the fix is live on `main` (production).
+4. **Use the CLI:**
+   ```bash
+   # Create an issue
+   gh issue create --title "Chat: timeout on long queries" --label "type: bug,priority: high,area: chat"
+
+   # List open issues by priority
+   gh issue list --label "priority: critical"
+   gh issue list --label "priority: high"
+   ```
+
 ## Content Categories
 
 From 37 PDFs in `content/pdfs/`:
