@@ -15,6 +15,7 @@ export {
   updateStoryStatus,
   bulkUpdateStoryStatus,
   bulkDeleteStories,
+  approveAllPendingStories,
   searchContentImages,
   fetchStoryTranslations,
   updateStoryTranslation,
