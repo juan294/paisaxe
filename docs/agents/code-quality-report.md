@@ -1,178 +1,156 @@
 # Code Quality Report
 
-> Generated on 2026-02-09
-> **Status: ALL ITEMS RESOLVED** (2026-02-09)
+> Generated on 2026-02-09 (post-embedded-checkout, content-discovery, subscription-optimizer, legal-i18n)
 
 ## Summary
 
-| Category | Found | Resolved | Status |
-|----------|-------|----------|--------|
-| Dead code items | 1 | 1 | DONE |
-| Pattern violations | 27 | 27 | DONE |
-| Complexity hotspots | 34 | 12 critical resolved | DONE |
-
-**Overall:** The codebase is exceptionally clean on dead code (Knip reports zero issues, zero unused dependencies, zero TODO/FIXME). All critical pattern violations and complexity hotspots have been addressed.
-
----
+- Dead code items found: **17** (11 barrel re-exports, 5 dead type re-exports, 1 commented-out import)
+- Pattern violations: **6** duplicated logic patterns
+- Complexity hotspots: **7** monolith components, **27** files over 300 lines
 
 ## Dead Code
 
-**Knip reports zero issues** — all exports, files, and dependencies are accounted for.
+### Unused Barrel Exports — `src/components/admin/marketing-dashboard/index.ts`
+11 re-exports that are never imported externally. Only `MarketingDashboard` is used outside the module.
 
-| Item | File | Action | Status |
-|------|------|--------|--------|
-| `PELAYO_SYSTEM_PROMPT` (deprecated) | `src/lib/chat-config.ts` | Removed export and backward-compat test | RESOLVED (`447eb30`) |
+**Fix:** Remove lines 2-14, keep only the `MarketingDashboard` export.
 
-- Commented-out code: 0
-- TODO/FIXME/HACK: 0
-- Unused CSS classes: 0
-- Unused dependencies: 0
-- ESLint suppressions: 20 (all justified — test mocks, iOS compat, intentional deps)
+Exports to remove: `AccountCard`, `AccountConfigDialog`, `PostRow`, `StatCard`, `DraftsPanel`, `CreateDraftDialog`, `PLATFORM_BADGES`, `PLATFORM_NAMES`, `PLATFORM_CREDENTIALS`, `DAY_NAMES`, `statColorClasses`.
 
----
+### Dead Type Re-exports — `src/components/admin/story-editor-dialog/types.ts:53`
+5 types re-exported but consumers import from canonical locations (`@/types/admin`, `@/types/immersive`):
+`CurationStatus`, `ContentImage`, `StoryCategory`, `StoryLocation`, `StoryDuration`.
+
+**Fix:** Remove the re-export line.
+
+### Same-file-only Exported Types (7 items, style issue)
+Types exported but only used within the same file. Low impact — remove `export` or keep for API documentation:
+- `UseStoryFiltersReturn` in `src/hooks/use-story-filters.ts:4`
+- `ChatActionsResult` in `src/lib/chat-action-detection.ts:22`
+- `TopicRelevance` in `src/lib/chat-safety.ts:13`
+- `UpsellDetectionResult` in `src/lib/chat-upsell-detection.ts:13`
+- `SendEmailOptions` in `src/lib/email.ts:19`
+- `SendSMSResult` in `src/lib/twilio-sms.ts:25`
+- `ValidationResult` in `src/lib/validation.ts:16`
+
+### Commented-Out Code (1 instance)
+- `src/components/immersive/author-typewriter.test.tsx:5-6` — commented-out import with explanation. Tests use dynamic `await import()` instead. Safe to remove both lines.
+
+### Stale TODOs
+**None.** Only 1 TODO found (`next.config.ts:59` — CSP nonce migration) and it's 1 day old.
+
+### Unused Files / Dependencies
+**None.** Codebase is clean.
 
 ## Pattern Violations
 
-### Duplicated Logic — RESOLVED
+### 1. Duplicated `getClientIp` / IP Extraction (5 files)
+IP address extraction logic duplicated with slight variations:
+- `src/app/api/chat/route.ts:44` — basic `x-forwarded-for` only
+- `src/app/api/chat/stream/route.ts:31` — same basic pattern
+- `src/app/api/suggestions/route.ts:14-16` — adds `x-real-ip` fallback
+- `src/app/api/mcp/weather/route.ts:125-131` — full `getClientIp` function
+- `src/app/api/mcp/places/route.ts:275-281` — identical `getClientIp` function
 
-`getSupabaseClient()` and `getUserFromRequest()` extracted into `src/lib/supabase-auth.ts` (shared module with 8 unit tests).
+**Fix:** Extract to `src/lib/request-utils.ts` with `x-real-ip` fallback included.
 
-Updated route files:
-- `src/app/api/favorites/route.ts` — uses shared auth import
-- `src/app/api/suggestions/route.ts` — uses shared auth import
-- `src/app/api/voice-access/route.ts` — uses shared auth import
-- `src/app/api/checkout/day-pass/route.ts` — uses shared auth import
+### 2. Supabase Admin Client — 3 Different Creation Patterns (4 files)
+- Canonical: `createAdminClient()` from `src/lib/supabase.ts`
+- Custom: `getSupabaseAdmin()` in `src/lib/costs/manual-costs.ts:11-20`
+- Inline: Direct `createClient()` in `src/app/api/admin/github-analytics/route.ts:26`, `src/app/api/cron/github-traffic-sync/route.ts:88`, `src/app/api/cron/content-discovery/route.ts:64`
 
-**Commit:** `447eb30` (auth-cleanup agent)
+**Fix:** Consolidate all to use `createAdminClient()` from `supabase.ts`.
 
-### Auth Pattern Inconsistencies — RESOLVED
+### 3. `formatForHogQL` Duplicated (2 files)
+- `src/app/api/admin/analytics/route.ts:75`
+- `src/app/api/admin/costs-analytics/route.ts:211`
 
-| Route | Fix |
-|-------|-----|
-| `/api/admin/tunnel/route.ts` | Standardized error handling with shared `validateAdminAuth()` pattern |
-| `/api/cron/github-traffic-sync/route.ts` | Standardized error handling |
+**Fix:** Extract to `src/lib/posthog-query.ts` (which already exists).
 
-**Commit:** `447eb30`
+### 4. `ELEVENLABS_API_BASE` Duplicated (2 files)
+- `src/app/api/admin/elevenlabs-analytics/route.ts:12`
+- `src/app/api/admin/costs-analytics/route.ts:180`
 
-### Missing `.trim()` on Environment Variables — RESOLVED
+**Fix:** Extract to `src/config/elevenlabs-agents.ts` or a shared constants file.
 
-All 5 files updated:
+### 5. `VALID_CATEGORIES` Duplicated (2 files)
+- `src/app/api/admin/stories/route.ts:12-18`
+- `src/app/api/admin/stories/[id]/route.ts:6-12`
 
-- `src/app/api/admin/elevenlabs-analytics/route.ts` — `ELEVENLABS_API_KEY.trim()`
-- `src/app/api/webhooks/supabase/route.ts` — `WEBHOOK_SECRET.trim()`
-- `src/app/api/webhooks/translate/route.ts` — `WEBHOOK_SECRET.trim()`
-- `src/app/api/checkout/day-pass/route.ts` — `STRIPE_SECRET_KEY.trim()`, `STRIPE_DAY_PASS_PRICE_ID.trim()`
-- `src/app/api/feature-flags/route.ts` — `NEXT_PUBLIC_SUPABASE_ANON_KEY.trim()`
+**Fix:** Export from `@/types/immersive` alongside the existing `StoryCategory` type.
 
-**Commit:** `447eb30`
+### 6. Minor: Relative Import in Same-Directory File
+- `src/lib/posting-service.ts:9` uses `./supabase` while other lib files use `@/lib/supabase`
 
-### Error Response Wrapping (Minor)
+**Fix:** Change to `@/lib/supabase` for consistency.
 
-Some public routes return flat responses (`json(storyIds)`) while admin routes wrap in `{ data: ... }`. Not a bug, but undocumented. **Deferred** — low impact, tracked for future standardization.
-
-### TypeScript Strictness
-
-| Pattern | Count | Assessment |
-|---------|-------|------------|
-| `as any` in production | 1 (`fullscreen-button.tsx` — iOS standalone check) | Acceptable, no typed alternative |
-| `as any` in tests | 16 | Acceptable for mock flexibility |
-| `@ts-ignore` / `@ts-expect-error` | 0 | Excellent |
-| Non-null assertions (`!`) on env vars | **Reduced** — shared `getSupabaseClient()` centralizes env var access | Improved |
-
----
+### Patterns That Are Clean
+- **Naming conventions**: All consistent (PascalCase components, camelCase utils, kebab-case files)
+- **Auth patterns**: 3 distinct patterns (admin, user, MCP) all used correctly and consistently
+- **Component structure**: Consistent `"use client"` → imports → types → component → export
+- **TypeScript strictness**: Excellent — zero `: any` in code, zero `@ts-ignore`, non-null assertions only in tests
+- **Error response format**: All API routes return `{ error: "message" }` consistently
+- **Import aliases**: `@/` used consistently for cross-directory imports
 
 ## Complexity Hotspots
 
-### Critical Files (>800 lines) — ALL RESOLVED
+### Monolith Components (7 components needing decomposition)
 
-| File | Original Lines | Resolution | New Structure | Commit |
-|------|---------------|------------|---------------|--------|
-| `costs-analytics-panel.tsx` | 1498 | Split into directory | `costs-analytics-panel/` (7 files: index, chart, modals, forecast, alerts, skeletons, types) | `4b64843` |
-| `story-editor-dialog.tsx` | 1154 | Split into directory | `story-editor-dialog/` (6 files: index, details-tab, image-tab, types, use-story-editor-state, use-story-editor-save) | `4222e3a` |
-| `marketing-dashboard.tsx` | 1096 | Split into directory | `marketing-dashboard/` (9 files: index, dashboard, account-card, account-config-dialog, post-row, stat-card, drafts-panel, create-draft-dialog, constants) | `aba72d5` |
-| `admin-api.ts` | 892 | Split into directory | `admin-api/` (7 files: index, stories, analytics, feature-flags, suggestions, costs, agents) | `0c04780` |
-| `agents-dashboard.tsx` | 835 | Split into directory | `agents-dashboard/` (10 files: index, constants, markdown, use-agent-runner, use-agent-terminal, agent-card, terminal-display, overall-health-banner, cross-agent-insights, activity-item) | `698acf5` |
+| Component | Lines | useState | Key Problem |
+|-----------|-------|----------|-------------|
+| `ImageEditorDialog` | 636 | 14 | 3 tabs, fullscreen, drag-drop, search — all in one component |
+| `AdminPageContent` | 591 | 14 | Auth, routing, CRUD, bulk ops, search, 6 tab panels |
+| `StoryViewer` | 519 | 5 | Navigation, gestures, filters, toolbar, related stories |
+| `VoiceAgentChat` | 431 | 10 | WebSocket lifecycle + message streaming + UI rendering |
+| `SuggestionsPanel` | 403 | 9 | CRUD + pagination + filtering + status management |
+| `CreateStoryDialog` | 394 | 14 | Multi-step form + image handling + validation |
+| `FeatureTogglesPanel` | 336 | 9 | Feature flag CRUD + environment switching |
 
-**Pattern used:** Barrel re-export via `index.ts` in each directory. All 25+ import sites across the codebase continue working with zero consumer changes.
+### Prop Drilling (systemic issue)
+State extracted to parent but drilled down through excessive props:
+- `ImageTab`: **25 props** — worst case
+- `DetailsTab`: **20 props**
+- `StoryViewer`: **14 props**
 
-### Critical Functions (>300 lines) — PARTIALLY RESOLVED
+**Root cause:** Components were partially decomposed (UI extracted) but state stayed in the parent, creating massive prop lists instead of using Context or composition.
 
-| File | Function | Lines | Status | Resolution |
-|------|----------|-------|--------|------------|
-| `story-editor-dialog.tsx` | `StoryEditorDialog` | 1046 | RESOLVED | Extracted `DetailsTab`, `ImageTab`, `useStoryEditorState()`, `useStoryEditorSave()` |
-| `voice-chat.tsx` | `VoiceChat` | 460 | RESOLVED | Extracted `useStreamChat()` hook (22 new tests) — commit `e6d2438` |
-| `agents-dashboard.tsx` | `AgentsDashboardInner` | 351 | RESOLVED | Extracted `useAgentTerminal()`, `useAgentRunner()` hooks + sub-components |
-| `story-viewer.tsx` | `StoryViewer` | 567 | DEFERRED | Typewriter already extracted (P1 perf optimization). Further splitting low priority. |
-| `admin/page.tsx` | `AdminPageContent` | 510 | DEFERRED | Low impact — orchestration component, complexity is inherent |
-| `voice-agent-chat.tsx` | `VoiceAgentChat` | 430 | DEFERRED | Low impact — single-purpose admin component |
-| `admin/analytics/route.ts` | `GET` | 375 | DEFERRED | Server-only, no client impact |
+### Deep Nesting (worst offenders)
+- **5 levels**: `src/lib/claude.ts:116` — curl process callback chain for SSE parsing
+- **4 levels**: `src/lib/costs/tier-alerts.ts:73`, `src/lib/claude.ts:123`, `image-editor-dialog.tsx:173`
 
-### Deep Nesting & Parameter Counts
+### Large Files (top 5)
+| Lines | File | Description |
+|-------|------|-------------|
+| 814 | `admin/page.tsx` | Admin page monolith |
+| 811 | `visitors-analytics-panel.tsx` | Visitors analytics |
+| 696 | `stripe-analytics-panel.tsx` | Stripe analytics |
+| 681 | `image-editor-dialog.tsx` | Image editor |
+| 574 | `story-viewer.tsx` | Story viewer |
 
-- **Deep nesting (3+ levels):** 4 instances, all acceptable (stream processing, modal handlers)
-- **Functions with >4 params:** 4 instances, all using destructured props (idiomatic React)
-- **`StoryViewer` takes 13 props** — partially addressed by typewriter extraction; further decomposition deferred
+### Long Functions (top 5)
+| Lines | Function | File |
+|-------|----------|------|
+| 636 | `ImageEditorDialog` | `image-editor-dialog.tsx` |
+| 591 | `AdminPageContent` | `admin/page.tsx` |
+| 519 | `StoryViewer` | `story-viewer.tsx` |
+| 431 | `VoiceAgentChat` | `voice-agent-chat.tsx` |
+| 403 | `SuggestionsPanel` | `suggestions-panel.tsx` |
 
----
+## Recommended Actions
 
-## Recommended Actions — Resolution Status
+### Top 5 Most Impactful Improvements (ordered by effort-to-impact ratio)
 
-### 1. Extract shared auth module — RESOLVED
-- **Commit:** `447eb30`
-- **Files created:** `src/lib/supabase-auth.ts`, `src/lib/supabase-auth.test.ts` (8 tests)
-- **Files updated:** 4 API route files now use shared imports
-- **Impact:** Eliminated ~120 LOC of duplication, centralized env var handling
+1. **Extract `getClientIp` to shared utility** — Touches 5 files, eliminates inconsistent IP extraction, 15 min fix.
 
-### 2. Add `.trim()` to env vars — RESOLVED
-- **Commit:** `447eb30`
-- **Files updated:** 5 API route files
-- **Impact:** All env vars now `.trim()`'d per project convention
+2. **Consolidate Supabase admin client** — 4 files creating their own client. Change to `createAdminClient()` from `supabase.ts`. 20 min fix.
 
-### 3. Split `costs-analytics-panel.tsx` — RESOLVED
-- **Commit:** `4b64843`
-- **New structure:** `costs-analytics-panel/` directory with 7 files
-- **Impact:** 1498 → max ~400 lines per file
+3. **Clean up barrel exports** — Remove 11 dead re-exports from marketing-dashboard/index.ts and 5 dead type re-exports. 5 min fix.
 
-### 4. Split `StoryEditorDialog` — RESOLVED
-- **Commit:** `4222e3a`
-- **New structure:** `story-editor-dialog/` directory with 6 files
-- **Impact:** 1154 → max ~350 lines per file, hooks independently testable
+4. **Extract shared constants** — `formatForHogQL`, `ELEVENLABS_API_BASE`, `VALID_CATEGORIES` duplicated across files. 15 min fix.
 
-### 5. Extract `useStreamChat()` hook — RESOLVED
-- **Commit:** `e6d2438`
-- **Files created:** `src/hooks/use-stream-chat.ts`, `src/hooks/use-stream-chat.test.ts` (22 tests)
-- **Impact:** VoiceChat reduced by ~179 lines, SSE logic independently testable
+5. **Decompose `ImageEditorDialog`** — Largest complexity hotspot. Extract `useImageEditor` hook and have `ImageTab` consume it via context instead of 25 props. 1-2 hour refactor, but eliminates the worst prop drilling and the largest monolith in the codebase.
 
-### Additional work completed (beyond original 5 recommendations):
-
-### 6. Split `marketing-dashboard.tsx` — RESOLVED
-- **Commit:** `aba72d5`
-- **New structure:** `marketing-dashboard/` directory with 9 files
-- **Impact:** 1096 → max ~300 lines per file
-
-### 7. Split `agents-dashboard.tsx` — RESOLVED
-- **Commit:** `698acf5`
-- **New structure:** `agents-dashboard/` directory with 10 files
-- **Impact:** 835 → max ~200 lines per file, hooks independently testable
-
-### 8. Split `admin-api.ts` — RESOLVED
-- **Commit:** `0c04780`
-- **New structure:** `admin-api/` directory with 7 files (stories, analytics, feature-flags, suggestions, costs, agents + barrel index)
-- **Impact:** 892 → max ~370 lines per file, 33 functions organized by domain
-
----
-
-## Test Impact
-
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| Total tests | 3185 | 3230 | +45 |
-| Test files | ~216 | 218 | +2 |
-| New test files | — | `supabase-auth.test.ts`, `use-stream-chat.test.ts` | — |
-
-All 3230 tests passing. TypeScript clean. Lint clean.
-
----
-
-*Report generated by Code Quality Agent — Updated: 2026-02-09*
-*All critical items resolved in commits: `447eb30`, `4b64843`, `4222e3a`, `aba72d5`, `698acf5`, `e6d2438`, `0c04780`*
+### Not Recommended Right Now
+- Decomposing analytics panels (they're large but read-only dashboards — complexity is inherent)
+- Refactoring `claude.ts` nesting (inherent to callback-based streaming APIs)
+- Removing same-file-only exports (purely cosmetic)
