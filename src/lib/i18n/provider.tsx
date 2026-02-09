@@ -3,7 +3,6 @@
 import {
   createContext,
   useState,
-  useEffect,
   useCallback,
   useMemo,
   type ReactNode,
@@ -36,17 +35,10 @@ interface LanguageProviderProps {
 }
 
 export function LanguageProvider({ children, initialLocale }: LanguageProviderProps) {
-  const [locale, setLocaleState] = useState<Locale>(initialLocale ?? 'es');
-  const [initialized, setInitialized] = useState(!!initialLocale);
-
-  // Detect browser language on mount (client-side only)
-  useEffect(() => {
-    if (!initialLocale) {
-      const detected = resolveLocale();
-      setLocaleState(detected);
-      setInitialized(true);
-    }
-  }, [initialLocale]);
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    if (typeof window === 'undefined') return initialLocale ?? 'es';
+    return initialLocale ?? resolveLocale();
+  });
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);
@@ -64,12 +56,6 @@ export function LanguageProvider({ children, initialLocale }: LanguageProviderPr
     () => ({ locale, setLocale, t }),
     [locale, setLocale, t]
   );
-
-  // Avoid rendering children with wrong locale before detection completes
-  // This prevents a flash of Spanish content for English users
-  if (!initialized) {
-    return null;
-  }
 
   return (
     <LanguageContext.Provider value={value}>
