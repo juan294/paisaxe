@@ -160,7 +160,7 @@ function AgentsDashboardInner() {
               <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
                 {agentFlags.map((flag) => {
                   const isExpanded = expandedKey === flag.flagKey;
-                  const isIndividualAgent = flag.flagKey.endsWith("_agent_enabled");
+                  const isIndividualAgent = flag.flagKey !== "automated_agents";
                   return (
                     <tr key={flag.flagKey} className={cn(flag.enabled && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
                       <td className="py-4 pl-5 align-top">
