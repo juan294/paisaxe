@@ -11,12 +11,16 @@ export function AgentCard({
   lastRunResult,
   onRun,
   onStop,
+  onClick,
+  hideStop,
 }: {
   agent: AgentStatus;
   isRunning: boolean;
   lastRunResult?: { status: "success" | "error" | "stopped"; time: string };
   onRun: () => void;
   onStop: () => void;
+  onClick?: () => void;
+  hideStop?: boolean;
 }) {
   // Determine what to show: running state > recent run result > report data
   const showLastRun = lastRunResult && !isRunning;
@@ -43,7 +47,16 @@ export function AgentCard({
   const timeText = showLastRun ? relativeTime(lastRunResult.time) : relativeTime(agent.lastRun);
 
   return (
-    <div className="rounded-2xl bg-white p-5 dark:bg-[#252320]">
+    <div
+      className={cn(
+        "rounded-2xl bg-white p-5 dark:bg-[#252320]",
+        onClick && "cursor-pointer transition-colors hover:bg-[#fafaf8] dark:hover:bg-[#2a2724]"
+      )}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+    >
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
@@ -54,9 +67,9 @@ export function AgentCard({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isRunning ? (
+          {isRunning && !hideStop ? (
             <button
-              onClick={onStop}
+              onClick={(e) => { e.stopPropagation(); onStop(); }}
               className="rounded-full p-1 text-[#c97a7a] transition-colors hover:bg-[#c97a7a]/10"
               aria-label={`Stop ${agent.name}`}
             >
@@ -64,7 +77,7 @@ export function AgentCard({
             </button>
           ) : (
             <button
-              onClick={onRun}
+              onClick={(e) => { e.stopPropagation(); onRun(); }}
               className="rounded-full p-1 text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
               aria-label={`Run ${agent.name}`}
             >
