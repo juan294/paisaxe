@@ -307,6 +307,23 @@ export const ast: Translations = {
     saved_places: 'Guardaos',
   },
 
+
+  about: {
+    title: 'Tocante a Paisaxe',
+    tagline: 'Mira. Entruga. Descubre.',
+    back: 'Tornar',
+    what_title: 'Qué ye Paisaxe',
+    what_description: 'Paisaxe ye una esperiencia turística inmersiva pa Asturies, nel norte d\'España. Guíes turístiques formoses esisten, feches con semeyes impresionantes y descripciones detallaes, pero tan enterraes al fondu de páxines web. Estátiques. Aburriaes. Nun pues interactuar con elles. Paisaxe da-yos vida.',
+    vision_title: 'La visión',
+    vision_description: 'Ves una imaxe preciosa. Inspírate. Toques-la y entrogues: u ye esto? Puedo dir colos neños? Cómo llego? Paisaxe respuende, como un amigu local qu\'enseña los sos rincones favoritos. Una cosa, fecha excepcionalmente bien.',
+    content_title: 'El conteníu',
+    content_description: 'Tol conteníu ta basau en materiales oficiales de Turismu d\'Asturies. Paisaxe nun inventa información: transforma guíes turístiques reales en conversaciones naturales, respetando y atribuyendo siempre la fonte orixinal.',
+    ai_title: 'Intelixencia artificial',
+    ai_description: 'Paisaxe usa IA pa responder les tos entrugues. El nuestru chat de testu ta impulsáu por Claude d\'Anthropic, y les conversaciones de voz por ElevenLabs. Les respuestes xénerense a partir de conteníu oficial verificáu, pero como toa IA, recomendamos verificar los detalles importantes.',
+    contact_title: 'Contautu',
+    contact_description: 'Paisaxe ye un proyeutu personal, fechu con cariñu n\'Asturies. Si tienes entrugues, idees o namás quies saludar:',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
