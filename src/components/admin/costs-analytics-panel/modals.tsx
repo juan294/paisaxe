@@ -66,10 +66,11 @@ export function AddCostModal({ onClose, onSubmit, dateRange }: AddCostModalProps
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+            <label htmlFor="cost-service" className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
               Service
             </label>
             <select
+              id="cost-service"
               value={formData.serviceId}
               onChange={(e) => handleServiceSelect(e.target.value)}
               className="w-full rounded-lg border border-[#e5e3de] bg-white px-3 py-2 text-sm dark:border-[#3d3a36] dark:bg-[#252320]"
@@ -88,10 +89,11 @@ export function AddCostModal({ onClose, onSubmit, dateRange }: AddCostModalProps
           {formData.serviceId === "custom" && (
             <>
               <div>
-                <label className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+                <label htmlFor="cost-service-id" className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
                   Service ID
                 </label>
                 <input
+                  id="cost-service-id"
                   type="text"
                   value={formData.serviceId === "custom" ? "" : formData.serviceId}
                   onChange={(e) =>
@@ -106,10 +108,11 @@ export function AddCostModal({ onClose, onSubmit, dateRange }: AddCostModalProps
                 />
               </div>
               <div>
-                <label className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+                <label htmlFor="cost-service-name" className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
                   Service Name
                 </label>
                 <input
+                  id="cost-service-name"
                   type="text"
                   value={formData.serviceName}
                   onChange={(e) =>
@@ -127,10 +130,11 @@ export function AddCostModal({ onClose, onSubmit, dateRange }: AddCostModalProps
           )}
 
           <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+            <label htmlFor="cost-category" className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
               Category
             </label>
             <select
+              id="cost-category"
               value={formData.category}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -149,10 +153,11 @@ export function AddCostModal({ onClose, onSubmit, dateRange }: AddCostModalProps
           </div>
 
           <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+            <label htmlFor="cost-amount" className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
               Cost (USD)
             </label>
             <input
+              id="cost-amount"
               type="number"
               step="0.01"
               min="0"
@@ -170,10 +175,11 @@ export function AddCostModal({ onClose, onSubmit, dateRange }: AddCostModalProps
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+              <label htmlFor="cost-billing-start" className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
                 Period Start
               </label>
               <input
+                id="cost-billing-start"
                 type="date"
                 value={formData.billingPeriodStart}
                 onChange={(e) =>
@@ -187,10 +193,11 @@ export function AddCostModal({ onClose, onSubmit, dateRange }: AddCostModalProps
               />
             </div>
             <div>
-              <label className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+              <label htmlFor="cost-billing-end" className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
                 Period End
               </label>
               <input
+                id="cost-billing-end"
                 type="date"
                 value={formData.billingPeriodEnd}
                 onChange={(e) =>
@@ -206,10 +213,11 @@ export function AddCostModal({ onClose, onSubmit, dateRange }: AddCostModalProps
           </div>
 
           <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+            <label htmlFor="cost-notes" className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
               Notes (optional)
             </label>
             <textarea
+              id="cost-notes"
               value={formData.notes}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, notes: e.target.value }))
@@ -274,10 +282,11 @@ export function EditCostModal({ cost, onClose, onSave }: EditCostModalProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+            <label htmlFor="edit-cost-amount" className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
               Cost (USD)
             </label>
             <input
+              id="edit-cost-amount"
               type="number"
               step="0.01"
               min="0"
@@ -289,10 +298,11 @@ export function EditCostModal({ cost, onClose, onSave }: EditCostModalProps) {
           </div>
 
           <div>
-            <label className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
+            <label htmlFor="edit-cost-notes" className="mb-1 block font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
               Notes
             </label>
             <textarea
+              id="edit-cost-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full rounded-lg border border-[#e5e3de] bg-white px-3 py-2 text-sm dark:border-[#3d3a36] dark:bg-[#252320]"
