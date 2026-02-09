@@ -242,9 +242,42 @@ async function fetchUsageMetrics(
       }
     }
 
-    // Fetch ElevenLabs voice metrics
+    // Fetch ElevenLabs voice metrics (filtered to Paisaxe agents only)
     if (elevenLabsKey) {
       try {
+        // First fetch agents list to identify Paisaxe agents
+        const agentsResponse = await fetch(
+          `${ELEVENLABS_API_BASE}/convai/agents`,
+          {
+            headers: {
+              "xi-api-key": elevenLabsKey,
+            },
+          }
+        );
+
+        let paisaxeAgentIds = new Set<string>();
+        if (agentsResponse.ok) {
+          const agentsData = await agentsResponse.json();
+          const agents: Array<{ agent_id: string; name?: string }> =
+            agentsData.agents || [];
+          // Only include agents whose name starts with "Paisaxe"
+          paisaxeAgentIds = new Set(
+            agents
+              .filter((a) => a.name?.startsWith("Paisaxe"))
+              .map((a) => a.agent_id)
+          );
+        }
+
+        // If no Paisaxe agents found via API, fall back to known config IDs
+        if (paisaxeAgentIds.size === 0) {
+          const { ELEVENLABS_AGENT_IDS } = await import(
+            "@/config/elevenlabs-agents"
+          );
+          for (const id of Object.values(ELEVENLABS_AGENT_IDS)) {
+            if (id) paisaxeAgentIds.add(id);
+          }
+        }
+
         const response = await fetch(
           `${ELEVENLABS_API_BASE}/convai/conversations?page_size=100`,
           {
@@ -256,17 +289,22 @@ async function fetchUsageMetrics(
 
         if (response.ok) {
           const data = await response.json();
-          const conversations = data.conversations || [];
+          const conversations: Array<{
+            agent_id?: string;
+            start_time_unix_secs?: number;
+            call_duration_secs?: number;
+          }> = data.conversations || [];
 
           const fromTs = new Date(from).getTime() / 1000;
           const toTs = new Date(to).getTime() / 1000;
 
-          const filtered = conversations.filter(
-            (c: { start_time_unix_secs?: number }) => {
-              const ts = c.start_time_unix_secs || 0;
-              return ts >= fromTs && ts <= toTs;
-            }
-          );
+          // Filter by date range AND Paisaxe agent IDs
+          const filtered = conversations.filter((c) => {
+            const ts = c.start_time_unix_secs || 0;
+            const inDateRange = ts >= fromTs && ts <= toTs;
+            const isPaisaxeAgent = paisaxeAgentIds.has(c.agent_id || "");
+            return inDateRange && isPaisaxeAgent;
+          });
 
           voiceConversations = filtered.length;
           voiceMinutes = filtered.reduce(
