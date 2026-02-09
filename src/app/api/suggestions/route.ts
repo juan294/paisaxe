@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import type { CreateSuggestionRequest, StorySuggestionRow } from "@/types/suggestions";
 import { rowToStorySuggestion } from "@/types/suggestions";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
+import { getClientIp } from "@/lib/request-utils";
 
 // In-memory rate limiting (per user ID or IP)
 const rateLimitMap = new Map<string, number>();
@@ -11,9 +12,7 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 function getRateLimitKey(request: NextRequest, userId: string | null): string {
   if (userId) return `user:${userId}`;
   // For anonymous users, rate limit by IP
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || request.headers.get("x-real-ip")
-    || "unknown";
+  const ip = getClientIp(request);
   return `ip:${ip}`;
 }
 
