@@ -44,17 +44,17 @@ None.
 
 ## Post-Launch Improvements (Tracked)
 
-| # | Item | Severity | Notes |
-|---|------|----------|--------|
-| 1 | Open redirect in OAuth callback (`next` param) | MEDIUM | Validate `next` starts with `/` and not `//` |
-| 2 | Missing `.trim()` on `STRIPE_WEBHOOK_SECRET` | LOW | Add `.trim()` for consistency with other env vars |
-| 3 | CSP `connect-src` missing Vercel Analytics domains | INFO | Add vitals.vercel-insights.com |
-| 4 | Increase `claude.ts` test coverage (57% → 80%+) | INFO | Core AI chat handler — add streaming/error tests |
-| 5 | Add `htmlFor`/`id` on admin panel form labels | INFO | Admin-only, low user impact |
-| 6 | Add `role="alert"` on form error messages | INFO | `suggest-place-dialog.tsx` errors not announced to screen readers |
-| 7 | Consider 308 for root→/immersive redirect | INFO | Currently 307 (temporary). Switch to 308 once path is finalized for SEO |
-| 8 | Add SPF/DKIM/DMARC DNS records | INFO | Only needed if transactional email is added |
-| 9 | Sync 6 extra .env.example vars to CLAUDE.md | INFO | PostHog, encryption key, weather/places API keys |
+| # | Item | Severity | Status | Notes |
+|---|------|----------|--------|--------|
+| 1 | Open redirect in OAuth callback (`next` param) | MEDIUM | RESOLVED | Already validated: starts with `/` and not `//` |
+| 2 | Missing `.trim()` on `STRIPE_WEBHOOK_SECRET` | LOW | RESOLVED | Already `.trim()`'d in `stripe.ts` |
+| 3 | CSP `connect-src` missing Vercel Analytics domains | INFO | RESOLVED | Already includes vitals.vercel-insights.com |
+| 4 | Increase `claude.ts` test coverage (57% → 80%+) | INFO | IN PROGRESS | Adding streaming/error tests |
+| 5 | Add `htmlFor`/`id` on admin panel form labels | INFO | IN PROGRESS | Admin-only, low user impact |
+| 6 | Add `role="alert"` on form error messages | INFO | IN PROGRESS | `suggest-place-dialog.tsx` |
+| 7 | Consider 308 for root→/immersive redirect | INFO | DEFERRED | User decision pending |
+| 8 | Add SPF/DKIM/DMARC DNS records | INFO | DEFERRED | Only needed if adding transactional email |
+| 9 | Sync 6 extra .env.example vars to CLAUDE.md | INFO | IN PROGRESS | PostHog, encryption key, weather/places API keys |
 
 ---
 

@@ -37,9 +37,9 @@ export const SERVICE_TIERS: ServiceTierConfig[] = [
       },
     ],
     nextTier: {
-      tierName: "Pro",
+      tierName: "Scale",
       monthlyCostUsd: 99,
-      notes: "500 min/mo, 10 concurrent, highest audio quality",
+      notes: "500 min/mo, priority support, custom voice cloning",
     },
   },
   {
