@@ -38,9 +38,28 @@ describe("TermsPage", () => {
     expect(link).toHaveAttribute("href", "mailto:support@paisaxe.es");
   });
 
-  it("should render in a semantic main/article structure", () => {
+  it("should render in a semantic main structure", () => {
     render(<TermsPage />);
     expect(screen.getByRole("main")).toBeInTheDocument();
-    expect(screen.getByRole("article")).toBeInTheDocument();
+  });
+
+  it("should use the immersive dark background", () => {
+    const { container } = render(<TermsPage />);
+    const outerDiv = container.firstElementChild;
+    expect(outerDiv?.className).toContain("bg-neutral-950");
+  });
+
+  it("should render a back navigation link to /immersive", () => {
+    render(<TermsPage />);
+    const backLink = screen.getByLabelText("Volver");
+    expect(backLink.closest("a")).toHaveAttribute("href", "/immersive");
+  });
+
+  it("should render footer links to privacy and about pages", () => {
+    render(<TermsPage />);
+    const privacyLink = screen.getByRole("link", { name: /privacidad/i });
+    expect(privacyLink).toHaveAttribute("href", "/privacy");
+    const aboutLink = screen.getByRole("link", { name: /sobre paisaxe/i });
+    expect(aboutLink).toHaveAttribute("href", "/about");
   });
 });
