@@ -109,10 +109,6 @@ test.describe("Suggestion feature", () => {
       // Fill in the place name
       await dialog.locator("#place-name").fill("Playa del Silencio");
 
-      // Select location via shadcn Select (combobox trigger → option)
-      await dialog.getByRole("combobox").click();
-      await page.getByRole("option").first().click();
-
       // Submit
       const submitButton = dialog.locator('button[type="submit"]');
       await expect(submitButton).toBeEnabled();
