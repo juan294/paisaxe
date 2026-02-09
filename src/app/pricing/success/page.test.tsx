@@ -38,9 +38,16 @@ vi.mock("next/link", () => ({
   }) => <a href={href}>{children}</a>,
 }));
 
+// Mock next/navigation
+const mockSearchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => mockSearchParams,
+}));
+
 describe("PricingSuccessPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams.delete("returnTo");
     mockUseVoiceAccess.mockReturnValue({
       hasAccess: true,
       isWhitelisted: false,
@@ -113,11 +120,24 @@ describe("PricingSuccessPage", () => {
     expect(screen.queryByText("premium.success_expires")).not.toBeInTheDocument();
   });
 
-  it("should render CTA link to immersive page", () => {
+  it("should render CTA link to immersive page when no returnTo", () => {
+    mockSearchParams.delete("returnTo");
     render(<PricingSuccessPage />);
 
     const ctaLink = screen.getByRole("link", { name: /premium.success_cta/i });
     expect(ctaLink).toHaveAttribute("href", "/immersive");
+  });
+
+  it("should render CTA link with story slug and voice=ready when returnTo is present", () => {
+    mockSearchParams.set("returnTo", "oviedo-walking-tour");
+    render(<PricingSuccessPage />);
+
+    const ctaLink = screen.getByRole("link", { name: /premium.success_cta/i });
+    expect(ctaLink).toHaveAttribute(
+      "href",
+      "/immersive?story=oviedo-walking-tour&voice=ready"
+    );
+    mockSearchParams.delete("returnTo");
   });
 
   it("should show retry hint when access is not showing", () => {
