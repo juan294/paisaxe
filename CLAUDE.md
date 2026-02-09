@@ -380,19 +380,48 @@ Every issue gets **one type label** + **one priority label** + **area label(s)**
 - **Priority**: `priority: critical`, `priority: high`, `priority: medium`, `priority: low`
 - **Area**: `area: chat`, `area: voice`, `area: payments`, `area: admin`, `area: content`, `area: infra`, `area: marketing`, `area: auth`, `area: ux`
 
-### Agent Rules for Issues
+### Auto-Filing Issues (MANDATORY)
 
-1. **Discover work → create an issue.** If you find a bug or needed improvement while working, create a GitHub issue to track it.
-2. **Reference issues in commits.** Use `Fixes #N` or `Refs #N` in commit messages.
-3. **Don't close issues prematurely.** Issues stay open until the fix is live on `main` (production).
+**When the user mentions a bug, feature idea, enhancement, or task — create a GitHub issue immediately.** Do not wait to be asked. Do not ask "should I create an issue?" Just file it.
+
+The user will throw ideas, complaints, observations, and requests in conversation. The agent's job is to:
+
+1. **Parse what the user said** into a clear issue title and description.
+2. **Classify it** with the right type, priority, and area labels.
+3. **Create it via CLI** — `gh issue create --title "..." --label "..." --body "..."`.
+4. **Report back** — show the issue number and URL so the user knows it's tracked.
+
+If the description would benefit from more detail, **ask the user** before creating — but bias toward filing it now with what you have rather than blocking on perfect information. You can always edit the issue later.
+
+**Example flow:**
+```
+User: "The voice chat sometimes drops after 30 seconds on mobile"
+Agent: *immediately creates issue* →
+  gh issue create \
+    --title "Voice: connection drops after ~30s on mobile" \
+    --label "type: bug,priority: high,area: voice" \
+    --body "## Description\nVoice chat sessions drop..."
+Agent: "Filed as #19 — type: bug, priority: high, area: voice"
+```
+
+**Multiple items in one message?** Create multiple issues. One issue per concern.
+
+### General Agent Rules for Issues
+
+1. **Reference issues in commits.** Use `Fixes #N` or `Refs #N` in commit messages.
+2. **Don't close issues prematurely.** Issues stay open until the fix is live on `main` (production).
+3. **When starting work on an issue**, mention the issue number in your first commit.
 4. **Use the CLI:**
    ```bash
    # Create an issue
-   gh issue create --title "Chat: timeout on long queries" --label "type: bug,priority: high,area: chat"
+   gh issue create --title "Chat: timeout on long queries" --label "type: bug,priority: high,area: chat" --body "..."
 
    # List open issues by priority
    gh issue list --label "priority: critical"
    gh issue list --label "priority: high"
+
+   # Edit an issue to add detail later
+   gh issue edit 19 --body "updated description..."
    ```
 
 ## Content Categories
