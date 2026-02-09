@@ -25,10 +25,11 @@ export async function POST(request: NextRequest) {
   } = await import("@/lib/chat-safety");
   const { GENERIC_REDIRECT_RESPONSE } = await import("@/lib/chat-config");
 
+  const { getClientIp } = await import("@/lib/request-utils");
+
   try {
     // Rate limiting
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const ip = getClientIp(request);
     const rateLimit = checkRateLimit(ip);
 
     if (!rateLimit.allowed) {
