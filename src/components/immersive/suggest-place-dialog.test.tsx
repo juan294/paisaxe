@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { SuggestPlaceDialog } from "./suggest-place-dialog";
 
 // Mock i18n
@@ -232,5 +232,95 @@ describe("SuggestPlaceDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
 
     expect(screen.getByText("Submitting...")).toBeInTheDocument();
+  });
+
+  it("shows error when place name exceeds 100 characters", async () => {
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    const longName = "A".repeat(101);
+    fireEvent.change(placeNameInput, { target: { value: longName } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Place name must be 3-100 characters")
+      ).toBeInTheDocument();
+    });
+
+    // Should not have called fetch
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("resets form and calls onClose after success timer", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: "suggestion-1" }),
+    });
+
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    fireEvent.change(placeNameInput, { target: { value: "Lago Enol" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    // Wait for success state
+    await waitFor(() => {
+      expect(screen.getByText("Thank you!")).toBeInTheDocument();
+    });
+
+    // onClose should not have been called yet
+    expect(mockOnClose).not.toHaveBeenCalled();
+
+    // Advance timer by 2000ms to trigger the setTimeout callback
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(mockOnClose).toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it("disables cancel button while loading", async () => {
+    // Use a fetch that never resolves to keep loading state
+    mockFetch.mockImplementation(() => new Promise(() => {}));
+
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    fireEvent.change(placeNameInput, { target: { value: "Lago Enol" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    // Verify loading state is active
+    expect(screen.getByText("Submitting...")).toBeInTheDocument();
+
+    // Cancel button should be disabled during loading
+    const cancelButton = screen.getByRole("button", { name: "Cancel" });
+    expect(cancelButton).toBeDisabled();
+  });
+
+  it("shows fallback error message when API returns empty error", async () => {
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ error: "" }),
+      })
+    );
+
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    fireEvent.change(placeNameInput, { target: { value: "Lago Enol" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Failed to submit suggestion")
+      ).toBeInTheDocument();
+    });
   });
 });

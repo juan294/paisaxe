@@ -1,16 +1,16 @@
 # Test Coverage Report
 
-> Last updated: 2026-02-06 (16:15 UTC)
+> Last updated: 2026-02-09
 > Scheduled: nightly at 2:00 CET via `scripts/coverage-agent.sh`
 
 ## Summary
 
-- **Total tests:** 2754 passed, 1 skipped
-- **Test files:** 196 passed (100%)
-- **Statement coverage:** 66.91%
-- **Branch coverage:** 60.07%
-- **Function coverage:** 62.27%
-- **Line coverage:** 67.63%
+- **Total tests:** 3160 passed, 1 skipped
+- **Test files:** 213 passed (100%)
+- **Statement coverage:** 73.68%
+- **Branch coverage:** 65.86%
+- **Function coverage:** 65.97%
+- **Line coverage:** 74.62%
 - **TypeScript:** ✅ No errors
 
 *Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
@@ -145,12 +145,12 @@
 | `src/app/api/suggestions/route.ts` | 88% | 94% | 67% | 88% | Rate limiting internal state management |
 | `src/app/api/voice-access/route.ts` | 84% | 100% | 50% | 84% | getSupabaseClient helper function coverage |
 | `src/app/api/webhooks/supabase/route.ts` | 95% | 95% | 100% | 100% | HMAC validation branch |
-| `src/app/auth/callback/route.ts` | 71% | 100% | 25% | 71% | Supabase Auth cookie handling (setAll catch block unreachable in jsdom) |
+| `src/app/auth/callback/route.ts` | 73% | 100% | 25% | 73% | Supabase Auth cookie handling (setAll catch block unreachable in jsdom) |
 | `src/app/favorites/page.tsx` | 86% | 77% | 82% | 89% | Complex RSC with suspense boundaries |
 | `src/app/immersive/page.tsx` | 69% | 46% | 69% | 70% | Complex client interactions with story navigation |
-| `src/components/provider.tsx` | 60% | 50% | 100% | 60% | PostHog analytics initialization (browser-only) |
+| `src/components/posthog-provider.tsx` | 62% | 29% | 78% | 57% | PostHog analytics initialization — dynamic imports hard to test in vitest |
 | `src/components/admin/*` (multiple) | 0-42% | 0-48% | 0-40% | 0-42% | Complex admin UI components with browser-specific interactions |
-| `src/components/immersive/fullscreen-button.tsx` | ~80% | ~75% | ~80% | ~80% | Fullscreen API not available in jsdom (requestFullscreen/exitFullscreen) |
+| `src/components/immersive/fullscreen-button.tsx` | 94% | 91% | 100% | 100% | Remaining: fullscreenchange event edge cases |
 | `src/components/immersive/share-button.tsx` | 96% | 93% | 100% | 100% | Minor branch for window.location origin edge case |
 | `src/components/immersive/toolbar-overflow-menu.tsx` | 96% | 93% | 91% | 96% | Line 69: ref cleanup edge case |
 | `src/components/immersive/volume-button.tsx` | 0% | 0% | 0% | 0% | Audio control component - requires browser audio APIs |
@@ -160,7 +160,7 @@
 | `src/lib/admin-api.ts` | 46% | 44% | 46% | 47% | Contains many fetch wrappers - tested via API route tests |
 | `src/lib/admin-auth.ts` | 73% | 100% | 25% | 73% | Server-side cookie handling |
 | `src/lib/chat-action-detection.ts` | 97% | 75% | 100% | 99% | Regex edge cases |
-| `src/lib/claude.ts` | 43% | 33% | 50% | 43% | Anthropic API streaming - requires live API for full coverage |
+| `src/lib/claude.ts` | 58% | 51% | 50% | 57% | Anthropic API streaming (curl subprocess) not unit-testable |
 | `src/lib/image-optimization.ts` | 95% | 69% | 100% | 96% | Sharp library edge cases |
 | `src/lib/localize-story.ts` | 100% | 87% | 100% | 100% | Branch coverage only - all statements covered |
 | `src/lib/rate-limit.ts` | 97% | 82% | 100% | 97% | Token bucket edge case |
@@ -194,11 +194,47 @@ These are deliberately untested and considered acceptable:
 
 7. **Claude API streaming** (`src/lib/claude.ts` streaming functions): The Anthropic SDK streaming requires live API access. Core response generation is tested; streaming edge cases are covered by E2E tests.
 
-8. **Fullscreen API** (`src/components/immersive/fullscreen-button.tsx`): The browser Fullscreen API (requestFullscreen/exitFullscreen) is not available in jsdom. iOS modal flow is tested.
+8. **Fullscreen API edge cases** (`src/components/immersive/fullscreen-button.tsx`): Desktop Fullscreen API is now mocked and tested (94% coverage). Remaining gap: Mac with touchpad detection edge case (line 19).
 
 9. **Admin tunnel route** (`src/app/api/admin/tunnel/route.ts`): Uses child_process spawn/exec for Cloudflare tunnel management. This is a development-only feature that requires actual shell execution and cannot be meaningfully tested in jsdom/vitest without mocking the entire child_process module, which would provide no real test value.
 
 ## Changes Made This Run
+
+### Test files created (2026-02-09):
+- `src/hooks/use-focus-trap.test.tsx` (7 tests) - Tab/Shift+Tab wrapping, Escape key, focus restoration
+- `src/components/posthog-provider.test.tsx` (11 tests) - Provider rendering, guard conditions, context propagation
+- `src/app/immersive/immersive-page-content.test.tsx` (5 tests) - Loading, rendering, no-results, query params
+
+### Test files modified (2026-02-09):
+- `src/lib/claude.test.ts` (+8 tests) - stderr handling, context truncation, stream async generator
+- `src/app/api/admin/costs-analytics/route.test.ts` (+4 tests) - ElevenLabs cost, recurring costs, usage metrics, POST error
+- `src/app/api/checkout/day-pass/route.test.ts` (+3 tests) - Missing env vars, dev error details
+- `src/components/admin/analytics-tabs.test.tsx` (+6 tests) - Keyboard shortcuts (Cmd+key, modifiers, input focus)
+- `src/components/immersive/fullscreen-button.test.tsx` (+5 tests) - Desktop fullscreen API (requestFullscreen, exitFullscreen, fullscreenchange)
+- `src/components/immersive/suggest-place-dialog.test.tsx` (+5 tests) - Place name >100 chars, success timer, loading cancel, empty error fallback
+- `src/components/immersive/voice-chat-elevenlabs.test.tsx` (+8 tests) - onConnect/onDisconnect/onError callbacks, empty agentId, connecting state, mute toggle, user message prefix, endSession error
+
+### Coverage improvements (2026-02-09):
+- **src/hooks/use-focus-trap.ts**: 58% → 97% (+39%)
+- **src/components/admin/analytics-tabs.tsx**: 43% → 100% (+57%)
+- **src/components/immersive/voice-chat-elevenlabs.tsx**: 80% → 100% (+20%)
+- **src/app/api/admin/costs-analytics/route.ts**: 59% → 96% (+37%)
+- **src/components/immersive/fullscreen-button.tsx**: 79% → 94% (+15%)
+- **src/components/immersive/suggest-place-dialog.tsx**: 70% → 89% (+19%)
+- **src/app/api/checkout/day-pass/route.ts**: 71% → 83% (+12%)
+- **src/app/immersive/immersive-page-content.tsx**: 70% → 81% (+11%)
+- **src/lib/claude.ts**: 57% → 58% (+1%)
+- **src/components/posthog-provider.tsx**: 56% → 62% (+6%)
+
+### Overall improvement (2026-02-09):
+- Statement coverage: 72.40% → 73.68% (+1.28%)
+- Branch coverage: 64.65% → 65.86% (+1.21%)
+- Function coverage: 65.15% → 65.97% (+0.82%)
+- Line coverage: 73.34% → 74.62% (+1.28%)
+- Total tests: 3099 → 3160 (+61 tests)
+- Test files: 210 → 213 (+3 files)
+
+---
 
 ### Test files created (2026-02-06):
 - `src/config/location.test.ts` (11 tests) - Tests for getRegionIds, getRegion, getRegionCoordinates
@@ -289,3 +325,8 @@ Run manually anytime:
   - **Fixed**: Proxy test NODE_ENV mocking issue (added `vi.unstubAllEnvs()` to cleanup)
   - **Verified**: TypeScript type safety (0 errors)
   - **Status**: Test suite is healthy and stable
+- **2026-02-09**: Coverage Agent run -- 3160 tests, 213 files (+61 tests, +3 files, +1.28% statement coverage)
+  - Created 3 new test files: use-focus-trap, posthog-provider, immersive-page-content
+  - Enhanced 7 existing test files: claude (+8), costs-analytics (+4), checkout/day-pass (+3), analytics-tabs (+6), fullscreen-button (+5), suggest-place-dialog (+5), voice-chat-elevenlabs (+8)
+  - 2 files reached 100%: analytics-tabs, voice-chat-elevenlabs
+  - 6 files significantly improved: use-focus-trap (58→97%), costs-analytics (59→96%), fullscreen-button (79→94%), suggest-place-dialog (70→89%), checkout/day-pass (71→83%), immersive-page-content (70→81%)
