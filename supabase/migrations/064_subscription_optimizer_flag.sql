@@ -5,4 +5,4 @@ VALUES (
   'Subscription Optimizer',
   'Analyzes service subscriptions and recommends cost optimizations. Runs weekly.',
   '{}', 'production'
-) ON CONFLICT (flag_key) DO NOTHING;
+) ON CONFLICT (flag_key, environment) DO NOTHING;
