@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Eye, Bookmark, LogOut, LogIn, Info } from "lucide-react";
+import { Bookmark, LogOut, LogIn, Info } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
 
 export function SiteInfoMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const { t } = useTranslation();
-  const { user, signInWithGoogle, signOut } = useAuth();
+  const { user, isLoading, signInWithGoogle, signOut } = useAuth();
 
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
   const close = useCallback(() => setIsOpen(false), []);
@@ -23,29 +23,60 @@ export function SiteInfoMenu() {
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, close]);
 
+  if (isLoading) {
+    return (
+      <div className="h-10 w-10 rounded-full bg-white/10 animate-pulse" />
+    );
+  }
+
   return (
-    <>
-      {/* Trigger button */}
+    <div className="relative">
+      {/* Trigger: profile picture (signed in) or sign-in icon (signed out) */}
       <button
-        onClick={toggle}
-        aria-label="Info"
-        className="fixed bottom-4 left-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white/70 hover:text-white hover:bg-black/60 transition-all duration-200 shadow-lg"
+        onClick={(e) => {
+          e.stopPropagation();
+          toggle();
+        }}
+        aria-label={user ? (user.name || t("auth.user")) : t("auth.sign_in")}
+        className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-white/50 flex items-center justify-center"
       >
-        <Eye className="h-4 w-4" />
+        {user ? (
+          user.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.avatarUrl}
+              alt={user.name || "Avatar"}
+              className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <span className="text-white text-sm font-medium">
+              {(user.name || user.email || "U")[0].toUpperCase()}
+            </span>
+          )
+        ) : (
+          <LogIn className="h-5 w-5 text-white" />
+        )}
       </button>
 
       {/* Backdrop */}
       {isOpen && (
         <div
           data-testid="info-menu-backdrop"
-          className="fixed inset-0 z-30"
-          onClick={close}
+          className="fixed inset-0 z-40"
+          onClick={(e) => {
+            e.stopPropagation();
+            close();
+          }}
         />
       )}
 
-      {/* Panel */}
+      {/* Dropdown panel */}
       {isOpen && (
-        <div className="fixed bottom-16 left-4 z-30 w-72 rounded-xl bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-200">
+        <div
+          className="absolute right-0 top-12 z-50 w-72 rounded-xl bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* User section */}
           <div className="px-4 py-3 border-b border-white/10">
             {user ? (
@@ -56,6 +87,7 @@ export function SiteInfoMenu() {
                     src={user.avatarUrl}
                     alt={user.name || "Avatar"}
                     className="h-8 w-8 rounded-full"
+                    referrerPolicy="no-referrer"
                   />
                 ) : (
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
@@ -138,6 +170,7 @@ export function SiteInfoMenu() {
                   signOut();
                   close();
                 }}
+                aria-label={t("auth.sign_out")}
                 className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-white/50 hover:text-red-400 hover:bg-white/5 transition-colors"
               >
                 <LogOut className="h-4 w-4" />
@@ -147,6 +180,6 @@ export function SiteInfoMenu() {
           )}
         </div>
       )}
-    </>
+    </div>
   );
 }

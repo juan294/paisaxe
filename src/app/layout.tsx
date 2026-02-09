@@ -14,7 +14,6 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
 import { Providers } from "./providers";
 import { PostHogPageView } from "@/components/posthog-provider";
-import { SiteInfoMenu } from "@/components/immersive/site-info-menu";
 import "./globals.css";
 
 const inter = Inter({
@@ -142,7 +141,6 @@ export default function RootLayout({
         <Providers>
           <PostHogPageView />
           {children}
-          <SiteInfoMenu />
         </Providers>
         <Analytics />
         <SpeedInsights />
