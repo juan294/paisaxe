@@ -290,6 +290,7 @@ export function StoryViewer({
 
       {/* Main content */}
       <article
+        data-testid="story-info-panel"
         onClick={(e) => {
           e.stopPropagation();
           setShowInfo((prev) => !prev);
@@ -316,7 +317,7 @@ export function StoryViewer({
             ? story.metadata.asturianu_subtitle
             : localizedStory.subtitle}
         </p>
-        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
+        <h1 data-testid="story-title" className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
           {ast && story.metadata?.asturianu_title
             ? story.metadata.asturianu_title
             : localizedStory.title}
@@ -375,6 +376,7 @@ export function StoryViewer({
 
       {/* Navigation arrows - invisible tap zones on phones, visible buttons on tablets/desktop */}
       <button
+        data-testid="prev-story-button"
         onClick={(e) => {
           e.stopPropagation();
           goToPrev();
@@ -386,6 +388,7 @@ export function StoryViewer({
       </button>
 
       <button
+        data-testid="next-story-button"
         onClick={(e) => {
           e.stopPropagation();
           goToNext();
