@@ -597,21 +597,21 @@ describe("Root path redirect", () => {
     delete process.env.MAINTENANCE_MODE;
   });
 
-  it("redirects / to /immersive on canonical domain", async () => {
+  it("redirects / to /immersive on canonical domain with 308", async () => {
     const request = new NextRequest("https://paisaxe.es/");
     const response = await proxy(request);
 
-    expect(response.status).toBe(307);
+    expect(response.status).toBe(308);
     expect(response.headers.get("location")).toBe(
       "https://paisaxe.es/immersive"
     );
   });
 
-  it("redirects / to /immersive on localhost", async () => {
+  it("redirects / to /immersive on localhost with 308", async () => {
     const request = new NextRequest("http://localhost:3000/");
     const response = await proxy(request);
 
-    expect(response.status).toBe(307);
+    expect(response.status).toBe(308);
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/immersive"
     );
