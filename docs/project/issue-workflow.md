@@ -103,7 +103,11 @@ gh issue create \
 
 ### Agent Rules
 
-- Agents **may create issues** to track discovered work.
+- **Auto-file issues.** When the user mentions a bug, feature, enhancement, or task in conversation, the agent creates a GitHub issue immediately via CLI. No manual steps for the user.
+- **Classify on creation.** Every issue gets type + priority + area labels at creation time. If unsure about priority, default to `priority: medium` and the user can adjust.
+- **Ask only when needed.** If the user's description is too vague to write a useful issue, ask for clarification. Otherwise, file it with what you have — issues can be edited later.
+- **Multiple items = multiple issues.** If the user lists several things, create one issue per concern.
+- **Report back.** After creating an issue, tell the user the issue number, URL, and labels.
 - Agents **may work on issues** on `develop` without asking (normal development).
 - Agents **must not close issues** that require a production release — the issue stays open until the fix is live on `main`.
 - When starting work on an issue, reference it in commit messages: `fix: resolve chat timeout (#42)`.
