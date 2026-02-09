@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Chunk } from "@/types";
+import { EventEmitter } from "events";
 
-const { mockExecFile, mockSleep } = vi.hoisted(() => {
-  return { mockExecFile: vi.fn(), mockSleep: vi.fn().mockResolvedValue(undefined) };
+const { mockExecFile, mockSleep, mockSpawn } = vi.hoisted(() => {
+  return { mockExecFile: vi.fn(), mockSleep: vi.fn().mockResolvedValue(undefined), mockSpawn: vi.fn() };
 });
 vi.mock("node:child_process", () => ({
   execFile: mockExecFile,
+  spawn: mockSpawn,
 }));
 vi.mock("node:util", () => ({
   promisify: (fn: typeof mockExecFile) => fn,
@@ -755,6 +757,235 @@ describe("claude", () => {
       ];
       const gen = streamChatResponse("Hola", chunks, true, 2);
       expect(gen[Symbol.asyncIterator]).toBeDefined();
+    });
+  });
+
+  // ─── streamWithCurl via streamChatResponse ─────────────────────────
+
+  describe("streamWithCurl via streamChatResponse", () => {
+    function createMockSpawnProcess() {
+      const stdout = new EventEmitter();
+      const stderr = new EventEmitter();
+      const proc = Object.assign(new EventEmitter(), { stdout, stderr });
+      return proc;
+    }
+
+    function setupMockSpawn() {
+      const proc = createMockSpawnProcess();
+      mockSpawn.mockReturnValue(proc);
+      return proc;
+    }
+
+    function sseData(obj: unknown) {
+      return Buffer.from(`data: ${JSON.stringify(obj)}\n\n`);
+    }
+
+    function sseDelta(text: string) {
+      return sseData({ type: "content_block_delta", delta: { type: "text_delta", text } });
+    }
+
+    it("should yield text deltas from SSE stream", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit("data", sseDelta("Hello "));
+        proc.stdout.emit("data", sseDelta("world"));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["Hello ", "world"]);
+    });
+
+    it("should handle multiple deltas in a single data event", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        const combined = Buffer.concat([sseDelta("foo"), sseDelta("bar")]);
+        proc.stdout.emit("data", combined);
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["foo", "bar"]);
+    });
+
+    it("should ignore [DONE] events", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit("data", sseDelta("text"));
+        proc.stdout.emit("data", Buffer.from("data: [DONE]\n\n"));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["text"]);
+    });
+
+    it("should throw on error events from SSE stream", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit("data", sseData({ type: "error", error: { message: "overloaded" } }));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      await expect(async () => {
+        for await (const chunk of streamChatResponse("Test", [])) {
+          chunks.push(chunk);
+        }
+      }).rejects.toThrow("overloaded");
+    });
+
+    it("should throw on process error event", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.emit("error", new Error("spawn ENOENT"));
+      }, 10);
+
+      const chunks: string[] = [];
+      await expect(async () => {
+        for await (const chunk of streamChatResponse("Test", [])) {
+          chunks.push(chunk);
+        }
+      }).rejects.toThrow("spawn ENOENT");
+    });
+
+    it("should throw when ANTHROPIC_API_KEY is not set for streaming", async () => {
+      vi.stubEnv("ANTHROPIC_API_KEY", "");
+
+      const chunks: string[] = [];
+      await expect(async () => {
+        for await (const chunk of streamChatResponse("Test", [])) {
+          chunks.push(chunk);
+        }
+      }).rejects.toThrow("ANTHROPIC_API_KEY is not set");
+    });
+
+    it("should log stderr output", async () => {
+      const proc = setupMockSpawn();
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      setTimeout(() => {
+        proc.stderr.emit("data", Buffer.from("curl warning"));
+        proc.stdout.emit("data", sseDelta("ok"));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[Claude Streaming] curl stderr:",
+        "curl warning"
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle partial SSE data across multiple buffer chunks", async () => {
+      const proc = setupMockSpawn();
+
+      setTimeout(() => {
+        const full = `data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"split"}}\n\n`;
+        proc.stdout.emit("data", Buffer.from(full.slice(0, 30)));
+        proc.stdout.emit("data", Buffer.from(full.slice(30)));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["split"]);
+    });
+
+    it("should pass correct curl arguments for streaming", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => proc.emit("close"), 10);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _chunk of streamChatResponse("Test", [])) { /* noop */ }
+
+      expect(mockSpawn).toHaveBeenCalledWith("curl", expect.arrayContaining([
+        "-s", "-S", "-N",
+        "-X", "POST",
+        "https://api.anthropic.com/v1/messages",
+        "-H", "Content-Type: application/json",
+      ]));
+    });
+
+    it("should ignore non-text-delta events", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit("data", sseData({ type: "message_start" }));
+        proc.stdout.emit("data", sseData({ type: "content_block_start" }));
+        proc.stdout.emit("data", sseDelta("actual text"));
+        proc.stdout.emit("data", sseData({ type: "message_stop" }));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["actual text"]);
+    });
+
+    it("should handle malformed JSON gracefully", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit("data", Buffer.from("data: {invalid json}\n\n"));
+        proc.stdout.emit("data", sseDelta("after error"));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["after error"]);
+    });
+
+    it("should include stream:true in the request body", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => proc.emit("close"), 10);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _chunk of streamChatResponse("Test", [])) { /* noop */ }
+
+      const curlArgs: string[] = mockSpawn.mock.calls[0][1];
+      const dIndex = curlArgs.indexOf("-d");
+      const body = JSON.parse(curlArgs[dIndex + 1]);
+      expect(body.stream).toBe(true);
+      expect(body.model).toBe("claude-sonnet-4-20250514");
+    });
+
+    it("should yield with asturianu mode enabled", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit("data", sseDelta("Ye prestoso"));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [], true, 2)) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["Ye prestoso"]);
+
+      const curlArgs: string[] = mockSpawn.mock.calls[0][1];
+      const dIndex = curlArgs.indexOf("-d");
+      const body = JSON.parse(curlArgs[dIndex + 1]);
+      expect(body.system).toContain("asturianu");
     });
   });
 
