@@ -1,4 +1,4 @@
-import type { AdminStory, CurationStatus, ContentImage } from "@/types/admin";
+import type { AdminStory } from "@/types/admin";
 import type { StoryCategory, StoryLocation, StoryDuration, StoryLocale, StoryTranslation } from "@/types/immersive";
 
 export type TabType = "details" | "image" | "translations";
@@ -50,4 +50,5 @@ export function generateSlug(title: string): string {
     .replace(/^-|-$/g, "");
 }
 
-export type { AdminStory, CurationStatus, ContentImage, StoryCategory, StoryLocation, StoryDuration };
+export type { AdminStory };
+
