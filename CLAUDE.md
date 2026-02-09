@@ -128,12 +128,33 @@ This is the default way of working — you do NOT need to be told to create a wo
 
 #### Workflow
 
+There are two worktree paths depending on context:
+
+**Interactive (main terminal)** — worktree outside the project:
 ```bash
-# 1. CREATE — Start every task by creating a worktree
 git worktree add -b feature/short-name ../paisaxe-short-name develop
+cd ../paisaxe-short-name
+```
+
+**Background agents (spawned via Task tool)** — worktree INSIDE the project:
+```bash
+# IMPORTANT: Background agents are sandboxed to the project directory.
+# Worktrees at ../paisaxe-* are INACCESSIBLE to background agents.
+# Always use .worktrees/ which is gitignored.
+git worktree add -b feature/short-name .worktrees/short-name develop
+cd .worktrees/short-name
+```
+
+**How to know which to use:** If you were spawned as a background agent (via `run_in_background: true` or as a team member), you MUST use `.worktrees/`. If you're the main interactive agent, use `../paisaxe-short-name`.
+
+**Full lifecycle (same for both paths):**
+```bash
+# 1. CREATE — Start every task by creating a worktree (pick the right path above)
+git worktree add -b feature/short-name <path> develop
 
 # 2. WORK — All changes happen in the worktree directory
-cd ../paisaxe-short-name
+cd <path>
+npm install  # Required — worktrees don't share node_modules
 # ... write tests first, then implement, then commit
 
 # 3. MERGE — After tests pass, merge back into develop
@@ -141,7 +162,7 @@ cd /Users/juan/Documents/GenAI_Projects/paisaxe
 git merge feature/short-name
 
 # 4. CLEAN UP — Always remove the worktree and branch after merge
-git worktree remove ../paisaxe-short-name
+git worktree remove <path>
 git branch -d feature/short-name
 ```
 
@@ -158,11 +179,13 @@ git branch -d feature/short-name
 
 1. **Auto-create**: When the user asks for any code change, immediately create a worktree. Do not ask — just do it.
 2. **Isolate**: Each worktree = one logical change. Never mix unrelated changes.
-3. **Test in worktree**: Run `npm run test && npm run typecheck && npm run lint` inside the worktree before merging.
-4. **Merge cleanly**: Merge the feature branch into `develop` from the main repo directory.
-5. **Always clean up**: Remove the worktree directory AND delete the branch after a successful merge. Never leave stale worktrees.
-6. **Parallel work**: Multiple agents can work in separate worktrees simultaneously — this is one of the key benefits.
-7. **If merge conflicts arise**: Resolve them in the main repo during merge, never in the worktree.
+3. **Install deps**: Run `npm install` in the worktree before running tests — worktrees don't share `node_modules/`.
+4. **Test in worktree**: Run `npm run test && npm run typecheck && npm run lint` inside the worktree before merging.
+5. **Merge cleanly**: Merge the feature branch into `develop` from the main repo directory.
+6. **Always clean up**: Remove the worktree directory AND delete the branch after a successful merge. Never leave stale worktrees.
+7. **Parallel work**: Multiple agents can work in separate worktrees simultaneously — this is one of the key benefits.
+8. **Background agents use `.worktrees/`**: Agents spawned with `run_in_background: true` or as team members are sandboxed to the project directory. They CANNOT access `../paisaxe-*` paths. Always use `.worktrees/short-name` inside the project.
+9. **If merge conflicts arise**: Resolve them in the main repo during merge, never in the worktree.
 
 ## Push Accountability (MANDATORY — Background)
 
