@@ -225,6 +225,7 @@ Required in `.env.local`:
 ANTHROPIC_API_KEY=       # Claude API
 VOYAGE_API_KEY=          # Voyage AI embeddings
 ELEVENLABS_API_KEY=      # Voice agents (optional)
+ELEVENLABS_WEBHOOK_SECRET=   # ElevenLabs webhook signature verification
 GITHUB_TOKEN=            # GitHub PAT with `repo` scope (traffic analytics)
 
 NEXT_PUBLIC_SUPABASE_URL=
@@ -248,6 +249,17 @@ TWILIO_ACCOUNT_SID=                     # Twilio account SID
 TWILIO_AUTH_TOKEN=                      # Twilio auth token
 TWILIO_PHONE_NUMBER=                    # Twilio sender phone number
 QA_ALERT_PHONE=                         # Phone for critical alerts (E.164: +34612345678)
+
+# Credentials encryption
+CREDENTIALS_ENCRYPTION_KEY=             # AES-256 encryption key for stored credentials
+
+# Voice Agent MCP tools (optional)
+OPENWEATHERMAP_API_KEY=                 # Weather data for voice agent
+GOOGLE_PLACES_API_KEY=                  # Places data for voice agent
+
+# PostHog analytics (optional)
+NEXT_PUBLIC_POSTHOG_KEY=                # PostHog project API key
+NEXT_PUBLIC_POSTHOG_HOST=               # PostHog ingestion host
 ```
 
 ## Architecture Decisions

@@ -29,7 +29,7 @@ export const RECURRING_SUBSCRIPTIONS: RecurringSubscription[] = [
     category: "ai",
     costUsd: 18.33,
     billingCycle: "monthly",
-    notes: "Creator plan (annual: $220/yr)",
+    notes: "Creator plan (annual: $220/yr, $266.20 with tax)",
     dashboardUrl: "https://elevenlabs.io/subscription",
     startDate: "2026-02-01",
   },
