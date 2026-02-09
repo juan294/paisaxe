@@ -7,6 +7,7 @@ import { SERVICE_REGISTRY } from "@/config/service-registry";
 import {
   analyzeSubscriptions,
   generateReport,
+  generateSharedContextEntry,
   type UsageMetricsInput,
 } from "@/lib/subscription-optimizer";
 
@@ -64,14 +65,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const markdownReport = generateReport(result);
 
     // Persist report to disk so the agents-summary API can read it
+    const projectRoot = process.cwd();
     const reportPath = pathModule.join(
-      process.cwd(),
+      projectRoot,
       "docs/agents/subscription-optimizer-report.md"
     );
     try {
       await fs.writeFile(reportPath, markdownReport, "utf-8");
     } catch {
       // Serverless environments may not have write access — continue gracefully
+    }
+
+    // Append shared context entry for cross-agent insights
+    const sharedContextPath = pathModule.join(projectRoot, "docs/agents/shared-context.md");
+    try {
+      const contextEntry = generateSharedContextEntry(result);
+      let existing = "";
+      try {
+        existing = await fs.readFile(sharedContextPath, "utf-8");
+      } catch {
+        // File doesn't exist yet — will be created
+        existing = "# Agent Shared Context\n> Cross-agent intelligence — agents read this before running and write findings after finishing.\n> Pruned automatically to keep the last 3 entries per agent.\n";
+      }
+      // Prepend new entry after the header (first 3 lines)
+      const headerEnd = existing.indexOf("\n\n");
+      const header = headerEnd >= 0 ? existing.slice(0, headerEnd) : existing;
+      const body = headerEnd >= 0 ? existing.slice(headerEnd + 2) : "";
+      await fs.writeFile(
+        sharedContextPath,
+        `${header}\n\n${contextEntry}\n\n${body}`,
+        "utf-8"
+      );
+    } catch {
+      // Non-critical — don't fail the run if shared context write fails
     }
 
     // Count actionable items (anything other than "keep")

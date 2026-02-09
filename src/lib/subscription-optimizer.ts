@@ -350,6 +350,39 @@ export function generateReport(report: SubscriptionReport): string {
   return lines.join("\n");
 }
 
+// ─── Shared Context Entry ────────────────────────────────────────────────────
+
+/**
+ * Generate a shared-context.md entry for cross-agent insights.
+ * Format matches the ENTRY:START/END markers parsed by agents-summary.
+ */
+export function generateSharedContextEntry(report: SubscriptionReport): string {
+  const date = report.analyzedAt.split("T")[0];
+  const upgradeCount = report.recommendations.filter((r) => r.action === "upgrade").length;
+  const reviewCount = report.recommendations.filter((r) => r.action === "review").length;
+  const keepCount = report.recommendations.filter((r) => r.action === "keep").length;
+
+  const lines: string[] = [];
+  lines.push(`<!-- ENTRY:START agent=subscription_optimizer timestamp=${report.analyzedAt} -->`);
+  lines.push(`## Subscription Optimizer — ${date}`);
+  lines.push(`- **Total spend**: $${report.totalMonthlySpend.toFixed(2)}/mo across ${report.recommendations.length} services`);
+
+  if (upgradeCount > 0) {
+    const upgrades = report.recommendations.filter((r) => r.action === "upgrade");
+    lines.push(`- **Upgrade needed** (${upgradeCount}): ${upgrades.map((r) => r.serviceName).join(", ")}`);
+  }
+  if (reviewCount > 0) {
+    const reviews = report.recommendations.filter((r) => r.action === "review");
+    lines.push(`- **Review recommended** (${reviewCount}): ${reviews.map((r) => r.serviceName).join(", ")}`);
+  }
+  if (keepCount > 0) {
+    lines.push(`- **Healthy** (${keepCount}): ${report.recommendations.filter((r) => r.action === "keep").map((r) => r.serviceName).join(", ")}`);
+  }
+
+  lines.push("<!-- ENTRY:END -->");
+  return lines.join("\n");
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function generateProgressBar(percentage: number): string {
