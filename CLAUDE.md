@@ -28,7 +28,7 @@ For operations (monitoring, pg_cron, webhooks, agents), see @docs/operations/ope
 **IMPORTANT: Always work on `develop` branch. Only merge to `main` for production releases.**
 
 ```bash
-main      # Production releases only
+main      # PRODUCTION — live site. Agents MUST NOT touch without explicit user authorization.
 develop   # Active development (DEFAULT)
 ```
 
@@ -39,28 +39,83 @@ develop   # Active development (DEFAULT)
 5. **No PRs for `develop`** — commit/merge directly, verify CI, done
 6. **PRs required for `main`** — branch protection enforces CI must pass before merge
 
+### Production Safety (MANDATORY — THIS IS A LIVE SITE)
+
+**The site is live. Real users are visiting paisaxe.es and paisaxe.com. Every production change carries risk.**
+
+**No agent may perform ANY of the following without the user explicitly saying "do it" or "go ahead" in the current conversation:**
+
+1. **Push to `main`** — NEVER. Not even a typo fix.
+2. **Create a PR targeting `main`** — NEVER. Only when the user requests a release.
+3. **Merge a PR into `main`** — NEVER. The user merges production PRs themselves or gives explicit authorization.
+4. **Run `vercel` deploy commands** — NEVER for production. Preview deployments on `develop` are fine.
+5. **Modify Supabase production data** — NEVER. Migrations must be reviewed.
+6. **Modify Vercel environment variables** — NEVER. The user does this.
+7. **Modify DNS, domain settings, or external service configs** — NEVER.
+
+**"Explicit authorization" means the user types something like:**
+- "Create the release PR"
+- "Go ahead and merge it"
+- "Push to main"
+- "Deploy to production"
+
+**These do NOT count as authorization:**
+- The user asking you to "fix a bug" (fix it on `develop`, don't release it)
+- The user saying "ship it" about a feature (merge to `develop`, not `main`)
+- CI being green (necessary but not sufficient)
+- A previous conversation's authorization (authorization does not carry over)
+
 ### Production Release (develop → main)
+
+**This is a user-initiated process. Agents prepare, users authorize.**
 
 `main` is protected with branch protection rules:
 - **Required status checks**: `lint-and-typecheck`, `test`, `build`, `e2e` must all pass
 - **Force pushes blocked**, **deletion blocked**
 - **PRs required** (0 approvals — solo dev can self-merge after CI passes)
 
-```bash
-# 1. Ensure develop is up to date and CI is green
-git push origin develop
+#### Release Process
 
-# 2. Create a PR from develop → main
+**Step 1: User requests a release.** The agent does NOT initiate this.
+
+**Step 2: Agent prepares a release summary** (does NOT create the PR yet):
+```bash
+# Show what will be released
+git log main..develop --oneline
+
+# Verify all checks pass on develop
+gh run list --branch develop --limit 3
+
+# Run the full local test suite
+npm run test && npm run typecheck && npm run lint && npm run test:e2e
+```
+
+Present the summary to the user:
+- List of commits since last release
+- CI status on develop
+- Any known risks or breaking changes
+- Recommendation: safe to release or not
+
+**Step 3: User confirms.** Only after explicit "go ahead" or equivalent:
+```bash
+# Create the PR
 gh pr create --base main --head develop --title "Release: description of changes"
 
-# 3. Wait for all 4 status checks to pass
+# Wait for all 4 status checks to pass
 gh pr checks
+```
 
-# 4. Merge once CI is green
+**Step 4: User authorizes merge.** Report CI status and wait for the user to say "merge it":
+```bash
+# Merge once user confirms
 gh pr merge --merge
+```
 
-# 5. Verify Vercel production deployment
+**Step 5: Verify deployment** (agent can do this autonomously after merge):
+```bash
 vercel ls --limit 5
+# Check /api/health on production
+curl -s https://paisaxe.es/api/health
 ```
 
 **Never bypass branch protection.** If CI fails on the PR, fix on `develop` first, push, and let the PR update.
@@ -111,20 +166,22 @@ git branch -d feature/short-name
 
 ## Push Accountability (MANDATORY — Background)
 
-**Every push requires CI verification. No exceptions. No matter how small the change.**
+**Every push to `develop` requires CI verification. No exceptions. No matter how small the change.**
 
-**This runs as a background agent so the terminal stays unblocked.** After ANY `git push`, immediately spawn a background task (using `run_in_background: true`) that:
+**Pushing to `main` is PROHIBITED** — see Production Safety above. This section applies to `develop` only.
+
+**This runs as a background agent so the terminal stays unblocked.** After ANY `git push origin develop`, immediately spawn a background task (using `run_in_background: true`) that:
 
 1. **Polls CI status** — `gh run list --limit 5` until the run completes
 2. **If CI passes** — Log success, no interruption needed
 3. **If CI fails** — Investigate with `gh run view <run-id> --log-failed`, fix the issue, and re-push — all in the background
-4. **Verify deployment** — For `main` branch, confirm Vercel deployment succeeds
+4. **NEVER push to `main`** — Even if a background fix seems urgent, it stays on `develop`
 
-The main terminal continues working on the next task immediately after pushing. The background agent owns the push outcome until CI is green.
+The main terminal continues working on the next task immediately after pushing. The background agent owns the push outcome until CI is green on `develop`.
 
 **If a background fix requires changes that conflict with current work**, notify the user before applying fixes.
 
-**This is non-negotiable.** You own the outcome of your push until CI is green and deployment is healthy. If you break the build, you fix the build — automatically in the background.
+**This is non-negotiable.** You own the outcome of your push until CI is green. If you break the build on `develop`, you fix the build — automatically in the background. But `main` is never touched without user authorization.
 
 ## Test-Driven Development (MANDATORY)
 
@@ -255,6 +312,7 @@ Core tables (see `supabase/migrations/` for full DDL):
 4. **No dead code** — Knip reports unused exports on PRs.
 5. **Health endpoint is sacred** — `/api/health` monitored 24/7. Don't break it.
 6. **Database function security** — All functions need explicit `SET search_path`. Use `search_path = ''` with fully qualified refs for security-definer functions.
+7. **Production is sacred** — No agent touches `main`, production deployments, or production infrastructure without explicit user authorization in the current conversation. See Production Safety section.
 
 ## Troubleshooting
 
@@ -295,12 +353,20 @@ Use these before telling the user "go to the dashboard and...":
 
 1. **Supabase CLI** — `supabase db push`, `supabase functions deploy`, etc.
 2. **GitHub CLI** — `gh pr create`, `gh run list`, `gh issue view`
-3. **Vercel CLI** — `vercel` for deployments and logs
+3. **Vercel CLI** — `vercel` for deployments and logs (develop/preview only)
 4. **MCP servers** — Check available tools in the session
 5. **Bash** — npm scripts, git, curl
 6. **SQL** — `supabase db execute` for queries
 
 Only ask for manual intervention when genuinely required (OAuth consent, billing, UI-only features).
+
+**EXCEPTION — Production-affecting actions require user authorization (see Production Safety):**
+- Anything touching `main` branch (push, PR, merge)
+- Production deployments
+- Production database migrations
+- External service configuration changes (ElevenLabs, Stripe, Vercel env vars, DNS)
+
+Agent autonomy applies to **development work on `develop`**. Production is user-controlled.
 
 ## Content Categories
 
