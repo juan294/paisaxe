@@ -298,7 +298,7 @@ export const ast: Translations = {
   footer: {
     terms: 'Condiciones d\'Usu',
     privacy: 'Politica de Privacidá',
-    content_attribution: 'Conteníu basáu en materiales de Turismu d\'Asturies',
+    content_attribution: 'Conteníu parcialmente basáu en materiales disponibles de baldre en turismoasturias.es',
     ai_disclaimer: 'Les respuestes son xeneraes por IA y deben verificase',
   },
 

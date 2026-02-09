@@ -8,7 +8,7 @@ vi.mock("@/lib/i18n", () => ({
       const translations: Record<string, string> = {
         "footer.terms": "Terms of Service",
         "footer.privacy": "Privacy Policy",
-        "footer.content_attribution": "Content based on materials from Turismo de Asturias",
+        "footer.content_attribution": "Content partially based on materials freely available at turismoasturias.es",
         "footer.ai_disclaimer": "Responses are AI-generated and should be verified",
       };
       return translations[key] || key;
@@ -35,7 +35,7 @@ describe("SiteFooter", () => {
   it("renders content attribution", () => {
     render(<SiteFooter />);
     expect(
-      screen.getByText("Content based on materials from Turismo de Asturias")
+      screen.getByText("Content partially based on materials freely available at turismoasturias.es")
     ).toBeInTheDocument();
   });
 
