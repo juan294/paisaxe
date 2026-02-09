@@ -141,6 +141,20 @@ describe("AuthButton", () => {
       expect(screen.getByText("T")).toBeInTheDocument(); // First letter of test@example.com
     });
 
+    it("should show 'U' fallback when no name, email, or avatar", () => {
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, name: null, email: null, avatarUrl: null },
+        session: { access_token: "token" } as never,
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+
+      render(<AuthButton />);
+
+      expect(screen.getByText("U")).toBeInTheDocument();
+    });
+
     it("should toggle dropdown when clicking avatar", () => {
       render(<AuthButton />);
 
@@ -181,6 +195,28 @@ describe("AuthButton", () => {
       fireEvent.click(screen.getByText(mockT("auth.sign_out")));
 
       expect(mockSignOut).toHaveBeenCalled();
+    });
+
+    it("should stop propagation when clicking dropdown content area", () => {
+      const parentHandler = vi.fn();
+      render(
+        <div onClick={parentHandler}>
+          <AuthButton />
+        </div>
+      );
+
+      // Open dropdown
+      fireEvent.click(screen.getByAltText("Test User"));
+
+      // Click on the dropdown content area (not a button)
+      const dropdownContent = screen.getByText("test@example.com").closest(
+        ".absolute.right-0"
+      );
+      expect(dropdownContent).toBeTruthy();
+      fireEvent.click(dropdownContent!);
+
+      // Parent should not receive the click (stopPropagation)
+      expect(parentHandler).not.toHaveBeenCalled();
     });
 
     it("should show Usuario when user has no name", () => {
