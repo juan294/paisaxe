@@ -302,6 +302,11 @@ export const ast: Translations = {
     ai_disclaimer: 'Les respuestes son xeneraes por IA y deben verificase',
   },
 
+  info_menu: {
+    about: 'Tocante a Paisaxe',
+    saved_places: 'Guardaos',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
