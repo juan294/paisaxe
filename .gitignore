@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+
+# Git worktrees (used by parallel agents inside the project sandbox)
+.worktrees/
 .pnp/
 .pnp.js
 
