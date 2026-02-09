@@ -4,7 +4,7 @@
  *
  * LOCATION-SPECIFIC: This entire file contains location-specific content.
  * When replicating, update:
- * - PELAYO_SYSTEM_PROMPT (or read from content/prompts/guide-system-prompt.md)
+ * - buildSystemPrompt() (or read from content/prompts/guide-system-prompt.md)
  * - GENERIC_REDIRECT_RESPONSE and GENERIC_REDIRECT_RESPONSE_ES
  * - Persona name references
  */
@@ -164,9 +164,6 @@ Respond naturally, then add marker at the very end:
 - ONE marker per response, at the very end
 - If I mention lacking real-time data → marker required`;
 }
-
-/** @deprecated Use buildSystemPrompt() instead. Kept for backward compatibility. */
-export const PELAYO_SYSTEM_PROMPT = buildSystemPrompt(0);
 
 // =============================================================================
 // LOCATION-SPECIFIC: Redirect Responses

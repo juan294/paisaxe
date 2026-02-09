@@ -1,32 +1,6 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { createDayPassCheckoutSession } from "@/lib/stripe";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in server component context
-          }
-        },
-      },
-    }
-  );
-}
+import { getSupabaseClient } from "@/lib/supabase-auth";
 
 /**
  * POST /api/checkout/day-pass
@@ -36,8 +10,8 @@ async function getSupabaseClient() {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Debug: Check env vars
-  const hasSecretKey = !!process.env.STRIPE_SECRET_KEY;
-  const hasPriceId = !!process.env.STRIPE_DAY_PASS_PRICE_ID;
+  const hasSecretKey = !!process.env.STRIPE_SECRET_KEY?.trim();
+  const hasPriceId = !!process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
 
   if (!hasSecretKey || !hasPriceId) {
     console.error("[checkout/day-pass] Missing env vars:", { hasSecretKey, hasPriceId });
