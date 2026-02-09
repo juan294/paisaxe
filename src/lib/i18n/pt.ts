@@ -295,6 +295,11 @@ export const pt: Translations = {
     ai_disclaimer: 'As respostas são geradas por IA e devem ser verificadas',
   },
 
+  info_menu: {
+    about: 'Sobre Paisaxe',
+    saved_places: 'Lugares guardados',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

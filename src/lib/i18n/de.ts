@@ -295,6 +295,11 @@ export const de: Translations = {
     ai_disclaimer: 'Antworten sind KI-generiert und sollten überprüft werden',
   },
 
+  info_menu: {
+    about: 'Über Paisaxe',
+    saved_places: 'Gespeicherte Orte',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
