@@ -288,6 +288,13 @@ export const pt: Translations = {
     immersive_description: 'Algo falhou ao carregar as histórias. Tente novamente.',
   },
 
+  footer: {
+    terms: 'Termos de Uso',
+    privacy: 'Política de Privacidade',
+    content_attribution: 'Conteúdo baseado em materiais de Turismo de Asturias',
+    ai_disclaimer: 'As respostas são geradas por IA e devem ser verificadas',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
