@@ -21,8 +21,11 @@ export function NavigationHint() {
   }, []);
 
   useEffect(() => {
-    // Only show on touch devices
+    // Only show on touch devices with phone-sized viewports (below sm breakpoint).
+    // Tablets have pointer: coarse but wider screens where the permanent nav
+    // arrows are already visible, so the swipe hint is unnecessary.
     if (!window.matchMedia("(pointer: coarse)").matches) return;
+    if (!window.matchMedia("(max-width: 639px)").matches) return;
     // Only show if not seen before
     if (localStorage.getItem(STORAGE_KEY) === "true") return;
 
