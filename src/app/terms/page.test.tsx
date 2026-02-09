@@ -34,8 +34,8 @@ describe("TermsPage", () => {
 
   it("should have a contact email link", () => {
     render(<TermsPage />);
-    const link = screen.getByRole("link", { name: "thecreativetoken@gmail.com" });
-    expect(link).toHaveAttribute("href", "mailto:thecreativetoken@gmail.com");
+    const link = screen.getByRole("link", { name: "support@paisaxe.es" });
+    expect(link).toHaveAttribute("href", "mailto:support@paisaxe.es");
   });
 
   it("should render in a semantic main/article structure", () => {

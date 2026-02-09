@@ -125,8 +125,8 @@ export default function TermsPage() {
         <p>
           Para cualquier consulta sobre estos términos, contacta con nosotros
           en:{" "}
-          <a href="mailto:thecreativetoken@gmail.com">
-            thecreativetoken@gmail.com
+          <a href="mailto:support@paisaxe.es">
+            support@paisaxe.es
           </a>
         </p>
       </article>
