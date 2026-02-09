@@ -6,7 +6,7 @@ import { GET, POST } from "./route";
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(() => ({
     auth: {
-      getUser: vi.fn(),
+      getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
     },
     from: vi.fn(() => ({
       select: vi.fn(() => ({
@@ -196,7 +196,7 @@ describe("Suggestions API", () => {
 
       mockCreateServerClient.mockReturnValue({
         auth: {
-          getUser: vi.fn(),
+          getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
         },
         from: vi.fn(() => ({
           insert: vi.fn(() => ({
@@ -346,6 +346,56 @@ describe("Suggestions API", () => {
       const json = await response.json();
       expect(json.data.placeName).toBe("New Place");
       expect(json.data.status).toBe("pending");
+    });
+
+    it("should use cookie session user_id when no Authorization header is sent", async () => {
+      const createdSuggestion = {
+        id: "sug-cookie",
+        user_id: "user-cookie-session",
+        place_name: "Cookie Place",
+        comment: null,
+        location: null,
+        attribution: null,
+        status: "pending",
+        admin_notes: null,
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+      };
+
+      const mockInsert = vi.fn(() => ({
+        select: vi.fn(() => ({
+          single: vi.fn(() =>
+            Promise.resolve({ data: createdSuggestion, error: null })
+          ),
+        })),
+      }));
+
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          // Cookie-based session returns a valid user
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-cookie-session" } },
+            error: null,
+          }),
+        },
+        from: vi.fn(() => ({
+          insert: mockInsert,
+        })),
+      } as never);
+
+      // NO Authorization header — user is authenticated via cookies only
+      const request = createRequest("POST", {
+        body: { placeName: "Cookie Place" },
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+      const json = await response.json();
+      expect(json.data.userId).toBe("user-cookie-session");
+      // Verify insert was called with the cookie user's ID, not null
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({ user_id: "user-cookie-session" })
+      );
     });
 
     it("should return 500 on database insert error", async () => {

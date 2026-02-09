@@ -75,8 +75,10 @@ export async function GET(request: NextRequest) {
 
 // POST /api/suggestions - Submit a new suggestion (auth optional)
 export async function POST(request: NextRequest) {
-  // Auth is optional - anonymous users can submit too
-  const user = await getUserFromRequest(request);
+  // Detect user from cookie session (covers logged-in users without Authorization header)
+  const supabase = await getSupabaseClient();
+  const { data: { user: sessionUser } } = await supabase.auth.getUser();
+  const user = sessionUser ?? await getUserFromRequest(request);
   const rateLimitKey = getRateLimitKey(request, user?.id ?? null);
 
   // Check rate limit
@@ -133,8 +135,6 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-
-  const supabase = await getSupabaseClient();
 
   const { data, error } = await supabase
     .from("story_suggestions")
