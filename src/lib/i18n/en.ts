@@ -308,6 +308,23 @@ export const en: Translations = {
     saved_places: 'Saved Places',
   },
 
+
+  about: {
+    title: 'About Paisaxe',
+    tagline: 'Look. Ask. Discover.',
+    back: 'Go back',
+    what_title: 'What is Paisaxe',
+    what_description: 'Paisaxe is an immersive tourism experience for Asturias, in northern Spain. Beautiful tourism guides exist, crafted with stunning photography and detailed descriptions, but they are buried at the bottom of websites. Static. Boring. You cannot interact with them. Paisaxe brings them to life.',
+    vision_title: 'The vision',
+    vision_description: 'You see a beautiful image. It inspires you. You tap it and ask: where is this? Can I bring my kids? How do I get there? Paisaxe answers, like a local friend showing you their favourite spots. One thing, done exceptionally well.',
+    content_title: 'The content',
+    content_description: 'All content is based on official materials from Turismo de Asturias. Paisaxe does not make up information: it transforms real tourism guides into natural conversations, always respecting and attributing the original source.',
+    ai_title: 'Artificial intelligence',
+    ai_description: 'Paisaxe uses AI to answer your questions. Our text chat is powered by Claude from Anthropic, and voice conversations by ElevenLabs. Responses are generated from verified official content, but as with any AI, we recommend verifying important details.',
+    contact_title: 'Contact',
+    contact_description: 'Paisaxe is a personal project, made with love in Asturias. If you have questions, ideas, or just want to say hello:',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
