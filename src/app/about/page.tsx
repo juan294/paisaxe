@@ -104,10 +104,10 @@ export default function AboutPage() {
               {t("about.contact_description")}
             </p>
             <a
-              href="mailto:thecreativetoken@gmail.com"
+              href="mailto:support@paisaxe.es"
               className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors underline underline-offset-4"
             >
-              thecreativetoken@gmail.com
+              support@paisaxe.es
             </a>
           </section>
         </div>
