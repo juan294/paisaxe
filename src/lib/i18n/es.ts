@@ -308,6 +308,23 @@ export const es: Translations = {
     saved_places: 'Guardados',
   },
 
+
+  about: {
+    title: 'Acerca de Paisaxe',
+    tagline: 'Mira. Pregunta. Descubre.',
+    back: 'Volver',
+    what_title: 'Qué es Paisaxe',
+    what_description: 'Paisaxe es una experiencia turística inmersiva para Asturias, en el norte de España. Hermosas guías turísticas existen, elaboradas con fotografías impresionantes y descripciones detalladas, pero están enterradas al fondo de páginas web. Estáticas. Aburridas. No puedes interactuar con ellas. Paisaxe les da vida.',
+    vision_title: 'La visión',
+    vision_description: 'Ves una imagen preciosa. Te inspira. La tocas y preguntas: ¿dónde es esto? ¿Puedo ir con niños? ¿Cómo llego? Paisaxe responde, como un amigo local que te enseña sus rincones favoritos. Una cosa, hecha excepcionalmente bien.',
+    content_title: 'El contenido',
+    content_description: 'Todo el contenido está basado en materiales oficiales de Turismo de Asturias. Paisaxe no inventa información: transforma guías turísticas reales en conversaciones naturales, respetando y atribuyendo siempre la fuente original.',
+    ai_title: 'Inteligencia artificial',
+    ai_description: 'Paisaxe usa IA para responder tus preguntas. Nuestro chat de texto está impulsado por Claude de Anthropic, y las conversaciones de voz por ElevenLabs. Las respuestas se generan a partir de contenido oficial verificado, pero como toda IA, recomendamos verificar los detalles importantes.',
+    contact_title: 'Contacto',
+    contact_description: 'Paisaxe es un proyecto personal, creado con cariño en Asturias. Si tienes preguntas, ideas o simplemente quieres saludar:',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
