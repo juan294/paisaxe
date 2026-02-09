@@ -217,7 +217,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         {/* ElevenLabs Voice Chat or Text Chat */}
         {isInitializing ? (
           /* Show loading while determining voice access */
-          <div className="h-64 flex items-center justify-center">
+          <div className="h-64 md:h-96 lg:h-[28rem] flex items-center justify-center">
             <div className="animate-pulse text-white/50 text-sm">
               {t("common.loading")}
             </div>
@@ -238,7 +238,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
               role="log"
               aria-live="polite"
               aria-label={t("accessibility.chat_messages")}
-              className="h-64 overflow-y-auto p-4 space-y-4"
+              className="h-64 md:h-96 lg:h-[28rem] overflow-y-auto p-4 space-y-4"
             >
               {messages.length === 0 && (
                 <div className="text-center text-white/50 py-8">
