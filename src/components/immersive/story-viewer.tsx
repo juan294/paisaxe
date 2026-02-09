@@ -29,6 +29,7 @@ import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { NavigationHint } from "./navigation-hint";
 import { AuthorTypewriter } from "./author-typewriter";
+import { StoryProgressBar } from "./story-progress-bar";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -253,62 +254,13 @@ export function StoryViewer({
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
       </div>
 
-      {/* Progress bar - fixed segments that fill and reset, creating an infinite flow */}
-      {(() => {
-        const PAGE_SIZE = 20;
-        const segmentCount = Math.min(PAGE_SIZE, stories.length);
-        const fillPosition = currentIndex % segmentCount;
-
-        return (
-          <div
-            role="progressbar"
-            aria-label={t("accessibility.story_progress")}
-            aria-valuenow={currentIndex + 1}
-            aria-valuemin={1}
-            aria-valuemax={stories.length}
-            className="absolute top-0 left-0 right-0 z-20 flex items-center gap-1 p-4"
-          >
-            {Array.from({ length: segmentCount }, (_, i) => {
-              const base = currentIndex - fillPosition;
-              const targetIndex = base + i;
-              const handleJump = () => {
-                if (targetIndex >= 0 && targetIndex < stories.length) {
-                  onIndexChange(targetIndex);
-                }
-              };
-              return (
-                <div
-                  key={i}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={t("accessibility.go_to_story")
-                    .replace("{current}", String(targetIndex + 1))
-                    .replace("{total}", String(stories.length))}
-                  className="flex-1 h-1 rounded-full bg-white/30 overflow-hidden cursor-pointer transition-all duration-300 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleJump();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleJump();
-                    }
-                  }}
-                >
-                  <div
-                    className={cn(
-                      "h-full bg-white transition-all duration-300 motion-reduce:transition-none",
-                      i <= fillPosition ? "w-full" : "w-0"
-                    )}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
+      {/* Progress bar - extracted & memoized component with event delegation */}
+      <StoryProgressBar
+        storiesLength={stories.length}
+        currentIndex={currentIndex}
+        onIndexChange={onIndexChange}
+        t={t}
+      />
 
       {/* Category badge / Filter */}
       <CategoryFilterBadge
