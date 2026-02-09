@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import fs from "fs";
+import path from "path";
 import RootLayout, { metadata } from "./layout";
 
 // Mock next/font/google
@@ -118,6 +120,26 @@ describe("RootLayout", () => {
     it("should include canonical URL via alternates", () => {
       expect(metadata.alternates).toBeDefined();
       expect(metadata.alternates!.canonical).toBe(SITE_URL);
+    });
+  });
+
+  describe("preconnect links", () => {
+    const layoutSource = fs.readFileSync(
+      path.join(process.cwd(), "src/app/layout.tsx"),
+      "utf-8"
+    );
+
+    it("should not contain Google Fonts preconnect links (next/font self-hosts)", () => {
+      expect(layoutSource).not.toContain("fonts.googleapis.com");
+      expect(layoutSource).not.toContain("fonts.gstatic.com");
+    });
+
+    it("should keep Supabase preconnect links", () => {
+      expect(layoutSource).toContain("axoishtlumlswzhegseq.supabase.co");
+    });
+
+    it("should keep Unsplash preconnect links", () => {
+      expect(layoutSource).toContain("images.unsplash.com");
     });
   });
 
