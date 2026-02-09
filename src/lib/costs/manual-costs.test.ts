@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase";
 import {
   fetchManualCosts,
   createManualCost,
@@ -8,34 +8,30 @@ import {
   getManualCost,
 } from "./manual-costs";
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(),
+vi.mock("@/lib/supabase", () => ({
+  createAdminClient: vi.fn(),
 }));
 
 describe("manual-costs", () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
-    process.env = { ...originalEnv };
-    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
-    process.env.SUPABASE_SERVICE_KEY = "test-service-key";
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    process.env = originalEnv;
     vi.restoreAllMocks();
   });
 
   function mockSupabase(methodChain: Record<string, unknown>) {
-    vi.mocked(createClient).mockReturnValue({
+    vi.mocked(createAdminClient).mockReturnValue({
       from: vi.fn().mockReturnValue(methodChain),
     } as never);
   }
 
   describe("fetchManualCosts", () => {
-    it("returns empty array when Supabase credentials are missing", async () => {
-      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    it("returns empty array when createAdminClient throws", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+      });
       const result = await fetchManualCosts("2024-01-01", "2024-01-31");
       expect(result).toEqual([]);
     });
@@ -157,8 +153,10 @@ describe("manual-costs", () => {
       expect(result).toBeNull();
     });
 
-    it("returns null when Supabase credentials missing", async () => {
-      delete process.env.SUPABASE_SERVICE_KEY;
+    it("returns null when createAdminClient throws", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+      });
       const result = await createManualCost(request);
       expect(result).toBeNull();
     });
@@ -236,8 +234,10 @@ describe("manual-costs", () => {
       expect(result).toBe(false);
     });
 
-    it("returns false when Supabase credentials missing", async () => {
-      delete process.env.SUPABASE_SERVICE_KEY;
+    it("returns false when createAdminClient throws", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+      });
       const result = await deleteManualCost("cost-1");
       expect(result).toBe(false);
     });
