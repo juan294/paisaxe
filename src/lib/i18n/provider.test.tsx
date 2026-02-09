@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
-import { LanguageProvider } from './provider';
+import { useContext } from 'react';
+import { LanguageProvider, LanguageContext } from './provider';
 import { useTranslation } from './use-translation';
 
 // Test component that uses the hook
@@ -282,5 +283,101 @@ describe('useTranslation', () => {
     }).toThrow('useTranslation must be used within a LanguageProvider');
 
     spy.mockRestore();
+  });
+});
+
+// Helper that reads context directly (no hook dependency)
+function LocaleDisplay() {
+  const ctx = useContext(LanguageContext);
+  return <span data-testid="ctx-locale">{ctx?.locale ?? 'NO_CONTEXT'}</span>;
+}
+
+describe('LanguageProvider render-blocking fix', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it('renders children immediately without null flash when no initialLocale', () => {
+    // With no initialLocale and no stored pref, should still render children
+    // on the first render (no useEffect delay, no return null)
+    Object.defineProperty(navigator, 'languages', {
+      value: ['es'],
+      configurable: true,
+    });
+
+    const { container } = render(
+      <LanguageProvider>
+        <LocaleDisplay />
+      </LanguageProvider>
+    );
+
+    // Children must be present on first render (not null)
+    expect(container.innerHTML).not.toBe('');
+    expect(screen.getByTestId('ctx-locale').textContent).toBe('es');
+  });
+
+  it('renders with stored locale immediately (no flash)', () => {
+    localStorage.setItem('paisaxe-locale', 'en');
+
+    render(
+      <LanguageProvider>
+        <LocaleDisplay />
+      </LanguageProvider>
+    );
+
+    // Should use 'en' from localStorage on first render
+    expect(screen.getByTestId('ctx-locale').textContent).toBe('en');
+  });
+
+  it('renders with detected browser language immediately (no flash)', () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['fr-FR', 'en-US'],
+      configurable: true,
+    });
+
+    render(
+      <LanguageProvider>
+        <LocaleDisplay />
+      </LanguageProvider>
+    );
+
+    // Should detect 'fr' from navigator.languages on first render
+    expect(screen.getByTestId('ctx-locale').textContent).toBe('fr');
+  });
+
+  it('defaults to es when no stored pref and unsupported browser language', () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['zh-CN', 'ja'],
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'language', {
+      value: 'zh-CN',
+      configurable: true,
+    });
+
+    render(
+      <LanguageProvider>
+        <LocaleDisplay />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('ctx-locale').textContent).toBe('es');
+  });
+
+  it('uses initialLocale prop without running detection', () => {
+    // Even if browser is 'fr', initialLocale='de' should win
+    Object.defineProperty(navigator, 'languages', {
+      value: ['fr-FR'],
+      configurable: true,
+    });
+
+    render(
+      <LanguageProvider initialLocale="de">
+        <LocaleDisplay />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('ctx-locale').textContent).toBe('de');
   });
 });
