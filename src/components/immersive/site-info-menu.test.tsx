@@ -43,7 +43,7 @@ describe("SiteInfoMenu", () => {
 
   it("renders the trigger button", () => {
     render(<SiteInfoMenu />);
-    expect(screen.getByRole("button", { name: /info/i })).toBeInTheDocument();
+    expect(screen.getByRole("button")).toBeInTheDocument();
   });
 
   it("panel is closed by default", () => {
@@ -53,14 +53,14 @@ describe("SiteInfoMenu", () => {
 
   it("opens panel when trigger is clicked", () => {
     render(<SiteInfoMenu />);
-    fireEvent.click(screen.getByRole("button", { name: /info/i }));
+    fireEvent.click(screen.getByRole("button"));
     expect(screen.getByText(mockT("footer.content_attribution"))).toBeInTheDocument();
     expect(screen.getByText(mockT("footer.ai_disclaimer"))).toBeInTheDocument();
   });
 
   it("renders legal links in panel", () => {
     render(<SiteInfoMenu />);
-    fireEvent.click(screen.getByRole("button", { name: /info/i }));
+    fireEvent.click(screen.getByRole("button"));
 
     const termsLink = screen.getByRole("link", { name: /condiciones/i });
     expect(termsLink).toHaveAttribute("href", "/terms");
@@ -71,7 +71,7 @@ describe("SiteInfoMenu", () => {
 
   it("renders saved places link in panel", () => {
     render(<SiteInfoMenu />);
-    fireEvent.click(screen.getByRole("button", { name: /info/i }));
+    fireEvent.click(screen.getByRole("button"));
 
     const favLink = screen.getByRole("link", { name: /guardados/i });
     expect(favLink).toHaveAttribute("href", "/favorites");
@@ -79,7 +79,7 @@ describe("SiteInfoMenu", () => {
 
   it("closes panel on Escape key", () => {
     render(<SiteInfoMenu />);
-    fireEvent.click(screen.getByRole("button", { name: /info/i }));
+    fireEvent.click(screen.getByRole("button"));
     expect(screen.getByText(mockT("footer.content_attribution"))).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: "Escape" });
@@ -88,7 +88,7 @@ describe("SiteInfoMenu", () => {
 
   it("closes panel when clicking backdrop", () => {
     render(<SiteInfoMenu />);
-    fireEvent.click(screen.getByRole("button", { name: /info/i }));
+    fireEvent.click(screen.getByRole("button"));
     expect(screen.getByText(mockT("footer.content_attribution"))).toBeInTheDocument();
 
     const backdrop = document.querySelector("[data-testid='info-menu-backdrop']");
@@ -99,17 +99,23 @@ describe("SiteInfoMenu", () => {
   });
 
   describe("signed out state", () => {
-    it("shows sign in button when user is null", () => {
+    it("shows sign in icon as trigger", () => {
       render(<SiteInfoMenu />);
-      fireEvent.click(screen.getByRole("button", { name: /info/i }));
-
-      expect(screen.getByRole("button", { name: mockT("auth.sign_in") })).toBeInTheDocument();
+      const button = screen.getByRole("button");
+      expect(button).toHaveAttribute("aria-label", mockT("auth.sign_in"));
     });
 
-    it("calls signInWithGoogle when clicking sign in", () => {
+    it("shows sign in option inside panel", () => {
       render(<SiteInfoMenu />);
-      fireEvent.click(screen.getByRole("button", { name: /info/i }));
-      fireEvent.click(screen.getByRole("button", { name: mockT("auth.sign_in") }));
+      fireEvent.click(screen.getByRole("button"));
+
+      expect(screen.getByText(mockT("auth.sign_in"))).toBeInTheDocument();
+    });
+
+    it("calls signInWithGoogle when clicking sign in inside panel", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+      fireEvent.click(screen.getByText(mockT("auth.sign_in")));
 
       expect(mockSignInWithGoogle).toHaveBeenCalled();
     });
@@ -133,35 +139,47 @@ describe("SiteInfoMenu", () => {
       });
     });
 
-    it("shows user name and email", () => {
+    it("shows user avatar as trigger", () => {
       render(<SiteInfoMenu />);
-      fireEvent.click(screen.getByRole("button", { name: /info/i }));
+      const avatar = screen.getByAltText("Test User");
+      expect(avatar).toHaveAttribute("src", "https://example.com/avatar.jpg");
+    });
+
+    it("shows user name and email in panel", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
 
       expect(screen.getByText("Test User")).toBeInTheDocument();
       expect(screen.getByText("test@example.com")).toBeInTheDocument();
     });
 
-    it("shows user avatar", () => {
+    it("shows sign out button in panel", () => {
       render(<SiteInfoMenu />);
-      fireEvent.click(screen.getByRole("button", { name: /info/i }));
-
-      const avatar = screen.getByAltText("Test User");
-      expect(avatar).toHaveAttribute("src", "https://example.com/avatar.jpg");
-    });
-
-    it("shows sign out button", () => {
-      render(<SiteInfoMenu />);
-      fireEvent.click(screen.getByRole("button", { name: /info/i }));
+      fireEvent.click(screen.getByRole("button"));
 
       expect(screen.getByRole("button", { name: mockT("auth.sign_out") })).toBeInTheDocument();
     });
 
     it("calls signOut when clicking sign out", () => {
       render(<SiteInfoMenu />);
-      fireEvent.click(screen.getByRole("button", { name: /info/i }));
+      fireEvent.click(screen.getByRole("button"));
       fireEvent.click(screen.getByRole("button", { name: mockT("auth.sign_out") }));
 
       expect(mockSignOut).toHaveBeenCalled();
+    });
+
+    it("shows loading skeleton when auth is loading", () => {
+      mockUseAuth.mockReturnValue({
+        user: null,
+        session: null,
+        isLoading: true,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+
+      render(<SiteInfoMenu />);
+      const skeleton = document.querySelector(".animate-pulse");
+      expect(skeleton).toBeInTheDocument();
     });
   });
 });
