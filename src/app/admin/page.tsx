@@ -9,7 +9,7 @@ import { AdminTabs, TABS, type AdminTab } from "@/components/admin/admin-tabs";
 import { AdminThemeProvider } from "@/components/admin/theme-provider";
 import { ThemeToggle } from "@/components/admin/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { fetchStories, bulkUpdateStoryStatus, bulkDeleteStories } from "@/lib/admin-api";
+import { fetchStories, bulkUpdateStoryStatus, bulkDeleteStories, approveAllPendingStories } from "@/lib/admin-api";
 import {
   RefreshCw,
   LogOut,
@@ -129,6 +129,8 @@ function AdminPageContent() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isApproveAllConfirmOpen, setIsApproveAllConfirmOpen] = useState(false);
+  const [isApprovingAll, setIsApprovingAll] = useState(false);
 
   const handleTabChange = useCallback((tab: AdminTab) => {
     setActiveTab(tab);
@@ -285,6 +287,29 @@ function AdminPageContent() {
   const handleStoryCreated = (_story: CreateStoryResponse) => {
     // Reload stories to get the full story data
     loadStories();
+  };
+
+  const handleApproveAll = async () => {
+    setIsApprovingAll(true);
+    setError("");
+
+    const result = await approveAllPendingStories();
+
+    if (result.error) {
+      setError(result.error);
+    } else if (result.data) {
+      // Update local state: mark all needs_curation stories as approved
+      setAllStories((prev) =>
+        prev.map((story) =>
+          story.curationStatus === "needs_curation"
+            ? { ...story, curationStatus: "approved" }
+            : story
+        )
+      );
+    }
+
+    setIsApprovingAll(false);
+    setIsApproveAllConfirmOpen(false);
   };
 
   const handleBulkDelete = async () => {
@@ -518,6 +543,20 @@ function AdminPageContent() {
                   className="h-11 rounded-xl border-none bg-white pl-10 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:bg-[#252320] dark:text-[#f5f3ee]"
                 />
               </div>
+              {needsCurationCount > 0 && (
+                <Button
+                  onClick={() => setIsApproveAllConfirmOpen(true)}
+                  disabled={isApprovingAll}
+                  className="h-11 rounded-xl bg-[#5a7a5a] text-sm font-medium text-white hover:bg-[#4a6a4a] disabled:opacity-50"
+                >
+                  {isApprovingAll ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                  )}
+                  Approve All ({needsCurationCount})
+                </Button>
+              )}
               <Button
                 onClick={() => setIsCreateDialogOpen(true)}
                 className="h-11 rounded-xl bg-[#2d2a26] text-sm font-medium text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
@@ -612,6 +651,47 @@ function AdminPageContent() {
         onOpenChange={setIsCreateDialogOpen}
         onCreated={handleStoryCreated}
       />
+
+      {/* Approve All Confirmation Dialog */}
+      {isApproveAllConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-[#252320]">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#5a7a5a]/10">
+              <CheckCircle2 className="h-6 w-6 text-[#5a7a5a]" />
+            </div>
+            <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
+              Approve All Stories
+            </h3>
+            <p className="mt-2 text-sm text-[#6b6560] dark:text-[#a39e98]">
+              This will approve {needsCurationCount} pending{" "}
+              {needsCurationCount === 1 ? "story" : "stories"}. This action
+              can be reversed by marking stories as pending individually.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <Button
+                onClick={() => setIsApproveAllConfirmOpen(false)}
+                disabled={isApprovingAll}
+                variant="ghost"
+                className="flex-1 h-11 rounded-xl text-sm font-medium text-[#6b6560] hover:bg-[#f5f3ee] dark:text-[#a39e98] dark:hover:bg-[#2d2a26]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleApproveAll}
+                disabled={isApprovingAll}
+                className="flex-1 h-11 rounded-xl bg-[#5a7a5a] text-sm font-medium text-white hover:bg-[#4a6a4a] disabled:opacity-50"
+              >
+                {isApprovingAll ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                )}
+                {isApprovingAll ? "Approving..." : "Approve All"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Selection Toolbar */}
       <SelectionToolbar

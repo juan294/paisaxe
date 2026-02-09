@@ -268,6 +268,29 @@ export async function bulkDeleteStories(
 }
 
 /**
+ * Approve all pending (needs_curation) stories at once
+ */
+export async function approveAllPendingStories(): Promise<
+  AdminApiResponse<{ approvedCount: number; approvedIds: string[] }>
+> {
+  try {
+    const response = await fetch(`${API_BASE}/stories/approve-all`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { error: error.error || "Failed to approve all stories" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error approving all stories:", error);
+    return { error: "Network error" };
+  }
+}
+
+/**
  * Search for content images from PDF manifest for a story
  */
 export async function searchContentImages(
