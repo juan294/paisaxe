@@ -325,22 +325,40 @@ describe("GET /api/admin/costs-analytics", () => {
       .mockResolvedValueOnce({ results: [[10]] })   // chat conversations
       .mockResolvedValueOnce({ results: [[500]] }); // total events
 
-    // Mock global fetch for ElevenLabs conversations API
+    // Mock global fetch for ElevenLabs agents + conversations API
+    const paisaxeAgentId = "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"; // pelayo
     const originalFetch = global.fetch;
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        conversations: [
-          {
-            start_time_unix_secs: Math.floor(new Date("2026-02-03").getTime() / 1000),
-            call_duration_secs: 180,
-          },
-          {
-            start_time_unix_secs: Math.floor(new Date("2026-02-04").getTime() / 1000),
-            call_duration_secs: 120,
-          },
-        ],
-      }),
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            agents: [
+              { agent_id: paisaxeAgentId, name: "Paisaxe - Pelayo (Visitor Guide)" },
+            ],
+          }),
+        });
+      }
+      if (url.includes("/convai/conversations")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            conversations: [
+              {
+                agent_id: paisaxeAgentId,
+                start_time_unix_secs: Math.floor(new Date("2026-02-03").getTime() / 1000),
+                call_duration_secs: 180,
+              },
+              {
+                agent_id: paisaxeAgentId,
+                start_time_unix_secs: Math.floor(new Date("2026-02-04").getTime() / 1000),
+                call_duration_secs: 120,
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
     }) as unknown as typeof fetch;
 
     const request = new NextRequest(
@@ -361,9 +379,15 @@ describe("GET /api/admin/costs-analytics", () => {
     // Verify PostHog was called 3 times
     expect(vi.mocked(queryPostHog)).toHaveBeenCalledTimes(3);
 
-    // Verify ElevenLabs fetch was called
+    // Verify ElevenLabs fetch was called for both agents and conversations
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("elevenlabs.io"),
+      expect.stringContaining("/convai/agents"),
+      expect.objectContaining({
+        headers: { "xi-api-key": "xi-test" },
+      })
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/convai/conversations"),
       expect.objectContaining({
         headers: { "xi-api-key": "xi-test" },
       })
@@ -371,6 +395,85 @@ describe("GET /api/admin/costs-analytics", () => {
 
     // Restore original fetch
     global.fetch = originalFetch;
+    vi.unstubAllEnvs();
+  });
+
+  it("should only count voice minutes from Paisaxe agents, not all account conversations", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    vi.mocked(fetchAnthropicCosts).mockResolvedValue(null);
+    vi.mocked(fetchTwilioCosts).mockResolvedValue(null);
+    vi.mocked(fetchElevenLabsCosts).mockResolvedValue(null);
+    vi.mocked(fetchManualCosts).mockResolvedValue([]);
+    vi.mocked(generateRecurringCosts).mockReturnValue([]);
+    vi.mocked(fetchAnthropicCostsByDay).mockResolvedValue([]);
+
+    vi.stubEnv("POSTHOG_PROJECT_ID", "");
+    vi.stubEnv("POSTHOG_PERSONAL_API_KEY", "");
+    vi.stubEnv("ELEVENLABS_API_KEY", "xi-test");
+
+    const paisaxeId = "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"; // pelayo
+    const nonPaisaxeId = "agent_other_project_12345";
+
+    const originalFetch2 = global.fetch;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            agents: [
+              { agent_id: paisaxeId, name: "Paisaxe - Pelayo (Visitor Guide)" },
+              { agent_id: nonPaisaxeId, name: "Other Project Agent" },
+            ],
+          }),
+        });
+      }
+      if (url.includes("/convai/conversations")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            conversations: [
+              {
+                agent_id: paisaxeId,
+                start_time_unix_secs: Math.floor(new Date("2026-02-03").getTime() / 1000),
+                call_duration_secs: 180, // 3 min - Paisaxe agent
+              },
+              {
+                agent_id: nonPaisaxeId,
+                start_time_unix_secs: Math.floor(new Date("2026-02-04").getTime() / 1000),
+                call_duration_secs: 600, // 10 min - NOT Paisaxe agent
+              },
+              {
+                agent_id: paisaxeId,
+                start_time_unix_secs: Math.floor(new Date("2026-02-05").getTime() / 1000),
+                call_duration_secs: 120, // 2 min - Paisaxe agent
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({}),
+      });
+    }) as unknown as typeof fetch;
+
+    const request = new NextRequest(
+      "http://localhost/api/admin/costs-analytics?includeUsage=true&from=2026-02-01&to=2026-02-06"
+    );
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.usageMetrics).toBeDefined();
+    // Should only count Paisaxe agent conversations (3 + 2 = 5 min)
+    expect(data.data.usageMetrics.voiceConversations).toBe(2);
+    expect(data.data.usageMetrics.voiceMinutes).toBe(5);
+
+    global.fetch = originalFetch2;
     vi.unstubAllEnvs();
   });
 });
