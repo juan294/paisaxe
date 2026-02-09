@@ -8,7 +8,7 @@
  * - CATEGORY_LABELS (if categories differ)
  */
 
-export type StorySourceType = "curated" | "user_submitted";
+export type StorySourceType = "curated" | "user_submitted" | "agent_discovered";
 
 export interface Story {
   id: string;
