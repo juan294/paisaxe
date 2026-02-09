@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import Image from "next/image";
 import {
   Dialog,
@@ -16,7 +16,6 @@ import {
   updateStoryImageUrl,
   uploadStoryImage,
   updateStoryStatus,
-  searchContentImages,
   updateStoryImageSource,
 } from "@/lib/admin-api";
 import {
@@ -31,9 +30,10 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import type { AdminStory, CurationStatus, ContentImage } from "@/types/admin";
+import type { AdminStory, CurationStatus } from "@/types/admin";
 import { cn } from "@/lib/utils";
 import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
+import { useImageEditor } from "./story-editor-dialog/use-image-editor";
 
 interface ImageEditorDialogProps {
   story: AdminStory | null;
@@ -41,109 +41,16 @@ interface ImageEditorDialogProps {
   onUpdate: (storyId: string, updates: Partial<AdminStory>) => void;
 }
 
-type TabType = "url" | "upload" | "content";
-
 export function ImageEditorDialog({
   story,
   onClose,
   onUpdate,
 }: ImageEditorDialogProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("content");
-  const [imageUrl, setImageUrl] = useState("");
-  const [imageSource, setImageSource] = useState("");
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Content images state
-  const [contentImages, setContentImages] = useState<ContentImage[]>([]);
-  const [contentImageIndex, setContentImageIndex] = useState(0);
-  const [isSearchingContent, setIsSearchingContent] = useState(false);
-  const [contentSearched, setContentSearched] = useState(false);
-
-  // Initialize imageSource when story changes
-  useEffect(() => {
-    if (story?.imageSource) {
-      setImageSource(story.imageSource);
-    } else {
-      setImageSource("");
-    }
-  }, [story]);
-
-  const handleUrlChange = (url: string) => {
-    setImageUrl(url);
-    setError("");
-    if (url) {
-      setPreviewUrl(url);
-    } else {
-      setPreviewUrl(null);
-    }
-  };
-
-  const validateAndSetFile = useCallback((file: File) => {
-    setError("");
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (!allowedTypes.includes(file.type)) {
-      setError("Invalid file type. Allowed: JPEG, PNG, WebP, GIF");
-      return false;
-    }
-
-    const maxSize = 5 * 1024 * 1024;
-    if (file.size > maxSize) {
-      setError("File too large. Maximum size is 5MB");
-      return false;
-    }
-
-    setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
-    return true;
-  }, []);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      return;
-    }
-    validateAndSetFile(file);
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-
-      const file = e.dataTransfer.files?.[0];
-      if (file && file.type.startsWith("image/")) {
-        validateAndSetFile(file);
-      }
-    },
-    [validateAndSetFile]
-  );
+  const setErrorStable = useCallback((e: string) => setError(e), []);
+  const img = useImageEditor(story, setErrorStable);
 
   const handleSave = async () => {
     if (!story) return;
@@ -153,23 +60,19 @@ export function ImageEditorDialog({
     try {
       let result;
 
-      if (activeTab === "url" && imageUrl) {
-        result = await updateStoryImageUrl(story.id, imageUrl, imageSource || undefined);
-      } else if (activeTab === "upload" && selectedFile) {
-        result = await uploadStoryImage(story.id, selectedFile, imageSource || undefined);
-      } else if (activeTab === "content" && currentContentImage) {
-        // For content images, use the URL (it's a local path that needs to be served)
-        result = await updateStoryImageUrl(story.id, currentContentImage.url, imageSource || undefined);
+      if (img.imageSourceTab === "url" && img.imageUrl) {
+        result = await updateStoryImageUrl(story.id, img.imageUrl, img.imageSource || undefined);
+      } else if (img.imageSourceTab === "upload" && img.selectedFile) {
+        result = await uploadStoryImage(story.id, img.selectedFile, img.imageSource || undefined);
+      } else if (img.imageSourceTab === "content" && img.currentContentImage) {
+        result = await updateStoryImageUrl(story.id, img.currentContentImage.url, img.imageSource || undefined);
       } else {
-        // Check if we can do a source-only update or if there's nothing to save
         const hasRealImage = story.image && !isPlaceholderImage(story);
-        const sourceChanged = imageSource !== (story.imageSource || "");
+        const sourceChanged = img.imageSource !== (story.imageSource || "");
 
         if (hasRealImage) {
-          // Story already has a real image
-          if (sourceChanged && imageSource) {
-            // Source changed - save just the source
-            const sourceResult = await updateStoryImageSource(story.id, imageSource);
+          if (sourceChanged && img.imageSource) {
+            const sourceResult = await updateStoryImageSource(story.id, img.imageSource);
             if (sourceResult.error) {
               setError(sourceResult.error);
             } else if (sourceResult.data) {
@@ -179,13 +82,11 @@ export function ImageEditorDialog({
             setIsLoading(false);
             return;
           } else {
-            // Nothing to save - just close the dialog
             resetAndClose();
             return;
           }
         }
 
-        // Story needs an image (placeholder or no image)
         setError("Please provide an image URL, upload a file, or select a content image");
         setIsLoading(false);
         return;
@@ -216,7 +117,6 @@ export function ImageEditorDialog({
         setError(result.error);
       } else {
         onUpdate(story.id, { curationStatus: "approved" as CurationStatus });
-        // Modal stays open so user can continue editing
       }
     } catch {
       setError("Failed to approve story");
@@ -246,76 +146,12 @@ export function ImageEditorDialog({
   };
 
   const resetAndClose = () => {
-    setImageUrl("");
-    setImageSource("");
-    setPreviewUrl(null);
-    setSelectedFile(null);
     setError("");
-    setActiveTab("content");
-    setIsDragging(false);
-    setContentImages([]);
-    setContentImageIndex(0);
-    setContentSearched(false);
+    img.resetImageState();
     onClose();
   };
 
-  const clearUpload = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const handleSearchContent = async () => {
-    if (!story) return;
-    setIsSearchingContent(true);
-    setError("");
-
-    try {
-      const result = await searchContentImages(story.id);
-
-      if (result.error) {
-        setError(result.error);
-      } else if (result.data) {
-        setContentImages(result.data.images);
-        setContentImageIndex(0);
-        setContentSearched(true);
-
-        if (result.data.images.length > 0) {
-          const firstImage = result.data.images[0];
-          setPreviewUrl(firstImage.url);
-          setImageUrl(firstImage.url);
-          setImageSource("Turismo de Asturias");
-        }
-      }
-    } catch {
-      setError("Failed to search content images");
-    } finally {
-      setIsSearchingContent(false);
-    }
-  };
-
-  const handleContentImageNav = (direction: "prev" | "next") => {
-    if (contentImages.length === 0) return;
-
-    let newIndex: number;
-    if (direction === "prev") {
-      newIndex = contentImageIndex === 0 ? contentImages.length - 1 : contentImageIndex - 1;
-    } else {
-      newIndex = contentImageIndex === contentImages.length - 1 ? 0 : contentImageIndex + 1;
-    }
-
-    setContentImageIndex(newIndex);
-    const image = contentImages[newIndex];
-    setPreviewUrl(image.url);
-    setImageUrl(image.url);
-    setImageSource("Turismo de Asturias");
-  };
-
-  const currentContentImage = contentImages[contentImageIndex] || null;
-
   if (!story) return null;
-
-  const currentPreview = previewUrl || story.image;
 
   return (
     <>
@@ -348,25 +184,25 @@ export function ImageEditorDialog({
 
             {/* Current/Preview Image */}
             <div className="relative mb-5 aspect-video overflow-hidden rounded-xl bg-[#f5f3ee] shadow-sm">
-              {currentPreview ? (
+              {img.currentPreview ? (
                 <>
                   <Image
-                    src={currentPreview}
+                    src={img.currentPreview}
                     alt={story.title}
                     fill
                     className="object-cover"
                     sizes="(max-width: 768px) 100vw, 600px"
                   />
                   <button
-                    onClick={() => setIsFullscreen(true)}
+                    onClick={() => img.setIsFullscreen(true)}
                     className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg bg-black/40 text-white/90 backdrop-blur-sm transition-all hover:bg-black/60"
                   >
                     <Maximize2 className="h-4 w-4" />
                   </button>
                   {/* Resolution info badge for content images */}
-                  {activeTab === "content" && currentContentImage && (
+                  {img.imageSourceTab === "content" && img.currentContentImage && (
                     <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-sm">
-                      {currentContentImage.width} × {currentContentImage.height}
+                      {img.currentContentImage.width} × {img.currentContentImage.height}
                     </div>
                   )}
                 </>
@@ -385,14 +221,14 @@ export function ImageEditorDialog({
               <button
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
-                  activeTab === "content"
+                  img.imageSourceTab === "content"
                     ? "bg-white text-[#2d2a26] shadow-sm"
                     : "text-[#6b6560] hover:text-[#2d2a26]"
                 )}
                 onClick={() => {
-                  setActiveTab("content");
-                  clearUpload();
-                  setImageUrl("");
+                  img.setImageSourceTab("content");
+                  img.clearUpload();
+                  img.handleUrlChange("");
                 }}
               >
                 <FolderSearch className="h-3.5 w-3.5" />
@@ -401,13 +237,13 @@ export function ImageEditorDialog({
               <button
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
-                  activeTab === "url"
+                  img.imageSourceTab === "url"
                     ? "bg-white text-[#2d2a26] shadow-sm"
                     : "text-[#6b6560] hover:text-[#2d2a26]"
                 )}
                 onClick={() => {
-                  setActiveTab("url");
-                  clearUpload();
+                  img.setImageSourceTab("url");
+                  img.clearUpload();
                 }}
               >
                 <Link className="h-3.5 w-3.5" />
@@ -416,14 +252,13 @@ export function ImageEditorDialog({
               <button
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
-                  activeTab === "upload"
+                  img.imageSourceTab === "upload"
                     ? "bg-white text-[#2d2a26] shadow-sm"
                     : "text-[#6b6560] hover:text-[#2d2a26]"
                 )}
                 onClick={() => {
-                  setActiveTab("upload");
-                  setImageUrl("");
-                  setPreviewUrl(null);
+                  img.setImageSourceTab("upload");
+                  img.handleUrlChange("");
                 }}
               >
                 <Upload className="h-3.5 w-3.5" />
@@ -433,23 +268,23 @@ export function ImageEditorDialog({
 
             {/* Tab Content */}
             <div className="space-y-3">
-              {activeTab === "url" ? (
+              {img.imageSourceTab === "url" ? (
                 <Input
                   type="url"
                   placeholder="https://example.com/image.jpg"
-                  value={imageUrl}
-                  onChange={(e) => handleUrlChange(e.target.value)}
+                  value={img.imageUrl}
+                  onChange={(e) => img.handleUrlChange(e.target.value)}
                   className="h-11 rounded-xl border-none bg-[#f5f3ee] text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:bg-[#2d2a26] dark:text-[#f5f3ee]"
                 />
-              ) : activeTab === "content" ? (
+              ) : img.imageSourceTab === "content" ? (
                 <div className="space-y-3">
                   {/* Search button */}
                   <button
-                    onClick={handleSearchContent}
-                    disabled={isSearchingContent || !story?.sourcePdf}
+                    onClick={img.handleSearchContent}
+                    disabled={img.isSearchingContent || !story?.sourcePdf}
                     className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#e5e3de]/80 bg-white/80 px-4 py-3 text-sm font-medium text-[#4d4944] shadow-sm backdrop-blur-sm transition-all hover:bg-[#f5f3ee] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isSearchingContent ? (
+                    {img.isSearchingContent ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Searching...
@@ -470,9 +305,9 @@ export function ImageEditorDialog({
                   )}
 
                   {/* Content search results */}
-                  {contentSearched && (
+                  {img.contentSearched && (
                     <div className="rounded-xl border border-[#e5e3de]/80 bg-white/80 p-3 shadow-sm backdrop-blur-sm">
-                      {contentImages.length === 0 ? (
+                      {img.contentImages.length === 0 ? (
                         <p className="text-center text-xs text-[#6b6560]">
                           No images found in the PDF content.
                         </p>
@@ -480,30 +315,30 @@ export function ImageEditorDialog({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-[#6b6560]">
-                              {contentImageIndex + 1} of {contentImages.length} images
+                              {img.contentImageIndex + 1} of {img.contentImages.length} images
                             </span>
                             <div className="flex gap-1">
                               <button
-                                onClick={() => handleContentImageNav("prev")}
+                                onClick={() => img.handleContentImageNav("prev")}
                                 className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560]"
                               >
                                 <ChevronLeft className="h-4 w-4" />
                               </button>
                               <button
-                                onClick={() => handleContentImageNav("next")}
+                                onClick={() => img.handleContentImageNav("next")}
                                 className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560]"
                               >
                                 <ChevronRight className="h-4 w-4" />
                               </button>
                             </div>
                           </div>
-                          {currentContentImage && (
+                          {img.currentContentImage && (
                             <div className="flex items-center justify-between text-[10px] text-[#6b6560]">
                               <span>
-                                {currentContentImage.width} × {currentContentImage.height}px
+                                {img.currentContentImage.width} × {img.currentContentImage.height}px
                               </span>
                               <span>
-                                Page {currentContentImage.pageNumber} · {currentContentImage.type}
+                                Page {img.currentContentImage.pageNumber} · {img.currentContentImage.type}
                               </span>
                             </div>
                           )}
@@ -515,28 +350,28 @@ export function ImageEditorDialog({
               ) : (
                 <div>
                   <input
-                    ref={fileInputRef}
+                    ref={img.fileInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={handleFileChange}
+                    onChange={img.handleFileChange}
                     className="hidden"
                   />
 
-                  {selectedFile ? (
+                  {img.selectedFile ? (
                     <div className="flex items-center justify-between rounded-xl border border-[#e5e3de]/80 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm">
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 shadow-sm">
                           <ImagePlus className="h-4 w-4 text-white" />
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-[#2d2a26]">{selectedFile.name}</p>
+                          <p className="text-xs font-medium text-[#2d2a26]">{img.selectedFile.name}</p>
                           <p className="text-[10px] text-[#6b6560]">
-                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                            {(img.selectedFile.size / 1024 / 1024).toFixed(2)} MB
                           </p>
                         </div>
                       </div>
                       <button
-                        onClick={clearUpload}
+                        onClick={img.clearUpload}
                         className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560]"
                       >
                         <X className="h-4 w-4" />
@@ -544,14 +379,14 @@ export function ImageEditorDialog({
                     </div>
                   ) : (
                     <div
-                      onClick={() => fileInputRef.current?.click()}
-                      onDragOver={handleDragOver}
-                      onDragEnter={handleDragEnter}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
+                      onClick={() => img.fileInputRef.current?.click()}
+                      onDragOver={img.handleDragOver}
+                      onDragEnter={img.handleDragEnter}
+                      onDragLeave={img.handleDragLeave}
+                      onDrop={img.handleDrop}
                       className={cn(
                         "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-8 transition-all",
-                        isDragging
+                        img.isDragging
                           ? "border-blue-400 bg-blue-50/50"
                           : "border-[#e5e3de] hover:border-[#a39e98] hover:bg-[#f5f3ee]/50"
                       )}
@@ -561,7 +396,7 @@ export function ImageEditorDialog({
                       </div>
                       <div className="text-center">
                         <p className="text-xs font-medium text-[#6b6560]">
-                          {isDragging ? "Drop here" : "Click or drag"}
+                          {img.isDragging ? "Drop here" : "Click or drag"}
                         </p>
                         <p className="mt-0.5 text-[10px] text-[#a39e98]">
                           JPEG, PNG, WebP, GIF · Max 5MB
@@ -581,8 +416,8 @@ export function ImageEditorDialog({
                   id="image-source"
                   type="text"
                   placeholder="e.g., Photo by Juan on Unsplash"
-                  value={imageSource}
-                  onChange={(e) => setImageSource(e.target.value)}
+                  value={img.imageSource}
+                  onChange={(e) => img.setImageSource(e.target.value)}
                   className="h-11 rounded-xl border-none bg-[#f5f3ee] text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:bg-[#2d2a26] dark:text-[#f5f3ee]"
                 />
                 <p className="mt-1.5 text-[10px] text-[#a39e98]">
@@ -653,20 +488,20 @@ export function ImageEditorDialog({
       </Dialog>
 
       {/* Fullscreen Preview */}
-      {isFullscreen && currentPreview && (
+      {img.isFullscreen && img.currentPreview && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95"
-          onClick={() => setIsFullscreen(false)}
+          onClick={() => img.setIsFullscreen(false)}
         >
           <Image
-            src={currentPreview}
+            src={img.currentPreview}
             alt={story.title}
             fill
             className="object-contain"
             sizes="100vw"
           />
           <button
-            onClick={() => setIsFullscreen(false)}
+            onClick={() => img.setIsFullscreen(false)}
             className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
           >
             <X className="h-5 w-5" />
