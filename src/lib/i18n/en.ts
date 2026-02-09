@@ -303,6 +303,11 @@ export const en: Translations = {
     ai_disclaimer: 'Responses are AI-generated and should be verified',
   },
 
+  info_menu: {
+    about: 'About Paisaxe',
+    saved_places: 'Saved Places',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
