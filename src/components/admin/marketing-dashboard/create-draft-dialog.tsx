@@ -99,7 +99,7 @@ export function CreateDraftDialog({
 
           {/* Content */}
           <div>
-            <label className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <label htmlFor="draft-content" className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               Content
               <span className={cn(
                 "normal-case",
@@ -109,6 +109,7 @@ export function CreateDraftDialog({
               </span>
             </label>
             <textarea
+              id="draft-content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder={`Write your ${PLATFORM_NAMES[platform]} post...`}
