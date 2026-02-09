@@ -409,7 +409,7 @@ Agent: "Filed as #19 — type: bug, priority: high, area: voice"
 ### General Agent Rules for Issues
 
 1. **Reference issues in commits.** Use `Fixes #N` or `Refs #N` in commit messages.
-2. **Don't close issues prematurely.** Issues stay open until the fix is live on `main` (production).
+2. **Close issues when merged to `develop` with green CI.** No need to wait for production release.
 3. **When starting work on an issue**, mention the issue number in your first commit.
 4. **Use the CLI:**
    ```bash

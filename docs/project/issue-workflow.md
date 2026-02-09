@@ -90,16 +90,15 @@ gh issue create \
 ## Workflow
 
 ```
-┌─────────┐    ┌─────────────┐    ┌──────────┐    ┌────────┐
-│  Open   │───▶│ In Progress │───▶│ On develop│───▶│ Closed │
-│ (triage)│    │ (worktree)  │    │ (testing) │    │(released)│
-└─────────┘    └─────────────┘    └──────────┘    └────────┘
+┌─────────┐    ┌─────────────┐    ┌────────┐
+│  Open   │───▶│ In Progress │───▶│ Closed │
+│ (triage)│    │ (worktree)  │    │(on develop)│
+└─────────┘    └─────────────┘    └────────┘
 ```
 
 1. **Open** — Issue is created, triaged with type + priority + area labels.
 2. **In Progress** — Someone is actively working on it (in a worktree).
-3. **On develop** — Fix/feature is merged to `develop`, being tested.
-4. **Closed** — Released to production via `main`. Close the issue when the PR to `main` is merged.
+3. **Closed** — Fix/feature is merged to `develop` and CI passes. Close the issue once it lands on `develop` with green CI.
 
 ### Agent Rules
 
@@ -109,7 +108,7 @@ gh issue create \
 - **Multiple items = multiple issues.** If the user lists several things, create one issue per concern.
 - **Report back.** After creating an issue, tell the user the issue number, URL, and labels.
 - Agents **may work on issues** on `develop` without asking (normal development).
-- Agents **must not close issues** that require a production release — the issue stays open until the fix is live on `main`.
+- Agents **close issues** once the fix is merged to `develop` and CI passes. No need to wait for production release.
 - When starting work on an issue, reference it in commit messages: `fix: resolve chat timeout (#42)`.
 
 ## Milestones
