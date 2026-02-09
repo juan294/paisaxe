@@ -146,4 +146,51 @@ describe("POST /api/checkout/day-pass", () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to create checkout session");
   });
+
+  it("should return 500 when STRIPE_SECRET_KEY is missing", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "");
+    const request = createRequest();
+    const response = await POST(request);
+    const data = await response.json();
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Stripe not configured");
+  });
+
+  it("should return 500 when STRIPE_DAY_PASS_PRICE_ID is missing", async () => {
+    vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "");
+    const request = createRequest();
+    const response = await POST(request);
+    const data = await response.json();
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Stripe not configured");
+  });
+
+  it("should include error details in development mode", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+
+    mockGetUser.mockResolvedValue({
+      data: {
+        user: {
+          id: "user-123",
+          email: "test@example.com",
+        },
+      },
+      error: null,
+    });
+
+    vi.mocked(createDayPassCheckoutSession).mockRejectedValue(
+      new Error("Detailed error")
+    );
+
+    const request = createRequest({
+      origin: "https://paisaxe.es",
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to create checkout session");
+    expect(data.details).toBe("Detailed error");
+  });
 });

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { AnalyticsTabs } from "./analytics-tabs";
 
 describe("AnalyticsTabs", () => {
@@ -59,5 +59,84 @@ describe("AnalyticsTabs", () => {
     tabs[3].click();
 
     expect(onTabChange).toHaveBeenCalledWith("costs");
+  });
+
+  describe("keyboard shortcuts", () => {
+    afterEach(() => {
+      cleanup();
+    });
+
+    it("should switch to visitors tab with Cmd+U", () => {
+      const onTabChange = vi.fn();
+      render(
+        <AnalyticsTabs activeTab="costs" onTabChange={onTabChange}>
+          <div>content</div>
+        </AnalyticsTabs>
+      );
+
+      fireEvent.keyDown(window, { key: "u", metaKey: true });
+      expect(onTabChange).toHaveBeenCalledWith("visitors");
+    });
+
+    it("should switch to costs tab with Cmd+P", () => {
+      const onTabChange = vi.fn();
+      render(
+        <AnalyticsTabs activeTab="visitors" onTabChange={onTabChange}>
+          <div>content</div>
+        </AnalyticsTabs>
+      );
+
+      fireEvent.keyDown(window, { key: "p", metaKey: true });
+      expect(onTabChange).toHaveBeenCalledWith("costs");
+    });
+
+    it("should ignore shortcut without Cmd/Ctrl modifier", () => {
+      const onTabChange = vi.fn();
+      render(
+        <AnalyticsTabs activeTab="visitors" onTabChange={onTabChange}>
+          <div>content</div>
+        </AnalyticsTabs>
+      );
+
+      fireEvent.keyDown(window, { key: "u" });
+      expect(onTabChange).not.toHaveBeenCalled();
+    });
+
+    it("should ignore shortcut when Alt modifier is pressed", () => {
+      const onTabChange = vi.fn();
+      render(
+        <AnalyticsTabs activeTab="visitors" onTabChange={onTabChange}>
+          <div>content</div>
+        </AnalyticsTabs>
+      );
+
+      fireEvent.keyDown(window, { key: "u", metaKey: true, altKey: true });
+      expect(onTabChange).not.toHaveBeenCalled();
+    });
+
+    it("should ignore shortcut when typing in an input", () => {
+      const onTabChange = vi.fn();
+      render(
+        <AnalyticsTabs activeTab="visitors" onTabChange={onTabChange}>
+          <input data-testid="test-input" />
+        </AnalyticsTabs>
+      );
+
+      const input = screen.getByTestId("test-input");
+      fireEvent.keyDown(input, { key: "u", metaKey: true });
+      expect(onTabChange).not.toHaveBeenCalled();
+    });
+
+    it("should ignore non-matching key with Cmd modifier", () => {
+      const onTabChange = vi.fn();
+      render(
+        <AnalyticsTabs activeTab="visitors" onTabChange={onTabChange}>
+          <div>content</div>
+        </AnalyticsTabs>
+      );
+
+      fireEvent.keyDown(window, { key: "z", metaKey: true });
+      expect(onTabChange).not.toHaveBeenCalled();
+    });
   });
 });
