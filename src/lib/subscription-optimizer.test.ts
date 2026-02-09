@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   analyzeSubscriptions,
   generateReport,
+  generateSharedContextEntry,
   type OptimizerInput,
   type Recommendation,
   type SubscriptionReport,
@@ -302,5 +303,71 @@ describe("generateReport", () => {
     const report = generateReport(reportWithUpgrade);
     expect(report).toContain("## Executive Summary");
     expect(report).toMatch(/1 needs? upgrade/i);
+  });
+});
+
+describe("generateSharedContextEntry", () => {
+  const mockReport: SubscriptionReport = {
+    recommendations: [
+      {
+        serviceId: "elevenlabs",
+        serviceName: "ElevenLabs",
+        currentPlan: "Creator",
+        monthlyCostUsd: 18.33,
+        action: "keep",
+        reason: "Usage at 12% of voice minute limit.",
+        unusedFeatures: ["Custom voice cloning"],
+        usagePercentages: [
+          { metricKey: "voiceMinutes", label: "Voice Minutes", percentage: 12, current: 12, limit: 100 },
+        ],
+      },
+      {
+        serviceId: "supabase",
+        serviceName: "Supabase",
+        currentPlan: "Pro",
+        monthlyCostUsd: 25,
+        action: "keep",
+        reason: "Storage usage at 19% of limit.",
+        unusedFeatures: [],
+        usagePercentages: [
+          { metricKey: "supabaseStorageGb", label: "Database Storage", percentage: 19, current: 1.5, limit: 8 },
+        ],
+      },
+      {
+        serviceId: "anthropic",
+        serviceName: "Anthropic Claude",
+        currentPlan: "Personal",
+        monthlyCostUsd: 10,
+        action: "review",
+        reason: "4 of 6 features unused.",
+        unusedFeatures: ["Batch API", "Prompt caching", "Message Batches API", "All model tiers"],
+        usagePercentages: [],
+      },
+    ],
+    totalMonthlySpend: 53.33,
+    analyzedAt: "2026-02-09T10:00:00.000Z",
+    dismissedFeatures: [],
+  };
+
+  it("should wrap content in ENTRY markers with correct agent key and timestamp", () => {
+    const entry = generateSharedContextEntry(mockReport);
+    expect(entry).toContain("<!-- ENTRY:START agent=subscription_optimizer timestamp=2026-02-09T10:00:00.000Z -->");
+    expect(entry).toContain("<!-- ENTRY:END -->");
+  });
+
+  it("should include total monthly spend", () => {
+    const entry = generateSharedContextEntry(mockReport);
+    expect(entry).toContain("$53.33");
+  });
+
+  it("should list services needing attention", () => {
+    const entry = generateSharedContextEntry(mockReport);
+    expect(entry).toContain("Anthropic Claude");
+    expect(entry).toMatch(/review/i);
+  });
+
+  it("should include a heading with the date", () => {
+    const entry = generateSharedContextEntry(mockReport);
+    expect(entry).toContain("## Subscription Optimizer — 2026-02-09");
   });
 });
