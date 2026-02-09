@@ -3,6 +3,7 @@ import {
   CATEGORY_LABELS,
   LOCATION_LABELS,
   DURATION_LABELS,
+  VALID_CATEGORIES,
   rowToStory,
   type Story,
   type StoryCategory,
@@ -74,6 +75,26 @@ describe("immersive types", () => {
       durations.forEach((dur) => {
         expect(DURATION_LABELS[dur]).toBeDefined();
       });
+    });
+  });
+
+  describe("VALID_CATEGORIES", () => {
+    it("should contain all 5 story categories", () => {
+      expect(VALID_CATEGORIES).toHaveLength(5);
+    });
+
+    it("should contain exactly the same categories as CATEGORY_LABELS keys", () => {
+      const labelKeys = Object.keys(CATEGORY_LABELS) as StoryCategory[];
+      expect(VALID_CATEGORIES).toEqual(expect.arrayContaining(labelKeys));
+      expect(labelKeys).toEqual(expect.arrayContaining([...VALID_CATEGORIES]));
+    });
+
+    it("should include all expected category values", () => {
+      expect(VALID_CATEGORIES).toContain("nature");
+      expect(VALID_CATEGORIES).toContain("cities");
+      expect(VALID_CATEGORIES).toContain("food");
+      expect(VALID_CATEGORIES).toContain("culture");
+      expect(VALID_CATEGORIES).toContain("activities");
     });
   });
 

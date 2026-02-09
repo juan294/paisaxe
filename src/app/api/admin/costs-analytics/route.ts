@@ -17,7 +17,8 @@ import type {
   CreateManualCostRequest,
   UsageMetrics,
 } from "@/types/costs-analytics";
-import { queryPostHog } from "@/lib/posthog-query";
+import { queryPostHog, formatForHogQL } from "@/lib/posthog-query";
+import { ELEVENLABS_API_BASE } from "@/config/elevenlabs-agents";
 
 function formatUsd(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -177,8 +178,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
-
 /**
  * Fetch usage metrics from PostHog and ElevenLabs for forecast computation.
  * Gracefully returns undefined on failure.
@@ -208,10 +207,6 @@ async function fetchUsageMetrics(
 
     // Fetch PostHog metrics (visitors + chat conversations + total events)
     if (projectId && posthogKey) {
-      const formatForHogQL = (dateStr: string) => {
-        const date = new Date(dateStr);
-        return date.toISOString().slice(0, 19).replace("T", " ");
-      };
       const hogFrom = formatForHogQL(from);
       const hogTo = formatForHogQL(to);
 

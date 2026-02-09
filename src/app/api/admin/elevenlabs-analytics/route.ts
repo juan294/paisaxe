@@ -7,9 +7,7 @@ import type {
   ElevenLabsStatusBreakdown,
   ElevenLabsConversation,
 } from "@/types/elevenlabs-analytics";
-import { ELEVENLABS_AGENT_IDS } from "@/config/elevenlabs-agents";
-
-const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
+import { ELEVENLABS_AGENT_IDS, ELEVENLABS_API_BASE } from "@/config/elevenlabs-agents";
 
 interface ElevenLabsConversationResponse {
   conversations: Array<{

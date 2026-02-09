@@ -98,6 +98,18 @@ export type StoryDuration =
 // =============================================================================
 
 /**
+ * All valid story categories as an array.
+ * Used for runtime validation in API routes.
+ */
+export const VALID_CATEGORIES: StoryCategory[] = [
+  "nature",
+  "cities",
+  "food",
+  "culture",
+  "activities",
+];
+
+/**
  * Category labels for display in UI.
  * Not strictly location-specific, but may vary by location.
  */

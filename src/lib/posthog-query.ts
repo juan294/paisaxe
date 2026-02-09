@@ -2,6 +2,15 @@ export interface HogQLResult {
   results: unknown[][];
 }
 
+/**
+ * Format an ISO date string for HogQL queries: 'YYYY-MM-DD HH:MM:SS'
+ * Strips milliseconds and timezone — PostHog EU uses DateTime64 with Europe/Madrid timezone.
+ */
+export function formatForHogQL(isoString: string): string {
+  const date = new Date(isoString);
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
 const POSTHOG_TIMEOUT_MS = 15000;
 const POSTHOG_MAX_RETRIES = 2;
 const POSTHOG_RETRY_DELAY_MS = 1000;
