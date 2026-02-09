@@ -73,7 +73,7 @@ describe('AboutPage', () => {
 
   it('renders the contact email link', () => {
     render(<AboutPage />);
-    const emailLink = screen.getByRole('link', { name: /thecreativetoken@gmail.com/ });
-    expect(emailLink).toHaveAttribute('href', 'mailto:thecreativetoken@gmail.com');
+    const emailLink = screen.getByRole('link', { name: /support@paisaxe.es/ });
+    expect(emailLink).toHaveAttribute('href', 'mailto:support@paisaxe.es');
   });
 });
