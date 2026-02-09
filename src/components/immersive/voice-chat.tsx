@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import { Story } from "@/types/immersive";
-import { ImageResult } from "@/types";
 import { cn } from "@/lib/utils";
 import { X, Send, AudioLines, Keyboard } from "lucide-react";
 import Link from "next/link";
@@ -17,17 +16,9 @@ import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { useStreamChat } from "@/hooks/use-stream-chat";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
-import {
-  detectUpsellMarker,
-  type UpsellReason,
-} from "@/lib/chat-upsell-detection";
-import {
-  canShowUpsell,
-  recordUpsellShown,
-  recordUpsellDismissed,
-} from "@/lib/chat-upsell-throttle";
 import { usePostHog } from "posthog-js/react";
 
 interface VoiceChatProps {
@@ -37,20 +28,8 @@ interface VoiceChatProps {
   initialMessage?: string;
 }
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  images?: ImageResult[];
-  /** Upsell reason detected in this message, if any */
-  upsellReason?: UpsellReason;
-  /** Whether the upsell CTA for this message was dismissed */
-  upsellDismissed?: boolean;
-}
-
 export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const [useElevenLabs, setUseElevenLabs] = useState(false);
   const [hasSetDefaultMode, setHasSetDefaultMode] = useState(false);
@@ -72,6 +51,15 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     isLoading: isVoiceAccessLoading
   } = useVoiceAccess();
 
+  // Stream chat hook for SSE message handling
+  const {
+    messages,
+    isStreaming: isLoading,
+    sendMessage,
+    resetMessages,
+    dismissUpsell: handleUpsellDismiss,
+  } = useStreamChat({ canUseVoice });
+
   // Set voice mode as default when user has access (only on first load)
   useEffect(() => {
     if (!isVoiceAccessLoading && !hasSetDefaultMode) {
@@ -87,8 +75,8 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
 
   // Reset messages when story changes
   useEffect(() => {
-    setMessages([]);
-  }, [story.id]);
+    resetMessages();
+  }, [story.id, resetMessages]);
 
   // Check if privacy notice was already acknowledged
   useEffect(() => {
@@ -120,20 +108,6 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     setUseElevenLabs(false);
   }, []);
 
-  const handleUpsellDismiss = useCallback((messageIndex: number) => {
-    recordUpsellDismissed(messageIndex);
-    setMessages((prev) => {
-      const updated = [...prev];
-      if (updated[messageIndex]) {
-        updated[messageIndex] = {
-          ...updated[messageIndex],
-          upsellDismissed: true,
-        };
-      }
-      return updated;
-    });
-  }, []);
-
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputValue.trim() || isLoading) return;
@@ -141,8 +115,6 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     const userMessage = inputValue.trim();
     const isFirstMessage = messages.length === 0;
     setInputValue("");
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
-    setIsLoading(true);
 
     // Track chat events in PostHog
     if (isFirstMessage) {
@@ -153,145 +125,11 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
       message_index: messages.length,
     });
 
-    // Add empty assistant message that will be streamed into
-    const assistantIndex = messages.length + 1; // +1 for the user message we just added
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
-    try {
-      const response = await fetch("/api/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userMessage,
-          context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
-          locale,
-          messageIndex: messages.filter((m) => m.role === "user").length,
-        }),
-      });
-
-      if (!response.ok) throw new Error("Failed");
-
-      // Check if we got a non-streaming JSON response (e.g., for flagged content)
-      const contentType = response.headers.get("content-type");
-      if (contentType?.includes("application/json")) {
-        const data = await response.json();
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[assistantIndex] = {
-            role: "assistant",
-            content: data.message || t("chat.error_processing"),
-            images: data.images,
-          };
-          return updated;
-        });
-        return;
-      }
-
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No reader");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      // Helper to process a single SSE event line
-      const processEvent = (line: string) => {
-        if (!line.startsWith("data: ")) return;
-
-        const jsonStr = line.slice(6);
-        try {
-          const event = JSON.parse(jsonStr);
-
-          if (event.type === "text") {
-            // Append text chunk to the assistant message
-            setMessages((prev) => {
-              const updated = [...prev];
-              const current = updated[assistantIndex];
-              updated[assistantIndex] = {
-                ...current,
-                content: current.content + event.content,
-              };
-              return updated;
-            });
-          } else if (event.type === "done") {
-            // Process upsell markers and add images from final event
-            setMessages((prev) => {
-              const updated = [...prev];
-              const currentMsg = updated[assistantIndex];
-              const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
-                currentMsg.content
-              );
-
-              // Only set upsell reason if user doesn't have voice access and throttle allows
-              const shouldShowUpsell =
-                hasUpsell && !canUseVoice && canShowUpsell(assistantIndex);
-
-              if (shouldShowUpsell) {
-                recordUpsellShown();
-              }
-
-              updated[assistantIndex] = {
-                ...currentMsg,
-                content: cleanContent,
-                images: event.images,
-                upsellReason: shouldShowUpsell ? reason ?? undefined : undefined,
-              };
-              return updated;
-            });
-          } else if (event.type === "error") {
-            setMessages((prev) => {
-              const updated = [...prev];
-              updated[assistantIndex] = {
-                role: "assistant",
-                content: t("chat.error_generic"),
-              };
-              return updated;
-            });
-          }
-        } catch {
-          // Ignore parse errors
-        }
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // Process complete SSE events
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || ""; // Keep incomplete event in buffer
-
-        for (const line of lines) {
-          processEvent(line);
-        }
-      }
-
-      // Process any remaining buffer content after stream ends
-      // (the 'done' event might be in the final chunk)
-      if (buffer.trim()) {
-        processEvent(buffer.trim());
-      }
-    } catch {
-      setMessages((prev) => {
-        const updated = [...prev];
-        if (updated[assistantIndex]) {
-          updated[assistantIndex] = {
-            role: "assistant",
-            content: t("chat.error_generic"),
-          };
-        } else {
-          updated.push({
-            role: "assistant",
-            content: t("chat.error_generic"),
-          });
-        }
-        return updated;
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await sendMessage(userMessage, {
+      context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
+      locale,
+      messageIndex: messages.filter((m) => m.role === "user").length,
+    });
   };
 
   if (!open) return null;
@@ -341,7 +179,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             {/* Upgrade prompt for users without voice access (signed in or not) */}
             {!isInitializing && !canUseVoice && (
               <Link
-                href="/pricing"
+                href={story.slug ? `/pricing?returnTo=${story.slug}` : "/pricing"}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-400 border border-green-500/50 rounded-full hover:bg-green-500/10 hover:border-green-400 transition-colors"
               >
                 <AudioLines className="h-3.5 w-3.5" />
@@ -379,7 +217,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
         {/* ElevenLabs Voice Chat or Text Chat */}
         {isInitializing ? (
           /* Show loading while determining voice access */
-          <div className="h-64 flex items-center justify-center">
+          <div className="h-64 md:h-96 lg:h-[28rem] flex items-center justify-center">
             <div className="animate-pulse text-white/50 text-sm">
               {t("common.loading")}
             </div>
@@ -392,7 +230,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
           />
         ) : useElevenLabs && needsPurchase ? (
           /* Show purchase CTA when user wants voice but needs to pay */
-          <VoicePurchaseCTA />
+          <VoicePurchaseCTA returnTo={story.slug} />
         ) : (
           <>
             {/* Messages */}
@@ -400,7 +238,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
               role="log"
               aria-live="polite"
               aria-label={t("accessibility.chat_messages")}
-              className="h-64 overflow-y-auto p-4 space-y-4"
+              className="h-64 md:h-96 lg:h-[28rem] overflow-y-auto p-4 space-y-4"
             >
               {messages.length === 0 && (
                 <div className="text-center text-white/50 py-8">

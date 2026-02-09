@@ -424,10 +424,16 @@ All agent reports go to `docs/agents/`:
 
 ```
 docs/agents/
-├── coverage-report.md
-├── security-report.md
-├── documentation-report.md
-└── performance-report.md
+├── code-quality-report.md   # Manual/on-demand — code quality audit findings
+├── cost-analyst-report.md   # Manual/on-demand — cost analysis
+├── coverage-report.md       # Daily (coverage agent)
+├── documentation-report.md  # Weekly Sunday (documentation agent)
+├── localization-report.md   # Manual/on-demand — localization audit
+├── performance-report.md    # Weekly Saturday (performance agent)
+├── pre-launch-report.md     # Manual/on-demand — pre-launch audit
+├── qa-report.md             # Manual/on-demand — QA audit
+├── security-report.md       # Weekly Monday (security agent)
+└── shared-context.md        # Cross-agent intelligence (read/write by all agents)
 ```
 
 ### Feature Flags (System Category)

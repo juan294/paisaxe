@@ -3,9 +3,9 @@
 ## Post Title Options
 
 Pick one:
-- "Asturias might be Spain's most underrated region—here's why it deserves a spot on your list"
-- "Skip the crowds: Why northern Spain (Asturias) should be on your radar"
-- "Just got back from Asturias, Spain—the anti-Barcelona experience I didn't know I needed"
+- "I spent 2 weeks building a different way to discover Asturias—talk to the places as you explore"
+- "Asturias might be Spain's most underrated region—I built something to help you experience it differently"
+- "Skip the crowds: a new way to explore northern Spain through conversation"
 
 ---
 
@@ -27,11 +27,19 @@ I've been obsessed with Asturias for a while now, and I'm surprised it doesn't c
 
 **Practical stuff:**
 
-Best time to visit is May-September (it rains a lot otherwise—they call it "the land of eternal drizzle"). Fly into Oviedo or Gijón, or take a train from Madrid. Renting a car helps for the smaller villages and coastal drives.
+Best time to visit is May–September (it rains a lot otherwise—they call it "the land of eternal drizzle"). Fly into Oviedo or Gijón, or take a train from Madrid. Renting a car helps for the smaller villages and coastal drives.
 
-I actually built a site to help people plan trips there: [paisaxe.es](https://paisaxe.es). It has a free AI chat that knows all the local spots, hiking routes, and restaurant recommendations. And for €1.99/day, you can talk to Pelayo—a voice guide who checks live weather, finds restaurants with real-time hours, and even calls ahead to book your table.
+I spent 2 weeks (nights and weekends) building something to help people experience it differently: [paisaxe.es](https://paisaxe.es). PAISAXE means "landscape" in the local Asturian language.
 
-Happy to answer questions if anyone's considering it!
+The idea is simple—don't just read about places, talk to them. By chat or by voice. A monument, a beach, a mountain, a restaurant. Start a conversation and discover it naturally, like you'd talk to a local:
+
+"Is this worth seeing on a rainy day?"
+"What should I notice when I'm here?"
+"Where should I go next if I have 2 hours?"
+
+Less planning, more wandering with purpose.
+
+Happy to answer questions if anyone's considering Asturias!
 
 ---
 

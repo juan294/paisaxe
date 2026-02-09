@@ -1,7 +1,7 @@
 import type { ServiceCost } from "@/types/costs-analytics";
 import { PLATFORM_SERVICES } from "@/types/costs-analytics";
 
-// ElevenLabs pricing tiers (as of 2024)
+// ElevenLabs pricing tiers (as of 2026)
 // These are estimates based on public pricing
 const ELEVENLABS_PRICING = {
   // Cost per 1000 characters for voice generation

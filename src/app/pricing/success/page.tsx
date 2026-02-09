@@ -4,11 +4,14 @@ import { useEffect } from "react";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Check, Mic, RefreshCw } from "lucide-react";
 
 export default function PricingSuccessPage() {
   const { canUseVoice, expiresAt, isLoading, refresh } = useVoiceAccess();
   const { t } = useTranslation();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get("returnTo");
 
   // Refresh access on mount to pick up the new purchase
   useEffect(() => {
@@ -61,7 +64,7 @@ export default function PricingSuccessPage() {
 
         {/* CTA */}
         <Link
-          href="/immersive"
+          href={returnTo ? `/immersive?story=${returnTo}&voice=ready` : "/immersive"}
           className="inline-flex items-center justify-center gap-2 w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors"
         >
           <Mic className="h-4 w-4" />

@@ -130,12 +130,11 @@ describe("ElevenLabsAnalyticsPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("04 — Recent Conversations")).toBeInTheDocument();
+      // "Completed" appears multiple times (summary stat label, status breakdown, recent conversations)
+      expect(screen.getAllByText("Completed").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("120s")).toBeInTheDocument();
+      expect(screen.getByText("30s")).toBeInTheDocument();
     });
-
-    // "Completed" appears multiple times (summary stat label, status breakdown, recent conversations)
-    expect(screen.getAllByText("Completed").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("120s")).toBeInTheDocument();
-    expect(screen.getByText("30s")).toBeInTheDocument();
   });
 
   it("shows empty state when no data", async () => {

@@ -1,31 +1,10 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { createDayPassCheckoutSession } from "@/lib/stripe";
+import { getSupabaseClient } from "@/lib/supabase-auth";
 
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in server component context
-          }
-        },
-      },
-    }
-  );
+/** Validate returnTo slug: only allow alphanumeric, hyphens, underscores */
+function isValidSlug(value: string): boolean {
+  return /^[a-z0-9][a-z0-9_-]*$/i.test(value) && value.length <= 100;
 }
 
 /**
@@ -33,11 +12,14 @@ async function getSupabaseClient() {
  *
  * Creates a Stripe Checkout Session for the Day Pass product.
  * Requires authentication. Returns the checkout URL.
+ *
+ * Body (optional):
+ * - returnTo: story slug to redirect back to after successful payment
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Debug: Check env vars
-  const hasSecretKey = !!process.env.STRIPE_SECRET_KEY;
-  const hasPriceId = !!process.env.STRIPE_DAY_PASS_PRICE_ID;
+  const hasSecretKey = !!process.env.STRIPE_SECRET_KEY?.trim();
+  const hasPriceId = !!process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
 
   if (!hasSecretKey || !hasPriceId) {
     console.error("[checkout/day-pass] Missing env vars:", { hasSecretKey, hasPriceId });
@@ -61,10 +43,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const origin =
       request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL;
 
+    // Parse optional returnTo slug from request body
+    let returnTo: string | undefined;
+    try {
+      const body = await request.json();
+      if (typeof body.returnTo === "string" && isValidSlug(body.returnTo)) {
+        returnTo = body.returnTo;
+      }
+    } catch {
+      // No body or invalid JSON — that's fine, returnTo stays undefined
+    }
+
+    const successUrl = returnTo
+      ? `${origin}/pricing/success?returnTo=${returnTo}`
+      : `${origin}/pricing/success`;
+
     const checkoutUrl = await createDayPassCheckoutSession({
       userId: user.id,
       userEmail: user.email || "",
-      successUrl: `${origin}/pricing/success`,
+      successUrl,
       cancelUrl: `${origin}/pricing`,
     });
 

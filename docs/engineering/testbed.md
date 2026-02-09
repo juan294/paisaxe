@@ -360,6 +360,11 @@ Test the immersive story viewer UI, navigation, and display.
 | 15.26 | **Auto-play pause** | Toggle auto-play off | Stories stop auto-advancing | | |
 | 15.27 | **Auto-play paused during chat** | Open chat while auto-play is on | Auto-play pauses; resumes when chat closes | | |
 | 15.28 | **Ambient mode (if enabled)** | Toggle ambient mode on | Slower Ken Burns zoom, 12-second intervals | | |
+| 15.29 | **Author typewriter animation** | Load story with author name | Author name types out character-by-character with blinking cursor | | |
+| 15.30 | **Typewriter reduced motion** | Enable "Reduce Motion" in OS settings, load story | Author name appears instantly (no typewriter animation) | | |
+| 15.31 | **Progress bar memoization** | Navigate between stories rapidly | Progress bar updates smoothly without jank (React.memo prevents unnecessary re-renders) | | |
+| 15.32 | **Navigation responsiveness (mobile)** | Swipe/tap rapidly on mobile | Touch events remain responsive during story transitions (startTransition keeps UI interactive) | | |
+| 15.33 | **No layout shift during navigation** | Navigate stories on mobile, observe content | Content doesn't jump or flash white between story transitions | | |
 
 ---
 
@@ -440,6 +445,10 @@ Test the language switcher component and i18n behavior.
 | 19.6 | **Escape closes dropdown** | Open dropdown, press Escape | Dropdown closes | | |
 | 19.7 | **Click-outside closes dropdown** | Open dropdown, click elsewhere | Dropdown closes | | |
 | 19.8 | **Asturianu option** | Select AST | Asturian text/labels appear where available | | |
+| 19.9 | **No blank frame on load** | Load `/immersive` fresh (clear cache) | Page renders immediately with content — no blank white flash before locale resolves | | |
+| 19.10 | **Lazy translation loading** | Switch to French (FR) or German (DE) | UI updates to selected language (may have brief moment showing default before switching) | | |
+| 19.11 | **Translation cache on re-switch** | Switch to FR, then ES, then back to FR | Second switch to FR is instant (cached in memory, no re-fetch) | | |
+| 19.12 | **Default locale (ES) instant** | Load page in Spanish locale | Spanish renders immediately with zero delay (statically imported) | | |
 
 ---
 
@@ -477,6 +486,9 @@ Test the text chat panel UI and voice upsell features.
 | 21.8 | **Upsell banner dismissible** | Click dismiss on upsell | Banner disappears, doesn't reappear frequently | | |
 | 21.9 | **Chat input validation** | Submit empty message | No submission, input stays focused | | |
 | 21.10 | **Message renders with markdown** | Receive response with lists/headers | Rendered as formatted HTML, not raw markdown | | |
+| 21.11 | **Streaming renders progressively** | Send question, watch response | Text appears word-by-word as SSE stream arrives (no freeze then dump) | | |
+| 21.12 | **Chat recovers from stream error** | Send question during flaky network | Error message displayed, can retry without refreshing | | |
+| 21.13 | **Upsell detection in stream** | Trigger upsell conditions via chat | Upsell banner appears after response completes (marker stripped from visible text) | | |
 
 ---
 
@@ -570,6 +582,50 @@ Test the splash page shown during maintenance mode.
 
 ---
 
+## 27. Admin Dashboard Performance 🔄
+
+Test that performance optimizations to the admin dashboard work correctly without breaking functionality.
+
+> **Both**: Automated unit tests cover lazy-mount logic. Manual verification for visual behavior and state persistence.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 27.1 | **Analytics tabs lazy-mount** | Open `/admin`, go to Analytics, observe Network/React DevTools | Only "Visitors" sub-panel mounts initially; Voice/Costs/Revenue mount on first click | | |
+| 27.2 | **Analytics tab state persists** | Switch from Visitors to Costs, change date range, switch back to Visitors, then back to Costs | Costs panel retains the date range selection (panel stays mounted with `display:none`) | | |
+| 27.3 | **Analytics cache works across tabs** | Load Visitors data, switch to Costs and back | Visitors data renders instantly from cache without re-fetch | | |
+| 27.4 | **Top-level tab persistence** | Open Analytics, configure something, switch to Stories tab, switch back | Analytics state fully preserved (no remount, no refetch) | | |
+| 27.5 | **Story editor dialog lazy-loads** | Open admin, click "Edit" on a story, observe Network tab | `StoryEditorDialog` chunk loads on first open (not on page load) | | |
+| 27.6 | **Create story dialog lazy-loads** | Open admin, click "Create Story", observe Network tab | `CreateStoryDialog` chunk loads on first open (not on page load) | | |
+| 27.7 | **Selection toolbar lazy-loads** | Select multiple stories with checkboxes | `SelectionToolbar` chunk loads when first selection is made | | |
+| 27.8 | **Story editor tabs work after split** | Open story editor, switch between Details and Image tabs | Both tabs render correctly, form state persists when switching | | |
+| 27.9 | **Costs panel charts render** | Open Analytics → Costs, verify charts | Bar charts, forecast line, and alerts render correctly | | |
+| 27.10 | **Costs panel CRUD operations** | Add a manual cost entry, edit it, delete it | All operations work, data refreshes, cache invalidates | | |
+| 27.11 | **Marketing dashboard loads** | Open Marketing tab | Account cards, drafts panel, and post rows render | | |
+| 27.12 | **Agents dashboard loads** | Open Agents tab | Agent cards, terminal display, and health banner render | | |
+| 27.13 | **Agent terminal works** | Click "Run" on an agent, watch terminal | Terminal shows streaming output, scrolls automatically | | |
+| 27.14 | **Admin API functions** | Perform any CRUD operation in admin (create story, toggle flag, etc.) | All admin API calls succeed (split into domain modules but barrel re-export preserves all paths) | | |
+| 27.15 | **Auth-protected routes reject unauthenticated** | Call any `/api/admin/*` route without auth cookie | Returns 401, no data leaked | | |
+
+---
+
+## 28. Performance Regression Checks 🖥️
+
+Verify that performance optimizations haven't regressed. Run these after any deploy that touches the affected files.
+
+> **Browser testable**: DevTools Performance/Network tab needed for verification.
+
+| # | Test Case | Steps | Expected Behavior | Result | Notes |
+|---|-----------|-------|-------------------|--------|-------|
+| 28.1 | **No font preconnect requests** | Load any page, check Network tab for `fonts.googleapis.com` | No requests to Google Fonts domains (self-hosted via next/font) | | |
+| 28.2 | **Translation bundle not in initial load** | Load `/immersive` in Spanish, check Network/Sources | Only `es` locale loaded; `fr`, `de`, `pt`, `ast` bundles not present in initial chunks | | |
+| 28.3 | **ElevenLabs chunk deferred** | Load `/immersive`, check Network tab before opening voice | 482KB ElevenLabs chunk NOT loaded until voice chat opens | | |
+| 28.4 | **Admin initial bundle reasonable** | Load `/admin`, check JS transfer size | No dialog chunks loaded until dialogs opened; analytics sub-panels load on tab click | | |
+| 28.5 | **INP within budget on mobile** | Run Lighthouse on `/immersive` in mobile mode | INP < 200ms (was 376ms before typewriter + startTransition fixes) | | |
+| 28.6 | **FCP within budget on mobile** | Run Lighthouse on `/immersive` in mobile mode | FCP < 1.8s (was 2.06s before LanguageProvider + translation lazy-load fixes) | | |
+| 28.7 | **No render-blocking blank frame** | Load `/immersive` with network throttling (Fast 3G) | Content appears on first paint — no blank white frame before locale resolves | | |
+
+---
+
 ## Results Summary
 
 | Category | Total | Passed | Failed | Needs Review |
@@ -588,19 +644,21 @@ Test the splash page shown during maintenance mode.
 | 12. Restaurant Bookings | 13 | | | |
 | 13. SMS Notifications | 9 | | | |
 | 14. Stress & Edge | 8 | | | |
-| 15. Story Viewer & Nav | 28 | | | |
+| 15. Story Viewer & Nav | 33 | | | |
 | 16. Story Filters | 9 | | | |
 | 17. Toolbar Actions | 9 | | | |
 | 18. Favorites Page | 10 | | | |
-| 19. Language Switcher | 8 | | | |
+| 19. Language Switcher | 12 | | | |
 | 20. Mood Discovery | 5 | | | |
-| 21. Chat UI & Upsell | 10 | | | |
+| 21. Chat UI & Upsell | 13 | | | |
 | 22. Pricing & VoicePass | 8 | | | |
 | 23. Related Stories & Badges | 5 | | | |
 | 24. Legal Pages | 5 | | | |
 | 25. Responsive Design | 12 | | | |
 | 26. Maintenance Page | 5 | | | |
-| **TOTAL** | **240** | | | |
+| 27. Admin Dashboard Perf | 15 | | | |
+| 28. Performance Regression | 7 | | | |
+| **TOTAL** | **274** | | | |
 
 ---
 
@@ -614,5 +672,5 @@ Test the splash page shown during maintenance mode.
 
 ---
 
-*Last updated: 2026-02-07 — Added mobile tap zones, navigation onboarding hint, auto-play, wrap-around, progress bar, and image attribution tests*
+*Last updated: 2026-02-09 — Added admin dashboard perf tests (lazy mount, dynamic imports, split components), performance regression checks (font preconnects, translation lazy-load, INP/FCP budgets), typewriter animation, startTransition navigation, streaming chat, and language provider tests*
 *Tested by: [NAME]*

@@ -33,9 +33,9 @@ export async function GET(): Promise<NextResponse> {
     );
   }
 
-  const authResult = await validateAdminAuth();
-  if (!authResult.valid) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await validateAdminAuth();
+  if (!auth.valid) {
+    return auth.error;
   }
 
   const running = await isTunnelRunning();
@@ -59,9 +59,9 @@ export async function POST(): Promise<NextResponse> {
     );
   }
 
-  const authResult = await validateAdminAuth();
-  if (!authResult.valid) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await validateAdminAuth();
+  if (!auth.valid) {
+    return auth.error;
   }
 
   // Check if already running
@@ -123,9 +123,9 @@ export async function DELETE(): Promise<NextResponse> {
     );
   }
 
-  const authResult = await validateAdminAuth();
-  if (!authResult.valid) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await validateAdminAuth();
+  if (!auth.valid) {
+    return auth.error;
   }
 
   try {

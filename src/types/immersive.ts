@@ -8,7 +8,7 @@
  * - CATEGORY_LABELS (if categories differ)
  */
 
-export type StorySourceType = "curated" | "user_submitted";
+export type StorySourceType = "curated" | "user_submitted" | "agent_discovered";
 
 export interface Story {
   id: string;
@@ -96,6 +96,18 @@ export type StoryDuration =
 // =============================================================================
 // LOCATION-SPECIFIC: Display labels (Spanish defaults)
 // =============================================================================
+
+/**
+ * All valid story categories as an array.
+ * Used for runtime validation in API routes.
+ */
+export const VALID_CATEGORIES: StoryCategory[] = [
+  "nature",
+  "cities",
+  "food",
+  "culture",
+  "activities",
+];
 
 /**
  * Category labels for display in UI.

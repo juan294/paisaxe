@@ -139,4 +139,26 @@ describe("useAdminRole", () => {
 
     expect(result.current.isAdmin).toBe(false);
   });
+
+  it("skips re-checking role when user ID has already been verified", async () => {
+    const user = { id: "user-123", email: "admin@example.com" };
+    mockUseAuth.mockReturnValue({ user, isLoading: false });
+    setupSupabaseMock({ role: "admin" });
+
+    const { result, rerender } = renderHook(() => useAdminRole());
+
+    // Wait for first check to complete
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.isAdmin).toBe(true);
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+
+    // Re-render with same user — should NOT trigger another query
+    rerender();
+
+    // Still admin, and no additional query was made
+    expect(result.current.isAdmin).toBe(true);
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+  });
 });

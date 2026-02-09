@@ -9,6 +9,7 @@ vi.mock("@/lib/admin-auth", () => ({
 
 // Mock config
 vi.mock("@/config/elevenlabs-agents", () => ({
+  ELEVENLABS_API_BASE: "https://api.elevenlabs.io/v1",
   ELEVENLABS_AGENT_IDS: {
     xander: "agent_test_xander",
     iris: "agent_test_iris",

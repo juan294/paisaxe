@@ -18,6 +18,7 @@ const AGENTS = [
   { flagKey: "qa_agent_enabled", name: "QA", schedule: "Weekly Sunday 8:00 AM", reportFile: "docs/agents/qa-report.md" },
   { flagKey: "localization_agent_enabled", name: "Localization", schedule: "Weekly Sunday 7:00 AM", reportFile: "docs/agents/localization-report.md" },
   { flagKey: "cost_analyst_agent_enabled", name: "Cost Analyst", schedule: "Daily at 3:00 AM", reportFile: "docs/agents/cost-analyst-report.md" },
+  { flagKey: "subscription_optimizer_enabled", name: "Subscription Optimizer", schedule: "Weekly Sunday 4:00 AM", reportFile: "docs/agents/subscription-optimizer-report.md" },
 ];
 
 // Map flag keys to display names for shared context parsing.

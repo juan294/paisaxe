@@ -1,44 +1,31 @@
 "use client";
 
-import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
-import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin, Loader2 } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin } from "lucide-react";
 
 export default function PricingPage() {
   const { user, session, signInWithGoogle } = useAuth();
   const { canUseVoice, isWhitelisted, expiresAt, isLoading } = useVoiceAccess();
   const { t } = useTranslation();
-  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const returnTo = searchParams.get("returnTo");
 
-  const handlePurchase = async () => {
+  const handlePurchase = () => {
     if (!user || !session) {
       signInWithGoogle("/pricing");
       return;
     }
 
-    setIsCheckoutLoading(true);
-
-    try {
-      const response = await fetch("/api/checkout/day-pass", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create checkout session");
-      }
-
-      const { url } = await response.json();
-      window.location.href = url;
-    } catch (error) {
-      console.error("[pricing] Checkout error:", error);
-      setIsCheckoutLoading(false);
-    }
+    // Navigate to embedded checkout page
+    const checkoutUrl = returnTo
+      ? `/pricing/checkout?returnTo=${returnTo}`
+      : "/pricing/checkout";
+    router.push(checkoutUrl);
   };
 
   if (isLoading) {
@@ -125,10 +112,10 @@ export default function PricingPage() {
             {/* Price */}
             <div className="p-6 text-center border-b border-neutral-800">
               <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-3">
-                Voice Pass · 24h
+                Voice Pass \u00b7 24h
               </p>
               <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-semibold text-white">€1.99</span>
+                <span className="text-4xl font-semibold text-white">\u20ac1.99</span>
               </div>
             </div>
 
@@ -158,10 +145,8 @@ export default function PricingPage() {
             <div className="p-6 pt-2">
               <button
                 onClick={handlePurchase}
-                disabled={isCheckoutLoading}
-                className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors flex items-center justify-center gap-2"
               >
-                {isCheckoutLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                 {user ? t("premium.pricing_cta") : t("premium.sign_in_to_purchase")}
               </button>
               <p className="mt-3 text-center text-xs text-neutral-500">

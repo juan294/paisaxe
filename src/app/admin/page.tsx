@@ -5,14 +5,11 @@ import dynamic from "next/dynamic";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdminRole } from "@/hooks/use-admin-role";
 import { StoryGrid } from "@/components/admin/story-grid";
-import { StoryEditorDialog } from "@/components/admin/story-editor-dialog";
-import { CreateStoryDialog } from "@/components/admin/create-story-dialog";
-import { SelectionToolbar } from "@/components/admin/selection-toolbar";
 import { AdminTabs, TABS, type AdminTab } from "@/components/admin/admin-tabs";
 import { AdminThemeProvider } from "@/components/admin/theme-provider";
 import { ThemeToggle } from "@/components/admin/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { fetchStories, bulkUpdateStoryStatus, bulkDeleteStories } from "@/lib/admin-api";
+import { fetchStories, bulkUpdateStoryStatus, bulkDeleteStories, approveAllPendingStories } from "@/lib/admin-api";
 import {
   RefreshCw,
   LogOut,
@@ -69,6 +66,21 @@ const AgentsDashboard = dynamic(
   { ssr: false, loading: TabPanelFallback }
 );
 
+const StoryEditorDialog = dynamic(
+  () => import("@/components/admin/story-editor-dialog").then(m => ({ default: m.StoryEditorDialog })),
+  { ssr: false }
+);
+
+const CreateStoryDialog = dynamic(
+  () => import("@/components/admin/create-story-dialog").then(m => ({ default: m.CreateStoryDialog })),
+  { ssr: false }
+);
+
+const SelectionToolbar = dynamic(
+  () => import("@/components/admin/selection-toolbar").then(m => ({ default: m.SelectionToolbar })),
+  { ssr: false }
+);
+
 type FilterType = "all" | CurationStatus | "missing_translations";
 
 const TRANSLATION_LOCALES: StoryLocale[] = ["en", "fr", "de", "pt", "ast"];
@@ -113,9 +125,17 @@ function AdminPageContent() {
   const [error, setError] = useState("");
   const [editingStory, setEditingStory] = useState<AdminStory | null>(null);
   const [activeTab, setActiveTab] = useState<AdminTab>("analytics");
+  const [visitedTabs, setVisitedTabs] = useState<Set<AdminTab>>(new Set(["analytics"]));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isApproveAllConfirmOpen, setIsApproveAllConfirmOpen] = useState(false);
+  const [isApprovingAll, setIsApprovingAll] = useState(false);
+
+  const handleTabChange = useCallback((tab: AdminTab) => {
+    setActiveTab(tab);
+    setVisitedTabs(prev => prev.has(tab) ? prev : new Set(prev).add(tab));
+  }, []);
 
   // Always fetch ALL stories - filter client-side for display
   const loadStories = useCallback(async () => {
@@ -151,14 +171,14 @@ function AdminPageContent() {
         e.preventDefault();
         const tab = TABS[keyNum - 1];
         if (tab) {
-          setActiveTab(tab.value);
+          handleTabChange(tab.value);
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [handleTabChange]);
 
   // Filter stories client-side for display
   const filteredStories = allStories.filter((story) => {
@@ -267,6 +287,29 @@ function AdminPageContent() {
   const handleStoryCreated = (_story: CreateStoryResponse) => {
     // Reload stories to get the full story data
     loadStories();
+  };
+
+  const handleApproveAll = async () => {
+    setIsApprovingAll(true);
+    setError("");
+
+    const result = await approveAllPendingStories();
+
+    if (result.error) {
+      setError(result.error);
+    } else if (result.data) {
+      // Update local state: mark all needs_curation stories as approved
+      setAllStories((prev) =>
+        prev.map((story) =>
+          story.curationStatus === "needs_curation"
+            ? { ...story, curationStatus: "approved" }
+            : story
+        )
+      );
+    }
+
+    setIsApprovingAll(false);
+    setIsApproveAllConfirmOpen(false);
   };
 
   const handleBulkDelete = async () => {
@@ -402,7 +445,7 @@ function AdminPageContent() {
 
           {/* Center tabs */}
           <div className="absolute left-1/2 -translate-x-1/2">
-            <AdminTabs activeTab={activeTab} onTabChange={setActiveTab} />
+            <AdminTabs activeTab={activeTab} onTabChange={handleTabChange} />
           </div>
 
           {/* Right side */}
@@ -500,6 +543,20 @@ function AdminPageContent() {
                   className="h-11 rounded-xl border-none bg-white pl-10 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:bg-[#252320] dark:text-[#f5f3ee]"
                 />
               </div>
+              {needsCurationCount > 0 && (
+                <Button
+                  onClick={() => setIsApproveAllConfirmOpen(true)}
+                  disabled={isApprovingAll}
+                  className="h-11 rounded-xl bg-[#5a7a5a] text-sm font-medium text-white hover:bg-[#4a6a4a] disabled:opacity-50"
+                >
+                  {isApprovingAll ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                  )}
+                  Approve All ({needsCurationCount})
+                </Button>
+              )}
               <Button
                 onClick={() => setIsCreateDialogOpen(true)}
                 className="h-11 rounded-xl bg-[#2d2a26] text-sm font-medium text-[#f5f3ee] hover:bg-[#3d3a36] dark:bg-[#f5f3ee] dark:text-[#2d2a26] dark:hover:bg-[#e5e3de]"
@@ -520,6 +577,7 @@ function AdminPageContent() {
         )}
 
         {/* Tab content */}
+        {/* Stories tab: conditional render (inline JSX with dependent state) */}
         {activeTab === "stories" && (
           <>
             {isLoading && allStories.length === 0 ? (
@@ -548,24 +606,35 @@ function AdminPageContent() {
           </>
         )}
 
-        {activeTab === "features" && (
-          <FeatureTogglesPanel />
+        {/* Lazy-mounted tabs: mount on first visit, persist with display:none */}
+        {visitedTabs.has("features") && (
+          <div style={{ display: activeTab === "features" ? "block" : "none" }}>
+            <FeatureTogglesPanel />
+          </div>
         )}
 
-        {activeTab === "analytics" && (
-          <AnalyticsDashboard />
+        {visitedTabs.has("analytics") && (
+          <div style={{ display: activeTab === "analytics" ? "block" : "none" }}>
+            <AnalyticsDashboard />
+          </div>
         )}
 
-        {activeTab === "marketing" && (
-          <MarketingDashboard />
+        {visitedTabs.has("marketing") && (
+          <div style={{ display: activeTab === "marketing" ? "block" : "none" }}>
+            <MarketingDashboard />
+          </div>
         )}
 
-        {activeTab === "suggestions" && (
-          <SuggestionsPanel />
+        {visitedTabs.has("suggestions") && (
+          <div style={{ display: activeTab === "suggestions" ? "block" : "none" }}>
+            <SuggestionsPanel />
+          </div>
         )}
 
-        {activeTab === "agents" && (
-          <AgentsDashboard />
+        {visitedTabs.has("agents") && (
+          <div style={{ display: activeTab === "agents" ? "block" : "none" }}>
+            <AgentsDashboard />
+          </div>
         )}
       </main>
 
@@ -582,6 +651,47 @@ function AdminPageContent() {
         onOpenChange={setIsCreateDialogOpen}
         onCreated={handleStoryCreated}
       />
+
+      {/* Approve All Confirmation Dialog */}
+      {isApproveAllConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-[#252320]">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#5a7a5a]/10">
+              <CheckCircle2 className="h-6 w-6 text-[#5a7a5a]" />
+            </div>
+            <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
+              Approve All Stories
+            </h3>
+            <p className="mt-2 text-sm text-[#6b6560] dark:text-[#a39e98]">
+              This will approve {needsCurationCount} pending{" "}
+              {needsCurationCount === 1 ? "story" : "stories"}. This action
+              can be reversed by marking stories as pending individually.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <Button
+                onClick={() => setIsApproveAllConfirmOpen(false)}
+                disabled={isApprovingAll}
+                variant="ghost"
+                className="flex-1 h-11 rounded-xl text-sm font-medium text-[#6b6560] hover:bg-[#f5f3ee] dark:text-[#a39e98] dark:hover:bg-[#2d2a26]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleApproveAll}
+                disabled={isApprovingAll}
+                className="flex-1 h-11 rounded-xl bg-[#5a7a5a] text-sm font-medium text-white hover:bg-[#4a6a4a] disabled:opacity-50"
+              >
+                {isApprovingAll ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                )}
+                {isApprovingAll ? "Approving..." : "Approve All"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Selection Toolbar */}
       <SelectionToolbar

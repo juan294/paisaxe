@@ -86,7 +86,7 @@ export interface CreateStoryRequest {
   bestMonths?: number[];
   metadata?: Record<string, unknown>;
   displayOrder?: number;
-  sourceType?: "curated" | "user_submitted";
+  sourceType?: "curated" | "user_submitted" | "agent_discovered";
   suggestionId?: string;
 }
 

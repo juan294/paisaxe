@@ -4,7 +4,7 @@
 **Updated**: 2026-02-01
 **Purpose**: Estimate monthly operational costs across three traffic scenarios
 
-> **Current Status**: ElevenLabs upgraded to Starter tier ($5/mo) on 2026-02-01 for commercial license compliance.
+> **Current Status**: ElevenLabs upgraded to Creator tier (annual: $220/yr, ~$18.33/mo) on 2026-02-09 for increased voice minutes (100 min/mo).
 
 ---
 
@@ -16,7 +16,7 @@
 | **Vercel** | Hosting, Edge Functions, CDN | Hobby (Free) |
 | **Claude API (Anthropic)** | Chat responses | Pay-as-you-go |
 | **Voyage AI** | Embeddings + Reranking | Pay-as-you-go |
-| **ElevenLabs** | Voice agents | Starter ($5/mo) |
+| **ElevenLabs** | Voice agents | Creator ($18.33/mo, annual) |
 | **PostHog** | Analytics | Free/Pay-as-you-go |
 
 ---
@@ -112,16 +112,16 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 | Vercel Hobby | Free tier | $0.00 |
 | Claude API | 100 chats × 2.5K tokens = 250K tokens ≈ $1 | $1.00 |
 | Voyage AI | Within free tier (200M tokens) | $0.00 |
-| ElevenLabs | 20 × 3 min = 60 min (Starter ~45 min included, may need upgrade) | $5.00 |
+| ElevenLabs | 20 × 3 min = 60 min (Creator ~100 min included) | $18.33 |
 | PostHog | 2K events (within 1M free) | $0.00 |
-| **TOTAL** | | **$31.00/mo** |
+| **TOTAL** | | **$44.33/mo** |
 
 ### Recommended Budget Limits
-- ElevenLabs: Start with Starter ($5/mo), upgrade to Creator ($22/mo) if exceeding ~40 min
+- ElevenLabs: Creator plan ($18.33/mo annual), upgrade to Pro ($99/mo) if exceeding ~100 min
 - Voyage AI: No limit needed (free tier sufficient)
 - Claude API: Set alert at $10/mo
 
-> **Note**: If voice agent usage consistently exceeds 40 minutes/month, upgrade to Creator tier.
+> **Note**: If voice agent usage consistently exceeds 100 minutes/month, upgrade to Pro tier.
 
 ---
 
@@ -192,7 +192,7 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 
 | Service | How to Set Limit | Recommended Limit |
 |---------|------------------|-------------------|
-| **ElevenLabs** | Dashboard → Billing → Usage Limits | $25/mo (start on Starter), $150/mo (Pro), $500/mo (Scale) |
+| **ElevenLabs** | Dashboard → Billing → Usage Limits | $25/mo (Creator), $150/mo (Pro), $500/mo (Scale) |
 | **Voyage AI** | Dashboard → Settings → Spending Limits | $50/mo |
 | **Claude API (Anthropic)** | Console → Usage Limits → Set monthly limit | $100/mo (start), $250/mo (max) |
 | **Supabase** | Dashboard → Billing → Enable Spend Cap | Default ON (Pro tier) |
@@ -235,7 +235,6 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 4. **Consider text fallback** when approaching limits
 
 **Upgrade triggers**:
-- Starter → Creator: Using >30 min/month OR seeing concurrent errors (3 concurrent limit)
 - Creator → Pro: Using >100 min/month OR need 10+ concurrent connections
 - Pro → Scale: Using >500 min/month OR sustained high traffic
 
@@ -269,7 +268,7 @@ Set up alerts for:
 
 | Scenario | Monthly Visitors | Monthly Cost | Key Driver |
 |----------|------------------|--------------|------------|
-| **Low** (Soft Launch) | 500 | ~$31 | Base infrastructure |
+| **Low** (Soft Launch) | 500 | ~$44 | Base infrastructure |
 | **Medium** (Growing) | 5,000 | ~$171 | Voice agents |
 | **High** (Viral) | 50,000 | ~$1,110 | Voice agents (overage) |
 

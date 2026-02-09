@@ -3,12 +3,12 @@
 ## Title
 
 ```
-Show HN: Paisaxe – AI travel guide that checks weather, finds restaurants, and calls to book your table
+Show HN: Paisaxe – Talk to the places of Asturias as you explore (chat + voice)
 ```
 
 Alternative:
 ```
-Show HN: I built a voice AI concierge for Asturias that makes real phone calls to book reservations
+Show HN: I spent 2 weeks building a way to discover Asturias through conversation
 ```
 
 ---
@@ -17,68 +17,54 @@ Show HN: I built a voice AI concierge for Asturias that makes real phone calls t
 
 Link: https://paisaxe.es
 
-I built a travel guide for Asturias (northern Spain) with two tiers: free text chat and a €1.99/day voice concierge that takes real-world actions.
+I spent 2 weeks (nights and weekends) building a different way to experience a region of Spain that most people have never heard of: Asturias.
 
-**The problem I wanted to solve:**
+**The idea:**
 
-Travel planning is either "read 50 blog posts" or "ask ChatGPT and hope it doesn't hallucinate." I wanted something that actually knew a specific region deeply—and could act on that knowledge.
+Asturias already has incredible websites with photos, itineraries, and recommendations. It doesn't need more travel information. What it might need is a different way to discover what's already there.
 
-**How it works:**
+Paisaxe ("landscape" in the local Asturian language) lets you talk to the places—by chat or by voice. A cathedral. A mountain trail. A beach. A restaurant. Start a conversation and discover it naturally.
 
-1. Ingested 37 PDFs of local travel guides, hiking routes, and cultural documentation
-2. Chunked and embedded with Voyage AI (voyage-3, 512 dimensions using Matryoshka)
-3. Hybrid search: pgvector similarity + keyword matching
-4. Two-stage retrieval: fetch 10 candidates, rerank to top 3 with Voyage rerank-2.5
-5. Claude generates responses with the retrieved context (free tier)
-6. Voice agent "Pelayo" via ElevenLabs Conversational AI with real-world tools (paid tier)
+**What makes it different from reading a guide:**
 
-**The voice agent can:**
-- Check live weather via OpenWeatherMap before your hike
-- Search restaurants/places with real-time hours, ratings, and phone numbers via Google Places
-- Call a restaurant on your behalf via Twilio and make a reservation—a real outbound phone call
+When you read a guide, you get a list. When you talk to a place, you get a conversation:
 
-**Stack:**
-- Next.js 16 (App Router)
-- Supabase (Postgres + pgvector)
-- Claude API for text chat
-- Voyage AI for embeddings + reranking
-- ElevenLabs for voice agent
-- Twilio for outbound booking calls
-- Stripe for payments
-- Deployed on Vercel
+- "Is this worth seeing on a rainy day?"
+- "What should I notice when I'm here?"
+- "Where should I go next if I have 2 hours?"
 
-**What I learned:**
+It changes the rhythm from planning to discovering. Less checklist, more wandering with purpose.
 
-- Matryoshka embeddings at 512 dims perform nearly as well as 1024 for this use case, with significant cost savings
-- Two-stage retrieval (retrieve then rerank) dramatically improved answer relevance vs. just top-k vector search
-- Giving a voice agent tools (weather, places, phone calls) transforms it from a chatbot into a concierge. The product shift was more significant than the UX shift.
+**Why Asturias:**
 
-Text chat is free, no login required. Voice Pass is €1.99/day. Would love feedback on the architecture or the voice-to-action pipeline.
+- Mountains that rival the Alps, meeting the Atlantic coast
+- Spain's cider culture (forget wine—it's all about sidra here)
+- Pre-Romanesque UNESCO sites older than most countries
+- The original Camino de Santiago route (Primitivo)
+- Almost zero crowds compared to Barcelona or Madrid
+
+It's a place that deserves to be experienced slowly, and conversation felt like the right way to do that.
+
+Free to try. No login required.
 
 ---
 
 ## Potential HN Questions to Prepare For
 
-**Q: Why not just use ChatGPT/Perplexity?**
-A: They hallucinate on specific local details. My system is grounded in verified local sources and cites them. When it doesn't know something, it says so. And neither of them will call a restaurant and make a reservation for you.
+**Q: How is this different from just chatting with ChatGPT about Asturias?**
+A: Depth and specificity. This is grounded in curated local knowledge about one region, not the open internet. When it doesn't know something, it says so. And the voice experience makes it feel like talking to a local, not querying a search engine.
 
-**Q: Why 512 dimensions instead of higher?**
-A: Matryoshka embeddings let you truncate. I tested 256/512/1024—512 was the sweet spot for retrieval quality vs. storage/compute cost. Diminishing returns above that for this corpus size.
+**Q: Why conversation as the interface?**
+A: Because travel isn't really about information—it's about discovery. Lists are efficient but flat. A conversation lets you follow your curiosity in the moment: "tell me more about that," "what else is nearby," "is it worth it in the rain?"
 
-**Q: How does the phone booking work?**
-A: Pelayo uses ElevenLabs Conversational AI + Twilio. When a user asks to book, Pelayo searches Google Places for the restaurant, gets the phone number, and initiates an outbound call. He speaks to the restaurant staff in Spanish, makes the reservation, and confirms back to the user.
+**Q: Why only one region?**
+A: Going deep on one place produces a much better experience than going wide on many. Asturias is underserved by mainstream travel content, so the gap was real.
 
-**Q: How do you handle the voice latency?**
-A: ElevenLabs Conversational AI handles the real-time aspects. The bottleneck is actually the RAG retrieval + tool execution. I stream responses to minimize perceived latency.
-
-**Q: What's the corpus size?**
-A: ~37 PDFs, roughly 200k tokens of source material after chunking. Small but deep on one region.
+**Q: What's the business model?**
+A: Free chat for everyone. There's a Voice Pass (€1.99/day) for visitors who want the voice experience on the ground—talk hands-free while exploring.
 
 **Q: Why €1.99/day instead of a subscription?**
-A: Tourism is inherently transactional. Most visitors need a guide for a day trip, not a month. A day pass maps to the use case and keeps the impulse-buy friction low.
-
-**Q: Cost to run?**
-A: Supabase free tier, Vercel free tier, pay-as-you-go for Claude/Voyage/ElevenLabs/Twilio. Text chat costs are low. Voice + outbound calls are the main variable cost, but revenue from Voice Pass covers it at moderate usage.
+A: Tourism is inherently transactional. Most visitors need it for a day trip, not a month. A day pass maps to the use case and keeps the friction low.
 
 ---
 

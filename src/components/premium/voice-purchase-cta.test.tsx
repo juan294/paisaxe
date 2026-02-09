@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { VoicePurchaseCTA } from "./voice-purchase-cta";
 
@@ -24,10 +24,6 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-// Mock fetch for checkout API
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
-
 // Create mocks
 const mockSignInWithGoogle = vi.fn();
 let mockUser: { id: string; email: string } | null = { id: "user-123", email: "test@example.com" };
@@ -41,35 +37,24 @@ vi.mock("@/hooks/use-auth", () => ({
   }),
 }));
 
-// Mock window.location
-const originalLocation = window.location;
+// Mock next/navigation
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}));
 
 beforeEach(() => {
   mockSignInWithGoogle.mockClear();
-  mockFetch.mockReset();
-  mockFetch.mockResolvedValue({
-    ok: true,
-    json: () => Promise.resolve({ url: "https://checkout.stripe.com/test" }),
-  });
+  mockPush.mockReset();
   mockUser = { id: "user-123", email: "test@example.com" };
   mockSession = { access_token: "test-token" };
-
-  // Mock window.location
-  Object.defineProperty(window, "location", {
-    value: {
-      ...originalLocation,
-      origin: "https://paisaxe.com",
-      href: "",
-    },
-    writable: true,
-  });
-});
-
-afterAll(() => {
-  Object.defineProperty(window, "location", {
-    value: originalLocation,
-    writable: true,
-  });
 });
 
 describe("VoicePurchaseCTA", () => {
@@ -86,7 +71,7 @@ describe("VoicePurchaseCTA", () => {
 
     it("renders the price", () => {
       render(<VoicePurchaseCTA />);
-      expect(screen.getByText("€1.99")).toBeInTheDocument();
+      expect(screen.getByText(/1\.99/)).toBeInTheDocument();
       expect(screen.getByText("per day")).toBeInTheDocument();
     });
 
@@ -103,7 +88,7 @@ describe("VoicePurchaseCTA", () => {
 
     it("shows 'Get Day Pass' button when user is signed in", () => {
       render(<VoicePurchaseCTA />);
-      expect(screen.getByRole("button", { name: "Get Day Pass" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Get Day Pass/ })).toBeInTheDocument();
     });
 
     it("shows 'Sign in to purchase' button when user is not signed in", () => {
@@ -113,14 +98,16 @@ describe("VoicePurchaseCTA", () => {
       expect(screen.getByRole("button", { name: "Sign in to purchase" })).toBeInTheDocument();
     });
 
-    it("redirects to checkout when clicking purchase button", async () => {
+    it("navigates to embedded checkout when clicking purchase button", () => {
       render(<VoicePurchaseCTA />);
-      fireEvent.click(screen.getByRole("button", { name: "Get Day Pass" }));
+      fireEvent.click(screen.getByRole("button", { name: /Get Day Pass/ }));
+      expect(mockPush).toHaveBeenCalledWith("/pricing/checkout");
+    });
 
-      // Wait for fetch to resolve and redirect to happen
-      await vi.waitFor(() => {
-        expect(window.location.href).toBe("https://checkout.stripe.com/test");
-      });
+    it("navigates to checkout with returnTo when slug is provided", () => {
+      render(<VoicePurchaseCTA returnTo="oviedo-walking-tour" />);
+      fireEvent.click(screen.getByRole("button", { name: /Get Day Pass/ }));
+      expect(mockPush).toHaveBeenCalledWith("/pricing/checkout?returnTo=oviedo-walking-tour");
     });
 
     it("calls signInWithGoogle when clicking button without session", () => {
@@ -140,7 +127,7 @@ describe("VoicePurchaseCTA", () => {
 
     it("renders purchase button with price in compact mode", () => {
       render(<VoicePurchaseCTA compact />);
-      expect(screen.getByRole("button", { name: /Get Day Pass.*€1.99/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Get Day Pass.*1\.99/ })).toBeInTheDocument();
     });
 
     it("does not render title in compact mode", () => {
@@ -165,8 +152,4 @@ describe("VoicePurchaseCTA", () => {
       expect(container.firstChild).toHaveClass("custom-class");
     });
   });
-
-  // Note: Testing the "Stripe not configured" case would require module isolation
-  // which is complex with vi.mock. The path is covered by manual inspection as it simply
-  // logs an error and returns early. The other tests cover the happy path adequately.
 });

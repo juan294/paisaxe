@@ -337,10 +337,6 @@ test.describe("QA Journey: New Features", () => {
     // Step 4: Fill the form
     await dialog.locator("#place-name").fill("Playa del Silencio");
 
-    // Select location via combobox
-    await dialog.getByRole("combobox").click();
-    await page.getByRole("option").first().click();
-
     // Add optional comment
     await dialog.locator("#comment").fill("A beautiful hidden beach");
 
