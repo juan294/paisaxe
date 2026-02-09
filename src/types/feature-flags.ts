@@ -23,6 +23,7 @@ export type FeatureFlagKey =
   | "qa_agent_enabled"
   | "localization_agent_enabled"
   | "cost_analyst_agent_enabled"
+  | "content_discovery_agent_enabled"
   | "fullscreen_button";
 
 export interface VisitorVoiceConfig {
