@@ -56,6 +56,11 @@ vi.mock("next/link", () => ({
   }) => <a href={href} {...rest}>{children}</a>,
 }));
 
+// Mock next/navigation
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 describe("PricingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -279,6 +284,7 @@ describe("PricingPage", () => {
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({}),
       });
     });
 

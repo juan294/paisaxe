@@ -64,13 +64,17 @@ export function ImmersivePageContent({ serverShuffleSeed }: ImmersivePageContent
     [startTransition]
   );
 
-  // Check for ?story= query param from share links
+  // Check for ?story= query param from share links or post-payment return
+  // When voice=ready is also present, auto-open the voice chat
   useEffect(() => {
     const storySlug = searchParams.get("story");
     if (storySlug && allStories.length > 0) {
       const index = allStories.findIndex((s) => s.slug === storySlug || s.id === storySlug);
       if (index >= 0) {
         setCurrentIndex(index);
+        if (searchParams.get("voice") === "ready") {
+          setChatOpen(true);
+        }
       }
     }
   }, [searchParams, allStories]);
