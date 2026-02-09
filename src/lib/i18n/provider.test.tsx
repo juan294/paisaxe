@@ -297,13 +297,39 @@ describe('LanguageProvider', () => {
 });
 
 describe('useTranslation', () => {
-  it('throws when used outside LanguageProvider', () => {
-    // Suppress React error output during this test
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    _resetTranslationCacheForTesting();
+  });
 
-    expect(() => {
-      render(<TestConsumer />);
-    }).toThrow('useTranslation must be used within a LanguageProvider');
+  it('returns fallback Spanish translations when used outside LanguageProvider', () => {
+    render(<TestConsumer />);
+
+    // Should not throw — returns defensive fallback
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+    expect(screen.getByTestId('translation').textContent).toBe('Cargando...');
+  });
+
+  it('returns a no-op setLocale when used outside LanguageProvider', () => {
+    render(<TestConsumer />);
+
+    // Clicking setLocale should not throw
+    act(() => {
+      screen.getByTestId('switch-en').click();
+    });
+
+    // Locale stays 'es' because setLocale is a no-op
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+  });
+
+  it('logs a warning when used outside LanguageProvider', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    render(<TestConsumer />);
+
+    expect(spy).toHaveBeenCalledWith(
+      'useTranslation: LanguageProvider not found, using fallback. This may indicate a rendering issue.'
+    );
 
     spy.mockRestore();
   });
