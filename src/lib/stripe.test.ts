@@ -29,6 +29,7 @@ import {
   formatPrice,
   getStripeClient,
   createDayPassCheckoutSession,
+  createEmbeddedCheckoutSession,
   verifyWebhookSignature,
 } from "./stripe";
 
@@ -156,6 +157,68 @@ describe("stripe", () => {
           cancelUrl: "https://example.com/cancel",
         })
       ).rejects.toThrow("Failed to create checkout session - no URL returned");
+    });
+  });
+
+  describe("createEmbeddedCheckoutSession", () => {
+    beforeEach(() => {
+      mockCreate.mockReset();
+    });
+
+    it("should throw error when STRIPE_DAY_PASS_PRICE_ID is missing", async () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "");
+
+      await expect(
+        createEmbeddedCheckoutSession({
+          userId: "user-123",
+          userEmail: "test@example.com",
+          returnUrl: "https://example.com/return",
+        })
+      ).rejects.toThrow("STRIPE_DAY_PASS_PRICE_ID not configured");
+    });
+
+    it("should create embedded checkout session with correct parameters", async () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
+
+      mockCreate.mockResolvedValue({
+        client_secret: "cs_test_secret_123",
+      });
+
+      const clientSecret = await createEmbeddedCheckoutSession({
+        userId: "user-123",
+        userEmail: "test@example.com",
+        returnUrl: "https://example.com/return?session_id={CHECKOUT_SESSION_ID}",
+      });
+
+      expect(clientSecret).toBe("cs_test_secret_123");
+      expect(mockCreate).toHaveBeenCalledWith({
+        ui_mode: "embedded",
+        mode: "payment",
+        payment_method_types: ["card"],
+        line_items: [{ price: "price_123", quantity: 1 }],
+        customer_email: "test@example.com",
+        metadata: { user_id: "user-123" },
+        return_url: "https://example.com/return?session_id={CHECKOUT_SESSION_ID}",
+      });
+    });
+
+    it("should throw error when client_secret is not returned", async () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
+
+      mockCreate.mockResolvedValue({ client_secret: null });
+
+      await expect(
+        createEmbeddedCheckoutSession({
+          userId: "user-123",
+          userEmail: "test@example.com",
+          returnUrl: "https://example.com/return",
+        })
+      ).rejects.toThrow(
+        "Failed to create embedded checkout session - no client_secret returned"
+      );
     });
   });
 

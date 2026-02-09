@@ -254,6 +254,8 @@ export const de: Translations = {
     success_expires: 'Dein Zugang ist gültig bis',
     success_cta: 'Jetzt Sprechen',
     success_retry_hint: 'Wenn dein Zugang nicht angezeigt wird, warte einen Moment und aktualisiere die Seite.',
+    checkout_title: 'Kasse',
+    checkout_back_to_pricing: 'Zurück zu den Preisen',
     pricing_title: 'Sprachgespräche',
     pricing_subtitle: 'Ohne Tippen. Echte Antworten. Echte Reservierungen.',
     pricing_cta: 'Tagespass Holen',

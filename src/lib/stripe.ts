@@ -68,6 +68,48 @@ export async function createDayPassCheckoutSession(
 }
 
 /**
+ * Options for creating a Stripe Embedded Checkout Session.
+ */
+export interface StripeEmbeddedCheckoutOptions {
+  userId: string;
+  userEmail: string;
+  returnUrl: string;
+}
+
+/**
+ * Create a Stripe Embedded Checkout Session for the Day Pass product.
+ * Returns the client_secret for the embedded checkout form.
+ */
+export async function createEmbeddedCheckoutSession(
+  options: StripeEmbeddedCheckoutOptions
+): Promise<string> {
+  const stripe = getStripeClient();
+  const priceId = process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
+
+  if (!priceId) {
+    throw new Error("STRIPE_DAY_PASS_PRICE_ID not configured");
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    ui_mode: "embedded",
+    mode: "payment",
+    payment_method_types: ["card"],
+    line_items: [{ price: priceId, quantity: 1 }],
+    customer_email: options.userEmail,
+    metadata: { user_id: options.userId },
+    return_url: options.returnUrl,
+  });
+
+  if (!session.client_secret) {
+    throw new Error(
+      "Failed to create embedded checkout session - no client_secret returned"
+    );
+  }
+
+  return session.client_secret;
+}
+
+/**
  * Verify Stripe webhook signature and construct the event.
  * Throws an error if verification fails.
  */
