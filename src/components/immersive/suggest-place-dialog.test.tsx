@@ -65,9 +65,10 @@ describe("SuggestPlaceDialog", () => {
     expect(screen.getByLabelText(/Place Name/)).toBeInTheDocument();
   });
 
-  it("renders location select", () => {
+  it("does not render location select (removed for simplicity)", () => {
     render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
-    expect(screen.getByText("Location")).toBeInTheDocument();
+    expect(screen.queryByText("Location")).not.toBeInTheDocument();
+    expect(screen.queryByText("Select region")).not.toBeInTheDocument();
   });
 
   it("renders comment textarea", () => {
@@ -149,7 +150,6 @@ describe("SuggestPlaceDialog", () => {
         body: JSON.stringify({
           placeName: "Lago Enol",
           comment: "Amazing views",
-          location: undefined,
           attribution: "Juan",
         }),
       });
