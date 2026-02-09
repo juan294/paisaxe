@@ -288,6 +288,13 @@ export const fr: Translations = {
     immersive_description: 'Une erreur est survenue lors du chargement des histoires. Réessayez.',
   },
 
+  footer: {
+    terms: 'Conditions d\'Utilisation',
+    privacy: 'Politique de Confidentialité',
+    content_attribution: 'Contenu basé sur des documents de Turismo de Asturias',
+    ai_disclaimer: 'Les réponses sont générées par IA et doivent être vérifiées',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

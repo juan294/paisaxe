@@ -295,6 +295,14 @@ export const en: Translations = {
     immersive_description: 'Something went wrong loading the stories. Try again.',
   },
 
+  footer: {
+    terms: 'Terms of Service',
+    privacy: 'Privacy Policy',
+    // LOCATION-SPECIFIC: Content source attribution
+    content_attribution: 'Content based on materials from Turismo de Asturias',
+    ai_disclaimer: 'Responses are AI-generated and should be verified',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {

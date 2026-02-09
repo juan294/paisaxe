@@ -295,6 +295,13 @@ export const ast: Translations = {
     immersive_description: 'Algo falló al cargar les histories. Inténtalo otra vuelta.',
   },
 
+  footer: {
+    terms: 'Condiciones d\'Usu',
+    privacy: 'Politica de Privacidá',
+    content_attribution: 'Conteníu basáu en materiales de Turismu d\'Asturies',
+    ai_disclaimer: 'Les respuestes son xeneraes por IA y deben verificase',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
