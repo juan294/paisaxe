@@ -54,11 +54,19 @@ interface LanguageProviderProps {
 }
 
 export function LanguageProvider({ children, initialLocale }: LanguageProviderProps) {
-  const [locale, setLocaleState] = useState<Locale>(() => {
-    if (typeof window === 'undefined') return initialLocale ?? 'es';
-    return initialLocale ?? resolveLocale();
-  });
+  // Always start with 'es' (SSR default) to prevent hydration mismatch.
+  // Browser locale detection runs in useEffect after hydration.
+  const [locale, setLocaleState] = useState<Locale>(initialLocale ?? 'es');
   const [loadGeneration, setLoadGeneration] = useState(0);
+
+  // After hydration, resolve the actual locale from browser/storage
+  useEffect(() => {
+    if (initialLocale) return; // explicit prop — skip detection
+    const resolved = resolveLocale();
+    if (resolved !== 'es') {
+      setLocaleState(resolved);
+    }
+  }, [initialLocale]);
 
   // Load translations for the current locale if not cached
   useEffect(() => {
