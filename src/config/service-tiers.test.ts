@@ -58,8 +58,9 @@ describe("SERVICE_TIERS config", () => {
   it("should include ElevenLabs tier", () => {
     const el = SERVICE_TIERS.find((t) => t.serviceId === "elevenlabs");
     expect(el).toBeDefined();
-    expect(el!.currentTierName).toBe("Starter");
-    expect(el!.limits[0].monthlyLimit).toBe(30);
+    expect(el!.currentTierName).toBe("Creator");
+    expect(el!.currentMonthlyCostUsd).toBe(18.33);
+    expect(el!.limits[0].monthlyLimit).toBe(100);
   });
 
   it("should include Vercel tier", () => {
