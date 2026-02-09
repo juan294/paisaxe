@@ -127,8 +127,8 @@ export default function PrivacyPage() {
         <h2>9. Contacto</h2>
         <p>
           Para cualquier consulta sobre privacidad, contacta con nosotros en:{" "}
-          <a href="mailto:thecreativetoken@gmail.com">
-            thecreativetoken@gmail.com
+          <a href="mailto:support@paisaxe.es">
+            support@paisaxe.es
           </a>
         </p>
       </article>
