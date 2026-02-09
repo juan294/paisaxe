@@ -1,65 +1,75 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
-import TermsPage, { metadata } from "./page";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import TermsPage from './page';
 
-describe("TermsPage", () => {
-  it("should export correct metadata", () => {
-    expect(metadata.title).toBe("Términos de Servicio | Paisaxe");
-    expect(metadata.description).toBe("Términos y condiciones de uso de Paisaxe");
+const mockT = vi.fn((key: string) => key);
+vi.mock('@/lib/i18n', () => ({
+  useTranslation: () => ({ t: mockT, locale: 'en', setLocale: vi.fn() }),
+}));
+
+describe('TermsPage', () => {
+  beforeEach(() => {
+    mockT.mockImplementation((key: string) => key);
   });
 
-  it("should render the terms heading", () => {
+  it('renders the page heading', () => {
     render(<TermsPage />);
-    expect(screen.getByRole("heading", { level: 1, name: "Términos de Servicio" })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('terms.title');
   });
 
-  it("should render all main sections", () => {
+  it('renders the last updated date', () => {
     render(<TermsPage />);
-    expect(screen.getByText("1. Descripción del servicio")).toBeInTheDocument();
-    expect(screen.getByText("2. Uso del servicio")).toBeInTheDocument();
-    expect(screen.getByText("3. VoicePass y pagos")).toBeInTheDocument();
-    expect(screen.getByText("4. Contenido generado por IA")).toBeInTheDocument();
-    expect(screen.getByText("5. Reservas")).toBeInTheDocument();
-    expect(screen.getByText("6. Propiedad intelectual")).toBeInTheDocument();
-    expect(screen.getByText("7. Limitación de responsabilidad")).toBeInTheDocument();
-    expect(screen.getByText("8. Modificaciones")).toBeInTheDocument();
-    expect(screen.getByText("9. Legislación aplicable")).toBeInTheDocument();
-    expect(screen.getByText("10. Contacto")).toBeInTheDocument();
+    expect(screen.getByText('terms.last_updated')).toBeInTheDocument();
   });
 
-  it("should mention VoicePass pricing", () => {
+  it('renders all 10 sections', () => {
     render(<TermsPage />);
-    expect(screen.getByText(/1,99 €/)).toBeInTheDocument();
+    expect(screen.getByText('terms.section1_title')).toBeInTheDocument();
+    expect(screen.getByText('terms.section2_title')).toBeInTheDocument();
+    expect(screen.getByText('terms.section3_title')).toBeInTheDocument();
+    expect(screen.getByText('terms.section4_title')).toBeInTheDocument();
+    expect(screen.getByText('terms.section5_title')).toBeInTheDocument();
+    expect(screen.getByText('terms.section6_title')).toBeInTheDocument();
+    expect(screen.getByText('terms.section7_title')).toBeInTheDocument();
+    expect(screen.getByText('terms.section8_title')).toBeInTheDocument();
+    expect(screen.getByText('terms.section9_title')).toBeInTheDocument();
+    expect(screen.getByText('terms.section10_title')).toBeInTheDocument();
   });
 
-  it("should have a contact email link", () => {
+  it('renders the VoicePass pricing key', () => {
     render(<TermsPage />);
-    const link = screen.getByRole("link", { name: "support@paisaxe.es" });
-    expect(link).toHaveAttribute("href", "mailto:support@paisaxe.es");
+    expect(screen.getByText('terms.pricing_description')).toBeInTheDocument();
   });
 
-  it("should render in a semantic main structure", () => {
+  it('has a contact email link', () => {
     render(<TermsPage />);
-    expect(screen.getByRole("main")).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /support@paisaxe.es/ });
+    expect(link).toHaveAttribute('href', 'mailto:support@paisaxe.es');
   });
 
-  it("should use the immersive dark background", () => {
+  it('renders in a semantic main structure', () => {
+    render(<TermsPage />);
+    expect(screen.getByRole('main')).toBeInTheDocument();
+  });
+
+  it('uses the immersive dark background', () => {
     const { container } = render(<TermsPage />);
     const outerDiv = container.firstElementChild;
-    expect(outerDiv?.className).toContain("bg-neutral-950");
+    expect(outerDiv?.className).toContain('bg-neutral-950');
   });
 
-  it("should render a back navigation link to /immersive", () => {
+  it('renders a back navigation link to /immersive', () => {
     render(<TermsPage />);
-    const backLink = screen.getByLabelText("Volver");
-    expect(backLink.closest("a")).toHaveAttribute("href", "/immersive");
+    const backLink = screen.getByLabelText('terms.back');
+    expect(backLink).toBeInTheDocument();
+    expect(backLink.closest('a')).toHaveAttribute('href', '/immersive');
   });
 
-  it("should render footer links to privacy and about pages", () => {
+  it('renders footer links to privacy and about pages', () => {
     render(<TermsPage />);
-    const privacyLink = screen.getByRole("link", { name: /privacidad/i });
-    expect(privacyLink).toHaveAttribute("href", "/privacy");
-    const aboutLink = screen.getByRole("link", { name: /sobre paisaxe/i });
-    expect(aboutLink).toHaveAttribute("href", "/about");
+    const privacyLink = screen.getByText('terms.footer_privacy');
+    expect(privacyLink.closest('a')).toHaveAttribute('href', '/privacy');
+    const aboutLink = screen.getByText('terms.footer_about');
+    expect(aboutLink.closest('a')).toHaveAttribute('href', '/about');
   });
 });
