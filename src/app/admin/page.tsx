@@ -5,9 +5,6 @@ import dynamic from "next/dynamic";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdminRole } from "@/hooks/use-admin-role";
 import { StoryGrid } from "@/components/admin/story-grid";
-import { StoryEditorDialog } from "@/components/admin/story-editor-dialog";
-import { CreateStoryDialog } from "@/components/admin/create-story-dialog";
-import { SelectionToolbar } from "@/components/admin/selection-toolbar";
 import { AdminTabs, TABS, type AdminTab } from "@/components/admin/admin-tabs";
 import { AdminThemeProvider } from "@/components/admin/theme-provider";
 import { ThemeToggle } from "@/components/admin/theme-toggle";
@@ -69,6 +66,21 @@ const AgentsDashboard = dynamic(
   { ssr: false, loading: TabPanelFallback }
 );
 
+const StoryEditorDialog = dynamic(
+  () => import("@/components/admin/story-editor-dialog").then(m => ({ default: m.StoryEditorDialog })),
+  { ssr: false }
+);
+
+const CreateStoryDialog = dynamic(
+  () => import("@/components/admin/create-story-dialog").then(m => ({ default: m.CreateStoryDialog })),
+  { ssr: false }
+);
+
+const SelectionToolbar = dynamic(
+  () => import("@/components/admin/selection-toolbar").then(m => ({ default: m.SelectionToolbar })),
+  { ssr: false }
+);
+
 type FilterType = "all" | CurationStatus | "missing_translations";
 
 const TRANSLATION_LOCALES: StoryLocale[] = ["en", "fr", "de", "pt", "ast"];
@@ -113,9 +125,15 @@ function AdminPageContent() {
   const [error, setError] = useState("");
   const [editingStory, setEditingStory] = useState<AdminStory | null>(null);
   const [activeTab, setActiveTab] = useState<AdminTab>("analytics");
+  const [visitedTabs, setVisitedTabs] = useState<Set<AdminTab>>(new Set(["analytics"]));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  const handleTabChange = useCallback((tab: AdminTab) => {
+    setActiveTab(tab);
+    setVisitedTabs(prev => prev.has(tab) ? prev : new Set(prev).add(tab));
+  }, []);
 
   // Always fetch ALL stories - filter client-side for display
   const loadStories = useCallback(async () => {
@@ -151,14 +169,14 @@ function AdminPageContent() {
         e.preventDefault();
         const tab = TABS[keyNum - 1];
         if (tab) {
-          setActiveTab(tab.value);
+          handleTabChange(tab.value);
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [handleTabChange]);
 
   // Filter stories client-side for display
   const filteredStories = allStories.filter((story) => {
@@ -402,7 +420,7 @@ function AdminPageContent() {
 
           {/* Center tabs */}
           <div className="absolute left-1/2 -translate-x-1/2">
-            <AdminTabs activeTab={activeTab} onTabChange={setActiveTab} />
+            <AdminTabs activeTab={activeTab} onTabChange={handleTabChange} />
           </div>
 
           {/* Right side */}
@@ -520,6 +538,7 @@ function AdminPageContent() {
         )}
 
         {/* Tab content */}
+        {/* Stories tab: conditional render (inline JSX with dependent state) */}
         {activeTab === "stories" && (
           <>
             {isLoading && allStories.length === 0 ? (
@@ -548,24 +567,35 @@ function AdminPageContent() {
           </>
         )}
 
-        {activeTab === "features" && (
-          <FeatureTogglesPanel />
+        {/* Lazy-mounted tabs: mount on first visit, persist with display:none */}
+        {visitedTabs.has("features") && (
+          <div style={{ display: activeTab === "features" ? "block" : "none" }}>
+            <FeatureTogglesPanel />
+          </div>
         )}
 
-        {activeTab === "analytics" && (
-          <AnalyticsDashboard />
+        {visitedTabs.has("analytics") && (
+          <div style={{ display: activeTab === "analytics" ? "block" : "none" }}>
+            <AnalyticsDashboard />
+          </div>
         )}
 
-        {activeTab === "marketing" && (
-          <MarketingDashboard />
+        {visitedTabs.has("marketing") && (
+          <div style={{ display: activeTab === "marketing" ? "block" : "none" }}>
+            <MarketingDashboard />
+          </div>
         )}
 
-        {activeTab === "suggestions" && (
-          <SuggestionsPanel />
+        {visitedTabs.has("suggestions") && (
+          <div style={{ display: activeTab === "suggestions" ? "block" : "none" }}>
+            <SuggestionsPanel />
+          </div>
         )}
 
-        {activeTab === "agents" && (
-          <AgentsDashboard />
+        {visitedTabs.has("agents") && (
+          <div style={{ display: activeTab === "agents" ? "block" : "none" }}>
+            <AgentsDashboard />
+          </div>
         )}
       </main>
 
