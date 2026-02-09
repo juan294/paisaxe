@@ -288,6 +288,10 @@ export const de: Translations = {
     not_found_description: 'Die gesuchte Seite existiert nicht oder wurde verschoben.',
     immersive_title: 'Erlebnis konnte nicht geladen werden',
     immersive_description: 'Beim Laden der Geschichten ist ein Fehler aufgetreten. Versuchen Sie es erneut.',
+    favorites_title: 'Gespeicherte Einträge konnten nicht geladen werden',
+    favorites_description: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
+    admin_title: 'Fehler im Admin-Bereich',
+    admin_description: 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
   },
 
   footer: {

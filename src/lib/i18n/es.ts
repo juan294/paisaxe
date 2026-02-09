@@ -295,6 +295,10 @@ export const es: Translations = {
     not_found_description: 'La página que buscas no existe o ha sido movida.',
     immersive_title: 'No se pudo cargar la experiencia',
     immersive_description: 'Algo falló al cargar las historias. Inténtalo de nuevo.',
+    favorites_title: 'No se pudieron cargar tus guardados',
+    favorites_description: 'Ha ocurrido un error. Inténtalo de nuevo.',
+    admin_title: 'Error en el panel de administración',
+    admin_description: 'Ha ocurrido un error inesperado. Por favor, inténtalo de nuevo.',
   },
 
   footer: {
