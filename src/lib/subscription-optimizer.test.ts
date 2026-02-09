@@ -264,4 +264,43 @@ describe("generateReport", () => {
     const report = generateReport(mockReport);
     expect(report).not.toContain("## Features Not Applicable");
   });
+
+  it("should include an executive summary with spend and actionable count", () => {
+    const report = generateReport(mockReport);
+    expect(report).toContain("## Executive Summary");
+    expect(report).toContain("$22.33");
+    // 1 service has action "review" (GitHub Pro)
+    expect(report).toMatch(/1 service.* flagged for review/i);
+  });
+
+  it("should include executive summary mentioning upgrade when present", () => {
+    const reportWithUpgrade: SubscriptionReport = {
+      ...mockReport,
+      recommendations: [
+        ...mockRecommendations,
+        {
+          serviceId: "supabase",
+          serviceName: "Supabase",
+          currentPlan: "Pro",
+          monthlyCostUsd: 25,
+          action: "upgrade",
+          reason: "Storage usage at 95% of limit.",
+          unusedFeatures: [],
+          usagePercentages: [
+            {
+              metricKey: "supabaseStorageGb",
+              label: "Database Storage",
+              percentage: 95,
+              current: 7.6,
+              limit: 8,
+            },
+          ],
+        },
+      ],
+      totalMonthlySpend: 47.33,
+    };
+    const report = generateReport(reportWithUpgrade);
+    expect(report).toContain("## Executive Summary");
+    expect(report).toMatch(/1 needs? upgrade/i);
+  });
 });

@@ -82,6 +82,7 @@ function AgentsDashboardInner() {
       setOptimizerRunning(false);
       if (result.data) {
         setOptimizerReportContent(result.data.report);
+        setShowOptimizerReport(true);
         recordRunResult(agentKey, "success");
       } else {
         recordRunResult(agentKey, "error");

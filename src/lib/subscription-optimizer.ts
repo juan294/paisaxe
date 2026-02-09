@@ -236,6 +236,28 @@ export function generateReport(report: SubscriptionReport): string {
   lines.push(`> Total monthly spend: **$${report.totalMonthlySpend.toFixed(2)}**`);
   lines.push("");
 
+  // Executive Summary (used by agents-summary parser for health summary)
+  const upgradeCount = report.recommendations.filter((r) => r.action === "upgrade").length;
+  const reviewCount = report.recommendations.filter((r) => r.action === "review").length;
+  const healthyCount = report.recommendations.filter((r) => r.action === "keep").length;
+
+  const parts: string[] = [
+    `Analyzed ${report.recommendations.length} services totaling $${report.totalMonthlySpend.toFixed(2)}/mo.`,
+  ];
+  if (upgradeCount > 0) {
+    parts.push(`${upgradeCount} need${upgradeCount === 1 ? "s" : ""} upgrade.`);
+  }
+  if (reviewCount > 0) {
+    parts.push(`${reviewCount} service${reviewCount === 1 ? "" : "s"} flagged for review.`);
+  }
+  if (healthyCount > 0) {
+    parts.push(`${healthyCount} healthy.`);
+  }
+
+  lines.push("## Executive Summary");
+  lines.push(parts.join(" "));
+  lines.push("");
+
   // Recommendations section
   lines.push("## Recommendations");
   lines.push("");

@@ -305,6 +305,47 @@ describe("GET /api/admin/agents-summary", () => {
     expect(optimizer.reportFile).toBe("docs/agents/subscription-optimizer-report.md");
   });
 
+  it("should parse optimizer report summary correctly", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-09T10:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("subscription-optimizer-report.md")) {
+        return [
+          "# Subscription Optimizer Report",
+          "> Week of 2026-02-09",
+          "> Total monthly spend: **$59.41**",
+          "",
+          "## Executive Summary",
+          "Analyzed 11 services totaling $59.41/mo. 4 services flagged for review, 7 healthy.",
+          "",
+          "## Recommendations",
+          "",
+          "### [review] Anthropic Claude — REVIEW",
+          "- **Plan**: Personal ($10.00/mo)",
+          "- **Assessment**: 4 of 6 plan features are unused.",
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\n## Executive Summary\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const optimizer = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "subscription_optimizer_enabled"
+    );
+    expect(optimizer.health).toBe("green");
+    expect(optimizer.healthSummary).not.toBe("No summary available.");
+    expect(optimizer.healthSummary).toContain("Analyzed 11 services");
+  });
+
   it("should set Cache-Control header", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,
