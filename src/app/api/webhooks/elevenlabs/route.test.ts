@@ -412,6 +412,83 @@ describe("POST /api/webhooks/elevenlabs", () => {
     });
   });
 
+  describe("data-wrapped payload format", () => {
+    it("should detect confirmed when transcript and analysis are inside data wrapper", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        data: {
+          transcript: buildTranscript(
+            { role: "agent", message: "Hola, llamo para reservar mesa para 4 personas." },
+            { role: "user", message: "Perfecto, le esperamos a las nueve." }
+          ),
+          analysis: {
+            call_successful: "success",
+            transcript_summary: "Booking confirmed for 4 people at 9pm.",
+          },
+        },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("confirmed");
+    });
+
+    it("should detect denied when transcript is inside data wrapper", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        data: {
+          transcript: buildTranscript(
+            { role: "agent", message: "Hola, llamo para reservar." },
+            { role: "user", message: "Lo siento, estamos completo." }
+          ),
+          analysis: { call_successful: "success" },
+        },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("denied");
+    });
+
+    it("should detect no_answer when analysis is inside data wrapper with failure", async () => {
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        data: {
+          transcript: [],
+          analysis: { call_successful: "failure" },
+        },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("no_answer");
+    });
+
+    it("should extract conversation_id from data wrapper", async () => {
+      const request = createSignedRequest({
+        data: {
+          conversation_id: "conv_456",
+          transcript: buildTranscript(
+            { role: "user", message: "Confirmado, le esperamos." }
+          ),
+          analysis: { call_successful: "success" },
+        },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("confirmed");
+    });
+  });
+
   it("should not send SMS when feature flag is disabled", async () => {
     vi.mocked(isFeatureFlagEnabled).mockResolvedValue(false);
 
