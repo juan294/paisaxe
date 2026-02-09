@@ -67,11 +67,11 @@ describe("GET /api/admin/agents-summary", () => {
 
     expect(response.status).toBe(200);
     expect(data.data.overallHealth).toBe("green");
-    expect(data.data.agents).toHaveLength(7);
+    expect(data.data.agents).toHaveLength(8);
     expect(data.data.agents[0].health).toBe("green");
     expect(data.data.agents[0].lastRun).toBe(mockDate.toISOString());
     expect(data.data.agents[0].healthSummary).toContain("All systems operational");
-    expect(data.data.recentActivity).toHaveLength(7);
+    expect(data.data.recentActivity).toHaveLength(8);
   });
 
   it("should handle missing report files gracefully", async () => {
@@ -87,7 +87,7 @@ describe("GET /api/admin/agents-summary", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.data.agents).toHaveLength(7);
+    expect(data.data.agents).toHaveLength(8);
     for (const agent of data.data.agents) {
       expect(agent.health).toBe("unknown");
       expect(agent.lastRun).toBeNull();
@@ -282,6 +282,27 @@ describe("GET /api/admin/agents-summary", () => {
     expect(data.data.sharedContext).toHaveLength(2);
     expect(data.data.sharedContext[0].agentName).toBe("Coverage");
     expect(data.data.sharedContext[1].agentName).toBe("Localization");
+  });
+
+  it("should include subscription optimizer in agents list", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockStat.mockRejectedValue(new Error("ENOENT"));
+    mockReadFile.mockRejectedValue(new Error("ENOENT"));
+
+    const response = await GET();
+    const data = await response.json();
+
+    const optimizer = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "subscription_optimizer_enabled"
+    );
+    expect(optimizer).toBeDefined();
+    expect(optimizer.name).toBe("Subscription Optimizer");
+    expect(optimizer.schedule).toBe("Weekly Sunday 4:00 AM");
+    expect(optimizer.reportFile).toBe("docs/agents/subscription-optimizer-report.md");
   });
 
   it("should set Cache-Control header", async () => {
