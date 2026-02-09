@@ -105,10 +105,11 @@ export function AccountConfigDialog({
         <div className="mt-6 space-y-4">
           {/* Account Name */}
           <div>
-            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <label htmlFor="account-display-name" className="mb-2 block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               Account Name
             </label>
             <input
+              id="account-display-name"
               type="text"
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
@@ -119,10 +120,11 @@ export function AccountConfigDialog({
 
           {/* Account Handle */}
           <div>
-            <label className="mb-2 block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+            <label htmlFor="account-handle" className="mb-2 block font-mono text-xs uppercase tracking-widest text-[#a39e98]">
               Handle / Username
             </label>
             <input
+              id="account-handle"
               type="text"
               value={accountHandle}
               onChange={(e) => setAccountHandle(e.target.value)}
@@ -138,12 +140,13 @@ export function AccountConfigDialog({
             </p>
             {credentialFields.map((field) => (
               <div key={field.key}>
-                <label className="mb-2 flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
+                <label htmlFor={`account-credential-${field.key}`} className="mb-2 flex items-center gap-1 font-mono text-xs uppercase tracking-widest text-[#a39e98]">
                   {field.label}
                   {field.required && <span className="text-red-500">*</span>}
                 </label>
                 <div className="relative">
                   <input
+                    id={`account-credential-${field.key}`}
                     type={showSecrets[field.key] ? "text" : "password"}
                     value={credentials[field.key] || ""}
                     onChange={(e) =>

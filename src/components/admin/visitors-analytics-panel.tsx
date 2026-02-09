@@ -83,11 +83,12 @@ export function VisitorsAnalyticsPanel() {
         </h2>
         <div className="flex items-center gap-6">
           {/* Localhost toggle */}
-          <label className="flex cursor-pointer items-center gap-2">
+          <label htmlFor="dev-toggle" className="flex cursor-pointer items-center gap-2">
             <span className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
               Dev
             </span>
             <button
+              id="dev-toggle"
               type="button"
               role="switch"
               aria-checked={includeLocalhost}

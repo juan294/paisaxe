@@ -323,4 +323,24 @@ describe("SuggestPlaceDialog", () => {
       ).toBeInTheDocument();
     });
   });
+  it("renders error message with role=alert for screen readers", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: "Rate limited" }),
+    });
+
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    fireEvent.change(placeNameInput, { target: { value: "Lago Enol" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      const alert = screen.getByRole("alert");
+      expect(alert).toBeInTheDocument();
+      expect(alert).toHaveTextContent("Too many requests. Try again later.");
+    });
+  });
+
 });

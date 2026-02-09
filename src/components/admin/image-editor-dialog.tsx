@@ -574,10 +574,11 @@ export function ImageEditorDialog({
 
               {/* Image Source / Attribution */}
               <div className="pt-2">
-                <label className="mb-1.5 block text-xs font-medium text-[#6b6560]">
+                <label htmlFor="image-source" className="mb-1.5 block text-xs font-medium text-[#6b6560]">
                   Image Source / Attribution
                 </label>
                 <Input
+                  id="image-source"
                   type="text"
                   placeholder="e.g., Photo by Juan on Unsplash"
                   value={imageSource}

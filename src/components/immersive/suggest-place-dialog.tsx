@@ -188,7 +188,7 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
 
             {/* Error Message */}
             {submitState === "error" && errorMessage && (
-              <div className="flex items-center gap-2 rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-300">
+              <div role="alert" className="flex items-center gap-2 rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-300">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 {errorMessage}
               </div>
