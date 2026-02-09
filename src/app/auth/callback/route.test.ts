@@ -2,28 +2,44 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "./route";
 
-// Mock Supabase SSR
+// Mock Supabase SSR — capture cookie config to exercise callbacks
 const mockExchangeCodeForSession = vi.fn();
 
+type CookieConfig = {
+  cookies: {
+    getAll: () => unknown[];
+    setAll: (cookies: { name: string; value: string; options?: unknown }[]) => void;
+  };
+};
+
+let capturedCookieConfig: CookieConfig | null = null;
+
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: vi.fn(() => ({
-    auth: {
-      exchangeCodeForSession: mockExchangeCodeForSession,
-    },
-  })),
+  createServerClient: vi.fn((_url: string, _key: string, config: CookieConfig) => {
+    capturedCookieConfig = config;
+    return {
+      auth: {
+        exchangeCodeForSession: mockExchangeCodeForSession,
+      },
+    };
+  }),
 }));
 
 // Mock cookies
+const mockCookieGetAll = vi.fn((): { name: string; value: string }[] => []);
+const mockCookieSet = vi.fn();
+
 vi.mock("next/headers", () => ({
   cookies: vi.fn(() => Promise.resolve({
-    getAll: vi.fn(() => []),
-    set: vi.fn(),
+    getAll: mockCookieGetAll,
+    set: mockCookieSet,
   })),
 }));
 
 describe("Auth Callback Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedCookieConfig = null;
   });
 
   const createRequest = (searchParams: Record<string, string> = {}) => {
@@ -133,9 +149,54 @@ describe("Auth Callback Route", () => {
     });
   });
 
-  // Note: Lines 20-21 (getAll) and 22-31 (setAll try/catch) are internal cookie
-  // plumbing passed as callbacks to createServerClient. Since createServerClient
-  // is fully mocked, these callbacks are never invoked in unit tests. This is
-  // expected and acceptable -- the Supabase SSR cookie integration is covered
-  // by the library's own tests and by E2E/integration testing.
+  describe("cookie callbacks", () => {
+    it("getAll callback should delegate to cookieStore.getAll", async () => {
+      const fakeCookies = [{ name: "sb-token", value: "abc123" }];
+      mockCookieGetAll.mockReturnValue(fakeCookies);
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({ code: "some-code" });
+      await GET(request);
+
+      expect(capturedCookieConfig).not.toBeNull();
+      const result = capturedCookieConfig!.cookies.getAll();
+      expect(result).toEqual(fakeCookies);
+    });
+
+    it("setAll callback should delegate to cookieStore.set for each cookie", async () => {
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({ code: "some-code" });
+      await GET(request);
+
+      expect(capturedCookieConfig).not.toBeNull();
+      const cookiesToSet = [
+        { name: "sb-access-token", value: "token1", options: { path: "/" } },
+        { name: "sb-refresh-token", value: "token2", options: { path: "/" } },
+      ];
+      capturedCookieConfig!.cookies.setAll(cookiesToSet);
+
+      expect(mockCookieSet).toHaveBeenCalledTimes(2);
+      expect(mockCookieSet).toHaveBeenCalledWith("sb-access-token", "token1", { path: "/" });
+      expect(mockCookieSet).toHaveBeenCalledWith("sb-refresh-token", "token2", { path: "/" });
+    });
+
+    it("setAll callback should silently catch errors (Server Component context)", async () => {
+      mockCookieSet.mockImplementation(() => {
+        throw new Error("Headers already sent");
+      });
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({ code: "some-code" });
+      await GET(request);
+
+      expect(capturedCookieConfig).not.toBeNull();
+      // Should not throw even though cookieStore.set throws
+      expect(() => {
+        capturedCookieConfig!.cookies.setAll([
+          { name: "sb-token", value: "val", options: {} },
+        ]);
+      }).not.toThrow();
+    });
+  });
 });
