@@ -291,7 +291,7 @@ export const pt: Translations = {
   footer: {
     terms: 'Termos de Uso',
     privacy: 'Política de Privacidade',
-    content_attribution: 'Conteúdo baseado em materiais de Turismo de Asturias',
+    content_attribution: 'Conteúdo parcialmente baseado em materiais disponíveis gratuitamente em turismoasturias.es',
     ai_disclaimer: 'As respostas são geradas por IA e devem ser verificadas',
   },
 

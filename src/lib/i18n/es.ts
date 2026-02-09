@@ -299,7 +299,7 @@ export const es: Translations = {
     terms: 'Condiciones de Uso',
     privacy: 'Politica de Privacidad',
     // LOCATION-SPECIFIC: Content source attribution
-    content_attribution: 'Contenido basado en materiales de Turismo de Asturias',
+    content_attribution: 'Contenido parcialmente basado en materiales disponibles gratuitamente en turismoasturias.es',
     ai_disclaimer: 'Las respuestas son generadas por IA y deben verificarse',
   },
 

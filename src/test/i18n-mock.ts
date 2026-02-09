@@ -140,7 +140,7 @@ export const mockTranslations: Record<string, string> = {
   // Footer
   "footer.terms": "Condiciones de Uso",
   "footer.privacy": "Politica de Privacidad",
-  "footer.content_attribution": "Contenido basado en materiales de Turismo de Asturias",
+  "footer.content_attribution": "Contenido parcialmente basado en materiales disponibles gratuitamente en turismoasturias.es",
   "footer.ai_disclaimer": "Las respuestas son generadas por IA y deben verificarse",
 
   // Info Menu
