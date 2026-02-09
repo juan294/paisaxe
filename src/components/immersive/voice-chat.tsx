@@ -179,7 +179,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             {/* Upgrade prompt for users without voice access (signed in or not) */}
             {!isInitializing && !canUseVoice && (
               <Link
-                href="/pricing"
+                href={story.slug ? `/pricing?returnTo=${story.slug}` : "/pricing"}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-400 border border-green-500/50 rounded-full hover:bg-green-500/10 hover:border-green-400 transition-colors"
               >
                 <AudioLines className="h-3.5 w-3.5" />
@@ -230,7 +230,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
           />
         ) : useElevenLabs && needsPurchase ? (
           /* Show purchase CTA when user wants voice but needs to pay */
-          <VoicePurchaseCTA />
+          <VoicePurchaseCTA returnTo={story.slug} />
         ) : (
           <>
             {/* Messages */}

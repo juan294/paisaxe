@@ -5,12 +5,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin, Loader2 } from "lucide-react";
 
 export default function PricingPage() {
   const { user, session, signInWithGoogle } = useAuth();
   const { canUseVoice, isWhitelisted, expiresAt, isLoading } = useVoiceAccess();
   const { t } = useTranslation();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get("returnTo");
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
 
   const handlePurchase = async () => {
@@ -27,6 +30,7 @@ export default function PricingPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ ...(returnTo ? { returnTo } : {}) }),
       });
 
       if (!response.ok) {

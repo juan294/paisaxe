@@ -33,13 +33,17 @@ vi.mock("@/lib/stripe", () => ({
 import { POST } from "./route";
 import { createDayPassCheckoutSession } from "@/lib/stripe";
 
-function createRequest(headers: Record<string, string> = {}): NextRequest {
+function createRequest(
+  headers: Record<string, string> = {},
+  body?: Record<string, unknown>
+): NextRequest {
   return new NextRequest("http://localhost:3000/api/checkout/day-pass", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...headers,
     },
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
 }
 
@@ -163,6 +167,91 @@ describe("POST /api/checkout/day-pass", () => {
     const data = await response.json();
     expect(response.status).toBe(500);
     expect(data.error).toBe("Stripe not configured");
+  });
+
+  it("should include returnTo story slug in success URL when provided", async () => {
+    mockGetUser.mockResolvedValue({
+      data: {
+        user: {
+          id: "user-123",
+          email: "test@example.com",
+        },
+      },
+      error: null,
+    });
+
+    vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+      "https://checkout.stripe.com/session123"
+    );
+
+    const request = createRequest(
+      { origin: "https://paisaxe.es" },
+      { returnTo: "oviedo-walking-tour" }
+    );
+
+    await POST(request);
+
+    expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        successUrl:
+          "https://paisaxe.es/pricing/success?returnTo=oviedo-walking-tour",
+      })
+    );
+  });
+
+  it("should use default success URL when no returnTo is provided", async () => {
+    mockGetUser.mockResolvedValue({
+      data: {
+        user: {
+          id: "user-123",
+          email: "test@example.com",
+        },
+      },
+      error: null,
+    });
+
+    vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+      "https://checkout.stripe.com/session123"
+    );
+
+    const request = createRequest({ origin: "https://paisaxe.es" });
+
+    await POST(request);
+
+    expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        successUrl: "https://paisaxe.es/pricing/success",
+      })
+    );
+  });
+
+  it("should ignore returnTo values with invalid characters", async () => {
+    mockGetUser.mockResolvedValue({
+      data: {
+        user: {
+          id: "user-123",
+          email: "test@example.com",
+        },
+      },
+      error: null,
+    });
+
+    vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+      "https://checkout.stripe.com/session123"
+    );
+
+    const request = createRequest(
+      { origin: "https://paisaxe.es" },
+      { returnTo: "../../admin/secrets" }
+    );
+
+    await POST(request);
+
+    expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        successUrl: "https://paisaxe.es/pricing/success",
+      })
+    );
   });
 
   it("should include error details in development mode", async () => {

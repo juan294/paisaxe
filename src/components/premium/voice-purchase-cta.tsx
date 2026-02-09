@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 interface VoicePurchaseCTAProps {
   /** Show compact version (for inline use) */
   compact?: boolean;
+  /** Story slug to return to after purchase */
+  returnTo?: string;
   className?: string;
 }
 
@@ -16,7 +18,7 @@ interface VoicePurchaseCTAProps {
  * Call-to-action component for voice pass purchase.
  * Shows pricing and redirects to Stripe checkout.
  */
-export function VoicePurchaseCTA({ compact = false, className }: VoicePurchaseCTAProps) {
+export function VoicePurchaseCTA({ compact = false, returnTo, className }: VoicePurchaseCTAProps) {
   const { user, session, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
@@ -35,6 +37,7 @@ export function VoicePurchaseCTA({ compact = false, className }: VoicePurchaseCT
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ ...(returnTo ? { returnTo } : {}) }),
       });
 
       if (!response.ok) {
