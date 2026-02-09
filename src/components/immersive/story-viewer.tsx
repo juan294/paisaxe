@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Play, Pause, Bookmark, Share2, Shuffle, Lightbulb, Camera } from "lucide-react";
 import { BookmarkButton } from "./bookmark-button";
 import { CategoryFilterBadge } from "./category-filter-badge";
-import { AuthButton } from "@/components/auth/auth-button";
+import { SiteInfoMenu } from "./site-info-menu";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useAuth } from "@/hooks/use-auth";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
@@ -549,8 +549,8 @@ export function StoryViewer({
           isFavorite={story ? isFavorite(story.id) : false}
           onToggle={() => story && toggleFavorite(story.id)}
         />
-        {/* Auth - always visible */}
-        <AuthButton />
+        {/* Profile & info menu - always visible */}
+        <SiteInfoMenu />
       </nav>
 
       {/* Keyboard hints - hidden on mobile and touch-only devices */}
