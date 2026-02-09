@@ -167,6 +167,28 @@ describe("AuthProvider", () => {
     expect(screen.getByTestId("user").textContent).toBe("none");
   });
 
+  it("handles getUser returning error even with a user object (clears auth state)", async () => {
+    // Edge case: getUser returns both an error AND a user
+    // The error should take precedence
+    mockGetUser.mockResolvedValue({
+      data: { user: mockSupabaseUser },
+      error: { message: "session_expired" },
+    });
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("false");
+    });
+
+    // Error takes precedence — user should be cleared
+    expect(screen.getByTestId("user").textContent).toBe("none");
+  });
+
   it("auth state changes via onAuthStateChange callback", async () => {
     // Start with no session so initial state is "none"
     mockGetSession.mockResolvedValue({
@@ -293,6 +315,27 @@ describe("AuthProvider", () => {
         redirectTo: expect.stringContaining("/auth/callback?next=%2Fadmin"),
       },
     });
+  });
+
+  it("signInWithGoogle uses window.location.origin for redirect URL", async () => {
+    // In jsdom, window.location.origin is "http://localhost" by default
+    const { result } = renderHook(() => useAuthContext(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    let signInPromise: Promise<void>;
+    act(() => {
+      signInPromise = result.current.signInWithGoogle();
+    });
+    await signInPromise!;
+
+    // Verify it uses window.location.origin (the "typeof window !== undefined" branch)
+    const callArgs = mockSignInWithOAuth.mock.calls[0][0];
+    expect(callArgs.options.redirectTo).toBe(
+      `${window.location.origin}/auth/callback`
+    );
   });
 
   it("signInWithGoogle throws on error", async () => {
