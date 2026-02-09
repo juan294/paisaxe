@@ -1,0 +1,83 @@
+name: Bug Report
+description: Something is broken or not working as expected
+labels: ["type: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill out the sections below so we can reproduce and fix it.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of what the bug is.
+      placeholder: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the system is affected?
+      options:
+        - Chat (text chat, RAG, Claude API)
+        - Voice (ElevenLabs, Pelayo)
+        - Payments (Stripe, day pass)
+        - Admin (dashboard, analytics)
+        - Content (PDFs, embeddings, stories)
+        - Infrastructure (CI, Vercel, Supabase)
+        - Marketing (SEO, social media)
+        - Authentication (login, OAuth)
+        - UX (design, accessibility)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Severity
+      description: How badly does this affect users?
+      options:
+        - Critical (blocks users, data loss)
+        - High (major feature broken)
+        - Medium (annoying but workaround exists)
+        - Low (cosmetic or edge case)
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Screenshots, error logs, browser info, or anything else relevant.
