@@ -15,66 +15,43 @@ import {
   Maximize2,
   X,
 } from "lucide-react";
-import type { ContentImage } from "@/types/admin";
-import type { AdminStory, ImageSourceType } from "./types";
+import type { AdminStory } from "./types";
 import { cn } from "@/lib/utils";
 import { isPlaceholderImage } from "@/lib/unsplash-placeholders";
+import { useImageEditorContext } from "./image-editor-context";
 
 interface ImageTabProps {
   story: AdminStory;
-  imageSourceTab: ImageSourceType;
-  currentPreview: string | null;
-  imageUrl: string;
-  imageSource: string;
-  selectedFile: File | null;
-  isDragging: boolean;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  contentImages: ContentImage[];
-  contentImageIndex: number;
-  isSearchingContent: boolean;
-  contentSearched: boolean;
-  currentContentImage: ContentImage | null;
-  onImageSourceTabChange: (tab: ImageSourceType) => void;
-  onUrlChange: (url: string) => void;
-  onImageSourceChange: (source: string) => void;
-  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnter: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
-  onClearUpload: () => void;
-  onSearchContent: () => void;
-  onContentImageNav: (direction: "prev" | "next") => void;
-  onFullscreen: () => void;
 }
 
-export function ImageTab({
-  story,
-  imageSourceTab,
-  currentPreview,
-  imageUrl,
-  imageSource,
-  selectedFile,
-  isDragging,
-  fileInputRef,
-  contentImages,
-  contentImageIndex,
-  isSearchingContent,
-  contentSearched,
-  currentContentImage,
-  onImageSourceTabChange,
-  onUrlChange,
-  onImageSourceChange,
-  onFileChange,
-  onDragOver,
-  onDragEnter,
-  onDragLeave,
-  onDrop,
-  onClearUpload,
-  onSearchContent,
-  onContentImageNav,
-  onFullscreen,
-}: ImageTabProps) {
+export function ImageTab({ story }: ImageTabProps) {
+  const {
+    imageSourceTab,
+    setImageSourceTab,
+    currentPreview,
+    imageUrl,
+    imageSource,
+    setImageSource,
+    selectedFile,
+    isDragging,
+    fileInputRef,
+    contentImages,
+    contentImageIndex,
+    isSearchingContent,
+    contentSearched,
+    currentContentImage,
+    setIsFullscreen,
+    handleUrlChange,
+    handleFileChange,
+    handleDragOver,
+    handleDragEnter,
+    handleDragLeave,
+    handleDrop,
+    clearUpload,
+    handleSearchContent,
+    handleContentImageNav,
+  } = useImageEditorContext();
+
   return (
     <>
       {/* Placeholder warning */}
@@ -97,7 +74,7 @@ export function ImageTab({
               sizes="(max-width: 768px) 100vw, 600px"
             />
             <button
-              onClick={onFullscreen}
+              onClick={() => setIsFullscreen(true)}
               className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg bg-black/40 text-white/90 backdrop-blur-sm transition-all hover:bg-black/60"
             >
               <Maximize2 className="h-4 w-4" />
@@ -120,9 +97,9 @@ export function ImageTab({
       <div className="flex gap-1 rounded-xl bg-[#f5f3ee] p-1 dark:bg-[#2d2a26]">
         <button
           onClick={() => {
-            onImageSourceTabChange("content");
-            onClearUpload();
-            onUrlChange("");
+            setImageSourceTab("content");
+            clearUpload();
+            handleUrlChange("");
           }}
           className={cn(
             "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
@@ -136,8 +113,8 @@ export function ImageTab({
         </button>
         <button
           onClick={() => {
-            onImageSourceTabChange("url");
-            onClearUpload();
+            setImageSourceTab("url");
+            clearUpload();
           }}
           className={cn(
             "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
@@ -151,8 +128,8 @@ export function ImageTab({
         </button>
         <button
           onClick={() => {
-            onImageSourceTabChange("upload");
-            onUrlChange("");
+            setImageSourceTab("upload");
+            handleUrlChange("");
           }}
           className={cn(
             "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
@@ -171,7 +148,7 @@ export function ImageTab({
         {imageSourceTab === "content" ? (
           <>
             <button
-              onClick={onSearchContent}
+              onClick={handleSearchContent}
               disabled={isSearchingContent || !story.sourcePdf}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#e5e3de] bg-white px-4 py-3 text-sm font-medium text-[#6b6560] transition-all hover:bg-[#f5f3ee] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#3d3a36] dark:bg-[#2d2a26] dark:text-[#a39e98] dark:hover:bg-[#3d3a36]"
             >
@@ -208,13 +185,13 @@ export function ImageTab({
                       </span>
                       <div className="flex gap-1">
                         <button
-                          onClick={() => onContentImageNav("prev")}
+                          onClick={() => handleContentImageNav("prev")}
                           className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
                         >
                           <ChevronLeft className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => onContentImageNav("next")}
+                          onClick={() => handleContentImageNav("next")}
                           className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
                         >
                           <ChevronRight className="h-4 w-4" />
@@ -237,7 +214,7 @@ export function ImageTab({
             type="url"
             placeholder="https://example.com/image.jpg"
             value={imageUrl}
-            onChange={(e) => onUrlChange(e.target.value)}
+            onChange={(e) => handleUrlChange(e.target.value)}
             className="bg-[#f5f3ee] dark:bg-[#2d2a26]"
           />
         ) : (
@@ -246,7 +223,7 @@ export function ImageTab({
               ref={fileInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={onFileChange}
+              onChange={handleFileChange}
               className="hidden"
             />
 
@@ -264,7 +241,7 @@ export function ImageTab({
                   </div>
                 </div>
                 <button
-                  onClick={onClearUpload}
+                  onClick={clearUpload}
                   className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
                 >
                   <X className="h-4 w-4" />
@@ -273,10 +250,10 @@ export function ImageTab({
             ) : (
               <div
                 onClick={() => fileInputRef.current?.click()}
-                onDragOver={onDragOver}
-                onDragEnter={onDragEnter}
-                onDragLeave={onDragLeave}
-                onDrop={onDrop}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
                 className={cn(
                   "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-8 transition-all",
                   isDragging
@@ -310,7 +287,7 @@ export function ImageTab({
             type="text"
             placeholder="e.g., Photo by Juan on Unsplash"
             value={imageSource}
-            onChange={(e) => onImageSourceChange(e.target.value)}
+            onChange={(e) => setImageSource(e.target.value)}
             className="bg-[#f5f3ee] dark:bg-[#2d2a26]"
           />
           <p className="text-[10px] text-[#a39e98]">

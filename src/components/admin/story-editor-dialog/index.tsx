@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { StoryTranslationsTab } from "../story-translations-tab";
 import { DetailsTab } from "./details-tab";
 import { ImageTab } from "./image-tab";
+import { ImageEditorProvider } from "./image-editor-context";
 import { useStoryEditorState } from "./use-story-editor-state";
 import { handleSave, handleApprove, handleMarkNeedsCuration } from "./use-story-editor-save";
 import type { StoryEditorDialogProps } from "./types";
@@ -62,11 +63,11 @@ export function StoryEditorDialog({
       duration: state.duration,
       sourcePdf: state.sourcePdf,
       questionPrompts: state.questionPrompts,
-      imageSourceTab: state.imageSourceTab,
-      imageUrl: state.imageUrl,
-      imageSource: state.imageSource,
-      selectedFile: state.selectedFile,
-      currentContentImage: state.currentContentImage,
+      imageSourceTab: state.imageEditor.imageSourceTab,
+      imageUrl: state.imageEditor.imageUrl,
+      imageSource: state.imageEditor.imageSource,
+      selectedFile: state.imageEditor.selectedFile,
+      currentContentImage: state.imageEditor.currentContentImage,
       onUpdate,
       setIsLoading: state.setIsLoading,
       setError: state.setError,
@@ -203,33 +204,9 @@ export function StoryEditorDialog({
                 onToggleOptionalFields={() => state.setShowOptionalFields(!state.showOptionalFields)}
               />
             ) : (
-              <ImageTab
-                story={story}
-                imageSourceTab={state.imageSourceTab}
-                currentPreview={state.currentPreview}
-                imageUrl={state.imageUrl}
-                imageSource={state.imageSource}
-                selectedFile={state.selectedFile}
-                isDragging={state.isDragging}
-                fileInputRef={state.fileInputRef}
-                contentImages={state.contentImages}
-                contentImageIndex={state.contentImageIndex}
-                isSearchingContent={state.isSearchingContent}
-                contentSearched={state.contentSearched}
-                currentContentImage={state.currentContentImage}
-                onImageSourceTabChange={state.setImageSourceTab}
-                onUrlChange={state.handleUrlChange}
-                onImageSourceChange={state.setImageSource}
-                onFileChange={state.handleFileChange}
-                onDragOver={state.handleDragOver}
-                onDragEnter={state.handleDragEnter}
-                onDragLeave={state.handleDragLeave}
-                onDrop={state.handleDrop}
-                onClearUpload={state.clearUpload}
-                onSearchContent={state.handleSearchContent}
-                onContentImageNav={state.handleContentImageNav}
-                onFullscreen={() => state.setIsFullscreen(true)}
-              />
+              <ImageEditorProvider value={state.imageEditor}>
+                <ImageTab story={story} />
+              </ImageEditorProvider>
             )}
           </div>
 
