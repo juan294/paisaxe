@@ -18,6 +18,10 @@ vi.mock("@/lib/costs", () => ({
 
 vi.mock("@/lib/posthog-query", () => ({
   queryPostHog: vi.fn(),
+  formatForHogQL: (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toISOString().slice(0, 19).replace("T", " ");
+  },
 }));
 
 import { validateAdminAuth } from "@/lib/admin-auth";
