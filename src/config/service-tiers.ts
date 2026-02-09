@@ -26,20 +26,20 @@ export const SERVICE_TIERS: ServiceTierConfig[] = [
   {
     serviceId: "elevenlabs",
     serviceName: "ElevenLabs",
-    currentTierName: "Starter",
-    currentMonthlyCostUsd: 5,
+    currentTierName: "Creator",
+    currentMonthlyCostUsd: 18.33,
     limits: [
       {
         metricKey: "voiceMinutes",
         label: "Voice Minutes",
-        monthlyLimit: 30,
+        monthlyLimit: 100,
         unit: "min",
       },
     ],
     nextTier: {
-      tierName: "Creator",
-      monthlyCostUsd: 22,
-      notes: "100 min/mo, more voices",
+      tierName: "Pro",
+      monthlyCostUsd: 99,
+      notes: "500 min/mo, 10 concurrent, highest audio quality",
     },
   },
   {
