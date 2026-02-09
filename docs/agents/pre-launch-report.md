@@ -49,12 +49,12 @@ None.
 | 1 | Open redirect in OAuth callback (`next` param) | MEDIUM | RESOLVED | Already validated: starts with `/` and not `//` |
 | 2 | Missing `.trim()` on `STRIPE_WEBHOOK_SECRET` | LOW | RESOLVED | Already `.trim()`'d in `stripe.ts` |
 | 3 | CSP `connect-src` missing Vercel Analytics domains | INFO | RESOLVED | Already includes vitals.vercel-insights.com |
-| 4 | Increase `claude.ts` test coverage (57% → 80%+) | INFO | IN PROGRESS | Adding streaming/error tests |
-| 5 | Add `htmlFor`/`id` on admin panel form labels | INFO | IN PROGRESS | Admin-only, low user impact |
-| 6 | Add `role="alert"` on form error messages | INFO | IN PROGRESS | `suggest-place-dialog.tsx` |
-| 7 | Consider 308 for root→/immersive redirect | INFO | DEFERRED | User decision pending |
-| 8 | Add SPF/DKIM/DMARC DNS records | INFO | DEFERRED | Only needed if adding transactional email |
-| 9 | Sync 6 extra .env.example vars to CLAUDE.md | INFO | IN PROGRESS | PostHog, encryption key, weather/places API keys |
+| 4 | Increase `claude.ts` test coverage (57% → 80%+) | INFO | RESOLVED | 92.3% statement coverage (13 streaming tests added) |
+| 5 | Add `htmlFor`/`id` on admin panel form labels | INFO | RESOLVED | 6 admin components fixed |
+| 6 | Add `role="alert"` on form error messages | INFO | RESOLVED | `suggest-place-dialog.tsx` + test |
+| 7 | Consider 308 for root→/immersive redirect | INFO | RESOLVED | Changed to 308 permanent redirect |
+| 8 | Add SPF/DKIM/DMARC DNS records | INFO | RESOLVED | SPF + DMARC reject-all on paisaxe.es & paisaxe.com |
+| 9 | Sync 6 extra .env.example vars to CLAUDE.md | INFO | RESOLVED | 6 vars synced to CLAUDE.md |
 
 ---
 
