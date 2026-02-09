@@ -17,7 +17,7 @@ import type {
   NewVsReturning,
 } from "@/types/analytics";
 
-import { queryPostHog } from "@/lib/posthog-query";
+import { queryPostHog, formatForHogQL } from "@/lib/posthog-query";
 import { buildDomainFilter } from "@/lib/analytics-filter";
 
 function getEmptyData(fromParam: string, toParam: string) {
@@ -70,12 +70,6 @@ export async function GET(request: NextRequest) {
     const toParam = url.searchParams.get("to") || new Date().toISOString();
     const includeDev = url.searchParams.get("includeLocalhost") === "true";
 
-    // Format dates for HogQL: 'YYYY-MM-DD HH:MM:SS' (no milliseconds, no timezone)
-    // PostHog EU uses DateTime64 with Europe/Madrid timezone, simpler format works better
-    const formatForHogQL = (isoString: string) => {
-      const date = new Date(isoString);
-      return date.toISOString().slice(0, 19).replace("T", " ");
-    };
     const from = formatForHogQL(fromParam);
     const to = formatForHogQL(toParam);
 

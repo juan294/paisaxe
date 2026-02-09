@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { queryPostHog } from "./posthog-query";
+import { queryPostHog, formatForHogQL } from "./posthog-query";
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -93,5 +93,31 @@ describe("queryPostHog", () => {
     ).rejects.toThrow("Some other error");
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("formatForHogQL", () => {
+  it("should convert an ISO string to HogQL datetime format", () => {
+    // ISO string with timezone and milliseconds → 'YYYY-MM-DD HH:MM:SS'
+    const result = formatForHogQL("2026-02-09T14:30:45.123Z");
+    expect(result).toBe("2026-02-09 14:30:45");
+  });
+
+  it("should handle midnight correctly", () => {
+    const result = formatForHogQL("2026-01-01T00:00:00.000Z");
+    expect(result).toBe("2026-01-01 00:00:00");
+  });
+
+  it("should handle end-of-day correctly", () => {
+    const result = formatForHogQL("2025-12-31T23:59:59.999Z");
+    expect(result).toBe("2025-12-31 23:59:59");
+  });
+
+  it("should strip milliseconds and timezone suffix", () => {
+    const result = formatForHogQL("2026-06-15T08:22:11.456Z");
+    // Must not contain 'T', '.', or 'Z'
+    expect(result).not.toContain("T");
+    expect(result).not.toContain(".");
+    expect(result).not.toContain("Z");
   });
 });
