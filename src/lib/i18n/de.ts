@@ -288,6 +288,13 @@ export const de: Translations = {
     immersive_description: 'Beim Laden der Geschichten ist ein Fehler aufgetreten. Versuchen Sie es erneut.',
   },
 
+  footer: {
+    terms: 'Nutzungsbedingungen',
+    privacy: 'Datenschutzrichtlinie',
+    content_attribution: 'Inhalte basierend auf Materialien von Turismo de Asturias',
+    ai_disclaimer: 'Antworten sind KI-generiert und sollten überprüft werden',
+  },
+
   admin: {
     title: 'Paisaxe Admin',
     login: {
