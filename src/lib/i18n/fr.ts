@@ -288,6 +288,10 @@ export const fr: Translations = {
     not_found_description: 'La page que vous recherchez n\'existe pas ou a été déplacée.',
     immersive_title: 'Impossible de charger l\'expérience',
     immersive_description: 'Une erreur est survenue lors du chargement des histoires. Réessayez.',
+    favorites_title: 'Impossible de charger vos enregistrements',
+    favorites_description: 'Une erreur est survenue. Veuillez réessayer.',
+    admin_title: 'Erreur du panneau d\'administration',
+    admin_description: 'Une erreur inattendue est survenue. Veuillez réessayer.',
   },
 
   footer: {

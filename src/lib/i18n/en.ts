@@ -295,6 +295,10 @@ export const en: Translations = {
     not_found_description: 'The page you are looking for does not exist or has been moved.',
     immersive_title: 'Could not load the experience',
     immersive_description: 'Something went wrong loading the stories. Try again.',
+    favorites_title: 'Could not load your saved items',
+    favorites_description: 'An error occurred. Please try again.',
+    admin_title: 'Admin panel error',
+    admin_description: 'An unexpected error occurred. Please try again.',
   },
 
   footer: {
