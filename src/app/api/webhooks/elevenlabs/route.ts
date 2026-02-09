@@ -327,9 +327,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const smsEnabled = await isFeatureFlagEnabled("sms_booking_confirmation");
 
     // Analyze call outcome
+    // ElevenLabs may send transcript/analysis at top level or nested in data
     const outcome = analyzeOutcome({
-      analysis: body.analysis,
-      transcript: body.transcript,
+      analysis: body.analysis ?? body.data?.analysis,
+      transcript: body.transcript ?? body.data?.transcript,
     });
 
     // Build SMS message
