@@ -42,6 +42,25 @@ describe("Security headers in next.config.ts", () => {
       expect(connectSrc).toContain("https://vitals.vercel-insights.com");
       expect(connectSrc).toContain("https://va.vercel-scripts.com");
     });
+
+    it("should include Stripe domains for embedded checkout", () => {
+      // Stripe embedded checkout requires js.stripe.com for scripts and iframes,
+      // and api.stripe.com for API calls from the Stripe.js SDK.
+      const scriptSrcMatch = configContent.match(/"script-src ([^"]+)"/);
+      expect(scriptSrcMatch).toBeTruthy();
+      const scriptSrc = scriptSrcMatch![1];
+      expect(scriptSrc).toContain("https://js.stripe.com");
+
+      const frameSrcMatch = configContent.match(/"frame-src ([^"]+)"/);
+      expect(frameSrcMatch).toBeTruthy();
+      const frameSrc = frameSrcMatch![1];
+      expect(frameSrc).toContain("https://js.stripe.com");
+
+      const connectSrcMatch = configContent.match(/"connect-src ([^"]+)"/);
+      expect(connectSrcMatch).toBeTruthy();
+      const connectSrc = connectSrcMatch![1];
+      expect(connectSrc).toContain("https://api.stripe.com");
+    });
   });
 
   describe("Deprecated headers", () => {
