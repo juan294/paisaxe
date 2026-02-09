@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils";
 interface AuthorTypewriterProps {
   prefersReducedMotion: boolean;
   t: (key: string) => string;
+  visible?: boolean;
 }
 
-export function AuthorTypewriter({ prefersReducedMotion, t }: AuthorTypewriterProps) {
+export function AuthorTypewriter({ prefersReducedMotion, t, visible = true }: AuthorTypewriterProps) {
   const textRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
@@ -105,7 +106,10 @@ export function AuthorTypewriter({ prefersReducedMotion, t }: AuthorTypewriterPr
 
   return (
     <div
-      className="group hidden md:block desktop-pointer-only absolute bottom-10 right-4 z-20"
+      className={cn(
+        "group hidden md:block desktop-pointer-only absolute bottom-10 right-4 z-20 transition-opacity duration-500 motion-reduce:transition-none",
+        visible ? "opacity-100" : "opacity-0 pointer-events-none"
+      )}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Popover card — appears above the pill on hover */}

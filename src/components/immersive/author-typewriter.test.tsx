@@ -136,6 +136,33 @@ describe("AuthorTypewriter", () => {
     expect(screen.getByLabelText("Made by Juan González")).toBeInTheDocument();
   });
 
+  it("should be visually hidden when visible prop is false", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    render(<AuthorTypewriter prefersReducedMotion={false} t={mockT} visible={false} />);
+
+    const outerDiv = screen.getByLabelText("Made by Juan González").closest(".group");
+    expect(outerDiv).toHaveClass("opacity-0");
+    expect(outerDiv).toHaveClass("pointer-events-none");
+  });
+
+  it("should be visible when visible prop is true", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    render(<AuthorTypewriter prefersReducedMotion={false} t={mockT} visible={true} />);
+
+    const outerDiv = screen.getByLabelText("Made by Juan González").closest(".group");
+    expect(outerDiv).toHaveClass("opacity-100");
+    expect(outerDiv).not.toHaveClass("pointer-events-none");
+  });
+
+  it("should default to visible when visible prop is omitted", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    render(<AuthorTypewriter prefersReducedMotion={false} t={mockT} />);
+
+    const outerDiv = screen.getByLabelText("Made by Juan González").closest(".group");
+    expect(outerDiv).toHaveClass("opacity-100");
+    expect(outerDiv).not.toHaveClass("pointer-events-none");
+  });
+
   it("should clean up timers on unmount", async () => {
     const { AuthorTypewriter } = await import("./author-typewriter");
     const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
