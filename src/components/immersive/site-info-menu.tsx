@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Bookmark, LogOut, LogIn, Info } from "lucide-react";
+import { LogOut, LogIn, Info } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -123,15 +123,6 @@ export function SiteInfoMenu() {
             >
               <Info className="h-4 w-4" />
               {t("info_menu.about")}
-            </Link>
-            <Link
-              href="/favorites"
-              onClick={close}
-              aria-label={t("info_menu.saved_places")}
-              className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
-            >
-              <Bookmark className="h-4 w-4" />
-              {t("info_menu.saved_places")}
             </Link>
           </div>
 

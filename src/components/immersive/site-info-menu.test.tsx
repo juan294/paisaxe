@@ -69,12 +69,11 @@ describe("SiteInfoMenu", () => {
     expect(privacyLink).toHaveAttribute("href", "/privacy");
   });
 
-  it("renders saved places link in panel", () => {
+  it("does not render saved places link in panel", () => {
     render(<SiteInfoMenu />);
     fireEvent.click(screen.getByRole("button"));
 
-    const favLink = screen.getByRole("link", { name: /guardados/i });
-    expect(favLink).toHaveAttribute("href", "/favorites");
+    expect(screen.queryByRole("link", { name: /guardados/i })).not.toBeInTheDocument();
   });
 
   it("closes panel on Escape key", () => {
