@@ -17,29 +17,59 @@
 - Documentation Agent: Webhook signature verification patterns are well-implemented — good reference for future external integrations
 <!-- ENTRY:END -->
 
-## Performance Agent — 2026-02-07
-- **Status: GREEN** — Total JS 2,455 KB, within 2,500 KB budget (45 KB headroom)
-- **Major improvement:** -434 KB (-15.0%) since Feb 6 — ElevenLabs duplication resolved (1 chunk instead of 2)
-- **Top opportunities:** `optimizePackageImports` for lucide-react (50-100 KB), lazy-load admin dialogs (50-70 KB)
-- **ElevenLabs SDK:** Single 482 KB chunk, properly deferred via VoiceChat dynamic import
+<!-- ENTRY:START agent=code_quality_audit timestamp=2026-02-09T18:00:00Z -->
+## Code Quality Audit — 2026-02-09
+- **All critical items RESOLVED** — 5 complexity hotspots split, auth duplication extracted, env var .trim() applied
+- **Component splits completed:**
+  - `costs-analytics-panel.tsx` (1,498 lines) → 7-file directory
+  - `story-editor-dialog.tsx` (1,154 lines) → 6-file directory
+  - `marketing-dashboard.tsx` (1,096 lines) → 9-file directory
+  - `admin-api.ts` (892 lines) → 7-file directory (6 domain modules + barrel)
+  - `agents-dashboard.tsx` (835 lines) → 10-file directory
+- **Pattern fixes:** Shared `src/lib/supabase-auth.ts` eliminates ~120 LOC duplication across 4 API routes. All env vars now `.trim()`'d.
+- **Hook extractions:** `useStreamChat` (from voice-chat), `useAgentTerminal` + `useAgentRunner` (from agents-dashboard), `useStoryEditorState` + `useStoryEditorSave` (from story-editor)
+- **Tests:** +45 new tests (3230 total), 2 new test files (`supabase-auth.test.ts`, `use-stream-chat.test.ts`)
+- **Barrel re-exports:** All splits use `index.ts` re-exports — zero consumer import changes needed
 
 **Cross-agent recommendations:**
-- Code Quality Agent: `story-editor-dialog.tsx` (1,154 lines) and `costs-analytics-panel.tsx` (1,498 lines) are largest client components — candidates for splitting
-- Dependencies Agent: No duplicate packages detected. All heavy packages correctly categorized (devDeps vs prod)
-- Security Agent: No new production dependencies. 27 of 40 budget utilized
+- Performance Agent: Admin dialogs now dynamic-imported (P2 optimization). Component splits don't change bundle size but improve code-splitting granularity. Run `build:analyze` to verify. `optimizePackageImports` for lucide-react still pending.
+- Coverage Agent: New test files cover shared auth (8 tests) and stream chat hook (22 tests). Split components may expose previously untestable logic — re-evaluate coverage targets.
+- Security Agent: `src/lib/supabase-auth.ts` centralizes Supabase client creation and user validation. All routes using it benefit from consistent error handling.
+- Documentation Agent: `docs/engineering/perf-optimization-2026-02.md` created documenting all Speed Insights P1+P2 work. `docs/agents/code-quality-report.md` updated with resolution status.
+<!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
+## Speed Insights Optimization (P1+P2) — 2026-02-09
+- **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
+- **P1 (High Impact) completed:**
+  - Lazy-mount analytics sub-panels (initial mount ~4,000 → ~810 lines)
+  - Lazy-mount top-level admin tabs (preserve state across tab switches)
+  - Typewriter animation optimization (ref-based DOM updates, no parent re-renders)
+  - LanguageProvider render-blocking fix (synchronous `useState` initializer)
+- **P2 (Medium Impact) completed:**
+  - Lazy-load translation files (keep es+en static, dynamic-import others, ~65KB savings)
+  - Dynamic-import admin dialogs (StoryEditorDialog, CreateStoryDialog, SelectionToolbar)
+  - Progress bar extraction with React.memo + event delegation
+  - `startTransition` wrapping for story navigation
+  - Removed unused font preconnects (wasted DNS lookups)
+- **P3 (deferred):** Edge-cached stories API for USA visitors, preload first story image
 
-
+**Cross-agent recommendations:**
+- Performance Agent: Re-run bundle analysis — lazy translation loading should reduce initial bundle by ~65KB. Dynamic admin dialog imports should defer ~70KB. Verify with `build:analyze`.
+- Code Quality Agent: New extracted components: `author-typewriter.tsx`, `story-progress-bar.tsx`. These follow React.memo + ref patterns documented in `perf-optimization-2026-02.md`.
+- Coverage Agent: New components (`AuthorTypewriter`, `StoryProgressBar`) may need test coverage.
+- Localization Agent: Translation lazy-loading caches in module-level Map. `es` and `en` are static imports; others load on demand. No change to translation content.
+<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-02-06T14:30:59Z -->
 ## Performance Agent — 2026-02-07
 - **Status: GREEN** — Total JS 2,455 KB, within 2,500 KB budget (45 KB headroom)
 - **Major improvement:** -434 KB (-15.0%) since Feb 6 — ElevenLabs duplication resolved (1 chunk instead of 2)
-- **Top opportunities:** `optimizePackageImports` for lucide-react (50-100 KB), lazy-load admin dialogs (50-70 KB)
+- **Top opportunities:** `optimizePackageImports` for lucide-react (50-100 KB) — admin dialogs now lazy-loaded (P2 optimization, 2026-02-09)
 - **ElevenLabs SDK:** Single 482 KB chunk, properly deferred via VoiceChat dynamic import
 
 **Cross-agent recommendations:**
-- Code Quality Agent: `story-editor-dialog.tsx` (1,154 lines) and `costs-analytics-panel.tsx` (1,498 lines) are largest client components — candidates for splitting
+- Code Quality Agent: All 5 critical complexity hotspots resolved (2026-02-09). See Code Quality Audit entry above.
 - Dependencies Agent: No duplicate packages detected. All heavy packages correctly categorized (devDeps vs prod)
 - Security Agent: No new production dependencies. 27 of 40 budget utilized
 <!-- ENTRY:END -->
