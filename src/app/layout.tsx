@@ -121,13 +121,6 @@ export default function RootLayout({
   return (
     <html lang={LOCATION_CONFIG.primaryLanguage} suppressHydrationWarning>
       <head>
-        {/* Font preconnects */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
         {/* Supabase preconnects - critical for image loading LCP */}
         <link rel="dns-prefetch" href="https://axoishtlumlswzhegseq.supabase.co" />
         <link
