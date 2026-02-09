@@ -22,6 +22,17 @@ vi.mock("@/lib/admin-auth", () => ({
     Promise.resolve({ valid: false, error: { status: 401 } }),
 }));
 
+// Mock fs.promises.writeFile
+const mockWriteFile = vi.fn();
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    default: { ...actual, promises: { ...actual.promises, writeFile: mockWriteFile } },
+    promises: { ...actual.promises, writeFile: mockWriteFile },
+  };
+});
+
 // Mock the subscription optimizer module
 const mockAnalyze = vi.fn();
 const mockGenerateReport = vi.fn();
@@ -42,6 +53,8 @@ describe("POST /api/cron/subscription-optimizer", () => {
     };
     mockAnalyze.mockReset();
     mockGenerateReport.mockReset();
+    mockWriteFile.mockReset();
+    mockWriteFile.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -130,6 +143,53 @@ describe("POST /api/cron/subscription-optimizer", () => {
     expect(response.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((response as any).body.report).toBe("# Subscription Optimizer Report");
+  });
+
+  it("writes the report to docs/agents/subscription-optimizer-report.md", async () => {
+    const reportContent = "# Subscription Optimizer Report\nContent here.";
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue(reportContent);
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    await POST(request as never);
+    expect(mockWriteFile).toHaveBeenCalledTimes(1);
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining("docs/agents/subscription-optimizer-report.md"),
+      reportContent,
+      "utf-8"
+    );
+  });
+
+  it("does not fail if report file write fails", async () => {
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+    mockWriteFile.mockRejectedValue(new Error("EROFS: read-only file system"));
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
   });
 
   it("returns 500 on analysis error", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
-import { fetchAgentsSummary, fetchFeatureFlags, updateFeatureFlag } from "@/lib/admin-api";
+import { fetchAgentsSummary, fetchFeatureFlags, updateFeatureFlag, triggerOptimizerRun } from "@/lib/admin-api";
 import { useAnalyticsData } from "../analytics-cache-context";
 import { AnalyticsCacheProvider } from "../analytics-cache-context";
 import { AgentConfigPanel } from "../agent-config-panel";
@@ -16,6 +16,8 @@ import { AgentTerminal } from "./terminal-display";
 import { OverallHealthBanner } from "./overall-health-banner";
 import { CrossAgentInsights } from "./cross-agent-insights";
 import { ActivityItem } from "./activity-item";
+import { OptimizerReportDialog } from "./optimizer-report-dialog";
+import { OptimizerConfigPanel } from "./optimizer-config-panel";
 
 // Re-export public API
 export { escapeHtml, renderMarkdown } from "./markdown";
@@ -32,6 +34,11 @@ function AgentsDashboardInner() {
   const [agentFlags, setAgentFlags] = useState<FeatureFlag[]>([]);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
+  // Optimizer-specific state
+  const [optimizerRunning, setOptimizerRunning] = useState(false);
+  const [showOptimizerReport, setShowOptimizerReport] = useState(false);
+  const [optimizerReportContent, setOptimizerReportContent] = useState("");
 
   const {
     runningAgents,
@@ -68,6 +75,21 @@ function AgentsDashboardInner() {
   }, []);
 
   const onRunAgent = async (agentKey: string) => {
+    // Optimizer is a synchronous API call, not a long-running shell process
+    if (agentKey === "subscription_optimizer_enabled") {
+      setOptimizerRunning(true);
+      const result = await triggerOptimizerRun();
+      setOptimizerRunning(false);
+      if (result.data) {
+        setOptimizerReportContent(result.data.report);
+        recordRunResult(agentKey, "success");
+      } else {
+        recordRunResult(agentKey, "error");
+      }
+      refresh();
+      return;
+    }
+
     const result = await handleRunAgent(agentKey);
     if (result.started && result.startedAt) {
       openTerminal(agentKey, result.startedAt);
@@ -164,7 +186,11 @@ function AgentsDashboardInner() {
                         </div>
                         {isExpanded && isIndividualAgent && (
                           <div className="mt-3 pl-4">
-                            <AgentConfigPanel flag={flag} onUpdate={handleFlagUpdate} />
+                            {flag.flagKey === "subscription_optimizer_enabled" ? (
+                              <OptimizerConfigPanel flag={flag} onUpdate={handleFlagUpdate} />
+                            ) : (
+                              <AgentConfigPanel flag={flag} onUpdate={handleFlagUpdate} />
+                            )}
                           </div>
                         )}
                       </td>
@@ -211,16 +237,21 @@ function AgentsDashboardInner() {
           Agent Status
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {data.agents.map((agent) => (
-            <AgentCard
-              key={agent.flagKey}
-              agent={agent}
-              isRunning={runningAgents.has(agent.flagKey)}
-              lastRunResult={lastRunResults[agent.flagKey]}
-              onRun={() => onRunAgent(agent.flagKey)}
-              onStop={() => handleStopAgent(agent.flagKey)}
-            />
-          ))}
+          {data.agents.map((agent) => {
+            const isOptimizer = agent.flagKey === "subscription_optimizer_enabled";
+            return (
+              <AgentCard
+                key={agent.flagKey}
+                agent={agent}
+                isRunning={isOptimizer ? optimizerRunning : runningAgents.has(agent.flagKey)}
+                lastRunResult={lastRunResults[agent.flagKey]}
+                onRun={() => onRunAgent(agent.flagKey)}
+                onStop={() => handleStopAgent(agent.flagKey)}
+                onClick={isOptimizer ? () => setShowOptimizerReport(true) : undefined}
+                hideStop={isOptimizer}
+              />
+            );
+          })}
         </div>
       </section>
 
@@ -237,6 +268,20 @@ function AgentsDashboardInner() {
           onClose={closeTerminal}
         />
       )}
+
+      {/* Optimizer Report Dialog */}
+      <OptimizerReportDialog
+        open={showOptimizerReport}
+        onOpenChange={setShowOptimizerReport}
+        reportMarkdown={
+          optimizerReportContent ||
+          data.agents.find((a) => a.flagKey === "subscription_optimizer_enabled")?.healthSummary ||
+          ""
+        }
+        analyzedAt={
+          data.agents.find((a) => a.flagKey === "subscription_optimizer_enabled")?.lastRun ?? null
+        }
+      />
 
       {/* Cross-Agent Insights */}
       {data.sharedContext.length > 0 && (

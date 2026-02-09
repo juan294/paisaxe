@@ -56,3 +56,5 @@ export {
   stopAgent,
   fetchAgentLogs,
 } from "./agents";
+
+export { triggerOptimizerRun } from "./optimizer";

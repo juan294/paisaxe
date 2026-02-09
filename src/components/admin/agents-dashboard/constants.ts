@@ -9,6 +9,7 @@ export const AGENT_FLAG_KEYS = [
   "qa_agent_enabled",
   "localization_agent_enabled",
   "cost_analyst_agent_enabled",
+  "subscription_optimizer_enabled",
 ] as const;
 
 /** Map flag keys to display names for the terminal header. */
@@ -20,6 +21,7 @@ export const AGENT_NAMES: Record<string, string> = {
   qa_agent_enabled: "QA Agent",
   localization_agent_enabled: "Localization Agent",
   cost_analyst_agent_enabled: "Cost Analyst Agent",
+  subscription_optimizer_enabled: "Subscription Optimizer",
 };
 
 export function relativeTime(isoDate: string | null): string {
