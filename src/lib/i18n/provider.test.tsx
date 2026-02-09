@@ -130,7 +130,7 @@ describe('LanguageProvider', () => {
     expect(localStorage.getItem('paisaxe-locale')).toBe('en');
   });
 
-  it('detects browser language on mount when no initialLocale', () => {
+  it('detects browser language on mount when no initialLocale', async () => {
     Object.defineProperty(navigator, 'languages', {
       value: ['en-US'],
       configurable: true,
@@ -146,7 +146,10 @@ describe('LanguageProvider', () => {
       </LanguageProvider>
     );
 
-    expect(screen.getByTestId('locale').textContent).toBe('en');
+    // Browser locale resolves after hydration-safe initial render
+    await waitFor(() => {
+      expect(screen.getByTestId('locale').textContent).toBe('en');
+    });
   });
 
   it('uses stored locale over browser language', () => {
@@ -335,7 +338,7 @@ describe('LanguageProvider render-blocking fix', () => {
     expect(screen.getByTestId('ctx-locale').textContent).toBe('es');
   });
 
-  it('renders with stored locale immediately (no flash)', () => {
+  it('renders with stored locale after hydration', async () => {
     localStorage.setItem('paisaxe-locale', 'en');
 
     render(
@@ -344,10 +347,13 @@ describe('LanguageProvider render-blocking fix', () => {
       </LanguageProvider>
     );
 
-    expect(screen.getByTestId('ctx-locale').textContent).toBe('en');
+    // Stored locale resolves after hydration-safe initial render
+    await waitFor(() => {
+      expect(screen.getByTestId('ctx-locale').textContent).toBe('en');
+    });
   });
 
-  it('renders with detected browser language immediately (no flash)', () => {
+  it('renders with detected browser language after hydration', async () => {
     Object.defineProperty(navigator, 'languages', {
       value: ['fr-FR', 'en-US'],
       configurable: true,
@@ -359,7 +365,10 @@ describe('LanguageProvider render-blocking fix', () => {
       </LanguageProvider>
     );
 
-    expect(screen.getByTestId('ctx-locale').textContent).toBe('fr');
+    // Browser locale resolves after hydration-safe initial render
+    await waitFor(() => {
+      expect(screen.getByTestId('ctx-locale').textContent).toBe('fr');
+    });
   });
 
   it('defaults to es when no stored pref and unsupported browser language', () => {
@@ -394,6 +403,73 @@ describe('LanguageProvider render-blocking fix', () => {
     );
 
     expect(screen.getByTestId('ctx-locale').textContent).toBe('de');
+  });
+});
+
+describe('Hydration safety', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+    _resetTranslationCacheForTesting();
+  });
+
+  it('initial render always uses SSR-safe default "es" even when browser is English', () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['en-US'],
+      configurable: true,
+    });
+
+    let firstRenderLocale: string | null = null;
+    function CaptureFirstRender() {
+      const { locale } = useTranslation();
+      if (firstRenderLocale === null) {
+        firstRenderLocale = locale;
+      }
+      return <span data-testid="locale">{locale}</span>;
+    }
+
+    render(
+      <LanguageProvider>
+        <CaptureFirstRender />
+      </LanguageProvider>
+    );
+
+    // First render must match SSR default to prevent hydration mismatch
+    expect(firstRenderLocale).toBe('es');
+  });
+
+  it('resolves to browser locale after hydration via useEffect', async () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['en-US'],
+      configurable: true,
+    });
+
+    render(
+      <LanguageProvider>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    // After effects run, it should switch to the detected browser locale
+    await waitFor(() => {
+      expect(screen.getByTestId('locale').textContent).toBe('en');
+    });
+  });
+
+  it('skips locale detection when initialLocale is provided', () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['en-US'],
+      configurable: true,
+    });
+
+    render(
+      <LanguageProvider initialLocale="es">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    // Should stay 'es' — initialLocale is explicit, no browser detection
+    expect(screen.getByTestId('locale').textContent).toBe('es');
   });
 });
 
