@@ -50,7 +50,7 @@ export class ComponentErrorBoundary extends Component<
           <p className="text-sm text-white/70">{t("errors.generic_title")}</p>
           <button
             onClick={this.handleReset}
-            className="px-4 py-2 text-sm bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors"
+            className="px-4 py-2 text-sm bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           >
             {t("errors.retry")}
           </button>
