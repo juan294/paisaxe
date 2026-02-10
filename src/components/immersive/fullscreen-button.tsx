@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Maximize, X, Share } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 export function FullscreenButton() {
   const { t } = useTranslation();
@@ -12,6 +13,13 @@ export function FullscreenButton() {
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [supportsFullscreen, setSupportsFullscreen] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  const closeInstructions = useCallback(() => {
+    setShowInstructions(false);
+  }, []);
+
+  useFocusTrap(modalRef, showInstructions, closeInstructions);
 
   useEffect(() => {
     // Detect iOS/iPadOS
@@ -76,16 +84,19 @@ export function FullscreenButton() {
       {showInstructions && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-          onClick={() => setShowInstructions(false)}
+          onClick={closeInstructions}
         >
           <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
             className="bg-neutral-900 rounded-2xl p-6 max-w-sm w-full text-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">{t("fullscreen.install_title")}</h2>
               <button
-                onClick={() => setShowInstructions(false)}
+                onClick={closeInstructions}
                 className="p-1 rounded-full hover:bg-white/10"
                 aria-label={t("common.close")}
               >
@@ -123,7 +134,7 @@ export function FullscreenButton() {
             </ol>
 
             <button
-              onClick={() => setShowInstructions(false)}
+              onClick={closeInstructions}
               className="mt-6 w-full py-3 bg-white text-black rounded-full font-medium hover:bg-white/90 transition-colors"
             >
               {t("fullscreen.got_it")}
