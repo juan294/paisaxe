@@ -12,7 +12,7 @@
 import { TwitterApi, type ApiResponseError } from "twitter-api-v2";
 import type { MarketingCredentials } from "@/types/marketing";
 
-export interface XPostResult {
+interface XPostResult {
   success: boolean;
   postId?: string;
   postUrl?: string;
@@ -20,12 +20,12 @@ export interface XPostResult {
   errorCode?: string;
 }
 
-export interface XDeleteResult {
+interface XDeleteResult {
   success: boolean;
   error?: string;
 }
 
-export interface XEngagement {
+interface XEngagement {
   likes: number;
   retweets: number;
   replies: number;
@@ -34,7 +34,7 @@ export interface XEngagement {
   bookmarks?: number;
 }
 
-export interface XUserInfo {
+interface XUserInfo {
   id: string;
   username: string;
   name: string;

@@ -6,7 +6,7 @@
  * - "production" for production domains (paisaxe.es, paisaxe.com)
  */
 
-export type Environment = "development" | "production";
+type Environment = "development" | "production";
 
 /**
  * Detect the current environment based on configuration.

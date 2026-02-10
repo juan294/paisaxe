@@ -13,7 +13,7 @@ import {
   recordUpsellDismissed,
 } from "@/lib/chat-upsell-throttle";
 
-export interface StreamChatMessage {
+interface StreamChatMessage {
   role: "user" | "assistant";
   content: string;
   images?: ImageResult[];

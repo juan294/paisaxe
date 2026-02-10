@@ -16,7 +16,7 @@ const DEFAULT_FROM = "Paisaxe <no-reply@paisaxe.es>";
 /** Default admin recipient */
 const DEFAULT_ADMIN_EMAIL = "admin@paisaxe.es";
 
-export interface SendEmailOptions {
+interface SendEmailOptions {
   /** Recipient email address(es) */
   to: string | string[];
   /** Email subject line */
@@ -31,13 +31,13 @@ export interface SendEmailOptions {
   replyTo?: string;
 }
 
-export interface SendEmailResult {
+interface SendEmailResult {
   success: boolean;
   id?: string;
   error?: string;
 }
 
-export interface AdminNotificationOptions {
+interface AdminNotificationOptions {
   /** Subject line (will be prefixed with "[Paisaxe Admin]") */
   subject: string;
   /** HTML body content */
