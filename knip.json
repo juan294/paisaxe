@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "exclude": ["types"],
   "entry": [
     "src/app/**/page.tsx",
     "src/app/**/layout.tsx",
