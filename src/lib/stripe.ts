@@ -132,7 +132,7 @@ export function verifyWebhookSignature(
  */
 export function isStripeConfigured(): boolean {
   return !!(
-    process.env.STRIPE_SECRET_KEY && process.env.STRIPE_DAY_PASS_PRICE_ID
+    process.env.STRIPE_SECRET_KEY?.trim() && process.env.STRIPE_DAY_PASS_PRICE_ID?.trim()
   );
 }
 
