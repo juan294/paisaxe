@@ -51,7 +51,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         returnTo = body.returnTo;
       }
     } catch {
-      // No body or invalid JSON \u2014 that\u2019s fine, returnTo stays undefined
+      // No body or invalid JSON — that's fine, returnTo stays undefined
     }
 
     const returnUrl = returnTo
