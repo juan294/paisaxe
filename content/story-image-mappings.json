@@ -3,7 +3,7 @@
     "storyId": "lagos-covadonga",
     "sourcePdf": "0062f6f0-a7d2-5b11-6b58-b47e5912be74.pdf",
     "originalImage": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920",
-    "newImage": "/images/stories/lagos-covadonga.png",
+    "newImage": "/images/stories/lagos-covadonga.webp",
     "source": "pdf"
   },
   {
@@ -24,21 +24,21 @@
     "storyId": "prerromanico",
     "sourcePdf": "02e93c24-6cac-6d7d-1ca8-59fd8d3fa337.pdf",
     "originalImage": "https://images.unsplash.com/photo-1568797629192-789acf8e4df3?w=1920",
-    "newImage": "/images/stories/prerromanico.png",
+    "newImage": "/images/stories/prerromanico.webp",
     "source": "pdf"
   },
   {
     "storyId": "ruta-cares",
     "sourcePdf": "0062f6f0-a7d2-5b11-6b58-b47e5912be74.pdf",
     "originalImage": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1920",
-    "newImage": "/images/stories/ruta-cares.png",
+    "newImage": "/images/stories/ruta-cares.webp",
     "source": "pdf"
   },
   {
     "storyId": "playa-silencio",
     "sourcePdf": "12c86611-ccbe-dbe9-ac86-67ef948a5371.pdf",
     "originalImage": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920",
-    "newImage": "/images/stories/playa-silencio.png",
+    "newImage": "/images/stories/playa-silencio.webp",
     "source": "pdf"
   },
   {
@@ -59,7 +59,7 @@
     "storyId": "aviles",
     "sourcePdf": "Guia-visitar-Aviles-ES.pdf",
     "originalImage": "https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=1920",
-    "newImage": "/images/stories/aviles.png",
+    "newImage": "/images/stories/aviles.webp",
     "source": "pdf"
   },
   {
@@ -80,7 +80,7 @@
     "storyId": "cangas-onis",
     "sourcePdf": "Guia-cultura-ES.pdf",
     "originalImage": "https://images.unsplash.com/photo-1464278533981-50106e6176b1?w=1920",
-    "newImage": "/images/stories/cangas-onis.png",
+    "newImage": "/images/stories/cangas-onis.webp",
     "source": "pdf"
   },
   {
@@ -94,7 +94,7 @@
     "storyId": "quesos-asturianos",
     "sourcePdf": "Guia-cultura-ES.pdf",
     "originalImage": "https://images.unsplash.com/photo-1452195100486-9cc805987862?w=1920",
-    "newImage": "/images/stories/quesos-asturianos.png",
+    "newImage": "/images/stories/quesos-asturianos.webp",
     "source": "pdf"
   },
   {

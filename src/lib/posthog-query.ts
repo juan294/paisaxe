@@ -1,4 +1,4 @@
-export interface HogQLResult {
+interface HogQLResult {
   results: unknown[][];
 }
 

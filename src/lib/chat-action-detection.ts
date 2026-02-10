@@ -5,21 +5,21 @@
  * context-aware action buttons (call, directions).
  */
 
-export interface PhoneMatch {
+interface PhoneMatch {
   /** Normalized phone number for tel: link (e.g., +34985123456) */
   number: string;
   /** Original display format from the text */
   display: string;
 }
 
-export interface AddressMatch {
+interface AddressMatch {
   /** The detected address text */
   text: string;
   /** Google Maps search URL */
   mapsUrl: string;
 }
 
-export interface ChatActionsResult {
+interface ChatActionsResult {
   phones: PhoneMatch[];
   addresses: AddressMatch[];
   hasActions: boolean;

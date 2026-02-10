@@ -18,7 +18,7 @@ export const MOCK_CHAT_RESPONSE = {
   images: [
     {
       id: "img-1",
-      path: "/images/stories/lagos-covadonga.png",
+      path: "/images/stories/lagos-covadonga.webp",
       caption: "Lagos de Covadonga",
       sourcePdf: "picos-europa.pdf",
     },
@@ -55,6 +55,17 @@ export const MOCK_FEATURE_FLAGS = {
     { flagKey: "booking_system", enabled: false },
     { flagKey: "autoplay_button", enabled: false },
     { flagKey: "sms_booking_confirmation", enabled: false },
+    { flagKey: "maintenance_mode", enabled: false },
+    { flagKey: "automated_agents", enabled: false },
+    { flagKey: "coverage_agent_enabled", enabled: false },
+    { flagKey: "security_agent_enabled", enabled: false },
+    { flagKey: "documentation_agent_enabled", enabled: false },
+    { flagKey: "performance_agent_enabled", enabled: false },
+    { flagKey: "qa_agent_enabled", enabled: false },
+    { flagKey: "localization_agent_enabled", enabled: false },
+    { flagKey: "cost_analyst_agent_enabled", enabled: false },
+    { flagKey: "subscription_optimizer_enabled", enabled: false },
+    { flagKey: "content_discovery_agent_enabled", enabled: false },
   ],
 };
 

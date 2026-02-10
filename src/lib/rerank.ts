@@ -3,7 +3,7 @@ import { VoyageAIClient } from "voyageai";
 import type { Chunk } from "@/types";
 
 const voyageClient = new VoyageAIClient({
-  apiKey: process.env.VOYAGE_API_KEY,
+  apiKey: process.env.VOYAGE_API_KEY?.trim(),
 });
 
 const RERANK_MODEL = "rerank-2.5";

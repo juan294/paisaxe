@@ -10,7 +10,7 @@ export const MAX_INPUT_LENGTH = 2000;
 export const MAX_CONVERSATION_TURNS = 20;
 
 /** Topic relevance classification for analytics */
-export type TopicRelevance = "likely_relevant" | "uncertain" | "likely_off_topic";
+type TopicRelevance = "likely_relevant" | "uncertain" | "likely_off_topic";
 
 /** Patterns that indicate potential prompt injection attempts */
 const INJECTION_PATTERNS: RegExp[] = [

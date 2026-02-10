@@ -27,14 +27,14 @@ export interface CreateDraftInput {
   contentTheme?: ContentTheme;
 }
 
-export interface CreateDraftResult {
+interface CreateDraftResult {
   success: boolean;
   post?: MarketingPost;
   error?: string;
   validationErrors?: string[];
 }
 
-export interface MarkAsPostedInput {
+interface MarkAsPostedInput {
   postId: string;
   platformPostId?: string;
   postUrl?: string;

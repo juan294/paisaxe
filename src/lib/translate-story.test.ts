@@ -367,6 +367,226 @@ describe("translate-story", () => {
       expect(result.results?.en?.success).toBe(true);
     });
 
+    it("should return error when DB update fails after successful translation", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const { callAnthropicAPI } = await import("./claude");
+
+      const mockStory = {
+        id: "test-story-id",
+        title: "Lagos de Covadonga",
+        subtitle: "Paraíso glaciar",
+        description: "Dos lagos de origen glaciar.",
+        metadata: {},
+      };
+
+      let updateCallCount = 0;
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: mockStory, error: null }),
+            })),
+          })),
+          update: vi.fn(() => {
+            updateCallCount++;
+            if (updateCallCount === 1) {
+              // First update: mark as translating — succeeds
+              return { eq: vi.fn().mockResolvedValue({ error: null }) };
+            }
+            // Second update: save translations — fails
+            return { eq: vi.fn().mockResolvedValue({ error: { message: "Database write timeout" } }) };
+          }),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      const mockTranslations = {
+        en: { title: "Lakes", subtitle: "Paradise", description: "Two lakes." },
+      };
+
+      vi.mocked(callAnthropicAPI).mockResolvedValue({
+        content: [{ type: "text", text: JSON.stringify(mockTranslations) }],
+        id: "test",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4-20250514",
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 100, output_tokens: 200 },
+      } as never);
+
+      const result = await translateStory("test-story-id", { locales: ["en"] });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Failed to save translations");
+      expect(result.error).toContain("Database write timeout");
+      expect(result.results?.en?.success).toBe(true);
+    });
+
+    it("should mark all locales as failed when Claude API throws", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const { callAnthropicAPI } = await import("./claude");
+
+      const mockStory = {
+        id: "test-story-id",
+        title: "Lagos de Covadonga",
+        subtitle: "Paraíso glaciar",
+        description: "Dos lagos de origen glaciar.",
+        metadata: {},
+      };
+
+      const updateMock = vi.fn().mockResolvedValue({ error: null });
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: mockStory, error: null }),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: updateMock,
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      vi.mocked(callAnthropicAPI).mockRejectedValue(new Error("API rate limit exceeded"));
+
+      const result = await translateStory("test-story-id", { locales: ["en", "fr"] });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("API rate limit exceeded");
+      expect(result.failedCount).toBe(2);
+      expect(result.successCount).toBe(0);
+      expect(result.results?.en?.success).toBe(false);
+      expect(result.results?.en?.error).toBe("API rate limit exceeded");
+      expect(result.results?.fr?.success).toBe(false);
+      expect(result.results?.fr?.error).toBe("API rate limit exceeded");
+      // Should have called update to mark locales as failed (beyond the initial "mark as translating" call)
+      expect(updateMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("should count pre-existing translations in successCount", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const { callAnthropicAPI } = await import("./claude");
+
+      const mockStory = {
+        id: "test-story-id",
+        title: "Test Story",
+        subtitle: "Test Subtitle",
+        description: "Test Description",
+        metadata: {
+          translations: {
+            en: { title: "English", subtitle: "Sub", description: "Desc" },
+            fr: { title: "Français", subtitle: "Sous", description: "Desc" },
+          },
+          translation_status: {
+            en: { status: "complete", updatedAt: new Date().toISOString() },
+            fr: { status: "complete", updatedAt: new Date().toISOString() },
+          },
+        },
+      };
+
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: mockStory, error: null }),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      const mockTranslations = {
+        de: { title: "Deutsch", subtitle: "Unter", description: "Beschr." },
+        pt: { title: "Português", subtitle: "Sub", description: "Desc." },
+        ast: { title: "Asturianu", subtitle: "So", description: "Desc." },
+      };
+
+      vi.mocked(callAnthropicAPI).mockResolvedValue({
+        content: [{ type: "text", text: JSON.stringify(mockTranslations) }],
+        id: "test",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4-20250514",
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 100, output_tokens: 200 },
+      } as never);
+
+      // Request all 5 locales — en and fr already exist, de/pt/ast need translation
+      const result = await translateStory("test-story-id");
+
+      expect(result.success).toBe(true);
+      // 2 pre-existing (en, fr) + 3 newly translated (de, pt, ast)
+      expect(result.successCount).toBe(5);
+      expect(result.failedCount).toBe(0);
+      // Pre-existing locales should be marked as success in results
+      expect(result.results?.en?.success).toBe(true);
+      expect(result.results?.fr?.success).toBe(true);
+      // Newly translated should also be success
+      expect(result.results?.de?.success).toBe(true);
+      expect(result.results?.pt?.success).toBe(true);
+      expect(result.results?.ast?.success).toBe(true);
+    });
+
+    it("should mark locale as failed when not returned by API", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const { callAnthropicAPI } = await import("./claude");
+
+      const mockStory = {
+        id: "test-story-id",
+        title: "Test Story",
+        subtitle: "Test Subtitle",
+        description: "Test Description",
+        metadata: {},
+      };
+
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: mockStory, error: null }),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      // API only returns "en", missing "fr"
+      const mockTranslations = {
+        en: { title: "English Title", subtitle: "Sub", description: "Desc." },
+      };
+
+      vi.mocked(callAnthropicAPI).mockResolvedValue({
+        content: [{ type: "text", text: JSON.stringify(mockTranslations) }],
+        id: "test",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4-20250514",
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 100, output_tokens: 200 },
+      } as never);
+
+      const result = await translateStory("test-story-id", { locales: ["en", "fr"] });
+
+      // Should not be fully successful since fr is missing
+      expect(result.success).toBe(false);
+      expect(result.successCount).toBe(1);
+      expect(result.failedCount).toBe(1);
+      expect(result.results?.en?.success).toBe(true);
+      expect(result.results?.fr?.success).toBe(false);
+      expect(result.results?.fr?.error).toBe("Translation not returned by API");
+    });
+
     it("should retranslate when forceRetranslate is true", async () => {
       const { createAdminClient } = await import("./supabase");
       const { callAnthropicAPI } = await import("./claude");

@@ -32,7 +32,7 @@ export interface DiscoverySupabaseClient {
 }
 
 /** A Google Places result relevant to our needs */
-export interface PlaceResult {
+interface PlaceResult {
   name: string;
   address: string;
   types: string[];
@@ -57,7 +57,7 @@ export interface StoryDraft {
   metadata: Record<string, unknown>;
 }
 
-export interface DiscoveryResult {
+interface DiscoveryResult {
   discovered: number;
   created: number;
   skippedDuplicates: number;

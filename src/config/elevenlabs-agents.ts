@@ -24,7 +24,7 @@ export const ELEVENLABS_AGENT_IDS = {
   penny: "agent_1601kg4wghnzewc9aqpkf4r2fkfw",
 } as const;
 
-export type ElevenLabsAgentId = keyof typeof ELEVENLABS_AGENT_IDS;
+type ElevenLabsAgentId = keyof typeof ELEVENLABS_AGENT_IDS;
 
 /**
  * Check if ElevenLabs agents are configured

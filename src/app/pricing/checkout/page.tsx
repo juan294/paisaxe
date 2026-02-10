@@ -13,7 +13,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
+  (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim()
 );
 
 export default function CheckoutPage() {

@@ -52,7 +52,7 @@ test.describe("Static pages", () => {
     expect(response?.ok()).toBe(true);
 
     // Should show the price and a CTA
-    await expect(page.getByText("1.99")).toBeVisible();
+    await expect(page.getByText("€1.99")).toBeVisible();
   });
 });
 
@@ -194,6 +194,9 @@ test.describe("Chat messageIndex", () => {
       chatPanel.getByText(/Lagos de Covadonga son dos lagos/)
     ).toBeVisible({ timeout: 5000 });
 
+    // Wait for input to be re-enabled after first response completes
+    await expect(chatPanel.locator("input")).toBeEnabled({ timeout: 5000 });
+
     // Send second message
     await chatPanel.locator("input").fill("Question two");
     await chatPanel.locator('button[type="submit"]').click();
@@ -280,9 +283,11 @@ test.describe("Feature flag gating", () => {
     await page.goto("/immersive");
     await expect(page.locator("h1")).toBeVisible();
 
+    // The FullscreenButton renders conditionally after a useEffect checks
+    // for Fullscreen API support, so it may not appear on the first paint.
     await expect(
       page.getByRole("button", { name: /fullscreen|pantalla completa|plein|ecrã/i })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 5000 });
   });
 });
 
