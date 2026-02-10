@@ -10,7 +10,7 @@
 export type UpsellReason = "weather" | "booking" | "realtime" | "slow_typing";
 
 /** Result of checking a message for upsell markers */
-export interface UpsellDetectionResult {
+interface UpsellDetectionResult {
   /** Whether an upsell marker was found */
   hasUpsell: boolean;
   /** The reason for the upsell, if found */

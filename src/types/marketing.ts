@@ -32,7 +32,7 @@ export type ContentTheme =
   | "autumn" // Sep-Oct: harvest, fall colors
   | "winter"; // Nov-Dec: Christmas, cocido, snow
 
-export type AgentAction =
+type AgentAction =
   | "generate_content"
   | "schedule_post"
   | "post"
@@ -61,7 +61,7 @@ export interface EncryptedCredentials {
   encrypted: string;
 }
 
-export interface MarketingAccount {
+interface MarketingAccount {
   id: string;
   platform: MarketingPlatform;
   accountName: string;
@@ -143,7 +143,7 @@ export interface MarketingSchedule {
   createdAt: string;
 }
 
-export interface MarketingContentBank {
+interface MarketingContentBank {
   id: string;
   platform: MarketingPlatform | "all";
   contentType: ContentType;
@@ -158,7 +158,7 @@ export interface MarketingContentBank {
   createdAt: string;
 }
 
-export interface MarketingAgentLog {
+interface MarketingAgentLog {
   id: string;
   agentName: string;
   action: AgentAction;

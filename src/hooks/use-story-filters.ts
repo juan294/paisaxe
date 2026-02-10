@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import type { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 
-export interface UseStoryFiltersReturn {
+interface UseStoryFiltersReturn {
   filteredStories: Story[];
   selectedCategory: StoryCategory | null;
   selectedLocation: StoryLocation | null;

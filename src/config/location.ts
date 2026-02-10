@@ -118,7 +118,7 @@ export const LOCATION_CONFIG = {
 // =============================================================================
 
 /** Region IDs derived from configuration */
-export type RegionId = keyof typeof LOCATION_CONFIG.regions;
+type RegionId = keyof typeof LOCATION_CONFIG.regions;
 
 /** Get all region IDs */
 export function getRegionIds(): RegionId[] {
