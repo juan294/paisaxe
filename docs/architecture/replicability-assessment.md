@@ -73,7 +73,7 @@ The location values are hardcoded in the constraint.
 
 | Location | Assets |
 |----------|--------|
-| `public/images/stories/` | 20+ images (lagos-covadonga.png, playa-silencio.png, etc.) |
+| `public/images/stories/` | 20+ images (lagos-covadonga.webp, playa-silencio.webp, etc.) |
 | `src/components/ui/logo.tsx` | Mountain peaks logo (Picos de Europa metaphor) |
 
 ### 8. Domain Configuration

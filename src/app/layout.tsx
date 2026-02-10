@@ -79,7 +79,7 @@ export const metadata: Metadata = {
     images: [
       {
         // LOCATION-SPECIFIC: Default OG image
-        url: `${SITE_URL}/images/stories/lagos-covadonga.png`,
+        url: `${SITE_URL}/images/stories/lagos-covadonga.webp`,
         width: 1200,
         height: 630,
         alt: `Lagos de Covadonga, ${LOCATION_CONFIG.name} - ${LOCATION_CONFIG.siteName}`,
@@ -91,7 +91,7 @@ export const metadata: Metadata = {
     title,
     // LOCATION-SPECIFIC: Twitter description
     description: LOCATION_CONFIG.seo.description,
-    images: [`${SITE_URL}/images/stories/lagos-covadonga.png`],
+    images: [`${SITE_URL}/images/stories/lagos-covadonga.webp`],
   },
   alternates: {
     canonical: SITE_URL,

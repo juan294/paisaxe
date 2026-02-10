@@ -179,7 +179,7 @@ Replace all stories with your location's content:
       "title": "Your Landmark Name",
       "subtitle": "Region Name",
       "description": "Description in primary language...",
-      "image": "/images/stories/your-landmark.png",
+      "image": "/images/stories/your-landmark.webp",
       "category": "nature",
       "sourcePdf": "your-content.pdf",
       "location": "north",
@@ -226,7 +226,7 @@ Replace these files in `public/`:
 | `icon-*.png` | App icons |
 | `icon.svg` | SVG favicon |
 | `apple-touch-icon.png` | iOS icon |
-| `images/stories/*.png` | Default story images |
+| `images/stories/*.webp` | Default story images |
 
 Update `public/manifest.json`:
 - `name` → Your site's full name

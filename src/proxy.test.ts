@@ -253,7 +253,7 @@ describe("Maintenance mode", () => {
 
     it("allows static image files through", async () => {
       const request = new NextRequest(
-        "http://localhost:3000/images/stories/test.png"
+        "http://localhost:3000/images/stories/test.webp"
       );
       const response = await proxy(request);
 

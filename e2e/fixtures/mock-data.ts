@@ -18,7 +18,7 @@ export const MOCK_CHAT_RESPONSE = {
   images: [
     {
       id: "img-1",
-      path: "/images/stories/lagos-covadonga.png",
+      path: "/images/stories/lagos-covadonga.webp",
       caption: "Lagos de Covadonga",
       sourcePdf: "picos-europa.pdf",
     },
