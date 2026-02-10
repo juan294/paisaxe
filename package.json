@@ -21,6 +21,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
+    "test:e2e:visual": "playwright test --project=visual-desktop --project=visual-mobile",
+    "test:e2e:visual:update": "playwright test --project=visual-desktop --project=visual-mobile --update-snapshots",
     "test:qa": "vitest run --config vitest.config.qa.ts --reporter=verbose",
     "process-pdfs": "tsx scripts/process-pdfs.ts",
     "seed-db": "tsx scripts/seed-database.ts",

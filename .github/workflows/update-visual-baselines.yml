@@ -1,20 +1,25 @@
-name: E2E Tests
+name: Update Visual Baselines
 
 on:
-  push:
-    branches: [develop, main]
-  pull_request:
-    branches: [develop, main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to update baselines on'
+        required: true
+        default: 'develop'
 
 jobs:
-  e2e:
-    name: Playwright E2E
+  update-baselines:
+    name: Regenerate Visual Baselines
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -39,8 +44,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_build
 
-      - name: Run E2E tests
-        run: npm run test:e2e
+      - name: Update visual baselines
+        run: npm run test:e2e:visual:update
         env:
           CI: true
           ANTHROPIC_API_KEY: dummy_key_for_e2e
@@ -51,31 +56,17 @@ jobs:
           STRIPE_SECRET_KEY: sk_test_dummy_for_e2e
           STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
 
-      - name: Run visual regression tests
-        run: npm run test:e2e:visual
-        continue-on-error: true
-        env:
-          CI: true
-          ANTHROPIC_API_KEY: dummy_key_for_e2e
-          VOYAGE_API_KEY: dummy_key_for_e2e
-          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key_for_e2e
-          MAINTENANCE_MODE: "false"
-          STRIPE_SECRET_KEY: sk_test_dummy_for_e2e
-          STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v6
-        if: ${{ !cancelled() }}
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 14
-
-      - name: Upload visual diff artifacts
-        uses: actions/upload-artifact@v6
-        if: ${{ !cancelled() }}
-        with:
-          name: visual-regression-results
-          path: test-results/
-          retention-days: 14
+      - name: Commit updated baselines
+        run: |
+          git add e2e/visual-regression.spec.ts-snapshots/
+          if git diff --cached --quiet; then
+            echo "No baseline changes detected"
+          else
+            git commit -m "chore: update visual regression baselines [skip ci]"
+            git push origin ${{ github.event.inputs.branch }}
+          fi
