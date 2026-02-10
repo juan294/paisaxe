@@ -6,7 +6,7 @@ import { getEnvironment } from "./environment";
 
 type PostgresChangeEvent = "INSERT" | "UPDATE" | "DELETE" | "*";
 
-export interface SubscribeToTableOptions {
+interface SubscribeToTableOptions {
   /** Filter by event type. Defaults to "*" (all events). */
   event?: PostgresChangeEvent;
   /** Optional Postgres filter expression (e.g., "is_active=eq.true"). */

@@ -13,7 +13,7 @@ export function sanitizeInput(input: string): string {
     .replace(COLLAPSE_WHITESPACE_REGEX, ' ');
 }
 
-export interface ValidationResult {
+interface ValidationResult {
   valid: boolean;
   error?: string;
   sanitizedMessage?: string;

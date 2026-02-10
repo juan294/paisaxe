@@ -1,6 +1,27 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { proxy, shouldBypassMaintenanceMode, AUTH_REFRESH_TIMEOUT_MS } from "./proxy";
 import { NextRequest } from "next/server";
+
+// --- Supabase SSR mock ---
+// Captures the cookies config passed to createServerClient so tests can invoke setAll.
+let capturedCookiesConfig: {
+  getAll: () => { name: string; value: string }[];
+  setAll?: (cookies: { name: string; value: string; options: Record<string, unknown> }[]) => void;
+} | null = null;
+
+const mockGetUser = vi.fn().mockResolvedValue({ data: { user: null }, error: null });
+
+vi.mock("@supabase/ssr", () => ({
+  createServerClient: vi.fn((_url: string, _key: string, options: { cookies: typeof capturedCookiesConfig }) => {
+    capturedCookiesConfig = options.cookies;
+    return {
+      auth: {
+        getUser: mockGetUser,
+      },
+    };
+  }),
+}));
+
+import { proxy, shouldBypassMaintenanceMode, AUTH_REFRESH_TIMEOUT_MS } from "./proxy";
 
 // Mock global fetch for database checks
 const mockFetch = vi.fn();
@@ -232,7 +253,7 @@ describe("Maintenance mode", () => {
 
     it("allows static image files through", async () => {
       const request = new NextRequest(
-        "http://localhost:3000/images/stories/test.png"
+        "http://localhost:3000/images/stories/test.webp"
       );
       const response = await proxy(request);
 
@@ -641,6 +662,9 @@ describe("Auth session refresh timeout", () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test-project.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = FAKE_JWT_KEY;
     mockFetch.mockReset();
+    mockGetUser.mockReset();
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    capturedCookiesConfig = null;
   });
 
   afterEach(() => {
@@ -650,8 +674,8 @@ describe("Auth session refresh timeout", () => {
   });
 
   it("should return response within timeout when Supabase auth hangs", async () => {
-    // Simulate a hanging fetch (never resolves) — e.g., DNS resolution hang
-    mockFetch.mockImplementation(() => new Promise(() => {}));
+    // Simulate a hanging getUser (never resolves) — e.g., DNS resolution hang
+    mockGetUser.mockImplementation(() => new Promise(() => {}));
 
     const request = new NextRequest("http://localhost:3000/immersive");
 
@@ -668,10 +692,7 @@ describe("Auth session refresh timeout", () => {
 
   it("should return response normally when Supabase responds quickly", async () => {
     // Simulate a fast auth response (getUser call succeeds)
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ data: { user: null }, error: null }),
-    });
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const request = new NextRequest("http://localhost:3000/immersive");
     const response = await proxy(request);
@@ -680,8 +701,8 @@ describe("Auth session refresh timeout", () => {
   });
 
   it("should return response when Supabase auth returns an error", async () => {
-    // Simulate a connection error
-    mockFetch.mockRejectedValue(new TypeError("fetch failed"));
+    // Simulate a connection error thrown during getUser
+    mockGetUser.mockRejectedValue(new TypeError("fetch failed"));
 
     const request = new NextRequest("http://localhost:3000/immersive");
     const response = await proxy(request);
@@ -697,8 +718,8 @@ describe("Auth session refresh timeout", () => {
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
-    // No fetch should have been called
-    expect(mockFetch).not.toHaveBeenCalled();
+    // createServerClient should not have been called (skipped early)
+    expect(mockGetUser).not.toHaveBeenCalled();
   });
 
   it("should skip auth refresh when Supabase key is not a valid JWT", async () => {
@@ -710,7 +731,158 @@ describe("Auth session refresh timeout", () => {
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
-    // Should not have attempted any fetch — skipped immediately
-    expect(mockFetch).not.toHaveBeenCalled();
+    // Should not have attempted getUser — skipped immediately
+    expect(mockGetUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("Auth session refresh - setAll cookie callback", () => {
+  const FAKE_JWT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test";
+
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test-project.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = FAKE_JWT_KEY;
+    mockFetch.mockReset();
+    mockGetUser.mockReset();
+    capturedCookiesConfig = null;
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  });
+
+  it("should set cookies on request and response when setAll is invoked during session refresh", async () => {
+    // When getUser() triggers a token refresh, Supabase calls setAll with new cookies.
+    // We simulate this by having getUser invoke setAll before resolving.
+    mockGetUser.mockImplementation(async () => {
+      // Supabase internally calls setAll when refreshing tokens
+      if (capturedCookiesConfig?.setAll) {
+        capturedCookiesConfig.setAll([
+          { name: "sb-access-token", value: "new-access-token", options: { path: "/", httpOnly: true } },
+          { name: "sb-refresh-token", value: "new-refresh-token", options: { path: "/", httpOnly: true } },
+        ]);
+      }
+      return { data: { user: { id: "user-1" } }, error: null };
+    });
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    // The response should still be a valid next() response
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+
+    // The setAll callback should have set cookies on the response
+    const accessCookie = response.cookies.get("sb-access-token");
+    expect(accessCookie).toBeDefined();
+    expect(accessCookie?.value).toBe("new-access-token");
+
+    const refreshCookie = response.cookies.get("sb-refresh-token");
+    expect(refreshCookie).toBeDefined();
+    expect(refreshCookie?.value).toBe("new-refresh-token");
+  });
+
+  it("should set cookies on the request object for downstream processing", async () => {
+    // Verify the setAll callback also sets cookies on the request (for server components)
+    mockGetUser.mockImplementation(async () => {
+      if (capturedCookiesConfig?.setAll) {
+        capturedCookiesConfig.setAll([
+          { name: "sb-session", value: "session-data", options: { path: "/" } },
+        ]);
+      }
+      return { data: { user: null }, error: null };
+    });
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+    await proxy(request);
+
+    // Verify cookie was set on the request object
+    const sessionCookie = request.cookies.get("sb-session");
+    expect(sessionCookie?.value).toBe("session-data");
+  });
+
+  it("should handle setAll with multiple cookies", async () => {
+    mockGetUser.mockImplementation(async () => {
+      if (capturedCookiesConfig?.setAll) {
+        capturedCookiesConfig.setAll([
+          { name: "cookie-a", value: "value-a", options: { path: "/", secure: true } },
+          { name: "cookie-b", value: "value-b", options: { path: "/", secure: true } },
+          { name: "cookie-c", value: "value-c", options: { path: "/", httpOnly: true } },
+        ]);
+      }
+      return { data: { user: null }, error: null };
+    });
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    expect(response.cookies.get("cookie-a")?.value).toBe("value-a");
+    expect(response.cookies.get("cookie-b")?.value).toBe("value-b");
+    expect(response.cookies.get("cookie-c")?.value).toBe("value-c");
+  });
+});
+
+describe("Auth session refresh - error logging", () => {
+  const FAKE_JWT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test";
+
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test-project.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = FAKE_JWT_KEY;
+    mockFetch.mockReset();
+    mockGetUser.mockReset();
+    capturedCookiesConfig = null;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    vi.mocked(console.error).mockRestore();
+  });
+
+  it("should NOT log when error is an Auth refresh timeout", async () => {
+    // Simulate getUser hanging and the Promise.race timeout firing
+    mockGetUser.mockImplementation(() => new Promise(() => {}));
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+    await proxy(request);
+
+    // The timeout error message is "Auth refresh timeout" — should be silently caught
+    expect(console.error).not.toHaveBeenCalledWith(
+      "Error refreshing auth session:",
+      expect.anything()
+    );
+  }, 10_000);
+
+  it("should log when error is an Error with non-timeout message", async () => {
+    // Simulate a real error from getUser (not a timeout)
+    const realError = new TypeError("fetch failed");
+    mockGetUser.mockRejectedValue(realError);
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+    await proxy(request);
+
+    expect(console.error).toHaveBeenCalledWith(
+      "Error refreshing auth session:",
+      realError
+    );
+  });
+
+  it("should NOT log when thrown value is not an Error instance", async () => {
+    // Simulate a non-Error thrown value (e.g., a string)
+    mockGetUser.mockRejectedValue("some string error");
+
+    const request = new NextRequest("http://localhost:3000/immersive");
+    await proxy(request);
+
+    // Not an Error instance, so the condition (error instanceof Error) is false
+    expect(console.error).not.toHaveBeenCalledWith(
+      "Error refreshing auth session:",
+      expect.anything()
+    );
   });
 });

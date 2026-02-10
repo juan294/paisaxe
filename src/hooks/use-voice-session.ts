@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 
 const STORAGE_KEY = "paisaxe_voice_session";
 
-export type TimeOfDay = "morning" | "afternoon" | "evening";
+type TimeOfDay = "morning" | "afternoon" | "evening";
 
 interface VoiceSessionState {
   conversationCount: number;

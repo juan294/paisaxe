@@ -27,7 +27,7 @@ export function getStripeClient(): Stripe {
 /**
  * Options for creating a Stripe Checkout Session.
  */
-export interface StripeCheckoutOptions {
+interface StripeCheckoutOptions {
   userId: string;
   userEmail: string;
   successUrl: string;
@@ -70,7 +70,7 @@ export async function createDayPassCheckoutSession(
 /**
  * Options for creating a Stripe Embedded Checkout Session.
  */
-export interface StripeEmbeddedCheckoutOptions {
+interface StripeEmbeddedCheckoutOptions {
   userId: string;
   userEmail: string;
   returnUrl: string;
@@ -132,7 +132,7 @@ export function verifyWebhookSignature(
  */
 export function isStripeConfigured(): boolean {
   return !!(
-    process.env.STRIPE_SECRET_KEY && process.env.STRIPE_DAY_PASS_PRICE_ID
+    process.env.STRIPE_SECRET_KEY?.trim() && process.env.STRIPE_DAY_PASS_PRICE_ID?.trim()
   );
 }
 

@@ -249,3 +249,159 @@ describe("useFeatureFlags isEnabledWithDefault", () => {
     expect(result.current.isEnabledWithDefault("surprise_me", true)).toBe(false);
   });
 });
+
+describe("useFeatureFlags cache behavior", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.resetModules();
+  });
+
+  it("should return cached data without fetching again when cache is fresh (line 41)", async () => {
+    const flags = [makeFlag("contextual_prompts", true)];
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: flags }),
+    });
+
+    // Import the module once — cache will be shared across renders
+    const { useFeatureFlags } = await import("./use-feature-flags");
+
+    // First render: populates the cache
+    const { result: result1, unmount } = renderHook(() => useFeatureFlags());
+    await waitFor(() => {
+      expect(result1.current.isReady).toBe(true);
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    unmount();
+
+    // Second render: same module, cache is still fresh (within 60s TTL)
+    const { result: result2 } = renderHook(() => useFeatureFlags());
+
+    // Should be immediately ready from cache (isReady starts true because cache.data exists)
+    expect(result2.current.isReady).toBe(true);
+    expect(result2.current.flags).toEqual(flags);
+
+    // fetch should NOT have been called again — served from fresh cache
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("should deduplicate in-flight requests and return the same promise (line 45)", async () => {
+    let resolveFirstFetch!: (value: Response) => void;
+    mockFetch.mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveFirstFetch = resolve;
+      })
+    );
+
+    // Import the module once — cache will be shared
+    const { useFeatureFlags } = await import("./use-feature-flags");
+
+    // First render: starts a fetch that hangs
+    const { result: result1 } = renderHook(() => useFeatureFlags());
+    expect(result1.current.isReady).toBe(false);
+
+    // Second render: while first fetch is still pending
+    const { result: result2 } = renderHook(() => useFeatureFlags());
+    expect(result2.current.isReady).toBe(false);
+
+    // fetch should only have been called ONCE — second render joined the existing promise
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    // Now resolve the hanging fetch
+    const flags = [makeFlag("contextual_prompts", true)];
+    resolveFirstFetch({
+      ok: true,
+      json: async () => ({ data: flags }),
+    } as Response);
+
+    // Both hooks should receive the data
+    await waitFor(() => {
+      expect(result1.current.isReady).toBe(true);
+    });
+    await waitFor(() => {
+      expect(result2.current.isReady).toBe(true);
+    });
+
+    expect(result1.current.flags).toEqual(flags);
+    expect(result2.current.flags).toEqual(flags);
+    // Still only one fetch call total
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("should return cached data when a refresh fetch fails (lines 60-61)", async () => {
+    const flags = [makeFlag("contextual_prompts", true)];
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: flags }),
+    });
+
+    // Import the module once — cache will be shared
+    const { useFeatureFlags } = await import("./use-feature-flags");
+
+    // First render: populates the cache successfully
+    const { result: result1, unmount } = renderHook(() => useFeatureFlags());
+    await waitFor(() => {
+      expect(result1.current.isReady).toBe(true);
+    });
+    expect(result1.current.flags).toEqual(flags);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    unmount();
+
+    // Force the cache to become stale by advancing time past TTL (60s)
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 120_000);
+
+    // Make the next fetch fail
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    // Second render: cache is stale, fetch will fail, should fall back to cached data
+    const { result: result2 } = renderHook(() => useFeatureFlags());
+    await waitFor(() => {
+      expect(result2.current.isReady).toBe(true);
+    });
+
+    // Should still have the cached flags from the first fetch
+    expect(result2.current.flags).toEqual(flags);
+    // Should have warned about using cached data
+    expect(warnSpy).toHaveBeenCalledWith(
+      "Failed to refresh feature flags, using cached:",
+      expect.any(Error)
+    );
+
+    warnSpy.mockRestore();
+    vi.restoreAllMocks();
+  });
+
+  it("should set flags to [] when useEffect load() catch block triggers (lines 81-83)", async () => {
+    // The catch block in the useEffect's load() only triggers if fetchFlags()
+    // rejects with an unhandled error. Since fetchFlags() has its own .catch()
+    // that always resolves (returning [] or cache.data), the outer catch is
+    // effectively unreachable under normal conditions.
+    //
+    // To trigger it, we need fetchFlags itself to throw synchronously or the
+    // promise to reject in a way that bypasses the inner .catch().
+    // We can achieve this by mocking the module's fetchFlags to reject.
+
+    // Import fresh module
+    const mod = await import("./use-feature-flags");
+
+    // Spy on the hook's internal behavior by making fetch throw in a way
+    // that causes the load() promise chain to reject.
+    // The inner .catch() handles fetch rejections, but if Date.now itself
+    // throws, fetchFlags will throw synchronously before creating the promise.
+    const dateNowSpy = vi.spyOn(Date, "now").mockImplementation(() => {
+      throw new Error("Date.now exploded");
+    });
+
+    const { result } = renderHook(() => mod.useFeatureFlags());
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    // The catch block sets flags to []
+    expect(result.current.flags).toEqual([]);
+
+    dateNowSpy.mockRestore();
+  });
+});

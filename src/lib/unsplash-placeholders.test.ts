@@ -164,7 +164,7 @@ describe("unsplash-placeholders", () => {
     it("should return false for local image paths", () => {
       expect(
         isOldUnsplashPlaceholder({
-          image: "/images/stories/lagos-covadonga.png",
+          image: "/images/stories/lagos-covadonga.webp",
         })
       ).toBe(false);
     });
@@ -227,7 +227,7 @@ describe("unsplash-placeholders", () => {
     it("should return false for real local images", async () => {
       const { needsPlaceholderImage } = await import("./unsplash-placeholders");
       expect(
-        needsPlaceholderImage({ image: "/images/stories/lagos-covadonga.png" })
+        needsPlaceholderImage({ image: "/images/stories/lagos-covadonga.webp" })
       ).toBe(false);
     });
 

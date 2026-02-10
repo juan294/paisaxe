@@ -64,7 +64,9 @@ describe("ChatUpsellCTA", () => {
   it("renders the purchase button with price", () => {
     render(<ChatUpsellCTA {...defaultProps} />);
 
-    expect(screen.getByRole("button", { name: /1\.99/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /€1\.99/ })).toBeInTheDocument();
+    // Ensure no raw unicode escape sequences are rendered
+    expect(screen.queryByText(/\\u[0-9a-f]{4}/i)).not.toBeInTheDocument();
   });
 
   it("calls onDismiss when dismiss button is clicked", async () => {
@@ -81,7 +83,7 @@ describe("ChatUpsellCTA", () => {
     const user = userEvent.setup();
     render(<ChatUpsellCTA {...defaultProps} />);
 
-    await user.click(screen.getByRole("button", { name: /1\.99/ }));
+    await user.click(screen.getByRole("button", { name: /€1\.99/ }));
 
     expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
   });
@@ -93,7 +95,7 @@ describe("ChatUpsellCTA", () => {
     const user = userEvent.setup();
     render(<ChatUpsellCTA {...defaultProps} />);
 
-    await user.click(screen.getByRole("button", { name: /1\.99/ }));
+    await user.click(screen.getByRole("button", { name: /€1\.99/ }));
 
     expect(mockPush).toHaveBeenCalledWith("/pricing/checkout");
   });

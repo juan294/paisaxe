@@ -71,8 +71,10 @@ describe("VoicePurchaseCTA", () => {
 
     it("renders the price", () => {
       render(<VoicePurchaseCTA />);
-      expect(screen.getByText(/1\.99/)).toBeInTheDocument();
+      expect(screen.getByText("€1.99")).toBeInTheDocument();
       expect(screen.getByText("per day")).toBeInTheDocument();
+      // Ensure no raw unicode escape sequences are rendered
+      expect(screen.queryByText(/\\u[0-9a-f]{4}/i)).not.toBeInTheDocument();
     });
 
     it("renders feature list", () => {
@@ -127,7 +129,7 @@ describe("VoicePurchaseCTA", () => {
 
     it("renders purchase button with price in compact mode", () => {
       render(<VoicePurchaseCTA compact />);
-      expect(screen.getByRole("button", { name: /Get Day Pass.*1\.99/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Get Day Pass.*€1\.99/ })).toBeInTheDocument();
     });
 
     it("does not render title in compact mode", () => {

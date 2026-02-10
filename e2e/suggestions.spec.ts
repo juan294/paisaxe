@@ -109,10 +109,16 @@ test.describe("Suggestion feature", () => {
       // Fill in the place name
       await dialog.locator("#place-name").fill("Playa del Silencio");
 
-      // Submit
+      // Submit and wait for the mocked API response to complete
       const submitButton = dialog.locator('button[type="submit"]');
       await expect(submitButton).toBeEnabled();
-      await submitButton.click();
+
+      await Promise.all([
+        page.waitForResponse((resp) =>
+          resp.url().includes("/api/suggestions") && resp.status() === 201
+        ),
+        submitButton.click(),
+      ]);
 
       // Should show success state — the success view has success title text
       await expect(
