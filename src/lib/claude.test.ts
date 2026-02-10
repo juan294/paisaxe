@@ -1018,3 +1018,224 @@ describe("claude", () => {
     });
   });
 });
+
+// ─── SDK path tests (USE_CURL = false, NODE_ENV = production) ──────────
+
+describe("claude SDK path (NODE_ENV=production)", () => {
+  const mockCreate = vi.fn();
+  const mockStream = vi.fn();
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-api-key");
+    mockCreate.mockReset();
+    mockStream.mockReset();
+
+    // Mock the Anthropic SDK module
+    vi.doMock("@anthropic-ai/sdk", () => {
+      return {
+        default: class MockAnthropic {
+          messages = {
+            create: mockCreate,
+            stream: mockStream,
+          };
+        },
+      };
+    });
+
+    // Mock child_process so it doesn't interfere
+    vi.doMock("node:child_process", () => ({
+      execFile: vi.fn(),
+      spawn: vi.fn(),
+    }));
+    vi.doMock("node:util", () => ({
+      promisify: (fn: unknown) => fn,
+    }));
+    vi.doMock("node:timers/promises", () => ({
+      setTimeout: vi.fn().mockResolvedValue(undefined),
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  describe("callWithSDK via callAnthropicAPI", () => {
+    it("should call client.messages.create with correct parameters", async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: "text", text: "SDK response" }],
+      });
+
+      const { callAnthropicAPI } = await import("./claude");
+
+      const result = await callAnthropicAPI(
+        "system prompt",
+        [{ role: "user", content: "Hello" }],
+        "claude-sonnet-4-20250514",
+        1024
+      );
+
+      expect(mockCreate).toHaveBeenCalledWith({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        system: "system prompt",
+        messages: [{ role: "user", content: "Hello" }],
+      });
+      expect(result.content[0]).toEqual({ type: "text", text: "SDK response" });
+    });
+
+    it("should propagate SDK errors", async () => {
+      mockCreate.mockRejectedValue(new Error("SDK authentication failed"));
+
+      const { callAnthropicAPI } = await import("./claude");
+
+      await expect(
+        callAnthropicAPI(
+          "system prompt",
+          [{ role: "user", content: "Test" }],
+          "claude-sonnet-4-20250514",
+          1024
+        )
+      ).rejects.toThrow("SDK authentication failed");
+    });
+  });
+
+  describe("callWithSDK via generateChatResponse", () => {
+    it("should generate a response using the SDK path", async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: "text", text: "SDK generated response" }],
+      });
+
+      const { generateChatResponse: genChat } = await import("./claude");
+
+      const response = await genChat("Tell me about Asturias", []);
+      expect(response).toBe("SDK generated response");
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.model).toBe("claude-sonnet-4-20250514");
+      expect(callArgs.max_tokens).toBe(1024);
+    });
+
+    it("should return empty string when SDK returns no text block", async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: "tool_use", id: "123", name: "test" }],
+      });
+
+      const { generateChatResponse: genChat } = await import("./claude");
+
+      const response = await genChat("Test", []);
+      expect(response).toBe("");
+    });
+  });
+
+  describe("streamWithSDK via streamChatResponse", () => {
+    it("should yield text deltas from SDK stream", async () => {
+      // Mock stream as an async iterable
+      const events = [
+        { type: "content_block_delta", delta: { type: "text_delta", text: "Hello " } },
+        { type: "content_block_delta", delta: { type: "text_delta", text: "from SDK" } },
+      ];
+
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          for (const event of events) {
+            yield event;
+          }
+        },
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["Hello ", "from SDK"]);
+    });
+
+    it("should filter out non-text-delta events from SDK stream", async () => {
+      const events = [
+        { type: "message_start", message: {} },
+        { type: "content_block_start", content_block: {} },
+        { type: "content_block_delta", delta: { type: "text_delta", text: "actual text" } },
+        { type: "content_block_delta", delta: { type: "input_json_delta", partial_json: "{}" } },
+        { type: "message_stop" },
+      ];
+
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          for (const event of events) {
+            yield event;
+          }
+        },
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["actual text"]);
+    });
+
+    it("should pass correct parameters to SDK stream", async () => {
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          // empty stream
+        },
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _chunk of streamChat("Test query", [], true, 2)) {
+        /* noop */
+      }
+
+      expect(mockStream).toHaveBeenCalledTimes(1);
+      const callArgs = mockStream.mock.calls[0][0];
+      expect(callArgs.model).toBe("claude-sonnet-4-20250514");
+      expect(callArgs.max_tokens).toBe(1024);
+      expect(callArgs.system).toContain("asturianu");
+      expect(callArgs.messages).toEqual([
+        { role: "user", content: expect.stringContaining("Test query") },
+      ]);
+    });
+
+    it("should propagate errors from SDK stream", async () => {
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          throw new Error("Stream connection lost");
+        },
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      await expect(async () => {
+        for await (const chunk of streamChat("Test", [])) {
+          chunks.push(chunk);
+        }
+      }).rejects.toThrow("Stream connection lost");
+    });
+
+    it("should handle empty SDK stream gracefully", async () => {
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          // No events at all
+        },
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual([]);
+    });
+  });
+});

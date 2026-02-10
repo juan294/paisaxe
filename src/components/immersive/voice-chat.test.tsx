@@ -50,10 +50,25 @@ vi.mock("@/lib/supabase-browser", () => ({
 }));
 
 // Mock VoiceChatElevenLabs component (to avoid navigator.mediaDevices issues in tests)
+// Store onFallbackToText so tests can invoke it
+let capturedOnFallbackToText: (() => void) | undefined;
 vi.mock("./voice-chat-elevenlabs", () => ({
-  VoiceChatElevenLabs: ({ story }: { story: { title: string } }) => (
-    <div data-testid="elevenlabs-voice-chat">
-      Voice chat active for {story.title}
+  VoiceChatElevenLabs: ({ story, onFallbackToText }: { story: { title: string }; onFallbackToText?: () => void }) => {
+    capturedOnFallbackToText = onFallbackToText;
+    return (
+      <div data-testid="elevenlabs-voice-chat">
+        Voice chat active for {story.title}
+      </div>
+    );
+  },
+}));
+
+// Mock ChatUpsellCTA component
+vi.mock("./chat-upsell-cta", () => ({
+  ChatUpsellCTA: ({ reason, onDismiss, className }: { reason: string; onDismiss: () => void; className?: string }) => (
+    <div data-testid="chat-upsell-cta" className={className}>
+      <span>Upsell: {reason}</span>
+      <button data-testid="dismiss-upsell" onClick={onDismiss}>Dismiss</button>
     </div>
   ),
 }));
@@ -946,6 +961,307 @@ describe("VoiceChat with voice access", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("elevenlabs-voice-chat")).not.toBeInTheDocument();
       expect(screen.getByPlaceholderText("Escribe tu pregunta...")).toBeInTheDocument();
+    });
+  });
+
+  it("should fall back to text mode when VoiceChatElevenLabs calls onFallbackToText", async () => {
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    // Verify voice mode is active by default
+    await waitFor(() => {
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+    });
+
+    // Simulate the ElevenLabs component calling onFallbackToText
+    expect(capturedOnFallbackToText).toBeDefined();
+    act(() => {
+      capturedOnFallbackToText!();
+    });
+
+    // Should now show text mode instead of voice
+    await waitFor(() => {
+      expect(screen.queryByTestId("elevenlabs-voice-chat")).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Escribe tu pregunta...")).toBeInTheDocument();
+    });
+  });
+});
+
+// Tests for initialMessage prop
+describe("VoiceChat initialMessage", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCapture.mockReset();
+    localStorageMock.clear();
+    resetMockVoiceAccess();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should populate input with initialMessage when provided", async () => {
+    render(
+      <VoiceChat
+        story={mockStory}
+        open={true}
+        onClose={() => {}}
+        initialMessage="What are the best hiking trails?"
+      />
+    );
+
+    await waitFor(() => {
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...") as HTMLInputElement;
+      expect(input.value).toBe("What are the best hiking trails?");
+    });
+  });
+});
+
+// Tests for markdown rendering in assistant messages
+describe("VoiceChat markdown rendering", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCapture.mockReset();
+    localStorageMock.clear();
+    resetMockVoiceAccess();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should render bold text in assistant messages", async () => {
+    mockFetch.mockResolvedValueOnce(
+      createStreamingResponse("This has **bold text** in it")
+    );
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    await userEvent.type(input, "Question");
+    const form = input.closest("form");
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      const strong = document.querySelector("strong");
+      expect(strong).toBeInTheDocument();
+      expect(strong?.textContent).toBe("bold text");
+      expect(strong).toHaveClass("font-semibold");
+    });
+  });
+
+  it("should render unordered lists in assistant messages", async () => {
+    mockFetch.mockResolvedValueOnce(
+      createStreamingResponse("Here are items:\n- First item\n- Second item")
+    );
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    await userEvent.type(input, "List things");
+    const form = input.closest("form");
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      const ul = document.querySelector("ul");
+      expect(ul).toBeInTheDocument();
+      expect(ul).toHaveClass("list-disc", "list-inside");
+      const items = ul!.querySelectorAll("li");
+      expect(items.length).toBe(2);
+    });
+  });
+
+  it("should render ordered lists in assistant messages", async () => {
+    mockFetch.mockResolvedValueOnce(
+      createStreamingResponse("Steps:\n1. First step\n2. Second step\n3. Third step")
+    );
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    await userEvent.type(input, "Give me steps");
+    const form = input.closest("form");
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      const ol = document.querySelector("ol");
+      expect(ol).toBeInTheDocument();
+      expect(ol).toHaveClass("list-decimal", "list-inside");
+      const items = ol!.querySelectorAll("li");
+      expect(items.length).toBe(3);
+    });
+  });
+
+  it("should render links with target=_blank and rel=noopener noreferrer", async () => {
+    mockFetch.mockResolvedValueOnce(
+      createStreamingResponse("Visit [this site](https://example.com) for more info")
+    );
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    await userEvent.type(input, "Show link");
+    const form = input.closest("form");
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      const messagesArea = screen.getByRole("log");
+      const link = messagesArea.querySelector("a[href='https://example.com']");
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+      expect(link).toHaveClass("underline");
+      expect(link?.textContent).toBe("this site");
+    });
+  });
+});
+
+// Tests for upsell CTA dismiss
+describe("VoiceChat upsell dismiss", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCapture.mockReset();
+    localStorageMock.clear();
+    resetMockVoiceAccess();
+    // Clear sessionStorage for upsell throttle
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should show upsell CTA and allow dismissal when marker is in response", async () => {
+    // Create a streaming response that includes the upsell marker
+    const encoder = new TextEncoder();
+    const textEvent = `data: ${JSON.stringify({ type: "text", content: "I cannot check the weather right now. [[VOICE_UPSELL:weather]]" })}\n\n`;
+    const doneEvent = `data: ${JSON.stringify({ type: "done", images: [], sources: [] })}\n\n`;
+
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(textEvent));
+        controller.enqueue(encoder.encode(doneEvent));
+        controller.close();
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: stream,
+    });
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    await userEvent.type(input, "What is the weather?");
+    const form = input.closest("form");
+    fireEvent.submit(form!);
+
+    // Wait for the upsell CTA to appear
+    await waitFor(() => {
+      expect(screen.getByTestId("chat-upsell-cta")).toBeInTheDocument();
+      expect(screen.getByText("Upsell: weather")).toBeInTheDocument();
+    });
+
+    // Click dismiss
+    fireEvent.click(screen.getByTestId("dismiss-upsell"));
+
+    // The upsell CTA should be gone after dismissal
+    await waitFor(() => {
+      expect(screen.queryByTestId("chat-upsell-cta")).not.toBeInTheDocument();
+    });
+  });
+});
+
+// Tests for voice upgrade link and expiry warning
+describe("VoiceChat upgrade and expiry", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCapture.mockReset();
+    localStorageMock.clear();
+    resetMockVoiceAccess();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should show upgrade link when user cannot use voice", () => {
+    mockVoiceAccess.canUseVoice = false;
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const upgradeLink = screen.getByText("voice.upgrade_cta");
+    expect(upgradeLink).toBeInTheDocument();
+    expect(upgradeLink.closest("a")).toHaveAttribute("href", "/pricing");
+  });
+
+  it("should include returnTo in upgrade link when story has slug", () => {
+    mockVoiceAccess.canUseVoice = false;
+    const storyWithSlug: Story = { ...mockStory, slug: "lagos-de-covadonga" };
+
+    render(<VoiceChat story={storyWithSlug} open={true} onClose={() => {}} />);
+
+    const upgradeLink = screen.getByText("voice.upgrade_cta");
+    expect(upgradeLink.closest("a")).toHaveAttribute(
+      "href",
+      "/pricing?returnTo=lagos-de-covadonga"
+    );
+  });
+
+  it("should show expiry warning when voice access expires in less than 6 hours", () => {
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.agentId = "test-agent-id";
+    mockVoiceAccess.hoursUntilExpiry = 3;
+    mockVoiceAccess.expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000);
+    mockVoiceAccess.isWhitelisted = false;
+    mockVoiceAccess.hasAccess = true;
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    // The expiry warning should appear
+    const warning = screen.getByText(/premium\.voice_pass_expiry/);
+    expect(warning).toBeInTheDocument();
+  });
+
+  it("should show loading state during initialization", () => {
+    mockVoiceAccess.isLoading = true;
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    expect(screen.getByText("Cargando...")).toBeInTheDocument();
+  });
+
+  it("should show VoicePurchaseCTA when voice mode is active but access revoked and purchase needed", async () => {
+    // Start with voice access enabled so useElevenLabs gets set to true
+    mockVoiceAccess.canUseVoice = true;
+    mockVoiceAccess.agentId = "test-agent-id";
+    mockVoiceAccess.isWhitelisted = true;
+    mockVoiceAccess.hasAccess = true;
+
+    const { rerender } = render(
+      <VoiceChat story={mockStory} open={true} onClose={() => {}} />
+    );
+
+    // Verify voice mode is active
+    await waitFor(() => {
+      expect(screen.getByTestId("elevenlabs-voice-chat")).toBeInTheDocument();
+    });
+
+    // Now simulate access being revoked (e.g. day pass expired)
+    mockVoiceAccess.canUseVoice = false;
+    mockVoiceAccess.needsPurchase = true;
+    mockVoiceAccess.agentId = "";
+    mockVoiceAccess.isWhitelisted = false;
+    mockVoiceAccess.hasAccess = false;
+
+    // Re-render with updated mock state
+    rerender(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    // useElevenLabs is still true from before, but canUseVoice is false and needsPurchase is true
+    // Should show the VoicePurchaseCTA
+    await waitFor(() => {
+      expect(screen.getByTestId("voice-purchase-cta")).toBeInTheDocument();
     });
   });
 });
