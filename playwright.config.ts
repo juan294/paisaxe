@@ -11,6 +11,14 @@ export default defineConfig({
   reporter: isCI ? [["html"], ["github"]] : [["html"]],
   timeout: isCI ? 15_000 : 30_000,
 
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.01,
+      threshold: 0.2,
+      animations: "disabled",
+    },
+  },
+
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
@@ -23,18 +31,28 @@ export default defineConfig({
     {
       name: "desktop",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: "**/qa-journey.spec.ts",
+      testIgnore: ["**/qa-journey.spec.ts", "**/visual-regression.spec.ts"],
     },
     {
       name: "mobile",
       use: { ...devices["Pixel 7"] },
-      testIgnore: "**/qa-journey.spec.ts",
+      testIgnore: ["**/qa-journey.spec.ts", "**/visual-regression.spec.ts"],
     },
     {
       name: "qa-journey",
       use: { ...devices["Desktop Chrome"] },
       testMatch: "qa-journey.spec.ts",
       timeout: 30_000,
+    },
+    {
+      name: "visual-desktop",
+      use: { ...devices["Desktop Chrome"], locale: "en-US" },
+      testMatch: "visual-regression.spec.ts",
+    },
+    {
+      name: "visual-mobile",
+      use: { ...devices["Pixel 7"], locale: "en-US" },
+      testMatch: "visual-regression.spec.ts",
     },
   ],
 
