@@ -115,8 +115,10 @@ describe("PricingPage", () => {
     render(<PricingPage />);
 
     expect(screen.getByText("premium.pricing_title")).toBeInTheDocument();
-    expect(screen.getByText(/1\.99/)).toBeInTheDocument();
+    expect(screen.getByText("€1.99")).toBeInTheDocument();
     expect(screen.getByText(/Voice Pass/)).toBeInTheDocument();
+    // Ensure no raw unicode escape sequences are rendered
+    expect(screen.queryByText(/\\u[0-9a-f]{4}/i)).not.toBeInTheDocument();
   });
 
   it("should show sign in button when user not authenticated", () => {
@@ -250,7 +252,7 @@ describe("PricingPage", () => {
 
     render(<PricingPage />);
 
-    expect(screen.queryByText(/1\.99/)).not.toBeInTheDocument();
+    expect(screen.queryByText("€1.99")).not.toBeInTheDocument();
   });
 
   it("should navigate to embedded checkout when authenticated user clicks purchase", () => {
