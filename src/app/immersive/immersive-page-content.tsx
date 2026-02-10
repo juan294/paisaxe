@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense, useTransition, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { StoryViewer } from "@/components/immersive/story-viewer";
 import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
@@ -42,6 +42,7 @@ export function ImmersivePageContent({ serverShuffleSeed }: ImmersivePageContent
   const [initialMessage, setInitialMessage] = useState<string | undefined>();
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [moodDismissed, setMoodDismissed] = useState(false);
+  const [, startTransition] = useTransition();
 
   // Use server-provided seed if available, otherwise generate client-side
   // This ensures shuffling happens on first render without flicker
@@ -52,13 +53,28 @@ export function ImmersivePageContent({ serverShuffleSeed }: ImmersivePageContent
   const { viewedIndices, markViewed } = useViewedStories();
   const searchParams = useSearchParams();
 
-  // Check for ?story= query param from share links
+  // Wrap index changes in startTransition so the browser can process touch events
+  // between render chunks, improving responsiveness on mobile
+  const handleIndexChange = useCallback(
+    (index: number) => {
+      startTransition(() => {
+        setCurrentIndex(index);
+      });
+    },
+    [startTransition]
+  );
+
+  // Check for ?story= query param from share links or post-payment return
+  // When voice=ready is also present, auto-open the voice chat
   useEffect(() => {
     const storySlug = searchParams.get("story");
     if (storySlug && allStories.length > 0) {
       const index = allStories.findIndex((s) => s.slug === storySlug || s.id === storySlug);
       if (index >= 0) {
         setCurrentIndex(index);
+        if (searchParams.get("voice") === "ready") {
+          setChatOpen(true);
+        }
       }
     }
   }, [searchParams, allStories]);
@@ -182,7 +198,7 @@ export function ImmersivePageContent({ serverShuffleSeed }: ImmersivePageContent
           stories={filteredStories}
           allStories={allStories}
           currentIndex={currentIndex}
-          onIndexChange={setCurrentIndex}
+          onIndexChange={handleIndexChange}
           onAskAbout={handleAskAbout}
           chatOpen={chatOpen}
           selectedCategory={selectedCategory}

@@ -17,11 +17,13 @@ vi.mock("@/lib/i18n", () => ({
 }));
 
 // Helper to set up matchMedia mock
-function mockMatchMedia(matches: boolean) {
+// Accepts a boolean (all queries match/don't match) or a record of query -> matches
+function mockMatchMedia(matches: boolean | Record<string, boolean>) {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches,
+      matches:
+        typeof matches === "boolean" ? matches : (matches[query] ?? false),
       media: query,
       onchange: null,
       addListener: vi.fn(),
@@ -33,12 +35,28 @@ function mockMatchMedia(matches: boolean) {
   });
 }
 
+// Simulate a phone: touch device + narrow viewport (below sm breakpoint 640px)
+function mockPhone() {
+  mockMatchMedia({
+    "(pointer: coarse)": true,
+    "(max-width: 639px)": true,
+  });
+}
+
+// Simulate a tablet: touch device + wide viewport (above sm breakpoint)
+function mockTablet() {
+  mockMatchMedia({
+    "(pointer: coarse)": true,
+    "(max-width: 639px)": false,
+  });
+}
+
 describe("NavigationHint", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.clear();
-    // Default: simulate a touch device
-    mockMatchMedia(true);
+    // Default: simulate a phone (touch + narrow viewport)
+    mockPhone();
   });
 
   afterEach(() => {
@@ -141,6 +159,14 @@ describe("NavigationHint", () => {
 
   it("does NOT render on desktop (pointer: fine)", () => {
     mockMatchMedia(false);
+
+    render(<NavigationHint />);
+
+    expect(screen.queryByTestId("navigation-hint")).not.toBeInTheDocument();
+  });
+
+  it("does NOT render on tablet (touch device but wide viewport)", () => {
+    mockTablet();
 
     render(<NavigationHint />);
 

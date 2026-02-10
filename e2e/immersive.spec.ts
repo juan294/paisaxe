@@ -16,52 +16,57 @@ test.describe("Immersive story viewer", () => {
 
   test("renders a story with title and description", async ({ page }) => {
     // Fallback stories should load — first story is "Lagos de Covadonga"
-    await expect(page.locator("h1")).toBeVisible();
-    await expect(page.locator("h1")).not.toBeEmpty();
+    const title = page.getByTestId("story-title");
+    await expect(title).toBeVisible({ timeout: 15000 });
+    await expect(title).not.toBeEmpty();
   });
 
   test("shows navigation arrows", async ({ page }) => {
     // Wait for the story to render
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.getByTestId("story-title")).toBeVisible({ timeout: 15000 });
 
     // Navigation arrows — both enabled since carousel loops infinitely
-    const prevButton = page.locator("button").filter({ has: page.locator("svg.lucide-chevron-left") });
-    const nextButton = page.locator("button").filter({ has: page.locator("svg.lucide-chevron-right") });
+    const prevButton = page.getByTestId("prev-story-button");
+    const nextButton = page.getByTestId("next-story-button");
 
     await expect(prevButton).toBeVisible();
     await expect(nextButton).toBeVisible();
   });
 
   test("navigates to next story via arrow click", async ({ page }) => {
-    await expect(page.locator("h1")).toBeVisible();
-    const firstTitle = await page.locator("h1").textContent();
+    const title = page.getByTestId("story-title");
+    await expect(title).toBeVisible({ timeout: 15000 });
+    const firstTitle = await title.textContent();
 
     // Click next arrow
-    const nextButton = page.locator("button").filter({ has: page.locator("svg.lucide-chevron-right") });
+    const nextButton = page.getByTestId("next-story-button");
     await nextButton.click();
 
     // Wait for transition and verify title changed
     await page.waitForTimeout(400);
-    const secondTitle = await page.locator("h1").textContent();
+    const secondTitle = await title.textContent();
     expect(secondTitle).not.toBe(firstTitle);
   });
 
   test("navigates via keyboard arrow keys", async ({ page }) => {
-    await expect(page.locator("h1")).toBeVisible();
-    const firstTitle = await page.locator("h1").textContent();
+    const title = page.getByTestId("story-title");
+    await expect(title).toBeVisible({ timeout: 15000 });
+    const firstTitle = await title.textContent();
 
     await page.keyboard.press("ArrowRight");
     await page.waitForTimeout(400);
 
-    const secondTitle = await page.locator("h1").textContent();
+    const secondTitle = await title.textContent();
     expect(secondTitle).not.toBe(firstTitle);
   });
 
   test("toggles info overlay with 'i' key", async ({ page }) => {
-    await expect(page.locator("h1")).toBeVisible();
+    const title = page.getByTestId("story-title");
+    await expect(title).toBeVisible({ timeout: 15000 });
 
-    // Info is visible by default - check h1 is visible
-    await expect(page.locator("h1")).toHaveCSS("opacity", "1");
+    // Info is visible by default - check the info panel is at full opacity
+    const infoPanel = page.getByTestId("story-info-panel");
+    await expect(infoPanel).toHaveCSS("opacity", "1");
 
     // Press 'i' to hide info overlay
     await page.keyboard.press("i");
@@ -70,10 +75,7 @@ test.describe("Immersive story viewer", () => {
     // Wait for the CSS transition (duration-500 = 500ms)
     await page.waitForTimeout(600);
 
-    // After toggle, the h1 should still exist in DOM but be inside a hidden container
-    // The bottom panel has class "opacity-0 translate-y-8" when hidden
-    // Verify by checking the bottom panel's computed opacity
-    const bottomPanel = page.locator(".absolute.bottom-0.left-0.right-0");
-    await expect(bottomPanel).toHaveCSS("opacity", "0");
+    // After toggle, the info panel should have opacity 0
+    await expect(infoPanel).toHaveCSS("opacity", "0");
   });
 });

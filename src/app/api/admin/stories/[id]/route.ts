@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { VALID_CATEGORIES } from "@/types/immersive";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
-
-const VALID_CATEGORIES: StoryCategory[] = [
-  "nature",
-  "cities",
-  "food",
-  "culture",
-  "activities",
-];
 
 const VALID_LOCATIONS: StoryLocation[] = ["eastern", "central", "western"];
 

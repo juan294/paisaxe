@@ -355,10 +355,11 @@ export function SuggestionsPanel() {
 
                   {/* Admin Notes */}
                   <div className="mb-4">
-                    <label className="mb-1 block text-xs font-medium uppercase tracking-widest text-[#a39e98]">
+                    <label htmlFor={`admin-notes-${suggestion.id}`} className="mb-1 block text-xs font-medium uppercase tracking-widest text-[#a39e98]">
                       Admin Notes
                     </label>
                     <textarea
+                      id={`admin-notes-${suggestion.id}`}
                       value={adminNotes[suggestion.id] || ""}
                       onChange={(e) =>
                         setAdminNotes((prev) => ({ ...prev, [suggestion.id]: e.target.value }))

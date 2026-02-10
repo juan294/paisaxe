@@ -39,10 +39,6 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-// Mock fetch for checkout API
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
-
 // Mock next/link
 vi.mock("next/link", () => ({
   default: ({
@@ -56,14 +52,24 @@ vi.mock("next/link", () => ({
   }) => <a href={href} {...rest}>{children}</a>,
 }));
 
+// Mock next/navigation
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({
+    push: mockPush,
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}));
+
 describe("PricingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetch.mockReset();
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ url: "https://checkout.stripe.com/test" }),
-    });
+    mockPush.mockReset();
     mockUseAuth.mockReturnValue({
       user: null,
       session: null,
@@ -109,8 +115,8 @@ describe("PricingPage", () => {
     render(<PricingPage />);
 
     expect(screen.getByText("premium.pricing_title")).toBeInTheDocument();
-    expect(screen.getByText("€1.99")).toBeInTheDocument();
-    expect(screen.getByText("Voice Pass · 24h")).toBeInTheDocument();
+    expect(screen.getByText(/1\.99/)).toBeInTheDocument();
+    expect(screen.getByText(/Voice Pass/)).toBeInTheDocument();
   });
 
   it("should show sign in button when user not authenticated", () => {
@@ -244,10 +250,10 @@ describe("PricingPage", () => {
 
     render(<PricingPage />);
 
-    expect(screen.queryByText("€1.99")).not.toBeInTheDocument();
+    expect(screen.queryByText(/1\.99/)).not.toBeInTheDocument();
   });
 
-  it("should call checkout API and redirect when authenticated user clicks purchase", async () => {
+  it("should navigate to embedded checkout when authenticated user clicks purchase", () => {
     mockUseAuth.mockReturnValue({
       user: { id: "user-123", email: "test@example.com" },
       session: { access_token: "token" },
@@ -255,77 +261,12 @@ describe("PricingPage", () => {
       isLoading: false,
     });
 
-    // Mock window.location.href setter
-    const hrefSetter = vi.fn();
-    const originalLocation = window.location;
-    Object.defineProperty(window, "location", {
-      value: { ...originalLocation, href: "" },
-      writable: true,
-    });
-    Object.defineProperty(window.location, "href", {
-      set: hrefSetter,
-      get: () => "",
-    });
-
     render(<PricingPage />);
 
     const button = screen.getByRole("button", { name: "premium.pricing_cta" });
     fireEvent.click(button);
 
-    // Wait for async checkout call
-    await vi.waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith("/api/checkout/day-pass", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-    });
-
-    // Should redirect to Stripe checkout
-    await vi.waitFor(() => {
-      expect(hrefSetter).toHaveBeenCalledWith("https://checkout.stripe.com/test");
-    });
-
-    // Restore
-    Object.defineProperty(window, "location", { value: originalLocation });
-  });
-
-  it("should handle checkout API error gracefully", async () => {
-    // Spy on console.error
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    mockUseAuth.mockReturnValue({
-      user: { id: "user-123", email: "test@example.com" },
-      session: { access_token: "token" },
-      signInWithGoogle: mockSignInWithGoogle,
-      isLoading: false,
-    });
-
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-    });
-
-    render(<PricingPage />);
-
-    const button = screen.getByRole("button", { name: "premium.pricing_cta" });
-    fireEvent.click(button);
-
-    // Wait for error to be logged
-    await vi.waitFor(() => {
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "[pricing] Checkout error:",
-        expect.any(Error)
-      );
-    });
-
-    // Button should be enabled again after error
-    await vi.waitFor(() => {
-      expect(button).not.toBeDisabled();
-    });
-
-    consoleErrorSpy.mockRestore();
+    expect(mockPush).toHaveBeenCalledWith("/pricing/checkout");
   });
 
   it("should show Premium Access text when isWhitelisted is true with no expiresAt", () => {
@@ -378,41 +319,5 @@ describe("PricingPage", () => {
       const spinner = screen.getByRole("status", { name: "accessibility.loading" });
       expect(spinner).toBeInTheDocument();
     });
-  });
-
-  it("should show loading state on purchase button while checkout is in progress", async () => {
-    mockUseAuth.mockReturnValue({
-      user: { id: "user-123", email: "test@example.com" },
-      session: { access_token: "token" },
-      signInWithGoogle: mockSignInWithGoogle,
-      isLoading: false,
-    });
-
-    // Create a promise that we can control
-    let resolveCheckout: (value: Response) => void;
-    const checkoutPromise = new Promise<Response>((resolve) => {
-      resolveCheckout = resolve;
-    });
-    mockFetch.mockReturnValueOnce(checkoutPromise);
-
-    render(<PricingPage />);
-
-    const button = screen.getByRole("button", { name: "premium.pricing_cta" });
-    fireEvent.click(button);
-
-    // Button should be disabled while loading
-    await vi.waitFor(() => {
-      expect(button).toBeDisabled();
-    });
-
-    // Spinner should be visible
-    const spinner = button.querySelector(".animate-spin");
-    expect(spinner).toBeInTheDocument();
-
-    // Resolve to clean up
-    resolveCheckout!({
-      ok: true,
-      json: () => Promise.resolve({ url: "https://checkout.stripe.com/test" }),
-    } as Response);
   });
 });

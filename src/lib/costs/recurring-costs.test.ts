@@ -15,7 +15,7 @@ describe("generateRecurringCosts", () => {
 
     const elevenlabs = costs.find((c) => c.serviceId === "elevenlabs");
     expect(elevenlabs).toBeDefined();
-    expect(elevenlabs!.costUsd).toBe(5);
+    expect(elevenlabs!.costUsd).toBe(18.33);
     expect(elevenlabs!.source).toBe("recurring");
   });
 

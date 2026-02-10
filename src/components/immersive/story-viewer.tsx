@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Play, Pause, Bookmark, Share2, Shuffle, Lightbulb, Camera } from "lucide-react";
 import { BookmarkButton } from "./bookmark-button";
 import { CategoryFilterBadge } from "./category-filter-badge";
-import { AuthButton } from "@/components/auth/auth-button";
+import { SiteInfoMenu } from "./site-info-menu";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useAuth } from "@/hooks/use-auth";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
@@ -28,6 +28,8 @@ import { getLabel } from "@/lib/asturianu";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { NavigationHint } from "./navigation-hint";
+import { AuthorTypewriter } from "./author-typewriter";
+import { StoryProgressBar } from "./story-progress-bar";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -71,10 +73,6 @@ export function StoryViewer({
   const [showInfo, setShowInfo] = useState(true);
   const [autoPlay, setAutoPlay] = useState(false);
   const [ambientMode, setAmbientMode] = useState(false);
-  const [typewriterText, setTypewriterText] = useState("</> JG");
-
-  const typewriterRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const { isEnabled } = useFeatureFlags();
   const { t, locale } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -87,109 +85,6 @@ export function StoryViewer({
   const story = stories[currentIndex];
   const prefetchedUrls = useRef<Set<string>>(new Set());
   const ambientStartRef = useRef<number | null>(null);
-
-  // Terminal typewriter animation for the author pill
-  useEffect(() => {
-    if (prefersReducedMotion) return;
-
-    const messages = [
-      "</> JG",
-      t("author_pill.made_with_love"),
-      t("author_pill.fueled_by_sidra"),
-      "npm run explore",
-      t("author_pill.buen_camino"),
-      t("author_pill.probably_hiking"),
-      t("author_pill.out_cycling"),
-      t("author_pill.scaling_rocks"),
-      t("author_pill.sleep_not_found"),
-      t("author_pill.works_on_my_machine"),
-      t("author_pill.bug_free"),
-    ];
-    const HOME = messages[0];
-    const CHAR_DELAY = 80;
-    const EMPTY_PAUSE = 300;
-    const HOME_HOLD = 30_000;
-    const MSG_HOLD = 4000;
-
-    let messageIndex = 0;
-    let cancelled = false;
-
-    const wait = (ms: number) =>
-      new Promise<void>((resolve) => {
-        typewriterRef.current = setTimeout(() => {
-          if (!cancelled) resolve();
-        }, ms);
-      });
-
-    const eraseText = async (text: string) => {
-      for (let i = text.length; i >= 0; i--) {
-        if (cancelled) return;
-        setTypewriterText(text.slice(0, i));
-        if (i > 0) await wait(CHAR_DELAY);
-      }
-    };
-
-    const typeText = async (text: string) => {
-      for (let i = 0; i <= text.length; i++) {
-        if (cancelled) return;
-        setTypewriterText(text.slice(0, i));
-        if (i < text.length) await wait(CHAR_DELAY);
-      }
-    };
-
-    const cycle = async () => {
-      // Start at home, wait
-      setTypewriterText(HOME);
-      await wait(HOME_HOLD);
-
-      while (!cancelled) {
-        // Move to next non-home message
-        messageIndex = (messageIndex + 1) % messages.length;
-        if (messageIndex === 0) messageIndex = 1; // skip home in rotation
-
-        const nextMsg = messages[messageIndex];
-        const currentText = HOME;
-
-        // Erase current text
-        await eraseText(currentText);
-        if (cancelled) return;
-
-        // Brief pause when empty
-        await wait(EMPTY_PAUSE);
-        if (cancelled) return;
-
-        // Type the new message
-        await typeText(nextMsg);
-        if (cancelled) return;
-
-        // Hold the message
-        await wait(MSG_HOLD);
-        if (cancelled) return;
-
-        // Erase the message
-        await eraseText(nextMsg);
-        if (cancelled) return;
-
-        // Brief pause when empty
-        await wait(EMPTY_PAUSE);
-        if (cancelled) return;
-
-        // Type home back
-        await typeText(HOME);
-        if (cancelled) return;
-
-        // Hold at home
-        await wait(HOME_HOLD);
-      }
-    };
-
-    cycle();
-
-    return () => {
-      cancelled = true;
-      if (typewriterRef.current) clearTimeout(typewriterRef.current);
-    };
-  }, [prefersReducedMotion, t]);
 
   // Prefetch adjacent images for smoother navigation
   useEffect(() => {
@@ -359,62 +254,13 @@ export function StoryViewer({
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
       </div>
 
-      {/* Progress bar - fixed segments that fill and reset, creating an infinite flow */}
-      {(() => {
-        const PAGE_SIZE = 20;
-        const segmentCount = Math.min(PAGE_SIZE, stories.length);
-        const fillPosition = currentIndex % segmentCount;
-
-        return (
-          <div
-            role="progressbar"
-            aria-label={t("accessibility.story_progress")}
-            aria-valuenow={currentIndex + 1}
-            aria-valuemin={1}
-            aria-valuemax={stories.length}
-            className="absolute top-0 left-0 right-0 z-20 flex items-center gap-1 p-4"
-          >
-            {Array.from({ length: segmentCount }, (_, i) => {
-              const base = currentIndex - fillPosition;
-              const targetIndex = base + i;
-              const handleJump = () => {
-                if (targetIndex >= 0 && targetIndex < stories.length) {
-                  onIndexChange(targetIndex);
-                }
-              };
-              return (
-                <div
-                  key={i}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={t("accessibility.go_to_story")
-                    .replace("{current}", String(targetIndex + 1))
-                    .replace("{total}", String(stories.length))}
-                  className="flex-1 h-1 rounded-full bg-white/30 overflow-hidden cursor-pointer transition-all duration-300 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleJump();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleJump();
-                    }
-                  }}
-                >
-                  <div
-                    className={cn(
-                      "h-full bg-white transition-all duration-300 motion-reduce:transition-none",
-                      i <= fillPosition ? "w-full" : "w-0"
-                    )}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
+      {/* Progress bar - extracted & memoized component with event delegation */}
+      <StoryProgressBar
+        storiesLength={stories.length}
+        currentIndex={currentIndex}
+        onIndexChange={onIndexChange}
+        t={t}
+      />
 
       {/* Category badge / Filter */}
       <CategoryFilterBadge
@@ -444,6 +290,7 @@ export function StoryViewer({
 
       {/* Main content */}
       <article
+        data-testid="story-info-panel"
         onClick={(e) => {
           e.stopPropagation();
           setShowInfo((prev) => !prev);
@@ -470,7 +317,7 @@ export function StoryViewer({
             ? story.metadata.asturianu_subtitle
             : localizedStory.subtitle}
         </p>
-        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
+        <h1 data-testid="story-title" className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
           {ast && story.metadata?.asturianu_title
             ? story.metadata.asturianu_title
             : localizedStory.title}
@@ -529,6 +376,7 @@ export function StoryViewer({
 
       {/* Navigation arrows - invisible tap zones on phones, visible buttons on tablets/desktop */}
       <button
+        data-testid="prev-story-button"
         onClick={(e) => {
           e.stopPropagation();
           goToPrev();
@@ -540,6 +388,7 @@ export function StoryViewer({
       </button>
 
       <button
+        data-testid="next-story-button"
         onClick={(e) => {
           e.stopPropagation();
           goToNext();
@@ -703,8 +552,8 @@ export function StoryViewer({
           isFavorite={story ? isFavorite(story.id) : false}
           onToggle={() => story && toggleFavorite(story.id)}
         />
-        {/* Auth - always visible */}
-        <AuthButton />
+        {/* Profile & info menu - always visible */}
+        <SiteInfoMenu />
       </nav>
 
       {/* Keyboard hints - hidden on mobile and touch-only devices */}
@@ -719,88 +568,7 @@ export function StoryViewer({
       </div>
 
       {/* "Made by" pill with vertical popover — desktop only */}
-      <div
-        className="group hidden md:block desktop-pointer-only absolute bottom-10 right-4 z-20"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Popover card — appears above the pill on hover */}
-        <div
-          className="absolute bottom-full right-0 pb-2 opacity-0 translate-y-2 scale-95 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)]"
-        >
-        <div
-          className="p-3 rounded-xl bg-white/10 backdrop-blur-xl border border-white/15"
-        >
-          <p className="text-[11px] text-white/60 font-medium whitespace-nowrap mb-2 select-none">
-            Juan Gonz&aacute;lez
-          </p>
-          <div className="flex items-center gap-2">
-            <a
-              href="https://x.com/JuanG294"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
-              aria-label="X (Twitter)"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-            </a>
-            <a
-              href="https://www.linkedin.com/in/juanagonzalezp/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
-              aria-label="LinkedIn"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-              </svg>
-            </a>
-            <a
-              href="https://medium.com/@juang294"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
-              aria-label="Medium"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M13.54 12a6.8 6.8 0 0 1-6.77 6.82A6.8 6.8 0 0 1 0 12a6.8 6.8 0 0 1 6.77-6.82A6.8 6.8 0 0 1 13.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z" />
-              </svg>
-            </a>
-            <a
-              href="https://github.com/juan294"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 rounded-lg bg-white/10 text-white/50 hover:text-white hover:bg-white/20 transition-all duration-200"
-              aria-label="GitHub"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
-              </svg>
-            </a>
-          </div>
-        </div>
-        </div>
-
-        {/* Trigger pill (always visible) — terminal typewriter */}
-        <div
-          className="flex items-center h-6 min-w-[3.5rem] px-2.5 rounded-full bg-white/10 hover:bg-white/15 backdrop-blur-sm cursor-default transition-all duration-150"
-          aria-label="Made by Juan González"
-        >
-          <span className="text-[10px] font-mono text-white/45 group-hover:text-white/60 transition-colors duration-300 select-none whitespace-nowrap">
-            {typewriterText}
-            <span
-              className={cn(
-                "text-white/30 ml-px",
-                !prefersReducedMotion && "animate-cursor-blink"
-              )}
-              aria-hidden="true"
-            >
-              &#9612;
-            </span>
-          </span>
-        </div>
-      </div>
+      <AuthorTypewriter prefersReducedMotion={prefersReducedMotion} t={t} visible={showInfo} />
 
       {/* First-visit navigation hint for mobile users */}
       <NavigationHint />
