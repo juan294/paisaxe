@@ -52,7 +52,7 @@ test.describe("Static pages", () => {
     expect(response?.ok()).toBe(true);
 
     // Should show the price and a CTA
-    await expect(page.getByText("1.99")).toBeVisible();
+    await expect(page.getByText("€1.99")).toBeVisible();
   });
 });
 
