@@ -24,6 +24,3 @@ jobs:
 
       - name: Run Knip (dead code detection)
         run: npx knip
-
-      - name: Check unused dependencies
-        run: npx knip --dependencies
