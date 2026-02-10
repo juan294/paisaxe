@@ -219,7 +219,7 @@ describe("rowToMarketingContentBank", () => {
     platform: "all",
     content_type: "photo_caption",
     content: "Discover the hidden valleys of Asturias.",
-    media_suggestions: ["/images/stories/covadonga.png"],
+    media_suggestions: ["/images/stories/covadonga.webp"],
     hashtag_set: ["#Asturias", "#HiddenValleys"],
     story_id: "story-456",
     theme: "spring",
@@ -249,7 +249,7 @@ describe("rowToMarketingContentBank", () => {
     expect(content.platform).toBe("all");
     expect(content.contentType).toBe("photo_caption");
     expect(content.content).toBe("Discover the hidden valleys of Asturias.");
-    expect(content.mediaSuggestions).toEqual(["/images/stories/covadonga.png"]);
+    expect(content.mediaSuggestions).toEqual(["/images/stories/covadonga.webp"]);
     expect(content.theme).toBe("spring");
     expect(content.isUsed).toBe(false);
   });

@@ -19,7 +19,7 @@ vi.mock("@/lib/stories-data", () => ({
         title: "Lagos de Covadonga",
         subtitle: "Picos de Europa",
         description: "Dos lagos glaciares en los Picos de Europa",
-        image: "/images/stories/lagos-covadonga.png",
+        image: "/images/stories/lagos-covadonga.webp",
         category: "nature",
         sourcePdf: "naturaleza.pdf",
       });
