@@ -93,6 +93,7 @@ export default function FavoritesPage() {
           <div className="flex items-center gap-4">
             <Link
               href="/immersive"
+              aria-label={t("accessibility.go_back")}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-white"
             >
               <ArrowLeft className="h-4 w-4" />
