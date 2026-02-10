@@ -1,16 +1,16 @@
 # Test Coverage Report
 
-> Last updated: 2026-02-09
+> Last updated: 2026-02-10
 > Scheduled: nightly at 2:00 CET via `scripts/coverage-agent.sh`
 
 ## Summary
 
-- **Total tests:** 3160 passed, 1 skipped
-- **Test files:** 213 passed (100%)
-- **Statement coverage:** 73.68%
-- **Branch coverage:** 65.86%
-- **Function coverage:** 65.97%
-- **Line coverage:** 74.62%
+- **Total tests:** 3641 passed, 1 skipped
+- **Test files:** 238 passed (100%)
+- **Statement coverage:** 79.01%
+- **Branch coverage:** 70.06%
+- **Function coverage:** 72.47%
+- **Line coverage:** 79.82%
 - **TypeScript:** ✅ No errors
 
 *Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
@@ -86,10 +86,12 @@
 | `src/hooks/use-admin-role.ts` | Hooks |
 | `src/hooks/use-auth.ts` | Hooks |
 | `src/hooks/use-favorites.ts` | Hooks |
+| `src/hooks/use-feature-flags.ts` | Hooks |
 | `src/hooks/use-realtime-feature-flags.ts` | Hooks |
 | `src/hooks/use-story-filters.ts` | Hooks |
 | `src/hooks/use-viewed-stories.ts` | Hooks |
 | `src/hooks/use-visitor-voice-access.ts` | Hooks |
+| `src/hooks/use-voice-access.ts` | Hooks |
 | `src/lib/asturianu.ts` | Lib |
 | `src/lib/chat-config.ts` | Lib |
 | `src/lib/chat-safety.ts` | Lib |
@@ -103,6 +105,7 @@
 | `src/lib/search.ts` | Lib |
 | `src/lib/shuffle.ts` | Lib |
 | `src/lib/stories-data.ts` | Lib |
+| `src/lib/supabase-auth.ts` | Lib |
 | `src/lib/supabase-browser.ts` | Lib |
 | `src/lib/supabase.ts` | Lib |
 | `src/lib/unsplash-placeholders.ts` | Lib |
@@ -121,12 +124,19 @@
 | `src/types/feature-flags.ts` | Types |
 | `src/types/immersive.ts` | Types |
 | `src/types/marketing.ts` | Types |
+| `src/lib/admin-api/analytics.ts` | Admin API |
+| `src/lib/admin-api/agents.ts` | Admin API |
+| `src/lib/admin-api/costs.ts` | Admin API |
+| `src/lib/admin-api/feature-flags.ts` | Admin API |
+| `src/lib/admin-api/suggestions.ts` | Admin API |
+| `src/lib/admin-auth.ts` | Lib |
+| `src/components/immersive/voice-chat.tsx` | Immersive |
 
 ## Files Below 100%
 
 | File | Stmts | Branch | Funcs | Lines | Reason |
 |------|-------|--------|-------|-------|--------|
-| `src/proxy.ts` | 98% | 97% | 100% | 98% | Line 12 is a type import only executed at compile time |
+| `src/proxy.ts` | 97% | 93% | 94% | 98% | Lines 21 (NODE_ENV guard), 253 (mock limitation in cookie callback) |
 | `src/app/admin/page.tsx` | 56% | 61% | 47% | 58% | Complex admin UI with many interactive states that require browser-specific testing |
 | `src/app/api/admin/agent-reports/route.ts` | 92% | 100% | 100% | 92% | File system operations with fs.stat edge cases |
 | `src/app/api/admin/elevenlabs-analytics/route.ts` | 91% | 81% | 95% | 90% | Some ElevenLabs API response edge cases not testable without live API |
@@ -154,20 +164,20 @@
 | `src/components/immersive/share-button.tsx` | 96% | 93% | 100% | 100% | Minor branch for window.location origin edge case |
 | `src/components/immersive/toolbar-overflow-menu.tsx` | 96% | 93% | 91% | 96% | Line 69: ref cleanup edge case |
 | `src/components/immersive/volume-button.tsx` | 0% | 0% | 0% | 0% | Audio control component - requires browser audio APIs |
-| `src/hooks/use-feature-flags.ts` | 86% | 70% | 100% | 84% | Fetch retry logic edge cases |
+| `src/hooks/use-feature-flags.ts` | 100% | 91% | 100% | 100% | Branch-only gaps in deferred loading conditionals |
 | `src/hooks/use-reduced-motion.ts` | 92% | 50% | 100% | 100% | SSR check branch |
 | `src/hooks/use-stories.ts` | 97% | 88% | 100% | 99% | LocalStorage quota exceeded handling |
-| `src/lib/admin-api.ts` | 46% | 44% | 46% | 47% | Contains many fetch wrappers - tested via API route tests |
-| `src/lib/admin-auth.ts` | 73% | 100% | 25% | 73% | Server-side cookie handling |
+| `src/lib/admin-api/stories.ts` | 93% | 93% | 92% | 93% | Lines 276-289: bulk operation edge cases |
+| `src/lib/admin-api/optimizer.ts` | 100% | 83% | 100% | 100% | Branch-only gap in optimizer config |
 | `src/lib/chat-action-detection.ts` | 97% | 75% | 100% | 99% | Regex edge cases |
-| `src/lib/claude.ts` | 58% | 51% | 50% | 57% | Anthropic API streaming (curl subprocess) not unit-testable |
+| `src/lib/claude.ts` | 99% | 90% | 100% | 99% | Line 323: unreachable TypeScript safety net in retry loop |
 | `src/lib/image-optimization.ts` | 95% | 69% | 100% | 96% | Sharp library edge cases |
 | `src/lib/localize-story.ts` | 100% | 87% | 100% | 100% | Branch coverage only - all statements covered |
 | `src/lib/rate-limit.ts` | 97% | 82% | 100% | 97% | Token bucket edge case |
 | `src/lib/costs/manual-costs.ts` | 93% | 92% | 100% | 93% | Supabase admin client null-check branches |
 | `src/lib/rerank.ts` | 89% | 86% | 100% | 89% | Voyage API error handling |
 | `src/lib/seasonal-weighting.ts` | 100% | 83% | 100% | 100% | Branch coverage only |
-| `src/lib/translate-story.ts` | 86% | 80% | 100% | 86% | Claude API translation calls and metadata edge cases |
+| `src/lib/translate-story.ts` | 97% | 84% | 100% | 97% | Lines 235, 241: internal throw statements in error handling |
 | `src/lib/i18n/detect-language.ts` | 91% | 83% | 100% | 97% | Navigator.languages fallback |
 | `src/lib/i18n/resolve.ts` | 92% | 88% | 100% | 92% | Translation key fallback chain |
 | `src/lib/i18n/index.ts` | 0% | 0% | 0% | 0% | Re-export only file (no executable code) |
@@ -192,13 +202,47 @@ These are deliberately untested and considered acceptable:
 
 6. **Complex admin UI components**: These components (content-dashboard, agent-chat, marketing-dashboard, etc.) have complex interactive states that are better tested via Playwright E2E tests rather than unit tests.
 
-7. **Claude API streaming** (`src/lib/claude.ts` streaming functions): The Anthropic SDK streaming requires live API access. Core response generation is tested; streaming edge cases are covered by E2E tests.
+7. **Claude API unreachable safety net** (`src/lib/claude.ts` line 323): A TypeScript-required `throw` after a retry loop that can never actually execute — the loop always either returns or throws the actual error. At 99.35% statement coverage.
 
 8. **Fullscreen API edge cases** (`src/components/immersive/fullscreen-button.tsx`): Desktop Fullscreen API is now mocked and tested (94% coverage). Remaining gap: Mac with touchpad detection edge case (line 19).
 
 9. **Admin tunnel route** (`src/app/api/admin/tunnel/route.ts`): Uses child_process spawn/exec for Cloudflare tunnel management. This is a development-only feature that requires actual shell execution and cannot be meaningfully tested in jsdom/vitest without mocking the entire child_process module, which would provide no real test value.
 
 ## Changes Made This Run
+
+### Test files created (2026-02-10):
+- `src/lib/admin-api/analytics.test.ts` (32 tests) - Full coverage for all 5 analytics fetch functions
+- `src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx` (33 tests) - Rendering, modals, date range, tier alerts, forecast, usage metrics
+- `src/components/admin/story-editor-dialog/use-story-editor-save.test.ts` (36 tests) - Details save, image upload/URL, translations, approve, mark-needs-curation
+
+### Test files modified (2026-02-10):
+- `src/lib/supabase-auth.test.ts` (+5 tests) - Cookie callbacks (getAll, setAll delegation), server client creation
+- `src/hooks/use-feature-flags.test.ts` (+4 tests) - Cache behavior: fresh cache hit, dedup in-flight, fetch fail with cached data, useEffect catch block
+- `src/lib/translate-story.test.ts` (+4 tests) - DB update error, API failure, pre-existing translations, missing locale
+- `src/components/immersive/voice-chat.test.tsx` (+8 tests) - initialMessage, voice fallback, ReactMarkdown components, upsell dismiss, purchase CTA
+- `src/lib/claude.test.ts` (+9 tests) - SDK path (callWithSDK, streamWithSDK) via NODE_ENV=production dynamic imports
+- `src/proxy.test.ts` (+7 tests) - Cookie setAll callback, auth session refresh error logging, Supabase auth error
+
+### Coverage improvements (2026-02-10):
+- **src/lib/admin-api/analytics.ts**: 67% → 100% (+33%)
+- **src/lib/supabase-auth.ts**: 73% → 100% (+27%)
+- **src/hooks/use-feature-flags.ts**: 86% → 100% (+14%)
+- **src/lib/translate-story.ts**: 85% → 97% (+12%)
+- **src/components/admin/costs-analytics-panel** (3 files): 35-43% → covered (+33 tests)
+- **src/components/admin/story-editor-dialog/use-story-editor-save.ts**: 0% → covered (+36 tests)
+- **src/components/immersive/voice-chat.tsx**: 87% → 100% (+13%)
+- **src/lib/claude.ts**: 92% → 99% (+7%)
+- **src/proxy.ts**: 92% → 97% (+5%)
+
+### Overall improvement (2026-02-10):
+- Statement coverage: 73.68% → 79.01% (+5.33%)
+- Branch coverage: 65.86% → 70.06% (+4.20%)
+- Function coverage: 65.97% → 72.47% (+6.50%)
+- Line coverage: 74.62% → 79.82% (+5.20%)
+- Total tests: 3160 → 3641 (+481 tests)
+- Test files: 213 → 238 (+25 files)
+
+---
 
 ### Test files created (2026-02-09):
 - `src/hooks/use-focus-trap.test.tsx` (7 tests) - Tab/Shift+Tab wrapping, Escape key, focus restoration
@@ -330,3 +374,10 @@ Run manually anytime:
   - Enhanced 7 existing test files: claude (+8), costs-analytics (+4), checkout/day-pass (+3), analytics-tabs (+6), fullscreen-button (+5), suggest-place-dialog (+5), voice-chat-elevenlabs (+8)
   - 2 files reached 100%: analytics-tabs, voice-chat-elevenlabs
   - 6 files significantly improved: use-focus-trap (58→97%), costs-analytics (59→96%), fullscreen-button (79→94%), suggest-place-dialog (70→89%), checkout/day-pass (71→83%), immersive-page-content (70→81%)
+- **2026-02-10**: Coverage Agent run -- 3641 tests, 238 files (+481 tests, +25 files, +5.33% statement coverage)
+  - Created 3 new test files: admin-api/analytics (32 tests), costs-analytics-panel (33 tests), use-story-editor-save (36 tests)
+  - Enhanced 6 existing test files: supabase-auth (+5), use-feature-flags (+4), translate-story (+4), voice-chat (+8), claude (+9), proxy (+7)
+  - 7 files reached 100%: admin-api/analytics, supabase-auth, use-feature-flags, admin-auth, voice-chat, admin-api/agents, admin-api/costs
+  - 3 files near-100%: claude (99%), proxy (97%), translate-story (97%)
+  - Largest single-run improvement to date: +5.33% statement coverage, +481 tests
+  - Used 8 parallel background agents for maximum throughput
