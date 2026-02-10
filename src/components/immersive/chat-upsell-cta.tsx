@@ -81,7 +81,7 @@ export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAPro
               "flex items-center gap-1.5"
             )}
           >
-            {t("upsell.try_voice")} - \u20ac1.99
+            {t("upsell.try_voice")} - €1.99
           </button>
         </div>
 
