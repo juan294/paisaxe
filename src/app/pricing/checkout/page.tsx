@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   EmbeddedCheckoutProvider,
@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
@@ -21,20 +21,27 @@ export default function CheckoutPage() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
+  const [error, setError] = useState<string | null>(null);
 
   const fetchClientSecret = useCallback(async () => {
-    const response = await fetch("/api/checkout/embedded", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...(returnTo ? { returnTo } : {}) }),
-    });
+    try {
+      const response = await fetch("/api/checkout/embedded", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...(returnTo ? { returnTo } : {}) }),
+      });
 
-    if (!response.ok) {
-      throw new Error("Failed to create checkout session");
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      const { clientSecret } = await response.json();
+      return clientSecret;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+      throw err;
     }
-
-    const { clientSecret } = await response.json();
-    return clientSecret;
   }, [returnTo]);
 
   // Show sign-in prompt if not authenticated
@@ -76,14 +83,32 @@ export default function CheckoutPage() {
 
       {/* Embedded Checkout */}
       <main className="mx-auto max-w-lg px-4 py-8">
-        <div id="checkout" className="rounded-xl overflow-hidden">
-          <EmbeddedCheckoutProvider
-            stripe={stripePromise}
-            options={{ fetchClientSecret }}
-          >
-            <EmbeddedCheckout />
-          </EmbeddedCheckoutProvider>
-        </div>
+        {error ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <AlertCircle className="h-8 w-8 text-red-400 mb-4" />
+            <h2 className="text-lg font-medium text-white mb-2">
+              {t("errors.generic_title")}
+            </h2>
+            <p className="text-sm text-neutral-400 mb-6">
+              {t("errors.generic_description")}
+            </p>
+            <button
+              onClick={() => setError(null)}
+              className="px-5 py-2.5 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors"
+            >
+              {t("errors.retry")}
+            </button>
+          </div>
+        ) : (
+          <div id="checkout" className="rounded-xl overflow-hidden">
+            <EmbeddedCheckoutProvider
+              stripe={stripePromise}
+              options={{ fetchClientSecret }}
+            >
+              <EmbeddedCheckout />
+            </EmbeddedCheckoutProvider>
+          </div>
+        )}
       </main>
     </div>
   );
