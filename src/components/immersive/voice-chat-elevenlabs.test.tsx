@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
 import type { Story } from "@/types/immersive";
 
@@ -7,6 +7,7 @@ import type { Story } from "@/types/immersive";
 const mockStartSession = vi.fn();
 const mockEndSession = vi.fn();
 const mockUseConversation = vi.fn();
+const mockIncrementConversation = vi.fn();
 
 vi.mock("@elevenlabs/react", () => ({
   useConversation: (options: {
@@ -15,6 +16,28 @@ vi.mock("@elevenlabs/react", () => ({
     onMessage?: (msg: { message?: string; source?: string }) => void;
     onError?: (error: unknown) => void;
   }) => mockUseConversation(options),
+}));
+
+// Mock localize-story
+vi.mock("@/lib/localize-story", () => ({
+  getLocalizedStory: (story: { title: string; subtitle: string; description: string }) => ({
+    title: story.title,
+    subtitle: story.subtitle,
+    description: story.description,
+  }),
+}));
+
+// Mock voice session hook
+vi.mock("@/hooks/use-voice-session", () => ({
+  useVoiceSession: () => ({
+    conversationCount: 0,
+    isReturning: false,
+    userLocale: "es-ES",
+    preferredLanguage: "Spanish" as const,
+    timeOfDay: "morning" as const,
+    incrementConversation: mockIncrementConversation,
+    resetSession: vi.fn(),
+  }),
 }));
 
 // Mock i18n
@@ -36,6 +59,7 @@ vi.mock("@/lib/i18n", () => ({
         "voice.error": "Error de conexión",
         "voice.no_permission": "Necesito acceso al micrófono",
         "voice.you": "Tú",
+        "voice.welcome_message": "Bienvenido a {title}",
       };
       return translations[key] || key;
     },
@@ -298,6 +322,234 @@ describe("VoiceChatElevenLabs", () => {
 
       const orbButton = screen.getByRole("button", { name: /Háblame/i });
       expect(orbButton).toHaveAttribute("aria-label");
+    });
+  });
+
+  describe("onConnect callback", () => {
+    it("should clear error and add welcome message when connected", async () => {
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Trigger the onConnect callback
+      act(() => {
+        conversationHandlers.onConnect?.();
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Bienvenido a Lagos de Covadonga/i)
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("onDisconnect callback", () => {
+    it("should increment conversation count when disconnected", () => {
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Trigger the onDisconnect callback
+      act(() => {
+        conversationHandlers.onDisconnect?.();
+      });
+
+      expect(mockIncrementConversation).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("onError callback", () => {
+    it("should show error message and call onFallbackToText", async () => {
+      const onFallbackToText = vi.fn();
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={onFallbackToText}
+        />
+      );
+
+      // Trigger the onError callback
+      act(() => {
+        conversationHandlers.onError?.(new Error("test error"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Error de conexión/i)).toBeInTheDocument();
+      });
+
+      expect(onFallbackToText).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("empty agentId", () => {
+    it("should show error and call fallback when agentId is empty", async () => {
+      const onFallbackToText = vi.fn();
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId=""
+          onFallbackToText={onFallbackToText}
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(screen.getByText("Voice agent not configured")).toBeInTheDocument();
+      });
+
+      expect(onFallbackToText).toHaveBeenCalledTimes(1);
+      // startSession should NOT have been called
+      expect(mockStartSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("connecting status", () => {
+    it("should show 'Conectando...' text when status is connecting", () => {
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connecting",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+        };
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      expect(screen.getByText("Conectando...")).toBeInTheDocument();
+    });
+  });
+
+  describe("mute toggle", () => {
+    it("should toggle mute button aria-label when clicked", () => {
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connected",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+        };
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Initially unmuted - should show "Silenciar" label
+      const muteButton = screen.getByRole("button", { name: /Silenciar/i });
+      expect(muteButton).toBeInTheDocument();
+
+      // Click to mute
+      fireEvent.click(muteButton);
+
+      // Now should show "Activar sonido" label
+      expect(
+        screen.getByRole("button", { name: /Activar sonido/i })
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("user message prefix", () => {
+    it("should display user prefix when message source is user", async () => {
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connected",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+        };
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Simulate a user message
+      act(() => {
+        conversationHandlers.onMessage?.({
+          message: "Donde puedo comer fabada?",
+          source: "user",
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Tú:/i)).toBeInTheDocument();
+        expect(screen.getByText(/Donde puedo comer fabada\?/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("endConversation error handling", () => {
+    it("should handle endSession throwing an error gracefully", async () => {
+      mockEndSession.mockRejectedValue(new Error("disconnect failed"));
+
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connected",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+        };
+      });
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const stopButton = screen.getByRole("button", { name: /Parar/i });
+      fireEvent.click(stopButton);
+
+      await waitFor(() => {
+        expect(mockEndSession).toHaveBeenCalled();
+      });
+
+      // The error should be caught silently (logged to console)
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith(
+          "Failed to end conversation:",
+          expect.any(Error)
+        );
+      });
+
+      consoleSpy.mockRestore();
     });
   });
 });

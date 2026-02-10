@@ -34,7 +34,7 @@ function isValidPayload(body: unknown): body is WebhookPayload {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const secret = request.headers.get("x-webhook-secret");
-    const expectedSecret = process.env.WEBHOOK_SECRET;
+    const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
 
     // Use constant-time comparison to prevent timing attacks
     if (

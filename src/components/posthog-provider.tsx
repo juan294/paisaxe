@@ -66,12 +66,18 @@ export function PostHogProviderWrapper({ children }: PostHogProviderWrapperProps
     // Only load PostHog in production
     if (!shouldInitializePostHog()) return;
 
-    // Lazy load PostHog after hydration
+    // Lazy load PostHog after hydration.
+    // IMPORTANT: After dynamic import, we use window.posthog (the global singleton)
+    // instead of posthogModule.default. Turbopack may create separate module instances
+    // for dynamic imports vs static bundles. Using window.posthog ensures we always
+    // reference the single canonical instance that the posthog-js library registers
+    // on the window object, avoiding silent event capture failures.
     Promise.all([
       import("posthog-js"),
       import("posthog-js/react"),
     ]).then(([posthogModule, reactModule]) => {
-      const ph = posthogModule.default;
+      // Prefer the global singleton; fall back to the module default
+      const ph = (window as { posthog?: PostHog }).posthog ?? posthogModule.default;
 
       // Initialize if not already initialized
       if (!ph.__loaded) {

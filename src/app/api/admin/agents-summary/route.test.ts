@@ -67,11 +67,11 @@ describe("GET /api/admin/agents-summary", () => {
 
     expect(response.status).toBe(200);
     expect(data.data.overallHealth).toBe("green");
-    expect(data.data.agents).toHaveLength(7);
+    expect(data.data.agents).toHaveLength(8);
     expect(data.data.agents[0].health).toBe("green");
     expect(data.data.agents[0].lastRun).toBe(mockDate.toISOString());
     expect(data.data.agents[0].healthSummary).toContain("All systems operational");
-    expect(data.data.recentActivity).toHaveLength(7);
+    expect(data.data.recentActivity).toHaveLength(8);
   });
 
   it("should handle missing report files gracefully", async () => {
@@ -87,7 +87,7 @@ describe("GET /api/admin/agents-summary", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.data.agents).toHaveLength(7);
+    expect(data.data.agents).toHaveLength(8);
     for (const agent of data.data.agents) {
       expect(agent.health).toBe("unknown");
       expect(agent.lastRun).toBeNull();
@@ -282,6 +282,68 @@ describe("GET /api/admin/agents-summary", () => {
     expect(data.data.sharedContext).toHaveLength(2);
     expect(data.data.sharedContext[0].agentName).toBe("Coverage");
     expect(data.data.sharedContext[1].agentName).toBe("Localization");
+  });
+
+  it("should include subscription optimizer in agents list", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockStat.mockRejectedValue(new Error("ENOENT"));
+    mockReadFile.mockRejectedValue(new Error("ENOENT"));
+
+    const response = await GET();
+    const data = await response.json();
+
+    const optimizer = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "subscription_optimizer_enabled"
+    );
+    expect(optimizer).toBeDefined();
+    expect(optimizer.name).toBe("Subscription Optimizer");
+    expect(optimizer.schedule).toBe("Weekly Sunday 4:00 AM");
+    expect(optimizer.reportFile).toBe("docs/agents/subscription-optimizer-report.md");
+  });
+
+  it("should parse optimizer report summary correctly", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-09T10:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("subscription-optimizer-report.md")) {
+        return [
+          "# Subscription Optimizer Report",
+          "> Week of 2026-02-09",
+          "> Total monthly spend: **$59.41**",
+          "",
+          "## Executive Summary",
+          "Analyzed 11 services totaling $59.41/mo. 4 services flagged for review, 7 healthy.",
+          "",
+          "## Recommendations",
+          "",
+          "### [review] Anthropic Claude — REVIEW",
+          "- **Plan**: Personal ($10.00/mo)",
+          "- **Assessment**: 4 of 6 plan features are unused.",
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\n## Executive Summary\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const optimizer = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "subscription_optimizer_enabled"
+    );
+    expect(optimizer.health).toBe("green");
+    expect(optimizer.healthSummary).not.toBe("No summary available.");
+    expect(optimizer.healthSummary).toContain("Analyzed 11 services");
   });
 
   it("should set Cache-Control header", async () => {

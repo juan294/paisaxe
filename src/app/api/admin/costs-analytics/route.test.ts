@@ -18,6 +18,10 @@ vi.mock("@/lib/costs", () => ({
 
 vi.mock("@/lib/posthog-query", () => ({
   queryPostHog: vi.fn(),
+  formatForHogQL: (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toISOString().slice(0, 19).replace("T", " ");
+  },
 }));
 
 import { validateAdminAuth } from "@/lib/admin-auth";
@@ -30,6 +34,7 @@ import {
   createManualCost,
   generateRecurringCosts,
 } from "@/lib/costs";
+import { queryPostHog } from "@/lib/posthog-query";
 import { GET, POST } from "./route";
 import type { ServiceCost } from "@/types/costs-analytics";
 
@@ -221,6 +226,260 @@ describe("GET /api/admin/costs-analytics", () => {
       "private, max-age=120, stale-while-revalidate=300"
     );
   });
+
+  it("should include ElevenLabs cost when returned", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockElevenLabsCost: ServiceCost = {
+      serviceId: "elevenlabs",
+      serviceName: "ElevenLabs",
+      category: "ai",
+      costUsd: 5.0,
+      costFormatted: "$5.00",
+      source: "api",
+      billingPeriodStart: "2026-02-01",
+      billingPeriodEnd: "2026-02-06",
+    };
+
+    vi.mocked(fetchAnthropicCosts).mockResolvedValue(mockAnthropicCost);
+    vi.mocked(fetchTwilioCosts).mockResolvedValue(mockTwilioCost);
+    vi.mocked(fetchElevenLabsCosts).mockResolvedValue(mockElevenLabsCost);
+    vi.mocked(fetchManualCosts).mockResolvedValue([]);
+    vi.mocked(generateRecurringCosts).mockReturnValue([]);
+    vi.mocked(fetchAnthropicCostsByDay).mockResolvedValue([]);
+
+    const request = new NextRequest("http://localhost/api/admin/costs-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.services).toHaveLength(3);
+    const elevenLabs = data.data.services.find(
+      (s: ServiceCost) => s.serviceId === "elevenlabs"
+    );
+    expect(elevenLabs).toBeDefined();
+    expect(elevenLabs.costUsd).toBe(5.0);
+    expect(elevenLabs.source).toBe("api");
+    expect(data.data.summary.totalMonthlyUsd).toBeCloseTo(20.7, 1);
+  });
+
+  it("should add recurring costs for uncovered services", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const recurringVercelCost: ServiceCost = {
+      serviceId: "vercel",
+      serviceName: "Vercel",
+      category: "infrastructure",
+      costUsd: 20.0,
+      costFormatted: "$20.00",
+      source: "recurring",
+      billingPeriodStart: "2026-02-01",
+      billingPeriodEnd: "2026-02-06",
+    };
+
+    vi.mocked(fetchAnthropicCosts).mockResolvedValue(mockAnthropicCost);
+    vi.mocked(fetchTwilioCosts).mockResolvedValue(null);
+    vi.mocked(fetchElevenLabsCosts).mockResolvedValue(null);
+    vi.mocked(fetchManualCosts).mockResolvedValue([]);
+    vi.mocked(generateRecurringCosts).mockReturnValue([recurringVercelCost]);
+    vi.mocked(fetchAnthropicCostsByDay).mockResolvedValue([]);
+
+    const request = new NextRequest("http://localhost/api/admin/costs-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.services).toHaveLength(2);
+    const vercel = data.data.services.find(
+      (s: ServiceCost) => s.serviceId === "vercel"
+    );
+    expect(vercel).toBeDefined();
+    expect(vercel.costUsd).toBe(20.0);
+    expect(vercel.source).toBe("recurring");
+    expect(data.data.summary.totalMonthlyUsd).toBeCloseTo(32.5, 1);
+  });
+
+  it("should include usageMetrics when includeUsage=true", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    vi.mocked(fetchAnthropicCosts).mockResolvedValue(null);
+    vi.mocked(fetchTwilioCosts).mockResolvedValue(null);
+    vi.mocked(fetchElevenLabsCosts).mockResolvedValue(null);
+    vi.mocked(fetchManualCosts).mockResolvedValue([]);
+    vi.mocked(generateRecurringCosts).mockReturnValue([]);
+    vi.mocked(fetchAnthropicCostsByDay).mockResolvedValue([]);
+
+    // Stub env vars required by fetchUsageMetrics
+    vi.stubEnv("POSTHOG_PROJECT_ID", "test-project");
+    vi.stubEnv("POSTHOG_PERSONAL_API_KEY", "phk_test");
+    vi.stubEnv("ELEVENLABS_API_KEY", "xi-test");
+
+    // Mock PostHog queries (visitors, chats, events)
+    vi.mocked(queryPostHog)
+      .mockResolvedValueOnce({ results: [[42]] })   // visitors
+      .mockResolvedValueOnce({ results: [[10]] })   // chat conversations
+      .mockResolvedValueOnce({ results: [[500]] }); // total events
+
+    // Mock global fetch for ElevenLabs agents + conversations API
+    const paisaxeAgentId = "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"; // pelayo
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            agents: [
+              { agent_id: paisaxeAgentId, name: "Paisaxe - Pelayo (Visitor Guide)" },
+            ],
+          }),
+        });
+      }
+      if (url.includes("/convai/conversations")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            conversations: [
+              {
+                agent_id: paisaxeAgentId,
+                start_time_unix_secs: Math.floor(new Date("2026-02-03").getTime() / 1000),
+                call_duration_secs: 180,
+              },
+              {
+                agent_id: paisaxeAgentId,
+                start_time_unix_secs: Math.floor(new Date("2026-02-04").getTime() / 1000),
+                call_duration_secs: 120,
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    }) as unknown as typeof fetch;
+
+    const request = new NextRequest(
+      "http://localhost/api/admin/costs-analytics?includeUsage=true&from=2026-02-01&to=2026-02-06"
+    );
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.usageMetrics).toBeDefined();
+    expect(data.data.usageMetrics.visitors).toBe(42);
+    expect(data.data.usageMetrics.chatConversations).toBe(10);
+    expect(data.data.usageMetrics.posthogEvents).toBe(500);
+    expect(data.data.usageMetrics.voiceConversations).toBe(2);
+    expect(data.data.usageMetrics.voiceMinutes).toBeGreaterThan(0);
+    expect(data.data.usageMetrics.periodDays).toBeGreaterThanOrEqual(1);
+
+    // Verify PostHog was called 3 times
+    expect(vi.mocked(queryPostHog)).toHaveBeenCalledTimes(3);
+
+    // Verify ElevenLabs fetch was called for both agents and conversations
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/convai/agents"),
+      expect.objectContaining({
+        headers: { "xi-api-key": "xi-test" },
+      })
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/convai/conversations"),
+      expect.objectContaining({
+        headers: { "xi-api-key": "xi-test" },
+      })
+    );
+
+    // Restore original fetch
+    global.fetch = originalFetch;
+    vi.unstubAllEnvs();
+  });
+
+  it("should only count voice minutes from Paisaxe agents, not all account conversations", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    vi.mocked(fetchAnthropicCosts).mockResolvedValue(null);
+    vi.mocked(fetchTwilioCosts).mockResolvedValue(null);
+    vi.mocked(fetchElevenLabsCosts).mockResolvedValue(null);
+    vi.mocked(fetchManualCosts).mockResolvedValue([]);
+    vi.mocked(generateRecurringCosts).mockReturnValue([]);
+    vi.mocked(fetchAnthropicCostsByDay).mockResolvedValue([]);
+
+    vi.stubEnv("POSTHOG_PROJECT_ID", "");
+    vi.stubEnv("POSTHOG_PERSONAL_API_KEY", "");
+    vi.stubEnv("ELEVENLABS_API_KEY", "xi-test");
+
+    const paisaxeId = "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"; // pelayo
+    const nonPaisaxeId = "agent_other_project_12345";
+
+    const originalFetch2 = global.fetch;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            agents: [
+              { agent_id: paisaxeId, name: "Paisaxe - Pelayo (Visitor Guide)" },
+              { agent_id: nonPaisaxeId, name: "Other Project Agent" },
+            ],
+          }),
+        });
+      }
+      if (url.includes("/convai/conversations")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            conversations: [
+              {
+                agent_id: paisaxeId,
+                start_time_unix_secs: Math.floor(new Date("2026-02-03").getTime() / 1000),
+                call_duration_secs: 180, // 3 min - Paisaxe agent
+              },
+              {
+                agent_id: nonPaisaxeId,
+                start_time_unix_secs: Math.floor(new Date("2026-02-04").getTime() / 1000),
+                call_duration_secs: 600, // 10 min - NOT Paisaxe agent
+              },
+              {
+                agent_id: paisaxeId,
+                start_time_unix_secs: Math.floor(new Date("2026-02-05").getTime() / 1000),
+                call_duration_secs: 120, // 2 min - Paisaxe agent
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({}),
+      });
+    }) as unknown as typeof fetch;
+
+    const request = new NextRequest(
+      "http://localhost/api/admin/costs-analytics?includeUsage=true&from=2026-02-01&to=2026-02-06"
+    );
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.usageMetrics).toBeDefined();
+    // Should only count Paisaxe agent conversations (3 + 2 = 5 min)
+    expect(data.data.usageMetrics.voiceConversations).toBe(2);
+    expect(data.data.usageMetrics.voiceMinutes).toBe(5);
+
+    global.fetch = originalFetch2;
+    vi.unstubAllEnvs();
+  });
 });
 
 describe("POST /api/admin/costs-analytics", () => {
@@ -318,6 +577,35 @@ describe("POST /api/admin/costs-analytics", () => {
     });
 
     vi.mocked(createManualCost).mockResolvedValue(null);
+
+    const request = new NextRequest("http://localhost/api/admin/costs-analytics", {
+      method: "POST",
+      body: JSON.stringify({
+        serviceId: "test",
+        serviceName: "Test",
+        category: "ai",
+        costUsd: 10,
+        billingPeriodStart: "2026-02-01",
+        billingPeriodEnd: "2026-02-28",
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to create cost entry");
+  });
+
+  it("should return 500 when createManualCost throws an exception", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    vi.mocked(createManualCost).mockRejectedValue(
+      new Error("Database connection lost")
+    );
 
     const request = new NextRequest("http://localhost/api/admin/costs-analytics", {
       method: "POST",

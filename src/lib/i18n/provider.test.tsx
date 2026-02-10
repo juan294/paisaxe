@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
-import { LanguageProvider } from './provider';
+import { render, screen, act, waitFor } from '@testing-library/react';
+import { useContext } from 'react';
+import { LanguageProvider, LanguageContext, _resetTranslationCacheForTesting } from './provider';
 import { useTranslation } from './use-translation';
 
 // Test component that uses the hook
@@ -25,6 +26,7 @@ describe('LanguageProvider', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    _resetTranslationCacheForTesting();
   });
 
   it('renders with default locale "es" when initialLocale is provided', () => {
@@ -128,7 +130,7 @@ describe('LanguageProvider', () => {
     expect(localStorage.getItem('paisaxe-locale')).toBe('en');
   });
 
-  it('detects browser language on mount when no initialLocale', () => {
+  it('detects browser language on mount when no initialLocale', async () => {
     Object.defineProperty(navigator, 'languages', {
       value: ['en-US'],
       configurable: true,
@@ -144,7 +146,10 @@ describe('LanguageProvider', () => {
       </LanguageProvider>
     );
 
-    expect(screen.getByTestId('locale').textContent).toBe('en');
+    // Browser locale resolves after hydration-safe initial render
+    await waitFor(() => {
+      expect(screen.getByTestId('locale').textContent).toBe('en');
+    });
   });
 
   it('uses stored locale over browser language', () => {
@@ -163,7 +168,8 @@ describe('LanguageProvider', () => {
     expect(screen.getByTestId('locale').textContent).toBe('es');
   });
 
-  it('renders with locale "fr" when initialLocale is "fr"', () => {
+  // Lazy-loaded locale tests — these locales load asynchronously
+  it('renders with locale "fr" after lazy load', async () => {
     render(
       <LanguageProvider initialLocale="fr">
         <TestConsumer />
@@ -171,10 +177,12 @@ describe('LanguageProvider', () => {
     );
 
     expect(screen.getByTestId('locale').textContent).toBe('fr');
-    expect(screen.getByTestId('translation').textContent).toBe('Chargement...');
+    await waitFor(() => {
+      expect(screen.getByTestId('translation').textContent).toBe('Chargement...');
+    });
   });
 
-  it('renders with locale "de" when initialLocale is "de"', () => {
+  it('renders with locale "de" after lazy load', async () => {
     render(
       <LanguageProvider initialLocale="de">
         <TestConsumer />
@@ -182,10 +190,12 @@ describe('LanguageProvider', () => {
     );
 
     expect(screen.getByTestId('locale').textContent).toBe('de');
-    expect(screen.getByTestId('translation').textContent).toBe('Laden...');
+    await waitFor(() => {
+      expect(screen.getByTestId('translation').textContent).toBe('Laden...');
+    });
   });
 
-  it('renders with locale "pt" when initialLocale is "pt"', () => {
+  it('renders with locale "pt" after lazy load', async () => {
     render(
       <LanguageProvider initialLocale="pt">
         <TestConsumer />
@@ -193,10 +203,12 @@ describe('LanguageProvider', () => {
     );
 
     expect(screen.getByTestId('locale').textContent).toBe('pt');
-    expect(screen.getByTestId('translation').textContent).toBe('Carregando...');
+    await waitFor(() => {
+      expect(screen.getByTestId('translation').textContent).toBe('Carregando...');
+    });
   });
 
-  it('switches locale from es to fr', () => {
+  it('switches locale from es to fr (lazy load)', async () => {
     render(
       <LanguageProvider initialLocale="es">
         <TestConsumer />
@@ -208,10 +220,12 @@ describe('LanguageProvider', () => {
     });
 
     expect(screen.getByTestId('locale').textContent).toBe('fr');
-    expect(screen.getByTestId('translation').textContent).toBe('Chargement...');
+    await waitFor(() => {
+      expect(screen.getByTestId('translation').textContent).toBe('Chargement...');
+    });
   });
 
-  it('switches locale from es to de', () => {
+  it('switches locale from es to de (lazy load)', async () => {
     render(
       <LanguageProvider initialLocale="es">
         <TestConsumer />
@@ -223,10 +237,12 @@ describe('LanguageProvider', () => {
     });
 
     expect(screen.getByTestId('locale').textContent).toBe('de');
-    expect(screen.getByTestId('translation').textContent).toBe('Laden...');
+    await waitFor(() => {
+      expect(screen.getByTestId('translation').textContent).toBe('Laden...');
+    });
   });
 
-  it('switches locale from es to pt', () => {
+  it('switches locale from es to pt (lazy load)', async () => {
     render(
       <LanguageProvider initialLocale="es">
         <TestConsumer />
@@ -238,49 +254,317 @@ describe('LanguageProvider', () => {
     });
 
     expect(screen.getByTestId('locale').textContent).toBe('pt');
-    expect(screen.getByTestId('translation').textContent).toBe('Carregando...');
+    await waitFor(() => {
+      expect(screen.getByTestId('translation').textContent).toBe('Carregando...');
+    });
   });
 
-  it('resolves chat placeholder in French', () => {
+  it('resolves chat placeholder in French (lazy load)', async () => {
     render(
       <LanguageProvider initialLocale="fr">
         <TestConsumer />
       </LanguageProvider>
     );
 
-    expect(screen.getByTestId('chat-placeholder').textContent).toBe('Posez une question sur ce lieu...');
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-placeholder').textContent).toBe('Posez une question sur ce lieu...');
+    });
   });
 
-  it('resolves chat placeholder in German', () => {
+  it('resolves chat placeholder in German (lazy load)', async () => {
     render(
       <LanguageProvider initialLocale="de">
         <TestConsumer />
       </LanguageProvider>
     );
 
-    expect(screen.getByTestId('chat-placeholder').textContent).toBe('Fragen Sie nach diesem Ort...');
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-placeholder').textContent).toBe('Fragen Sie nach diesem Ort...');
+    });
   });
 
-  it('resolves chat placeholder in Portuguese', () => {
+  it('resolves chat placeholder in Portuguese (lazy load)', async () => {
     render(
       <LanguageProvider initialLocale="pt">
         <TestConsumer />
       </LanguageProvider>
     );
 
-    expect(screen.getByTestId('chat-placeholder').textContent).toBe('Pergunte sobre este lugar...');
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-placeholder').textContent).toBe('Pergunte sobre este lugar...');
+    });
   });
 });
 
 describe('useTranslation', () => {
-  it('throws when used outside LanguageProvider', () => {
-    // Suppress React error output during this test
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    _resetTranslationCacheForTesting();
+  });
 
-    expect(() => {
-      render(<TestConsumer />);
-    }).toThrow('useTranslation must be used within a LanguageProvider');
+  it('returns fallback Spanish translations when used outside LanguageProvider', () => {
+    render(<TestConsumer />);
+
+    // Should not throw — returns defensive fallback
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+    expect(screen.getByTestId('translation').textContent).toBe('Cargando...');
+  });
+
+  it('returns a no-op setLocale when used outside LanguageProvider', () => {
+    render(<TestConsumer />);
+
+    // Clicking setLocale should not throw
+    act(() => {
+      screen.getByTestId('switch-en').click();
+    });
+
+    // Locale stays 'es' because setLocale is a no-op
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+  });
+
+  it('logs a warning when used outside LanguageProvider', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    render(<TestConsumer />);
+
+    expect(spy).toHaveBeenCalledWith(
+      'useTranslation: LanguageProvider not found, using fallback. This may indicate a rendering issue.'
+    );
 
     spy.mockRestore();
+  });
+});
+
+// Helper that reads context directly (no hook dependency)
+function LocaleDisplay() {
+  const ctx = useContext(LanguageContext);
+  return <span data-testid="ctx-locale">{ctx?.locale ?? 'NO_CONTEXT'}</span>;
+}
+
+describe('LanguageProvider render-blocking fix', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+    _resetTranslationCacheForTesting();
+  });
+
+  it('renders children immediately without null flash when no initialLocale', () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['es'],
+      configurable: true,
+    });
+
+    const { container } = render(
+      <LanguageProvider>
+        <LocaleDisplay />
+      </LanguageProvider>
+    );
+
+    expect(container.innerHTML).not.toBe('');
+    expect(screen.getByTestId('ctx-locale').textContent).toBe('es');
+  });
+
+  it('renders with stored locale after hydration', async () => {
+    localStorage.setItem('paisaxe-locale', 'en');
+
+    render(
+      <LanguageProvider>
+        <LocaleDisplay />
+      </LanguageProvider>
+    );
+
+    // Stored locale resolves after hydration-safe initial render
+    await waitFor(() => {
+      expect(screen.getByTestId('ctx-locale').textContent).toBe('en');
+    });
+  });
+
+  it('renders with detected browser language after hydration', async () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['fr-FR', 'en-US'],
+      configurable: true,
+    });
+
+    render(
+      <LanguageProvider>
+        <LocaleDisplay />
+      </LanguageProvider>
+    );
+
+    // Browser locale resolves after hydration-safe initial render
+    await waitFor(() => {
+      expect(screen.getByTestId('ctx-locale').textContent).toBe('fr');
+    });
+  });
+
+  it('defaults to es when no stored pref and unsupported browser language', () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['zh-CN', 'ja'],
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'language', {
+      value: 'zh-CN',
+      configurable: true,
+    });
+
+    render(
+      <LanguageProvider>
+        <LocaleDisplay />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('ctx-locale').textContent).toBe('es');
+  });
+
+  it('uses initialLocale prop without running detection', () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['fr-FR'],
+      configurable: true,
+    });
+
+    render(
+      <LanguageProvider initialLocale="de">
+        <LocaleDisplay />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('ctx-locale').textContent).toBe('de');
+  });
+});
+
+describe('Hydration safety', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+    _resetTranslationCacheForTesting();
+  });
+
+  it('initial render always uses SSR-safe default "es" even when browser is English', () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['en-US'],
+      configurable: true,
+    });
+
+    let firstRenderLocale: string | null = null;
+    function CaptureFirstRender() {
+      const { locale } = useTranslation();
+      if (firstRenderLocale === null) {
+        firstRenderLocale = locale;
+      }
+      return <span data-testid="locale">{locale}</span>;
+    }
+
+    render(
+      <LanguageProvider>
+        <CaptureFirstRender />
+      </LanguageProvider>
+    );
+
+    // First render must match SSR default to prevent hydration mismatch
+    expect(firstRenderLocale).toBe('es');
+  });
+
+  it('resolves to browser locale after hydration via useEffect', async () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['en-US'],
+      configurable: true,
+    });
+
+    render(
+      <LanguageProvider>
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    // After effects run, it should switch to the detected browser locale
+    await waitFor(() => {
+      expect(screen.getByTestId('locale').textContent).toBe('en');
+    });
+  });
+
+  it('skips locale detection when initialLocale is provided', () => {
+    Object.defineProperty(navigator, 'languages', {
+      value: ['en-US'],
+      configurable: true,
+    });
+
+    render(
+      <LanguageProvider initialLocale="es">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    // Should stay 'es' — initialLocale is explicit, no browser detection
+    expect(screen.getByTestId('locale').textContent).toBe('es');
+  });
+});
+
+describe('Lazy translation loading', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+    _resetTranslationCacheForTesting();
+  });
+
+  it('falls back to Spanish translations while lazy locale is loading', () => {
+    render(
+      <LanguageProvider initialLocale="fr">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    // Locale is set immediately, but translations fall back to es until loaded
+    expect(screen.getByTestId('locale').textContent).toBe('fr');
+    // On first render, French translations aren't cached yet — falls back to Spanish
+    expect(screen.getByTestId('translation').textContent).toBe('Cargando...');
+  });
+
+  it('loads French translations asynchronously and re-renders', async () => {
+    render(
+      <LanguageProvider initialLocale="fr">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    // After async load, French translations appear
+    await waitFor(() => {
+      expect(screen.getByTestId('translation').textContent).toBe('Chargement...');
+    });
+  });
+
+  it('caches loaded translations — no re-import on subsequent mounts', async () => {
+    // First mount: loads French
+    const { unmount } = render(
+      <LanguageProvider initialLocale="fr">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('translation').textContent).toBe('Chargement...');
+    });
+
+    unmount();
+
+    // Second mount: French is already cached, should be immediate
+    render(
+      <LanguageProvider initialLocale="fr">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    // Should be French immediately (cached)
+    expect(screen.getByTestId('translation').textContent).toBe('Chargement...');
+  });
+
+  it('es and en are always available without async loading', () => {
+    render(
+      <LanguageProvider initialLocale="es">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    // Spanish is always available — no fallback needed
+    expect(screen.getByTestId('translation').textContent).toBe('Cargando...');
   });
 });

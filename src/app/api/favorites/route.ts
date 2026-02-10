@@ -1,53 +1,6 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in server component context
-          }
-        },
-      },
-    }
-  );
-}
-
-async function getUserFromRequest(request: NextRequest) {
-  const authHeader = request.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  const supabase = await getSupabaseClient();
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    return null;
-  }
-
-  return user;
-}
+import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 
 // GET /api/favorites - Get user's favorites
 export async function GET(request: NextRequest) {

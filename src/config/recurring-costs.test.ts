@@ -51,7 +51,7 @@ describe("RECURRING_SUBSCRIPTIONS config", () => {
       (s) => s.serviceId === "elevenlabs"
     );
     expect(elevenlabs).toBeDefined();
-    expect(elevenlabs!.costUsd).toBe(5);
+    expect(elevenlabs!.costUsd).toBe(18.33);
   });
 
   it("should include AWS Domains subscription", () => {

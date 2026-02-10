@@ -189,7 +189,163 @@ describe("FullscreenButton", () => {
     });
   });
 
-  // NOTE: Testing fullscreen API (requestFullscreen/exitFullscreen) is not possible
-  // in jsdom as these browser APIs are not available. Integration tests with
-  // Playwright are recommended for testing this functionality on real browsers.
+  // --- Desktop Fullscreen API tests ---
+  // jsdom does not provide the Fullscreen API, so we mock it on document/documentElement.
+
+  describe("desktop fullscreen behavior", () => {
+    afterEach(() => {
+      // Clean up fullscreen API mocks
+      delete (document.documentElement as unknown as Record<string, unknown>).requestFullscreen;
+      delete (document as unknown as Record<string, unknown>).exitFullscreen;
+      delete (document as unknown as Record<string, unknown>).fullscreenElement;
+    });
+
+    it("should not render when not iOS and fullscreen API is not supported", async () => {
+      // Default beforeEach sets Windows UA (non-iOS) and matchMedia(false) (not standalone).
+      // document.documentElement.requestFullscreen is undefined in jsdom by default,
+      // so supportsFullscreen will be false => component returns null.
+
+      await act(async () => {
+        render(<FullscreenButton />);
+      });
+
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("should render button when fullscreen API is supported on desktop", async () => {
+      Object.defineProperty(document.documentElement, "requestFullscreen", {
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true,
+        configurable: true,
+      });
+
+      await act(async () => {
+        render(<FullscreenButton />);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /fullscreen.toggle/i })
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("should call requestFullscreen when clicking and not currently fullscreen", async () => {
+      const requestFullscreenMock = vi.fn().mockResolvedValue(undefined);
+
+      Object.defineProperty(document.documentElement, "requestFullscreen", {
+        value: requestFullscreenMock,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(document, "fullscreenElement", {
+        value: null,
+        writable: true,
+        configurable: true,
+      });
+
+      await act(async () => {
+        render(<FullscreenButton />);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /fullscreen.toggle/i })
+        ).toBeInTheDocument();
+      });
+
+      const button = screen.getByRole("button", { name: /fullscreen.toggle/i });
+
+      await act(async () => {
+        fireEvent.click(button);
+      });
+
+      expect(requestFullscreenMock).toHaveBeenCalledOnce();
+    });
+
+    it("should call exitFullscreen when clicking and already fullscreen", async () => {
+      const exitFullscreenMock = vi.fn().mockResolvedValue(undefined);
+
+      Object.defineProperty(document.documentElement, "requestFullscreen", {
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(document, "exitFullscreen", {
+        value: exitFullscreenMock,
+        writable: true,
+        configurable: true,
+      });
+      // Simulate already being in fullscreen
+      Object.defineProperty(document, "fullscreenElement", {
+        value: document.documentElement,
+        writable: true,
+        configurable: true,
+      });
+
+      await act(async () => {
+        render(<FullscreenButton />);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /fullscreen.toggle/i })
+        ).toBeInTheDocument();
+      });
+
+      const button = screen.getByRole("button", { name: /fullscreen.toggle/i });
+
+      await act(async () => {
+        fireEvent.click(button);
+      });
+
+      expect(exitFullscreenMock).toHaveBeenCalledOnce();
+    });
+
+    it("should update isFullscreen state when fullscreenchange event fires", async () => {
+      Object.defineProperty(document.documentElement, "requestFullscreen", {
+        value: vi.fn().mockResolvedValue(undefined),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(document, "fullscreenElement", {
+        value: null,
+        writable: true,
+        configurable: true,
+      });
+
+      await act(async () => {
+        render(<FullscreenButton />);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /fullscreen.toggle/i })
+        ).toBeInTheDocument();
+      });
+
+      // Initially not fullscreen: Maximize icon visible (no "hidden" class), X icon hidden
+      const button = screen.getByRole("button", { name: /fullscreen.toggle/i });
+      const svgs = button.querySelectorAll("svg");
+      // First SVG is Maximize, second is X
+      expect(svgs[0]).not.toHaveClass("hidden");
+      expect(svgs[1]).toHaveClass("hidden");
+
+      // Simulate entering fullscreen
+      Object.defineProperty(document, "fullscreenElement", {
+        value: document.documentElement,
+        writable: true,
+        configurable: true,
+      });
+
+      await act(async () => {
+        document.dispatchEvent(new Event("fullscreenchange"));
+      });
+
+      // After fullscreen: Maximize icon hidden, X icon visible
+      const updatedSvgs = button.querySelectorAll("svg");
+      expect(updatedSvgs[0]).toHaveClass("hidden");
+      expect(updatedSvgs[1]).not.toHaveClass("hidden");
+    });
+  });
 });

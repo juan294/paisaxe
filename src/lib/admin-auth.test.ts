@@ -12,20 +12,32 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
-// Mock Supabase server client
+// Mock Supabase server client — capture cookie config to exercise callbacks
 const mockGetUser = vi.fn();
 const mockFrom = vi.fn();
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
 const mockSingle = vi.fn();
 
+type CookieConfig = {
+  cookies: {
+    getAll: () => unknown[];
+    setAll: (cookies: { name: string; value: string; options?: unknown }[]) => void;
+  };
+};
+
+let capturedCookieConfig: CookieConfig | null = null;
+
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: () => ({
-    auth: {
-      getUser: mockGetUser,
-    },
-    from: mockFrom,
-  }),
+  createServerClient: (_url: string, _key: string, config: CookieConfig) => {
+    capturedCookieConfig = config;
+    return {
+      auth: {
+        getUser: mockGetUser,
+      },
+      from: mockFrom,
+    };
+  },
 }));
 
 function setupProfileMock(data: { role: string } | null, error: unknown = null) {
@@ -38,6 +50,7 @@ function setupProfileMock(data: { role: string } | null, error: unknown = null) 
 describe("validateAdminAuth", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedCookieConfig = null;
     mockGetAll.mockReturnValue([]);
   });
 
@@ -146,5 +159,67 @@ describe("validateAdminAuth", () => {
       expect(result.error.status).toBe(500);
       expect(body.error).toBe("Authentication failed");
     }
+  });
+
+  describe("cookie callbacks", () => {
+    it("getAll callback should delegate to cookieStore.getAll", async () => {
+      const fakeCookies = [{ name: "sb-token", value: "abc123" }];
+      mockGetAll.mockReturnValue(fakeCookies);
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      await validateAdminAuth();
+
+      // The captured cookie config should have been passed to createServerClient
+      expect(capturedCookieConfig).not.toBeNull();
+      const result = capturedCookieConfig!.cookies.getAll();
+      expect(result).toEqual(fakeCookies);
+      expect(mockGetAll).toHaveBeenCalled();
+    });
+
+    it("setAll callback should delegate to cookieStore.set for each cookie", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      await validateAdminAuth();
+
+      expect(capturedCookieConfig).not.toBeNull();
+      const cookiesToSet = [
+        { name: "sb-access-token", value: "token1", options: { path: "/" } },
+        { name: "sb-refresh-token", value: "token2", options: { path: "/" } },
+      ];
+      capturedCookieConfig!.cookies.setAll(cookiesToSet);
+
+      expect(mockSet).toHaveBeenCalledTimes(2);
+      expect(mockSet).toHaveBeenCalledWith("sb-access-token", "token1", { path: "/" });
+      expect(mockSet).toHaveBeenCalledWith("sb-refresh-token", "token2", { path: "/" });
+    });
+
+    it("setAll callback should silently catch errors (Server Component context)", async () => {
+      mockSet.mockImplementation(() => {
+        throw new Error("Headers already sent");
+      });
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      await validateAdminAuth();
+
+      expect(capturedCookieConfig).not.toBeNull();
+      // Should not throw even though mockSet throws
+      expect(() => {
+        capturedCookieConfig!.cookies.setAll([
+          { name: "sb-token", value: "val", options: {} },
+        ]);
+      }).not.toThrow();
+    });
   });
 });

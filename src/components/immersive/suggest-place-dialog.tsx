@@ -12,14 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Loader2, CheckCircle, AlertCircle, Lightbulb, MapPin } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 
@@ -35,7 +28,6 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
 
   const [placeName, setPlaceName] = useState("");
   const [comment, setComment] = useState("");
-  const [location, setLocation] = useState<string>("");
   const [attribution, setAttribution] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -62,7 +54,6 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
         body: JSON.stringify({
           placeName: trimmedPlaceName,
           comment: comment.trim() || undefined,
-          location: location || undefined,
           attribution: attribution.trim() || undefined,
         }),
       });
@@ -83,7 +74,6 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
       setTimeout(() => {
         setPlaceName("");
         setComment("");
-        setLocation("");
         setAttribution("");
         setSubmitState("idle");
         onClose();
@@ -157,31 +147,6 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
               </p>
             </div>
 
-            {/* Location */}
-            <div className="space-y-2">
-              <Label htmlFor="location" className="text-white/80 flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {t("suggestions.location_label")}
-              </Label>
-              <Select
-                value={location}
-                onValueChange={setLocation}
-                disabled={submitState === "loading"}
-              >
-                <SelectTrigger
-                  id="location"
-                  className="bg-white/10 border-white/20 text-white focus:border-white/40"
-                >
-                  <SelectValue placeholder={t("suggestions.location_placeholder")} />
-                </SelectTrigger>
-                <SelectContent className="bg-white/10 backdrop-blur-xl border-white/20 text-white">
-                  <SelectItem value="eastern">{t("suggestions.location_eastern")}</SelectItem>
-                  <SelectItem value="central">{t("suggestions.location_central")}</SelectItem>
-                  <SelectItem value="western">{t("suggestions.location_western")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Comment */}
             <div className="space-y-2">
               <Label htmlFor="comment" className="text-white/80">
@@ -223,7 +188,7 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
 
             {/* Error Message */}
             {submitState === "error" && errorMessage && (
-              <div className="flex items-center gap-2 rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-300">
+              <div role="alert" className="flex items-center gap-2 rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-300">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 {errorMessage}
               </div>

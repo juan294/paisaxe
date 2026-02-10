@@ -8,6 +8,12 @@
  * these IDs. See REPLICATION.md for instructions.
  */
 
+/**
+ * ElevenLabs API v1 base URL.
+ * Shared across all routes that call the ElevenLabs API.
+ */
+export const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
+
 // LOCATION-SPECIFIC: Replace these agent IDs with your own ElevenLabs agents
 export const ELEVENLABS_AGENT_IDS = {
   // Tourism guide for immersive stories (primary voice agent)
