@@ -22,7 +22,7 @@ export interface PendingBooking {
   updated_at: string;
 }
 
-export interface SendSMSResult {
+interface SendSMSResult {
   success: boolean;
   sid?: string;
   error?: string;

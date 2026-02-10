@@ -40,9 +40,9 @@ export const FORMAT_SETTINGS = {
  */
 export const IMAGE_SIZES = [640, 1200, 2048] as const;
 
-export type ImageFormat = "avif" | "webp" | "jpeg";
+type ImageFormat = "avif" | "webp" | "jpeg";
 
-export interface OptimizedImage {
+interface OptimizedImage {
   buffer: Buffer;
   format: ImageFormat;
   width: number;
@@ -50,7 +50,7 @@ export interface OptimizedImage {
   size: number;
 }
 
-export interface ImageOptimizationResult {
+interface ImageOptimizationResult {
   /** Optimized image variants keyed by `{format}-{width}` */
   variants: Map<string, OptimizedImage>;
   /** Base64 data URL for blur placeholder */
