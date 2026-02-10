@@ -129,7 +129,7 @@ describe("StoryJsonLd", () => {
     subtitle: "Los lagos glaciares más famosos de Asturias",
     description:
       "Descubre la belleza de los lagos Enol y Ercina en los Picos de Europa.",
-    image: "/images/stories/lagos-covadonga.png",
+    image: "/images/stories/lagos-covadonga.webp",
     category: "nature",
     sourcePdf: "picos-europa.pdf",
     location: "eastern",
@@ -148,7 +148,7 @@ describe("StoryJsonLd", () => {
     subtitle: "El plato más emblemático de la gastronomía asturiana",
     description:
       "La fabada es un guiso tradicional hecho con fabes de la granja.",
-    image: "/images/stories/fabada.png",
+    image: "/images/stories/fabada.webp",
     category: "food",
     sourcePdf: "gastronomia.pdf",
     location: "central",
@@ -230,7 +230,7 @@ describe("StoryJsonLd", () => {
     );
     const data = JSON.parse(script!.textContent!);
 
-    expect(data.image).toContain("lagos-covadonga.png");
+    expect(data.image).toContain("lagos-covadonga.webp");
   });
 
   it("includes isPartOf reference to Paisaxe", () => {
