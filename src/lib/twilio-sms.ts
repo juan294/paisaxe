@@ -35,9 +35,9 @@ export interface SendSMSResult {
  * @param body - Message text
  */
 export async function sendSMS(to: string, body: string): Promise<SendSMSResult> {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
+  const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER?.trim();
 
   if (!accountSid || !authToken || !fromNumber) {
     console.error("[twilio-sms] Missing Twilio credentials");

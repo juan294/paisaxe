@@ -17,7 +17,7 @@ const AUTH_TAG_LENGTH = 16; // 128 bits
  * Key must be 32 bytes (256 bits) encoded as base64.
  */
 function getEncryptionKey(): Buffer {
-  const key = process.env.CREDENTIALS_ENCRYPTION_KEY;
+  const key = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
   if (!key) {
     throw new Error(
       "CREDENTIALS_ENCRYPTION_KEY environment variable is not set. " +

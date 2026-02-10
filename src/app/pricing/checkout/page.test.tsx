@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import CheckoutPage from "./page";
 
@@ -210,6 +210,52 @@ describe("CheckoutPage", () => {
       expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing/checkout");
 
       mockSearchParams.delete("returnTo");
+    });
+  });
+
+  describe("Stripe key trimming", () => {
+    const originalKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
+    afterEach(() => {
+      if (originalKey !== undefined) {
+        process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = originalKey;
+      } else {
+        delete process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+      }
+    });
+
+    it("should trim trailing whitespace/newlines from publishable key", async () => {
+      // Simulate the Vercel invisible-character bug
+      process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = "pk_test_abc123\n";
+
+      vi.resetModules();
+
+      const { loadStripe } = await import("@stripe/stripe-js");
+      await import("./page");
+
+      expect(loadStripe).toHaveBeenCalledWith("pk_test_abc123");
+    });
+
+    it("should handle empty key gracefully", async () => {
+      process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = "";
+
+      vi.resetModules();
+
+      const { loadStripe } = await import("@stripe/stripe-js");
+      await import("./page");
+
+      expect(loadStripe).toHaveBeenCalledWith("");
+    });
+
+    it("should handle whitespace-only key as empty", async () => {
+      process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = "  \n  ";
+
+      vi.resetModules();
+
+      const { loadStripe } = await import("@stripe/stripe-js");
+      await import("./page");
+
+      expect(loadStripe).toHaveBeenCalledWith("");
     });
   });
 
