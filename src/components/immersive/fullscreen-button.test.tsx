@@ -9,6 +9,12 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
+// Mock useFocusTrap so we can verify it's called correctly
+const mockUseFocusTrap = vi.fn();
+vi.mock("@/hooks/use-focus-trap", () => ({
+  useFocusTrap: (...args: unknown[]) => mockUseFocusTrap(...args),
+}));
+
 // Helper to set up matchMedia mock
 const mockMatchMedia = (standalone: boolean) => {
   Object.defineProperty(window, "matchMedia", {
@@ -186,6 +192,120 @@ describe("FullscreenButton", () => {
       expect(screen.getByText("fullscreen.step_tap")).toBeInTheDocument();
       expect(screen.getByText("fullscreen.step_add_home")).toBeInTheDocument();
       expect(screen.getByText("fullscreen.step_open")).toBeInTheDocument();
+    });
+  });
+
+  // --- Focus trap tests for iOS instructions modal ---
+
+  describe("iOS instructions modal focus trap", () => {
+    beforeEach(() => {
+      // Mock iOS device for all tests in this block
+      Object.defineProperty(navigator, "userAgent", {
+        value: "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0)",
+        configurable: true,
+      });
+      Object.defineProperty(navigator, "platform", {
+        value: "iPhone",
+        configurable: true,
+      });
+      mockUseFocusTrap.mockClear();
+    });
+
+    it("should call useFocusTrap with active=true when modal is open", async () => {
+      await act(async () => {
+        render(<FullscreenButton />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /fullscreen.toggle/i })).toBeInTheDocument();
+      });
+
+      // Open the modal
+      const button = screen.getByRole("button", { name: /fullscreen.toggle/i });
+      await act(async () => {
+        fireEvent.click(button);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("fullscreen.install_title")).toBeInTheDocument();
+      });
+
+      // useFocusTrap should have been called with (ref, true, onEscape)
+      const lastCall = mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1];
+      expect(lastCall[1]).toBe(true); // active = true
+      expect(typeof lastCall[2]).toBe("function"); // onEscape callback
+    });
+
+    it("should call useFocusTrap with active=false when modal is closed", async () => {
+      await act(async () => {
+        render(<FullscreenButton />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /fullscreen.toggle/i })).toBeInTheDocument();
+      });
+
+      // Initially, the modal is not open — useFocusTrap should be called with active=false
+      const initialCall = mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1];
+      expect(initialCall[1]).toBe(false); // active = false
+    });
+
+    it("should have role=dialog and aria-modal=true on the modal container", async () => {
+      await act(async () => {
+        render(<FullscreenButton />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /fullscreen.toggle/i })).toBeInTheDocument();
+      });
+
+      // Open the modal
+      const button = screen.getByRole("button", { name: /fullscreen.toggle/i });
+      await act(async () => {
+        fireEvent.click(button);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("fullscreen.install_title")).toBeInTheDocument();
+      });
+
+      // The modal content container should have dialog role and aria-modal
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toBeInTheDocument();
+      expect(dialog).toHaveAttribute("aria-modal", "true");
+    });
+
+    it("should close modal when Escape callback is invoked", async () => {
+      await act(async () => {
+        render(<FullscreenButton />);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /fullscreen.toggle/i })).toBeInTheDocument();
+      });
+
+      // Open the modal
+      const button = screen.getByRole("button", { name: /fullscreen.toggle/i });
+      await act(async () => {
+        fireEvent.click(button);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("fullscreen.install_title")).toBeInTheDocument();
+      });
+
+      // Get the onEscape callback that was passed to useFocusTrap
+      const lastCallWhenOpen = mockUseFocusTrap.mock.calls[mockUseFocusTrap.mock.calls.length - 1];
+      const onEscapeCallback = lastCallWhenOpen[2];
+
+      // Invoke the escape callback — should close the modal
+      await act(async () => {
+        onEscapeCallback();
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("fullscreen.install_title")).not.toBeInTheDocument();
+      });
     });
   });
 
