@@ -1451,34 +1451,6 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
     },
   },
 
-  'playa-de-las-catedrales': {
-    en: {
-      title: 'Beach of the Cathedrals',
-      subtitle: 'Ribadeo',
-      description: 'Impressive rock formations resembling Gothic cathedral buttresses, accessible at low tide.',
-    },
-    fr: {
-      title: 'Plage des Cathédrales',
-      subtitle: 'Ribadeo',
-      description: 'Impressionnantes formations rocheuses ressemblant à des arcs-boutants de cathédrale gothique, accessibles à marée basse.',
-    },
-    de: {
-      title: 'Strand der Kathedralen',
-      subtitle: 'Ribadeo',
-      description: 'Beeindruckende Felsformationen, die gotischen Kathedralenstrebebögen ähneln, bei Ebbe zugänglich.',
-    },
-    pt: {
-      title: 'Praia das Catedrais',
-      subtitle: 'Ribadeo',
-      description: 'Impressionantes formações rochosas semelhantes a arcobotantes de catedral gótica, acessíveis com maré baixa.',
-    },
-    ast: {
-      title: 'Playa de les Catedrales',
-      subtitle: 'Ribadeo',
-      description: 'Impresionantes formaciones rocoses que s\'asemeyen a arcobotantes de catedral gótica, accesibles con marea baxa.',
-    },
-  },
-
   // ============================================
   // ACTIVITIES & FAMILY
   // ============================================
@@ -1508,34 +1480,6 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Muséu del Xurásicu (MUJA)',
       subtitle: 'Colunga',
       description: 'Viaxe al pasáu en forma de buelga de dinosauriu. Répliques a escala real, fósiles auténticos y actividaes interactives pa tola familia.',
-    },
-  },
-
-  'teleferico-de-fuente-de': {
-    en: {
-      title: 'Fuente Dé Cable Car',
-      subtitle: 'Picos de Europa',
-      description: 'Vertiginous ascent of 753 meters in 4 minutes to the heart of Picos de Europa. Breathtaking views.',
-    },
-    fr: {
-      title: 'Téléphérique de Fuente Dé',
-      subtitle: 'Pics d\'Europe',
-      description: 'Ascension vertigineuse de 753 mètres en 4 minutes jusqu\'au cœur des Pics d\'Europe. Vues à couper le souffle.',
-    },
-    de: {
-      title: 'Seilbahn von Fuente Dé',
-      subtitle: 'Picos de Europa',
-      description: 'Schwindelerregender Aufstieg von 753 Metern in 4 Minuten ins Herz der Picos de Europa. Atemberaubende Ausblicke.',
-    },
-    pt: {
-      title: 'Teleférico de Fuente Dé',
-      subtitle: 'Picos da Europa',
-      description: 'Subida vertiginosa de 753 metros em 4 minutos até ao coração dos Picos da Europa. Vistas de tirar o fôlego.',
-    },
-    ast: {
-      title: 'Teleféricu de Fuente Dé',
-      subtitle: 'Picos d\'Europa',
-      description: 'Xubida vertixinosa de 753 metros en 4 minutos al corazón de los Picos d\'Europa. Vistes de quitar l\'aliendu.',
     },
   },
 

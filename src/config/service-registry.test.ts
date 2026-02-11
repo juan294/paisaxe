@@ -97,6 +97,13 @@ describe("SERVICE_REGISTRY config", () => {
     expect(g!.areasToWatch).toContain("bundled perks");
   });
 
+  it("should include Claude Code Max", () => {
+    const cc = SERVICE_REGISTRY.find((s) => s.serviceId === "claude-code-max");
+    expect(cc).toBeDefined();
+    expect(cc!.currentPlan).toBe("Max (20x)");
+    expect(cc!.monthlyCostUsd).toBe(200);
+  });
+
   it("should have valid monthlyCostUsd (non-negative number)", () => {
     for (const entry of SERVICE_REGISTRY) {
       expect(entry.monthlyCostUsd).toBeGreaterThanOrEqual(0);

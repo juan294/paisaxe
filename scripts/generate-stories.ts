@@ -6,14 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 // Load environment variables from .env.local
 config({ path: ".env.local" });
 
-const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-
-if (!anthropicApiKey) {
-  console.error("Missing ANTHROPIC_API_KEY environment variable");
-  process.exit(1);
-}
-
-const anthropic = new Anthropic({ apiKey: anthropicApiKey });
+// --- Exported types ---
 
 interface Chunk {
   content: string;
@@ -34,6 +27,84 @@ interface GeneratedStory {
   location?: "eastern" | "central" | "western";
   duration?: "day-trip" | "weekend" | "week";
 }
+
+export interface GeneratedStoryWithQuote extends GeneratedStory {
+  sourceQuote: string;
+}
+
+export interface ValidationResult {
+  valid: GeneratedStoryWithQuote[];
+  excluded: Array<{ story: GeneratedStoryWithQuote; reason: string }>;
+}
+
+// Known non-Asturian places near the border that are commonly confused
+export const NON_ASTURIAN_BLOCKLIST = [
+  // Galicia (west)
+  "Ribadeo",
+  "Mondoñedo",
+  "Foz",
+  "Viveiro",
+  "Lugo",
+  "A Fonsagrada",
+  // Cantabria (east)
+  "Santander",
+  "Castro Urdiales",
+  "San Vicente de la Barquera",
+  "Santillana del Mar",
+  "Comillas",
+  "Fuente Dé",
+  "Potes",
+  "Camaleño",
+  // León (south)
+  "León",
+  "Ponferrada",
+  "Villablino",
+];
+
+// --- Validation function ---
+
+/**
+ * Validates generated stories against source chunks and geographic constraints.
+ * Returns valid stories and excluded stories with reasons.
+ */
+export function validateGeneratedStories(
+  stories: GeneratedStoryWithQuote[],
+  chunkTexts: string[],
+): ValidationResult {
+  const valid: GeneratedStoryWithQuote[] = [];
+  const excluded: ValidationResult["excluded"] = [];
+
+  const allChunkText = chunkTexts.join(" ").toLowerCase();
+
+  for (const story of stories) {
+    const reasons: string[] = [];
+
+    // Citation check: verify sourceQuote appears in chunks (fuzzy/substring match)
+    const quote = story.sourceQuote?.toLowerCase().trim();
+    if (!quote || !allChunkText.includes(quote)) {
+      reasons.push("Failed citation check: sourceQuote not found in source chunks");
+    }
+
+    // Geographic check: blocklist against title and subtitle
+    const titleAndSubtitle = `${story.title} ${story.subtitle}`.toLowerCase();
+    for (const place of NON_ASTURIAN_BLOCKLIST) {
+      if (titleAndSubtitle.includes(place.toLowerCase())) {
+        reasons.push(`Failed geographic check: contains non-Asturian place "${place}"`);
+        break;
+      }
+    }
+
+    if (reasons.length > 0) {
+      excluded.push({ story, reason: reasons.join("; ") });
+    } else {
+      valid.push(story);
+    }
+  }
+
+  return { valid, excluded };
+}
+
+// --- Internal helpers (not exported) ---
 
 const CHUNKS_FILE = path.join(process.cwd(), "content", "processed", "chunks.json");
 const OUTPUT_FILE = path.join(process.cwd(), "content", "processed", "generated-stories.json");
@@ -101,12 +172,22 @@ async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function createAnthropicClient(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) {
+    console.error("Missing ANTHROPIC_API_KEY environment variable");
+    process.exit(1);
+  }
+  return new Anthropic({ apiKey });
+}
+
 async function generateStoriesFromChunks(
+  anthropic: Anthropic,
   pdfName: string,
   chunks: Chunk[],
   maxStories: number = 10,
   retries: number = 3
-): Promise<GeneratedStory[]> {
+): Promise<GeneratedStoryWithQuote[]> {
   const context = PDF_CONTEXT[pdfName] || {
     name: pdfName,
     type: "general",
@@ -120,17 +201,25 @@ async function generateStoriesFromChunks(
     .join("\n\n---\n\n")
     .slice(0, 50000); // Limit total characters
 
-  const prompt = `You are an expert travel content creator for Asturias, Spain. Analyze the following content from "${context.name}" and generate ${maxStories} unique, engaging stories for a travel app.
+  const prompt = `You are an expert content extractor for Asturias, Spain tourism. Your task is to extract stories about places EXPLICITLY NAMED in the following PDF content from "${context.name}".
+
+CRITICAL CONSTRAINTS:
+- ONLY create stories about places, restaurants, or attractions that are EXPLICITLY NAMED in the provided text below.
+- Do NOT use your training knowledge to add places not mentioned in the text.
+- Do NOT invent or embellish details beyond what the text states.
+- All places MUST be within the Principado de Asturias autonomous community. Exclude any places in Galicia (e.g. Ribadeo, Mondoñedo), Cantabria (e.g. Santander, Fuente Dé, Potes), León, or other regions — even if mentioned in the text as nearby or as excursions.
+- If the text mentions fewer than ${maxStories} distinct Asturian places, return only as many as you can verify in the text. Do NOT pad with invented entries.
 
 CONTENT FROM PDF:
 ${combinedContent}
 
 REQUIREMENTS:
-1. Each story should be about a SPECIFIC place, restaurant, activity, or attraction
+1. Each story must be about a SPECIFIC place, restaurant, activity, or attraction NAMED in the text above
 2. Stories must be in SPANISH
 3. Generate diverse content - don't repeat similar places
 4. For restaurants: include the restaurant name in the title
-5. For places: focus on what makes each unique
+5. For places: focus on what makes each unique, using details from the text
+6. For each story, provide a "sourceQuote" — the exact sentence or phrase from the PDF text above where this place is named. This must be a verbatim quote from the text.
 
 OUTPUT FORMAT (JSON array):
 [
@@ -139,7 +228,8 @@ OUTPUT FORMAT (JSON array):
     "slug": "unique-slug-id",
     "title": "Nombre del Lugar",
     "subtitle": "Breve descripción de ubicación o tipo",
-    "description": "Descripción atractiva de 2-3 oraciones que invite a visitar. Incluir detalles únicos y atractivos.",
+    "description": "Descripción atractiva de 2-3 oraciones basada en la información del texto.",
+    "sourceQuote": "Frase exacta del texto donde se menciona este lugar",
     "category": "${context.expectedCategory}",
     "location": "eastern" | "central" | "western",
     "duration": "day-trip" | "weekend" | "week"
@@ -153,7 +243,7 @@ LOCATION GUIDE:
 
 CATEGORY OPTIONS: nature, cities, food, culture, activities
 
-Generate exactly ${maxStories} stories. Return ONLY valid JSON, no explanations.`;
+Generate up to ${maxStories} stories. Return ONLY valid JSON, no explanations.`;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -184,7 +274,7 @@ Generate exactly ${maxStories} stories. Return ONLY valid JSON, no explanations.
       }
       jsonText = jsonText.trim();
 
-      const stories: GeneratedStory[] = JSON.parse(jsonText);
+      const stories: GeneratedStoryWithQuote[] = JSON.parse(jsonText);
 
       // Add source PDF and default image
       return stories.map(story => ({
@@ -206,6 +296,8 @@ Generate exactly ${maxStories} stories. Return ONLY valid JSON, no explanations.
 }
 
 async function main() {
+  const anthropic = createAnthropicClient();
+
   console.log("Loading chunks...");
   const chunks = await loadChunks();
   console.log(`Loaded ${chunks.length} chunks`);
@@ -239,10 +331,25 @@ async function main() {
     console.log(`\nProcessing ${pdfName} (${pdfChunks.length} chunks)...`);
     console.log(`Generating up to ${maxStories} stories...`);
 
-    const stories = await generateStoriesFromChunks(pdfName, pdfChunks, maxStories);
-    console.log(`Generated ${stories.length} stories`);
+    const rawStories = await generateStoriesFromChunks(anthropic, pdfName, pdfChunks, maxStories);
+    console.log(`Generated ${rawStories.length} raw stories`);
 
-    allStories.push(...stories);
+    // Validate against source chunks
+    const chunkTexts = pdfChunks.map(c => c.content);
+    const { valid, excluded } = validateGeneratedStories(rawStories, chunkTexts);
+
+    if (excluded.length > 0) {
+      console.warn(`⚠️  Excluded ${excluded.length} stories from ${pdfName}:`);
+      for (const { story, reason } of excluded) {
+        console.warn(`   - "${story.title}": ${reason}`);
+      }
+    }
+
+    console.log(`✓ ${valid.length} stories passed validation`);
+
+    // Strip sourceQuote before adding to output (validation-only field)
+    const cleaned: GeneratedStory[] = valid.map(({ sourceQuote, ...rest }) => rest);
+    allStories.push(...cleaned);
 
     // Rate limiting
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -257,10 +364,23 @@ async function main() {
     const pdfChunks = groupedChunks.get(pdfName)!;
     console.log(`\nProcessing additional PDF ${pdfName} (${pdfChunks.length} chunks)...`);
 
-    const stories = await generateStoriesFromChunks(pdfName, pdfChunks, 8);
-    console.log(`Generated ${stories.length} stories`);
+    const rawStories = await generateStoriesFromChunks(anthropic, pdfName, pdfChunks, 8);
+    console.log(`Generated ${rawStories.length} raw stories`);
 
-    allStories.push(...stories);
+    const chunkTexts = pdfChunks.map(c => c.content);
+    const { valid, excluded } = validateGeneratedStories(rawStories, chunkTexts);
+
+    if (excluded.length > 0) {
+      console.warn(`⚠️  Excluded ${excluded.length} stories from ${pdfName}:`);
+      for (const { story, reason } of excluded) {
+        console.warn(`   - "${story.title}": ${reason}`);
+      }
+    }
+
+    console.log(`✓ ${valid.length} stories passed validation`);
+
+    const cleaned: GeneratedStory[] = valid.map(({ sourceQuote, ...rest }) => rest);
+    allStories.push(...cleaned);
 
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
@@ -307,4 +427,10 @@ const GENERATED_STORIES: Story[] = ${JSON.stringify(finalStories, null, 2)};`;
   console.log(`\nTypeScript output saved to: ${tsOutputFile}`);
 }
 
-main().catch(console.error);
+// Only run main() when executed directly (not when imported for tests)
+const isDirectExecution = process.argv[1]?.endsWith("generate-stories.ts") ||
+  process.argv[1]?.endsWith("generate-stories");
+
+if (isDirectExecution) {
+  main().catch(console.error);
+}
