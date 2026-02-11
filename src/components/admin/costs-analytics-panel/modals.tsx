@@ -58,6 +58,7 @@ export function AddCostModal({ onClose, onSubmit, dateRange }: AddCostModalProps
           </h3>
           <button
             onClick={onClose}
+            aria-label="Close add cost modal"
             className="rounded-full p-1 text-[#a39e98] hover:bg-[#f5f3ee] dark:hover:bg-[#3d3a36]"
           >
             <X className="h-5 w-5" />
@@ -275,6 +276,7 @@ export function EditCostModal({ cost, onClose, onSave }: EditCostModalProps) {
           </h3>
           <button
             onClick={onClose}
+            aria-label="Close edit cost modal"
             className="rounded-full p-1 text-[#a39e98] hover:bg-[#f5f3ee] dark:hover:bg-[#3d3a36]"
           >
             <X className="h-5 w-5" />

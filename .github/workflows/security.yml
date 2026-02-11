@@ -21,15 +21,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run security audit
-        # KEEP AT critical — raising to high breaks CI (verified 2026-02-07).
-        # Root cause: voyageai → qs <6.14.1 (GHSA-6rw7-vpxm-498p, high severity).
-        # No upstream fix available; qs is a transitive dep of voyageai.
-        # TODO: Change to --audit-level=high once voyageai ships a qs >=6.14.1 dependency.
-        run: npm audit --audit-level=critical
+        # Raised to high after adding qs override in package.json (Fixes #93).
+        # Previous blocker: voyageai → qs <6.14.1 (GHSA-6rw7-vpxm-498p, high severity).
+        run: npm audit --audit-level=high

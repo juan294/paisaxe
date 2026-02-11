@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@anthropic-ai/sdk", "sharp"],
   experimental: {
     // Tree-shake barrel exports — avoids bundling all 1,000+ lucide icons
-    optimizePackageImports: ["lucide-react"],
+    optimizePackageImports: ["lucide-react", "posthog-js"],
   },
   // Exclude heavy directories from serverless function tracing.
   // Routes using fs + process.cwd() (agents-summary, agents/run) cause
