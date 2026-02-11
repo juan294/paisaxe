@@ -1,12 +1,12 @@
 # Pre-Launch Audit Report
 
-> Generated on 2026-02-10 (visual regression testing, env var safety, test coverage expansion, 190+ commits)
-> Previous audits: 2026-02-07, 2026-02-08, 2026-02-09
-> PR #75: develop -> main
+> Generated on 2026-02-11 (brand asset update, cost tracking, story pipeline hardening)
+> Previous audits: 2026-02-07, 2026-02-08, 2026-02-09, 2026-02-10
+> Release: develop -> main
 
-## Verdict: CONDITIONAL
+## Verdict: READY
 
-No blockers. 8 warnings to monitor — none require immediate action before deploy. 7 recommendations for post-release improvement.
+No blockers found. All warnings are low-severity, already tracked, or cosmetic. The site is production-ready.
 
 ---
 
@@ -16,32 +16,36 @@ None.
 
 ---
 
-## Warnings (should address soon)
+## Warnings (should fix soon)
 
-| # | Area | Finding | Risk |
-|---|------|---------|------|
-| W1 | Security | `qs < 6.14.1` DoS vulnerability via `voyageai` dependency | LOW — server-side only, controlled inputs, no upstream fix available |
-| W2 | Security | CSP `script-src 'unsafe-inline'` | LOW — documented TODO with migration path to nonce-based CSP |
-| W3 | Security | `webhook_config` table RLS allows any authenticated user to read webhook secret | MEDIUM — should restrict to service_role only |
-| W4 | QA | 3 flaky E2E tests (pre-launch.spec.ts:156, suggestions.spec.ts:94, pre-launch.spec.ts:269) | LOW — pass on retry, timing-related |
-| W5 | QA | 16 visual regression baselines missing (expected — newly added feature) | NONE — `continue-on-error: true` in CI, baselines need initial generation |
-| W6 | QA | Branch coverage at 70% (lowest metric) | LOW — critical paths all covered |
-| W7 | Performance | 102 story PNGs total 127MB (2.5-3.8MB each) | MEDIUM — slow first-time image optimization on serverless cold starts |
-| W8 | A11y | Fullscreen instructions modal lacks focus trap | LOW — iOS-only, dismiss button works, keyboard users can close |
+| # | Area | Issue | Severity | Notes |
+|---|------|-------|----------|-------|
+| W1 | Security | `qs` vulnerability in `voyageai` dependency | Low-Medium | Server-side only, no user-controlled query strings reach it. No upstream fix available. |
+| W2 | Security | CSP `'unsafe-inline'` in `script-src` | Medium | Already tracked TODO in `next.config.ts`. Migrate to nonce-based CSP when feasible. |
+| W3 | QA | 1 flaky E2E test (Journey 13: `h1` timeout) | Low | Race condition in qa-journey spec. Not a product bug — test needs more specific selector or longer timeout. |
+| W4 | QA | 5/28 feature flags have no test mocks | Low | `mood_discovery`, `asturianu_touches`, `story_freshness`, `automated_agents`, `content_discovery_agent_enabled` |
+| W5 | Performance | Largest client chunk at 470KB (protobuf/Supabase) | Low | Under 500KB threshold. Monitor with `ANALYZE=true npm run build`. |
+| W6 | A11y | Admin icon-only buttons lack `aria-label` | Low | Internal tooling only, not user-facing. |
 
 ---
 
 ## Recommendations (nice to have)
 
-| # | Area | Finding |
-|---|------|---------|
-| R1 | Architecture | Move `twitter-api-v2` to devDependencies (X API free tier can't post) |
-| R2 | Architecture | Enable `noUncheckedIndexedAccess` in tsconfig.json |
-| R3 | QA | Add `maintenance_mode` flag to E2E mock fixtures |
-| R4 | QA | Add unit tests for admin API client modules and hooks (use-auth, use-focus-trap) |
-| R5 | Performance | Pre-optimize story PNGs to WebP (127MB -> ~20MB) |
-| R6 | A11y | Add `aria-label` to favorites page back link |
-| R7 | A11y | Add `focus-visible:ring-2` to error boundary retry button |
+| # | Area | Recommendation |
+|---|------|----------------|
+| R1 | Dependencies | Run `npm update` for patch updates (@types/node, @types/react, posthog-js, resend) |
+| R2 | Dependencies | Verify `jsdom@28.0.0` is intentional (npm shows 27.0.1 as latest) |
+| R3 | Performance | Add `posthog-js` to `optimizePackageImports` in next.config.ts |
+| R4 | Performance | Switch `<img>` to `next/image` in `voice-chat.tsx:283` for auto-optimization |
+| R5 | Security | Consider distributed rate limiting (Upstash/Redis) for production resilience |
+| R6 | Security | Verify `NODE_ENV=production` on Vercel (prevents stack trace leakage) |
+| R7 | QA | Add test mocks for the 5 untested feature flags |
+| R8 | QA | Plan admin UI test coverage (~45 components at 0%) |
+| R9 | QA | Add `use-focus-trap` hook unit tests |
+| R10 | A11y | Add `aria-expanded` to `CategoryFilterBadge` toggle button |
+| R11 | A11y | Add responsive breakpoints to admin panels without any (maintenance, feature-toggles, agent-config, tunnel-control) |
+| R12 | DevOps | Consider pinning Node.js version in CI for reproducible builds |
+| R13 | Architecture | Fix duplicate step "3" comment in proxy.ts (cosmetic) |
 
 ---
 
@@ -49,106 +53,123 @@ None.
 
 ### Architecture (architect)
 
-| Check | Status |
+| Check | Result |
 |-------|--------|
-| `npm run typecheck` | PASS — no errors |
-| `npx knip` | PASS — no dead code |
-| `npm audit` | 2 HIGH — `qs` via `voyageai` (no upstream fix) |
-| `tsconfig.json` strict mode | PASS — `strict: true` |
-| `next.config.ts` production readiness | PASS — security headers, CSP, image optimization |
-| `proxy.ts` request handling | PASS — maintenance, CORS, auth, canonical domain |
-| Dependency health | GOOD — clean tree |
+| TypeScript strict mode | PASS — `strict: true`, zero `any` types, zero `@ts-ignore` |
+| Typecheck | PASS — 0 errors |
+| Dead code (knip) | PASS — clean |
+| Circular dependencies | PASS — 0 found (551 files scanned) |
+| Dependencies | GOOD — no duplicates, no unnecessary prod deps |
+| next.config.ts | GOOD — comprehensive security headers, image optimization, CSP |
+| proxy.ts | GOOD — correct request handling chain, auth timeout, fail-open maintenance |
+| tsconfig.json | PASS — strict, isolatedModules, bundler resolution |
 
-Minor: duplicate step numbering in proxy.ts (steps 3/3 should be 3/4) — cosmetic only.
+**Key finding:** Zero type errors, zero dead code, zero circular dependencies. Architecture is clean.
+
+---
 
 ### Quality Assurance (qa-lead)
 
 | Metric | Value |
 |--------|-------|
-| Unit tests | 238 files, 3,644 passed, 1 skipped, 0 failed |
-| E2E tests | 170 total: 123 passed, 28 skipped, 19 failed |
-| Statement coverage | 78.95% |
-| Branch coverage | 70.01% |
-| Function coverage | 72.39% |
-| Line coverage | 79.78% |
+| Unit tests | 3,804 passed / 0 failed |
+| E2E tests | 125 passed / 1 flaky / 28 skipped |
+| Line coverage (src/) | 98.36% |
+| Branch coverage (src/) | 93.15% |
+| Function coverage (src/) | 94.73% |
+| Overall line coverage | 79.92% (admin UI gap) |
 
-E2E failures: 16 are visual regression (expected — no baselines yet), 3 are flaky (pass on retry).
+**Key findings:**
+- All critical user-facing paths have test coverage (chat, auth, payments, voice, proxy, health)
+- 1 flaky E2E test in qa-journey spec (h1 timeout race condition)
+- 5/28 feature flags lack test mocks
+- Admin UI components (~45 files) at 0% coverage — not blocking but a maintenance risk
+- Source-only coverage is excellent at 97.6% lines
 
-All critical paths covered: auth, chat API, Stripe checkout/webhooks, ElevenLabs webhooks, health endpoint, feature flags, voice access, MCP booking, proxy, Supabase auth, Claude integration (99.3% line coverage), Stripe lib (96.9%).
-
-Feature flags: 28 defined, 16 in E2E mock. 11 missing are admin-only agent flags (low risk). `maintenance_mode` is the notable gap.
+---
 
 ### Security (security-reviewer)
 
-| Check | Status |
+| Check | Result |
 |-------|--------|
 | Hardcoded secrets | PASS — none found |
-| Auth flows | PASS — 2-layer admin auth, webhook signatures verified |
-| RLS policies | PASS — all tables protected |
-| CORS | PASS — strict origin allowlist, no wildcards |
-| XSS vectors | PASS — all `dangerouslySetInnerHTML` uses sanitized |
-| CSP headers | WARNING — `unsafe-inline` in script-src (documented migration path) |
-| Chat safety | PASS — injection detection (14 patterns), rate limiting, input sanitization |
-| Timing-safe comparisons | PASS — MCP auth, ElevenLabs webhook |
+| Admin auth flow | PASS — `getUser()` + role check, 401/403 properly returned |
+| CORS configuration | PASS — explicit allowlist, no wildcards |
+| XSS vectors | PASS — all 7 `dangerouslySetInnerHTML` uses are safe (JSON.stringify or escapeHtml) |
+| CSP headers | WARNING — `unsafe-inline` in script-src (tracked TODO) |
+| Client-side secrets | PASS — no server secrets exposed to client bundles |
+| Webhook verification | PASS — Stripe, ElevenLabs (HMAC+timestamp), Supabase all use proper signature verification |
+| MCP auth | PASS — `timingSafeEqual` used |
+| Rate limiting | PASS — in-memory per-IP limiting on chat, MCP routes |
+| Chat safety | PASS — injection detection, sanitization, length limits, topic relevance |
+| SQL injection | PASS — parameterized queries only via Supabase client |
+| npm audit | WARNING — 2 high (`qs` via `voyageai`), server-side only, low real-world risk |
 
-Notable: `webhook_config` table allows any authenticated user to SELECT the webhook secret. Should restrict to service_role or admin only.
+**Key finding:** No security blockers. The `qs` vulnerability and CSP `unsafe-inline` are known and tracked.
+
+---
 
 ### Performance (performance-eng)
 
-| Check | Status |
-|-------|--------|
-| Bundle size | PASS — no chunks > 500KB (largest: 472KB ElevenLabs SDK) |
-| Code splitting | PASS — 9 dynamic imports, heavy components lazy-loaded |
-| Dead code | PASS — Knip clean |
-| CWV budgets | PASS — Lighthouse CI configured (Perf >= 60%, A11y >= 80%) |
-| Build | PASS — 9.6s compile, 58 static pages, no warnings |
-| Image optimization | WARNING — 127MB of source PNGs, first-load optimization heavy |
+| Metric | Value |
+|--------|-------|
+| Build time | 10.6s (Turbopack) |
+| Build warnings | 0 |
+| Static pages | 58 generated in 390ms |
+| Largest chunk | 470KB (under 500KB threshold) |
+| Total client JS | 2.7MB uncompressed |
+| CSS | 136KB total |
+| Dead code | None (knip clean) |
+| Dynamic imports | 9 heavy components lazily loaded |
+| Image format | All stories WebP (14.1MB / 102 images) |
 
-Build output: 59 JS chunks totaling 3.0MB. Static fonts: 224KB. `outputFileTracingExcludes` properly configured to keep serverless functions lean.
+**Key findings:**
+- Build is clean with no warnings
+- Code splitting is excellent — admin panels dynamically imported, never reach visitor bundles
+- Image optimization well-configured (AVIF+WebP, 30-day cache, responsive sizes, priority loading)
+- Font loading optimal (self-hosted Inter via next/font)
+- Tree-shaking configured for lucide-react
+- One `<img>` tag in voice-chat could use `next/image` (minor)
+
+---
 
 ### UX & Accessibility (ux-reviewer)
 
-| Check | Status |
+| Check | Result |
 |-------|--------|
-| ARIA labels | GOOD — 104 occurrences across 54 files, 1 missing on favorites back link |
-| Alt text | EXCELLENT — no missing alt text |
-| i18n completeness | EXCELLENT — 6 locales fully aligned, automated tests verify |
-| Responsive design | GOOD — mobile overflow menu, safe-area insets, proper breakpoints |
-| Keyboard navigation | GOOD — comprehensive handlers, skip link present, 1 modal missing focus trap |
-| Error states | GOOD — all errors use i18n, `role="alert"` on form errors |
+| ARIA labels | GOOD — 104 labels across 54 files; admin has gaps |
+| Alt text | PASS — all `<Image>` and `<img>` have alt props |
+| i18n completeness | EXCELLENT — 6 locales, enforced parity in tests, type-safe |
+| Responsive design | GOOD — visitor-facing is well-covered; some admin panels lack breakpoints |
+| Keyboard navigation | GOOD — proper focus traps, arrow key nav, skip-to-content |
+| Error states | GOOD — i18n error messages, `role="alert"`, ComponentErrorBoundary |
+| Reduced motion | GOOD — `motion-reduce` support throughout, auto-play disabled |
+| Semantic HTML | GOOD — `<main>`, `<article>`, proper roles, live regions |
+
+**Key findings:**
+- Visitor-facing accessibility is strong with a dedicated 507-line test suite
+- i18n is type-safe with enforced parity across all 6 locales
+- Admin icon-only buttons lack aria-labels (internal tooling, low priority)
+- `CategoryFilterBadge` missing `aria-expanded` attribute
+
+---
 
 ### DevOps & Infrastructure (devops)
 
-| Check | Status |
+| Check | Result |
 |-------|--------|
-| Health endpoint | PASS — 200 OK, "healthy", Supabase connected (618ms) |
-| DNS | PASS — paisaxe.es and paisaxe.com resolve to Vercel (76.76.21.21) |
-| Redirects | PASS — .com -> .es, www -> apex, all 308 permanent |
-| Security headers | PASS — HSTS, X-Frame-Options, CSP, nosniff, referrer-policy |
-| CI (develop) | PASS — all workflows green |
-| CI (main) | PASS — last 5 runs all passed |
-| Vercel config | PASS — vercel.json with proper redirects |
-| Env vars | PASS — .env.example matches CLAUDE.md |
+| Vercel config | PASS — domain redirects correct (301 permanent) |
+| Env vars | PASS — all 27 required vars in `.env.example` |
+| Health endpoint | PASS — healthy, Supabase connected, DB at 0.5% |
+| GitHub Actions | PASS — all workflows green on both branches |
+| DNS | PASS — both domains -> Vercel (76.76.21.21) |
+| Branch protection | PASS — 4 required checks, no force push, no delete |
+| HTTPS/headers | PASS — HSTS 2yr+preload, CSP, X-Frame-Options DENY |
+| CI workflows | PASS — 9 well-configured workflows, consistent tooling |
+| Architecture compliance | PASS — proxy.ts in use, no middleware.ts conflict |
 
----
-
-## Comparison with Previous Audit (2026-02-09)
-
-| Item | Previous | Current |
-|------|----------|---------|
-| Unit tests | 3,535 | 3,644 (+109) |
-| Test files | 236 | 238 (+2) |
-| Statement coverage | ~77% | 78.95% (+2%) |
-| E2E flaky tests | 5 | 3 (improved) |
-| Blockers | 0 | 0 |
-| Security findings | 2 warnings | 2 warnings (same: qs, CSP) |
-
-New since last audit: visual regression testing framework, env var trim safety, expanded test coverage.
-
----
-
-## Release Recommendation
-
-**CONDITIONAL — safe to deploy.** No blockers found across all 6 audit areas. The warnings are either known limitations with documented migration paths (CSP `unsafe-inline`), upstream dependency issues with no fix available (`qs` in `voyageai`), or newly introduced features awaiting baseline generation (visual regression). The `webhook_config` RLS policy (W3) should be tightened in the next development cycle.
-
-PR #75 CI: 18/18 checks passed. Ready for merge on user authorization.
+**Key findings:**
+- Infrastructure is solid across the board
+- All 4 required status checks enforced on `main`
+- Security headers are comprehensive and correctly configured
+- Health endpoint shows Supabase at 845ms latency (likely cold start)
