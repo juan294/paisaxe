@@ -1,6 +1,6 @@
 // Platform Costs Analytics Types
 
-export type CostCategory = "ai" | "infrastructure" | "communications" | "analytics" | "payments";
+export type CostCategory = "ai" | "infrastructure" | "communications" | "analytics" | "payments" | "development";
 export type CostSource = "api" | "estimate" | "manual" | "recurring";
 
 export interface ServiceCost {
@@ -180,5 +180,12 @@ export const PLATFORM_SERVICES = {
     category: "infrastructure" as CostCategory,
     hasApi: false,
     dashboardUrl: "https://github.com/settings/billing/summary",
+  },
+  claudeCodeMax: {
+    id: "claude-code-max",
+    name: "Claude Code Max",
+    category: "development" as CostCategory,
+    hasApi: false,
+    dashboardUrl: "https://claude.ai/settings/billing",
   },
 } as const;

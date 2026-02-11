@@ -73,4 +73,15 @@ describe("RECURRING_SUBSCRIPTIONS config", () => {
     expect(github!.category).toBe("infrastructure");
     expect(github!.serviceName).toBe("GitHub Pro");
   });
+
+  it("should include Claude Code Max subscription", () => {
+    const claudeCode = RECURRING_SUBSCRIPTIONS.find(
+      (s) => s.serviceId === "claude-code-max"
+    );
+    expect(claudeCode).toBeDefined();
+    expect(claudeCode!.costUsd).toBe(200);
+    expect(claudeCode!.category).toBe("development");
+    expect(claudeCode!.serviceName).toBe("Claude Code Max");
+    expect(claudeCode!.notes).toContain("20x");
+  });
 });
