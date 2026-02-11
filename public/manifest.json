@@ -4,8 +4,8 @@
   "description": "Tu guía personal para explorar Asturias. Descubre paisajes, rutas, gastronomía y cultura.",
   "start_url": "/immersive",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#0a0a0a",
+  "background_color": "#0a0f1a",
+  "theme_color": "#0a0f1a",
   "orientation": "portrait-primary",
   "icons": [
     {

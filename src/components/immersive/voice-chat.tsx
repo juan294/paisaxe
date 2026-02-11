@@ -279,6 +279,11 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                       <div className="mt-3 space-y-3">
                         {msg.images.map((image) => (
                           <figure key={image.id} className="overflow-hidden rounded-xl">
+                            {/* Using <img> intentionally: image paths come from the database
+                                (images.path) and can be local (/images/...) or Supabase storage
+                                URLs. Dimensions are unknown at render time, and the dynamic
+                                nature of RAG-returned images makes next/image's required
+                                width/height or fill+parent sizing impractical here. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={image.path}

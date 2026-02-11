@@ -75,6 +75,7 @@ export function ImageTab({ story }: ImageTabProps) {
             />
             <button
               onClick={() => setIsFullscreen(true)}
+              aria-label="View image fullscreen"
               className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg bg-black/40 text-white/90 backdrop-blur-sm transition-all hover:bg-black/60"
             >
               <Maximize2 className="h-4 w-4" />
@@ -186,12 +187,14 @@ export function ImageTab({ story }: ImageTabProps) {
                       <div className="flex gap-1">
                         <button
                           onClick={() => handleContentImageNav("prev")}
+                          aria-label="Previous image"
                           className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
                         >
                           <ChevronLeft className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleContentImageNav("next")}
+                          aria-label="Next image"
                           className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
                         >
                           <ChevronRight className="h-4 w-4" />
@@ -242,6 +245,7 @@ export function ImageTab({ story }: ImageTabProps) {
                 </div>
                 <button
                   onClick={clearUpload}
+                  aria-label="Remove uploaded file"
                   className="flex h-7 w-7 items-center justify-center rounded-lg text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
                 >
                   <X className="h-4 w-4" />

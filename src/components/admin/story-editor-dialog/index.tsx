@@ -278,6 +278,7 @@ export function StoryEditorDialog({
           />
           <button
             onClick={() => state.setIsFullscreen(false)}
+            aria-label="Close fullscreen preview"
             className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
           >
             <X className="h-5 w-5" />

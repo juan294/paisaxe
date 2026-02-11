@@ -86,6 +86,8 @@ export function CategoryFilterBadge({
           e.stopPropagation();
           setIsExpanded(!isExpanded);
         }}
+        aria-expanded={isExpanded}
+        aria-haspopup="true"
         className={cn(
           "flex items-center gap-2 px-4 py-2 rounded-xl",
           "text-sm font-medium text-white",
