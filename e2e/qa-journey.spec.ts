@@ -321,9 +321,9 @@ test.describe("QA Journey: New Features", () => {
       })
     );
 
-    // Step 1: Navigate to immersive view
-    await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    // Step 1: Navigate to immersive view and wait for it to load
+    await page.goto("/immersive", { waitUntil: "networkidle" });
+    await expect(page.locator('[data-testid="story-title"]')).toBeVisible({ timeout: 15000 });
 
     // Step 2: Click the suggest button
     const suggestButton = page.locator("[data-suggest-place-trigger]");
@@ -352,7 +352,7 @@ test.describe("QA Journey: New Features", () => {
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
 
     // Step 8: Back on immersive view
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator('[data-testid="story-title"]')).toBeVisible({ timeout: 10000 });
   });
 
   test("Journey 14: Multi-turn chat conversation", async ({ page }) => {
