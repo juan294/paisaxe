@@ -403,10 +403,10 @@ export async function proxy(request: NextRequest) {
     return corsResponse;
   }
 
-  // 3. Refresh auth session if needed (handles expired tokens)
+  // 4. Refresh auth session if needed (handles expired tokens)
   const response = await refreshAuthSession(request);
 
-  // 4. Add CORS headers if needed
+  // 5. Add CORS headers if needed
   addCORSHeaders(request, response);
 
   return response;
