@@ -251,6 +251,7 @@ export function DetailsTab({
                         const updated = questionPrompts.filter((_, i) => i !== index);
                         onQuestionPromptsChange(updated);
                       }}
+                      aria-label="Remove question prompt"
                       className="flex h-9 w-9 items-center justify-center rounded-md text-[#a39e98] transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
                     >
                       <Trash2 className="h-4 w-4" />

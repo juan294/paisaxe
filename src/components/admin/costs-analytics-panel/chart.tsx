@@ -192,6 +192,7 @@ export function ServiceBreakdownTable({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[#a39e98] hover:text-[#6b6560]"
+                      aria-label={`Open ${service.serviceName} dashboard`}
                     >
                       <ExternalLink className="h-3 w-3" />
                     </a>
@@ -215,6 +216,7 @@ export function ServiceBreakdownTable({
                 <div className="flex items-center justify-end gap-2">
                   <button
                     onClick={() => onEdit(service)}
+                    aria-label={`Edit ${service.serviceName} cost`}
                     className="rounded p-1 text-[#a39e98] hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
                   >
                     <Pencil className="h-3 w-3" />
@@ -225,6 +227,7 @@ export function ServiceBreakdownTable({
                         `${service.serviceId}-${service.billingPeriodStart}`
                       )
                     }
+                    aria-label={`Delete ${service.serviceName} cost`}
                     className="rounded p-1 text-[#a39e98] hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20"
                   >
                     <Trash2 className="h-3 w-3" />
