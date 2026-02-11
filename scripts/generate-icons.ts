@@ -37,7 +37,7 @@ async function generateIcon(svgBuffer: Buffer, config: IconConfig): Promise<void
     const padding = Math.round(config.size * config.padding);
 
     const resized = await sharp(svgBuffer)
-      .resize(innerSize, innerSize, { fit: "contain", background: { r: 10, g: 10, b: 10, alpha: 1 } })
+      .resize(innerSize, innerSize, { fit: "contain", background: { r: 10, g: 15, b: 26, alpha: 1 } })
       .png()
       .toBuffer();
 
@@ -48,14 +48,14 @@ async function generateIcon(svgBuffer: Buffer, config: IconConfig): Promise<void
         bottom: padding,
         left: padding,
         right: padding,
-        background: { r: 10, g: 10, b: 10, alpha: 1 }, // #0a0a0a
+        background: { r: 10, g: 15, b: 26, alpha: 1 }, // #0a0f1a
       })
       .png()
       .toFile(outputPath);
   } else {
     // Standard icon, just resize
     await sharp(svgBuffer)
-      .resize(config.size, config.size, { fit: "contain", background: { r: 10, g: 10, b: 10, alpha: 1 } })
+      .resize(config.size, config.size, { fit: "contain", background: { r: 10, g: 15, b: 26, alpha: 1 } })
       .png()
       .toFile(outputPath);
   }
@@ -66,7 +66,7 @@ async function generateIcon(svgBuffer: Buffer, config: IconConfig): Promise<void
 async function generateFavicon(svgBuffer: Buffer): Promise<void> {
   // Generate a 32x32 PNG first
   const png32 = await sharp(svgBuffer)
-    .resize(32, 32, { fit: "contain", background: { r: 10, g: 10, b: 10, alpha: 1 } })
+    .resize(32, 32, { fit: "contain", background: { r: 10, g: 15, b: 26, alpha: 1 } })
     .png()
     .toBuffer();
 
@@ -80,7 +80,7 @@ async function generateFavicon(svgBuffer: Buffer): Promise<void> {
 
   // Also create a 16x16 version
   await sharp(svgBuffer)
-    .resize(16, 16, { fit: "contain", background: { r: 10, g: 10, b: 10, alpha: 1 } })
+    .resize(16, 16, { fit: "contain", background: { r: 10, g: 15, b: 26, alpha: 1 } })
     .png()
     .toFile(join(PUBLIC_DIR, "favicon-16.png"));
 
