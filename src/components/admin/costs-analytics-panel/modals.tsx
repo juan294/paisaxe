@@ -149,6 +149,7 @@ export function AddCostModal({ onClose, onSubmit, dateRange }: AddCostModalProps
               <option value="communications">Communications</option>
               <option value="analytics">Analytics</option>
               <option value="payments">Payments</option>
+              <option value="development">Development</option>
             </select>
           </div>
 
