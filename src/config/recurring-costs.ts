@@ -64,4 +64,14 @@ export const RECURRING_SUBSCRIPTIONS: RecurringSubscription[] = [
     dashboardUrl: "https://console.anthropic.com/settings/billing",
     startDate: "2025-12-15",
   },
+  {
+    serviceId: "claude-code-max",
+    serviceName: "Claude Code Max",
+    category: "development",
+    costUsd: 200,
+    billingCycle: "monthly",
+    notes: "Max plan (20x Pro). Primary dev tool for building Paisaxe. $200/mo USD list price",
+    dashboardUrl: "https://claude.ai/settings/billing",
+    startDate: "2026-01-27",
+  },
 ];

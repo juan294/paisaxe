@@ -362,4 +362,32 @@ export const SERVICE_REGISTRY: ServiceRegistryEntry[] = [
     notes:
       "The $10/mo Google Cloud credit was a hidden perk discovered accidentally. Watch for similar bundled benefits.",
   },
+  {
+    serviceId: "claude-code-max",
+    serviceName: "Claude Code Max",
+    currentPlan: "Max (20x)",
+    monthlyCostUsd: 200,
+    dashboardUrl: "https://claude.ai/settings/billing",
+    changelogUrl: "https://docs.anthropic.com/en/docs/about-claude/models",
+    includedFeatures: [
+      "20x Pro usage capacity",
+      "Claude Code (full access)",
+      "Priority model access",
+      "Cowork (research preview)",
+      "Maximum context windows",
+    ],
+    usedFeatures: [
+      "20x Pro usage capacity",
+      "Claude Code (full access)",
+      "Priority model access",
+    ],
+    areasToWatch: [
+      "usage limits vs actual consumption",
+      "new Claude Code features",
+      "plan pricing changes",
+      "alternative dev tools",
+    ],
+    notes:
+      "Primary development tool for building Paisaxe. $200/mo USD. Upgraded from Pro → Max 5x → Max 20x during project.",
+  },
 ];

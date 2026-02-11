@@ -263,6 +263,10 @@ function CategoryBadge({ category }: { category: CostCategory }) {
       bg: "bg-rose-100 dark:bg-rose-900/30",
       text: "text-rose-700 dark:text-rose-400",
     },
+    development: {
+      bg: "bg-cyan-100 dark:bg-cyan-900/30",
+      text: "text-cyan-700 dark:text-cyan-400",
+    },
   };
 
   const style = styles[category];

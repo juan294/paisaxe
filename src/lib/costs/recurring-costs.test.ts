@@ -5,8 +5,8 @@ describe("generateRecurringCosts", () => {
   it("should generate costs for the current month", () => {
     const costs = generateRecurringCosts("2026-02-01", "2026-02-28");
 
-    // Should include Supabase, ElevenLabs, AWS Domains, GitHub Pro, and Anthropic
-    expect(costs.length).toBe(5);
+    // Should include Supabase, ElevenLabs, AWS Domains, GitHub Pro, Anthropic, and Claude Code Max
+    expect(costs.length).toBe(6);
 
     const supabase = costs.find((c) => c.serviceId === "supabase");
     expect(supabase).toBeDefined();
@@ -60,6 +60,23 @@ describe("generateRecurringCosts", () => {
     const supabase = costs.find((c) => c.serviceId === "supabase");
 
     expect(supabase!.notes).toBe("Pro plan base cost");
+  });
+
+  it("should include Claude Code Max for February 2026", () => {
+    const costs = generateRecurringCosts("2026-02-01", "2026-02-28");
+    const claudeCode = costs.find((c) => c.serviceId === "claude-code-max");
+
+    expect(claudeCode).toBeDefined();
+    expect(claudeCode!.costUsd).toBe(200);
+    expect(claudeCode!.category).toBe("development");
+    expect(claudeCode!.source).toBe("recurring");
+  });
+
+  it("should not include Claude Code Max before its start date", () => {
+    const costs = generateRecurringCosts("2026-01-01", "2026-01-20");
+    const claudeCode = costs.find((c) => c.serviceId === "claude-code-max");
+
+    expect(claudeCode).toBeUndefined();
   });
 
   it("should return empty array for date range before any subscriptions", () => {
