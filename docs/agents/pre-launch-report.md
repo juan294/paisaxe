@@ -1,44 +1,73 @@
 # Pre-Launch Audit Report
 
-> Generated on 2026-02-13 (Stripe refunds, pre-release audit)
-> Previous audits: 2026-02-07, 2026-02-08, 2026-02-09, 2026-02-10, 2026-02-11
+> Generated on 2026-02-13 (final — all issues resolved)
+> Previous audits: 2026-02-07, 2026-02-08, 2026-02-09, 2026-02-10, 2026-02-11, 2026-02-12
 > Release: develop -> main
 
-## Verdict: CONDITIONAL
+## Verdict: READY
 
-No blockers found. Warnings fixed in-session or tracked as GitHub issues. Safe to release after fix agents complete.
-
----
-
-## Blockers (must fix before deploy)
-
-None.
+All blockers and warnings resolved. All 4 CI workflows green. Safe to release.
 
 ---
 
-## Warnings (fixed in this session)
+## Issues Resolved in This Session
 
-| # | Area | Issue | Fix |
-|---|------|-------|-----|
-| F1 | A11y | Admin icon-only buttons missing `aria-label` (refresh, logout, GitHub sync) | Added ARIA labels |
-| F2 | Perf | Chat response images using raw `<img>` instead of `next/image` | Converted to `next/image` |
-| F3 | QA | 1 skipped test in immersive page tests | Fixed or removed |
-| F4 | UX | Favorites error page missing "go home" link | Added link |
-
-## Warnings (tracked as GitHub issues)
-
-| # | Issue | Priority | Type |
-|---|-------|----------|------|
-| [#110](https://github.com/juan294/paisaxe/issues/110) | CSP unsafe-inline → nonce-based migration | high | security |
-| [#111](https://github.com/juan294/paisaxe/issues/111) | Distributed rate limiting (in-memory → Redis/KV) | medium | security |
-| [#112](https://github.com/juan294/paisaxe/issues/112) | CSRF protection for state-changing routes | medium | security |
-| [#113](https://github.com/juan294/paisaxe/issues/113) | Admin component test coverage (many at 0%) | low | enhancement |
-| [#114](https://github.com/juan294/paisaxe/issues/114) | Checkout page test coverage + E2E spec | medium | enhancement |
-| [#115](https://github.com/juan294/paisaxe/issues/115) | enforce_admins on main branch protection | medium | security |
+| # | Issue | Fix | Commit |
+|---|-------|-----|--------|
+| [#109](https://github.com/juan294/paisaxe/issues/109) | Stripe refunds not reflected in revenue analytics | Added refund detection via `latest_charge`, net revenue computation, UI updates | `ec05016` |
+| [#110](https://github.com/juan294/paisaxe/issues/110) | CSP `unsafe-inline` in script-src | Migrated to nonce-based CSP with `strict-dynamic` | `7f24f6c` |
+| [#111](https://github.com/juan294/paisaxe/issues/111) | Rate limiting in-memory only (not distributed) | Added Upstash Redis backend with in-memory fallback | `9d71833` |
+| [#112](https://github.com/juan294/paisaxe/issues/112) | No CSRF protection on state-changing routes | Double-submit cookie pattern in proxy.ts, 25 files updated | `40eb7ee` |
+| [#113](https://github.com/juan294/paisaxe/issues/113) | Admin components at 0% test coverage | 16 test files, 129 smoke tests added | `eaaf253` |
+| [#114](https://github.com/juan294/paisaxe/issues/114) | Checkout page low coverage, no E2E | Coverage 50%→100%, 8 E2E tests added | `58b6c54` |
+| [#115](https://github.com/juan294/paisaxe/issues/115) | `enforce_admins` disabled on main branch | Enabled via GitHub API | N/A (API) |
+| — | Admin icon-only buttons missing `aria-label` | Added ARIA labels to refresh, logout, GitHub sync buttons | `eb861ad` |
+| — | Chat images using raw `<img>` | Converted to `next/image` with proper sizes | `a53139f` |
+| — | Skipped test in immersive page | Removed redundant skipped test | `32ba3d2` |
+| — | Favorites error page missing "go home" link | Added link with i18n text | `32ba3d2` |
 
 ---
 
-## Recommendations (nice to have)
+## Current State
+
+### Quality Assurance
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Unit tests | 3,848 passed | **4,051 passed** |
+| E2E tests | 170 tests | **178+ tests** |
+| Test files | 247 | **265** |
+| Admin coverage | Many at 0% | **16 components covered** |
+| Checkout coverage | 50% stmt | **100% stmt** |
+
+### Security
+
+| Check | Result |
+|-------|--------|
+| CSP headers | **PASS** — nonce-based `script-src` with `strict-dynamic` (was `unsafe-inline`) |
+| CSRF protection | **PASS** — double-submit cookie on all state-changing API routes |
+| Rate limiting | **PASS** — Upstash Redis distributed + in-memory fallback |
+| Webhook verification | PASS — Stripe, ElevenLabs HMAC, Supabase secret |
+| Hardcoded secrets | PASS — none found |
+| CORS | PASS — strict origin allowlist |
+| XSS vectors | PASS — all `dangerouslySetInnerHTML` safe |
+| Open redirect | PASS — auth callback validates `next` param |
+| SQL injection | PASS — all queries via Supabase query builder |
+| npm audit | LOW — 2 `qs` advisories (transitive, server-side only) |
+| Branch protection | **PASS** — `enforce_admins` enabled, 4 required checks |
+
+### CI Status (all green)
+
+| Workflow | Status |
+|----------|--------|
+| CI (lint, typecheck, test, build) | Pass |
+| E2E Tests | Pass |
+| Lighthouse CI | Pass |
+| Security Scan | Pass |
+
+---
+
+## Recommendations (nice to have, not blocking)
 
 | # | Area | Recommendation |
 |---|------|----------------|
@@ -54,112 +83,18 @@ None.
 
 ---
 
-## Detailed Findings
+## Commits Since Last Production Release
 
-### Architecture (architect)
-
-| Check | Result |
-|-------|--------|
-| TypeScript strict mode | PASS — `strict: true`, 21 `any` (test mocks only) |
-| Typecheck | PASS — 0 errors |
-| Dead code (knip) | PASS — zero output |
-| Circular dependencies | PASS — none detected |
-| Dependencies | GOOD — all current stable, zero unused |
-| next.config.ts | GOOD — security headers, HSTS, image optimization, CSP, PostHog proxy |
-| proxy.ts | GOOD — strict CORS, 3s auth timeout, fail-open maintenance, canonical redirects |
-| tsconfig.json | PASS — strict, bundler resolution, incremental builds |
-
-**Key finding:** Zero type errors, zero dead code, zero circular dependencies. 2 low-severity `qs` advisories (transitive via voyageai, no upstream fix, server-side only).
-
----
-
-### Quality Assurance (qa-lead)
-
-| Metric | Value |
-|--------|-------|
-| Unit tests | 3,848 passed / 1 skipped / 0 failed |
-| E2E tests | 12 specs / 170 tests |
-| Statement coverage | 79.16% |
-| Branch coverage | 70.18% |
-| Function coverage | 72.57% |
-| Line coverage | 79.99% |
-
-**High-coverage critical paths:**
-- `proxy.ts`: 97.63% stmt
-- `lib/stripe.ts`: 96.87% stmt
-- `lib/claude.ts`: 99.35% stmt
-- `auth/callback`: 100%
-- `hooks/use-stream-chat`: 97.7% stmt
-- All webhook routes: tested (Stripe 8, ElevenLabs 22, Supabase 8, Translate 6)
-
-**Low-coverage areas:** Admin components (many at 0%), checkout page (50% stmt). Tracked in #113 and #114.
-
----
-
-### Security (security-reviewer)
-
-| Check | Result |
-|-------|--------|
-| Hardcoded secrets | PASS — none found (test mocks only) |
-| Admin auth flow | PASS — `getUser()` server-side + DB role check, 401/403 distinction |
-| CORS configuration | PASS — strict origin allowlist, no wildcards, localhost dev-only |
-| XSS vectors | PASS — 8 `dangerouslySetInnerHTML` all safe (JSON-LD + escaped markdown) |
-| CSP headers | WARNING — `unsafe-inline` (tracked #110) |
-| Webhook verification | PASS — Stripe `constructEvent`, ElevenLabs HMAC+timingSafeEqual, Supabase secret |
-| Open redirect | PASS — auth callback validates `next` param |
-| SQL injection | PASS — all queries via Supabase query builder |
-| npm audit | LOW — 2 `qs` advisories (server-side, low exploitability) |
-| Rate limiting | PASS — in-memory per-IP (distributed store tracked #111) |
-| CSRF | WARNING — no explicit tokens (tracked #112) |
-
----
-
-### Performance (performance-eng)
-
-| Metric | Value |
-|--------|-------|
-| Build time | 11.8s (Turbopack) |
-| Static pages | 58 in 652ms |
-| Total client JS | 3.0MB across 59 chunks |
-| Largest chunk | 472KB (livekit/protobuf — dynamically loaded) |
-| CSS | ~136KB |
-| Dead code | None |
-| Dynamic imports | 10+ heavy components lazily loaded |
-
-**Key findings:**
-- No chunk exceeds 500KB threshold
-- Code splitting excellent: VoiceChat (SSR disabled), 8 admin panels, PostHog, i18n locales all lazy
-- `next/image` used consistently with proper `sizes`, `priority` on LCP hero
-- Font self-hosted via `next/font` (no render-blocking Google Fonts request)
-- Build clean with zero warnings
-
----
-
-### UX & Accessibility (ux-reviewer)
-
-| Check | Result |
-|-------|--------|
-| ARIA labels | GOOD — 241 attrs across 80 files; admin gaps fixed |
-| Alt text | PASS — all images have proper `alt` |
-| i18n completeness | EXCELLENT — 6 locales, automated parity tests |
-| Responsive design | GOOD — strong breakpoint usage across all key pages |
-| Keyboard navigation | GOOD — 7 components with `onKeyDown`, full arrow key nav, skip link |
-| Error states | GOOD — 4 error boundaries, i18n messages, `role="alert"` |
-| Reduced motion | GOOD — `motion-reduce` on 16 files / 40 occurrences |
-
-**Locales:** Spanish (es), English (en), French (fr), German (de), Portuguese (pt), Asturian (ast) — all complete and parity-enforced.
-
----
-
-### DevOps & Infrastructure (devops)
-
-| Check | Result |
-|-------|--------|
-| Vercel config | PASS — 3 domain redirects (301 permanent) |
-| Env vars | PASS — all 26 required vars in `.env.example`, full CLAUDE.md parity |
-| Health endpoint | PASS — Supabase check, DB size check, proper cache headers |
-| GitHub Actions | PASS — all runs green, 9 workflows |
-| Branch protection | PASS — 4 required checks, force push blocked |
-| enforce_admins | WARNING — disabled (tracked #115) |
-
-**CI workflows:** lint, typecheck, test, build, E2E, security, Lighthouse, knip, license check, bundle size, AI code review, visual regression — comprehensive coverage.
+```
+195b107 test(e2e): add CSRF token headers to POST/DELETE E2E tests
+eaaf253 test(admin): add smoke tests for 16 admin components at 0% coverage (Fixes #113)
+40eb7ee fix(security): add CSRF double-submit cookie protection (Fixes #112)
+7f24f6c fix(security): migrate CSP script-src from unsafe-inline to nonce-based (Fixes #110)
+9d71833 fix(security): add distributed rate limiting with Upstash Redis fallback (Fixes #111)
+58b6c54 test(payments): improve checkout coverage and add E2E spec (Fixes #114)
+f988228 docs: update pre-launch audit report for Feb 13, 2026
+a53139f perf(chat): use next/image for chat response images
+32ba3d2 fix(ux): unskip/fix immersive filter test and add go-home link to favorites error
+eb861ad fix(a11y): add missing ARIA labels to admin icon buttons (Refs #110)
+ec05016 fix(payments): reflect Stripe refunds in revenue analytics (Fixes #109)
+```
