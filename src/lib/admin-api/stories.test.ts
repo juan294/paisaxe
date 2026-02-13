@@ -295,7 +295,7 @@ describe("admin-api/stories", () => {
       await uploadStoryImage(storyId, file);
 
       const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(init.headers).toBeUndefined();
+      expect(init.headers).toEqual({});
     });
 
     it("returns data on successful response", async () => {
@@ -485,7 +485,7 @@ describe("admin-api/stories", () => {
 
       const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(init.body).toBeUndefined();
-      expect(init.headers).toBeUndefined();
+      expect(init.headers).toEqual({});
     });
 
     it("returns error from response body on non-ok response", async () => {

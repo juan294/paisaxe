@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { csrfHeaders } from "@/lib/csrf-client";
 import {
   Dialog,
   DialogContent,
@@ -48,9 +49,7 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
     try {
       const response = await fetch("/api/suggestions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({
           placeName: trimmedPlaceName,
           comment: comment.trim() || undefined,

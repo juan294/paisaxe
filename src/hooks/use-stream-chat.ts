@@ -12,6 +12,7 @@ import {
   recordUpsellShown,
   recordUpsellDismissed,
 } from "@/lib/chat-upsell-throttle";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface StreamChatMessage {
   role: "user" | "assistant";
@@ -73,7 +74,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
       try {
         const response = await fetch("/api/chat/stream", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...csrfHeaders() },
           body: JSON.stringify({
             message: userMessage,
             context: options.context,

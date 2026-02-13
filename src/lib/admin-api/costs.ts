@@ -5,6 +5,7 @@ import type {
   ManualCostEntry,
   UpdateManualCostRequest,
 } from "@/types/costs-analytics";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 const API_BASE = "/api/admin";
 
@@ -45,9 +46,7 @@ export async function createManualCostEntry(
   try {
     const response = await fetch(`${API_BASE}/costs-analytics`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(data),
     });
 
@@ -73,9 +72,7 @@ export async function updateManualCostEntry(
   try {
     const response = await fetch(`${API_BASE}/costs-analytics/${id}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(data),
     });
 
@@ -100,6 +97,7 @@ export async function deleteManualCostEntry(
   try {
     const response = await fetch(`${API_BASE}/costs-analytics/${id}`, {
       method: "DELETE",
+      headers: csrfHeaders(),
     });
 
     if (!response.ok) {

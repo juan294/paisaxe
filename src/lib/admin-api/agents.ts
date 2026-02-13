@@ -1,5 +1,6 @@
 import type { AdminApiResponse } from "@/types/admin";
 import type { AgentsDashboardData, AgentRunStatus, AgentLogsResponse } from "@/types/agents-dashboard";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 const API_BASE = "/api/admin";
 
@@ -31,7 +32,7 @@ export async function triggerAgentRun(
   try {
     const response = await fetch(`${API_BASE}/agents/run`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ agentKey }),
     });
 
@@ -73,7 +74,7 @@ export async function stopAgent(agentKey: string): Promise<AdminApiResponse<{ st
   try {
     const response = await fetch(`${API_BASE}/agents/run`, {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ agentKey }),
     });
 

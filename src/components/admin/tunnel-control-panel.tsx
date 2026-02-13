@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface TunnelStatus {
   running: boolean;
@@ -54,7 +55,7 @@ export function TunnelTableRow({ rowNumber, onRunningChange }: TunnelTableRowPro
 
     try {
       const method = status.running ? "DELETE" : "POST";
-      const response = await fetch("/api/admin/tunnel", { method });
+      const response = await fetch("/api/admin/tunnel", { method, headers: csrfHeaders() });
 
       if (response.ok) {
         const data = await response.json();

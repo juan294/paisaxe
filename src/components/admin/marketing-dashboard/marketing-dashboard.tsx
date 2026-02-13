@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, AlertCircle } from "lucide-react";
 import { VoiceAgentChat } from "../voice-agent-chat";
 import { ELEVENLABS_AGENT_IDS } from "@/config/elevenlabs-agents";
+import { csrfHeaders } from "@/lib/csrf-client";
 import type {
   MarketingDashboardSummary,
   MarketingPlatform,
@@ -56,6 +57,7 @@ export function MarketingDashboard() {
         // Pause the account (keep credentials)
         const response = await fetch(`/api/admin/marketing/accounts?platform=${platform}&action=pause`, {
           method: "PATCH",
+          headers: csrfHeaders(),
         });
         if (!response.ok) {
           const result = await response.json();
@@ -65,6 +67,7 @@ export function MarketingDashboard() {
         // Resume the account (credentials still exist)
         const response = await fetch(`/api/admin/marketing/accounts?platform=${platform}&action=resume`, {
           method: "PATCH",
+          headers: csrfHeaders(),
         });
         if (!response.ok) {
           const result = await response.json();
@@ -88,6 +91,7 @@ export function MarketingDashboard() {
     try {
       const response = await fetch(`/api/admin/marketing/accounts?platform=${platform}`, {
         method: "DELETE",
+        headers: csrfHeaders(),
       });
       if (!response.ok) {
         const result = await response.json();
