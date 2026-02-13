@@ -284,6 +284,10 @@ GOOGLE_PLACES_API_KEY=                  # Places data for voice agent
 RESEND_API_KEY=                         # Resend API key for sending emails
 ADMIN_EMAIL=                            # Admin notification recipient (default: admin@paisaxe.es)
 
+# Upstash Redis (distributed rate limiting - optional)
+UPSTASH_REDIS_REST_URL=                # Upstash Redis REST URL
+UPSTASH_REDIS_REST_TOKEN=              # Upstash Redis REST token
+
 # PostHog analytics (optional)
 NEXT_PUBLIC_POSTHOG_KEY=                # PostHog project API key
 NEXT_PUBLIC_POSTHOG_HOST=               # PostHog ingestion host
