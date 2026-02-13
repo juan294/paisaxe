@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, POST } from "./route";
 
+// Mock rate limiter
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn(),
+}));
+
 // Mock Supabase SSR
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(() => ({
@@ -33,9 +38,11 @@ vi.mock("next/headers", () => ({
   ),
 }));
 
-// Get mock reference
+// Get mock references
 import { createServerClient } from "@supabase/ssr";
+import { checkRateLimit } from "@/lib/rate-limit";
 const mockCreateServerClient = vi.mocked(createServerClient);
+const mockCheckRateLimit = vi.mocked(checkRateLimit);
 
 describe("Suggestions API", () => {
   let requestCounter = 0;
@@ -43,6 +50,13 @@ describe("Suggestions API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requestCounter++;
+    // Default: allow all requests
+    mockCheckRateLimit.mockResolvedValue({
+      allowed: true,
+      limit: 1,
+      remaining: 0,
+      resetAt: Date.now() + 60_000,
+    });
   });
 
   // Each request gets a unique IP to avoid rate limit collisions across tests
@@ -429,19 +443,13 @@ describe("Suggestions API", () => {
     });
 
     it("should return 429 when rate limited", async () => {
-      // First request - should succeed
-      const createdSuggestion = {
-        id: "sug-new",
-        user_id: "user-rate-limit",
-        place_name: "First Place",
-        comment: null,
-        location: null,
-        attribution: null,
-        status: "pending",
-        admin_notes: null,
-        created_at: "2024-01-01T00:00:00Z",
-        updated_at: "2024-01-01T00:00:00Z",
-      };
+      mockCheckRateLimit.mockResolvedValue({
+        allowed: false,
+        limit: 1,
+        remaining: 0,
+        resetAt: Date.now() + 60_000,
+        retryAfter: 60,
+      });
 
       mockCreateServerClient.mockReturnValue({
         auth: {
@@ -450,34 +458,63 @@ describe("Suggestions API", () => {
             error: null,
           }),
         },
+        from: vi.fn(),
+      } as never);
+
+      const request = createRequest("POST", {
+        headers: { Authorization: "Bearer valid-token" },
+        body: { placeName: "Some Place" },
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(429);
+      const json = await response.json();
+      expect(json.error).toContain("Rate limit exceeded");
+    });
+
+    it("should call checkRateLimit with suggestion prefix and custom config", async () => {
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-rl-check" } },
+            error: null,
+          }),
+        },
         from: vi.fn(() => ({
           insert: vi.fn(() => ({
             select: vi.fn(() => ({
               single: vi.fn(() =>
-                Promise.resolve({ data: createdSuggestion, error: null })
+                Promise.resolve({
+                  data: {
+                    id: "sug-rl",
+                    user_id: "user-rl-check",
+                    place_name: "RL Check Place",
+                    comment: null,
+                    location: null,
+                    attribution: null,
+                    status: "pending",
+                    admin_notes: null,
+                    created_at: "2024-01-01T00:00:00Z",
+                    updated_at: "2024-01-01T00:00:00Z",
+                  },
+                  error: null,
+                })
               ),
             })),
           })),
         })),
       } as never);
 
-      const request1 = createRequest("POST", {
+      const request = createRequest("POST", {
         headers: { Authorization: "Bearer valid-token" },
-        body: { placeName: "First Place" },
+        body: { placeName: "RL Check Place" },
       });
-      const response1 = await POST(request1);
-      expect(response1.status).toBe(201);
+      await POST(request);
 
-      // Second request immediately after - should be rate limited
-      const request2 = createRequest("POST", {
-        headers: { Authorization: "Bearer valid-token" },
-        body: { placeName: "Second Place" },
-      });
-      const response2 = await POST(request2);
-
-      expect(response2.status).toBe(429);
-      const json = await response2.json();
-      expect(json.error).toContain("Rate limit exceeded");
+      expect(mockCheckRateLimit).toHaveBeenCalledWith(
+        expect.stringContaining("suggestion:"),
+        expect.objectContaining({ maxRequests: 1, windowMs: 60_000 })
+      );
     });
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 
 export default function FavoritesError({
@@ -24,12 +25,20 @@ export default function FavoritesError({
       <p className="mt-4 max-w-md text-white/70">
         {t("errors.favorites_description")}
       </p>
-      <button
-        onClick={reset}
-        className="mt-8 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full px-6 py-3 text-white transition-colors"
-      >
-        {t("errors.retry")}
-      </button>
+      <div className="mt-8 flex flex-col items-center gap-4">
+        <button
+          onClick={reset}
+          className="bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full px-6 py-3 text-white transition-colors"
+        >
+          {t("errors.retry")}
+        </button>
+        <Link
+          href="/"
+          className="text-white/60 hover:text-white transition-colors text-sm underline underline-offset-4"
+        >
+          {t("errors.go_home")}
+        </Link>
+      </div>
     </div>
   );
 }

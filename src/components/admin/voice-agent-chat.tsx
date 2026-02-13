@@ -12,6 +12,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { csrfHeaders } from "@/lib/csrf-client";
 import type { MarketingPlatform } from "@/types/marketing";
 
 interface Message {
@@ -183,7 +184,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
         // Use the existing text API
         const response = await fetch("/api/admin/marketing/agent", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...csrfHeaders() },
           body: JSON.stringify({
             agentId: selectedAgent.id,
             message: userMessage,

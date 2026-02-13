@@ -1,5 +1,6 @@
 import type { AdminApiResponse } from "@/types/admin";
 import type { AdminStorySuggestion, SuggestionStatus, StorySuggestion } from "@/types/suggestions";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 const API_BASE = "/api/admin";
 
@@ -39,9 +40,7 @@ export async function updateSuggestion(
   try {
     const response = await fetch(`${API_BASE}/suggestions/${suggestionId}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(updates),
     });
 
@@ -66,6 +65,7 @@ export async function deleteSuggestion(
   try {
     const response = await fetch(`${API_BASE}/suggestions/${suggestionId}`, {
       method: "DELETE",
+      headers: csrfHeaders(),
     });
 
     if (!response.ok) {

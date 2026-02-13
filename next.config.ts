@@ -56,31 +56,8 @@ const nextConfig: NextConfig = {
         { key: "X-Frame-Options", value: "DENY" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" },
-        // TODO: Migrate to nonce-based CSP to eliminate 'unsafe-inline' from script-src.
-        // Next.js 16 uses proxy.ts (not middleware.ts). To implement:
-        // 1. Generate a nonce per request in proxy.ts: crypto.randomUUID()
-        // 2. Inject it into the CSP header: script-src 'nonce-<value>' 'strict-dynamic'
-        // 3. Pass the nonce to <Script> components via next/script nonce prop
-        // 4. Remove 'unsafe-inline' from script-src once all inline scripts use nonces
-        // Blocked by: Need to verify proxy.ts can set response headers that
-        // next.config.ts CSP won't override (static headers vs per-request headers).
-        {
-          key: "Content-Security-Policy",
-          value: [
-            "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' blob: https://js.stripe.com",
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://picsum.photos https://*.googleusercontent.com",
-            "font-src 'self' data:",
-            "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://*.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com",
-            "media-src 'self' blob:",
-            "worker-src 'self' blob:",
-            "frame-src https://js.stripe.com",
-            "frame-ancestors 'none'",
-            "base-uri 'self'",
-            "form-action 'self'",
-          ].join("; "),
-        },
+        // CSP is set dynamically per-request in proxy.ts with a nonce.
+        // See buildCspHeader() in src/proxy.ts.
       ],
     },
     {

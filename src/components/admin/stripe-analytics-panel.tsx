@@ -127,13 +127,18 @@ export function StripeAnalyticsPanel() {
           {/* Summary Stats */}
           <section className="grid grid-cols-2 gap-16 lg:grid-cols-4">
             <StatCard
-              value={data.summary.totalRevenueFormatted}
-              label="Total Revenue"
+              value={data.summary.netRevenueFormatted}
+              label="Net Revenue"
               color="emerald"
             />
             <StatCard
-              value={data.summary.thirtyDayRevenueFormatted}
-              label="30-Day Revenue"
+              value={data.summary.totalRefundsFormatted}
+              label="Refunds"
+              color="rose"
+            />
+            <StatCard
+              value={data.summary.thirtyDayNetRevenueFormatted}
+              label="30-Day Net"
               color="blue"
             />
             <StatCard
@@ -141,12 +146,14 @@ export function StripeAnalyticsPanel() {
               label="Total Orders"
               color="amber"
             />
-            <StatCard
-              value={data.summary.averageOrderValueFormatted}
-              label="Avg Order Value"
-              color="violet"
-            />
           </section>
+
+          {/* Revenue Breakdown */}
+          <div className="font-mono text-xs text-[#6b6560] dark:text-[#a39e98]">
+            Gross: {data.summary.totalRevenueFormatted}
+            {" — "}Refunds: {data.summary.totalRefundsFormatted}
+            {" = "}Net: {data.summary.netRevenueFormatted}
+          </div>
 
           {/* Revenue Chart */}
           {data.revenueByDay.length > 0 && (
@@ -202,7 +209,7 @@ function isEmptyData(data: StripeAnalyticsDashboardData): boolean {
 interface StatCardProps {
   value: number | string;
   label: string;
-  color?: "blue" | "emerald" | "amber" | "violet";
+  color?: "blue" | "emerald" | "amber" | "violet" | "rose";
 }
 
 const statColorClasses = {
@@ -210,6 +217,7 @@ const statColorClasses = {
   emerald: "text-emerald-600 dark:text-emerald-400",
   amber: "text-amber-600 dark:text-amber-400",
   violet: "text-violet-600 dark:text-violet-400",
+  rose: "text-rose-600 dark:text-rose-400",
 };
 
 function StatCard({ value, label, color }: StatCardProps) {
@@ -456,8 +464,19 @@ function RecentOrdersTable({ number, title, orders }: RecentOrdersTableProps) {
               <td className="py-2">
                 <OrderStatusBadge status={order.status} />
               </td>
-              <td className="py-2 text-right font-mono text-sm font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                {order.totalFormatted}
+              <td className="py-2 text-right font-mono text-sm tabular-nums">
+                {order.refundedAmount > 0 ? (
+                  <div>
+                    <span className="text-[#a39e98] line-through">{order.totalFormatted}</span>
+                    <span className="ml-1 text-xs font-medium text-rose-600 dark:text-rose-400">
+                      -{order.refundedAmountFormatted}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    {order.totalFormatted}
+                  </span>
+                )}
               </td>
             </tr>
           ))}
@@ -530,9 +549,9 @@ function SkeletonRevenueDashboard() {
       {/* Summary Stats Skeleton */}
       <section className="grid grid-cols-2 gap-16 lg:grid-cols-4">
         <SkeletonStatCard color="emerald" />
+        <SkeletonStatCard color="rose" />
         <SkeletonStatCard color="blue" />
         <SkeletonStatCard color="amber" />
-        <SkeletonStatCard color="violet" />
       </section>
 
       {/* Revenue Chart Skeleton */}
@@ -555,9 +574,10 @@ const skeletonColorClasses: Record<string, string> = {
   emerald: "bg-emerald-200 dark:bg-emerald-900/30",
   amber: "bg-amber-200 dark:bg-amber-900/30",
   violet: "bg-violet-200 dark:bg-violet-900/30",
+  rose: "bg-rose-200 dark:bg-rose-900/30",
 };
 
-function SkeletonStatCard({ color }: { color: "blue" | "emerald" | "amber" | "violet" }) {
+function SkeletonStatCard({ color }: { color: "blue" | "emerald" | "amber" | "violet" | "rose" }) {
   return (
     <div>
       <div className={`h-12 w-28 animate-pulse rounded lg:h-16 lg:w-36 ${skeletonColorClasses[color]}`} />

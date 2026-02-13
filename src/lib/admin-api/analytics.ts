@@ -3,6 +3,7 @@ import type { AnalyticsDashboardData } from "@/types/analytics";
 import type { ElevenLabsAnalyticsDashboardData } from "@/types/elevenlabs-analytics";
 import type { StripeAnalyticsDashboardData } from "@/types/stripe-analytics";
 import type { GitHubAnalyticsDashboardData } from "@/types/github-analytics";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 const API_BASE = "/api/admin";
 
@@ -123,9 +124,7 @@ export async function syncGithubTraffic(): Promise<AdminApiResponse<{ synced: bo
   try {
     const response = await fetch("/api/cron/github-traffic-sync", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
     });
 
     if (!response.ok) {

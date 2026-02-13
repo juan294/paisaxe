@@ -1,67 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { buildCspHeader } from "@/proxy";
 
 /**
- * Tests for security headers in next.config.ts.
- * These tests parse the config file to verify CSP directives and header policies.
+ * Tests for security headers.
+ *
+ * CSP is now dynamically generated per-request in proxy.ts with a nonce.
+ * Static security headers remain in next.config.ts.
  */
 describe("Security headers in next.config.ts", () => {
   const configPath = resolve(__dirname, "../../next.config.ts");
   const configContent = readFileSync(configPath, "utf-8");
-
-  describe("Content-Security-Policy", () => {
-    it("should include blob: in script-src for AudioWorklet support", () => {
-      // ElevenLabs SDK loads rawAudioProcessor as a blob: AudioWorklet module.
-      // AudioWorklets are governed by script-src (not worker-src) per the CSP spec.
-      // Match the actual CSP directive string (inside quotes), not TODO comments.
-      const scriptSrcMatch = configContent.match(/"script-src ([^"]+)"/);
-      expect(scriptSrcMatch).toBeTruthy();
-      const scriptSrc = scriptSrcMatch![1];
-      expect(scriptSrc).toContain("blob:");
-    });
-
-    it("should include blob: in worker-src", () => {
-      const workerSrcMatch = configContent.match(/"worker-src ([^"]+)"/);
-      expect(workerSrcMatch).toBeTruthy();
-      const workerSrc = workerSrcMatch![1];
-      expect(workerSrc).toContain("blob:");
-    });
-
-    it("should include blob: in media-src", () => {
-      const mediaSrcMatch = configContent.match(/"media-src ([^"]+)"/);
-      expect(mediaSrcMatch).toBeTruthy();
-      const mediaSrc = mediaSrcMatch![1];
-      expect(mediaSrc).toContain("blob:");
-    });
-
-    it("should include Vercel Analytics domains in connect-src", () => {
-      const connectSrcMatch = configContent.match(/"connect-src ([^"]+)"/);
-      expect(connectSrcMatch).toBeTruthy();
-      const connectSrc = connectSrcMatch![1];
-      expect(connectSrc).toContain("https://vitals.vercel-insights.com");
-      expect(connectSrc).toContain("https://va.vercel-scripts.com");
-    });
-
-    it("should include Stripe domains for embedded checkout", () => {
-      // Stripe embedded checkout requires js.stripe.com for scripts and iframes,
-      // and api.stripe.com for API calls from the Stripe.js SDK.
-      const scriptSrcMatch = configContent.match(/"script-src ([^"]+)"/);
-      expect(scriptSrcMatch).toBeTruthy();
-      const scriptSrc = scriptSrcMatch![1];
-      expect(scriptSrc).toContain("https://js.stripe.com");
-
-      const frameSrcMatch = configContent.match(/"frame-src ([^"]+)"/);
-      expect(frameSrcMatch).toBeTruthy();
-      const frameSrc = frameSrcMatch![1];
-      expect(frameSrc).toContain("https://js.stripe.com");
-
-      const connectSrcMatch = configContent.match(/"connect-src ([^"]+)"/);
-      expect(connectSrcMatch).toBeTruthy();
-      const connectSrc = connectSrcMatch![1];
-      expect(connectSrc).toContain("https://api.stripe.com");
-    });
-  });
 
   describe("Deprecated headers", () => {
     it("should not include X-XSS-Protection header", () => {
@@ -72,7 +22,6 @@ describe("Security headers in next.config.ts", () => {
   describe("Required security headers", () => {
     it("should include Strict-Transport-Security only in production", () => {
       expect(configContent).toContain("Strict-Transport-Security");
-      // HSTS must be conditional on NODE_ENV to avoid poisoning localhost in browsers
       expect(configContent).toMatch(/process\.env\.NODE_ENV\s*===?\s*["']production["']/);
     });
 
@@ -88,8 +37,70 @@ describe("Security headers in next.config.ts", () => {
       expect(configContent).toContain("Referrer-Policy");
     });
 
-    it("should include Content-Security-Policy", () => {
-      expect(configContent).toContain("Content-Security-Policy");
+    it("should NOT include static CSP in next.config.ts (now dynamic in proxy.ts)", () => {
+      // CSP is set per-request in proxy.ts with a nonce. next.config.ts must not
+      // set a static CSP that would conflict with or override the dynamic one.
+      expect(configContent).not.toMatch(/"Content-Security-Policy"/);
     });
+  });
+});
+
+describe("CSP header via buildCspHeader (proxy.ts)", () => {
+  const testNonce = "test-nonce-abc123";
+  const csp = buildCspHeader(testNonce);
+
+  it("should include nonce in script-src", () => {
+    expect(csp).toContain(`'nonce-${testNonce}'`);
+  });
+
+  it("should NOT include unsafe-inline in script-src", () => {
+    const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+  });
+
+  it("should include strict-dynamic in script-src", () => {
+    const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
+    expect(scriptSrc).toContain("'strict-dynamic'");
+  });
+
+  it("should include blob: in script-src for AudioWorklet support", () => {
+    const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
+    expect(scriptSrc).toContain("blob:");
+  });
+
+  it("should include blob: in worker-src", () => {
+    const workerSrc = csp.split(";").find((d) => d.trim().startsWith("worker-src"))!;
+    expect(workerSrc).toContain("blob:");
+  });
+
+  it("should include blob: in media-src", () => {
+    const mediaSrc = csp.split(";").find((d) => d.trim().startsWith("media-src"))!;
+    expect(mediaSrc).toContain("blob:");
+  });
+
+  it("should include Vercel Analytics domains in connect-src", () => {
+    const connectSrc = csp.split(";").find((d) => d.trim().startsWith("connect-src"))!;
+    expect(connectSrc).toContain("https://vitals.vercel-insights.com");
+    expect(connectSrc).toContain("https://va.vercel-scripts.com");
+  });
+
+  it("should include Stripe domains for embedded checkout", () => {
+    const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
+    expect(scriptSrc).toContain("https://js.stripe.com");
+
+    const frameSrc = csp.split(";").find((d) => d.trim().startsWith("frame-src"))!;
+    expect(frameSrc).toContain("https://js.stripe.com");
+
+    const connectSrc = csp.split(";").find((d) => d.trim().startsWith("connect-src"))!;
+    expect(connectSrc).toContain("https://api.stripe.com");
+  });
+
+  it("should keep unsafe-inline in style-src for Tailwind/Next.js CSS", () => {
+    const styleSrc = csp.split(";").find((d) => d.trim().startsWith("style-src"))!;
+    expect(styleSrc).toContain("'unsafe-inline'");
+  });
+
+  it("should include frame-ancestors none", () => {
+    expect(csp).toContain("frame-ancestors 'none'");
   });
 });

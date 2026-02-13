@@ -1,5 +1,6 @@
 import type { AdminApiResponse } from "@/types/admin";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 const API_BASE = "/api/admin";
 
@@ -8,7 +9,9 @@ const API_BASE = "/api/admin";
  */
 export async function fetchFeatureFlags(): Promise<AdminApiResponse<FeatureFlag[]>> {
   try {
-    const response = await fetch("/api/feature-flags");
+    const response = await fetch("/api/feature-flags", {
+      cache: "no-store",
+    });
 
     if (!response.ok) {
       const error = await response.json();
@@ -32,9 +35,7 @@ export async function updateFeatureFlag(
   try {
     const response = await fetch(`${API_BASE}/feature-flags/${flagKey}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ enabled }),
     });
 
@@ -60,9 +61,7 @@ export async function updateFeatureFlagConfig(
   try {
     const response = await fetch(`${API_BASE}/feature-flags/${flagKey}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ config }),
     });
 

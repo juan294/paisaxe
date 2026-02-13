@@ -1,4 +1,20 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, APIRequestContext } from "@playwright/test";
+
+/**
+ * Helper to get CSRF headers by visiting a page first.
+ * The proxy sets a __csrf cookie on non-API page requests.
+ * Returns headers with both the cookie and the x-csrf-token header.
+ */
+async function getCsrfHeaders(request: APIRequestContext) {
+  const pageResponse = await request.get("/immersive");
+  const setCookie = pageResponse.headers()["set-cookie"] || "";
+  const match = setCookie.match(/__csrf=([a-f0-9]+)/);
+  const token = match?.[1] || "";
+  return {
+    "x-csrf-token": token,
+    Cookie: `__csrf=${token}`,
+  };
+}
 
 test.describe("API route smoke tests", () => {
   test("GET /api/health returns valid JSON", async ({ request }) => {
@@ -28,7 +44,9 @@ test.describe("API route smoke tests", () => {
   });
 
   test("POST /api/chat rejects empty body", async ({ request }) => {
+    const csrf = await getCsrfHeaders(request);
     const response = await request.post("/api/chat", {
+      headers: csrf,
       data: {},
     });
     // Should return 400 for invalid/empty request
@@ -47,14 +65,21 @@ test.describe("API route smoke tests", () => {
   });
 
   test("POST /api/favorites returns 401 without auth", async ({ request }) => {
+    const csrf = await getCsrfHeaders(request);
     const response = await request.post("/api/favorites", {
+      headers: csrf,
       data: { storyIds: ["test-id"] },
     });
     expect(response.status()).toBe(401);
   });
 
-  test("DELETE /api/favorites returns 401 without auth", async ({ request }) => {
-    const response = await request.delete("/api/favorites?storyId=test-id");
+  test("DELETE /api/favorites returns 401 without auth", async ({
+    request,
+  }) => {
+    const csrf = await getCsrfHeaders(request);
+    const response = await request.delete("/api/favorites?storyId=test-id", {
+      headers: csrf,
+    });
     expect(response.status()).toBe(401);
   });
 });

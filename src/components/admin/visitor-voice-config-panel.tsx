@@ -58,8 +58,22 @@ export function VisitorVoiceConfigPanel({
     setIsSaving(true);
     setError("");
 
+    // Auto-add any pending email from the input field
+    let emailsToSave = emails;
+    const pendingEmail = newEmail.trim().toLowerCase();
+    if (pendingEmail) {
+      const isDuplicate = emails.some(
+        (email) => email.toLowerCase() === pendingEmail
+      );
+      if (!isDuplicate) {
+        emailsToSave = [...emails, pendingEmail];
+        setEmails(emailsToSave);
+      }
+      setNewEmail("");
+    }
+
     const result = await updateFeatureFlagConfig("visitor_voice_agent", {
-      whitelisted_emails: emails,
+      whitelisted_emails: emailsToSave,
       agent_id: agentId,
     });
 
