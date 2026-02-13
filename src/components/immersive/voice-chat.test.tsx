@@ -40,6 +40,28 @@ vi.mock("posthog-js/react", () => ({
   usePostHog: () => ({ capture: mockCapture }),
 }));
 
+// Mock next/image — renders a plain <img> with all props forwarded for test assertions
+vi.mock("next/image", () => ({
+  default: ({ src, alt, className, width, height, sizes }: {
+    src: string;
+    alt: string;
+    className?: string;
+    width?: number;
+    height?: number;
+    sizes?: string;
+  }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      data-width={width}
+      data-height={height}
+      data-sizes={sizes}
+    />
+  ),
+}));
+
 // Mock Supabase browser client
 vi.mock("@/lib/supabase-browser", () => ({
   createSupabaseBrowserClient: () => ({
@@ -864,6 +886,37 @@ describe("VoiceChat", () => {
       await waitFor(() => {
         expect(screen.getByText("Empty images array.")).toBeInTheDocument();
         expect(screen.queryByRole("img")).not.toBeInTheDocument();
+      });
+    });
+
+    it("should render images with next/image optimization props", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createStreamingResponse("Optimized image.", [
+          {
+            id: "img-1",
+            path: "https://example.supabase.co/storage/v1/images/optimized.jpg",
+            caption: "Optimized photo",
+            sourcePdf: "guide.pdf",
+          },
+        ])
+      );
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "Question");
+
+      const form = input.closest("form");
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
+
+      await waitFor(() => {
+        const img = screen.getByRole("img", { name: "Optimized photo" });
+        expect(img).toBeInTheDocument();
+        // Verify next/image optimization props are passed
+        expect(img).toHaveAttribute("data-width", "400");
+        expect(img).toHaveAttribute("data-height", "300");
+        expect(img).toHaveAttribute("data-sizes", "(max-width: 640px) 100vw, 400px");
       });
     });
 
