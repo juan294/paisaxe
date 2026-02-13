@@ -221,6 +221,51 @@ describe("rate-limit", () => {
     it("resetRateLimit does not crash in Upstash mode", () => {
       expect(() => resetRateLimit()).not.toThrow();
     });
+
+    it("creates distinct Upstash limiter per config", async () => {
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 10,
+        remaining: 9,
+        reset: Date.now() + 60_000,
+      });
+
+      // First call with default config creates one Ratelimit instance
+      await checkRateLimit("chat:user1");
+
+      // Second call with a different config creates a separate instance
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 1,
+        remaining: 0,
+        reset: Date.now() + 60_000,
+      });
+      await checkRateLimit("suggestion:user1", {
+        windowMs: 60_000,
+        maxRequests: 1,
+        maxEntries: 100,
+      });
+
+      // slidingWindow should have been called twice — once per distinct config
+      const { Ratelimit: MockRatelimit } = await import("@upstash/ratelimit");
+      expect(MockRatelimit.slidingWindow).toHaveBeenCalledTimes(2);
+    });
+
+    it("reuses cached Upstash limiter for same config", async () => {
+      mockLimit.mockResolvedValue({
+        success: true,
+        limit: 10,
+        remaining: 9,
+        reset: Date.now() + 60_000,
+      });
+
+      // Two calls with the same default config should reuse one instance
+      await checkRateLimit("user1");
+      await checkRateLimit("user2");
+
+      const { Ratelimit: MockRatelimit } = await import("@upstash/ratelimit");
+      expect(MockRatelimit.slidingWindow).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("backend auto-detection", () => {

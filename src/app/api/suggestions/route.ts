@@ -4,42 +4,13 @@ import type { CreateSuggestionRequest, StorySuggestionRow } from "@/types/sugges
 import { rowToStorySuggestion } from "@/types/suggestions";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 import { getClientIp } from "@/lib/request-utils";
+import { checkRateLimit } from "@/lib/rate-limit";
 
-// In-memory rate limiting (per user ID or IP)
-const rateLimitMap = new Map<string, number>();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-
-function getRateLimitKey(request: NextRequest, userId: string | null): string {
-  if (userId) return `user:${userId}`;
-  // For anonymous users, rate limit by IP
-  const ip = getClientIp(request);
-  return `ip:${ip}`;
-}
-
-function isRateLimited(key: string): boolean {
-  const now = Date.now();
-  const lastSubmission = rateLimitMap.get(key);
-
-  if (lastSubmission && now - lastSubmission < RATE_LIMIT_WINDOW_MS) {
-    return true;
-  }
-
-  return false;
-}
-
-function recordSubmission(key: string): void {
-  rateLimitMap.set(key, Date.now());
-
-  // Clean up old entries periodically (every 100 entries)
-  if (rateLimitMap.size > 100) {
-    const now = Date.now();
-    for (const [k, timestamp] of rateLimitMap.entries()) {
-      if (now - timestamp > RATE_LIMIT_WINDOW_MS * 5) {
-        rateLimitMap.delete(k);
-      }
-    }
-  }
-}
+const SUGGESTION_RATE_LIMIT = {
+  windowMs: 60_000,     // 1 minute
+  maxRequests: 1,        // 1 suggestion per minute
+  maxEntries: 10_000,
+};
 
 // GET /api/suggestions - Get user's own suggestions (requires auth)
 export async function GET(request: NextRequest) {
@@ -78,10 +49,13 @@ export async function POST(request: NextRequest) {
   const supabase = await getSupabaseClient();
   const { data: { user: sessionUser } } = await supabase.auth.getUser();
   const user = sessionUser ?? await getUserFromRequest(request);
-  const rateLimitKey = getRateLimitKey(request, user?.id ?? null);
 
-  // Check rate limit
-  if (isRateLimited(rateLimitKey)) {
+  // Rate limit by user ID or IP
+  const ip = getClientIp(request);
+  const identifier = `suggestion:${user?.id ?? ip}`;
+  const rateLimit = await checkRateLimit(identifier, SUGGESTION_RATE_LIMIT);
+
+  if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please wait before submitting another suggestion." },
       { status: 429 }
@@ -155,9 +129,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-
-  // Record the submission for rate limiting
-  recordSubmission(rateLimitKey);
 
   const suggestion = rowToStorySuggestion(data as StorySuggestionRow);
   return NextResponse.json({ data: suggestion }, { status: 201 });
