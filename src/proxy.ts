@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { LOCATION_CONFIG } from "@/config/location";
 import { getEnvironment } from "@/lib/environment";
+import crypto from "crypto";
 
 // LOCATION-SPECIFIC: Build allowed origins from config domains
 const ALLOWED_ORIGINS: string[] = [];
@@ -198,6 +199,45 @@ function handleCORS(request: NextRequest): NextResponse | null {
   }
 
   return null;
+}
+
+/**
+ * Generate a CSP nonce for per-request script authorization.
+ * Uses crypto.randomBytes for cryptographic randomness, base64url-encoded.
+ */
+function generateNonce(): string {
+  return crypto.randomBytes(16).toString("base64url");
+}
+
+/**
+ * Build the Content-Security-Policy header value with a per-request nonce.
+ *
+ * - script-src uses nonce + 'strict-dynamic' instead of 'unsafe-inline'.
+ *   'strict-dynamic' allows scripts loaded by trusted (nonced) scripts to execute,
+ *   which is required for Vercel Analytics, SpeedInsights, and PostHog dynamic imports.
+ * - style-src keeps 'unsafe-inline' because Tailwind/Next.js CSS-in-JS requires it.
+ * - blob: is required in script-src for ElevenLabs AudioWorklet processor.
+ * - https://js.stripe.com is explicitly listed for Stripe checkout.
+ *
+ * Note: With 'strict-dynamic', host-based allowlists (like https://js.stripe.com)
+ * are ignored by browsers that support strict-dynamic (CSP Level 3). They are kept
+ * as fallback for older browsers that don't support strict-dynamic.
+ */
+export function buildCspHeader(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' blob: https://js.stripe.com`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://picsum.photos https://*.googleusercontent.com",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://*.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com",
+    "media-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "frame-src https://js.stripe.com",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
 }
 
 /**
@@ -403,10 +443,17 @@ export async function proxy(request: NextRequest) {
     return corsResponse;
   }
 
-  // 4. Refresh auth session if needed (handles expired tokens)
+  // 4. Generate CSP nonce and set it on the request for downstream server components
+  const nonce = generateNonce();
+  request.headers.set("x-csp-nonce", nonce);
+
+  // 5. Refresh auth session if needed (handles expired tokens)
   const response = await refreshAuthSession(request);
 
-  // 5. Add CORS headers if needed
+  // 6. Set per-request CSP header with nonce (replaces static CSP in next.config.ts)
+  response.headers.set("Content-Security-Policy", buildCspHeader(nonce));
+
+  // 7. Add CORS headers if needed
   addCORSHeaders(request, response);
 
   return response;
