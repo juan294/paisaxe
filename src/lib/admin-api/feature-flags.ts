@@ -8,7 +8,9 @@ const API_BASE = "/api/admin";
  */
 export async function fetchFeatureFlags(): Promise<AdminApiResponse<FeatureFlag[]>> {
   try {
-    const response = await fetch("/api/feature-flags");
+    const response = await fetch("/api/feature-flags", {
+      cache: "no-store",
+    });
 
     if (!response.ok) {
       const error = await response.json();
