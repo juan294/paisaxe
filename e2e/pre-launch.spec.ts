@@ -1,10 +1,25 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, APIRequestContext } from "@playwright/test";
 import {
   MOCK_CHAT_RESPONSE,
   MOCK_CHAT_RESPONSE_FOLLOWUP,
   MOCK_FEATURE_FLAGS,
   withFeatureFlags,
 } from "./fixtures/mock-data";
+
+/**
+ * Helper to get CSRF headers by visiting a page first.
+ * The proxy sets a __csrf cookie on non-API page requests.
+ */
+async function getCsrfHeaders(request: APIRequestContext) {
+  const pageResponse = await request.get("/immersive");
+  const setCookie = pageResponse.headers()["set-cookie"] || "";
+  const match = setCookie.match(/__csrf=([a-f0-9]+)/);
+  const token = match?.[1] || "";
+  return {
+    "x-csrf-token": token,
+    Cookie: `__csrf=${token}`,
+  };
+}
 
 /**
  * Pre-Launch Validation E2E Tests
@@ -60,7 +75,9 @@ test.describe("Static pages", () => {
 
 test.describe("API route smoke tests", () => {
   test("POST /api/suggestions rejects empty body", async ({ request }) => {
+    const csrf = await getCsrfHeaders(request);
     const response = await request.post("/api/suggestions", {
+      headers: csrf,
       data: {},
     });
     expect(response.status()).toBe(400);
@@ -70,7 +87,9 @@ test.describe("API route smoke tests", () => {
   });
 
   test("POST /api/suggestions rejects short name", async ({ request }) => {
+    const csrf = await getCsrfHeaders(request);
     const response = await request.post("/api/suggestions", {
+      headers: csrf,
       data: { placeName: "Ab" },
     });
     expect(response.status()).toBe(400);
@@ -92,7 +111,10 @@ test.describe("API route smoke tests", () => {
   test("POST /api/checkout/day-pass rejects without auth", async ({
     request,
   }) => {
-    const response = await request.post("/api/checkout/day-pass");
+    const csrf = await getCsrfHeaders(request);
+    const response = await request.post("/api/checkout/day-pass", {
+      headers: csrf,
+    });
     // Returns 401 (no user) or 500 (Stripe not configured) — either is non-200
     expect(response.ok()).toBe(false);
 
