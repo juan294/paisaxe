@@ -389,12 +389,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       // Check if SMS confirmation is enabled
       const smsEnabled = await isFeatureFlagEnabled("sms_booking_confirmation");
       const smsNote = smsEnabled
-        ? ` I'll send you an SMS at ${customer_phone} once the reservation is confirmed.`
+        ? ` The visitor will receive an SMS at ${customer_phone} once the restaurant answers and confirms.`
         : "";
 
       return NextResponse.json<MakeBookingResponse>({
         success: true,
-        message: `Calling ${venue_name} now to make a reservation for ${party_size} people on ${date} at ${time} under the name ${customer_name}.${smsNote}`,
+        message: `IMPORTANT: The call to ${venue_name} has been INITIATED but the reservation is NOT confirmed yet. The restaurant has not answered yet. DO NOT tell the user the reservation is confirmed. Tell the user: "Estoy llamando al restaurante ahora. Te avisaré cuando confirmen."${smsNote}`,
         call_sid: result.callSid || result.conversationId,
         status: "initiated",
         estimated_wait: "30-60 seconds",
