@@ -93,7 +93,7 @@ describe("CORS proxy", () => {
     const response = await proxy(request);
     expect(response.status).toBe(204);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://paisaxe.com");
-    expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
+    expect(response.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, PUT, PATCH, DELETE, OPTIONS");
   });
 
   it("should handle OPTIONS preflight without CORS for unknown origins", async () => {
@@ -996,5 +996,195 @@ describe("CSP nonce", () => {
     expect(response.status).toBe(308);
     // Redirect responses don't need CSP
     expect(response.headers.get("Content-Security-Policy")).toBeNull();
+  });
+});
+
+describe("CSRF protection", () => {
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  it("sets a __csrf cookie on responses that don't have one", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    const csrfCookie = response.cookies.get("__csrf");
+    expect(csrfCookie).toBeDefined();
+    expect(csrfCookie?.value).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("preserves existing __csrf cookie instead of generating a new one", async () => {
+    const existingToken = "a".repeat(64);
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: {
+        cookie: `__csrf=${existingToken}`,
+      },
+    });
+    const response = await proxy(request);
+
+    // Should NOT set a new cookie (existing one is preserved)
+    const csrfCookie = response.cookies.get("__csrf");
+    // The cookie might not be explicitly set on the response if it already exists
+    // What matters is that it doesn't overwrite with a new value
+    if (csrfCookie) {
+      expect(csrfCookie.value).toBe(existingToken);
+    }
+  });
+
+  it("returns 403 for POST to /api/ without CSRF token", async () => {
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title: "test" }),
+    });
+    const response = await proxy(request);
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toContain("CSRF");
+  });
+
+  it("returns 403 for PUT to /api/ without CSRF token", async () => {
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/123", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title: "test" }),
+    });
+    const response = await proxy(request);
+
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 403 for PATCH to /api/ without CSRF token", async () => {
+    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/test", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ enabled: true }),
+    });
+    const response = await proxy(request);
+
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 403 for DELETE to /api/ without CSRF token", async () => {
+    const request = new NextRequest("http://localhost:3000/api/favorites?storyId=123", {
+      method: "DELETE",
+    });
+    const response = await proxy(request);
+
+    expect(response.status).toBe(403);
+  });
+
+  it("allows POST when CSRF header matches cookie", async () => {
+    const token = "b".repeat(64);
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": token,
+        cookie: `__csrf=${token}`,
+      },
+      body: JSON.stringify({ message: "hello" }),
+    });
+    const response = await proxy(request);
+
+    // Should NOT be 403
+    expect(response.status).not.toBe(403);
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("returns 403 when CSRF header does not match cookie", async () => {
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": "a".repeat(64),
+        cookie: `__csrf=${"b".repeat(64)}`,
+      },
+      body: JSON.stringify({ message: "hello" }),
+    });
+    const response = await proxy(request);
+
+    expect(response.status).toBe(403);
+  });
+
+  it("does not enforce CSRF on GET requests to /api/", async () => {
+    const request = new NextRequest("http://localhost:3000/api/admin/stories");
+    const response = await proxy(request);
+
+    expect(response.status).not.toBe(403);
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("exempts webhook routes from CSRF", async () => {
+    const request = new NextRequest("http://localhost:3000/api/webhooks/stripe", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ type: "checkout.session.completed" }),
+    });
+    const response = await proxy(request);
+
+    // Should NOT be 403 — webhooks use their own signature verification
+    expect(response.status).not.toBe(403);
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("exempts /api/cron/ routes from CSRF", async () => {
+    const request = new NextRequest("http://localhost:3000/api/cron/daily-post", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+    const response = await proxy(request);
+
+    expect(response.status).not.toBe(403);
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("exempts /api/mcp/ routes from CSRF", async () => {
+    const request = new NextRequest("http://localhost:3000/api/mcp/tools", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+    const response = await proxy(request);
+
+    expect(response.status).not.toBe(403);
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
+
+  it("does not enforce CSRF on non-API routes (e.g., pages)", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      method: "POST",
+    });
+    const response = await proxy(request);
+
+    expect(response.status).not.toBe(403);
+  });
+
+  it("sets SameSite=Strict on the CSRF cookie", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    const csrfCookie = response.cookies.get("__csrf");
+    expect(csrfCookie).toBeDefined();
+    expect(csrfCookie?.sameSite).toBe("strict");
   });
 });

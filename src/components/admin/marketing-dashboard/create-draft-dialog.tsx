@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { csrfHeaders } from "@/lib/csrf-client";
 import {
   Dialog,
   DialogContent,
@@ -42,7 +43,7 @@ export function CreateDraftDialog({
     try {
       const response = await fetch("/api/admin/marketing/posts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({ platform, content: content.trim() }),
       });
 

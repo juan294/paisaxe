@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Copy, Check, Trash2, Plus } from "lucide-react";
 import type { MarketingPost } from "@/types/marketing";
+import { csrfHeaders } from "@/lib/csrf-client";
 import { PLATFORM_BADGES } from "./constants";
 import { CreateDraftDialog } from "./create-draft-dialog";
 
@@ -45,7 +46,7 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
     try {
       const response = await fetch(
         `/api/admin/marketing/posts?id=${postId}&action=mark-posted`,
-        { method: "PATCH" }
+        { method: "PATCH", headers: csrfHeaders() }
       );
       if (response.ok) {
         loadDrafts();
@@ -61,6 +62,7 @@ export function DraftsPanel({ onDraftPosted }: { onDraftPosted: () => void }) {
     try {
       const response = await fetch(`/api/admin/marketing/posts?id=${postId}`, {
         method: "DELETE",
+        headers: csrfHeaders(),
       });
       if (response.ok) {
         loadDrafts();

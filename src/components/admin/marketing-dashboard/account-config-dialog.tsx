@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertCircle, Eye, EyeOff } from "lucide-react";
 import type { MarketingPlatform, MarketingAccountPublic } from "@/types/marketing";
+import { csrfHeaders } from "@/lib/csrf-client";
 import { PLATFORM_BADGES, PLATFORM_NAMES, PLATFORM_CREDENTIALS } from "./constants";
 
 export function AccountConfigDialog({
@@ -60,7 +61,7 @@ export function AccountConfigDialog({
     try {
       const response = await fetch("/api/admin/marketing/accounts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({
           platform,
           accountName: accountName.trim() || "Paisaxe",
