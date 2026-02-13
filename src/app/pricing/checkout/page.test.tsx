@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import CheckoutPage from "./page";
 
 // --- Mocks ---
@@ -9,14 +9,21 @@ vi.mock("@stripe/stripe-js", () => ({
   loadStripe: vi.fn(() => Promise.resolve({ /* mock Stripe instance */ })),
 }));
 
+// Capture fetchClientSecret from options so we can invoke it in tests
+let capturedFetchClientSecret: (() => Promise<string>) | null = null;
+
 vi.mock("@stripe/react-stripe-js", () => ({
   EmbeddedCheckoutProvider: ({
     children,
+    options,
   }: {
     children: React.ReactNode;
     stripe: unknown;
-    options: unknown;
-  }) => <div data-testid="embedded-checkout-provider">{children}</div>,
+    options: { fetchClientSecret: () => Promise<string> };
+  }) => {
+    capturedFetchClientSecret = options.fetchClientSecret;
+    return <div data-testid="embedded-checkout-provider">{children}</div>;
+  },
   EmbeddedCheckout: () => (
     <div data-testid="embedded-checkout">Stripe Checkout Form</div>
   ),
@@ -71,6 +78,7 @@ global.fetch = mockFetch;
 describe("CheckoutPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedFetchClientSecret = null;
     mockSearchParams.delete("returnTo");
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({
@@ -192,6 +200,178 @@ describe("CheckoutPage", () => {
 
       const checkoutContainer = document.querySelector("#checkout");
       expect(checkoutContainer).toBeInTheDocument();
+    });
+
+    it("should call /api/checkout/embedded and return client secret on success", async () => {
+      render(<CheckoutPage />);
+
+      expect(capturedFetchClientSecret).toBeDefined();
+      const secret = await capturedFetchClientSecret!();
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/checkout/embedded", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(secret).toBe("cs_test_123");
+    });
+
+    it("should include returnTo in request body when search param is set", async () => {
+      mockSearchParams.set("returnTo", "oviedo-walking-tour");
+
+      render(<CheckoutPage />);
+
+      expect(capturedFetchClientSecret).toBeDefined();
+      await capturedFetchClientSecret!();
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/checkout/embedded", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ returnTo: "oviedo-walking-tour" }),
+      });
+
+      mockSearchParams.delete("returnTo");
+    });
+
+    it("should show error state when fetch returns non-ok response with error body", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({ error: "Stripe not configured" }),
+      });
+
+      render(<CheckoutPage />);
+
+      expect(capturedFetchClientSecret).toBeDefined();
+
+      await act(async () => {
+        try {
+          await capturedFetchClientSecret!();
+        } catch {
+          // Expected — the function re-throws after calling setError
+        }
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
+      });
+      expect(screen.getByText("errors.generic_description")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "errors.retry" })).toBeInTheDocument();
+    });
+
+    it("should show error state with HTTP status when response JSON is invalid", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => { throw new Error("invalid json"); },
+      });
+
+      render(<CheckoutPage />);
+
+      await act(async () => {
+        try {
+          await capturedFetchClientSecret!();
+        } catch {
+          // Expected
+        }
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
+      });
+    });
+
+    it("should show error state when fetch throws a network error", async () => {
+      mockFetch.mockRejectedValue(new TypeError("Failed to fetch"));
+
+      render(<CheckoutPage />);
+
+      await act(async () => {
+        try {
+          await capturedFetchClientSecret!();
+        } catch {
+          // Expected
+        }
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("error state and retry", () => {
+    beforeEach(() => {
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-123", email: "test@example.com" },
+        session: { access_token: "token-abc" },
+        signInWithGoogle: mockSignInWithGoogle,
+        isLoading: false,
+      });
+    });
+
+    it("should hide checkout and show error UI with AlertCircle icon", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({ error: "Server error" }),
+      });
+
+      render(<CheckoutPage />);
+
+      await act(async () => {
+        try {
+          await capturedFetchClientSecret!();
+        } catch {
+          // Expected
+        }
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("embedded-checkout")).not.toBeInTheDocument();
+        expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
+      });
+    });
+
+    it("should reset error and show checkout again when retry button is clicked", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ error: "Temporary error" }),
+      });
+
+      render(<CheckoutPage />);
+
+      // Trigger the error
+      await act(async () => {
+        try {
+          await capturedFetchClientSecret!();
+        } catch {
+          // Expected
+        }
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
+      });
+
+      // Reset fetch mock for success
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ clientSecret: "cs_test_456" }),
+      });
+
+      // Click retry button
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "errors.retry" }));
+      });
+
+      // Should show checkout again, not error
+      await waitFor(() => {
+        expect(screen.queryByText("errors.generic_title")).not.toBeInTheDocument();
+        expect(screen.getByTestId("embedded-checkout-provider")).toBeInTheDocument();
+        expect(screen.getByTestId("embedded-checkout")).toBeInTheDocument();
+      });
     });
   });
 
