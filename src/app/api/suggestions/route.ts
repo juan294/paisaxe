@@ -50,18 +50,7 @@ export async function POST(request: NextRequest) {
   const { data: { user: sessionUser } } = await supabase.auth.getUser();
   const user = sessionUser ?? await getUserFromRequest(request);
 
-  // Rate limit by user ID or IP
-  const ip = getClientIp(request);
-  const identifier = `suggestion:${user?.id ?? ip}`;
-  const rateLimit = await checkRateLimit(identifier, SUGGESTION_RATE_LIMIT);
-
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: "Rate limit exceeded. Please wait before submitting another suggestion." },
-      { status: 429 }
-    );
-  }
-
+  // Parse and validate body BEFORE rate limiting — invalid requests shouldn't consume tokens
   let body: CreateSuggestionRequest;
   try {
     body = await request.json();
@@ -106,6 +95,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: "Attribution must not exceed 100 characters" },
       { status: 400 }
+    );
+  }
+
+  // Rate limit after validation — only valid requests consume tokens
+  const ip = getClientIp(request);
+  const identifier = `suggestion:${user?.id ?? ip}`;
+  const rateLimit = await checkRateLimit(identifier, SUGGESTION_RATE_LIMIT);
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Please wait before submitting another suggestion." },
+      { status: 429 }
     );
   }
 
