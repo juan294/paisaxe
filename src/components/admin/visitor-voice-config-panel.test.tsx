@@ -187,6 +187,109 @@ describe("VisitorVoiceConfigPanel", () => {
   });
 
   describe("saving config", () => {
+    it("should auto-add pending email from input when Save is clicked", async () => {
+      const updatedFlag = makeMockFlag({
+        whitelisted_emails: ["pending@example.com"],
+        agent_id: "",
+      });
+      mockUpdateFeatureFlagConfig.mockResolvedValue({ data: updatedFlag });
+
+      const flag = makeMockFlag({ whitelisted_emails: [], agent_id: "" });
+      render(<VisitorVoiceConfigPanel flag={flag} onUpdate={mockOnUpdate} />);
+
+      // Type email but do NOT click Add
+      const input = screen.getByPlaceholderText(/user@example.com/i);
+      await userEvent.type(input, "pending@example.com");
+
+      // Click Save directly
+      const saveButton = screen.getByRole("button", { name: /^Save$/i });
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockUpdateFeatureFlagConfig).toHaveBeenCalledWith("visitor_voice_agent", {
+          whitelisted_emails: ["pending@example.com"],
+          agent_id: "",
+        });
+      });
+    });
+
+    it("should auto-add pending email alongside existing emails on Save", async () => {
+      const updatedFlag = makeMockFlag({
+        whitelisted_emails: ["existing@example.com", "new@example.com"],
+        agent_id: "agent-1",
+      });
+      mockUpdateFeatureFlagConfig.mockResolvedValue({ data: updatedFlag });
+
+      const flag = makeMockFlag({
+        whitelisted_emails: ["existing@example.com"],
+        agent_id: "agent-1",
+      });
+      render(<VisitorVoiceConfigPanel flag={flag} onUpdate={mockOnUpdate} />);
+
+      // Type a new email but don't click Add
+      const input = screen.getByPlaceholderText(/user@example.com/i);
+      await userEvent.type(input, "new@example.com");
+
+      const saveButton = screen.getByRole("button", { name: /^Save$/i });
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockUpdateFeatureFlagConfig).toHaveBeenCalledWith("visitor_voice_agent", {
+          whitelisted_emails: ["existing@example.com", "new@example.com"],
+          agent_id: "agent-1",
+        });
+      });
+    });
+
+    it("should not duplicate email when pending input matches existing on Save", async () => {
+      const updatedFlag = makeMockFlag({
+        whitelisted_emails: ["existing@example.com"],
+        agent_id: "",
+      });
+      mockUpdateFeatureFlagConfig.mockResolvedValue({ data: updatedFlag });
+
+      const flag = makeMockFlag({
+        whitelisted_emails: ["existing@example.com"],
+        agent_id: "",
+      });
+      render(<VisitorVoiceConfigPanel flag={flag} onUpdate={mockOnUpdate} />);
+
+      // Type duplicate email
+      const input = screen.getByPlaceholderText(/user@example.com/i);
+      await userEvent.type(input, "existing@example.com");
+
+      const saveButton = screen.getByRole("button", { name: /^Save$/i });
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockUpdateFeatureFlagConfig).toHaveBeenCalledWith("visitor_voice_agent", {
+          whitelisted_emails: ["existing@example.com"],
+          agent_id: "",
+        });
+      });
+    });
+
+    it("should clear pending email input after Save auto-adds it", async () => {
+      const updatedFlag = makeMockFlag({
+        whitelisted_emails: ["pending@example.com"],
+        agent_id: "",
+      });
+      mockUpdateFeatureFlagConfig.mockResolvedValue({ data: updatedFlag });
+
+      const flag = makeMockFlag({ whitelisted_emails: [], agent_id: "" });
+      render(<VisitorVoiceConfigPanel flag={flag} onUpdate={mockOnUpdate} />);
+
+      const input = screen.getByPlaceholderText(/user@example.com/i) as HTMLInputElement;
+      await userEvent.type(input, "pending@example.com");
+
+      const saveButton = screen.getByRole("button", { name: /^Save$/i });
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(input.value).toBe("");
+      });
+    });
+
     it("should call updateFeatureFlagConfig when Save is clicked", async () => {
       const flag = makeMockFlag({ whitelisted_emails: [], agent_id: "" });
       render(<VisitorVoiceConfigPanel flag={flag} onUpdate={mockOnUpdate} />);

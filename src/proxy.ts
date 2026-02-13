@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { LOCATION_CONFIG } from "@/config/location";
 import { getEnvironment } from "@/lib/environment";
+import crypto from "crypto";
+import {
+  generateCsrfToken,
+  validateCsrfToken,
+  isExemptFromCsrf,
+  csrfCookieOptions,
+  CSRF_COOKIE_NAME,
+} from "@/lib/csrf";
 
 // LOCATION-SPECIFIC: Build allowed origins from config domains
 const ALLOWED_ORIGINS: string[] = [];
@@ -22,8 +30,8 @@ if (process.env.NODE_ENV === "development") {
 }
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, x-csrf-token",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -201,6 +209,45 @@ function handleCORS(request: NextRequest): NextResponse | null {
 }
 
 /**
+ * Generate a CSP nonce for per-request script authorization.
+ * Uses crypto.randomBytes for cryptographic randomness, base64url-encoded.
+ */
+function generateNonce(): string {
+  return crypto.randomBytes(16).toString("base64url");
+}
+
+/**
+ * Build the Content-Security-Policy header value with a per-request nonce.
+ *
+ * - script-src uses nonce + 'strict-dynamic' instead of 'unsafe-inline'.
+ *   'strict-dynamic' allows scripts loaded by trusted (nonced) scripts to execute,
+ *   which is required for Vercel Analytics, SpeedInsights, and PostHog dynamic imports.
+ * - style-src keeps 'unsafe-inline' because Tailwind/Next.js CSS-in-JS requires it.
+ * - blob: is required in script-src for ElevenLabs AudioWorklet processor.
+ * - https://js.stripe.com is explicitly listed for Stripe checkout.
+ *
+ * Note: With 'strict-dynamic', host-based allowlists (like https://js.stripe.com)
+ * are ignored by browsers that support strict-dynamic (CSP Level 3). They are kept
+ * as fallback for older browsers that don't support strict-dynamic.
+ */
+export function buildCspHeader(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' blob: https://js.stripe.com`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://picsum.photos https://*.googleusercontent.com",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://*.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com",
+    "media-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "frame-src https://js.stripe.com",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+}
+
+/**
  * Add CORS headers to a response for API routes.
  */
 function addCORSHeaders(request: NextRequest, response: NextResponse): void {
@@ -210,8 +257,8 @@ function addCORSHeaders(request: NextRequest, response: NextResponse): void {
   // Only add CORS headers to API routes with allowed origins
   if (pathname.startsWith("/api") && isAllowedOrigin(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin!);
-    response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+    response.headers.set("Access-Control-Allow-Methods", CORS_HEADERS["Access-Control-Allow-Methods"]);
+    response.headers.set("Access-Control-Allow-Headers", CORS_HEADERS["Access-Control-Allow-Headers"]);
   }
 }
 
@@ -371,6 +418,55 @@ function handleStoryRewrite(request: NextRequest): NextResponse | null {
   return NextResponse.redirect(url, 308);
 }
 
+/**
+ * HTTP methods that require CSRF validation.
+ */
+const CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * Validate CSRF token for state-changing API requests.
+ * Returns a 403 response if validation fails, null if it passes.
+ */
+function handleCsrfValidation(request: NextRequest): NextResponse | null {
+  const { pathname } = request.nextUrl;
+
+  // Only validate API routes
+  if (!pathname.startsWith("/api")) return null;
+
+  // Only validate state-changing methods
+  if (!CSRF_METHODS.has(request.method)) return null;
+
+  // Skip exempt routes (webhooks, MCP, cron, health)
+  if (isExemptFromCsrf(pathname)) return null;
+
+  // Validate token
+  if (validateCsrfToken(request)) return null;
+
+  return NextResponse.json(
+    { error: "CSRF token missing or invalid" },
+    { status: 403 }
+  );
+}
+
+/**
+ * Set CSRF cookie on non-API page requests if one doesn't already exist.
+ * The cookie is httpOnly=false so client-side JS can read it.
+ */
+function setCsrfCookie(request: NextRequest, response: NextResponse): void {
+  const { pathname } = request.nextUrl;
+
+  // Don't set cookie on API requests
+  if (pathname.startsWith("/api")) return;
+
+  // Don't overwrite existing cookie
+  const existingToken = request.cookies.get(CSRF_COOKIE_NAME);
+  if (existingToken?.value) return;
+
+  const token = generateCsrfToken();
+  const isProduction = process.env.NODE_ENV === "production";
+  response.cookies.set(CSRF_COOKIE_NAME, token, csrfCookieOptions(isProduction));
+}
+
 export async function proxy(request: NextRequest) {
   // 0a. Redirect alternate domains to canonical domain (single hop)
   const canonicalRedirect = handleCanonicalDomain(request);
@@ -403,10 +499,26 @@ export async function proxy(request: NextRequest) {
     return corsResponse;
   }
 
-  // 4. Refresh auth session if needed (handles expired tokens)
+  // 4. Validate CSRF token for state-changing API requests
+  const csrfResponse = handleCsrfValidation(request);
+  if (csrfResponse) {
+    return csrfResponse;
+  }
+
+  // 5. Generate CSP nonce and set it on the request for downstream server components
+  const nonce = generateNonce();
+  request.headers.set("x-csp-nonce", nonce);
+
+  // 6. Refresh auth session if needed (handles expired tokens)
   const response = await refreshAuthSession(request);
 
-  // 5. Add CORS headers if needed
+  // 7. Set per-request CSP header with nonce (replaces static CSP in next.config.ts)
+  response.headers.set("Content-Security-Policy", buildCspHeader(nonce));
+
+  // 8. Set CSRF cookie on page requests (if not already set)
+  setCsrfCookie(request, response);
+
+  // 9. Add CORS headers if needed
   addCORSHeaders(request, response);
 
   return response;

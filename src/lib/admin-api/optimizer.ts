@@ -1,4 +1,5 @@
 import type { AdminApiResponse } from "@/types/admin";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 interface OptimizerRunResult {
   success: boolean;
@@ -21,7 +22,7 @@ export async function triggerOptimizerRun(
   try {
     const response = await fetch("/api/cron/subscription-optimizer", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(usageMetrics ? { usageMetrics } : {}),
     });
 

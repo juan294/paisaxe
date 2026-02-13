@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "./use-auth";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 const STORAGE_KEY = "paisaxe_favorites";
 
@@ -75,6 +76,7 @@ export function useFavorites(): UseFavoritesReturn {
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${session.access_token}`,
+                ...csrfHeaders(),
               },
               body: JSON.stringify({ storyIds: newFavorites }),
             });
@@ -121,6 +123,7 @@ export function useFavorites(): UseFavoritesReturn {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${session.access_token}`,
+              ...csrfHeaders(),
             },
           });
         } else {
@@ -129,6 +132,7 @@ export function useFavorites(): UseFavoritesReturn {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${session.access_token}`,
+              ...csrfHeaders(),
             },
             body: JSON.stringify({ storyIds: [storyId] }),
           });

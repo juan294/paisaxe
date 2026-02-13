@@ -239,7 +239,7 @@ describe("admin-api/costs", () => {
       await deleteManualCostEntry("c1");
 
       const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(init.headers).toBeUndefined();
+      expect(init.headers).toEqual({});
       expect(init.body).toBeUndefined();
     });
 

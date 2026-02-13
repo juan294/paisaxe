@@ -11,6 +11,7 @@ import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, AlertCircle } from "lucide-react";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 const stripePromise = loadStripe(
   (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim()
@@ -27,7 +28,7 @@ export default function CheckoutPage() {
     try {
       const response = await fetch("/api/checkout/embedded", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({ ...(returnTo ? { returnTo } : {}) }),
       });
 

@@ -6,6 +6,7 @@ import { Story } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { X, Send, AudioLines, Keyboard } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { ChatMessageSkeleton } from "./skeleton-chat-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -279,17 +280,13 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
                       <div className="mt-3 space-y-3">
                         {msg.images.map((image) => (
                           <figure key={image.id} className="overflow-hidden rounded-xl">
-                            {/* Using <img> intentionally: image paths come from the database
-                                (images.path) and can be local (/images/...) or Supabase storage
-                                URLs. Dimensions are unknown at render time, and the dynamic
-                                nature of RAG-returned images makes next/image's required
-                                width/height or fill+parent sizing impractical here. */}
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <Image
                               src={image.path}
                               alt={image.caption || t("chat.image_alt")}
+                              width={400}
+                              height={300}
+                              sizes="(max-width: 640px) 100vw, 400px"
                               className="w-full rounded-xl object-cover"
-                              loading="lazy"
                             />
                             {image.caption && (
                               <figcaption className="mt-1.5 text-xs text-white/70">

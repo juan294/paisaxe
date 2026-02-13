@@ -60,7 +60,7 @@ describe("POST /api/chat", () => {
     vi.clearAllMocks();
 
     // Default: rate limit allows requests
-    vi.mocked(checkRateLimit).mockReturnValue({
+    vi.mocked(checkRateLimit).mockResolvedValue({
       allowed: true,
       limit: 10,
       remaining: 9,
@@ -310,7 +310,7 @@ describe("POST /api/chat", () => {
   });
 
   it("should return 429 when rate limited with correct headers", async () => {
-    vi.mocked(checkRateLimit).mockReturnValue({
+    vi.mocked(checkRateLimit).mockResolvedValue({
       allowed: false,
       limit: 10,
       remaining: 0,
@@ -335,7 +335,7 @@ describe("POST /api/chat", () => {
   });
 
   it("should include X-RateLimit-Remaining header on successful response", async () => {
-    vi.mocked(checkRateLimit).mockReturnValue({
+    vi.mocked(checkRateLimit).mockResolvedValue({
       allowed: true,
       limit: 10,
       remaining: 7,

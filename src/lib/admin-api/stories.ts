@@ -11,6 +11,7 @@ import type {
   GenerateTranslationsResponse,
 } from "@/types/admin";
 import type { StoryLocale, StoryTranslation } from "@/types/immersive";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 const API_BASE = "/api/admin";
 
@@ -23,9 +24,7 @@ export async function createStory(
   try {
     const response = await fetch(`${API_BASE}/stories`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(data),
     });
 
@@ -51,9 +50,7 @@ export async function updateStory(
   try {
     const response = await fetch(`${API_BASE}/stories/${storyId}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(data),
     });
 
@@ -106,9 +103,7 @@ export async function updateStoryImageUrl(
   try {
     const response = await fetch(`${API_BASE}/stories/${storyId}/image`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ imageUrl, imageSource }),
     });
 
@@ -141,6 +136,7 @@ export async function uploadStoryImage(
 
     const response = await fetch(`${API_BASE}/stories/${storyId}/image`, {
       method: "PUT",
+      headers: csrfHeaders(),
       body: formData,
     });
 
@@ -166,9 +162,7 @@ export async function updateStoryImageSource(
   try {
     const response = await fetch(`${API_BASE}/stories/${storyId}/image-source`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ imageSource }),
     });
 
@@ -194,9 +188,7 @@ export async function updateStoryStatus(
   try {
     const response = await fetch(`${API_BASE}/stories/${storyId}/status`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ status }),
     });
 
@@ -222,9 +214,7 @@ export async function bulkUpdateStoryStatus(
   try {
     const response = await fetch(`${API_BASE}/stories/bulk-status`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ storyIds, status }),
     });
 
@@ -249,9 +239,7 @@ export async function bulkDeleteStories(
   try {
     const response = await fetch(`${API_BASE}/stories/bulk-delete`, {
       method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ storyIds }),
     });
 
@@ -276,6 +264,7 @@ export async function approveAllPendingStories(): Promise<
   try {
     const response = await fetch(`${API_BASE}/stories/approve-all`, {
       method: "POST",
+      headers: csrfHeaders(),
     });
 
     if (!response.ok) {
@@ -343,9 +332,7 @@ export async function updateStoryTranslation(
   try {
     const response = await fetch(`${API_BASE}/stories/${storyId}/translations`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify({ locale, translation }),
     });
 
@@ -374,9 +361,7 @@ export async function generateStoryTranslations(
   try {
     const response = await fetch(`${API_BASE}/stories/${storyId}/translations`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(options || {}),
     });
 
