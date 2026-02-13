@@ -96,23 +96,32 @@ const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 const useUpstash = Boolean(upstashUrl && upstashToken);
 
-let upstashRatelimit: Ratelimit | null = null;
+// Cache Ratelimit instances by config key so each route's limits are enforced independently
+const upstashInstances = new Map<string, Ratelimit>();
 
-if (useUpstash) {
-  upstashRatelimit = new Ratelimit({
-    redis: new Redis({ url: upstashUrl!, token: upstashToken! }),
-    limiter: Ratelimit.slidingWindow(
-      DEFAULT_CONFIG.maxRequests,
-      `${DEFAULT_CONFIG.windowMs / 1000} s`,
-    ),
-    prefix: "paisaxe-rl",
-  });
+function getUpstashLimiter(config: RateLimitConfig): Ratelimit {
+  const key = `${config.maxRequests}:${config.windowMs}`;
+  let instance = upstashInstances.get(key);
+  if (!instance) {
+    instance = new Ratelimit({
+      redis: new Redis({ url: upstashUrl!, token: upstashToken! }),
+      limiter: Ratelimit.slidingWindow(
+        config.maxRequests,
+        `${config.windowMs / 1000} s`,
+      ),
+      prefix: `paisaxe-rl:${key}`,
+    });
+    upstashInstances.set(key, instance);
+  }
+  return instance;
 }
 
 async function checkUpstash(
   identifier: string,
+  config: RateLimitConfig,
 ): Promise<RateLimitResult> {
-  const result = await upstashRatelimit!.limit(identifier);
+  const limiter = getUpstashLimiter(config);
+  const result = await limiter.limit(identifier);
   const now = Date.now();
 
   if (result.success) {
@@ -140,9 +149,9 @@ export async function checkRateLimit(
   identifier: string,
   config: RateLimitConfig = DEFAULT_CONFIG,
 ): Promise<RateLimitResult> {
-  if (useUpstash && upstashRatelimit) {
+  if (useUpstash) {
     try {
-      return await checkUpstash(identifier);
+      return await checkUpstash(identifier, config);
     } catch {
       // Upstash failed — fall back to in-memory so requests aren't blocked
       return checkInMemory(identifier, config);
