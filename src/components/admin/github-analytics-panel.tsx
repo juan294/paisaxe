@@ -75,6 +75,7 @@ export function GitHubAnalyticsPanel() {
           <button
             onClick={handleSync}
             disabled={isSyncing}
+            aria-label="Sync GitHub data"
             className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-[#6b6560] transition-colors hover:text-[#2d2a26] disabled:opacity-50 dark:text-[#a39e98] dark:hover:text-[#f5f3ee]"
           >
             <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />

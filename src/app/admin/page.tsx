@@ -454,6 +454,7 @@ function AdminPageContent() {
               <button
                 onClick={loadStories}
                 disabled={isLoading}
+                aria-label="Refresh stories"
                 className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
                   "text-[#6b6560] hover:bg-white hover:text-[#2d2a26]",
@@ -469,6 +470,7 @@ function AdminPageContent() {
 
             <button
               onClick={handleLogout}
+              aria-label="Logout"
               className={cn(
                 "flex h-9 items-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors",
                 "text-[#6b6560] hover:bg-white hover:text-[#2d2a26]",
