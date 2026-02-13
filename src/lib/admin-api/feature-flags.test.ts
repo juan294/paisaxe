@@ -21,7 +21,7 @@ describe("admin-api/feature-flags", () => {
   // ─── fetchFeatureFlags ───────────────────────────────────────────
 
   describe("fetchFeatureFlags", () => {
-    it("sends GET to /api/feature-flags", async () => {
+    it("sends GET to /api/feature-flags with cache bypass", async () => {
       const mockData = [{ flagKey: "visitor_voice_agent", enabled: true }];
       global.fetch = vi.fn().mockResolvedValue(
         mockResponse({ data: mockData })
@@ -30,8 +30,9 @@ describe("admin-api/feature-flags", () => {
       const result = await fetchFeatureFlags();
 
       expect(fetch).toHaveBeenCalledOnce();
-      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(String(url)).toBe("/api/feature-flags");
+      expect(init?.cache).toBe("no-store");
       expect(result).toEqual({ data: mockData });
     });
 
