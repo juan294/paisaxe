@@ -283,7 +283,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const ip = getClientIp(request);
-  const rateCheck = checkRateLimit(`mcp-places:${ip}`, PLACES_RATE_LIMIT);
+  const rateCheck = await checkRateLimit(`mcp-places:${ip}`, PLACES_RATE_LIMIT);
   if (!rateCheck.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
@@ -335,7 +335,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const ip = getClientIp(request);
-  const rateCheck = checkRateLimit(`mcp-places:${ip}`, PLACES_RATE_LIMIT);
+  const rateCheck = await checkRateLimit(`mcp-places:${ip}`, PLACES_RATE_LIMIT);
   if (!rateCheck.allowed) {
     return NextResponse.json(
       { error: "Too many requests" },
