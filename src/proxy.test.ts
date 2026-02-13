@@ -886,3 +886,115 @@ describe("Auth session refresh - error logging", () => {
     );
   });
 });
+
+describe("CSP nonce", () => {
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  it("should set a Content-Security-Policy header with a nonce on every response", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    const csp = response.headers.get("Content-Security-Policy");
+    expect(csp).toBeTruthy();
+    expect(csp).toMatch(/'nonce-[A-Za-z0-9_-]+'/);
+  });
+
+  it("should include required script-src directives in the CSP", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    const csp = response.headers.get("Content-Security-Policy")!;
+    // Must allow Stripe scripts
+    expect(csp).toContain("https://js.stripe.com");
+    // Must allow blob: for ElevenLabs AudioWorklet
+    expect(csp).toContain("blob:");
+    // Must NOT contain unsafe-inline in script-src
+    const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"));
+    expect(scriptSrc).toBeTruthy();
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+  });
+
+  it("should keep style-src with unsafe-inline for Tailwind/Next.js CSS", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    const csp = response.headers.get("Content-Security-Policy")!;
+    const styleSrc = csp.split(";").find((d) => d.trim().startsWith("style-src"));
+    expect(styleSrc).toContain("'unsafe-inline'");
+  });
+
+  it("should generate a unique nonce per request", async () => {
+    const request1 = new NextRequest("http://localhost:3000/immersive");
+    const request2 = new NextRequest("http://localhost:3000/immersive");
+
+    const response1 = await proxy(request1);
+    const response2 = await proxy(request2);
+
+    const csp1 = response1.headers.get("Content-Security-Policy")!;
+    const csp2 = response2.headers.get("Content-Security-Policy")!;
+
+    const nonce1 = csp1.match(/'nonce-([A-Za-z0-9_-]+)'/)?.[1];
+    const nonce2 = csp2.match(/'nonce-([A-Za-z0-9_-]+)'/)?.[1];
+
+    expect(nonce1).toBeTruthy();
+    expect(nonce2).toBeTruthy();
+    expect(nonce1).not.toBe(nonce2);
+  });
+
+  it("should set x-csp-nonce request header for downstream server components", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    // The nonce should be passed to downstream server components via request header
+    const csp = response.headers.get("Content-Security-Policy")!;
+    const nonceFromCsp = csp.match(/'nonce-([A-Za-z0-9_-]+)'/)?.[1];
+
+    // The request headers should contain the nonce for downstream reading
+    expect(request.headers.get("x-csp-nonce")).toBe(nonceFromCsp);
+  });
+
+  it("should include strict-dynamic in script-src for nonce propagation", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    const csp = response.headers.get("Content-Security-Policy")!;
+    const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"));
+    expect(scriptSrc).toContain("'strict-dynamic'");
+  });
+
+  it("should include all required CSP directives", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    const csp = response.headers.get("Content-Security-Policy")!;
+
+    // Verify all essential directives are present
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("img-src");
+    expect(csp).toContain("font-src");
+    expect(csp).toContain("connect-src");
+    expect(csp).toContain("media-src");
+    expect(csp).toContain("worker-src");
+    expect(csp).toContain("frame-src");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("base-uri 'self'");
+    expect(csp).toContain("form-action 'self'");
+  });
+
+  it("should not set CSP on redirect responses", async () => {
+    // paisaxe.com → paisaxe.es redirect
+    const request = new NextRequest("https://paisaxe.com/immersive");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    // Redirect responses don't need CSP
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+  });
+});
