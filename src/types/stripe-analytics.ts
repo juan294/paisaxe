@@ -10,6 +10,8 @@ export interface StripeOrder {
   status: "succeeded" | "pending" | "failed" | "refunded" | "partially_refunded";
   createdAt: string;
   productName: string;
+  refundedAmount: number;
+  refundedAmountFormatted: string;
 }
 
 export interface StripeRevenueByDay {
@@ -21,8 +23,16 @@ export interface StripeRevenueByDay {
 export interface StripeAnalyticsSummary {
   totalRevenue: number;
   totalRevenueFormatted: string;
+  totalRefunds: number;
+  totalRefundsFormatted: string;
+  netRevenue: number;
+  netRevenueFormatted: string;
   thirtyDayRevenue: number;
   thirtyDayRevenueFormatted: string;
+  thirtyDayRefunds: number;
+  thirtyDayRefundsFormatted: string;
+  thirtyDayNetRevenue: number;
+  thirtyDayNetRevenueFormatted: string;
   totalOrders: number;
   thirtyDayOrders: number;
   averageOrderValue: number;

@@ -17,15 +17,53 @@ function formatCurrency(amount: number, currency: string): string {
   }).format(amount / 100);
 }
 
+function emptySummary(): StripeAnalyticsSummary {
+  return {
+    totalRevenue: 0,
+    totalRevenueFormatted: "€0.00",
+    totalRefunds: 0,
+    totalRefundsFormatted: "€0.00",
+    netRevenue: 0,
+    netRevenueFormatted: "€0.00",
+    thirtyDayRevenue: 0,
+    thirtyDayRevenueFormatted: "€0.00",
+    thirtyDayRefunds: 0,
+    thirtyDayRefundsFormatted: "€0.00",
+    thirtyDayNetRevenue: 0,
+    thirtyDayNetRevenueFormatted: "€0.00",
+    totalOrders: 0,
+    thirtyDayOrders: 0,
+    averageOrderValue: 0,
+    averageOrderValueFormatted: "€0.00",
+    currency: "EUR",
+  };
+}
+
+interface ChargeRefundInfo {
+  refunded: boolean;
+  amount_refunded: number;
+}
+
+function getChargeRefundInfo(
+  paymentIntent: Stripe.PaymentIntent
+): ChargeRefundInfo {
+  const charge = paymentIntent.latest_charge;
+  if (charge && typeof charge === "object" && "amount_refunded" in charge) {
+    return {
+      refunded: Boolean(charge.refunded),
+      amount_refunded: (charge as { amount_refunded: number }).amount_refunded,
+    };
+  }
+  return { refunded: false, amount_refunded: 0 };
+}
+
 function getPaymentStatus(
   paymentIntent: Stripe.PaymentIntent
 ): StripeOrder["status"] {
   if (paymentIntent.status === "succeeded") {
-    // Check for refunds
-    const refundedAmount = paymentIntent.amount_received - (paymentIntent.amount || 0);
-    if (refundedAmount > 0 && refundedAmount < paymentIntent.amount_received) {
-      return "partially_refunded";
-    }
+    const { refunded, amount_refunded } = getChargeRefundInfo(paymentIntent);
+    if (refunded) return "refunded";
+    if (amount_refunded > 0) return "partially_refunded";
     return "succeeded";
   }
   if (paymentIntent.status === "requires_payment_method" ||
@@ -49,17 +87,7 @@ export async function GET(request: NextRequest) {
     // Return empty data if not configured (graceful degradation)
     return NextResponse.json({
       data: {
-        summary: {
-          totalRevenue: 0,
-          totalRevenueFormatted: "€0.00",
-          thirtyDayRevenue: 0,
-          thirtyDayRevenueFormatted: "€0.00",
-          totalOrders: 0,
-          thirtyDayOrders: 0,
-          averageOrderValue: 0,
-          averageOrderValueFormatted: "€0.00",
-          currency: "EUR",
-        },
+        summary: emptySummary(),
         recentOrders: [],
         revenueByDay: [],
         productBreakdown: [],
@@ -83,12 +111,13 @@ export async function GET(request: NextRequest) {
     const fromTimestamp = Math.floor(new Date(fromParam).getTime() / 1000);
     const toTimestamp = Math.floor(new Date(toParam).getTime() / 1000);
 
-    // Fetch payment intents in date range
+    // Fetch payment intents in date range with charge data for refund detection
     const paymentIntents = await stripe.paymentIntents.list({
       created: {
         gte: fromTimestamp,
         lte: toTimestamp,
       },
+      expand: ["data.latest_charge"],
       limit: 100,
     });
 
@@ -97,17 +126,22 @@ export async function GET(request: NextRequest) {
     // Map payment intents to orders
     const recentOrders: StripeOrder[] = paymentIntents.data
       .slice(0, 20)
-      .map((pi) => ({
-        id: pi.id,
-        customerEmail: pi.receipt_email || pi.metadata?.user_email || "Unknown",
-        customerName: pi.metadata?.user_name || null,
-        total: pi.amount,
-        totalFormatted: formatCurrency(pi.amount, pi.currency),
-        currency: pi.currency.toUpperCase(),
-        status: getPaymentStatus(pi),
-        createdAt: new Date(pi.created * 1000).toISOString(),
-        productName: "Voice Pass - 24h",
-      }));
+      .map((pi) => {
+        const { amount_refunded } = getChargeRefundInfo(pi);
+        return {
+          id: pi.id,
+          customerEmail: pi.receipt_email || pi.metadata?.user_email || "Unknown",
+          customerName: pi.metadata?.user_name || null,
+          total: pi.amount,
+          totalFormatted: formatCurrency(pi.amount, pi.currency),
+          currency: pi.currency.toUpperCase(),
+          status: getPaymentStatus(pi),
+          createdAt: new Date(pi.created * 1000).toISOString(),
+          productName: "Voice Pass - 24h",
+          refundedAmount: amount_refunded,
+          refundedAmountFormatted: formatCurrency(amount_refunded, pi.currency),
+        };
+      });
 
     // Calculate revenue by day
     const revenueByDayMap = new Map<string, { revenue: number; orders: number }>();
@@ -165,18 +199,20 @@ export async function GET(request: NextRequest) {
     let allTimeOrders = 0;
     let thirtyDayRevenue = 0;
     let thirtyDayOrders = 0;
+    let allTimeRefunds = 0;
+    let thirtyDayRefunds = 0;
 
     const thirtyDaysAgo = Math.floor(
       (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
     );
 
-    // Get balance transactions for totals
-    const balanceTransactions = await stripe.balanceTransactions.list({
-      type: "charge",
-      limit: 100,
-    });
+    // Get charge and refund balance transactions in parallel
+    const [chargeTransactions, refundTransactions] = await Promise.all([
+      stripe.balanceTransactions.list({ type: "charge", limit: 100 }),
+      stripe.balanceTransactions.list({ type: "refund", limit: 100 }),
+    ]);
 
-    for (const tx of balanceTransactions.data) {
+    for (const tx of chargeTransactions.data) {
       if (tx.status === "available") {
         allTimeRevenue += tx.amount;
         allTimeOrders++;
@@ -187,11 +223,32 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    for (const tx of refundTransactions.data) {
+      if (tx.status === "available") {
+        const absAmount = Math.abs(tx.amount);
+        allTimeRefunds += absAmount;
+        if (tx.created >= thirtyDaysAgo) {
+          thirtyDayRefunds += absAmount;
+        }
+      }
+    }
+
+    const netRevenue = allTimeRevenue - allTimeRefunds;
+    const thirtyDayNetRevenue = thirtyDayRevenue - thirtyDayRefunds;
+
     const summary: StripeAnalyticsSummary = {
       totalRevenue: allTimeRevenue,
       totalRevenueFormatted: formatCurrency(allTimeRevenue, currency),
+      totalRefunds: allTimeRefunds,
+      totalRefundsFormatted: formatCurrency(allTimeRefunds, currency),
+      netRevenue,
+      netRevenueFormatted: formatCurrency(netRevenue, currency),
       thirtyDayRevenue,
       thirtyDayRevenueFormatted: formatCurrency(thirtyDayRevenue, currency),
+      thirtyDayRefunds,
+      thirtyDayRefundsFormatted: formatCurrency(thirtyDayRefunds, currency),
+      thirtyDayNetRevenue,
+      thirtyDayNetRevenueFormatted: formatCurrency(thirtyDayNetRevenue, currency),
       totalOrders: allTimeOrders,
       thirtyDayOrders,
       averageOrderValue:
@@ -228,17 +285,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       data: {
-        summary: {
-          totalRevenue: 0,
-          totalRevenueFormatted: "€0.00",
-          thirtyDayRevenue: 0,
-          thirtyDayRevenueFormatted: "€0.00",
-          totalOrders: 0,
-          thirtyDayOrders: 0,
-          averageOrderValue: 0,
-          averageOrderValueFormatted: "€0.00",
-          currency: "EUR",
-        },
+        summary: emptySummary(),
         recentOrders: [],
         revenueByDay: [],
         productBreakdown: [],
