@@ -1,5 +1,19 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/github-traffic-sync",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/content-discovery",
+      "schedule": "0 3 * * 1"
+    },
+    {
+      "path": "/api/cron/subscription-optimizer",
+      "schedule": "0 4 * * 1"
+    }
+  ],
   "redirects": [
     {
       "source": "/:path*",
