@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { createAdminClient } from "@/lib/supabase";
+import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 
 const GITHUB_API_BASE = "https://api.github.com";
 const REPO = "juan294/paisaxe";
@@ -48,26 +48,8 @@ async function fetchGitHub<T>(endpoint: string, token: string): Promise<T> {
   return response.json();
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  // Auth: verify webhook secret (pg_cron) OR admin session (manual sync)
-  const secret = request.headers.get("x-webhook-secret");
-  const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
-
-  // Check webhook secret first (for pg_cron calls)
-  const hasValidSecret =
-    !!secret &&
-    !!expectedSecret &&
-    secret.length === expectedSecret.length &&
-    timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
-
-  // Fallback: check admin session (for manual sync from admin panel)
-  if (!hasValidSecret) {
-    const auth = await validateAdminAuth();
-    if (!auth.valid) {
-      return auth.error;
-    }
-  }
-
+/** Core sync logic shared by GET (Vercel Cron) and POST (pg_cron/admin). */
+async function syncGitHubTraffic(): Promise<NextResponse> {
   const githubToken = process.env.GITHUB_TOKEN?.trim();
   if (!githubToken) {
     return NextResponse.json(
@@ -207,4 +189,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 500 }
     );
   }
+}
+
+/** Vercel Cron handler — triggered via GET with Authorization: Bearer <CRON_SECRET>. */
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  if (!verifyVercelCron(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return syncGitHubTraffic();
+}
+
+/** pg_cron / admin handler — triggered via POST with x-webhook-secret or admin session. */
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (!verifyWebhookSecret(request)) {
+    const auth = await validateAdminAuth();
+    if (!auth.valid) {
+      return auth.error;
+    }
+  }
+  return syncGitHubTraffic();
 }

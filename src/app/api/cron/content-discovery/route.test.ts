@@ -16,12 +16,12 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => ({ from: vi.fn() })),
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 import { runDiscovery } from "@/lib/content-discovery";
 
-function makeRequest(headers: Record<string, string> = {}) {
+function makeRequest(headers: Record<string, string> = {}, method = "POST") {
   return new Request("http://localhost:3000/api/cron/content-discovery", {
-    method: "POST",
+    method,
     headers,
   }) as unknown as import("next/server").NextRequest;
 }
@@ -34,6 +34,7 @@ describe("POST /api/cron/content-discovery", () => {
     process.env = {
       ...ORIGINAL_ENV,
       WEBHOOK_SECRET: "test-secret",
+      CRON_SECRET: "test-cron-secret",
       GOOGLE_PLACES_API_KEY: "test-google-key",
       ANTHROPIC_API_KEY: "test-anthropic-key",
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
@@ -107,5 +108,54 @@ describe("POST /api/cron/content-discovery", () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.created).toBe(0);
+  });
+});
+
+describe("GET /api/cron/content-discovery (Vercel Cron)", () => {
+  const ORIGINAL_ENV = { ...process.env };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env = {
+      ...ORIGINAL_ENV,
+      WEBHOOK_SECRET: "test-secret",
+      CRON_SECRET: "test-cron-secret",
+      GOOGLE_PLACES_API_KEY: "test-google-key",
+      ANTHROPIC_API_KEY: "test-anthropic-key",
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_SERVICE_KEY: "test-service-key",
+    };
+  });
+
+  afterAll(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it("rejects GET without Authorization header", async () => {
+    const res = await GET(makeRequest({}, "GET"));
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects GET with wrong CRON_SECRET", async () => {
+    const res = await GET(makeRequest({ authorization: "Bearer wrong-secret" }, "GET"));
+    expect(res.status).toBe(401);
+  });
+
+  it("accepts GET with valid CRON_SECRET and runs discovery", async () => {
+    (runDiscovery as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      discovered: 1,
+      created: 1,
+      skippedDuplicates: 0,
+      errors: [],
+      stories: [{ id: "uuid-1", title: "Place 1", slug: "place-1", category: "nature" }],
+    });
+
+    const res = await GET(
+      makeRequest({ authorization: "Bearer test-cron-secret" }, "GET")
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.created).toBe(1);
   });
 });
