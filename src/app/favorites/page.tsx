@@ -233,7 +233,7 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
   return (
     <Link
       ref={itemRef}
-      href="/immersive"
+      href={`/immersive?story=${story.slug || story.id}`}
       className={cn(
         "group relative w-full overflow-hidden rounded-lg",
         isFeature && "sm:col-span-2"

@@ -238,6 +238,62 @@ describe("FavoritesPage", () => {
     });
   });
 
+  describe("story card navigation", () => {
+    beforeEach(() => {
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1", "story-2"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+    });
+
+    it("should include ?story= param with slug in story card link", async () => {
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+      });
+
+      const storyLink = screen.getByText("Lagos de Covadonga").closest("a");
+      expect(storyLink).toHaveAttribute("href", "/immersive?story=lagos-covadonga");
+    });
+
+    it("should fall back to story id when slug is missing", async () => {
+      mockUseStories.mockReturnValue({
+        stories: [
+          {
+            id: "story-no-slug",
+            title: "Story Without Slug",
+            subtitle: "No slug here",
+            description: "Test story",
+            image: "/images/test.jpg",
+            category: "nature" as const,
+            sourcePdf: "test.pdf",
+            // No slug property
+          },
+        ],
+        isLoading: false,
+        error: null,
+        refresh: vi.fn(),
+      });
+
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-no-slug"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Story Without Slug")).toBeInTheDocument();
+      });
+
+      const storyLink = screen.getByText("Story Without Slug").closest("a");
+      expect(storyLink).toHaveAttribute("href", "/immersive?story=story-no-slug");
+    });
+  });
+
   describe("story cards", () => {
     beforeEach(() => {
       mockUseFavorites.mockReturnValue({
