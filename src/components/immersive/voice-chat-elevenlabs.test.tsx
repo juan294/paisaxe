@@ -156,6 +156,53 @@ describe("VoiceChatElevenLabs", () => {
         );
       });
     });
+
+    it("should pass user_access_token as dynamic variable when provided", async () => {
+      mockStartSession.mockResolvedValue(undefined);
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent-123"
+          onFallbackToText={() => {}}
+          userAccessToken="test-supabase-token-abc"
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(mockStartSession).toHaveBeenCalledWith(
+          expect.objectContaining({
+            dynamicVariables: expect.objectContaining({
+              user_access_token: "test-supabase-token-abc",
+            }),
+          })
+        );
+      });
+    });
+
+    it("should not include user_access_token when not provided", async () => {
+      mockStartSession.mockResolvedValue(undefined);
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent-123"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(mockStartSession).toHaveBeenCalled();
+        const callArgs = mockStartSession.mock.calls[0][0];
+        expect(callArgs.dynamicVariables).not.toHaveProperty("user_access_token");
+      });
+    });
   });
 
   describe("connection states", () => {
