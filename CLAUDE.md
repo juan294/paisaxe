@@ -613,99 +613,87 @@ npm run test && npm run typecheck && npm run lint
 
 **Do NOT commit** — present the full diff to the user for review. The user decides whether to commit.
 
-## Code Quality Deep-Dive (Agent Team)
-
-**Trigger:** User says "run a code quality audit" or "deep dive on code quality"
-
-Create a team called "code-quality" with 3 parallel specialists:
-
-1. **dead-code-hunter**
-   - Run `npx knip` to find unused exports, files, and dependencies
-   - Check for commented-out code blocks
-   - Find unused CSS classes or Tailwind utilities
-   - Look for TODO/FIXME/HACK comments older than 30 days
-   - Produce a prioritized list of dead code to remove
-
-2. **pattern-enforcer**
-   - Check for consistent naming conventions across the codebase
-   - Verify all API routes follow the same auth pattern
-   - Check that all components follow the same file structure
-   - Look for duplicated logic that could be consolidated
-   - Verify error handling patterns are consistent
-   - Check for consistent use of TypeScript types vs `any`
-
-3. **complexity-analyst**
-   - Identify functions longer than 50 lines
-   - Find files larger than 300 lines
-   - Look for deeply nested conditionals (3+ levels)
-   - Check for functions with more than 4 parameters
-   - Identify components with too many responsibilities
-   - Suggest specific simplification strategies
-
-### Output
-
-Write the final report to `docs/agents/code-quality-report.md`:
-
-```
-# Code Quality Report
-> Generated on [date]
-
-## Summary
-- Dead code items found: [N]
-- Pattern violations: [N]
-- Complexity hotspots: [N]
-
-## Dead Code
-[Prioritized list from dead-code-hunter]
-
-## Pattern Violations
-[Findings from pattern-enforcer]
-
-## Complexity Hotspots
-[Findings from complexity-analyst with simplification suggestions]
-
-## Recommended Actions
-[Top 5 most impactful improvements, ordered by effort-to-impact ratio]
-```
-
 ## Codebase Health Check (Agent Team)
 
-**Trigger:** User says "run a health check", "codebase health", or "health monitoring"
+**Trigger:** User says "run a health check", "codebase health", "health monitoring", "code quality audit", or "deep dive on code quality"
 
-This is a comprehensive health check that goes beyond code quality to cover tests, CI, and dependencies. Create a team called "health-check" with 4 parallel agents:
+This is the **single unified audit** for the entire codebase. It replaces the former standalone "Code Quality Deep-Dive" and "Coverage Report" — those checks are now folded into this workflow to eliminate overlap.
+
+Create a team called "health-check" with 4 parallel agents:
 
 ### Agents
 
 1. **test-health**
    - Run full test suite, identify any flaky tests (run failing tests 3x to confirm)
+   - Report coverage percentages by module (`npm run test:coverage`)
    - Check coverage gaps in recently changed files (`git diff develop..main`)
-   - Report coverage percentages by module
+   - Flag files at 0% coverage that have been modified recently
    - Flag tests that take unusually long (> 5 seconds)
 
 2. **code-quality**
-   - Run linter, check for TypeScript strict-mode violations
-   - Find TODO/FIXME/HACK comments, identify dead exports and unused dependencies
+   - Run linter and typecheck (`npm run lint && npm run typecheck`)
+   - Run `npx knip` for unused exports, files, and dependencies
+   - Find TODO/FIXME/HACK comments
    - Check for `any` types that should be properly typed
-   - Run `npx knip` for unused exports and files
+   - Identify complexity hotspots: functions > 50 lines, files > 300 lines, nesting > 3 levels
+   - Check for duplicated logic and inconsistent patterns across API routes and components
+   - Cross-reference: flag files that are both complex AND low-coverage (highest risk)
 
 3. **ci-deploy-health**
    - Check last 5 CI runs for patterns in failures (`gh run list --limit 5`)
-   - Verify all environment variables are set in Vercel production
-   - Confirm cron jobs are executing successfully
+   - Verify production health endpoint (`curl /api/health`)
+   - Check database size and latency
+   - Confirm cron jobs are configured and executing
    - Check for any Vercel deployment errors or warnings
 
 4. **dependency-health**
    - Check for outdated dependencies (`npm outdated`)
    - Identify known vulnerabilities (`npm audit`)
-   - Verify lockfile integrity
+   - Verify lockfile integrity (`npm ci --dry-run`)
    - Flag any dependencies with incompatible licenses (only MIT, Apache-2.0, BSD, ISC allowed)
 
 ### Output
 
-Collect all agent reports into a single markdown file at `docs/health-report-[TODAY].md` with sections ranked by severity.
+Write the unified report to `docs/health-report-[TODAY].md`. This is the **single source of truth** — it replaces `docs/agents/coverage-report.md` and `docs/agents/code-quality-report.md` (those files are archived and no longer updated).
+
+Report structure:
+```
+# Codebase Health Report
+> Generated: [date] | Branch: develop | Commit: [hash]
+
+## Executive Summary
+[Overall status + score table]
+
+## Test Health
+[Pass rate, coverage by module, coverage gaps, flaky tests]
+
+## Code Quality
+[Lint/type errors, dead code, complexity hotspots, pattern violations]
+
+## CI & Deploy Health
+[CI runs, production status, database, cron jobs]
+
+## Dependency Health
+[Outdated deps, vulnerabilities, lockfile, licenses]
+
+## Recommended Actions
+[Priority 1: quick automated fixes]
+[Priority 2: manual improvements with GitHub issues]
+[Priority 3: items to monitor]
+```
 
 ### Auto-Remediation
 
 - For **critical issues**, automatically create GitHub issues.
-- For **simple fixes** (unused deps, lint fixes, dead code), fix them in a single PR titled `chore: automated health fixes [DATE]`.
+- For **simple fixes** (unused deps, lint fixes, dead code, minor/patch dep updates), fix them in a single PR titled `chore: automated health fixes [DATE]`.
 - For **complex issues**, file issues with context and suggested approaches — do NOT auto-fix.
+
+### Relationship to Other Reports
+
+This health check is the **periodic comprehensive audit**. It does NOT replace:
+- **QA Report** — LLM safety tests, browser journeys (unique domain)
+- **Security Report** — deep CVE/CSP/CSRF/rate-limiting audit (unique domain)
+- **Performance Report** — bundle size analysis, Lighthouse deep-dive (unique domain)
+- **Pre-Launch Report** — production readiness gate (superset, run only before releases)
+- **Cost Analyst Report** — API spend tracking and forecasting (unique domain)
+- **Localization Report** — translation completeness (unique domain)
