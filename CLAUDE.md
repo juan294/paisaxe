@@ -239,6 +239,10 @@ npm run test:e2e:ui    # Playwright UI mode
 
 # Data pipeline
 npm run seed-db        # Generate embeddings and populate DB
+
+# Headless mode (non-interactive CI/batch runs)
+claude -p "Fix all TypeScript lint errors and run tests" --allowedTools "Edit,Read,Bash,Write" --output-format json
+claude -p "Read issue #240 and implement the fix with TDD" --allowedTools "Edit,Read,Bash,Write,Grep"
 ```
 
 ## Environment Variables
