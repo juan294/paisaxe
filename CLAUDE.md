@@ -377,6 +377,31 @@ Core tables (see `supabase/migrations/` for full DDL):
 - If a sub-agent fails due to permissions, take over manually immediately rather than retrying.
 - Be aware of context window limits when receiving multiple parallel task notifications.
 
+### Self-Healing Agent Pipelines
+
+When spawning multi-agent pipelines (audits, fixes, refactors), agents MUST be resilient to failures:
+
+**Failure Recovery Protocol:**
+1. Each sub-agent should attempt the fix using its primary tool.
+2. If it hits a permission or tool error, **try an alternative approach** before reporting failure:
+   - If `Write` fails → try `Edit`
+   - If `Bash` is blocked → report back with exact manual steps the parent can execute
+   - If a file is locked or inaccessible → skip and document why
+3. **Parent agent tracks all sub-agent results.** After the first pass:
+   - Retry failed agents once with modified instructions (e.g., different tool, different approach)
+   - Collect all remaining blockers into a single summary
+4. **Escalate only truly blocked items.** Do not ask the user to intervene unless all automated alternatives have been exhausted.
+5. **Consolidate output:**
+   - Create **one PR** with all successful fixes
+   - Create **one GitHub issue** listing any unresolved items with reproduction steps
+
+**Error Reporting Contract:**
+Sub-agents must report failures in a structured way:
+- What was attempted
+- What error occurred
+- What alternative was tried (if any)
+- Whether the item is recoverable or needs manual intervention
+
 ## Testing & CI
 
 - This project uses TDD. Always write tests before or alongside implementation.
@@ -499,6 +524,36 @@ Agent: "Filed as #19 — type: bug, priority: high, area: voice"
    gh issue edit 19 --body "updated description..."
    ```
 
+## Autonomous Issue Implementation
+
+**Trigger:** User says "implement issue #N" or "work on issue #N end-to-end"
+
+This workflow takes a GitHub issue and implements it from start to finish with zero intervention, tying together TDD, worktrees, CI monitoring, and issue tracking into a single autonomous pipeline.
+
+### Workflow
+
+```
+Implement GitHub issue #[NUMBER] end-to-end with zero intervention:
+
+1. Read the issue thoroughly. Read CLAUDE.md and any referenced plan files.
+2. Create a feature branch from develop following our naming convention.
+3. Write failing tests FIRST that capture every acceptance criterion from the issue.
+4. Implement the feature iteratively — run tests after each change, fix failures before moving on.
+5. Spawn a parallel Task agent to update all relevant documentation (README, CLAUDE.md, any /docs files).
+6. Run the full test suite. If anything fails, diagnose and fix. Repeat until all tests pass.
+7. Commit with a conventional message, push to origin.
+8. Monitor CI — if it fails, pull the logs, fix the issue, push again. Repeat up to 3 times.
+9. Once CI is green, report the summary of what was implemented.
+```
+
+### Rules
+
+- **Do NOT ask questions** — make reasonable decisions based on codebase patterns and document any assumptions in the PR description.
+- **Follow all existing conventions** — TDD, worktree isolation, branch naming, push accountability.
+- **Reference the issue** in all commits: `Fixes #N` or `Refs #N`.
+- **Close the issue** once merged to `develop` with green CI.
+- **If the issue is ambiguous**, document your interpretation in the commit/PR rather than blocking on clarification.
+
 ## Content Categories
 
 From 37 PDFs in `content/pdfs/`:
@@ -612,3 +667,45 @@ Write the final report to `docs/agents/code-quality-report.md`:
 ## Recommended Actions
 [Top 5 most impactful improvements, ordered by effort-to-impact ratio]
 ```
+
+## Codebase Health Check (Agent Team)
+
+**Trigger:** User says "run a health check", "codebase health", or "health monitoring"
+
+This is a comprehensive health check that goes beyond code quality to cover tests, CI, and dependencies. Create a team called "health-check" with 4 parallel agents:
+
+### Agents
+
+1. **test-health**
+   - Run full test suite, identify any flaky tests (run failing tests 3x to confirm)
+   - Check coverage gaps in recently changed files (`git diff develop..main`)
+   - Report coverage percentages by module
+   - Flag tests that take unusually long (> 5 seconds)
+
+2. **code-quality**
+   - Run linter, check for TypeScript strict-mode violations
+   - Find TODO/FIXME/HACK comments, identify dead exports and unused dependencies
+   - Check for `any` types that should be properly typed
+   - Run `npx knip` for unused exports and files
+
+3. **ci-deploy-health**
+   - Check last 5 CI runs for patterns in failures (`gh run list --limit 5`)
+   - Verify all environment variables are set in Vercel production
+   - Confirm cron jobs are executing successfully
+   - Check for any Vercel deployment errors or warnings
+
+4. **dependency-health**
+   - Check for outdated dependencies (`npm outdated`)
+   - Identify known vulnerabilities (`npm audit`)
+   - Verify lockfile integrity
+   - Flag any dependencies with incompatible licenses (only MIT, Apache-2.0, BSD, ISC allowed)
+
+### Output
+
+Collect all agent reports into a single markdown file at `docs/health-report-[TODAY].md` with sections ranked by severity.
+
+### Auto-Remediation
+
+- For **critical issues**, automatically create GitHub issues.
+- For **simple fixes** (unused deps, lint fixes, dead code), fix them in a single PR titled `chore: automated health fixes [DATE]`.
+- For **complex issues**, file issues with context and suggested approaches — do NOT auto-fix.
