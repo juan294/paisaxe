@@ -265,7 +265,8 @@ describe("POST /api/chat/stream", () => {
       expect.stringContaining("Lagos de Covadonga"),
       expect.any(Array),
       false,
-      0
+      0,
+      expect.any(Array)
     );
   });
 
