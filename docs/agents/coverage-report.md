@@ -4,16 +4,16 @@
 > See `docs/health-report-[DATE].md` for the latest coverage data.
 > This file is kept for historical reference only and is no longer updated.
 
-> Last updated: 2026-02-10 (final standalone run)
+> Last updated: 2026-02-16 (final standalone run)
 
 ## Summary
 
-- **Total tests:** 3641 passed, 1 skipped
-- **Test files:** 238 passed (100%)
-- **Statement coverage:** 79.01%
-- **Branch coverage:** 70.06%
-- **Function coverage:** 72.47%
-- **Line coverage:** 79.82%
+- **Total tests:** 4243 passed
+- **Test files:** 274 passed (100%)
+- **Statement coverage:** 88.29%
+- **Branch coverage:** 80.18%
+- **Function coverage:** 85.30%
+- **Line coverage:** 89.25%
 - **TypeScript:** ✅ No errors
 
 *Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
@@ -134,6 +134,14 @@
 | `src/lib/admin-api/suggestions.ts` | Admin API |
 | `src/lib/admin-auth.ts` | Lib |
 | `src/components/immersive/voice-chat.tsx` | Immersive |
+| `src/components/admin/agents-dashboard/constants.ts` | Admin |
+| `src/components/admin/agents-dashboard/use-agent-runner.ts` | Admin |
+| `src/components/admin/agents-dashboard/use-agent-terminal.ts` | Admin |
+| `src/components/admin/story-editor-dialog/types.ts` | Admin |
+| `src/components/admin/marketing-dashboard/stat-card.tsx` | Marketing |
+| `src/components/admin/marketing-dashboard/constants.ts` | Marketing |
+| `src/components/admin/marketing-dashboard/account-card.tsx` | Marketing |
+| `src/components/admin/story-card.tsx` | Admin |
 
 ## Files Below 100%
 
@@ -212,6 +220,48 @@ These are deliberately untested and considered acceptable:
 9. **Admin tunnel route** (`src/app/api/admin/tunnel/route.ts`): Uses child_process spawn/exec for Cloudflare tunnel management. This is a development-only feature that requires actual shell execution and cannot be meaningfully tested in jsdom/vitest without mocking the entire child_process module, which would provide no real test value.
 
 ## Changes Made This Run
+
+### Test files created (2026-02-16):
+- `src/components/admin/agents-dashboard/constants.test.ts` (18 tests) - relativeTime, formatElapsed, AGENT_FLAG_KEYS, AGENT_NAMES, HEALTH_* constants
+- `src/components/admin/story-editor-dialog/types.test.ts` (12 tests) - generateSlug with accents/ñ/special chars, CATEGORIES, LOCATIONS, DURATIONS
+- `src/components/admin/agents-dashboard/use-agent-runner.test.ts` (13 tests) - handleRunAgent, handleStopAgent, polling lifecycle, recordRunResult
+- `src/components/admin/agents-dashboard/use-agent-terminal.test.ts` (13 tests) - openTerminal, closeTerminal, log polling, stream completion, exit codes
+- `src/components/admin/story-editor-dialog/use-story-editor-state.test.ts` (20 tests) - Form initialization, handlers, change tracking, resetAndClose
+- `src/components/admin/costs-analytics-panel/modals.test.tsx` (16 tests) - AddCostModal and EditCostModal forms, submission, loading
+- `src/components/admin/marketing-dashboard/stat-card.test.tsx` (6 tests) - Rendering, locale formatting, color classes, error styling
+- `src/components/admin/marketing-dashboard/post-row.test.tsx` (10 tests) - Content, platform badge, status display, scheduled dates, external links
+
+### Test files modified (2026-02-16):
+- `src/components/admin/story-card.test.tsx` (+17 tests) - Selection mode, translation badges, subtitle display
+- `src/app/api/admin/marketing/accounts/route.test.ts` (+11 tests) - PATCH method, error paths for GET/POST/DELETE
+- `src/components/immersive/story-viewer.test.tsx` (+7 tests) - Mobile overflow menu, bookmarks, image source attribution
+- `src/components/admin/marketing-dashboard/drafts-panel.test.tsx` (+8 tests) - Copy, mark-as-posted, delete, error handling, singular count
+- `src/components/admin/marketing-dashboard/marketing-dashboard.test.tsx` (+15 tests) - Upcoming/recent posts, schedules, toggle/disconnect, retry, empty state
+- `src/components/admin/marketing-dashboard/account-card.test.tsx` (+3 tests) - Configure, resume, disconnect button handlers
+
+### Coverage improvements (2026-02-16):
+- **src/components/admin/agents-dashboard/constants.ts**: 0% → 100%
+- **src/components/admin/agents-dashboard/use-agent-runner.ts**: 27% → 100%
+- **src/components/admin/agents-dashboard/use-agent-terminal.ts**: 27% → 100%
+- **src/components/admin/story-editor-dialog/types.ts**: 0% → 100%
+- **src/components/admin/story-editor-dialog/use-story-editor-state.ts**: 71% → 98%
+- **src/components/admin/marketing-dashboard/stat-card.tsx**: 0% → 100%
+- **src/components/admin/marketing-dashboard/account-card.tsx**: 53% → 100%
+- **src/components/admin/marketing-dashboard/constants.ts**: 0% → 100%
+- **src/components/admin/marketing-dashboard/drafts-panel.tsx**: 43% → 83%
+- **src/components/admin/marketing-dashboard/marketing-dashboard.tsx**: 46% → 73%
+- **src/components/admin/costs-analytics-panel/modals.tsx**: 41% → 72%
+- **src/components/admin/story-card.tsx**: 38% → 100%
+
+### Overall improvement (2026-02-16):
+- Statement coverage: 85.92% → 88.29% (+2.37%)
+- Branch coverage: 77.65% → 80.18% (+2.53%)
+- Function coverage: 82.16% → 85.30% (+3.14%)
+- Line coverage: 86.79% → 89.25% (+2.46%)
+- Total tests: 4075 → 4243 (+168 tests)
+- Test files: 266 → 274 (+8 files)
+
+---
 
 ### Test files created (2026-02-10):
 - `src/lib/admin-api/analytics.test.ts` (32 tests) - Full coverage for all 5 analytics fetch functions
@@ -384,3 +434,8 @@ Run manually anytime:
   - 3 files near-100%: claude (99%), proxy (97%), translate-story (97%)
   - Largest single-run improvement to date: +5.33% statement coverage, +481 tests
   - Used 8 parallel background agents for maximum throughput
+- **2026-02-16**: Coverage Agent run -- 4243 tests, 274 files (+168 tests, +8 files, +2.37% statement coverage)
+  - Created 8 new test files: agents-dashboard constants/use-agent-runner/use-agent-terminal, story-editor types/use-story-editor-state, costs-analytics modals, marketing stat-card/post-row
+  - Enhanced 6 existing test files: story-card (+17), accounts route (+11), story-viewer (+7), drafts-panel (+8), marketing-dashboard (+15), account-card (+3)
+  - 8 files reached 100%: agents constants, use-agent-runner, use-agent-terminal, story-editor types, stat-card, account-card, marketing constants, story-card
+  - 4 files significantly improved: drafts-panel (43→83%), marketing-dashboard (46→73%), modals (41→72%), use-story-editor-state (71→98%)
