@@ -19,6 +19,7 @@ interface VoiceChatElevenLabsProps {
   story: Story;
   agentId: string;
   onFallbackToText: () => void;
+  userAccessToken?: string | null;
 }
 
 // Animated orb component for voice visualization
