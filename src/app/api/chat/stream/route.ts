@@ -122,7 +122,8 @@ export async function POST(request: NextRequest) {
             enrichedMessage,
             chunks,
             asturianEnabled,
-            messageIndex
+            messageIndex,
+            images
           )) {
             // Send text chunk as SSE event
             const event = `data: ${JSON.stringify({ type: "text", content: chunk })}\n\n`;

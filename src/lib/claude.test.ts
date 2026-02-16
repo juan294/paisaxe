@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { Chunk } from "@/types";
+import type { Chunk, ImageResult } from "@/types";
 import { EventEmitter } from "events";
 
 const { mockExecFile, mockSleep, mockSpawn } = vi.hoisted(() => {
@@ -16,7 +16,7 @@ vi.mock("node:timers/promises", () => ({
   setTimeout: mockSleep,
 }));
 
-import { generateChatResponse, extractSourcesFromChunks, sanitizeOutput, streamChatResponse } from "./claude";
+import { generateChatResponse, extractSourcesFromChunks, sanitizeOutput, streamChatResponse, formatImagesForContext } from "./claude";
 
 /** Set up a mock curl response (returns JSON from stdout) */
 function setupMockAPIResponse(body: unknown, status = 200) {
@@ -986,6 +986,85 @@ describe("claude", () => {
       const dIndex = curlArgs.indexOf("-d");
       const body = JSON.parse(curlArgs[dIndex + 1]);
       expect(body.system).toContain("asturianu");
+    });
+  });
+
+  // ─── formatImagesForContext ──────────────────────────────────────────
+
+  describe("formatImagesForContext", () => {
+    it("should return empty string for empty array", () => {
+      expect(formatImagesForContext([])).toBe("");
+    });
+
+    it("should return empty string for undefined", () => {
+      expect(formatImagesForContext(undefined)).toBe("");
+    });
+
+    it("should format images with captions in available_images tags", () => {
+      const images: ImageResult[] = [
+        { id: "1", path: "/images/cathedral.jpg", caption: "Oviedo Cathedral", sourcePdf: "oviedo-guide.pdf" },
+      ];
+      const result = formatImagesForContext(images);
+      expect(result).toContain("<available_images>");
+      expect(result).toContain("</available_images>");
+      expect(result).toContain("Oviedo Cathedral");
+      expect(result).toContain("oviedo-guide.pdf");
+    });
+
+    it("should format multiple images", () => {
+      const images: ImageResult[] = [
+        { id: "1", path: "/images/cathedral.jpg", caption: "Oviedo Cathedral", sourcePdf: "oviedo-guide.pdf" },
+        { id: "2", path: "/images/playa.jpg", caption: "Playa de Gulpiyuri", sourcePdf: "beaches.pdf" },
+      ];
+      const result = formatImagesForContext(images);
+      expect(result).toContain("Oviedo Cathedral");
+      expect(result).toContain("Playa de Gulpiyuri");
+    });
+
+    it("should handle images without captions", () => {
+      const images: ImageResult[] = [
+        { id: "1", path: "/images/map.jpg", caption: undefined, sourcePdf: "general-guide.pdf" },
+      ];
+      const result = formatImagesForContext(images);
+      expect(result).toContain("<available_images>");
+      expect(result).toContain("general-guide.pdf");
+      expect(result).not.toContain("null");
+    });
+  });
+
+  // ─── images in user content via generateChatResponse ────────────────
+
+  describe("images in user content", () => {
+    it("should include available_images in user content when images provided", async () => {
+      setupMockAPIResponse({
+        content: [{ type: "text", text: "Response" }],
+      });
+
+      const chunks: Chunk[] = [
+        { id: "1", content: "Oviedo info", sourcePdf: "oviedo.pdf", pageNumber: 1 },
+      ];
+      const images: ImageResult[] = [
+        { id: "img1", path: "/images/cathedral.jpg", caption: "Oviedo Cathedral", sourcePdf: "oviedo.pdf" },
+      ];
+
+      await generateChatResponse("Tell me about Oviedo", chunks, false, 0, images);
+
+      const body = getCurlBody();
+      const userContent = body.messages[0].content;
+      expect(userContent).toContain("<available_images>");
+      expect(userContent).toContain("Oviedo Cathedral");
+    });
+
+    it("should NOT include available_images when no images provided", async () => {
+      setupMockAPIResponse({
+        content: [{ type: "text", text: "Response" }],
+      });
+
+      await generateChatResponse("Hello", []);
+
+      const body = getCurlBody();
+      const userContent = body.messages[0].content;
+      expect(userContent).not.toContain("<available_images>");
     });
   });
 
