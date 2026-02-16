@@ -311,7 +311,7 @@ describe("useFavorites", () => {
       );
     });
 
-    it("should handle cloud sync fetch error gracefully on toggle", async () => {
+    it("should revert local state when cloud sync fails on add", async () => {
       const consoleSpy = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
@@ -350,12 +350,55 @@ describe("useFavorites", () => {
         await result.current.toggleFavorite("story-1");
       });
 
-      // Favorite should still be added locally even if cloud fails
-      expect(result.current.favorites).toContain("story-1");
+      // Favorite should be REVERTED since cloud sync failed
+      expect(result.current.favorites).not.toContain("story-1");
       expect(consoleSpy).toHaveBeenCalledWith(
         "Error syncing favorite to cloud:",
         expect.any(Error)
       );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should revert localStorage when cloud sync fails on remove", async () => {
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      // Cloud sync GET succeeds with story-1, toggle DELETE will fail
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          return { ok: true, json: async () => ["story-1"] };
+        }
+        if (options?.method === "DELETE") {
+          throw new Error("Network error");
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+
+      localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+        expect(result.current.favorites).toContain("story-1");
+      });
+
+      // Try to remove story-1 — should be reverted when cloud fails
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      // State should be reverted
+      expect(result.current.favorites).toContain("story-1");
+
+      // localStorage should be reverted to pre-toggle value
+      const lastSetCall = localStorageMock.setItem.mock.calls
+        .filter((call: unknown[]) => call[0] === "paisaxe_favorites")
+        .pop();
+      const savedFavorites = JSON.parse(lastSetCall![1]);
+      expect(savedFavorites).toContain("story-1");
 
       consoleSpy.mockRestore();
     });
