@@ -1,7 +1,10 @@
-# Test Coverage Report
+# Test Coverage Report (ARCHIVED)
 
-> Last updated: 2026-02-10
-> Scheduled: nightly at 2:00 CET via `scripts/coverage-agent.sh`
+> **ARCHIVED**: This standalone report has been consolidated into the unified Codebase Health Check.
+> See `docs/health-report-[DATE].md` for the latest coverage data.
+> This file is kept for historical reference only and is no longer updated.
+
+> Last updated: 2026-02-10 (final standalone run)
 
 ## Summary
 
