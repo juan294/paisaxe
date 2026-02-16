@@ -357,6 +357,34 @@ Core tables (see `supabase/migrations/` for full DDL):
 6. **Database function security** — All functions need explicit `SET search_path`. Use `search_path = ''` with fully qualified refs for security-definer functions.
 7. **Production is sacred** — No agent touches `main`, production deployments, or production infrastructure without explicit user authorization in the current conversation. See Production Safety section.
 
+## Deployment
+
+- Production deploys from `main` only. Changes pushed to `develop` must be merged to `main` via PR before they go live.
+- Always confirm the target branch before pushing — if the goal is production deployment, ensure the PR targets `main`.
+
+## Language & Tone
+
+- All user-facing content for the Asturias project must be in Spanish unless explicitly stated otherwise.
+- For social media copy: keep tone confident and positive — avoid pitying, resentful, or overly dramatic language. Never mention unreleased/unpublished features.
+
+## Sub-Agent & Background Task Guidelines
+
+- Sub-agents (Task tool) may lack Bash or file-write permissions. If spawning agents for fixes, verify they have the required tool access first.
+- If a sub-agent fails due to permissions, take over manually immediately rather than retrying.
+- Be aware of context window limits when receiving multiple parallel task notifications.
+
+## Testing & CI
+
+- This project uses TDD. Always write tests before or alongside implementation.
+- All PRs must have CI green before merging. Run the full test suite locally before pushing.
+- After merging to develop, if production deployment is the goal, immediately create a PR from develop → main.
+
+## Tool & API Awareness
+
+- You CAN set Vercel environment variables via CLI — do not claim otherwise.
+- You CANNOT handle credentials (npm tokens, API keys) directly — ask the user to provide/set them.
+- Upstash Redis API differs from standard Redis: use `zrange` with options instead of `zrangebyscore`/`zrevrangebyscore`.
+
 ## Troubleshooting
 
 ### Vercel Environment Variables with Invisible Characters
