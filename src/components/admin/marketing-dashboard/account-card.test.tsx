@@ -119,6 +119,90 @@ describe("AccountCard", () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
+  it("calls onConfigure when configure button clicked for active account", async () => {
+    const user = userEvent.setup();
+    const onConfigure = vi.fn();
+
+    render(
+      <AccountCard
+        platform="x"
+        account={{
+          id: "acc-4",
+          platform: "x",
+          accountName: "Test",
+          isActive: true,
+          hasCredentials: true,
+          accountHandle: "@test",
+          lastSyncAt: null,
+          createdAt: "2024-01-01T00:00:00Z",
+          updatedAt: "2024-01-01T00:00:00Z",
+        }}
+        onConfigure={onConfigure}
+        onToggle={vi.fn()}
+        onDisconnect={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByText("Configure"));
+    expect(onConfigure).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onToggle when resume button clicked for paused account", async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+
+    render(
+      <AccountCard
+        platform="instagram"
+        account={{
+          id: "acc-5",
+          platform: "instagram",
+          accountName: "Paisaxe IG",
+          isActive: false,
+          hasCredentials: true,
+          accountHandle: "@paisaxe",
+          lastSyncAt: null,
+          createdAt: "2024-01-01T00:00:00Z",
+          updatedAt: "2024-01-01T00:00:00Z",
+        }}
+        onConfigure={vi.fn()}
+        onToggle={onToggle}
+        onDisconnect={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByText("Resume"));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onDisconnect when disconnect button clicked for paused account", async () => {
+    const user = userEvent.setup();
+    const onDisconnect = vi.fn();
+
+    render(
+      <AccountCard
+        platform="instagram"
+        account={{
+          id: "acc-6",
+          platform: "instagram",
+          accountName: "Paisaxe IG",
+          isActive: false,
+          hasCredentials: true,
+          accountHandle: "@paisaxe",
+          lastSyncAt: null,
+          createdAt: "2024-01-01T00:00:00Z",
+          updatedAt: "2024-01-01T00:00:00Z",
+        }}
+        onConfigure={vi.fn()}
+        onToggle={vi.fn()}
+        onDisconnect={onDisconnect}
+      />
+    );
+
+    await user.click(screen.getByText("Disconnect"));
+    expect(onDisconnect).toHaveBeenCalledTimes(1);
+  });
+
   it("shows correct platform badges", () => {
     const { rerender } = render(
       <AccountCard
