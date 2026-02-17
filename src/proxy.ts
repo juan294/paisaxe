@@ -263,11 +263,32 @@ function addCORSHeaders(request: NextRequest, response: NextResponse): void {
 }
 
 /**
+ * Check if the request has Supabase auth cookies.
+ * Supabase stores auth tokens in cookies named `sb-{projectRef}-auth-token`
+ * or chunked as `sb-{projectRef}-auth-token.0`, `.1`, etc.
+ * Returns false for anonymous visitors (no auth cookies).
+ * Exported for testing.
+ */
+export function hasSupabaseAuthCookies(request: NextRequest): boolean {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return false;
+  try {
+    const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+    const prefix = `sb-${projectRef}-auth-token`;
+    return request.cookies.getAll().some(
+      (c) => c.name === prefix || c.name.startsWith(`${prefix}.`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Timeout for auth session refresh in milliseconds.
  * Prevents the proxy from hanging when Supabase is unreachable.
  * Exported for testing.
  */
-export const AUTH_REFRESH_TIMEOUT_MS = 3_000;
+export const AUTH_REFRESH_TIMEOUT_MS = 1_500;
 
 /**
  * Refresh Supabase auth session if expired.
@@ -290,6 +311,11 @@ async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
   // Skip if Supabase not configured or using dummy credentials (CI/E2E).
   // Real Supabase anon keys are JWTs that start with 'eyJ'.
   if (!supabaseUrl || !supabaseKey || !supabaseKey.startsWith("eyJ")) {
+    return response;
+  }
+
+  // Skip auth refresh if no auth cookies exist (anonymous visitor)
+  if (!hasSupabaseAuthCookies(request)) {
     return response;
   }
 

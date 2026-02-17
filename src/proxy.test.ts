@@ -21,7 +21,7 @@ vi.mock("@supabase/ssr", () => ({
   }),
 }));
 
-import { proxy, shouldBypassMaintenanceMode, AUTH_REFRESH_TIMEOUT_MS } from "./proxy";
+import { proxy, shouldBypassMaintenanceMode, AUTH_REFRESH_TIMEOUT_MS, hasSupabaseAuthCookies } from "./proxy";
 
 // Mock global fetch for database checks
 const mockFetch = vi.fn();
@@ -677,7 +677,9 @@ describe("Auth session refresh timeout", () => {
     // Simulate a hanging getUser (never resolves) — e.g., DNS resolution hang
     mockGetUser.mockImplementation(() => new Promise(() => {}));
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
 
     const startTime = Date.now();
     const response = await proxy(request);
@@ -694,7 +696,9 @@ describe("Auth session refresh timeout", () => {
     // Simulate a fast auth response (getUser call succeeds)
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -704,7 +708,9 @@ describe("Auth session refresh timeout", () => {
     // Simulate a connection error thrown during getUser
     mockGetUser.mockRejectedValue(new TypeError("fetch failed"));
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
     const response = await proxy(request);
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
@@ -768,7 +774,9 @@ describe("Auth session refresh - setAll cookie callback", () => {
       return { data: { user: { id: "user-1" } }, error: null };
     });
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
     const response = await proxy(request);
 
     // The response should still be a valid next() response
@@ -795,7 +803,9 @@ describe("Auth session refresh - setAll cookie callback", () => {
       return { data: { user: null }, error: null };
     });
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
     await proxy(request);
 
     // Verify cookie was set on the request object
@@ -815,7 +825,9 @@ describe("Auth session refresh - setAll cookie callback", () => {
       return { data: { user: null }, error: null };
     });
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
     const response = await proxy(request);
 
     expect(response.cookies.get("cookie-a")?.value).toBe("value-a");
@@ -848,7 +860,9 @@ describe("Auth session refresh - error logging", () => {
     // Simulate getUser hanging and the Promise.race timeout firing
     mockGetUser.mockImplementation(() => new Promise(() => {}));
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
     await proxy(request);
 
     // The timeout error message is "Auth refresh timeout" — should be silently caught
@@ -863,7 +877,9 @@ describe("Auth session refresh - error logging", () => {
     const realError = new TypeError("fetch failed");
     mockGetUser.mockRejectedValue(realError);
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
     await proxy(request);
 
     expect(console.error).toHaveBeenCalledWith(
@@ -876,7 +892,9 @@ describe("Auth session refresh - error logging", () => {
     // Simulate a non-Error thrown value (e.g., a string)
     mockGetUser.mockRejectedValue("some string error");
 
-    const request = new NextRequest("http://localhost:3000/immersive");
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
     await proxy(request);
 
     // Not an Error instance, so the condition (error instanceof Error) is false
@@ -1186,5 +1204,103 @@ describe("CSRF protection", () => {
     const csrfCookie = response.cookies.get("__csrf");
     expect(csrfCookie).toBeDefined();
     expect(csrfCookie?.sameSite).toBe("strict");
+  });
+});
+
+describe("hasSupabaseAuthCookies", () => {
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test-project.supabase.co";
+  });
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  });
+
+  it("returns false when no cookies present", () => {
+    const request = new NextRequest("http://localhost:3000/immersive");
+    expect(hasSupabaseAuthCookies(request)).toBe(false);
+  });
+
+  it("returns true when base auth token cookie present", () => {
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=jwt-value" },
+    });
+    expect(hasSupabaseAuthCookies(request)).toBe(true);
+  });
+
+  it("returns true when chunked auth token cookies present", () => {
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token.0=chunk0" },
+    });
+    expect(hasSupabaseAuthCookies(request)).toBe(true);
+  });
+
+  it("returns false when Supabase URL not configured", () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=jwt-value" },
+    });
+    expect(hasSupabaseAuthCookies(request)).toBe(false);
+  });
+
+  it("returns false for unrelated cookies", () => {
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "__csrf=abc123; theme=dark" },
+    });
+    expect(hasSupabaseAuthCookies(request)).toBe(false);
+  });
+});
+
+describe("Auth session refresh - anonymous visitor skip", () => {
+  const FAKE_JWT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test";
+
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test-project.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = FAKE_JWT_KEY;
+    mockFetch.mockReset();
+    mockGetUser.mockReset();
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    capturedCookiesConfig = null;
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  });
+
+  it("should skip auth refresh when no Supabase auth cookies exist (anonymous visitor)", async () => {
+    // No cookies on request — anonymous visitor
+    const request = new NextRequest("http://localhost:3000/immersive");
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    // getUser should NOT have been called — skipped for anonymous
+    expect(mockGetUser).not.toHaveBeenCalled();
+  });
+
+  it("should run auth refresh when base auth cookie exists", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: {
+        cookie: "sb-test-project-auth-token=some-jwt-value",
+      },
+    });
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    expect(mockGetUser).toHaveBeenCalled();
+  });
+
+  it("should run auth refresh when chunked auth cookies exist", async () => {
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: {
+        cookie: "sb-test-project-auth-token.0=chunk0; sb-test-project-auth-token.1=chunk1",
+      },
+    });
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    expect(mockGetUser).toHaveBeenCalled();
   });
 });
