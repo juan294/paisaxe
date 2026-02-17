@@ -27,7 +27,7 @@ test.describe("Chat panel", () => {
     });
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
   });
 
   test("opens chat panel when Ask button is clicked", async ({ page }) => {
