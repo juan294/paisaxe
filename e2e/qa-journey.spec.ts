@@ -53,9 +53,9 @@ test.describe("QA Journey: Anonymous User", () => {
   }) => {
     // Step 1: Navigate to immersive view
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
-    const firstTitle = await page.locator("h1").textContent();
+    const firstTitle = await page.locator("h1").first().textContent();
     expect(firstTitle).toBeTruthy();
 
     // Step 2: Navigate to next story via arrow
@@ -69,7 +69,7 @@ test.describe("QA Journey: Anonymous User", () => {
     await page.waitForTimeout(500);
 
     // Step 3: Verify story changed
-    const secondTitle = await page.locator("h1").textContent();
+    const secondTitle = await page.locator("h1").first().textContent();
     expect(secondTitle).not.toBe(firstTitle);
 
     // Step 4: Navigate back with previous arrow
@@ -81,7 +81,7 @@ test.describe("QA Journey: Anonymous User", () => {
     await page.waitForTimeout(500);
 
     // Step 5: Verify we're back to first story
-    const returnedTitle = await page.locator("h1").textContent();
+    const returnedTitle = await page.locator("h1").first().textContent();
     expect(returnedTitle).toBe(firstTitle);
   });
 
@@ -89,22 +89,22 @@ test.describe("QA Journey: Anonymous User", () => {
     page,
   }) => {
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
-    const firstTitle = await page.locator("h1").textContent();
+    const firstTitle = await page.locator("h1").first().textContent();
 
     // Navigate with right arrow key
     await page.keyboard.press("ArrowRight");
     await page.waitForTimeout(500);
 
-    const secondTitle = await page.locator("h1").textContent();
+    const secondTitle = await page.locator("h1").first().textContent();
     expect(secondTitle).not.toBe(firstTitle);
 
     // Navigate with left arrow key
     await page.keyboard.press("ArrowLeft");
     await page.waitForTimeout(500);
 
-    const returnedTitle = await page.locator("h1").textContent();
+    const returnedTitle = await page.locator("h1").first().textContent();
     expect(returnedTitle).toBe(firstTitle);
   });
 
@@ -112,7 +112,7 @@ test.describe("QA Journey: Anonymous User", () => {
     page,
   }) => {
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     // Step 1: Open chat panel
     const askButton = page.locator('[data-testid="ask-button"]');
@@ -153,7 +153,7 @@ test.describe("QA Journey: Anonymous User", () => {
     await closeButton.click();
 
     await expect(chatPanel).not.toBeVisible();
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
   });
 
   test("Journey 4: Favorites page shows sign-in prompt for anonymous users", async ({
@@ -176,10 +176,10 @@ test.describe("QA Journey: Anonymous User", () => {
     page,
   }) => {
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     // Info is visible by default
-    await expect(page.locator("h1")).toHaveCSS("opacity", "1");
+    await expect(page.locator("h1").first()).toHaveCSS("opacity", "1");
 
     // Press 'i' to hide info
     await page.keyboard.press("i");
@@ -187,7 +187,7 @@ test.describe("QA Journey: Anonymous User", () => {
 
     // Bottom panel should be hidden
     const bottomPanel = page.locator(".absolute.bottom-0.left-0.right-0");
-    await expect(bottomPanel).toHaveCSS("opacity", "0");
+    await expect(bottomPanel).toHaveCSS("opacity", "0", { timeout: 5000 });
 
     // Press 'i' again to show info
     await page.keyboard.press("i");
@@ -201,18 +201,18 @@ test.describe("QA Journey: Anonymous User", () => {
     page,
   }) => {
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     // Collect titles from multiple stories
     const titles: string[] = [];
-    const titleText = await page.locator("h1").textContent();
+    const titleText = await page.locator("h1").first().textContent();
     if (titleText) titles.push(titleText);
 
     // Navigate through 3 more stories
     for (let i = 0; i < 3; i++) {
       await page.keyboard.press("ArrowRight");
       await page.waitForTimeout(500);
-      const title = await page.locator("h1").textContent();
+      const title = await page.locator("h1").first().textContent();
       if (title) titles.push(title);
     }
 
@@ -250,7 +250,7 @@ test.describe("QA Journey: Error Handling", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     // Open chat
     const askButton = page.locator('[data-testid="ask-button"]');
@@ -323,7 +323,7 @@ test.describe("QA Journey: New Features", () => {
 
     // Step 1: Navigate to immersive view and wait for it to load
     await page.goto("/immersive", { waitUntil: "networkidle" });
-    await expect(page.locator('[data-testid="story-title"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="story-title"]').first()).toBeVisible({ timeout: 15000 });
 
     // Step 2: Click the suggest button
     const suggestButton = page.locator("[data-suggest-place-trigger]");
@@ -352,7 +352,7 @@ test.describe("QA Journey: New Features", () => {
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
 
     // Step 8: Back on immersive view
-    await expect(page.locator('[data-testid="story-title"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="story-title"]').first()).toBeVisible({ timeout: 10000 });
   });
 
   test("Journey 14: Multi-turn chat conversation", async ({ page }) => {
@@ -383,7 +383,7 @@ test.describe("QA Journey: New Features", () => {
 
     // Step 1: Navigate to immersive
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     // Step 2: Open chat
     await page.locator('[data-testid="ask-button"]').click();
@@ -433,7 +433,7 @@ test.describe("QA Journey: New Features", () => {
     await closeButton.click();
 
     await expect(chatPanel).not.toBeVisible();
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
   });
 });
 
@@ -483,9 +483,9 @@ authTest.describe("QA Journey: Authenticated User", () => {
 
       // First, get the first story ID from the stories API
       await page.goto("/immersive");
-      await authExpect(page.locator("h1")).toBeVisible({ timeout: 10000 });
+      await authExpect(page.locator("h1").first()).toBeVisible({ timeout: 10000 });
 
-      const storyTitle = await page.locator("h1").textContent();
+      const storyTitle = await page.locator("h1").first().textContent();
       authExpect(storyTitle).toBeTruthy();
 
       // Get a story ID - we'll use a known fallback story ID
@@ -541,7 +541,7 @@ authTest.describe("QA Journey: Authenticated User", () => {
       const testStoryId = "test-story-persistence";
 
       await page.goto("/immersive");
-      await authExpect(page.locator("h1")).toBeVisible({ timeout: 10000 });
+      await authExpect(page.locator("h1").first()).toBeVisible({ timeout: 10000 });
 
       // Add favorite via localStorage
       await page.evaluate((storyId) => {
@@ -595,7 +595,7 @@ authTest.describe("QA Journey: Authenticated User", () => {
 
       // Should be on immersive page
       await page.waitForURL("**/immersive");
-      await authExpect(page.locator("h1")).toBeVisible({ timeout: 10000 });
+      await authExpect(page.locator("h1").first()).toBeVisible({ timeout: 10000 });
     }
   );
 });

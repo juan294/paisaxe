@@ -153,7 +153,7 @@ test.describe("Chat messageIndex", () => {
     });
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     // Open chat
     await page.locator('[data-testid="ask-button"]').click();
@@ -198,7 +198,7 @@ test.describe("Chat messageIndex", () => {
     });
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     // Open chat
     await page.locator('[data-testid="ask-button"]').click();
@@ -244,7 +244,7 @@ test.describe("Feature flag gating", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     await expect(
       page.locator("[data-suggest-place-trigger]")
@@ -266,7 +266,7 @@ test.describe("Feature flag gating", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     await expect(
       page.locator("[data-suggest-place-trigger]")
@@ -283,7 +283,7 @@ test.describe("Feature flag gating", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     // Fullscreen button has translated aria-label (Fullscreen, Pantalla completa, etc.)
     await expect(
@@ -303,7 +303,7 @@ test.describe("Feature flag gating", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     // The FullscreenButton renders conditionally after a useEffect checks
     // for Fullscreen API support, so it may not appear on the first paint.
@@ -326,7 +326,7 @@ test.describe("Language switching", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
   });
 
   test("language switcher visible in toolbar", async ({ page }) => {

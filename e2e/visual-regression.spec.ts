@@ -88,7 +88,7 @@ test.describe("Visual regression — public pages", () => {
     await page.goto("/immersive");
 
     // Wait for story content to render
-    const title = page.getByTestId("story-title");
+    const title = page.getByTestId("story-title").first();
     await expect(title).toBeVisible({ timeout: 15000 });
     await stabilizePage(page);
 
