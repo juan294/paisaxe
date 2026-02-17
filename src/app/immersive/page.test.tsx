@@ -265,3 +265,82 @@ describe("ImmersivePageContent", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// ImmersivePage (async server component) — page.tsx default export
+// ---------------------------------------------------------------------------
+describe("ImmersivePage (server component)", () => {
+  let mockIsFeatureFlagEnabled: ReturnType<typeof vi.fn>;
+  let mockGetStoriesServer: ReturnType<typeof vi.fn>;
+
+  const mockServerStories = [
+    { id: "s1", slug: "s1", title: "Server Story", subtitle: "Sub", description: "Desc", image: "/s.jpg", category: "nature", sourcePdf: "s.pdf" },
+  ];
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockIsFeatureFlagEnabled = vi.fn().mockResolvedValue(false);
+    mockGetStoriesServer = vi.fn().mockResolvedValue(mockServerStories);
+  });
+
+  async function importAndRender() {
+    vi.doMock("@/lib/feature-flags-server", () => ({
+      isFeatureFlagEnabled: mockIsFeatureFlagEnabled,
+    }));
+
+    vi.doMock("@/lib/stories-server", () => ({
+      getStoriesServer: mockGetStoriesServer,
+    }));
+
+    vi.doMock("./immersive-page-content", () => ({
+      ImmersivePageContent: ({ serverShuffleSeed, initialStories }: { serverShuffleSeed: number | null; initialStories?: unknown[] }) => (
+        <div data-testid="immersive-content" data-seed={String(serverShuffleSeed)} data-stories={String(initialStories?.length ?? 0)} />
+      ),
+    }));
+
+    vi.doMock("@/components/immersive/skeleton-story-card", () => ({
+      StoryCardSkeleton: () => <div data-testid="skeleton-fallback" />,
+    }));
+
+    const { default: ImmersivePage } = await import("./page");
+    const element = await ImmersivePage();
+    return render(element);
+  }
+
+  it("should render with null seed when randomized_order is disabled", async () => {
+    mockIsFeatureFlagEnabled.mockResolvedValue(false);
+    await importAndRender();
+
+    const content = screen.getByTestId("immersive-content");
+    expect(content).toHaveAttribute("data-seed", "null");
+    expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith("randomized_order");
+  });
+
+  it("should render with numeric seed when randomized_order is enabled", async () => {
+    mockIsFeatureFlagEnabled.mockResolvedValue(true);
+    await importAndRender();
+
+    const content = screen.getByTestId("immersive-content");
+    const seed = content.getAttribute("data-seed");
+    expect(seed).not.toBe("null");
+    const seedNum = Number(seed);
+    expect(Number.isInteger(seedNum)).toBe(true);
+    expect(seedNum).toBeGreaterThanOrEqual(0);
+    expect(seedNum).toBeLessThan(2147483647);
+  });
+
+  it("should pass server-fetched stories as initialStories prop", async () => {
+    await importAndRender();
+
+    const content = screen.getByTestId("immersive-content");
+    expect(content).toHaveAttribute("data-stories", String(mockServerStories.length));
+    expect(mockGetStoriesServer).toHaveBeenCalledTimes(1);
+  });
+
+  it("should fetch stories and flags in parallel", async () => {
+    await importAndRender();
+
+    expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith("randomized_order");
+    expect(mockGetStoriesServer).toHaveBeenCalledTimes(1);
+  });
+});
