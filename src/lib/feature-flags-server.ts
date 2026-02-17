@@ -17,6 +17,11 @@ export async function isFeatureFlagEnabled(
       return false;
     }
 
+    // Skip fetch with dummy credentials (CI/E2E) — real Supabase anon keys are JWTs starting with 'eyJ'
+    if (!supabaseKey.startsWith("eyJ")) {
+      return false;
+    }
+
     const environment = getEnvironment();
     const isDev = environment === "development";
 

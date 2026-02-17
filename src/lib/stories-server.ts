@@ -16,6 +16,11 @@ export async function getStoriesServer(): Promise<Story[]> {
     return FALLBACK_STORIES;
   }
 
+  // Skip fetch with dummy credentials (CI/E2E) — real Supabase anon keys are JWTs starting with 'eyJ'
+  if (!supabaseKey.startsWith("eyJ")) {
+    return FALLBACK_STORIES;
+  }
+
   try {
     const isDev = getEnvironment() === "development";
 

@@ -64,7 +64,7 @@ describe("getStoriesServer", () => {
     process.env = {
       ...originalEnv,
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test-anon-key",
     };
   });
 
@@ -186,6 +186,17 @@ describe("getStoriesServer", () => {
     expect(fetchOptions.next).toBeUndefined();
   });
 
+  it("returns FALLBACK_STORIES when anon key is not a real JWT (CI/E2E)", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "dummy_key_for_e2e";
+
+    const { getStoriesServer } = await import("./stories-server");
+    const result = await getStoriesServer();
+
+    expect(result).toEqual(MOCK_FALLBACK_STORIES);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it("passes correct headers", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
@@ -197,8 +208,8 @@ describe("getStoriesServer", () => {
 
     const fetchOptions = mockFetch.mock.calls[0][1];
     expect(fetchOptions.headers).toEqual({
-      apikey: "test-anon-key",
-      Authorization: "Bearer test-anon-key",
+      apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test-anon-key",
+      Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test-anon-key",
     });
   });
 });

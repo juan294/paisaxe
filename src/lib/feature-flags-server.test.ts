@@ -17,7 +17,7 @@ describe("isFeatureFlagEnabled", () => {
     process.env = {
       ...originalEnv,
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test-anon-key",
     };
   });
 
@@ -87,6 +87,17 @@ describe("isFeatureFlagEnabled", () => {
 
     const { isFeatureFlagEnabled } = await import("./feature-flags-server");
     const result = await isFeatureFlagEnabled("randomized_order");
+    expect(result).toBe(false);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("returns false when anon key is not a real JWT (CI/E2E)", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "dummy_key_for_e2e";
+
+    const { isFeatureFlagEnabled } = await import("./feature-flags-server");
+    const result = await isFeatureFlagEnabled("randomized_order");
+
     expect(result).toBe(false);
     expect(mockFetch).not.toHaveBeenCalled();
   });
