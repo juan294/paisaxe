@@ -90,7 +90,7 @@ describe("PricingPage", () => {
     });
   });
 
-  it("should render loading state", () => {
+  it("should render static content even during loading", () => {
     mockUseVoiceAccess.mockReturnValue({
       hasAccess: false,
       isWhitelisted: false,
@@ -106,9 +106,53 @@ describe("PricingPage", () => {
 
     render(<PricingPage />);
 
-    // Should show loading spinner
-    const spinner = document.querySelector(".animate-spin");
+    // Static content should render immediately
+    expect(screen.getByText("premium.pricing_title")).toBeInTheDocument();
+    expect(screen.getByText("€1.99")).toBeInTheDocument();
+    expect(screen.getByText("premium.faq_title")).toBeInTheDocument();
+    expect(screen.getByText("premium.feature_24h")).toBeInTheDocument();
+  });
+
+  it("should show disabled button with spinner during loading", () => {
+    mockUseVoiceAccess.mockReturnValue({
+      hasAccess: false,
+      isWhitelisted: false,
+      canUseVoice: false,
+      needsSignIn: false,
+      needsPurchase: true,
+      expiresAt: null,
+      hoursUntilExpiry: null,
+      agentId: "test-agent",
+      isLoading: true,
+      refresh: mockRefresh,
+    });
+
+    render(<PricingPage />);
+
+    // CTA button should be disabled with spinner
+    const button = screen.getByRole("button");
+    expect(button).toBeDisabled();
+    const spinner = button.querySelector(".animate-spin");
     expect(spinner).toBeInTheDocument();
+  });
+
+  it("should not show access banner during loading", () => {
+    mockUseVoiceAccess.mockReturnValue({
+      hasAccess: false,
+      isWhitelisted: false,
+      canUseVoice: false,
+      needsSignIn: false,
+      needsPurchase: true,
+      expiresAt: null,
+      hoursUntilExpiry: null,
+      agentId: "test-agent",
+      isLoading: true,
+      refresh: mockRefresh,
+    });
+
+    render(<PricingPage />);
+
+    expect(screen.queryByText("premium.success_subtitle")).not.toBeInTheDocument();
   });
 
   it("should render pricing page with price", () => {
@@ -302,7 +346,7 @@ describe("PricingPage", () => {
       expect(backLink).toHaveAttribute("href", "/immersive");
     });
 
-    it("should have aria-label on the loading spinner", () => {
+    it("should have accessible loading state in CTA button during loading", () => {
       mockUseVoiceAccess.mockReturnValue({
         hasAccess: false,
         isWhitelisted: false,
@@ -318,7 +362,11 @@ describe("PricingPage", () => {
 
       render(<PricingPage />);
 
-      const spinner = screen.getByRole("status", { name: "accessibility.loading" });
+      // Button should be disabled during loading
+      const button = screen.getByRole("button");
+      expect(button).toBeDisabled();
+      // Spinner should be inside the button
+      const spinner = button.querySelector(".animate-spin");
       expect(spinner).toBeInTheDocument();
     });
   });
