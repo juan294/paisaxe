@@ -113,17 +113,24 @@ function initializeCache(): void {
  * - Deduplicates concurrent requests
  * - Persists to localStorage for next visit
  */
-export function useStories() {
+export function useStories(initialStories?: Story[]) {
   // Initialize cache from storage on first render
   const initialized = useRef(false);
-  if (!initialized.current && typeof window !== "undefined") {
-    initializeCache();
+  if (!initialized.current) {
+    if (initialStories?.length && !cache.data) {
+      // Seed cache with server-provided stories
+      cache.data = initialStories;
+      cache.timestamp = Date.now();
+    } else if (typeof window !== "undefined") {
+      initializeCache();
+    }
     initialized.current = true;
   }
 
-  const [stories, setStories] = useState<Story[]>(cache.data || FALLBACK_STORIES);
-  // If we have cached data (from localStorage or memory), don't show loading
-  const [isLoading, setIsLoading] = useState(!cache.data);
+  const hasInitial = !!(initialStories && initialStories.length > 0);
+  const [stories, setStories] = useState<Story[]>(cache.data || (hasInitial ? initialStories : FALLBACK_STORIES));
+  // If we have cached data OR server-provided initial stories, don't show loading
+  const [isLoading, setIsLoading] = useState(!cache.data && !hasInitial);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchStories = useCallback(async (force = false): Promise<Story[]> => {

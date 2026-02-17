@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { StoryViewer } from "@/components/immersive/story-viewer";
 import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
 import { useStories } from "@/hooks/use-stories";
+import type { Story } from "@/types/immersive";
 import { useStoryFilters } from "@/hooks/use-story-filters";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useViewedStories } from "@/hooks/use-viewed-stories";
@@ -33,10 +34,12 @@ interface ImmersivePageContentProps {
    * This prevents the flicker that occurs when shuffle is applied after hydration.
    */
   serverShuffleSeed: number | null;
+  /** Server-fetched stories to seed the client cache and skip loading state */
+  initialStories?: Story[];
 }
 
-export function ImmersivePageContent({ serverShuffleSeed }: ImmersivePageContentProps) {
-  const { stories: allStories, isLoading } = useStories();
+export function ImmersivePageContent({ serverShuffleSeed, initialStories }: ImmersivePageContentProps) {
+  const { stories: allStories, isLoading } = useStories(initialStories);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | undefined>();
