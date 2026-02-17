@@ -279,7 +279,6 @@ describe("/api/mcp/make-booking", () => {
       expect(data.success).toBe(true);
       expect(data.status).toBe("initiated");
       expect(data.call_sid).toBe("conv_123456789");
-      expect(data.message).toContain("Calling Casa Gerardo");
 
       // Verify ElevenLabs API was called
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -288,6 +287,40 @@ describe("/api/mcp/make-booking", () => {
       expect(url).toContain("outbound-call");
       expect(options.method).toBe("POST");
       expect(options.headers["xi-api-key"]).toBe("test-api-key");
+    });
+
+    it("should NOT say reservation is confirmed in initiated response", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_123456789" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // The response must make clear this is NOT a confirmed reservation
+      expect(data.message).toContain("NOT confirmed yet");
+      expect(data.message).not.toContain("confirmed your reservation");
+      // Must instruct the agent what to tell the user
+      expect(data.message).toContain("DO NOT tell the user");
     });
 
     it("should handle ElevenLabs API errors gracefully", async () => {
@@ -476,7 +509,7 @@ describe("/api/mcp/make-booking", () => {
       const response = await POST(request);
       const data = await response.json();
 
-      expect(data.message).toContain("I'll send you an SMS");
+      expect(data.message).toContain("SMS");
       expect(data.message).toContain("+34612345678");
     });
 

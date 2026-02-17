@@ -12,7 +12,7 @@ test.describe("Author pill", () => {
     );
     await page.goto("/immersive");
     // Wait for the story to render
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
   });
 
   test("renders the pill with initial text on desktop", async ({

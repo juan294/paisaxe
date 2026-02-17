@@ -162,6 +162,22 @@ describe("buildSystemPrompt", () => {
     });
   });
 
+  describe("image awareness", () => {
+    const prompt = buildSystemPrompt(0);
+
+    it("should contain an IMAGES section", () => {
+      expect(prompt).toContain("# IMAGES");
+    });
+
+    it("should instruct Claude that images are displayed automatically", () => {
+      expect(prompt).toMatch(/automatically displayed|shown automatically|appear automatically/i);
+    });
+
+    it("should instruct Claude to reference images naturally", () => {
+      expect(prompt).toMatch(/reference|mention|refer/i);
+    });
+  });
+
   describe("follow-up messages (messageIndex>0)", () => {
     const prompt = buildSystemPrompt(3);
 

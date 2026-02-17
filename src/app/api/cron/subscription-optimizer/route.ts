@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { promises as fs } from "fs";
 import pathModule from "path";
 import { validateAdminAuth } from "@/lib/admin-auth";
@@ -10,6 +9,7 @@ import {
   generateSharedContextEntry,
   type UsageMetricsInput,
 } from "@/lib/subscription-optimizer";
+import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 
 /**
  * Default usage metrics when none are provided.
@@ -26,36 +26,9 @@ const DEFAULT_USAGE_METRICS: UsageMetricsInput = {
   periodDays: 30,
 };
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  // Auth: verify webhook secret (pg_cron) OR admin session (manual trigger)
-  const secret = request.headers.get("x-webhook-secret");
-  const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
-
-  const hasValidSecret =
-    !!secret &&
-    !!expectedSecret &&
-    secret.length === expectedSecret.length &&
-    timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret));
-
-  if (!hasValidSecret) {
-    const auth = await validateAdminAuth();
-    if (!auth.valid) {
-      return auth.error;
-    }
-  }
-
+/** Core analysis logic shared by GET (Vercel Cron) and POST (pg_cron/admin). */
+async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextResponse> {
   try {
-    // Use provided usage metrics or fall back to defaults
-    let usageMetrics = DEFAULT_USAGE_METRICS;
-    try {
-      const body = await request.json();
-      if (body?.usageMetrics) {
-        usageMetrics = { ...DEFAULT_USAGE_METRICS, ...body.usageMetrics };
-      }
-    } catch {
-      // No body or invalid JSON — use defaults
-    }
-
     const result = analyzeSubscriptions({
       services: SERVICE_REGISTRY,
       usageMetrics,
@@ -128,4 +101,35 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 500 }
     );
   }
+}
+
+/** Vercel Cron handler — triggered via GET with Authorization: Bearer <CRON_SECRET>. */
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  if (!verifyVercelCron(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return runOptimizer(DEFAULT_USAGE_METRICS);
+}
+
+/** pg_cron / admin handler — triggered via POST with x-webhook-secret or admin session. */
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (!verifyWebhookSecret(request)) {
+    const auth = await validateAdminAuth();
+    if (!auth.valid) {
+      return auth.error;
+    }
+  }
+
+  // Use provided usage metrics or fall back to defaults
+  let usageMetrics = DEFAULT_USAGE_METRICS;
+  try {
+    const body = await request.json();
+    if (body?.usageMetrics) {
+      usageMetrics = { ...DEFAULT_USAGE_METRICS, ...body.usageMetrics };
+    }
+  } catch {
+    // No body or invalid JSON — use defaults
+  }
+
+  return runOptimizer(usageMetrics);
 }

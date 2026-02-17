@@ -977,4 +977,185 @@ describe("StoryViewer", () => {
       expect(outerDiv).toHaveClass("md:block");
     });
   });
+
+  describe("mobile overflow menu", () => {
+    it("should show surprise me in overflow when feature flag enabled", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "surprise_me"
+      );
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({ viewedIndices: new Set<number>() })}
+        />
+      );
+
+      // Open the overflow menu
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      expect(screen.getByText("Sorpréndeme")).toBeInTheDocument();
+    });
+
+    it("should navigate to unviewed story on surprise me click", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "surprise_me"
+      );
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            viewedIndices: new Set<number>([0]),
+            currentIndex: 0,
+          })}
+        />
+      );
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      const surpriseItem = screen.getByText("Sorpréndeme");
+      fireEvent.click(surpriseItem);
+
+      expect(onIndexChange).toHaveBeenCalled();
+      const calledIndex = onIndexChange.mock.calls[0][0];
+      expect(calledIndex).not.toBe(0);
+      expect([1, 2]).toContain(calledIndex);
+    });
+
+    it("should pick random when all stories viewed", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "surprise_me"
+      );
+
+      vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            viewedIndices: new Set<number>([0, 1, 2]),
+            currentIndex: 0,
+          })}
+        />
+      );
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      const surpriseItem = screen.getByText("Sorpréndeme");
+      fireEvent.click(surpriseItem);
+
+      expect(onIndexChange).toHaveBeenCalledWith(1);
+      vi.spyOn(Math, "random").mockRestore();
+    });
+
+    it("should show autoplay toggle in overflow when flag enabled", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "autoplay_button"
+      );
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      expect(
+        screen.getByText("accessibility.play_short", { exact: true })
+      ).toBeInTheDocument();
+    });
+
+    it("should show share option in overflow when flag enabled", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "story_sharing"
+      );
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      expect(screen.getByText("Compartir")).toBeInTheDocument();
+    });
+
+    it("should copy to clipboard when navigator.share unavailable", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "story_sharing"
+      );
+
+      const mockWriteText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: mockWriteText },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(navigator, "share", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      const shareItem = screen.getByText("Compartir");
+      fireEvent.click(shareItem);
+
+      expect(mockWriteText).toHaveBeenCalledWith(
+        expect.stringContaining("/stories/story-1")
+      );
+    });
+  });
+
+  describe("fullscreen button feature flag", () => {
+    it("should not render FullscreenButton when flag is disabled", async () => {
+      mockIsEnabled.mockReturnValue(false);
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      expect(screen.queryByLabelText("fullscreen.toggle")).not.toBeInTheDocument();
+    });
+
+    it("should check fullscreen_button flag", async () => {
+      mockIsEnabled.mockReturnValue(false);
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      expect(mockIsEnabled).toHaveBeenCalledWith("fullscreen_button");
+    });
+  });
+
+  describe("bookmarks button", () => {
+    it("should render bookmarks button", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // The button is rendered with the translated label
+      const bookmarksBtn = screen.getByText("Guardados");
+      expect(bookmarksBtn).toBeInTheDocument();
+    });
+  });
+
+  describe("image source attribution", () => {
+    it("should show image source when story has imageSource", async () => {
+      const storiesWithSource = [
+        {
+          ...mockStories[0],
+          imageSource: "Photo by Juan on Unsplash",
+        },
+        ...mockStories.slice(1),
+      ];
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            stories: storiesWithSource,
+            allStories: storiesWithSource,
+          })}
+        />
+      );
+
+      expect(
+        screen.getByText("Photo by Juan on Unsplash")
+      ).toBeInTheDocument();
+    });
+  });
 });

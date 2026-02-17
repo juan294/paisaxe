@@ -48,6 +48,7 @@ const mockFetch = vi.fn();
 describe("POST /api/cron/github-traffic-sync", () => {
   const originalEnv = process.env;
   const WEBHOOK_SECRET = "test-webhook-secret-123";
+  const CRON_SECRET = "test-cron-secret-456";
   const GITHUB_TOKEN = "ghp_test_token_123";
 
   beforeEach(() => {
@@ -55,6 +56,7 @@ describe("POST /api/cron/github-traffic-sync", () => {
     process.env = {
       ...originalEnv,
       WEBHOOK_SECRET,
+      CRON_SECRET,
       GITHUB_TOKEN,
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
       SUPABASE_SERVICE_KEY: "test-service-key",
@@ -185,5 +187,75 @@ describe("POST /api/cron/github-traffic-sync", () => {
     expect(response.body).toEqual(expect.objectContaining({
       synced: true,
     }));
+  });
+});
+
+describe("GET /api/cron/github-traffic-sync (Vercel Cron)", () => {
+  const originalEnv = process.env;
+  const CRON_SECRET = "test-cron-secret-456";
+  const GITHUB_TOKEN = "ghp_test_token_123";
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = {
+      ...originalEnv,
+      CRON_SECRET,
+      GITHUB_TOKEN,
+      WEBHOOK_SECRET: "test-webhook-secret-123",
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_SERVICE_KEY: "test-service-key",
+    };
+    global.fetch = mockFetch;
+    mockFetch.mockReset();
+    mockUpsert.mockClear();
+    mockInsert.mockClear();
+    mockFrom.mockClear();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("rejects GET without Authorization header", async () => {
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: {} }
+    );
+
+    const response = await GET(request as never);
+    expect(response.status).toBe(401);
+  });
+
+  it("rejects GET with wrong CRON_SECRET", async () => {
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { authorization: "Bearer wrong-secret" } }
+    );
+
+    const response = await GET(request as never);
+    expect(response.status).toBe(401);
+  });
+
+  it("accepts GET with valid CRON_SECRET and runs sync", async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ count: 0, uniques: 0, views: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ count: 0, uniques: 0, clones: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] });
+
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { authorization: `Bearer ${CRON_SECRET}` } }
+    );
+
+    const response = await GET(request as never);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(expect.objectContaining({
+      synced: true,
+    }));
+    expect(mockFetch).toHaveBeenCalledTimes(4);
   });
 });

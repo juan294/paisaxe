@@ -239,6 +239,10 @@ npm run test:e2e:ui    # Playwright UI mode
 
 # Data pipeline
 npm run seed-db        # Generate embeddings and populate DB
+
+# Headless mode (non-interactive CI/batch runs)
+claude -p "Fix all TypeScript lint errors and run tests" --allowedTools "Edit,Read,Bash,Write" --output-format json
+claude -p "Read issue #240 and implement the fix with TDD" --allowedTools "Edit,Read,Bash,Write,Grep"
 ```
 
 ## Environment Variables
@@ -287,6 +291,9 @@ ADMIN_EMAIL=                            # Admin notification recipient (default:
 # Upstash Redis (distributed rate limiting - optional)
 UPSTASH_REDIS_REST_URL=                # Upstash Redis REST URL
 UPSTASH_REDIS_REST_TOKEN=              # Upstash Redis REST token
+
+# Vercel Cron (required for scheduled jobs)
+CRON_SECRET=                           # Vercel Cron authentication secret
 
 # PostHog analytics (optional)
 NEXT_PUBLIC_POSTHOG_KEY=                # PostHog project API key
@@ -356,6 +363,59 @@ Core tables (see `supabase/migrations/` for full DDL):
 5. **Health endpoint is sacred** — `/api/health` monitored 24/7. Don't break it.
 6. **Database function security** — All functions need explicit `SET search_path`. Use `search_path = ''` with fully qualified refs for security-definer functions.
 7. **Production is sacred** — No agent touches `main`, production deployments, or production infrastructure without explicit user authorization in the current conversation. See Production Safety section.
+
+## Deployment
+
+- Production deploys from `main` only. Changes pushed to `develop` must be merged to `main` via PR before they go live.
+- Always confirm the target branch before pushing — if the goal is production deployment, ensure the PR targets `main`.
+
+## Language & Tone
+
+- All user-facing content for the Asturias project must be in Spanish unless explicitly stated otherwise.
+- For social media copy: keep tone confident and positive — avoid pitying, resentful, or overly dramatic language. Never mention unreleased/unpublished features.
+
+## Sub-Agent & Background Task Guidelines
+
+- Sub-agents (Task tool) may lack Bash or file-write permissions. If spawning agents for fixes, verify they have the required tool access first.
+- If a sub-agent fails due to permissions, take over manually immediately rather than retrying.
+- Be aware of context window limits when receiving multiple parallel task notifications.
+
+### Self-Healing Agent Pipelines
+
+When spawning multi-agent pipelines (audits, fixes, refactors), agents MUST be resilient to failures:
+
+**Failure Recovery Protocol:**
+1. Each sub-agent should attempt the fix using its primary tool.
+2. If it hits a permission or tool error, **try an alternative approach** before reporting failure:
+   - If `Write` fails → try `Edit`
+   - If `Bash` is blocked → report back with exact manual steps the parent can execute
+   - If a file is locked or inaccessible → skip and document why
+3. **Parent agent tracks all sub-agent results.** After the first pass:
+   - Retry failed agents once with modified instructions (e.g., different tool, different approach)
+   - Collect all remaining blockers into a single summary
+4. **Escalate only truly blocked items.** Do not ask the user to intervene unless all automated alternatives have been exhausted.
+5. **Consolidate output:**
+   - Create **one PR** with all successful fixes
+   - Create **one GitHub issue** listing any unresolved items with reproduction steps
+
+**Error Reporting Contract:**
+Sub-agents must report failures in a structured way:
+- What was attempted
+- What error occurred
+- What alternative was tried (if any)
+- Whether the item is recoverable or needs manual intervention
+
+## Testing & CI
+
+- This project uses TDD. Always write tests before or alongside implementation.
+- All PRs must have CI green before merging. Run the full test suite locally before pushing.
+- After merging to develop, if production deployment is the goal, immediately create a PR from develop → main.
+
+## Tool & API Awareness
+
+- You CAN set Vercel environment variables via CLI — do not claim otherwise.
+- You CANNOT handle credentials (npm tokens, API keys) directly — ask the user to provide/set them.
+- Upstash Redis API differs from standard Redis: use `zrange` with options instead of `zrangebyscore`/`zrevrangebyscore`.
 
 ## Troubleshooting
 
@@ -467,6 +527,36 @@ Agent: "Filed as #19 — type: bug, priority: high, area: voice"
    gh issue edit 19 --body "updated description..."
    ```
 
+## Autonomous Issue Implementation
+
+**Trigger:** User says "implement issue #N" or "work on issue #N end-to-end"
+
+This workflow takes a GitHub issue and implements it from start to finish with zero intervention, tying together TDD, worktrees, CI monitoring, and issue tracking into a single autonomous pipeline.
+
+### Workflow
+
+```
+Implement GitHub issue #[NUMBER] end-to-end with zero intervention:
+
+1. Read the issue thoroughly. Read CLAUDE.md and any referenced plan files.
+2. Create a feature branch from develop following our naming convention.
+3. Write failing tests FIRST that capture every acceptance criterion from the issue.
+4. Implement the feature iteratively — run tests after each change, fix failures before moving on.
+5. Spawn a parallel Task agent to update all relevant documentation (README, CLAUDE.md, any /docs files).
+6. Run the full test suite. If anything fails, diagnose and fix. Repeat until all tests pass.
+7. Commit with a conventional message, push to origin.
+8. Monitor CI — if it fails, pull the logs, fix the issue, push again. Repeat up to 3 times.
+9. Once CI is green, report the summary of what was implemented.
+```
+
+### Rules
+
+- **Do NOT ask questions** — make reasonable decisions based on codebase patterns and document any assumptions in the PR description.
+- **Follow all existing conventions** — TDD, worktree isolation, branch naming, push accountability.
+- **Reference the issue** in all commits: `Fixes #N` or `Refs #N`.
+- **Close the issue** once merged to `develop` with green CI.
+- **If the issue is ambiguous**, document your interpretation in the commit/PR rather than blocking on clarification.
+
 ## Content Categories
 
 From 37 PDFs in `content/pdfs/`:
@@ -526,57 +616,87 @@ npm run test && npm run typecheck && npm run lint
 
 **Do NOT commit** — present the full diff to the user for review. The user decides whether to commit.
 
-## Code Quality Deep-Dive (Agent Team)
+## Codebase Health Check (Agent Team)
 
-**Trigger:** User says "run a code quality audit" or "deep dive on code quality"
+**Trigger:** User says "run a health check", "codebase health", "health monitoring", "code quality audit", or "deep dive on code quality"
 
-Create a team called "code-quality" with 3 parallel specialists:
+This is the **single unified audit** for the entire codebase. It replaces the former standalone "Code Quality Deep-Dive" and "Coverage Report" — those checks are now folded into this workflow to eliminate overlap.
 
-1. **dead-code-hunter**
-   - Run `npx knip` to find unused exports, files, and dependencies
-   - Check for commented-out code blocks
-   - Find unused CSS classes or Tailwind utilities
-   - Look for TODO/FIXME/HACK comments older than 30 days
-   - Produce a prioritized list of dead code to remove
+Create a team called "health-check" with 4 parallel agents:
 
-2. **pattern-enforcer**
-   - Check for consistent naming conventions across the codebase
-   - Verify all API routes follow the same auth pattern
-   - Check that all components follow the same file structure
-   - Look for duplicated logic that could be consolidated
-   - Verify error handling patterns are consistent
-   - Check for consistent use of TypeScript types vs `any`
+### Agents
 
-3. **complexity-analyst**
-   - Identify functions longer than 50 lines
-   - Find files larger than 300 lines
-   - Look for deeply nested conditionals (3+ levels)
-   - Check for functions with more than 4 parameters
-   - Identify components with too many responsibilities
-   - Suggest specific simplification strategies
+1. **test-health**
+   - Run full test suite, identify any flaky tests (run failing tests 3x to confirm)
+   - Report coverage percentages by module (`npm run test:coverage`)
+   - Check coverage gaps in recently changed files (`git diff develop..main`)
+   - Flag files at 0% coverage that have been modified recently
+   - Flag tests that take unusually long (> 5 seconds)
+
+2. **code-quality**
+   - Run linter and typecheck (`npm run lint && npm run typecheck`)
+   - Run `npx knip` for unused exports, files, and dependencies
+   - Find TODO/FIXME/HACK comments
+   - Check for `any` types that should be properly typed
+   - Identify complexity hotspots: functions > 50 lines, files > 300 lines, nesting > 3 levels
+   - Check for duplicated logic and inconsistent patterns across API routes and components
+   - Cross-reference: flag files that are both complex AND low-coverage (highest risk)
+
+3. **ci-deploy-health**
+   - Check last 5 CI runs for patterns in failures (`gh run list --limit 5`)
+   - Verify production health endpoint (`curl /api/health`)
+   - Check database size and latency
+   - Confirm cron jobs are configured and executing
+   - Check for any Vercel deployment errors or warnings
+
+4. **dependency-health**
+   - Check for outdated dependencies (`npm outdated`)
+   - Identify known vulnerabilities (`npm audit`)
+   - Verify lockfile integrity (`npm ci --dry-run`)
+   - Flag any dependencies with incompatible licenses (only MIT, Apache-2.0, BSD, ISC allowed)
 
 ### Output
 
-Write the final report to `docs/agents/code-quality-report.md`:
+Write the unified report to `docs/health-report-[TODAY].md`. This is the **single source of truth** — it replaces `docs/agents/coverage-report.md` and `docs/agents/code-quality-report.md` (those files are archived and no longer updated).
 
+Report structure:
 ```
-# Code Quality Report
-> Generated on [date]
+# Codebase Health Report
+> Generated: [date] | Branch: develop | Commit: [hash]
 
-## Summary
-- Dead code items found: [N]
-- Pattern violations: [N]
-- Complexity hotspots: [N]
+## Executive Summary
+[Overall status + score table]
 
-## Dead Code
-[Prioritized list from dead-code-hunter]
+## Test Health
+[Pass rate, coverage by module, coverage gaps, flaky tests]
 
-## Pattern Violations
-[Findings from pattern-enforcer]
+## Code Quality
+[Lint/type errors, dead code, complexity hotspots, pattern violations]
 
-## Complexity Hotspots
-[Findings from complexity-analyst with simplification suggestions]
+## CI & Deploy Health
+[CI runs, production status, database, cron jobs]
+
+## Dependency Health
+[Outdated deps, vulnerabilities, lockfile, licenses]
 
 ## Recommended Actions
-[Top 5 most impactful improvements, ordered by effort-to-impact ratio]
+[Priority 1: quick automated fixes]
+[Priority 2: manual improvements with GitHub issues]
+[Priority 3: items to monitor]
 ```
+
+### Auto-Remediation
+
+- For **critical issues**, automatically create GitHub issues.
+- For **simple fixes** (unused deps, lint fixes, dead code, minor/patch dep updates), fix them in a single PR titled `chore: automated health fixes [DATE]`.
+- For **complex issues**, file issues with context and suggested approaches — do NOT auto-fix.
+
+### Relationship to Other Reports
+
+This health check is the **periodic comprehensive audit**. It does NOT replace:
+- **QA Report** — LLM safety tests, browser journeys (unique domain)
+- **Security Report** — deep CVE/CSP/CSRF/rate-limiting audit (unique domain)
+- **Performance Report** — bundle size analysis, Lighthouse deep-dive (unique domain)
+- **Pre-Launch Report** — production readiness gate (superset, run only before releases)
+- **Cost Analyst Report** — API spend tracking and forecasting (unique domain)
+- **Localization Report** — translation completeness (unique domain)

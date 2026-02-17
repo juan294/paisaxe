@@ -19,6 +19,7 @@ interface VoiceChatElevenLabsProps {
   story: Story;
   agentId: string;
   onFallbackToText: () => void;
+  userAccessToken?: string | null;
 }
 
 // Animated orb component for voice visualization
@@ -105,6 +106,7 @@ export function VoiceChatElevenLabs({
   story,
   agentId,
   onFallbackToText,
+  userAccessToken,
 }: VoiceChatElevenLabsProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -207,6 +209,9 @@ export function VoiceChatElevenLabs({
             hour: "2-digit",
             minute: "2-digit",
           }),
+
+          // Auth token for MCP tools (conditional)
+          ...(userAccessToken ? { user_access_token: userAccessToken } : {}),
         },
         overrides: {
           agent: {

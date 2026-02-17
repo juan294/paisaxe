@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { Chunk, Source } from "@/types";
+import type { Chunk, ImageResult, Source } from "@/types";
 
 interface AnthropicMessage {
   role: "user" | "assistant";
@@ -336,6 +336,24 @@ const ASTURIANU_PROMPT_ADDITION = `
 - No fuerces el uso excesivo, solo añade toques sutiles que enriquezcan la experiencia`;
 
 /**
+ * Format images as context for Claude so it knows what visuals are available.
+ * Images are displayed automatically below the response — Claude just needs
+ * to know they exist so it can reference them naturally in its text.
+ */
+export function formatImagesForContext(images: ImageResult[] | undefined): string {
+  if (!images || images.length === 0) return "";
+
+  const imageList = images
+    .map((img) => {
+      const caption = img.caption && img.caption !== "null" ? `"${img.caption}"` : "(no caption)";
+      return `- ${caption} (source: ${img.sourcePdf})`;
+    })
+    .join("\n");
+
+  return `\n\n<available_images>\n${imageList}\n</available_images>`;
+}
+
+/**
  * Build the context text from chunks with length limiting.
  */
 function buildContextText(context: Chunk[]): string {
@@ -361,13 +379,15 @@ export async function generateChatResponse(
   userMessage: string,
   context: Chunk[],
   asturianEnabled: boolean = false,
-  messageIndex: number = 0
+  messageIndex: number = 0,
+  images?: ImageResult[]
 ): Promise<string> {
   const contextText = buildContextText(context);
+  const imageContext = formatImagesForContext(images);
 
   const userContent = contextText
-    ? `<context>\n${contextText}\n</context>\n\n<user_question>\n${userMessage}\n</user_question>`
-    : `<user_question>\n${userMessage}\n</user_question>`;
+    ? `<context>\n${contextText}\n</context>${imageContext}\n\n<user_question>\n${userMessage}\n</user_question>`
+    : `${imageContext ? imageContext + "\n\n" : ""}<user_question>\n${userMessage}\n</user_question>`;
 
   const basePrompt = buildSystemPrompt(messageIndex);
   const systemPrompt = asturianEnabled
@@ -395,13 +415,15 @@ export async function* streamChatResponse(
   userMessage: string,
   context: Chunk[],
   asturianEnabled: boolean = false,
-  messageIndex: number = 0
+  messageIndex: number = 0,
+  images?: ImageResult[]
 ): AsyncGenerator<string, void, unknown> {
   const contextText = buildContextText(context);
+  const imageContext = formatImagesForContext(images);
 
   const userContent = contextText
-    ? `<context>\n${contextText}\n</context>\n\n<user_question>\n${userMessage}\n</user_question>`
-    : `<user_question>\n${userMessage}\n</user_question>`;
+    ? `<context>\n${contextText}\n</context>${imageContext}\n\n<user_question>\n${userMessage}\n</user_question>`
+    : `${imageContext ? imageContext + "\n\n" : ""}<user_question>\n${userMessage}\n</user_question>`;
 
   const basePrompt = buildSystemPrompt(messageIndex);
   const systemPrompt = asturianEnabled

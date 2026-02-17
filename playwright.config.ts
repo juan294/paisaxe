@@ -61,6 +61,8 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: !isCI,
     timeout: 120_000,
+    // Wait for server to be fully ready before running tests (reduces flaky visual regression)
+    ...(isCI && { stdout: "pipe" }),
     env: {
       ANTHROPIC_API_KEY: "dummy_key_for_e2e",
       VOYAGE_API_KEY: "dummy_key_for_e2e",
