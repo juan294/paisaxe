@@ -1001,6 +1001,7 @@ describe("CSP nonce", () => {
     expect(csp).toContain("media-src");
     expect(csp).toContain("worker-src");
     expect(csp).toContain("frame-src");
+    expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("base-uri 'self'");
     expect(csp).toContain("form-action 'self'");

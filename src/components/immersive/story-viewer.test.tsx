@@ -1108,6 +1108,22 @@ describe("StoryViewer", () => {
     });
   });
 
+  describe("fullscreen button feature flag", () => {
+    it("should not render FullscreenButton when flag is disabled", async () => {
+      mockIsEnabled.mockReturnValue(false);
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      expect(screen.queryByLabelText("fullscreen.toggle")).not.toBeInTheDocument();
+    });
+
+    it("should check fullscreen_button flag", async () => {
+      mockIsEnabled.mockReturnValue(false);
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      expect(mockIsEnabled).toHaveBeenCalledWith("fullscreen_button");
+    });
+  });
+
   describe("bookmarks button", () => {
     it("should render bookmarks button", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
