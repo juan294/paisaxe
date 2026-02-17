@@ -28,16 +28,6 @@ export default function PricingPage() {
     router.push(checkoutUrl);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center">
-        <div role="status" aria-label={t("accessibility.loading")}>
-          <RefreshCw className="h-5 w-5 animate-spin text-neutral-500" />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-neutral-950">
       {/* Header */}
@@ -80,7 +70,7 @@ export default function PricingPage() {
         </div>
 
         {/* Already has access */}
-        {canUseVoice && (
+        {!isLoading && canUseVoice && (
           <div className="mb-8 p-5 rounded-xl bg-green-500/5 border border-green-500/10">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
@@ -107,7 +97,7 @@ export default function PricingPage() {
         )}
 
         {/* Pricing Card */}
-        {!canUseVoice && (
+        {(isLoading || !canUseVoice) && (
           <div className="rounded-xl border border-neutral-800 overflow-hidden">
             {/* Price */}
             <div className="p-6 text-center border-b border-neutral-800">
@@ -145,9 +135,16 @@ export default function PricingPage() {
             <div className="p-6 pt-2">
               <button
                 onClick={handlePurchase}
-                className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors flex items-center justify-center gap-2"
+                disabled={isLoading}
+                className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {user ? t("premium.pricing_cta") : t("premium.sign_in_to_purchase")}
+                {isLoading ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : user ? (
+                  t("premium.pricing_cta")
+                ) : (
+                  t("premium.sign_in_to_purchase")
+                )}
               </button>
               <p className="mt-3 text-center text-xs text-neutral-500">
                 {t("premium.secure_payment")}
