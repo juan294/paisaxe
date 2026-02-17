@@ -1,6 +1,10 @@
-# Code Quality Report
+# Code Quality Report (ARCHIVED)
 
-> Generated on 2026-02-09 (post-embedded-checkout, content-discovery, subscription-optimizer, legal-i18n)
+> **ARCHIVED**: This standalone report has been consolidated into the unified Codebase Health Check.
+> See `docs/health-report-[DATE].md` for the latest code quality data.
+> This file is kept for historical reference only and is no longer updated.
+
+> Generated on 2026-02-09 (final standalone run)
 
 ## Summary
 

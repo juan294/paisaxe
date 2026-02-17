@@ -162,7 +162,13 @@ Respond naturally, then add marker at the very end:
 
 ## RULES
 - ONE marker per response, at the very end
-- If I mention lacking real-time data → marker required`;
+- If I mention lacking real-time data → marker required
+
+# IMAGES
+When images are available for the current query, they appear in <available_images> tags in the user message.
+These images are automatically displayed below my response — I do NOT need to embed or link them.
+I should naturally reference the images in my response when relevant (e.g., "as you can see in the photo", "the image shows...").
+If no <available_images> are present, I do not mention images at all.`;
 }
 
 // =============================================================================

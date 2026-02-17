@@ -1,15 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MarketingDashboard } from "./marketing-dashboard";
 
-// Mock child components
+// Mock child components - AccountCard passes through callbacks for testing
 vi.mock("./account-card", () => ({
-  AccountCard: ({ platform }: { platform: string }) => (
-    <div data-testid={`account-card-${platform}`}>{platform}</div>
+  AccountCard: ({ platform, onConfigure, onToggle, onDisconnect }: {
+    platform: string;
+    onConfigure: () => void;
+    onToggle: () => void;
+    onDisconnect: () => void;
+  }) => (
+    <div data-testid={`account-card-${platform}`}>
+      {platform}
+      <button data-testid={`configure-${platform}`} onClick={onConfigure}>Configure</button>
+      <button data-testid={`toggle-${platform}`} onClick={onToggle}>Toggle</button>
+      <button data-testid={`disconnect-${platform}`} onClick={onDisconnect}>Disconnect</button>
+    </div>
   ),
 }));
 vi.mock("./account-config-dialog", () => ({
-  AccountConfigDialog: () => null,
+  AccountConfigDialog: ({ platform }: { platform: string | null }) => (
+    platform ? <div data-testid="config-dialog">{platform}</div> : null
+  ),
 }));
 vi.mock("./post-row", () => ({
   PostRow: ({ post }: { post: { content: string } }) => (
@@ -26,6 +39,11 @@ vi.mock("./drafts-panel", () => ({
 }));
 vi.mock("../voice-agent-chat", () => ({
   VoiceAgentChat: () => <div data-testid="voice-agent-chat">Voice Chat</div>,
+}));
+
+// Mock csrfHeaders
+vi.mock("@/lib/csrf-client", () => ({
+  csrfHeaders: () => ({ "x-csrf-token": "test-token" }),
 }));
 
 const mockData = {
@@ -137,5 +155,278 @@ describe("MarketingDashboard", () => {
     await waitFor(() => {
       expect(screen.getByTestId("drafts-panel")).toBeInTheDocument();
     });
+  });
+
+  it("renders upcoming posts table when posts exist", async () => {
+    const dataWithPosts = {
+      ...mockData,
+      upcomingPosts: [
+        { id: "p1", content: "Upcoming content", platform: "x", status: "scheduled" },
+      ],
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: dataWithPosts }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Upcoming content")).toBeInTheDocument();
+    });
+  });
+
+  it("shows 'No scheduled posts' when empty", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: mockData }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No scheduled posts")).toBeInTheDocument();
+    });
+  });
+
+  it("renders recent posts table when posts exist", async () => {
+    const dataWithPosts = {
+      ...mockData,
+      recentPosts: [
+        { id: "p2", content: "Recent content", platform: "x", status: "posted" },
+      ],
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: dataWithPosts }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Recent content")).toBeInTheDocument();
+    });
+  });
+
+  it("shows 'No posts yet' when recent posts empty", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: mockData }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No posts yet")).toBeInTheDocument();
+    });
+  });
+
+  it("renders schedules when active schedules exist", async () => {
+    const dataWithSchedules = {
+      ...mockData,
+      schedules: [
+        { id: "s1", platform: "x", dayOfWeek: 1, timeUtc: "10:00", isActive: true },
+        { id: "s2", platform: "instagram", dayOfWeek: null, timeUtc: "15:00", isActive: true },
+        { id: "s3", platform: "x", dayOfWeek: 3, timeUtc: "09:00", isActive: false },
+      ],
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: dataWithSchedules }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("10:00")).toBeInTheDocument();
+    });
+
+    // Daily schedule (dayOfWeek null)
+    expect(screen.getByText("Daily")).toBeInTheDocument();
+    expect(screen.getByText("15:00")).toBeInTheDocument();
+
+    // Inactive schedule should not render
+    expect(screen.queryByText("09:00")).not.toBeInTheDocument();
+  });
+
+  it("shows 'No schedules configured' when empty", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: mockData }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No schedules configured")).toBeInTheDocument();
+    });
+  });
+
+  it("shows setup instructions when no accounts connected", async () => {
+    const dataNoAccounts = { ...mockData, accounts: [] };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: dataNoAccounts }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No accounts connected")).toBeInTheDocument();
+    });
+  });
+
+  it("shows Retry button on error state", async () => {
+    const user = userEvent.setup();
+
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: "Server error" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ data: mockData }),
+      });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Server error")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Retry")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Retry"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Marketing Automation")).toBeInTheDocument();
+    });
+  });
+
+  it("handles network error in loadData", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Network error")).toBeInTheDocument();
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("pauses active account on toggle", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) }) // initial load
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) }) // PATCH pause
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) }); // reload
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("toggle-x"));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("action=pause"),
+        expect.objectContaining({ method: "PATCH" })
+      );
+    });
+  });
+
+  it("opens configure dialog for platform without credentials", async () => {
+    const user = userEvent.setup();
+    // instagram has no account
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: mockData }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("configure-instagram")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("configure-instagram"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("config-dialog")).toBeInTheDocument();
+    });
+  });
+
+  it("disconnects account after confirm", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) }) // initial load
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) }) // DELETE
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) }); // reload
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("disconnect-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("disconnect-x"));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("platform=x"),
+        expect.objectContaining({ method: "DELETE" })
+      );
+    });
+  });
+
+  it("does not disconnect when confirm is cancelled", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: mockData }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("disconnect-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("disconnect-x"));
+
+    // Only the initial load should have been called
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows Refresh button and refreshes on click", async () => {
+    const user = userEvent.setup();
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: mockData }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Refresh")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Refresh"));
+
+    // Should have been called twice: initial + refresh
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 });

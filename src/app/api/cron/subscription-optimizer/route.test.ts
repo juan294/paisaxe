@@ -44,12 +44,14 @@ vi.mock("@/lib/subscription-optimizer", () => ({
 describe("POST /api/cron/subscription-optimizer", () => {
   const originalEnv = process.env;
   const WEBHOOK_SECRET = "test-webhook-secret-123";
+  const CRON_SECRET = "test-cron-secret-456";
 
   beforeEach(() => {
     vi.resetModules();
     process.env = {
       ...originalEnv,
       WEBHOOK_SECRET,
+      CRON_SECRET,
     };
     mockAnalyze.mockReset();
     mockGenerateReport.mockReset();
@@ -235,6 +237,78 @@ describe("POST /api/cron/subscription-optimizer", () => {
     expect(mockAnalyze).toHaveBeenCalledWith(
       expect.objectContaining({
         usageMetrics: expect.any(Object),
+      })
+    );
+  });
+});
+
+describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
+  const originalEnv = process.env;
+  const CRON_SECRET = "test-cron-secret-456";
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = {
+      ...originalEnv,
+      WEBHOOK_SECRET: "test-webhook-secret-123",
+      CRON_SECRET,
+    };
+    mockAnalyze.mockReset();
+    mockGenerateReport.mockReset();
+    mockWriteFile.mockReset();
+    mockWriteFile.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("rejects GET without Authorization header", async () => {
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: {} }
+    );
+
+    const response = await GET(request as never);
+    expect(response.status).toBe(401);
+  });
+
+  it("rejects GET with wrong CRON_SECRET", async () => {
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { authorization: "Bearer wrong-secret" } }
+    );
+
+    const response = await GET(request as never);
+    expect(response.status).toBe(401);
+  });
+
+  it("accepts GET with valid CRON_SECRET and runs analysis", async () => {
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { authorization: `Bearer ${CRON_SECRET}` } }
+    );
+
+    const response = await GET(request as never);
+    expect(response.status).toBe(200);
+    expect(mockAnalyze).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((response as any).body).toEqual(
+      expect.objectContaining({
+        success: true,
+        totalMonthlySpend: 50,
       })
     );
   });

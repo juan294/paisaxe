@@ -108,11 +108,12 @@ export function useFavorites(): UseFavoritesReturn {
       }
 
       const isCurrentlyFavorite = favorites.includes(storyId);
+      const previousFavorites = favorites;
       const newFavorites = isCurrentlyFavorite
         ? favorites.filter((id) => id !== storyId)
         : [...favorites, storyId];
 
-      // Update local state immediately
+      // Update local state immediately (optimistic)
       setFavorites(newFavorites);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newFavorites));
 
@@ -139,6 +140,9 @@ export function useFavorites(): UseFavoritesReturn {
         }
       } catch (error) {
         console.error("Error syncing favorite to cloud:", error);
+        // Revert optimistic update on failure
+        setFavorites(previousFavorites);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(previousFavorites));
       }
     },
     [favorites, user, session]

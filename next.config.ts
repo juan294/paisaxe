@@ -83,10 +83,6 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
-      {
-        protocol: "https",
-        hostname: "picsum.photos",
-      },
     ],
     // Increase cache duration for images (default is 60 seconds)
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days for immutable images

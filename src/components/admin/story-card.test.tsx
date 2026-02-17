@@ -124,6 +124,184 @@ describe("StoryCard", () => {
     });
   });
 
+  describe("selection mode", () => {
+    it("should toggle selection when clicked in selection mode", () => {
+      const onToggleSelect = vi.fn();
+      render(
+        <StoryCard
+          story={mockStory}
+          onEdit={mockOnEdit}
+          selectionMode={true}
+          onToggleSelect={onToggleSelect}
+        />
+      );
+
+      const card = screen.getByRole("button");
+      fireEvent.click(card);
+
+      expect(onToggleSelect).toHaveBeenCalledWith("story-1");
+      expect(mockOnEdit).not.toHaveBeenCalled();
+    });
+
+    it("should toggle selection on checkbox click", () => {
+      const onToggleSelect = vi.fn();
+      render(
+        <StoryCard
+          story={mockStory}
+          onEdit={mockOnEdit}
+          onToggleSelect={onToggleSelect}
+        />
+      );
+
+      const checkbox = screen.getByRole("checkbox");
+      fireEvent.click(checkbox);
+
+      expect(onToggleSelect).toHaveBeenCalledWith("story-1");
+    });
+
+    it("should toggle selection on keyboard Enter", () => {
+      const onToggleSelect = vi.fn();
+      render(
+        <StoryCard
+          story={mockStory}
+          onEdit={mockOnEdit}
+          onToggleSelect={onToggleSelect}
+        />
+      );
+
+      const checkbox = screen.getByRole("checkbox");
+      fireEvent.keyDown(checkbox, { key: "Enter" });
+
+      expect(onToggleSelect).toHaveBeenCalledWith("story-1");
+    });
+
+    it("should toggle selection on keyboard Space", () => {
+      const onToggleSelect = vi.fn();
+      render(
+        <StoryCard
+          story={mockStory}
+          onEdit={mockOnEdit}
+          onToggleSelect={onToggleSelect}
+        />
+      );
+
+      const checkbox = screen.getByRole("checkbox");
+      fireEvent.keyDown(checkbox, { key: " " });
+
+      expect(onToggleSelect).toHaveBeenCalledWith("story-1");
+    });
+
+    it("should show selected state with ring", () => {
+      const { container } = render(
+        <StoryCard
+          story={mockStory}
+          onEdit={mockOnEdit}
+          isSelected={true}
+          onToggleSelect={vi.fn()}
+        />
+      );
+
+      const button = container.querySelector("button");
+      expect(button).toHaveClass("ring-2");
+    });
+
+    it("should show checkbox for stories without images in selection mode", () => {
+      const storyWithoutImage = { ...mockStory, image: "" };
+      const onToggleSelect = vi.fn();
+      render(
+        <StoryCard
+          story={storyWithoutImage}
+          onEdit={mockOnEdit}
+          selectionMode={true}
+          onToggleSelect={onToggleSelect}
+        />
+      );
+
+      const checkboxes = screen.getAllByRole("checkbox");
+      expect(checkboxes.length).toBeGreaterThan(0);
+
+      // Click on the checkbox in no-image state
+      fireEvent.click(checkboxes[0]);
+      expect(onToggleSelect).toHaveBeenCalledWith("story-1");
+    });
+
+    it("should toggle select on Enter in no-image checkbox", () => {
+      const storyWithoutImage = { ...mockStory, image: "" };
+      const onToggleSelect = vi.fn();
+      render(
+        <StoryCard
+          story={storyWithoutImage}
+          onEdit={mockOnEdit}
+          onToggleSelect={onToggleSelect}
+        />
+      );
+
+      const checkbox = screen.getByRole("checkbox");
+      fireEvent.keyDown(checkbox, { key: "Enter" });
+      expect(onToggleSelect).toHaveBeenCalledWith("story-1");
+    });
+  });
+
+  describe("translation badges", () => {
+    it("should show i18n badge when metadata is missing", () => {
+      const storyNoMetadata = { ...mockStory, metadata: undefined };
+      render(<StoryCard story={storyNoMetadata} onEdit={mockOnEdit} />);
+      expect(screen.getByText("i18n")).toBeInTheDocument();
+    });
+
+    it("should show i18n badge when translations are incomplete", () => {
+      const storyPartialTranslations: AdminStory = {
+        ...mockStory,
+        metadata: {
+          translations: {
+            en: { title: "Test", subtitle: "", description: "", questionPrompts: [], status: "draft" as const },
+          },
+          translation_status: {
+            en: { status: "draft" as const, lastUpdated: "2026-01-01" },
+          },
+        },
+      };
+      render(<StoryCard story={storyPartialTranslations} onEdit={mockOnEdit} />);
+      expect(screen.getByText("i18n")).toBeInTheDocument();
+    });
+
+    it("should not show i18n badge when all translations are complete", () => {
+      const completeTranslation = { title: "T", subtitle: "S", description: "D", questionPrompts: [], status: "complete" as const };
+      const allLocales = ["en", "fr", "de", "pt", "ast"];
+      const translations: Record<string, typeof completeTranslation> = {};
+      const translationStatus: Record<string, { status: "complete"; lastUpdated: string }> = {};
+      for (const locale of allLocales) {
+        translations[locale] = completeTranslation;
+        translationStatus[locale] = { status: "complete", lastUpdated: "2026-01-01" };
+      }
+      const storyComplete: AdminStory = {
+        ...mockStory,
+        metadata: { translations, translation_status: translationStatus },
+      };
+      render(<StoryCard story={storyComplete} onEdit={mockOnEdit} />);
+      expect(screen.queryByText("i18n")).not.toBeInTheDocument();
+    });
+
+    it("should show i18n badge in no-image state too", () => {
+      const storyNoImage = { ...mockStory, image: "", metadata: undefined };
+      render(<StoryCard story={storyNoImage} onEdit={mockOnEdit} />);
+      expect(screen.getByText("i18n")).toBeInTheDocument();
+    });
+  });
+
+  describe("subtitle display", () => {
+    it("should show subtitle when present", () => {
+      render(<StoryCard story={mockStory} onEdit={mockOnEdit} />);
+      expect(screen.getByText("Test Subtitle")).toBeInTheDocument();
+    });
+
+    it("should not show subtitle when empty", () => {
+      const storyNoSubtitle = { ...mockStory, subtitle: "" };
+      render(<StoryCard story={storyNoSubtitle} onEdit={mockOnEdit} />);
+      expect(screen.queryByText("Test Subtitle")).not.toBeInTheDocument();
+    });
+  });
+
   describe("hover effects", () => {
     it("should have group class for hover effects", () => {
       const { container } = render(<StoryCard story={mockStory} onEdit={mockOnEdit} />);

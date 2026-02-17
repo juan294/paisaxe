@@ -437,6 +437,99 @@ describe("useStories", () => {
   });
 });
 
+describe("useStories with initialStories", () => {
+  const serverStories = [
+    {
+      id: "server-1",
+      slug: "server-1",
+      title: "Server Story 1",
+      subtitle: "Sub 1",
+      description: "Desc 1",
+      image: "/s1.png",
+      category: "nature" as const,
+      sourcePdf: "s1.pdf",
+    },
+    {
+      id: "server-2",
+      slug: "server-2",
+      title: "Server Story 2",
+      subtitle: "Sub 2",
+      description: "Desc 2",
+      image: "/s2.png",
+      category: "cities" as const,
+      sourcePdf: "s2.pdf",
+    },
+  ];
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockGetStoriesFromDB.mockReset();
+    localStorageMock.clear();
+    localStorageMock.getItem.mockClear();
+    localStorageMock.setItem.mockClear();
+    localStorageMock.removeItem.mockClear();
+    mockGetStoriesFromDB.mockResolvedValue(mockStories);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("should use initial stories immediately (isLoading=false) when no cache", async () => {
+    // Make DB fetch slow to verify we're using initialStories, not waiting for fetch
+    mockGetStoriesFromDB.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(mockStories), 1000))
+    );
+
+    const { useStories } = await import("./use-stories");
+    const { result } = renderHook(() => useStories(serverStories));
+
+    // Should immediately have server stories, NOT loading
+    expect(result.current.stories).toEqual(serverStories);
+    expect(result.current.isLoading).toBe(false);
+  });
+
+  it("should prefer cache over initialStories when cache exists", async () => {
+    // First: populate cache
+    const { useStories } = await import("./use-stories");
+    const { result: result1 } = renderHook(() => useStories());
+
+    await waitFor(() => {
+      expect(result1.current.isLoading).toBe(false);
+    });
+    expect(result1.current.stories).toEqual(mockStories);
+
+    // Second: render with initialStories — cache should win
+    const { result: result2 } = renderHook(() => useStories(serverStories));
+    expect(result2.current.stories).toEqual(mockStories);
+    expect(result2.current.isLoading).toBe(false);
+  });
+
+  it("should fall back to normal behavior when initialStories is empty", async () => {
+    let resolveDB: (value: unknown) => void;
+    mockGetStoriesFromDB.mockImplementation(
+      () => new Promise((resolve) => { resolveDB = resolve; })
+    );
+
+    const { useStories } = await import("./use-stories");
+    const { result } = renderHook(() => useStories([]));
+
+    // Empty initialStories should not seed cache, so isLoading should be true
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.stories).toEqual(mockFallbackStories);
+
+    await act(async () => {
+      resolveDB!(mockStories);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.stories).toEqual(mockStories);
+  });
+});
+
 describe("useStories localStorage persistence", () => {
   beforeEach(() => {
     vi.resetModules();

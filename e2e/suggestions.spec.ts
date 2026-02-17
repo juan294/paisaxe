@@ -39,7 +39,7 @@ test.describe("Suggestion feature", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     await expect(
       page.locator("[data-suggest-place-trigger]")
@@ -58,7 +58,7 @@ test.describe("Suggestion feature", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1").first()).toBeVisible();
 
     await expect(
       page.locator("[data-suggest-place-trigger]")
@@ -78,7 +78,7 @@ test.describe("Suggestion feature", () => {
       );
 
       await page.goto("/immersive");
-      await expect(page.locator("h1")).toBeVisible();
+      await expect(page.locator("h1").first()).toBeVisible();
     });
 
     test("opens dialog on click", async ({ page }) => {

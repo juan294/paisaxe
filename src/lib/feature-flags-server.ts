@@ -1,32 +1,54 @@
-import { supabase } from "@/lib/supabase";
-import type { FeatureFlagKey, FeatureFlagRow } from "@/types/feature-flags";
+import type { FeatureFlagKey } from "@/types/feature-flags";
 import { getEnvironment } from "@/lib/environment";
 
 /**
  * Server-side function to check if a feature flag is enabled.
- * Use this in Server Components and API routes.
- *
+ * Uses Supabase REST API with Next.js cache revalidation.
  * Falls back to false if the flag doesn't exist or there's an error.
  */
 export async function isFeatureFlagEnabled(
   key: FeatureFlagKey
 ): Promise<boolean> {
   try {
-    const environment = getEnvironment();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
-    const { data, error } = await supabase
-      .from("feature_flags")
-      .select("enabled")
-      .eq("flag_key", key)
-      .eq("environment", environment)
-      .single();
-
-    if (error) {
-      console.warn(`Failed to fetch feature flag "${key}":`, error.message);
+    if (!supabaseUrl || !supabaseKey) {
       return false;
     }
 
-    return (data as Pick<FeatureFlagRow, "enabled">)?.enabled ?? false;
+    // Skip fetch with dummy credentials (CI/E2E) — real Supabase anon keys are JWTs starting with 'eyJ'
+    if (!supabaseKey.startsWith("eyJ")) {
+      return false;
+    }
+
+    const environment = getEnvironment();
+    const isDev = environment === "development";
+
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/feature_flags?flag_key=eq.${key}&environment=eq.${environment}&select=enabled`,
+      {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        ...(isDev
+          ? { cache: "no-store" as const }
+          : { next: { revalidate: 60 } }),
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`Failed to fetch feature flag "${key}":`, response.status);
+      return false;
+    }
+
+    const data = await response.json();
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0].enabled === true;
+    }
+
+    return false;
   } catch (error) {
     console.warn(`Error checking feature flag "${key}":`, error);
     return false;
