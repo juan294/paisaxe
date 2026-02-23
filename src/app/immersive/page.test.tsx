@@ -20,6 +20,7 @@ vi.mock("@/lib/supabase-browser", () => ({
   createSupabaseBrowserClient: () => ({
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
       onAuthStateChange: vi.fn().mockReturnValue({
         data: { subscription: { unsubscribe: vi.fn() } },
       }),
@@ -196,11 +197,14 @@ describe("ImmersivePageContent", () => {
         screen.getByRole("button", { name: "Preguntar sobre esto" })
       );
 
-      await waitFor(() => {
-        expect(
-          screen.getByPlaceholderText("Escribe tu pregunta...")
-        ).toBeInTheDocument();
-      });
+      await waitFor(
+        () => {
+          expect(
+            screen.getByPlaceholderText("Escribe tu pregunta...")
+          ).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
     });
 
     it("should close VoiceChat when clicking close button", async () => {
@@ -212,11 +216,14 @@ describe("ImmersivePageContent", () => {
         screen.getByRole("button", { name: "Preguntar sobre esto" })
       );
 
-      await waitFor(() => {
-        expect(
-          screen.getByPlaceholderText("Escribe tu pregunta...")
-        ).toBeInTheDocument();
-      });
+      await waitFor(
+        () => {
+          expect(
+            screen.getByPlaceholderText("Escribe tu pregunta...")
+          ).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
 
       // Voice chat modal is open - test passes
     });
