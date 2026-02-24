@@ -51,11 +51,12 @@ test.describe("Author pill", () => {
     // Hover over the pill group
     await pillGroup.hover();
 
-    // Social links should become visible
-    const xLink = page.locator('a[aria-label="X (Twitter)"]');
-    const linkedinLink = page.locator('a[aria-label="LinkedIn"]');
-    const mediumLink = page.locator('a[aria-label="Medium"]');
-    const githubLink = page.locator('a[aria-label="GitHub"]');
+    // Social links should become visible (use .first() to avoid strict mode
+    // violations when the popover renders duplicate links)
+    const xLink = page.locator('a[aria-label="X (Twitter)"]').first();
+    const linkedinLink = page.locator('a[aria-label="LinkedIn"]').first();
+    const mediumLink = page.locator('a[aria-label="Medium"]').first();
+    const githubLink = page.locator('a[aria-label="GitHub"]').first();
 
     await expect(xLink).toBeVisible();
     await expect(linkedinLink).toBeVisible();
@@ -68,10 +69,10 @@ test.describe("Author pill", () => {
 
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    const xLink = page.locator('a[aria-label="X (Twitter)"]');
-    const linkedinLink = page.locator('a[aria-label="LinkedIn"]');
-    const mediumLink = page.locator('a[aria-label="Medium"]');
-    const githubLink = page.locator('a[aria-label="GitHub"]');
+    const xLink = page.locator('a[aria-label="X (Twitter)"]').first();
+    const linkedinLink = page.locator('a[aria-label="LinkedIn"]').first();
+    const mediumLink = page.locator('a[aria-label="Medium"]').first();
+    const githubLink = page.locator('a[aria-label="GitHub"]').first();
 
     await expect(xLink).toHaveAttribute("href", "https://x.com/JuanG294");
     await expect(linkedinLink).toHaveAttribute("href", "https://www.linkedin.com/in/juanagonzalezp/");
@@ -84,7 +85,7 @@ test.describe("Author pill", () => {
 
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    const xLink = page.locator('a[aria-label="X (Twitter)"]');
+    const xLink = page.locator('a[aria-label="X (Twitter)"]').first();
     await expect(xLink).toHaveAttribute("target", "_blank");
     await expect(xLink).toHaveAttribute("rel", "noopener noreferrer");
   });
