@@ -340,8 +340,8 @@ test.describe("Language switching", () => {
     const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
     await switcher.locator("button").first().click();
 
-    // Click ES in the dropdown
-    const esButton = switcher.getByRole("option", { name: "ES", exact: true });
+    // Click ES in the dropdown (aria-label is full name e.g. "Español (ES)")
+    const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
     await page.waitForTimeout(300);
 
@@ -363,15 +363,15 @@ test.describe("Language switching", () => {
     // First switch to ES, then back to EN to verify round-trip
     const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
 
-    // Switch to ES first
+    // Switch to ES first (aria-label is full name e.g. "Español (ES)")
     await switcher.locator("button").first().click();
-    const esButton = switcher.getByRole("option", { name: "ES", exact: true });
+    const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
     await page.waitForTimeout(300);
 
     // Now switch back to EN
     await switcher.locator("button").first().click();
-    const enButton = switcher.getByRole("option", { name: "EN", exact: true });
+    const enButton = switcher.locator('button[aria-label$="(EN)"]');
     await enButton.click();
     await page.waitForTimeout(300);
 
@@ -393,7 +393,7 @@ test.describe("Language switching", () => {
     // Switch to ES (different from default EN)
     const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
     await switcher.locator("button").first().click();
-    const esButton = switcher.getByRole("option", { name: "ES", exact: true });
+    const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
     await page.waitForTimeout(300);
 
@@ -430,10 +430,10 @@ test.describe("Language switching", () => {
     await closeButton.click();
     await expect(chatPanel).not.toBeVisible();
 
-    // Switch to ES
+    // Switch to ES (aria-label is full name e.g. "Español (ES)")
     const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
     await switcher.locator("button").first().click();
-    const esButton = switcher.getByRole("option", { name: "ES", exact: true });
+    const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
     await page.waitForTimeout(300);
 
