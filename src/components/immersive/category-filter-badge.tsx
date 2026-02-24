@@ -133,7 +133,7 @@ export function CategoryFilterBadge({
           )}
           style={{ transitionDelay: isExpanded ? "50ms" : "0ms" }}
         >
-          <div className="text-white/50 text-xs uppercase tracking-wider mb-2 font-medium">
+          <div className="text-white/60 text-xs uppercase tracking-wider mb-2 font-medium">
             {t("stories.filters.category")}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -161,7 +161,7 @@ export function CategoryFilterBadge({
           )}
           style={{ transitionDelay: isExpanded ? "100ms" : "0ms" }}
         >
-          <div className="text-white/50 text-xs uppercase tracking-wider mb-2 font-medium">
+          <div className="text-white/60 text-xs uppercase tracking-wider mb-2 font-medium">
             {t("stories.filters.location")}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -188,7 +188,7 @@ export function CategoryFilterBadge({
           )}
           style={{ transitionDelay: isExpanded ? "150ms" : "0ms" }}
         >
-          <div className="text-white/50 text-xs uppercase tracking-wider mb-2 font-medium">
+          <div className="text-white/60 text-xs uppercase tracking-wider mb-2 font-medium">
             {t("stories.filters.duration")}
           </div>
           <div className="flex flex-wrap gap-2">

@@ -128,17 +128,17 @@ export function SiteInfoMenu() {
 
           {/* Legal & attribution */}
           <div className="px-4 py-3 space-y-2">
-            <p className="text-[10px] leading-relaxed text-white/40">
+            <p className="text-[10px] leading-relaxed text-white/60">
               {t("footer.content_attribution")}
             </p>
-            <p className="text-[10px] leading-relaxed text-white/40">
+            <p className="text-[10px] leading-relaxed text-white/60">
               {t("footer.ai_disclaimer")}
             </p>
             <div className="flex items-center gap-2 pt-1">
               <Link
                 href="/terms"
                 onClick={close}
-                className="text-[10px] text-white/40 underline underline-offset-2 hover:text-white/60 transition-colors"
+                className="text-[10px] text-white/60 underline underline-offset-2 hover:text-white/80 transition-colors"
               >
                 {t("footer.terms")}
               </Link>
@@ -146,7 +146,7 @@ export function SiteInfoMenu() {
               <Link
                 href="/privacy"
                 onClick={close}
-                className="text-[10px] text-white/40 underline underline-offset-2 hover:text-white/60 transition-colors"
+                className="text-[10px] text-white/60 underline underline-offset-2 hover:text-white/80 transition-colors"
               >
                 {t("footer.privacy")}
               </Link>
