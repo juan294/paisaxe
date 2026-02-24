@@ -300,7 +300,7 @@ Runs on every PR against `http://localhost:3000/immersive`.
 
 | Category | Minimum |
 |----------|---------|
-| Performance | 60% |
+| Performance | 70% |
 | Accessibility | 80% |
 
 **Core Web Vitals Budgets**:
