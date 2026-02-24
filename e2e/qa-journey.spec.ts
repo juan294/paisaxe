@@ -300,7 +300,7 @@ test.describe("QA Journey: New Features", () => {
   }, testInfo) => {
     // Suggest button uses hidden md:block — skip on mobile
     const viewport = page.viewportSize();
-    if (viewport && viewport.width < 768) testInfo.skip();
+    if (viewport && viewport.width < 768) testInfo.skip(true, "Suggest button uses hidden md:block — not visible on mobile");
     // Enable suggestion feature flag
     await page.route("**/api/feature-flags", (route) =>
       route.fulfill({
@@ -453,7 +453,7 @@ authTest.describe("QA Journey: Authenticated User", () => {
   // Skip entire suite if auth credentials not configured
   authTest.beforeAll(() => {
     if (!hasAuthCredentials()) {
-      authTest.skip();
+      authTest.skip(true, "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD)");
     }
   });
 
