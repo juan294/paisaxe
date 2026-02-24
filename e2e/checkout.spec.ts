@@ -64,6 +64,78 @@ test.describe("Checkout flow", () => {
     await expect(page.locator("body")).not.toBeEmpty();
   });
 
+  test("checkout health endpoint returns configuration status", async ({
+    request,
+  }) => {
+    const response = await request.get("/api/checkout/health");
+    // In test env, Stripe keys aren't real so this may return 503 (degraded)
+    // but the endpoint itself should respond without crashing
+    expect([200, 503]).toContain(response.status());
+    const data = await response.json();
+    expect(data).toHaveProperty("status");
+    expect(data).toHaveProperty("checks");
+    expect(data.checks).toHaveProperty("envVars");
+    expect(data.checks).toHaveProperty("priceActive");
+    expect(data.checks).toHaveProperty("webhookSecret");
+  });
+
+  test("pricing page CTA button is clickable for unauthenticated users", async ({
+    page,
+  }) => {
+    await page.route("**/api/voice-access", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          hasAccess: false,
+          canUseVoice: false,
+          isWhitelisted: false,
+          needsSignIn: false,
+          needsPurchase: true,
+          expiresAt: null,
+          hoursUntilExpiry: null,
+        }),
+      })
+    );
+
+    // Mock auth to return no user (unauthenticated)
+    await page.route("**/auth/v1/user", (route) =>
+      route.fulfill({ status: 401, body: JSON.stringify({ error: "not authenticated" }) })
+    );
+
+    await page.goto("/pricing");
+    await expect(page.getByText("€1.99")).toBeVisible({ timeout: 10000 });
+
+    // The CTA button should be present and enabled
+    const ctaButton = page.locator("button").filter({ hasText: /purchase|comprar|iniciar/i }).first();
+    await expect(ctaButton).toBeVisible();
+    await expect(ctaButton).toBeEnabled();
+  });
+
+  test("success page renders after purchase", async ({ page }) => {
+    // Mock voice access to show success state
+    await page.route("**/api/voice-access", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          hasAccess: true,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          purchaseType: "day_pass",
+        }),
+      })
+    );
+
+    const response = await page.goto("/pricing/success");
+    expect(response?.ok()).toBe(true);
+
+    // Should show success confirmation
+    await expect(page.locator("body")).not.toBeEmpty();
+    // Should have a link back to immersive
+    const immersiveLink = page.locator('a[href*="/immersive"]');
+    await expect(immersiveLink).toBeVisible({ timeout: 10000 });
+  });
+
   test("pricing page back link navigates to /immersive", async ({ page }) => {
     await page.route("**/api/voice-access", (route) =>
       route.fulfill({
