@@ -100,7 +100,7 @@ describe("LanguageSwitcher", () => {
       fireEvent.click(toggleButton);
 
       // ES option in dropdown should have selected styling and aria-selected
-      const esOption = screen.getByRole("option", { name: "ES" });
+      const esOption = screen.getByRole("option", { name: /Espa\u00f1ol/ });
       expect(esOption).toHaveAttribute("aria-selected", "true");
       expect(esOption.className).toContain("bg-white");
       expect(esOption.className).toContain("text-black");
@@ -115,7 +115,7 @@ describe("LanguageSwitcher", () => {
       fireEvent.click(toggleButton);
 
       // Click EN option
-      const enOption = screen.getByRole("option", { name: "EN" });
+      const enOption = screen.getByRole("option", { name: /English/ });
       fireEvent.click(enOption);
 
       expect(mockSetLocale).toHaveBeenCalledWith("en");
@@ -127,7 +127,7 @@ describe("LanguageSwitcher", () => {
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("option", { name: "FR" }));
+      fireEvent.click(screen.getByRole("option", { name: /Fran\u00e7ais/ }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("fr");
     });
@@ -138,7 +138,7 @@ describe("LanguageSwitcher", () => {
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("option", { name: "DE" }));
+      fireEvent.click(screen.getByRole("option", { name: /Deutsch/ }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("de");
     });
@@ -149,7 +149,7 @@ describe("LanguageSwitcher", () => {
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("option", { name: "PT" }));
+      fireEvent.click(screen.getByRole("option", { name: /Portugu\u00eas/ }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("pt");
     });
@@ -160,7 +160,7 @@ describe("LanguageSwitcher", () => {
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("option", { name: "AST" }));
+      fireEvent.click(screen.getByRole("option", { name: /Asturianu/ }));
 
       expect(mockSetLocale).toHaveBeenCalledWith("ast");
     });
@@ -173,7 +173,7 @@ describe("LanguageSwitcher", () => {
       fireEvent.click(toggleButton);
 
       // Find ES option
-      const esOption = screen.getByRole("option", { name: "ES" });
+      const esOption = screen.getByRole("option", { name: /Espa\u00f1ol/ });
       fireEvent.click(esOption);
 
       expect(mockSetLocale).toHaveBeenCalledWith("es");
@@ -232,7 +232,7 @@ describe("LanguageSwitcher", () => {
       fireEvent.click(toggleButton);
 
       // Select a language
-      fireEvent.click(screen.getByRole("option", { name: "EN" }));
+      fireEvent.click(screen.getByRole("option", { name: /English/ }));
 
       // Dropdown should be hidden via CSS
       const groupContainer = screen.getByRole("group");
@@ -266,7 +266,7 @@ describe("LanguageSwitcher", () => {
 
       const toggleButton = screen.getByRole("button", { expanded: false });
       fireEvent.click(toggleButton);
-      fireEvent.click(screen.getByRole("option", { name: "EN" }));
+      fireEvent.click(screen.getByRole("option", { name: /English/ }));
 
       expect(parentHandler).not.toHaveBeenCalled();
     });
