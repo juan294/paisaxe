@@ -15,7 +15,6 @@
       "schedule": "0 4 * * 1"
     }
   ],
-  "_comment_redirects": "Defense-in-depth: these CDN-level redirects duplicate the canonical-domain logic in src/proxy.ts handleCanonicalDomain(). Both layers are intentional — Vercel redirects catch requests before the app boots, while the proxy handles any that slip through (e.g., preview deployments, direct IP access).",
   "redirects": [
     {
       "source": "/:path*",
