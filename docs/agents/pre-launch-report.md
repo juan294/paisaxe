@@ -169,7 +169,7 @@ All user-facing tables have RLS enabled with correct policies. The only bug is i
 - Font optimization via `next/font/google` (self-hosted, no FOUT)
 - DNS prefetch for Supabase and Unsplash
 - SSE streaming for chat responses
-- Lighthouse CI budgets: Perf >= 60%, A11y >= 80%, LCP < 4s
+- Lighthouse CI budgets: Perf >= 70%, A11y >= 80%, LCP < 4s
 
 ---
 
