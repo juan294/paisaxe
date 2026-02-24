@@ -6,13 +6,13 @@ import { useTranslation } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const languages: { code: Locale; label: string }[] = [
-  { code: "es", label: "ES" },
-  { code: "ast", label: "AST" },
-  { code: "en", label: "EN" },
-  { code: "fr", label: "FR" },
-  { code: "de", label: "DE" },
-  { code: "pt", label: "PT" },
+const languages: { code: Locale; label: string; fullName: string }[] = [
+  { code: "es", label: "ES", fullName: "Espa\u00f1ol (ES)" },
+  { code: "ast", label: "AST", fullName: "Asturianu (AST)" },
+  { code: "en", label: "EN", fullName: "English (EN)" },
+  { code: "fr", label: "FR", fullName: "Fran\u00e7ais (FR)" },
+  { code: "de", label: "DE", fullName: "Deutsch (DE)" },
+  { code: "pt", label: "PT", fullName: "Portugu\u00eas (PT)" },
 ];
 
 export function LanguageSwitcher() {
@@ -154,6 +154,7 @@ export function LanguageSwitcher() {
               key={lang.code}
               role="option"
               aria-selected={locale === lang.code}
+              aria-label={lang.fullName}
               tabIndex={-1}
               onClick={(e) => {
                 e.stopPropagation();
