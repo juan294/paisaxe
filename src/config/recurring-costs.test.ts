@@ -46,12 +46,14 @@ describe("RECURRING_SUBSCRIPTIONS config", () => {
     expect(supabase!.costUsd).toBe(25);
   });
 
-  it("should include ElevenLabs subscription", () => {
+  it("should include ElevenLabs subscription at effective rate with tax", () => {
     const elevenlabs = RECURRING_SUBSCRIPTIONS.find(
       (s) => s.serviceId === "elevenlabs"
     );
     expect(elevenlabs).toBeDefined();
-    expect(elevenlabs!.costUsd).toBe(18.33);
+    // Effective monthly rate: $266.20/yr ÷ 12 = $22.18/mo (includes tax)
+    expect(elevenlabs!.costUsd).toBe(22.18);
+    expect(elevenlabs!.notes).toContain("$266.20");
   });
 
   it("should include AWS Domains subscription", () => {
