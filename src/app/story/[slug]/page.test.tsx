@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { redirect } from "next/navigation";
-import StoryPage, { generateMetadata } from "./page";
+import StoryPage, { generateMetadata, generateStaticParams, revalidate } from "./page";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
@@ -10,16 +10,86 @@ vi.mock("next/navigation", () => ({
 // Mock stories-data
 vi.mock("@/lib/stories-data", () => ({
   getStoryBySlugFromDB: vi.fn(),
+  getStoriesFromDB: vi.fn(),
 }));
 
-import { getStoryBySlugFromDB } from "@/lib/stories-data";
+import { getStoryBySlugFromDB, getStoriesFromDB } from "@/lib/stories-data";
 
 const mockGetStoryBySlugFromDB = vi.mocked(getStoryBySlugFromDB);
+const mockGetStoriesFromDB = vi.mocked(getStoriesFromDB);
 const mockRedirect = vi.mocked(redirect);
 
 describe("StoryPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe("revalidate", () => {
+    it("should export revalidate set to 3600 (1 hour)", () => {
+      expect(revalidate).toBe(3600);
+    });
+  });
+
+  describe("generateStaticParams", () => {
+    it("should return slugs for all active stories", async () => {
+      mockGetStoriesFromDB.mockResolvedValue([
+        {
+          id: "story-1",
+          slug: "lagos-covadonga",
+          title: "Lagos de Covadonga",
+          subtitle: "Picos de Europa",
+          description: "Iconic glacial lakes",
+          category: "nature",
+          image: "/images/test.jpg",
+          sourcePdf: "test.pdf",
+        },
+        {
+          id: "story-2",
+          slug: "ruta-cares",
+          title: "Ruta del Cares",
+          subtitle: "Desfiladero",
+          description: "Dramatic gorge hike",
+          category: "activities",
+          image: "/images/test2.jpg",
+          sourcePdf: "test2.pdf",
+        },
+      ]);
+
+      const params = await generateStaticParams();
+
+      expect(params).toEqual([
+        { slug: "lagos-covadonga" },
+        { slug: "ruta-cares" },
+      ]);
+      expect(mockGetStoriesFromDB).toHaveBeenCalledOnce();
+    });
+
+    it("should return empty array when no stories exist", async () => {
+      mockGetStoriesFromDB.mockResolvedValue([]);
+
+      const params = await generateStaticParams();
+
+      expect(params).toEqual([]);
+    });
+
+    it("should fall back to story id when slug is missing", async () => {
+      mockGetStoriesFromDB.mockResolvedValue([
+        {
+          id: "story-no-slug",
+          slug: "",
+          title: "Story Without Slug",
+          subtitle: "Unknown",
+          description: "A story without a slug",
+          category: "culture",
+          image: "/images/test.jpg",
+          sourcePdf: "test.pdf",
+        },
+      ]);
+
+      const params = await generateStaticParams();
+
+      expect(params).toEqual([{ slug: "story-no-slug" }]);
+    });
   });
 
   describe("generateMetadata", () => {
