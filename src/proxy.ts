@@ -370,6 +370,11 @@ async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
 /**
  * Canonical domain: redirect alternate/www domains to the primary domain.
  *
+ * Defense-in-depth: vercel.json "redirects" perform this same redirect at the
+ * CDN edge before the app boots. This proxy-level handler is the second layer,
+ * catching any requests that bypass CDN redirects (preview deployments, direct
+ * IP access, future domain additions not yet in vercel.json).
+ *
  * Prevents double-redirect chains like:
  *   paisaxe.com/ → 308 → paisaxe.com/immersive → 308 → paisaxe.es/immersive
  * Instead:
