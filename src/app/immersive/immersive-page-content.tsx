@@ -46,6 +46,7 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [moodDismissed, setMoodDismissed] = useState(false);
   const [, startTransition] = useTransition();
+  const deepLinkHandled = useRef(false);
 
   // Use server-provided seed if available, otherwise generate client-side
   // This ensures shuffling happens on first render without flicker
@@ -66,21 +67,6 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
     },
     [startTransition]
   );
-
-  // Check for ?story= query param from share links or post-payment return
-  // When voice=ready is also present, auto-open the voice chat
-  useEffect(() => {
-    const storySlug = searchParams.get("story");
-    if (storySlug && allStories.length > 0) {
-      const index = allStories.findIndex((s) => s.slug === storySlug || s.id === storySlug);
-      if (index >= 0) {
-        setCurrentIndex(index);
-        if (searchParams.get("voice") === "ready") {
-          setChatOpen(true);
-        }
-      }
-    }
-  }, [searchParams, allStories]);
 
   // Check if mood was already dismissed this session
   useEffect(() => {
@@ -126,6 +112,23 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
     setSelectedDuration,
     clearAll,
   } = useStoryFilters(processedStories);
+
+  // Check for ?story= query param from share links or post-payment return.
+  // Searches filteredStories (post-shuffle) so the index matches the displayed order.
+  // Uses a ref guard to fire only once — prevents re-triggering on filter changes.
+  useEffect(() => {
+    const storySlug = searchParams.get("story");
+    if (storySlug && filteredStories.length > 0 && !deepLinkHandled.current) {
+      const index = filteredStories.findIndex((s) => s.slug === storySlug || s.id === storySlug);
+      if (index >= 0) {
+        deepLinkHandled.current = true;
+        setCurrentIndex(index);
+        if (searchParams.get("voice") === "ready") {
+          setChatOpen(true);
+        }
+      }
+    }
+  }, [searchParams, filteredStories]);
 
   // Reset index when filters change and current index is out of bounds
   useEffect(() => {
