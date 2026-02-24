@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getStripeClient } from "@/lib/stripe";
+import { validateAdminAuth } from "@/lib/admin-auth";
 
 interface HealthCheck {
   status: "healthy" | "degraded";
@@ -22,12 +23,19 @@ interface HealthCheck {
  * GET /api/checkout/health
  *
  * Diagnostic endpoint to verify the Stripe checkout pipeline is properly
- * configured and operational. Checks:
+ * configured and operational. Requires admin authentication.
+ *
+ * Checks:
  * 1. Required environment variables are set
  * 2. Day Pass price ID is active in Stripe
  * 3. Webhook secret is configured
  */
-export async function GET(): Promise<NextResponse<HealthCheck>> {
+export async function GET(): Promise<NextResponse> {
+  const auth = await validateAdminAuth();
+  if (!auth.valid) {
+    return auth.error;
+  }
+
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
   const priceId = process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();

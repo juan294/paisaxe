@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextResponse } from "next/server";
 
 // Set env vars before imports
 vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
 vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
 vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_test_123");
+
+// Mock admin auth
+vi.mock("@/lib/admin-auth", () => ({
+  validateAdminAuth: vi.fn(),
+}));
 
 // Mock Stripe library
 const mockRetrieve = vi.fn();
@@ -16,6 +22,7 @@ vi.mock("@/lib/stripe", () => ({
   isStripeConfigured: vi.fn(() => true),
 }));
 
+import { validateAdminAuth } from "@/lib/admin-auth";
 import { GET } from "./route";
 
 describe("GET /api/checkout/health", () => {
@@ -24,6 +31,41 @@ describe("GET /api/checkout/health", () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
     vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_test_123");
+    // Default: auth passes
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "admin-user-1",
+    });
+  });
+
+  it("should return 401 when admin auth fails", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: false,
+      error: NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      ),
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(401);
+    const data = await response.json();
+    expect(data.error).toBe("Authentication required");
+  });
+
+  it("should return 403 when user is not admin", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: false,
+      error: NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 }
+      ),
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(403);
+    const data = await response.json();
+    expect(data.error).toBe("Admin access required");
   });
 
   it("should return healthy when Stripe is fully configured and price is active", async () => {
