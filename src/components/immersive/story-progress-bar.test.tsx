@@ -130,12 +130,17 @@ describe("StoryProgressBar", () => {
     });
   });
 
-  it("segments have tabIndex 0 for keyboard focus", () => {
+  it("uses roving tabindex — only current segment has tabIndex 0", () => {
     render(<StoryProgressBar {...defaultProps} />);
     const progressbar = screen.getByRole("progressbar");
     const segments = progressbar.querySelectorAll('[role="button"]');
-    segments.forEach((segment) => {
-      expect(segment).toHaveAttribute("tabindex", "0");
+    // currentIndex=2, fillPosition=2: only segment at fillPosition gets tabIndex 0
+    segments.forEach((segment, i) => {
+      if (i === 2) {
+        expect(segment).toHaveAttribute("tabindex", "0");
+      } else {
+        expect(segment).toHaveAttribute("tabindex", "-1");
+      }
     });
   });
 
@@ -168,5 +173,118 @@ describe("StoryProgressBar", () => {
         expect(fillDiv!.className).toContain("w-0");
       }
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // Arrow-key navigation (roving tabindex) — Fixes #139
+  // -------------------------------------------------------------------------
+  describe("arrow-key navigation", () => {
+    const storyTitles = ["Lagos de Covadonga", "Oviedo Cathedral", "Sidra House", "Playa del Silencio", "Senda del Oso"];
+
+    const arrowNavProps = {
+      ...defaultProps,
+      storyTitles,
+    };
+
+    it("ArrowRight navigates to next segment and calls onIndexChange", () => {
+      const onIndexChange = vi.fn();
+      render(
+        <StoryProgressBar {...arrowNavProps} onIndexChange={onIndexChange} />
+      );
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // Focus current segment (index 2), press ArrowRight -> should go to index 3
+      fireEvent.keyDown(segments[2], { key: "ArrowRight" });
+      expect(onIndexChange).toHaveBeenCalledWith(3);
+    });
+
+    it("ArrowLeft navigates to previous segment and calls onIndexChange", () => {
+      const onIndexChange = vi.fn();
+      render(
+        <StoryProgressBar {...arrowNavProps} onIndexChange={onIndexChange} />
+      );
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // Focus current segment (index 2), press ArrowLeft -> should go to index 1
+      fireEvent.keyDown(segments[2], { key: "ArrowLeft" });
+      expect(onIndexChange).toHaveBeenCalledWith(1);
+    });
+
+    it("ArrowRight wraps from last segment to first", () => {
+      const onIndexChange = vi.fn();
+      render(
+        <StoryProgressBar {...arrowNavProps} currentIndex={4} onIndexChange={onIndexChange} />
+      );
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      fireEvent.keyDown(segments[4], { key: "ArrowRight" });
+      expect(onIndexChange).toHaveBeenCalledWith(0);
+    });
+
+    it("ArrowLeft wraps from first segment to last", () => {
+      const onIndexChange = vi.fn();
+      render(
+        <StoryProgressBar {...arrowNavProps} currentIndex={0} onIndexChange={onIndexChange} />
+      );
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      fireEvent.keyDown(segments[0], { key: "ArrowLeft" });
+      expect(onIndexChange).toHaveBeenCalledWith(4);
+    });
+
+    it("only current segment has tabIndex 0, others have tabIndex -1 (roving tabindex)", () => {
+      render(<StoryProgressBar {...arrowNavProps} />);
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // currentIndex=2, fillPosition=2
+      segments.forEach((segment, i) => {
+        if (i === 2) {
+          expect(segment).toHaveAttribute("tabindex", "0");
+        } else {
+          expect(segment).toHaveAttribute("tabindex", "-1");
+        }
+      });
+    });
+
+    it("includes story title in segment aria-label when storyTitles provided", () => {
+      render(<StoryProgressBar {...arrowNavProps} />);
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // Each segment label should include the story title
+      expect(segments[0].getAttribute("aria-label")).toContain("Lagos de Covadonga");
+      expect(segments[1].getAttribute("aria-label")).toContain("Oviedo Cathedral");
+      expect(segments[2].getAttribute("aria-label")).toContain("Sidra House");
+    });
+
+    it("current segment has aria-current='true'", () => {
+      render(<StoryProgressBar {...arrowNavProps} />);
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      expect(segments[2]).toHaveAttribute("aria-current", "true");
+      expect(segments[0]).not.toHaveAttribute("aria-current");
+      expect(segments[4]).not.toHaveAttribute("aria-current");
+    });
+
+    it("Home key navigates to first segment", () => {
+      const onIndexChange = vi.fn();
+      render(
+        <StoryProgressBar {...arrowNavProps} onIndexChange={onIndexChange} />
+      );
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      fireEvent.keyDown(segments[2], { key: "Home" });
+      expect(onIndexChange).toHaveBeenCalledWith(0);
+    });
+
+    it("End key navigates to last segment", () => {
+      const onIndexChange = vi.fn();
+      render(
+        <StoryProgressBar {...arrowNavProps} onIndexChange={onIndexChange} />
+      );
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      fireEvent.keyDown(segments[2], { key: "End" });
+      expect(onIndexChange).toHaveBeenCalledWith(4);
+    });
   });
 });

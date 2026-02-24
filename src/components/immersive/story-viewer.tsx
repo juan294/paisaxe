@@ -200,6 +200,12 @@ export function StoryViewer({
     [story, allStories]
   );
 
+  // Story titles for progress bar screen reader announcements
+  const storyTitles = useMemo(
+    () => stories.map((s) => s.title),
+    [stories]
+  );
+
   // Asturianu labels
   const ast = isEnabled("asturianu_touches");
 
@@ -260,6 +266,7 @@ export function StoryViewer({
         currentIndex={currentIndex}
         onIndexChange={onIndexChange}
         t={t}
+        storyTitles={storyTitles}
       />
 
       {/* Category badge / Filter */}
