@@ -156,7 +156,7 @@ test.describe("Chat messageIndex", () => {
     await expect(page.locator("h1").first()).toBeVisible();
 
     // Open chat
-    await page.locator('[data-testid="ask-button"]').click();
+    await page.locator('[data-testid="ask-button"]').first().click();
     const chatPanel = page.locator(".fixed.inset-0.z-50");
     await expect(chatPanel).toBeVisible();
 
@@ -201,7 +201,7 @@ test.describe("Chat messageIndex", () => {
     await expect(page.locator("h1").first()).toBeVisible();
 
     // Open chat
-    await page.locator('[data-testid="ask-button"]').click();
+    await page.locator('[data-testid="ask-button"]').first().click();
     const chatPanel = page.locator(".fixed.inset-0.z-50");
     await expect(chatPanel).toBeVisible();
 
@@ -346,7 +346,7 @@ test.describe("Language switching", () => {
     await page.waitForTimeout(300);
 
     // Open chat to check Spanish placeholder
-    await page.locator('[data-testid="ask-button"]').click();
+    await page.locator('[data-testid="ask-button"]').first().click();
     const chatPanel = page.locator(".fixed.inset-0.z-50");
     await expect(chatPanel).toBeVisible();
 
@@ -376,7 +376,7 @@ test.describe("Language switching", () => {
     await page.waitForTimeout(300);
 
     // Open chat to check English placeholder
-    await page.locator('[data-testid="ask-button"]').click();
+    await page.locator('[data-testid="ask-button"]').first().click();
     const chatPanel = page.locator(".fixed.inset-0.z-50");
     await expect(chatPanel).toBeVisible();
 
@@ -416,7 +416,7 @@ test.describe("Language switching", () => {
     });
 
     // Open chat (default locale is EN in Desktop Chrome)
-    await page.locator('[data-testid="ask-button"]').click();
+    await page.locator('[data-testid="ask-button"]').first().click();
     const chatPanel = page.locator(".fixed.inset-0.z-50");
     await expect(chatPanel).toBeVisible();
 
@@ -438,7 +438,7 @@ test.describe("Language switching", () => {
     await page.waitForTimeout(300);
 
     // Re-open chat
-    await page.locator('[data-testid="ask-button"]').click();
+    await page.locator('[data-testid="ask-button"]').first().click();
     await expect(chatPanel).toBeVisible();
 
     await dismissPrivacyNotice(chatPanel);
