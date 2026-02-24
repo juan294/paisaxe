@@ -1,8 +1,10 @@
 "use client";
 
+import { useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import type { Mood } from "@/lib/mood-mapping";
 
 interface MoodOverlayProps {
@@ -19,6 +21,9 @@ const MOOD_OPTIONS: { mood: Mood; labelKey: string; emoji: string; color: string
 
 export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(dialogRef, true, onDismiss);
 
   const handleSelect = (mood: Mood) => {
     onSelectMood(mood);
@@ -34,7 +39,7 @@ export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" />
 
       {/* Content */}
-      <div className="relative max-w-md w-full text-center rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-300 motion-reduce:animate-none" role="dialog" aria-label={t("mood.title")}>
+      <div ref={dialogRef} className="relative max-w-md w-full text-center rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-300 motion-reduce:animate-none" role="dialog" aria-modal="true" aria-label={t("mood.title")}>
         {/* Dismiss button */}
         <button
           onClick={handleDismiss}
@@ -73,7 +78,7 @@ export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
 
         <button
           onClick={handleDismiss}
-          className="mt-6 text-sm text-white/60 hover:text-white/80 transition-colors"
+          className="mt-6 text-sm text-white/60 hover:text-white/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-md"
         >
           {t("mood.show_all")}
         </button>
