@@ -16,7 +16,7 @@ export function QuestionPrompts({ prompts, storyId: _storyId, onSelectPrompt }: 
   };
 
   return (
-    <div className="flex flex-wrap gap-2 mt-3">
+    <div role="group" aria-label="Preguntas sugeridas" className="flex flex-wrap gap-2 mt-3">
       {prompts.slice(0, 3).map((prompt) => (
         <button
           key={prompt}

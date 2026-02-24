@@ -11,10 +11,12 @@ vi.mock("@stripe/stripe-js", () => ({
 
 // Capture fetchClientSecret from options so we can invoke it in tests
 let capturedFetchClientSecret: (() => Promise<string>) | null = null;
+let capturedStripePromise: unknown = null;
 
 vi.mock("@stripe/react-stripe-js", () => ({
   EmbeddedCheckoutProvider: ({
     children,
+    stripe,
     options,
   }: {
     children: React.ReactNode;
@@ -22,6 +24,7 @@ vi.mock("@stripe/react-stripe-js", () => ({
     options: { fetchClientSecret: () => Promise<string> };
   }) => {
     capturedFetchClientSecret = options.fetchClientSecret;
+    capturedStripePromise = stripe;
     return <div data-testid="embedded-checkout-provider">{children}</div>;
   },
   EmbeddedCheckout: () => (
@@ -79,6 +82,7 @@ describe("CheckoutPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedFetchClientSecret = null;
+    capturedStripePromise = null;
     mockSearchParams.delete("returnTo");
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({
@@ -393,8 +397,74 @@ describe("CheckoutPage", () => {
     });
   });
 
+  describe("lazy Stripe.js loading", () => {
+    beforeEach(() => {
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-123", email: "test@example.com" },
+        session: { access_token: "token-abc" },
+        signInWithGoogle: mockSignInWithGoogle,
+        isLoading: false,
+      });
+    });
+
+    it("should NOT call loadStripe at module import time", async () => {
+      vi.resetModules();
+
+      const { loadStripe } = await import("@stripe/stripe-js");
+      await import("./page");
+
+      // loadStripe should not be called eagerly at module scope
+      expect(loadStripe).not.toHaveBeenCalled();
+    });
+
+    it("should call loadStripe lazily when the component renders", async () => {
+      vi.resetModules();
+
+      const { loadStripe } = await import("@stripe/stripe-js");
+      const mod = await import("./page");
+      const Page = mod.default;
+
+      // loadStripe not called yet — only the module was imported
+      expect(loadStripe).not.toHaveBeenCalled();
+
+      // Render triggers getStripe() in the authenticated branch
+      render(<Page />);
+
+      // After rendering the authenticated checkout, loadStripe should have been called
+      expect(loadStripe).toHaveBeenCalledTimes(1);
+    });
+
+    it("should pass the lazy stripe promise to EmbeddedCheckoutProvider", () => {
+      render(<CheckoutPage />);
+
+      // The captured stripe promise should be a promise (from loadStripe)
+      expect(capturedStripePromise).toBeDefined();
+      expect(capturedStripePromise).not.toBeNull();
+    });
+
+    it("should reuse the same stripe instance on re-render (singleton)", () => {
+      const { rerender } = render(<CheckoutPage />);
+      const first = capturedStripePromise;
+
+      rerender(<CheckoutPage />);
+      const second = capturedStripePromise;
+
+      expect(first).toBe(second);
+    });
+  });
+
   describe("Stripe key trimming", () => {
     const originalKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
+    beforeEach(() => {
+      // Ensure authenticated state so getStripe() is called during render
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-123", email: "test@example.com" },
+        session: { access_token: "token-abc" },
+        signInWithGoogle: mockSignInWithGoogle,
+        isLoading: false,
+      });
+    });
 
     afterEach(() => {
       if (originalKey !== undefined) {
@@ -411,7 +481,11 @@ describe("CheckoutPage", () => {
       vi.resetModules();
 
       const { loadStripe } = await import("@stripe/stripe-js");
-      await import("./page");
+      const mod = await import("./page");
+
+      // Render to trigger lazy loading
+      const Page = mod.default;
+      render(<Page />);
 
       expect(loadStripe).toHaveBeenCalledWith("pk_test_abc123");
     });
@@ -422,7 +496,10 @@ describe("CheckoutPage", () => {
       vi.resetModules();
 
       const { loadStripe } = await import("@stripe/stripe-js");
-      await import("./page");
+      const mod = await import("./page");
+
+      const Page = mod.default;
+      render(<Page />);
 
       expect(loadStripe).toHaveBeenCalledWith("");
     });
@@ -433,7 +510,10 @@ describe("CheckoutPage", () => {
       vi.resetModules();
 
       const { loadStripe } = await import("@stripe/stripe-js");
-      await import("./page");
+      const mod = await import("./page");
+
+      const Page = mod.default;
+      render(<Page />);
 
       expect(loadStripe).toHaveBeenCalledWith("");
     });

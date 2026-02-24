@@ -214,4 +214,108 @@ describe("GET /api/health", () => {
     );
     expect(routeSource).not.toContain("readFileSync");
   });
+
+  // --- Coverage for checkDatabaseSize() catch branch (line 80) ---
+
+  it("should handle non-Error exception from database size RPC", async () => {
+    mockSupabaseSuccess();
+    // Throw a non-Error value (string) to cover the `err instanceof Error` false branch
+    vi.mocked(supabase.rpc).mockRejectedValue("something went wrong");
+
+    const response = await GET();
+    const data = await response.json();
+
+    // Database error should surface as "Unknown error" since it's not an Error instance
+    expect(data.services.database).toBeDefined();
+    expect(data.services.database.error).toBe("Unknown error");
+    // Supabase is fine, and database error alone (without usage_percent) doesn't trigger degraded
+    expect(response.status).toBe(200);
+  });
+
+  it("should handle Error exception from database size RPC catch branch", async () => {
+    mockSupabaseSuccess();
+    vi.mocked(supabase.rpc).mockRejectedValue(new Error("RPC network failure"));
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.database.error).toBe("RPC network failure");
+    expect(response.status).toBe(200);
+  });
+
+  // --- Coverage for outer GET() catch block (lines 122-139) ---
+
+  it("should return 503 with degraded status when outer try block throws (Error)", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    // Make process.uptime() throw only on first call (inside try block) to trigger
+    // the outer catch block (lines 122-139). On second call (inside catch block)
+    // it returns normally so the catch can build the response.
+    const originalUptime = process.uptime;
+    let callCount = 0;
+    process.uptime = () => {
+      callCount++;
+      if (callCount === 1) throw new Error("Catastrophic failure");
+      return originalUptime.call(process);
+    };
+
+    const response = await GET();
+    const data = await response.json();
+
+    process.uptime = originalUptime;
+
+    expect(response.status).toBe(503);
+    expect(data.status).toBe("degraded");
+    expect(data.services.supabase.status).toBe("error");
+    expect(data.services.supabase.latency_ms).toBe(0);
+    expect(data.services.supabase.error).toBe("Catastrophic failure");
+    expect(data.services.database.error).toBe("Catastrophic failure");
+    expect(data.version).toBe(packageJson.version);
+    expect(typeof data.uptime).toBe("number");
+    expect(data.timestamp).toBeDefined();
+    // Verify Cache-Control header on 503 path
+    expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
+  });
+
+  it("should handle non-Error exception in outer GET() catch block", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    // Throw a non-Error value on first call to cover the `err instanceof Error` false branch
+    const originalUptime = process.uptime;
+    let callCount = 0;
+    process.uptime = () => {
+      callCount++;
+      if (callCount === 1) throw "string error";
+      return originalUptime.call(process);
+    };
+
+    const response = await GET();
+    const data = await response.json();
+
+    process.uptime = originalUptime;
+
+    expect(response.status).toBe(503);
+    expect(data.status).toBe("degraded");
+    expect(data.services.supabase.error).toBe("Unknown error");
+    expect(data.services.database.error).toBe("Unknown error");
+  });
+
+  // --- Coverage for checkSupabase() non-Error exception (line 51) ---
+
+  it("should handle non-Error exception from supabase check", async () => {
+    // Make from() return an object whose select().limit() rejects with a non-Error
+    const mockLimit = vi.fn().mockRejectedValue(42);
+    const mockSelect = vi.fn().mockReturnValue({ limit: mockLimit });
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    vi.mocked(supabase.from).mockImplementation(mockFrom);
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.status).toBe("degraded");
+    expect(data.services.supabase.status).toBe("error");
+    expect(data.services.supabase.error).toBe("Unknown error");
+  });
 });

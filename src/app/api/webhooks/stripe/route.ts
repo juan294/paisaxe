@@ -74,6 +74,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
+    console.info("[stripe-webhook] Purchase created", {
+      userId,
+      paymentProviderId,
+      purchaseType: "day_pass",
+      expiresAt: expiresAt.toISOString(),
+    });
+
     return NextResponse.json({
       success: true,
       purchaseType: "day_pass",

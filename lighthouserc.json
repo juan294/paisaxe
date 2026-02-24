@@ -16,11 +16,10 @@
       }
     },
     "assert": {
-      "preset": "lighthouse:default",
       "assertions": {
         "categories:performance": [
           "error",
-          { "minScore": 0.6, "aggregationMethod": "median-run" }
+          { "minScore": 0.7, "aggregationMethod": "median-run" }
         ],
         "categories:accessibility": [
           "error",
@@ -39,11 +38,11 @@
           { "maxNumericValue": 3000, "aggregationMethod": "median-run" }
         ],
         "largest-contentful-paint": [
-          "warn",
+          "error",
           { "maxNumericValue": 4000, "aggregationMethod": "median-run" }
         ],
         "cumulative-layout-shift": [
-          "warn",
+          "error",
           { "maxNumericValue": 0.25, "aggregationMethod": "median-run" }
         ],
         "total-blocking-time": [

@@ -181,7 +181,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             {!isInitializing && !canUseVoice && (
               <Link
                 href={story.slug ? `/pricing?returnTo=${story.slug}` : "/pricing"}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-400 border border-green-500/50 rounded-full hover:bg-green-500/10 hover:border-green-400 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-400 border border-green-500/50 rounded-full hover:bg-green-500/10 hover:border-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400/70"
               >
                 <AudioLines className="h-3.5 w-3.5" />
                 <span>{t("voice.upgrade_cta")}</span>
@@ -238,6 +238,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             <div
               role="log"
               aria-live="polite"
+              aria-busy={isLoading}
               aria-label={t("accessibility.chat_messages")}
               className="h-64 md:h-96 lg:h-[28rem] overflow-y-auto p-4 space-y-4"
             >
