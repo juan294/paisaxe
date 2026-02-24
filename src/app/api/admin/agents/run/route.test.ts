@@ -212,6 +212,273 @@ describe("POST /api/admin/agents/run", () => {
     // Verify startedAt is a valid ISO date
     expect(new Date(data.startedAt).toISOString()).toBe(data.startedAt);
   });
+
+  // --- Coverage: stdout/stderr data handlers and exit event (lines 125-151) ---
+
+  it("captures stdout lines in agent logs", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(11111);
+    mockSpawn.mockReturnValue(mockChild);
+
+    // Start the agent
+    await POST(makeRequest({ agentKey: "security_agent_enabled" }));
+
+    // Simulate stdout output
+    const stdout = (mockChild as EventEmitter & { stdout: EventEmitter }).stdout;
+    stdout.emit("data", Buffer.from("Running security scan...\nFound 0 issues\n"));
+
+    // Fetch logs
+    const response = await GET(
+      makeGetRequest({ agentKey: "security_agent_enabled" })
+    );
+    const data = await response.json();
+
+    expect(data.logs.length).toBeGreaterThanOrEqual(2);
+    expect(data.logs[0].text).toBe("Running security scan...");
+    expect(data.logs[1].text).toBe("Found 0 issues");
+    expect(data.finished).toBe(false);
+  });
+
+  it("captures stderr lines with [stderr] prefix in agent logs", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(22222);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "documentation_agent_enabled" }));
+
+    // Simulate stderr output
+    const stderr = (mockChild as EventEmitter & { stderr: EventEmitter }).stderr;
+    stderr.emit("data", Buffer.from("Warning: deprecated API\n"));
+
+    const response = await GET(
+      makeGetRequest({ agentKey: "documentation_agent_enabled" })
+    );
+    const data = await response.json();
+
+    expect(data.logs.length).toBeGreaterThanOrEqual(1);
+    expect(data.logs[0].text).toBe("[stderr] Warning: deprecated API");
+  });
+
+  it("skips empty lines in stdout and stderr output", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(33000);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "performance_agent_enabled" }));
+
+    const stdout = (mockChild as EventEmitter & { stdout: EventEmitter }).stdout;
+    const stderr = (mockChild as EventEmitter & { stderr: EventEmitter }).stderr;
+
+    // Emit lines with empty lines interspersed
+    stdout.emit("data", Buffer.from("real line\n\n   \nanother line\n"));
+    stderr.emit("data", Buffer.from("err line\n\n   \n"));
+
+    const response = await GET(
+      makeGetRequest({ agentKey: "performance_agent_enabled" })
+    );
+    const data = await response.json();
+
+    // Only non-empty trimmed lines should appear
+    const texts = data.logs.map((l: { text: string }) => l.text);
+    expect(texts).toContain("real line");
+    expect(texts).toContain("another line");
+    expect(texts).toContain("[stderr] err line");
+    // Empty or whitespace-only lines should NOT appear
+    expect(texts).not.toContain("");
+    expect(texts).not.toContain("   ");
+    expect(texts).not.toContain("[stderr] ");
+    expect(texts).not.toContain("[stderr]    ");
+  });
+
+  it("strips ANSI escape codes from log output", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(33333);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "performance_agent_enabled" }));
+
+    const stdout = (mockChild as EventEmitter & { stdout: EventEmitter }).stdout;
+    // Emit text with ANSI color codes
+    stdout.emit("data", Buffer.from("\x1b[32mSuccess\x1b[0m: all tests passed\n"));
+
+    const response = await GET(
+      makeGetRequest({ agentKey: "performance_agent_enabled" })
+    );
+    const data = await response.json();
+
+    expect(data.logs[0].text).toBe("Success: all tests passed");
+  });
+
+  it("handles exit event and flushes remaining buffers", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(44444);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "localization_agent_enabled" }));
+
+    // Emit partial line without trailing newline (remains in buffer)
+    const stdout = (mockChild as EventEmitter & { stdout: EventEmitter }).stdout;
+    stdout.emit("data", Buffer.from("final output"));
+
+    const stderr = (mockChild as EventEmitter & { stderr: EventEmitter }).stderr;
+    stderr.emit("data", Buffer.from("final error"));
+
+    // Trigger exit event
+    (mockChild as EventEmitter).emit("exit", 0);
+
+    const response = await GET(
+      makeGetRequest({ agentKey: "localization_agent_enabled" })
+    );
+    const data = await response.json();
+
+    expect(data.finished).toBe(true);
+    expect(data.exitCode).toBe(0);
+    // Should have flushed the remaining stdout buffer, stderr buffer, and exit message
+    const texts = data.logs.map((l: { text: string }) => l.text);
+    expect(texts).toContain("final output");
+    expect(texts).toContain("[stderr] final error");
+    expect(texts).toContain("Process exited with code 0");
+  });
+
+  it("handles exit event with null exit code", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(55555);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "cost_analyst_agent_enabled" }));
+
+    // Trigger exit with null code (e.g., killed by signal)
+    (mockChild as EventEmitter).emit("exit", null);
+
+    const response = await GET(
+      makeGetRequest({ agentKey: "cost_analyst_agent_enabled" })
+    );
+    const data = await response.json();
+
+    expect(data.finished).toBe(true);
+    expect(data.exitCode).toBeNull();
+    const texts = data.logs.map((l: { text: string }) => l.text);
+    expect(texts).toContain("Process exited with code unknown");
+  });
+
+  // --- Coverage: ring buffer overflow (line 41) ---
+
+  it("trims log buffer when it exceeds MAX_LOG_LINES (500)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(99000);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "coverage_agent_enabled" }));
+
+    // Emit more than 500 lines to trigger the ring buffer splice
+    const stdout = (mockChild as EventEmitter & { stdout: EventEmitter }).stdout;
+    const lines = Array.from({ length: 510 }, (_, i) => `line-${i}`).join("\n") + "\n";
+    stdout.emit("data", Buffer.from(lines));
+
+    const response = await GET(
+      makeGetRequest({ agentKey: "coverage_agent_enabled" })
+    );
+    const data = await response.json();
+
+    // Should be capped at 500
+    expect(data.logs.length).toBe(500);
+    // The first lines should have been trimmed — the oldest lines are removed
+    expect(data.logs[0].text).toBe("line-10");
+    expect(data.logs[499].text).toBe("line-509");
+  });
+
+  // --- Coverage: already-running conflict (409) and stale detection (lines 76-88) ---
+
+  it("returns 409 when agent is already running", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(66666);
+    mockSpawn.mockReturnValue(mockChild);
+
+    // Start the agent first time
+    await POST(makeRequest({ agentKey: "qa_agent_enabled" }));
+
+    // Mock process.kill to simulate the process is still alive (signal 0 check)
+    const originalKill = process.kill;
+    process.kill = vi.fn() as typeof process.kill;
+
+    // Try to start the same agent again
+    const response = await POST(
+      makeRequest({ agentKey: "qa_agent_enabled" })
+    );
+
+    process.kill = originalKill;
+
+    expect(response.status).toBe(409);
+    const data = await response.json();
+    expect(data.error).toBe("Agent is already running");
+    expect(data.startedAt).toBeDefined();
+  });
+
+  it("allows restart when previous process died (stale detection)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild1 = createMockChild(77777);
+    mockSpawn.mockReturnValueOnce(mockChild1);
+
+    // Start the agent
+    await POST(makeRequest({ agentKey: "coverage_agent_enabled" }));
+
+    // Mock process.kill to throw (process is dead)
+    const originalKill = process.kill;
+    process.kill = vi.fn().mockImplementation(() => {
+      throw new Error("ESRCH: No such process");
+    }) as typeof process.kill;
+
+    // Now create a new mock child for the restart
+    const mockChild2 = createMockChild(88888);
+    mockSpawn.mockReturnValueOnce(mockChild2);
+
+    // Try to start the same agent — should succeed because stale detection kicks in
+    const response = await POST(
+      makeRequest({ agentKey: "coverage_agent_enabled" })
+    );
+
+    process.kill = originalKill;
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.started).toBe(true);
+  });
 });
 
 describe("GET /api/admin/agents/run", () => {
@@ -266,11 +533,101 @@ describe("GET /api/admin/agents/run", () => {
     expect(data.offset).toBe(0);
     expect(data.finished).toBe(true);
   });
+
+  it("returns logs with since offset for a running agent", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(10001);
+    mockSpawn.mockReturnValue(mockChild);
+
+    // Start an agent
+    await POST(makeRequest({ agentKey: "security_agent_enabled" }));
+
+    // Emit several stdout lines
+    const stdout = (mockChild as EventEmitter & { stdout: EventEmitter }).stdout;
+    stdout.emit("data", Buffer.from("line1\nline2\nline3\n"));
+
+    // Fetch all logs first
+    const response1 = await GET(
+      makeGetRequest({ agentKey: "security_agent_enabled" })
+    );
+    const data1 = await response1.json();
+    expect(data1.logs.length).toBe(3);
+    expect(data1.offset).toBe(3);
+
+    // Fetch with since=2 (should get only the 3rd log)
+    const response2 = await GET(
+      makeGetRequest({ agentKey: "security_agent_enabled", since: "2" })
+    );
+    const data2 = await response2.json();
+    expect(data2.logs.length).toBe(1);
+    expect(data2.logs[0].text).toBe("line3");
+  });
+
+  it("marks stale agents as finished in GET running status", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(10002);
+    mockSpawn.mockReturnValue(mockChild);
+
+    // Start an agent
+    await POST(makeRequest({ agentKey: "documentation_agent_enabled" }));
+
+    // Mock process.kill to throw (process died)
+    const originalKill = process.kill;
+    process.kill = vi.fn().mockImplementation(() => {
+      throw new Error("ESRCH: No such process");
+    }) as typeof process.kill;
+
+    // GET the running agents — should detect stale and not include it
+    const response = await GET(makeGetRequest());
+    const data = await response.json();
+
+    process.kill = originalKill;
+
+    // The stale agent should NOT appear in running list
+    expect(data.running).not.toHaveProperty("documentation_agent_enabled");
+  });
+
+  it("includes alive agents in GET running status", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(10003);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "performance_agent_enabled" }));
+
+    // Mock process.kill to succeed (process is alive)
+    const originalKill = process.kill;
+    process.kill = vi.fn() as typeof process.kill;
+
+    const response = await GET(makeGetRequest());
+    const data = await response.json();
+
+    process.kill = originalKill;
+
+    expect(data.running).toHaveProperty("performance_agent_enabled");
+    expect(data.running.performance_agent_enabled.startedAt).toBeDefined();
+  });
 });
 
 describe("DELETE /api/admin/agents/run", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.ALLOW_AGENT_RUN = "true";
+  });
+
+  afterEach(() => {
+    delete process.env.ALLOW_AGENT_RUN;
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -329,6 +686,127 @@ describe("DELETE /api/admin/agents/run", () => {
     const response = await DELETE(
       makeDeleteRequest({ agentKey: "qa_agent_enabled" })
     );
+    expect(response.status).toBe(404);
+    const data = await response.json();
+    expect(data.error).toBe("Agent is not running");
+  });
+
+  it("successfully stops a running agent", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(20001);
+    mockSpawn.mockReturnValue(mockChild);
+
+    // Start the agent
+    await POST(makeRequest({ agentKey: "localization_agent_enabled" }));
+
+    // Mock process.kill for the delete operation (kill process group)
+    const originalKill = process.kill;
+    process.kill = vi.fn() as typeof process.kill;
+
+    const response = await DELETE(
+      makeDeleteRequest({ agentKey: "localization_agent_enabled" })
+    );
+
+    process.kill = originalKill;
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.stopped).toBe(true);
+    expect(data.agentKey).toBe("localization_agent_enabled");
+
+    // Verify agent is marked as stopped
+    const logsResponse = await GET(
+      makeGetRequest({ agentKey: "localization_agent_enabled" })
+    );
+    const logsData = await logsResponse.json();
+    expect(logsData.finished).toBe(true);
+    expect(logsData.stoppedByUser).toBe(true);
+    // Should have "Process stopped by user" in logs
+    const texts = logsData.logs.map((l: { text: string }) => l.text);
+    expect(texts).toContain("Process stopped by user");
+  });
+
+  it("falls back to direct kill when process group kill fails", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(20002);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "cost_analyst_agent_enabled" }));
+
+    // Mock process.kill: first call (negative PID group kill) throws, second call succeeds
+    const originalKill = process.kill;
+    let killCallCount = 0;
+    process.kill = vi.fn().mockImplementation(() => {
+      killCallCount++;
+      if (killCallCount === 1) throw new Error("EPERM");
+      // second call (direct PID kill) succeeds
+    }) as typeof process.kill;
+
+    const response = await DELETE(
+      makeDeleteRequest({ agentKey: "cost_analyst_agent_enabled" })
+    );
+
+    process.kill = originalKill;
+
+    expect(response.status).toBe(200);
+    expect(killCallCount).toBe(2);
+  });
+
+  it("handles both group and direct kill failing (process already dead)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(20003);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "qa_agent_enabled" }));
+
+    // Mock process.kill: both calls throw (process already dead)
+    const originalKill = process.kill;
+    process.kill = vi.fn().mockImplementation(() => {
+      throw new Error("ESRCH");
+    }) as typeof process.kill;
+
+    const response = await DELETE(
+      makeDeleteRequest({ agentKey: "qa_agent_enabled" })
+    );
+
+    process.kill = originalKill;
+
+    // Should still succeed — agent is marked as stopped
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.stopped).toBe(true);
+  });
+
+  it("returns 404 when trying to stop an already-finished agent", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(20004);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "security_agent_enabled" }));
+
+    // Simulate exit event so agent is marked as finished
+    (mockChild as EventEmitter).emit("exit", 0);
+
+    const response = await DELETE(
+      makeDeleteRequest({ agentKey: "security_agent_enabled" })
+    );
+
     expect(response.status).toBe(404);
     const data = await response.json();
     expect(data.error).toBe("Agent is not running");
