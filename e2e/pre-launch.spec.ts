@@ -254,7 +254,7 @@ test.describe("Feature flag gating", () => {
   test("suggest button visible when flag on", async ({ page }, testInfo) => {
     // Suggest button uses hidden md:block — skip on mobile
     const viewport = page.viewportSize();
-    if (viewport && viewport.width < 768) testInfo.skip();
+    if (viewport && viewport.width < 768) testInfo.skip(true, "Suggest button uses hidden md:block — not visible on mobile");
     await page.route("**/api/feature-flags", (route) =>
       route.fulfill({
         status: 200,

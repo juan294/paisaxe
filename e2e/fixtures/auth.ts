@@ -137,9 +137,9 @@ export const test = base.extend<AuthFixtures>({
 
   // Authenticated browser context
   authenticatedContext: async ({ browser }, use) => {
-    // Skip if credentials not configured
+    // Skip if credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD not set)
     if (!hasAuthCredentials()) {
-      test.skip();
+      test.skip(true, "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD)");
       return;
     }
 
@@ -150,9 +150,9 @@ export const test = base.extend<AuthFixtures>({
 
   // Authenticated page with session injected
   authenticatedPage: async ({ authenticatedContext }, use) => {
-    // Skip if credentials not configured
+    // Skip if credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD not set)
     if (!hasAuthCredentials()) {
-      test.skip();
+      test.skip(true, "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD)");
       return;
     }
 
