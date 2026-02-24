@@ -16,11 +16,11 @@
       }
     },
     "assert": {
-      "preset": "lighthouse:default",
+      "preset": "lighthouse:recommended",
       "assertions": {
         "categories:performance": [
           "error",
-          { "minScore": 0.6, "aggregationMethod": "median-run" }
+          { "minScore": 0.7, "aggregationMethod": "median-run" }
         ],
         "categories:accessibility": [
           "error",
