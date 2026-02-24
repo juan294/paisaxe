@@ -298,6 +298,9 @@ CRON_SECRET=                           # Vercel Cron authentication secret
 # PostHog analytics (optional)
 NEXT_PUBLIC_POSTHOG_KEY=                # PostHog project API key
 NEXT_PUBLIC_POSTHOG_HOST=               # PostHog ingestion host
+
+# Maintenance mode (optional)
+MAINTENANCE_MODE=                       # "true" forces maintenance on, "false" forces off, unset checks DB flag
 ```
 
 ## Architecture Decisions
