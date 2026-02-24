@@ -335,7 +335,7 @@ export function StoryViewer({
 
         {/* Image source attribution */}
         {story.imageSource && (
-          <p className="text-xs text-white/50 mb-6 flex items-center gap-1">
+          <p className="text-xs text-white/60 mb-6 flex items-center gap-1">
             <Camera className="h-3 w-3" aria-hidden="true" />
             <span>{story.imageSource}</span>
           </p>
@@ -566,7 +566,7 @@ export function StoryViewer({
       {/* Keyboard hints - hidden on mobile and touch-only devices */}
       <div
         className={cn(
-          "hidden md:block desktop-pointer-only absolute bottom-4 right-4 z-20 text-white/40 text-xs transition-opacity duration-500 motion-reduce:transition-none",
+          "hidden md:block desktop-pointer-only absolute bottom-4 right-4 z-20 text-white/60 text-xs transition-opacity duration-500 motion-reduce:transition-none",
           showInfo ? "opacity-100" : "opacity-0"
         )}
         aria-hidden="true"
