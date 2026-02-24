@@ -331,17 +331,17 @@ test.describe("Language switching", () => {
 
   test("language switcher visible in toolbar", async ({ page }) => {
     // The switcher is a div with role="group" and language-related aria-label
-    const switcher = page.locator('div[role="group"]').first();
+    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
     await expect(switcher).toBeVisible();
   });
 
   test("switching to ES changes UI text", async ({ page }) => {
     // Desktop Chrome defaults to English — switch to ES
-    const switcher = page.locator('div[role="group"]').first();
+    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
     await switcher.locator("button").first().click();
 
     // Click ES in the dropdown
-    const esButton = page.locator('div[role="group"]').getByRole("option", { name: "ES", exact: true });
+    const esButton = switcher.getByRole("option", { name: "ES", exact: true });
     await esButton.click();
     await page.waitForTimeout(300);
 
@@ -361,17 +361,17 @@ test.describe("Language switching", () => {
 
   test("switching to EN shows English text", async ({ page }) => {
     // First switch to ES, then back to EN to verify round-trip
-    const switcher = page.locator('div[role="group"]').first();
+    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
 
     // Switch to ES first
     await switcher.locator("button").first().click();
-    const esButton = page.locator('div[role="group"]').getByRole("option", { name: "ES", exact: true });
+    const esButton = switcher.getByRole("option", { name: "ES", exact: true });
     await esButton.click();
     await page.waitForTimeout(300);
 
     // Now switch back to EN
     await switcher.locator("button").first().click();
-    const enButton = page.locator('div[role="group"]').getByRole("option", { name: "EN", exact: true });
+    const enButton = switcher.getByRole("option", { name: "EN", exact: true });
     await enButton.click();
     await page.waitForTimeout(300);
 
@@ -391,9 +391,9 @@ test.describe("Language switching", () => {
 
   test("language persists in localStorage", async ({ page }) => {
     // Switch to ES (different from default EN)
-    const switcher = page.locator('div[role="group"]').first();
+    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
     await switcher.locator("button").first().click();
-    const esButton = page.locator('div[role="group"]').getByRole("option", { name: "ES", exact: true });
+    const esButton = switcher.getByRole("option", { name: "ES", exact: true });
     await esButton.click();
     await page.waitForTimeout(300);
 
@@ -431,9 +431,9 @@ test.describe("Language switching", () => {
     await expect(chatPanel).not.toBeVisible();
 
     // Switch to ES
-    const switcher = page.locator('div[role="group"]').first();
+    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
     await switcher.locator("button").first().click();
-    const esButton = page.locator('div[role="group"]').getByRole("option", { name: "ES", exact: true });
+    const esButton = switcher.getByRole("option", { name: "ES", exact: true });
     await esButton.click();
     await page.waitForTimeout(300);
 

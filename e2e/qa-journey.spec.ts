@@ -115,7 +115,7 @@ test.describe("QA Journey: Anonymous User", () => {
     await expect(page.locator("h1").first()).toBeVisible();
 
     // Step 1: Open chat panel
-    const askButton = page.locator('[data-testid="ask-button"]');
+    const askButton = page.locator('[data-testid="ask-button"]').first();
     await askButton.click();
 
     const chatPanel = page.locator(".fixed.inset-0.z-50");
@@ -253,7 +253,7 @@ test.describe("QA Journey: Error Handling", () => {
     await expect(page.locator("h1").first()).toBeVisible();
 
     // Open chat
-    const askButton = page.locator('[data-testid="ask-button"]');
+    const askButton = page.locator('[data-testid="ask-button"]').first();
     await askButton.click();
 
     const chatPanel = page.locator(".fixed.inset-0.z-50");
@@ -386,7 +386,7 @@ test.describe("QA Journey: New Features", () => {
     await expect(page.locator("h1").first()).toBeVisible();
 
     // Step 2: Open chat
-    await page.locator('[data-testid="ask-button"]').click();
+    await page.locator('[data-testid="ask-button"]').first().click();
     const chatPanel = page.locator(".fixed.inset-0.z-50");
     await expect(chatPanel).toBeVisible();
 

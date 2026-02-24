@@ -64,19 +64,12 @@ test.describe("Checkout flow", () => {
     await expect(page.locator("body")).not.toBeEmpty();
   });
 
-  test("checkout health endpoint returns configuration status", async ({
+  test("checkout health endpoint requires admin auth", async ({
     request,
   }) => {
     const response = await request.get("/api/checkout/health");
-    // In test env, Stripe keys aren't real so this may return 503 (degraded)
-    // but the endpoint itself should respond without crashing
-    expect([200, 503]).toContain(response.status());
-    const data = await response.json();
-    expect(data).toHaveProperty("status");
-    expect(data).toHaveProperty("checks");
-    expect(data.checks).toHaveProperty("envVars");
-    expect(data.checks).toHaveProperty("priceActive");
-    expect(data.checks).toHaveProperty("webhookSecret");
+    // The health endpoint requires admin auth (validateAdminAuth)
+    expect(response.status()).toBe(401);
   });
 
   test("pricing page CTA button is clickable for unauthenticated users", async ({
