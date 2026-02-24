@@ -15,7 +15,8 @@ describe("generateRecurringCosts", () => {
 
     const elevenlabs = costs.find((c) => c.serviceId === "elevenlabs");
     expect(elevenlabs).toBeDefined();
-    expect(elevenlabs!.costUsd).toBe(18.33);
+    // Effective monthly rate: $266.20/yr ÷ 12 = $22.18/mo (includes tax)
+    expect(elevenlabs!.costUsd).toBe(22.18);
     expect(elevenlabs!.source).toBe("recurring");
   });
 
