@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MoodOverlay } from "./mood-overlay";
 
 // Mock i18n
@@ -106,5 +106,77 @@ describe("MoodOverlay", () => {
     );
     const grid = container.querySelector(".grid.grid-cols-2");
     expect(grid).toBeInTheDocument();
+  });
+
+  describe("accessibility", () => {
+    beforeEach(() => {
+      vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+        cb(0);
+        return 1;
+      });
+      vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      cleanup();
+      vi.restoreAllMocks();
+    });
+
+    it("traps focus within the dialog (Tab wraps from last to first)", () => {
+      render(<MoodOverlay onSelectMood={mockOnSelectMood} onDismiss={mockOnDismiss} />);
+      const dialog = screen.getByRole("dialog");
+
+      // Get all focusable buttons inside the dialog
+      const buttons = dialog.querySelectorAll<HTMLElement>("button");
+      const lastButton = buttons[buttons.length - 1];
+      const firstButton = buttons[0];
+
+      // Focus the last button
+      lastButton.focus();
+      expect(document.activeElement).toBe(lastButton);
+
+      // Press Tab — should wrap to first
+      fireEvent.keyDown(dialog, { key: "Tab", shiftKey: false });
+      expect(document.activeElement).toBe(firstButton);
+    });
+
+    it("traps focus within the dialog (Shift+Tab wraps from first to last)", () => {
+      render(<MoodOverlay onSelectMood={mockOnSelectMood} onDismiss={mockOnDismiss} />);
+      const dialog = screen.getByRole("dialog");
+
+      const buttons = dialog.querySelectorAll<HTMLElement>("button");
+      const firstButton = buttons[0];
+      const lastButton = buttons[buttons.length - 1];
+
+      // Focus the first button
+      firstButton.focus();
+      expect(document.activeElement).toBe(firstButton);
+
+      // Press Shift+Tab — should wrap to last
+      fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+      expect(document.activeElement).toBe(lastButton);
+    });
+
+    it("calls onDismiss when Escape key is pressed", () => {
+      render(<MoodOverlay onSelectMood={mockOnSelectMood} onDismiss={mockOnDismiss} />);
+      const dialog = screen.getByRole("dialog");
+
+      fireEvent.keyDown(dialog, { key: "Escape" });
+      expect(mockOnDismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it("'Show all' dismiss button has focus-visible ring styles", () => {
+      render(<MoodOverlay onSelectMood={mockOnSelectMood} onDismiss={mockOnDismiss} />);
+      const showAllButton = screen.getByText("Show all");
+
+      expect(showAllButton.className).toContain("focus-visible:ring-2");
+      expect(showAllButton.className).toContain("focus-visible:ring-white/70");
+    });
+
+    it("sets aria-modal on the dialog", () => {
+      render(<MoodOverlay onSelectMood={mockOnSelectMood} onDismiss={mockOnDismiss} />);
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toHaveAttribute("aria-modal", "true");
+    });
   });
 });
