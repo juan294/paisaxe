@@ -206,6 +206,35 @@ describe("POST /api/webhooks/stripe", () => {
     expect(data.error).toBe("Database error");
   });
 
+  it("should log successful purchase creation", async () => {
+    const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    const event = createCheckoutSessionEvent("user-123", "pi_test456");
+    vi.mocked(verifyWebhookSignature).mockReturnValue(event);
+
+    const mockInsert = vi.fn(() => ({ error: null }));
+    const mockFrom = vi.fn(() => ({ insert: mockInsert }));
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: mockFrom,
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const request = createRequest(JSON.stringify({}), {
+      "stripe-signature": "valid-signature",
+    });
+
+    await POST(request);
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[stripe-webhook] Purchase created"),
+      expect.objectContaining({
+        userId: "user-123",
+        paymentProviderId: "pi_test456",
+        purchaseType: "day_pass",
+      })
+    );
+
+    consoleSpy.mockRestore();
+  });
+
   it("should use checkout session ID as fallback when payment_intent is null", async () => {
     const event: Stripe.Event = {
       id: "evt_test123",

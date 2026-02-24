@@ -1,9 +1,23 @@
 import { redirect } from "next/navigation";
-import { getStoryBySlugFromDB } from "@/lib/stories-data";
+import { getStoryBySlugFromDB, getStoriesFromDB } from "@/lib/stories-data";
 import type { Metadata } from "next";
+
+/** ISR: revalidate story pages every hour */
+export const revalidate = 3600;
 
 interface StoryPageProps {
   params: Promise<{ slug: string }>;
+}
+
+/**
+ * Pre-render all active story pages at build time.
+ * Falls back to on-demand rendering for new stories added after build.
+ */
+export async function generateStaticParams(): Promise<{ slug: string }[]> {
+  const stories = await getStoriesFromDB();
+  return stories.map((story) => ({
+    slug: story.slug || story.id,
+  }));
 }
 
 export async function generateMetadata({ params }: StoryPageProps): Promise<Metadata> {

@@ -13,9 +13,15 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { csrfHeaders } from "@/lib/csrf-client";
 
-const stripePromise = loadStripe(
-  (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim()
-);
+let stripePromise: ReturnType<typeof loadStripe> | null = null;
+function getStripe() {
+  if (!stripePromise) {
+    stripePromise = loadStripe(
+      (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim()
+    );
+  }
+  return stripePromise;
+}
 
 export default function CheckoutPage() {
   const { user, session, signInWithGoogle } = useAuth();
@@ -103,7 +109,7 @@ export default function CheckoutPage() {
         ) : (
           <div id="checkout" className="rounded-xl overflow-hidden">
             <EmbeddedCheckoutProvider
-              stripe={stripePromise}
+              stripe={getStripe()}
               options={{ fetchClientSecret }}
             >
               <EmbeddedCheckout />

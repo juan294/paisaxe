@@ -21,7 +21,7 @@ test.describe("Suggestion feature", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const viewport = page.viewportSize();
     if (viewport && viewport.width < 768) {
-      testInfo.skip();
+      testInfo.skip(true, "Suggest button uses hidden md:block — not visible on mobile");
     }
   });
 

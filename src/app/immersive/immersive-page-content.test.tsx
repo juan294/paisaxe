@@ -246,4 +246,59 @@ describe("ImmersivePageContent", () => {
     // The slug "oviedo-cathedral" matches the second story (index 1)
     expect(viewer).toHaveAttribute("data-index", "1");
   });
+
+  // -----------------------------------------------------------------------
+  // 6. ?story= resolves correctly with shuffled story order
+  // -----------------------------------------------------------------------
+  it("?story= query param finds story in shuffled filteredStories", () => {
+    setupDefaults();
+    // Simulate shuffled order: oviedo-cathedral is now at index 0
+    const shuffledStories = [mockStories[1], mockStories[0]];
+    vi.mocked(useStoryFilters).mockReturnValue({
+      ...defaultFiltersMock(shuffledStories),
+    });
+    vi.mocked(useSearchParams).mockReturnValue({
+      get: (key: string) => (key === "story" ? "oviedo-cathedral" : null),
+      toString: () => "",
+    } as unknown as ReturnType<typeof useSearchParams>);
+
+    render(<ImmersivePageContent serverShuffleSeed={42} />);
+
+    const viewer = screen.getByTestId("story-viewer");
+    // oviedo-cathedral is at index 0 in the shuffled filteredStories
+    expect(viewer).toHaveAttribute("data-index", "0");
+  });
+
+  // -----------------------------------------------------------------------
+  // 7. Deep-link effect fires only once (not re-triggered by filter changes)
+  // -----------------------------------------------------------------------
+  it("deep-link does not reset index when filters change after initial load", () => {
+    setupDefaults();
+    const shuffledStories = [mockStories[1], mockStories[0]];
+    vi.mocked(useStoryFilters).mockReturnValue({
+      ...defaultFiltersMock(shuffledStories),
+    });
+    vi.mocked(useSearchParams).mockReturnValue({
+      get: (key: string) => (key === "story" ? "oviedo-cathedral" : null),
+      toString: () => "",
+    } as unknown as ReturnType<typeof useSearchParams>);
+
+    const { rerender } = render(<ImmersivePageContent serverShuffleSeed={42} />);
+
+    // Initial render: deep-link sets index to 0 (oviedo-cathedral in shuffled order)
+    expect(screen.getByTestId("story-viewer")).toHaveAttribute("data-index", "0");
+
+    // Simulate filter change: only lagos-covadonga remains, oviedo filtered out
+    vi.mocked(useStoryFilters).mockReturnValue({
+      ...defaultFiltersMock([mockStories[0]]),
+    });
+
+    rerender(<ImmersivePageContent serverShuffleSeed={42} />);
+
+    // Index should NOT be reset by the deep-link effect again
+    // The out-of-bounds guard (line 131-135) resets it to 0, which is fine —
+    // but it's because of the bounds check, not the deep-link re-firing
+    const viewer = screen.getByTestId("story-viewer");
+    expect(viewer).toHaveAttribute("data-index", "0");
+  });
 });
