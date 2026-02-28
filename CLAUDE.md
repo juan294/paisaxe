@@ -245,6 +245,10 @@ claude -p "Fix all TypeScript lint errors and run tests" --allowedTools "Edit,Re
 claude -p "Read issue #240 and implement the fix with TDD" --allowedTools "Edit,Read,Bash,Write,Grep"
 ```
 
+### CRITICAL: Run verification commands sequentially, NEVER in parallel
+Never run typecheck, lint, or test as parallel sibling Bash tool calls.
+Chain with `&&` or `;`: `npm run typecheck 2>&1; npm run lint 2>&1`
+
 ## Environment Variables
 
 Required in `.env.local`:
@@ -473,6 +477,89 @@ Only ask for manual intervention when genuinely required (OAuth consent, billing
 - External service configuration changes (ElevenLabs, Stripe, Vercel env vars, DNS)
 
 Agent autonomy applies to **development work on `develop`**. Production is user-controlled.
+
+## RPI Workflow
+
+This project follows the Research-Plan-Implement (RPI) pattern.
+All significant changes go through four phases:
+1. /research — Understand the codebase as-is
+2. /plan — Create a phased implementation spec
+3. /implement — Execute one phase at a time with review gates
+4. /validate — Verify implementation against the plan
+
+### Context Management
+
+- Each RPI phase should be its own conversation. Don't run research + plan + implement in one session.
+- Use `/clear` between unrelated tasks. Use `/compact` when context is heavy but the task continues.
+- Subagents are context control mechanisms — they search/read in their window and return only distilled results.
+- Research and planning happen on the default branch. Implementation happens in worktrees or feature branches.
+- If research comes back wrong, throw it out and restart with more specific steering.
+
+### Rules for All Phases
+
+- Read all mentioned files COMPLETELY before doing anything else.
+- Never suggest improvements during research — only document what exists.
+- Every code reference must include file:line.
+- Spawn parallel subagents for independent research tasks.
+- Wait for ALL subagents before synthesizing.
+- Never write documents with placeholder values.
+
+### Rules for Implementation
+
+- Follow the atomic loop: implement → review → fix → approve.
+- Run ALL automated verification after each phase.
+- STOP after each phase and wait for human confirmation.
+- Never auto-proceed to the next phase.
+- If the plan doesn't match reality, STOP and explain the mismatch.
+
+### Testing Philosophy
+
+- Prefer automated verification over manual testing.
+- Manual testing is ONLY for: sudo, hardware, new installs, truly visual-only validation.
+- If you can verify it with a command or tool, do so automatically.
+- Don't use Claude for linting/formatting — use automated tools and hooks instead.
+
+## Agent Operational Rules
+
+### Shell & Tools
+- Chain verification commands sequentially, never as parallel Bash calls
+- In worktrees: prefix every command with `cd /absolute/path && `
+- Never use `~` in file tool paths — use full absolute paths starting with `/`
+- Always pass `{ encoding: 'utf-8' }` to `execSync`/`spawnSync`
+
+### Git Operations
+- Run typecheck/lint BEFORE committing (pre-commit hooks run the same checks)
+- `git pull --rebase` before every push
+- Remove worktrees BEFORE merging PRs with `--delete-branch`
+- `git worktree remove --force` (always use --force)
+- Use `;` not `&&` for multiple cleanup operations
+
+### GitHub CLI
+- Don't guess `gh --json` field names — query available fields first
+- Check CI per-PR with `--json`, not chained human-readable output
+- `review: fail` means "needs approval", NOT a CI failure
+
+### Sub-agents & Agent Teams
+- Verify tool permissions before spawning sub-agents for write operations
+- If a sub-agent fails due to permissions, take over manually immediately
+- Monitor context size when running many parallel agents
+- Agent Teams are enabled via `.claude/settings.json` — use them for complex parallel work
+- When creating a team: break work so each teammate owns different files (avoid conflicts)
+- Teammates don't inherit conversation history — include full context in spawn prompts
+- Use subagents for focused tasks (result is all that matters); use teams for collaborative work requiring discussion
+
+## Memory Management
+
+When you discover an operational lesson during any session — CI failure pattern, permission issue, workaround, tooling quirk, environment-specific behavior — save it to auto memory immediately. Don't wait to be asked.
+
+What to save proactively:
+- CI/CD pipeline behaviors and failure patterns specific to this project
+- Environment quirks (build flags, platform issues, dependency conflicts)
+- Project-specific conventions confirmed by the user
+- Workarounds for tools, APIs, or libraries used in this project
+- Permission configurations that required adjustment
+
+After completing `/bootstrap`, `/adopt`, or any significant configuration change, save the key decisions and project context to auto memory so future sessions start with full awareness.
 
 ## Issue Tracking (GitHub Issues)
 
