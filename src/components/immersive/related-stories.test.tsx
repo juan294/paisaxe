@@ -4,6 +4,12 @@ import { RelatedStories } from "./related-stories";
 import type { Story } from "@/types/immersive";
 import { createMockT } from "@/test/i18n-mock";
 
+// Mock next/image
+vi.mock("next/image", () => ({
+  // eslint-disable-next-line @next/next/no-img-element
+  default: (props: Record<string, unknown>) => <img {...props} />,
+}));
+
 // Mock i18n
 const mockT = createMockT();
 vi.mock("@/lib/i18n", () => ({
