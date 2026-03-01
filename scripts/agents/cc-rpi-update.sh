@@ -11,7 +11,7 @@
 set -euo pipefail
 
 # ── Configuration ──
-CC_RPI_PATH="/Users/juan/Documents/GenAI_Projects/cc-rpi"
+CC_RPI_PATH="/Users/juan/Documents/code/cc-rpi"
 
 # ── Environment setup (required for launchd) ──
 # launchd provides a minimal environment — no PATH, no TERM, possibly no HOME.
