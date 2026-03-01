@@ -1,5 +1,6 @@
 # Dependencies
-node_modules/
+node_modules
+node_modules.nosync/
 
 # Git worktrees (used by parallel agents inside the project sandbox)
 .worktrees/

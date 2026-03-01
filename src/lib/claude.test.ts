@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Chunk, ImageResult } from "@/types";
 import { EventEmitter } from "events";
