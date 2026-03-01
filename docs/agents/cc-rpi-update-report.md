@@ -1,41 +1,60 @@
-## cc-rpi sync report — v1.2.1 (4866803)
+# cc-rpi Sync Report
 
-**Synced to:** cc-rpi v1.2.1 (`4866803a4aa47d548184a1f5928cda68b00fc232`)
-**Date:** 2026-02-28
-**Type:** First sync (no previous `cc-rpi-sync.json` existed)
+> Generated: 2026-03-01 | Blueprint: v1.3.0 (`23c0b72`)
 
-### Commands (6 checked)
-- **research.md** — identical, no change
-- **plan.md** — identical, no change
-- **implement.md** — identical, no change
-- **validate.md** — identical, no change
-- **describe-pr.md** — identical, no change
-- **pre-launch.md** — skipped (heavily customized with project-specific tooling, paths, and team structure)
-- **review-pr.md, upgrade-deps.md, incident.md** — project-specific, left untouched
+## Summary
 
-### CLAUDE.md sections updated
-- **Added `### CRITICAL: Run verification commands sequentially`** under Key Commands — warns against parallel Bash tool calls for typecheck/lint/test
-- **Added `## RPI Workflow`** — full Research-Plan-Implement-Validate methodology with Context Management, Rules for All Phases, Rules for Implementation, and Testing Philosophy subsections
-- **Added `## Agent Operational Rules`** — Shell & Tools, Git Operations, GitHub CLI, and Sub-agents & Agent Teams rules
-- **Added `## Memory Management`** — proactive operational lesson saving
+Synced from **v1.2.1** → **v1.3.0** (5 commits).
 
-### CLAUDE.md sections skipped (heavily customized)
-- **`## Push Accountability`** — project version includes production safety rules and background agent protocol beyond template
-- **`## Test-Driven Development`** — project version is a superset with detailed per-scenario rules
-- **`## Agent Autonomy`** — project version lists project-specific tools (Supabase CLI, Vercel CLI, MCP servers)
+## Blueprint Changes (v1.2.1 → v1.3.0)
 
-### settings.json changes
-- **Added `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`** = `"1"` (enables Agent Teams)
-- **Added `permissions.allow`** — `Bash(git *)`, `Bash(gh *)`, `Bash(npm run *)`, `Read`, `Write`, `Edit`, `Glob`, `Grep`
-- **Added `permissions.deny`** = `[]`
-- **Preserved** existing `hooks.PostToolUse` lint-fix hook
+- `feat: integrate /simplify and /batch into RPI workflow`
+- `docs: add errors #39-#43 — gh deprecation, venv bypass, Python escaping, module imports, JSON indexing`
+- `fix: quote $(whoami) in shell templates to pass shellcheck SC2046`
+- `docs: add post-adoption /pre-launch recommendation to /adopt command`
 
-### Sync metadata
-- `.claude/cc-rpi-sync.json` created (not git-tracked — `.claude/` is gitignored except `.claude/commands/`)
-- `.claude/settings.json` updated (not git-tracked — same gitignore rule)
-- `CLAUDE.md` committed: `621ea04 chore: sync with cc-rpi blueprint v1.2.1`
+## Commands Updated
 
-### Notable new content delivered
-- **38 operational rules** from `patterns/quick-reference.md` now codified in Agent Operational Rules
-- **RPI phase workflow** with context management and testing philosophy
-- **Memory Management** protocol for proactive lesson capture
+| Command | Status | Key Changes |
+|---------|--------|-------------|
+| `implement.md` | **Updated** | Added `/batch` eligibility check (step 4), `/simplify` code quality pass (step 5e), reviewer now focused on plan compliance |
+| `plan.md` | **Updated** | Added step 11: identify `[batch-eligible]` phases for parallel execution |
+| `validate.md` | **Updated** | Added step 5: recommend `/simplify` for code quality issues |
+| `pre-launch.md` | **Updated** | Replaced project-specific version with generic template; added "After the Audit" section recommending `/simplify` as first fix action |
+
+## CLAUDE.md Sections Updated
+
+| Section | Status | Changes |
+|---------|--------|---------|
+| `### Rules for Implementation` | **Updated** | Added `/simplify` to atomic loop, `/batch` for batch-eligible phases, `/simplify` explanation |
+| `## Push Accountability` | Skipped | Heavily customized with project-specific production safety rules |
+| `## TDD Protocol` | Skipped | Heavily customized (titled "Test-Driven Development (MANDATORY)") |
+| `## Agent Autonomy` | Skipped | Heavily customized with project-specific tool lists |
+| `## Agent Operational Rules` | No change needed | Already matches template |
+| `## Memory Management` | No change needed | Already matches template |
+
+## settings.json Changes
+
+No changes needed. Project already has equivalent permissions (`npm` instead of `pnpm`).
+
+## Notable New Content
+
+### New Error Patterns (#39-#43)
+- **#39**: Always run `/simplify` after reviewer approval during `/implement`
+- **#40**: Mark independent plan phases as `[batch-eligible]`
+- **#41**: Use `/batch` for bulk changes outside the RPI cycle
+- **#42**: After `/pre-launch` audit, run `/simplify` first
+- **#43**: `gh` fails with "Projects (classic) deprecated" GraphQL error — upgrade with `brew upgrade gh`
+- **#44**: Always use `uv run python` — never bare `python3`
+- **#45**: Don't escape `!=` inside single-quoted shell strings
+- **#46**: Use `python -m` for scripts with package-relative imports
+- **#47**: Inspect JSON structure before indexing
+
+### Key Theme: `/simplify` and `/batch` Integration
+v1.3.0's main feature is integrating two new native commands into the RPI workflow:
+- `/simplify` — automated code quality pass (reuse, quality, efficiency) that runs after plan-compliance review
+- `/batch` — parallel execution of independent plan phases in separate worktrees
+
+## Note on .claude/ Directory
+
+The `.claude/` directory is gitignored in this project. Command files, sync metadata, and settings.json are updated locally but not tracked in git. Only `CLAUDE.md` changes are committed.
