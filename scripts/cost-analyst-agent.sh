@@ -3,7 +3,7 @@
 # Queries billing APIs, analyzes costs, writes docs/agents/cost-analyst-report.md
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/Documents/GenAI_Projects/paisaxe"
+PROJECT_DIR="/Users/juan/Documents/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/cost-analyst-agent-$(date +%Y-%m-%d).log"

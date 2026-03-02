@@ -3,7 +3,7 @@
 # Checks for stale documentation, updates CLAUDE.md, outputs to docs/agents/documentation-report.md
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/Documents/GenAI_Projects/paisaxe"
+PROJECT_DIR="/Users/juan/Documents/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/documentation-agent-$(date +%Y-%m-%d).log"

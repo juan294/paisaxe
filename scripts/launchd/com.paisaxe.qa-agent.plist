@@ -8,7 +8,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/juan/Documents/GenAI_Projects/paisaxe/scripts/qa-agent.sh</string>
+        <string>/Users/juan/Documents/code/paisaxe/scripts/qa-agent.sh</string>
     </array>
 
     <!-- Run every Sunday at 8:00 AM local time -->
@@ -23,10 +23,10 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/juan/Documents/GenAI_Projects/paisaxe/logs/qa-agent-stdout.log</string>
+    <string>/Users/juan/Documents/code/paisaxe/logs/qa-agent-stdout.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/juan/Documents/GenAI_Projects/paisaxe/logs/qa-agent-stderr.log</string>
+    <string>/Users/juan/Documents/code/paisaxe/logs/qa-agent-stderr.log</string>
 
     <key>EnvironmentVariables</key>
     <dict>
