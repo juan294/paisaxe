@@ -66,3 +66,4 @@ supabase/.temp/
 .performance-history.json
 .agent-context.json
 .agent-alerts.json
+scripts/agent-config.json

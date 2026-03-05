@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { updateFeatureFlagConfig } from "@/lib/admin-api";
-import type { FeatureFlag, AgentConfig, FeatureFlagKey } from "@/types/feature-flags";
+import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
+
+interface AgentConfig {
+  prompt: string;
+  schedule_description?: string;
+  output_file?: string;
+}
 import { cn } from "@/lib/utils";
 import { AGENT_PROMPT_DEFAULTS } from "@/config/agent-prompts";
 

@@ -11,7 +11,7 @@ import { updateFeatureFlagConfig } from "@/lib/admin-api";
 
 const baseFlagFactory = (configOverride?: Record<string, unknown>): FeatureFlag => ({
   id: "uuid-1",
-  flagKey: "subscription_optimizer_enabled",
+  flagKey: "maintenance_mode" as FeatureFlag["flagKey"],
   enabled: true,
   label: "Subscription Optimizer",
   description: "Analyzes service subscriptions",
@@ -104,7 +104,7 @@ describe("OptimizerConfigPanel", () => {
 
     await waitFor(() => {
       expect(updateFeatureFlagConfig).toHaveBeenCalledWith(
-        "subscription_optimizer_enabled",
+        "maintenance_mode",
         expect.objectContaining({
           optimizer: expect.objectContaining({
             usageMetrics: expect.objectContaining({ voiceMinutes: 50 }),

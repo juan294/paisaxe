@@ -49,7 +49,7 @@ log_success "Feature flags enabled — proceeding with QA Agent" | tee -a "$LOG_
 
 cd "$PROJECT_DIR"
 
-# Get configuration from feature flag
+# Get configuration from local agent config
 TESTS_PER_CATEGORY=$(get_agent_config "qa_agent_enabled" "testsPerCategory" || echo "3")
 ENABLE_JOURNEY_TESTS=$(get_agent_config "qa_agent_enabled" "enableJourneyTests" || echo "true")
 ENABLE_GITHUB_ISSUES=$(get_agent_config "qa_agent_enabled" "enableGithubIssues" || echo "true")
@@ -486,13 +486,10 @@ fi
 log_info "=== Phase 5: Claude Analysis & Report ===" | tee -a "$LOG_FILE"
 log_info "Metrics collected, invoking Claude for analysis..." | tee -a "$LOG_FILE"
 
-# Fetch the prompt from the feature flag config, fall back to shared default
-AGENT_PROMPT=$(get_agent_prompt "qa_agent_enabled" 2>/dev/null) || {
-  log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
-  AGENT_PROMPT=$(get_default_prompt "qa_agent_enabled" 2>/dev/null) || {
-    log_error "No prompt available for qa_agent_enabled" | tee -a "$LOG_FILE"
-    exit 1
-  }
+# Load the agent prompt from shared TypeScript config
+AGENT_PROMPT=$(get_default_prompt "qa_agent_enabled" 2>/dev/null) || {
+  log_error "No prompt available for qa_agent_enabled" | tee -a "$LOG_FILE"
+  exit 1
 }
 
 # Read shared context from other agents
