@@ -240,6 +240,12 @@ npm run test:e2e:ui    # Playwright UI mode
 # Data pipeline
 npm run seed-db        # Generate embeddings and populate DB
 
+# Agent management (local flags)
+scripts/agent-ctl.sh status           # Show all agent flags
+scripts/agent-ctl.sh enable <key>     # Enable an agent
+scripts/agent-ctl.sh disable <key>    # Disable an agent
+scripts/agent-ctl.sh master on|off    # Master toggle
+
 # Headless mode (non-interactive CI/batch runs)
 claude -p "Fix all TypeScript lint errors and run tests" --allowedTools "Edit,Read,Bash,Write" --output-format json
 claude -p "Read issue #240 and implement the fix with TDD" --allowedTools "Edit,Read,Bash,Write,Grep"
@@ -338,6 +344,9 @@ MAINTENANCE_MODE=                       # "true" forces maintenance on, "false" 
 - `refresh()` invalidates cache (used after CRUD mutations in costs panel)
 - **HTTP Cache-Control**: `private, max-age=120, stale-while-revalidate=300` on all 4 admin analytics API routes
 - No external dependencies — pure React Context + `useRef<Map>`
+
+### Local Agent Flags
+Automated agent enabled/disabled flags live in `scripts/agent-config.json` (local-only, gitignored). Defaults tracked in `scripts/agent-config.defaults.json`. Agents read flags via `jq` in `scripts/lib/agent-utils.sh` — no HTTP dependency. The admin dashboard reads/writes this file via `GET/PUT /api/admin/agent-config` (dev-only route). CLI: `scripts/agent-ctl.sh`.
 
 ### Proxy (NOT Middleware)
 **IMPORTANT: This project uses `src/proxy.ts`, NOT `middleware.ts`.**

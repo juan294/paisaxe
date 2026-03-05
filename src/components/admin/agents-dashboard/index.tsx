@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
-import { fetchAgentsSummary, fetchFeatureFlags, updateFeatureFlag, triggerOptimizerRun } from "@/lib/admin-api";
+import { fetchAgentsSummary, fetchAgentConfig, updateAgentMaster, updateAgentEnabled, triggerOptimizerRun } from "@/lib/admin-api";
 import { useAnalyticsData } from "../analytics-cache-context";
 import { AnalyticsCacheProvider } from "../analytics-cache-context";
-import { AgentConfigPanel } from "../agent-config-panel";
-import { AlertCircle, Loader2, Settings } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { FeatureFlag } from "@/types/feature-flags";
+import type { AgentConfigFile } from "@/types/agent-config";
 import { AGENT_FLAG_KEYS, AGENT_NAMES } from "./constants";
 import { useAgentRunner } from "./use-agent-runner";
 import { useAgentTerminal } from "./use-agent-terminal";
@@ -17,7 +16,6 @@ import { OverallHealthBanner } from "./overall-health-banner";
 import { CrossAgentInsights } from "./cross-agent-insights";
 import { ActivityItem } from "./activity-item";
 import { OptimizerReportDialog } from "./optimizer-report-dialog";
-import { OptimizerConfigPanel } from "./optimizer-config-panel";
 
 // Re-export public API
 export { escapeHtml, renderMarkdown } from "./markdown";
@@ -30,10 +28,9 @@ function AgentsDashboardInner() {
     "{}",
   );
 
-  // Agent feature flag toggles
-  const [agentFlags, setAgentFlags] = useState<FeatureFlag[]>([]);
+  // Agent local config toggles
+  const [agentConfig, setAgentConfig] = useState<AgentConfigFile | null>(null);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   // Optimizer-specific state
   const [optimizerRunning, setOptimizerRunning] = useState(false);
@@ -67,9 +64,9 @@ function AgentsDashboardInner() {
   });
 
   useEffect(() => {
-    fetchFeatureFlags().then((result) => {
+    fetchAgentConfig().then((result) => {
       if (result.data) {
-        setAgentFlags(result.data.filter((f) => (AGENT_FLAG_KEYS as readonly string[]).includes(f.flagKey)));
+        setAgentConfig(result.data);
       }
     });
   }, []);
@@ -97,17 +94,20 @@ function AgentsDashboardInner() {
     }
   };
 
-  const handleToggle = async (flag: FeatureFlag) => {
-    setUpdatingKey(flag.flagKey);
-    const result = await updateFeatureFlag(flag.flagKey, !flag.enabled);
-    if (result.data) {
-      setAgentFlags((prev) => prev.map((f) => (f.flagKey === flag.flagKey ? result.data! : f)));
-    }
+  const handleMasterToggle = async () => {
+    if (!agentConfig) return;
+    setUpdatingKey("master");
+    const result = await updateAgentMaster(!agentConfig.master_enabled);
+    if (result.data) setAgentConfig(result.data);
     setUpdatingKey(null);
   };
 
-  const handleFlagUpdate = (updatedFlag: FeatureFlag) => {
-    setAgentFlags((prev) => prev.map((f) => (f.flagKey === updatedFlag.flagKey ? updatedFlag : f)));
+  const handleAgentToggle = async (key: string) => {
+    if (!agentConfig) return;
+    setUpdatingKey(key);
+    const result = await updateAgentEnabled(key, !agentConfig.agents[key]?.enabled);
+    if (result.data) setAgentConfig(result.data);
+    setUpdatingKey(null);
   };
 
   if (isLoading) {
@@ -150,8 +150,8 @@ function AgentsDashboardInner() {
       {/* Overall Health Banner */}
       <OverallHealthBanner health={data.overallHealth} agents={data.agents} />
 
-      {/* Agent Toggles */}
-      {agentFlags.length > 0 && (
+      {/* Agent Toggles (local config) */}
+      {agentConfig && (
         <section>
           <h2 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
             Agent Toggles
@@ -159,68 +159,76 @@ function AgentsDashboardInner() {
           <div className="rounded-2xl bg-white dark:bg-[#252320]">
             <table className="w-full">
               <tbody className="divide-y divide-[#f5f3ee] dark:divide-[#3d3a36]">
-                {agentFlags.map((flag) => {
-                  const isExpanded = expandedKey === flag.flagKey;
-                  const isIndividualAgent = flag.flagKey !== "automated_agents";
+                {/* Master toggle */}
+                <tr className={cn(agentConfig.master_enabled && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
+                  <td className="py-4 pl-5 align-top">
+                    <span className="text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                      All Automated Agents
+                    </span>
+                  </td>
+                  <td className="py-4 pr-4 align-top text-sm text-[#6b6560] dark:text-[#a39e98]">
+                    Master toggle for all agents
+                  </td>
+                  <td className="w-20 py-4 pr-5 text-center align-top">
+                    <button
+                      onClick={handleMasterToggle}
+                      disabled={updatingKey === "master"}
+                      className={cn(
+                        "relative h-6 w-11 rounded-full transition-colors",
+                        agentConfig.master_enabled
+                          ? "bg-[#2d2a26] dark:bg-[#f5f3ee]"
+                          : "bg-[#e5e3de] dark:bg-[#3d3a36]",
+                        updatingKey === "master" && "cursor-wait opacity-50"
+                      )}
+                      role="switch"
+                      aria-checked={agentConfig.master_enabled}
+                      aria-label="Toggle All Automated Agents"
+                    >
+                      <span className={cn(
+                        "absolute top-0.5 h-5 w-5 rounded-full transition-all",
+                        agentConfig.master_enabled
+                          ? "left-[22px] bg-white dark:bg-[#2d2a26]"
+                          : "left-0.5 bg-white dark:bg-[#6b6560]"
+                      )} />
+                    </button>
+                  </td>
+                </tr>
+                {/* Individual agent toggles */}
+                {AGENT_FLAG_KEYS.map((key) => {
+                  const agent = agentConfig.agents[key];
+                  if (!agent) return null;
+                  const name = AGENT_NAMES[key] ?? key;
                   return (
-                    <tr key={flag.flagKey} className={cn(flag.enabled && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
+                    <tr key={key} className={cn(agent.enabled && "bg-[#f5f3ee]/50 dark:bg-[#252320]/50")}>
                       <td className="py-4 pl-5 align-top">
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "text-sm font-medium",
-                            flag.flagKey === "automated_agents"
-                              ? "text-[#2d2a26] dark:text-[#f5f3ee]"
-                              : "pl-4 text-[#2d2a26] dark:text-[#f5f3ee]"
-                          )}>
-                            {flag.label}
-                          </span>
-                          {isIndividualAgent && (
-                            <button
-                              onClick={() => setExpandedKey(isExpanded ? null : flag.flagKey)}
-                              className="inline-flex items-center rounded p-1 text-[#a39e98] transition-colors hover:bg-[#f5f3ee] hover:text-[#6b6560] dark:hover:bg-[#3d3a36]"
-                              aria-label={`Configure ${flag.label}`}
-                              aria-expanded={isExpanded}
-                            >
-                              <Settings className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </div>
-                        {isExpanded && isIndividualAgent && (
-                          <div className="mt-3 pl-4">
-                            {flag.flagKey === "subscription_optimizer_enabled" ? (
-                              <OptimizerConfigPanel flag={flag} onUpdate={handleFlagUpdate} />
-                            ) : (
-                              <AgentConfigPanel flag={flag} onUpdate={handleFlagUpdate} />
-                            )}
-                          </div>
-                        )}
+                        <span className="pl-4 text-sm font-medium text-[#2d2a26] dark:text-[#f5f3ee]">
+                          {name}
+                        </span>
                       </td>
                       <td className="py-4 pr-4 align-top text-sm text-[#6b6560] dark:text-[#a39e98]">
-                        {flag.description || "\u2014"}
+                        {"\u2014"}
                       </td>
                       <td className="w-20 py-4 pr-5 text-center align-top">
                         <button
-                          onClick={() => handleToggle(flag)}
-                          disabled={updatingKey === flag.flagKey}
+                          onClick={() => handleAgentToggle(key)}
+                          disabled={updatingKey === key}
                           className={cn(
                             "relative h-6 w-11 rounded-full transition-colors",
-                            flag.enabled
+                            agent.enabled
                               ? "bg-[#2d2a26] dark:bg-[#f5f3ee]"
                               : "bg-[#e5e3de] dark:bg-[#3d3a36]",
-                            updatingKey === flag.flagKey && "cursor-wait opacity-50"
+                            updatingKey === key && "cursor-wait opacity-50"
                           )}
                           role="switch"
-                          aria-checked={flag.enabled}
-                          aria-label={`Toggle ${flag.label}`}
+                          aria-checked={agent.enabled}
+                          aria-label={`Toggle ${name}`}
                         >
-                          <span
-                            className={cn(
-                              "absolute top-0.5 h-5 w-5 rounded-full transition-all",
-                              flag.enabled
-                                ? "left-[22px] bg-white dark:bg-[#2d2a26]"
-                                : "left-0.5 bg-white dark:bg-[#6b6560]"
-                            )}
-                          />
+                          <span className={cn(
+                            "absolute top-0.5 h-5 w-5 rounded-full transition-all",
+                            agent.enabled
+                              ? "left-[22px] bg-white dark:bg-[#2d2a26]"
+                              : "left-0.5 bg-white dark:bg-[#6b6560]"
+                          )} />
                         </button>
                       </td>
                     </tr>

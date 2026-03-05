@@ -11,7 +11,7 @@ vi.mock("@/lib/admin-api", () => ({
 
 const mockFlag: FeatureFlag = {
   id: "2",
-  flagKey: "coverage_agent_enabled",
+  flagKey: "contextual_prompts" as FeatureFlag["flagKey"],
   label: "Coverage Agent",
   description: "Automated test coverage monitoring",
   enabled: true,
@@ -36,8 +36,8 @@ describe("AgentConfigPanel", () => {
     render(<AgentConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
 
     expect(screen.getByText("Schedule")).toBeInTheDocument();
-    // Schedule text comes from AGENT_PROMPT_DEFAULTS, not the flag config
-    expect(screen.getByText("Daily at 2:00 AM")).toBeInTheDocument();
+    // "contextual_prompts" has no entry in AGENT_PROMPT_DEFAULTS → fallback
+    expect(screen.getByText("Not scheduled")).toBeInTheDocument();
   });
 
   it("renders prompt editor with label", () => {

@@ -2,23 +2,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { AgentsDashboard } from "./index";
 import * as adminApi from "@/lib/admin-api";
+import type { AgentConfigFile } from "@/types/agent-config";
 
 vi.mock("@/lib/admin-api", () => ({
   fetchAgentsSummary: vi.fn(),
-  fetchFeatureFlags: vi.fn(),
-  updateFeatureFlag: vi.fn(),
+  fetchAgentConfig: vi.fn(),
+  updateAgentMaster: vi.fn(),
+  updateAgentEnabled: vi.fn(),
   triggerOptimizerRun: vi.fn(),
 }));
 
 // Mock sub-components that do complex rendering
 vi.mock("./optimizer-report-dialog", () => ({
   OptimizerReportDialog: () => null,
-}));
-vi.mock("./optimizer-config-panel", () => ({
-  OptimizerConfigPanel: () => null,
-}));
-vi.mock("../agent-config-panel", () => ({
-  AgentConfigPanel: () => <div data-testid="agent-config-panel" />,
 }));
 vi.mock("./terminal-display", () => ({
   AgentTerminal: () => null,
@@ -57,10 +53,18 @@ const mockData = {
   ],
 };
 
+const mockAgentConfig: AgentConfigFile = {
+  master_enabled: true,
+  agents: {
+    coverage_agent_enabled: { enabled: true, config: {} },
+    security_agent_enabled: { enabled: true, config: {} },
+  },
+};
+
 describe("AgentsDashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(adminApi.fetchFeatureFlags).mockResolvedValue({ data: [] });
+    vi.mocked(adminApi.fetchAgentConfig).mockResolvedValue({ data: mockAgentConfig });
   });
 
   it("shows loading state initially", () => {
@@ -144,24 +148,9 @@ describe("AgentsDashboard", () => {
     });
   });
 
-  it("renders agent toggle section when flags exist", async () => {
+  it("renders agent toggle section when config loaded", async () => {
     vi.mocked(adminApi.fetchAgentsSummary).mockResolvedValue({
       data: mockData,
-    });
-    vi.mocked(adminApi.fetchFeatureFlags).mockResolvedValue({
-      data: [
-        {
-          id: "1",
-          flagKey: "automated_agents",
-          label: "All Automated Agents",
-          description: "Master toggle",
-          enabled: true,
-          config: {},
-          environment: "production",
-          createdAt: "2024-01-01",
-          updatedAt: "2024-01-01",
-        },
-      ],
     });
 
     render(<AgentsDashboard />);

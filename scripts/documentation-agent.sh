@@ -193,13 +193,10 @@ log_info "Collecting documentation gaps for Claude..." | tee -a "$LOG_FILE"
 if [[ -n "$UNDOCUMENTED_ROUTES" ]] || [[ -n "$UNDOCUMENTED_FLAGS" ]]; then
   log_info "Documentation gaps found — invoking Claude to update CLAUDE.md..." | tee -a "$LOG_FILE"
 
-  # Fetch the prompt from the feature flag config
-  AGENT_PROMPT=$(get_agent_prompt "documentation_agent_enabled" 2>/dev/null) || {
-    log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
-    AGENT_PROMPT=$(get_default_prompt "documentation_agent_enabled" 2>/dev/null) || {
-      log_error "No prompt available for documentation_agent_enabled" | tee -a "$LOG_FILE"
-      exit 1
-    }
+  # Load the agent prompt from shared TypeScript config
+  AGENT_PROMPT=$(get_default_prompt "documentation_agent_enabled" 2>/dev/null) || {
+    log_error "No prompt available for documentation_agent_enabled" | tee -a "$LOG_FILE"
+    exit 1
   }
 
   # Read shared context from other agents

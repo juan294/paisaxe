@@ -4,8 +4,11 @@
  * Tests that verify untested feature flags are properly checked
  * in the components/modules that consume them.
  *
- * Fixes #96 — Covers: mood_discovery, asturianu_touches,
- * story_freshness, automated_agents, content_discovery_agent_enabled
+ * Fixes #96 — Covers: mood_discovery, asturianu_touches, story_freshness
+ *
+ * Note: automated_agents and content_discovery_agent_enabled were removed
+ * from FeatureFlagKey — agent flags are now managed locally via
+ * scripts/agent-config.json (not Supabase feature_flags).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
@@ -200,129 +203,7 @@ describe("Feature flag: story_freshness", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. automated_agents — master toggle for the agent system
-// ---------------------------------------------------------------------------
-describe("Feature flag: automated_agents", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    mockFetch.mockReset();
-  });
-
-  it("should be false by default when flag is not present", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: [] }),
-    });
-
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
-
-    await waitFor(() => expect(result.current.isReady).toBe(true));
-
-    expect(result.current.isEnabled("automated_agents")).toBe(false);
-  });
-
-  it("should return true when automated_agents flag is enabled", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: [makeFlag("automated_agents", true)] }),
-    });
-
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
-
-    await waitFor(() => expect(result.current.isReady).toBe(true));
-
-    expect(result.current.isEnabled("automated_agents")).toBe(true);
-  });
-
-  it("should be listed in AGENT_FLAG_KEYS constants", async () => {
-    const { AGENT_FLAG_KEYS } = await import(
-      "@/components/admin/agents-dashboard/constants"
-    );
-
-    expect(AGENT_FLAG_KEYS).toContain("automated_agents");
-  });
-
-  it("automated_agents is treated as the master toggle (not an individual agent)", async () => {
-    // In the agents dashboard, automated_agents is explicitly different
-    // from individual agent flags — it doesn't have a config panel
-    const { AGENT_FLAG_KEYS } = await import(
-      "@/components/admin/agents-dashboard/constants"
-    );
-
-    // automated_agents should be in the list
-    expect(AGENT_FLAG_KEYS).toContain("automated_agents");
-
-    // It should be the first flag in the list (master toggle)
-    expect(AGENT_FLAG_KEYS[0]).toBe("automated_agents");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 5. content_discovery_agent_enabled — content discovery agent toggle
-// ---------------------------------------------------------------------------
-describe("Feature flag: content_discovery_agent_enabled", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    mockFetch.mockReset();
-  });
-
-  it("should be false by default when flag is not present", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: [] }),
-    });
-
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
-
-    await waitFor(() => expect(result.current.isReady).toBe(true));
-
-    expect(result.current.isEnabled("content_discovery_agent_enabled")).toBe(false);
-  });
-
-  it("should return true when content_discovery_agent_enabled flag is enabled", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: [makeFlag("content_discovery_agent_enabled", true)],
-      }),
-    });
-
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
-
-    await waitFor(() => expect(result.current.isReady).toBe(true));
-
-    expect(result.current.isEnabled("content_discovery_agent_enabled")).toBe(true);
-  });
-
-  it("should return false when content_discovery_agent_enabled flag is disabled", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: [makeFlag("content_discovery_agent_enabled", false)],
-      }),
-    });
-
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
-
-    await waitFor(() => expect(result.current.isReady).toBe(true));
-
-    expect(result.current.isEnabled("content_discovery_agent_enabled")).toBe(false);
-  });
-
-  it("content_discovery_agent_enabled is a valid FeatureFlagKey", async () => {
-    // Type-level check — if this compiles, the key is valid
-    const key: FeatureFlagKey = "content_discovery_agent_enabled";
-    expect(key).toBe("content_discovery_agent_enabled");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Cross-flag: verify all 5 flags can coexist and be queried independently
+// Cross-flag: verify all 3 flags can coexist and be queried independently
 // ---------------------------------------------------------------------------
 describe("Feature flags: combined behavior", () => {
   beforeEach(() => {
@@ -330,13 +211,11 @@ describe("Feature flags: combined behavior", () => {
     mockFetch.mockReset();
   });
 
-  it("should handle all 5 flags being enabled simultaneously", async () => {
+  it("should handle all 3 flags being enabled simultaneously", async () => {
     const allFlags = [
       makeFlag("mood_discovery", true),
       makeFlag("asturianu_touches", true),
       makeFlag("story_freshness", true),
-      makeFlag("automated_agents", true),
-      makeFlag("content_discovery_agent_enabled", true),
     ];
 
     mockFetch.mockResolvedValue({
@@ -352,17 +231,13 @@ describe("Feature flags: combined behavior", () => {
     expect(result.current.isEnabled("mood_discovery")).toBe(true);
     expect(result.current.isEnabled("asturianu_touches")).toBe(true);
     expect(result.current.isEnabled("story_freshness")).toBe(true);
-    expect(result.current.isEnabled("automated_agents")).toBe(true);
-    expect(result.current.isEnabled("content_discovery_agent_enabled")).toBe(true);
   });
 
-  it("should handle all 5 flags being disabled simultaneously", async () => {
+  it("should handle all 3 flags being disabled simultaneously", async () => {
     const allFlags = [
       makeFlag("mood_discovery", false),
       makeFlag("asturianu_touches", false),
       makeFlag("story_freshness", false),
-      makeFlag("automated_agents", false),
-      makeFlag("content_discovery_agent_enabled", false),
     ];
 
     mockFetch.mockResolvedValue({
@@ -378,8 +253,6 @@ describe("Feature flags: combined behavior", () => {
     expect(result.current.isEnabled("mood_discovery")).toBe(false);
     expect(result.current.isEnabled("asturianu_touches")).toBe(false);
     expect(result.current.isEnabled("story_freshness")).toBe(false);
-    expect(result.current.isEnabled("automated_agents")).toBe(false);
-    expect(result.current.isEnabled("content_discovery_agent_enabled")).toBe(false);
   });
 
   it("should handle mixed enabled/disabled state", async () => {
@@ -387,8 +260,6 @@ describe("Feature flags: combined behavior", () => {
       makeFlag("mood_discovery", true),
       makeFlag("asturianu_touches", false),
       makeFlag("story_freshness", true),
-      makeFlag("automated_agents", false),
-      makeFlag("content_discovery_agent_enabled", true),
     ];
 
     mockFetch.mockResolvedValue({
@@ -404,7 +275,5 @@ describe("Feature flags: combined behavior", () => {
     expect(result.current.isEnabled("mood_discovery")).toBe(true);
     expect(result.current.isEnabled("asturianu_touches")).toBe(false);
     expect(result.current.isEnabled("story_freshness")).toBe(true);
-    expect(result.current.isEnabled("automated_agents")).toBe(false);
-    expect(result.current.isEnabled("content_discovery_agent_enabled")).toBe(true);
   });
 });

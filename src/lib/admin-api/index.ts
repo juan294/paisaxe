@@ -58,3 +58,10 @@ export {
 } from "./agents";
 
 export { triggerOptimizerRun } from "./optimizer";
+
+export {
+  fetchAgentConfig,
+  updateAgentMaster,
+  updateAgentEnabled,
+  updateAgentConfigValue,
+} from "./agent-config";
