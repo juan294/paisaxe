@@ -18,9 +18,31 @@ import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useStreamChat } from "@/hooks/use-stream-chat";
-import { VoiceChatElevenLabs } from "./voice-chat-elevenlabs";
+import dynamic from "next/dynamic";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
 import { usePostHog } from "posthog-js/react";
+
+// Dynamically import VoiceChatElevenLabs to defer the ~471KB LiveKit/ElevenLabs chunk.
+// This code only loads when voice mode is active (user has access + agent configured).
+const VoiceChatElevenLabs = dynamic(
+  () => import("./voice-chat-elevenlabs").then((mod) => mod.VoiceChatElevenLabs),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        data-testid="voice-loading-fallback"
+        className="h-64 md:h-96 lg:h-[28rem] flex items-center justify-center"
+      >
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-20 w-20 rounded-full bg-white/10 animate-pulse" />
+          <div className="animate-pulse text-white/50 text-sm">
+            Cargando asistente de voz...
+          </div>
+        </div>
+      </div>
+    ),
+  }
+);
 
 interface VoiceChatProps {
   story: Story;
