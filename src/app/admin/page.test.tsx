@@ -39,8 +39,13 @@ vi.mock("@/hooks/use-admin-role", () => ({
 // Mock fetchStories
 const mockFetchStories = vi.fn();
 
+const mockApproveAllPendingStories = vi.fn();
+
 vi.mock("@/lib/admin-api", () => ({
   fetchStories: (...args: unknown[]) => mockFetchStories(...args),
+  bulkUpdateStoryStatus: vi.fn().mockResolvedValue({ data: { updated: 0 } }),
+  bulkDeleteStories: vi.fn().mockResolvedValue({ data: { deleted: 0 } }),
+  approveAllPendingStories: (...args: unknown[]) => mockApproveAllPendingStories(...args),
 }));
 
 // Mock StoryGrid
@@ -120,6 +125,22 @@ vi.mock("@/components/admin/create-story-dialog", () => ({
 
 vi.mock("@/components/admin/story-editor-dialog", () => ({
   StoryEditorDialog: () => <div data-testid="story-editor-dialog">Story Editor Dialog</div>,
+}));
+
+vi.mock("@/components/admin/selection-toolbar", () => ({
+  SelectionToolbar: () => null,
+}));
+
+vi.mock("@/components/admin/marketing-dashboard", () => ({
+  MarketingDashboard: () => <div data-testid="marketing-dashboard">Marketing</div>,
+}));
+
+vi.mock("@/components/admin/suggestions-panel", () => ({
+  SuggestionsPanel: () => <div data-testid="suggestions-panel">Suggestions</div>,
+}));
+
+vi.mock("@/components/admin/agents-dashboard", () => ({
+  AgentsDashboard: () => <div data-testid="agents-dashboard">Agents</div>,
 }));
 
 // Mock lucide-react icons
@@ -725,6 +746,78 @@ describe("AdminPage", () => {
         await waitFor(() => {
           expect(screen.getByText("No stories match this filter")).toBeInTheDocument();
         });
+      });
+    });
+
+    describe("Approve All dialog accessibility (#181)", () => {
+      async function openApproveAllDialog() {
+        render(<AdminPage />);
+        // Navigate to Stories tab
+        await act(async () => {
+          fireEvent.click(screen.getByText("Stories"));
+        });
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+        // Click "Approve All" button
+        const approveAllBtn = screen.getByRole("button", { name: /Approve All/i });
+        await act(async () => {
+          fireEvent.click(approveAllBtn);
+        });
+      }
+
+      it("has role='dialog' on the confirmation dialog", async () => {
+        await openApproveAllDialog();
+
+        const dialog = screen.getByRole("dialog");
+        expect(dialog).toBeInTheDocument();
+      });
+
+      it("has aria-modal='true' on the confirmation dialog", async () => {
+        await openApproveAllDialog();
+
+        const dialog = screen.getByRole("dialog");
+        expect(dialog).toHaveAttribute("aria-modal", "true");
+      });
+    });
+
+    describe("StatCard filter button aria-labels (#183)", () => {
+      async function renderStoriesTab() {
+        render(<AdminPage />);
+        await act(async () => {
+          fireEvent.click(screen.getByText("Stories"));
+        });
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+      }
+
+      it("Pending stat card has an aria-label", async () => {
+        await renderStoriesTab();
+
+        const pendingBtn = screen.getByRole("button", { name: /filter.*pending/i });
+        expect(pendingBtn).toBeInTheDocument();
+      });
+
+      it("Approved stat card has an aria-label", async () => {
+        await renderStoriesTab();
+
+        const approvedBtn = screen.getByRole("button", { name: /filter.*approved/i });
+        expect(approvedBtn).toBeInTheDocument();
+      });
+
+      it("Missing i18n stat card has an aria-label", async () => {
+        await renderStoriesTab();
+
+        const missingBtn = screen.getByRole("button", { name: /filter.*missing/i });
+        expect(missingBtn).toBeInTheDocument();
+      });
+
+      it("Total stat card has an aria-label", async () => {
+        await renderStoriesTab();
+
+        const totalBtn = screen.getByRole("button", { name: /filter.*total|filter.*all/i });
+        expect(totalBtn).toBeInTheDocument();
       });
     });
   });
