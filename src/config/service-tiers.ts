@@ -27,7 +27,7 @@ export const SERVICE_TIERS: ServiceTierConfig[] = [
     serviceId: "elevenlabs",
     serviceName: "ElevenLabs",
     currentTierName: "Creator",
-    currentMonthlyCostUsd: 18.33,
+    currentMonthlyCostUsd: 22.18,
     limits: [
       {
         metricKey: "voiceMinutes",
@@ -45,21 +45,17 @@ export const SERVICE_TIERS: ServiceTierConfig[] = [
   {
     serviceId: "vercel",
     serviceName: "Vercel",
-    currentTierName: "Hobby",
-    currentMonthlyCostUsd: 0,
+    currentTierName: "Pro",
+    currentMonthlyCostUsd: 20,
     limits: [
       {
         metricKey: "visitors",
         label: "Monthly Visitors",
-        monthlyLimit: 50000,
+        monthlyLimit: 500000,
         unit: "visitors",
       },
     ],
-    nextTier: {
-      tierName: "Pro",
-      monthlyCostUsd: 20,
-      notes: "Unlimited bandwidth, team features",
-    },
+    nextTier: undefined,
   },
   {
     serviceId: "posthog",

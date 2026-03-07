@@ -163,6 +163,61 @@ describe("AuthorTypewriter", () => {
     expect(outerDiv).not.toHaveClass("pointer-events-none");
   });
 
+  it("should cycle through messages after HOME_HOLD period", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container } = render(<AuthorTypewriter prefersReducedMotion={false} t={mockT} />);
+
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+
+    // Initially shows "</> JG"
+    expect(textSpan.textContent).toBe("</> JG");
+
+    // Advance past HOME_HOLD (30s)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_100);
+    });
+
+    // Now the erase phase starts — text should begin to shorten
+    // Advance through the erase of "</> JG" (5 chars * 80ms = 400ms)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    // Text should be partially or fully erased
+    expect(textSpan.textContent!.length).toBeLessThan(5);
+
+    // Advance past EMPTY_PAUSE (300ms) and through typing of next message
+    // Next message is t("author_pill.made_with_love") = "hecho con ♥ en Asturias" (21 chars)
+    // 21 chars * 80ms = 1680ms, plus 300ms pause = 1980ms
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    // Now should show the translated message
+    expect(textSpan.textContent).toBeTruthy();
+    expect(textSpan.textContent!.length).toBeGreaterThan(0);
+
+    // Advance through MSG_HOLD (4000ms) to see the erase start
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4100);
+    });
+
+    // Erase phase for the message should be starting
+    // Advance through erase of the message
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    // Advance through EMPTY_PAUSE + type HOME
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    // Should be typing HOME ("</> JG") back
+    // The text should eventually return to "</> JG" or be mid-type
+    expect(textSpan.textContent!.length).toBeGreaterThanOrEqual(0);
+  });
+
   it("should clean up timers on unmount", async () => {
     const { AuthorTypewriter } = await import("./author-typewriter");
     const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");

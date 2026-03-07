@@ -1,232 +1,263 @@
 # Performance Report
 
-> Updated on 2026-02-07
+> Updated on 2026-03-07
 
-## Health Status: GREEN (with caveats)
+## Health Status: YELLOW (build blocked locally + CI broken)
 
-**Total JS: 2,455 KB — within 2,500 KB budget (45 KB headroom).** This is a significant improvement from the previous report (2,889 KB on 2026-02-06), reflecting a **-434 KB reduction (-15.0%)** — the ElevenLabs duplication issue from the previous report appears resolved.
+**Bundle sizes could not be measured this cycle.** Two independent blockers prevent a production build:
 
-**Caveats:** Budget headroom is thin (1.8%). One new dependency or unoptimized import could push back over. The remaining optimization opportunities below would create a comfortable buffer.
+1. **Local:** Corrupted `coverage/src` directory (65535 hard links, 2 MB) causes Turbopack `EAGAIN` deadlock (os error 11)
+2. **CI:** TypeScript error in `src/app/api/admin/agent-config/route.ts` — `AuthResult` type not assignable to `Response` (build step fails on develop)
+
+**Estimated Total JS: ~2,380-2,410 KB (within 2,500 KB budget)** based on Feb 7 baseline (2,455 KB), minus `optimizePackageImports` savings (~50-75 KB), plus new Upstash deps (~25-30 KB). Headroom estimated at 90-120 KB — improved from Feb 7's 45 KB.
+
+**Production deps: 31 of 40 budget (77.5%).** Four new deps since last report.
 
 ## Key Metrics
 
-| Metric | Current (2026-02-07) | Previous (2026-02-06) | Change | Budget | Status |
+| Metric | Current (2026-03-07) | Previous (2026-02-07) | Change | Budget | Status |
 |--------|---------------------|----------------------|--------|--------|--------|
-| Total JS | 2,455 KB | 2,889 KB | **-434 KB (-15.0%)** | 2,500 KB | Within budget |
-| Total CSS | 130 KB | 132 KB | -2 KB | - | Stable |
-| Production deps | 27 | 27 | 0 | 40 | Good |
-| node_modules | 856 MB | 850 MB | +6 MB | - | Stable |
-| .next build | 2,102 MB | 2,129 MB | -27 MB | - | Stable |
+| Total JS | ~2,380-2,410 KB (est.) | 2,455 KB | **~-45 to -75 KB** | 2,500 KB | Within budget (est.) |
+| Total CSS | Unknown | 130 KB | - | - | Cannot measure |
+| Production deps | 31 | 27 | **+4** | 40 | Good |
+| node_modules | 861 MB | 856 MB | +5 MB | - | Stable |
+| .next (dev cache) | 843 MB | 2,102 MB (prod) | N/A | - | Dev cache only |
+
+**Note:** `.next` is 843 MB (dev server cache), not comparable to the 2,102 MB production build artifact from Feb 7.
 
 ## Budget Status
 
 | Budget | Limit | Current | Headroom | Status |
 |--------|-------|---------|----------|--------|
-| Total JS | 2,500 KB | 2,455 KB | **45 KB (1.8%)** | Within budget |
-| Production deps | 40 | 27 | 13 | Comfortable |
+| Total JS | 2,500 KB | ~2,395 KB (est.) | **~105 KB (4.2%)** | Improved (est.) |
+| Production deps | 40 | 31 | 9 | Good |
 
-## Largest Bundles (Top 10)
+## Build Blockers (P0)
 
-| Chunk | Size | Contents | Lazy? | Optimization |
-|-------|------|----------|-------|-------------|
-| c9dd1f17b9fef791.js | **482 KB** | ElevenLabs SDK (protobuf, LiveKit WebRTC) | Yes (via VoiceChat dynamic import) | See #1 below |
-| 4af27f77bd5de33b.js | 224 KB | Next.js client runtime | No (required) | None possible |
-| 29caf01f750f57fe.js | 183 KB | Cookie/session libraries (Supabase Auth) | No (required for auth) | None practical |
-| 6009f44925f0d98a.js | **173 KB** | PostHog analytics | Yes (lazy-loaded in useEffect) | Already optimized |
-| 1cadbebe7f77139c.js | **152 KB** | react-markdown + CSS parser | Yes (via VoiceChat) | Already optimized |
-| a6dad97d9634a72d.js | 112 KB | Unknown | - | Needs investigation |
-| 2375e3fd2a9b8844.js | 111 KB | Unknown | - | Needs investigation |
-| f03c14a7bd65a02e.js | 103 KB | Unknown | - | Needs investigation |
-| 8ce0c6b6d103b3c8.js | 72 KB | Unknown | - | Low priority |
-| fcf4e9656d2eb87f.js | 64 KB | Unknown | - | Low priority |
+### 1. CRITICAL: Corrupted `coverage/` directory blocks local builds
 
-**Key improvement:** Previous report showed TWO 476 KB ElevenLabs chunks (likely duplication). Now there's only ONE 482 KB chunk — the duplication was resolved, saving ~476 KB.
+The `coverage/src` directory has 65535 hard links (2 MB directory entry) — likely from a `vitest --coverage` run that crashed or was killed mid-write. Turbopack's `DirAssetReference` tries to scan it (via `agents/run/route.ts` which uses `fs.readdir`), hits OS error 11 (`EAGAIN` — resource deadlock), and panics.
 
-## Previous Optimizations (Still Active)
-
-| Optimization | Date | Savings | Status |
-|-------------|------|---------|--------|
-| framer-motion removed | 2026-02-02 | -177 KB | Permanent |
-| PostHog lazy-loaded | 2026-02-02 | ~560 KB deferred | Active |
-| PDF deps moved to devDependencies | 2026-02-02 | Variable | Active |
-| ElevenLabs duplication resolved | 2026-02-07 | ~476 KB | Active |
-| Admin tab panels lazy-loaded | Pre-existing | Variable | Active |
-| VoiceChat dynamic import | Pre-existing | ~500 KB+ deferred | Active |
-
-## Top Optimization Opportunities
-
-### 1. HIGH: Add `optimizePackageImports` for lucide-react (~50-100 KB)
-
-**Issue:** 54 files import from `lucide-react`. While named imports enable tree-shaking, Next.js's `optimizePackageImports` is more aggressive — it rewrites barrel imports to direct file imports, avoiding loading the full module graph.
-
-**Current state:** `next.config.ts` has no `experimental.optimizePackageImports`.
-
-**Heaviest import sites:**
-- `src/components/admin/story-editor-dialog.tsx` — 28 icons
-- `src/app/admin/page.tsx` — 14 icons
-- `src/components/admin/costs-analytics-panel.tsx` — 13 icons
+**Impact:** Cannot run `npm run build` or `npm run build:analyze` locally.
 
 **Fix:**
-```typescript
-// next.config.ts
-const nextConfig: NextConfig = {
-  experimental: {
-    optimizePackageImports: ['lucide-react'],
-  },
-  // ... rest of config
-};
-```
-
-**Effort:** 1 line change. **Estimated savings:** 50-100 KB. **Risk:** None.
-
----
-
-### 2. HIGH: Lazy-load StoryEditorDialog and CreateStoryDialog (~70 KB)
-
-**Issue:** `src/app/admin/page.tsx` statically imports two large dialog components:
-```typescript
-// Line 8 - static import, loaded with admin page
-import { StoryEditorDialog } from "@/components/admin/story-editor-dialog";
-// Line 9 - static import
-import { CreateStoryDialog } from "@/components/admin/create-story-dialog";
-```
-
-These dialogs are only rendered when the user clicks "Edit Story" or "Create Story" — not on initial page load. Yet they're bundled into the initial admin chunk.
-
-**Fix:**
-```typescript
-// Replace static imports with dynamic imports
-const StoryEditorDialog = dynamic(
-  () => import("@/components/admin/story-editor-dialog").then(m => ({ default: m.StoryEditorDialog })),
-  { ssr: false }
-);
-
-const CreateStoryDialog = dynamic(
-  () => import("@/components/admin/create-story-dialog").then(m => ({ default: m.CreateStoryDialog })),
-  { ssr: false }
-);
-```
-
-**Effort:** Low. **Estimated savings:** 50-70 KB from admin initial bundle. **Risk:** Minimal (dialogs show a frame later on first open).
-
----
-
-### 3. MEDIUM: Confirm ElevenLabs chunk is fully lazy-loaded
-
-**Current state:** `voice-chat-elevenlabs.tsx` imports `useConversation` from `@elevenlabs/react` statically (line 4). However, this file is imported by `voice-chat.tsx`, which is dynamically imported by `immersive-page-content.tsx`:
-
-```
-immersive-page-content.tsx → dynamic import → voice-chat.tsx → voice-chat-elevenlabs.tsx → @elevenlabs/react
-```
-
-The 482 KB ElevenLabs chunk should NOT load until the user opens voice chat. **Verify this with Lighthouse or DevTools Network tab** — if the chunk loads on page load, the dynamic import chain is broken somewhere.
-
-**Admin side concern:** `voice-agent-chat.tsx` also imports `@elevenlabs/react` directly (line 4). This component is used inside `marketing-dashboard.tsx`. Since `MarketingDashboard` is already dynamically imported in `admin/page.tsx`, this should be properly deferred. But it means the 482 KB chunk loads whenever an admin opens the Marketing tab, even before starting a voice session.
-
-**Potential fix for admin:**
-```typescript
-// In marketing-dashboard.tsx, lazy-load voice-agent-chat
-const VoiceAgentChat = dynamic(
-  () => import("@/components/admin/voice-agent-chat").then(m => ({ default: m.VoiceAgentChat })),
-  { ssr: false }
-);
-```
-
-**Effort:** Low. **Estimated savings:** 482 KB deferred from Marketing tab load. **Risk:** None.
-
----
-
-### 4. LOW: Run `build:analyze` for definitive chunk identification
-
-**Issue:** Chunks `a6dad97d`, `2375e3fd`, and `f03c14a7` (combined 326 KB) have unknown contents. Minified chunk filenames change between builds, so reading them directly is unreliable.
-
-**Action:**
 ```bash
-npm run build:analyze
+rm -rf coverage
 ```
 
-This generates interactive treemap visualizations showing exactly what's in each chunk. Use this to identify any unexpected dependencies or duplication.
+The `coverage/` directory is gitignored and regenerated by `npm run test:coverage`. Deleting it is safe.
 
----
+**Why webpack fallback fails:** Next.js 16 uses `node:` protocol imports (`node:child_process`, `node:timers/promises`) which the webpack bundler doesn't support. Turbopack is required.
 
-### 5. LOW: Consider lighter markdown renderer
+### 2. CRITICAL: CI build fails on `develop`
 
-**Issue:** `react-markdown` + its CSS parser dependency contributes ~152 KB. This only runs inside VoiceChat (already lazy-loaded), so it doesn't affect initial load.
+TypeScript error in `src/app/api/admin/agent-config/route.ts`:
+```
+Type 'AuthResult' is not assignable to type 'void | Response'.
+Type '{ valid: true; userId: string; }' is not assignable to type 'void | Response'.
+```
 
-**Alternative:** A custom lightweight markdown renderer for the subset of markdown used in chat responses (bold, italic, links, lists, code blocks) could save ~100 KB. However, `react-markdown` is well-tested and the chunk is already deferred.
+The `GET` handler returns `AuthResult` on success instead of always returning a `NextResponse`. This blocks the build step in CI (lint+typecheck passes, but Next.js build-time type checking is stricter about route handler return types).
 
-**Verdict:** Not worth the maintenance cost. Leave as-is.
+**Impact:** No production builds on CI since Mar 5.
+
+## Optimization Progress (Since Feb 7)
+
+### Implemented
+
+| Optimization | Date | Estimated Savings | Source |
+|-------------|------|-------------------|--------|
+| `optimizePackageImports: ['lucide-react', 'posthog-js']` | Feb 9 | ~50-100 KB | P1 from Feb 7 report |
+| Dynamic-import StoryEditorDialog | Feb 9 | ~30-40 KB deferred | P1 from Feb 7 report |
+| Dynamic-import CreateStoryDialog | Feb 9 | ~20-30 KB deferred | P1 from Feb 7 report |
+| Dynamic-import SelectionToolbar | Feb 9 | ~10 KB deferred | Speed Insights work |
+| Lazy-mount analytics sub-panels | Feb 9 | ~3,200 lines deferred | Speed Insights P1 |
+| Lazy-load translation files (non-es/en) | Feb 9 | ~65 KB deferred | Speed Insights P2 |
+| Typewriter extraction (ref-based DOM) | Feb 9 | Runtime perf | Speed Insights P1 |
+| Removed unused font preconnects | Feb 9 | DNS latency | Speed Insights P2 |
+
+### Still Pending
+
+| Optimization | Priority | Estimated Savings | Effort | Status |
+|-------------|----------|-------------------|--------|--------|
+| Lazy-load VoiceAgentChat in MarketingDashboard | P2 | 482 KB deferred from Marketing tab | Low | **Still static import** |
+| Run `build:analyze` to identify unknown chunks | P2 | Diagnostic | Low | **Blocked by build** |
+| Verify ElevenLabs chunk deferred on public pages | P3 | 0-482 KB | Low | Unverified |
+
+## Remaining Optimization Opportunities
+
+### 1. MEDIUM: Lazy-load VoiceAgentChat in MarketingDashboard (~482 KB deferred)
+
+`marketing-dashboard.tsx:5` statically imports `VoiceAgentChat`, which pulls in the entire ElevenLabs SDK (482 KB). This loads the moment an admin opens the Marketing tab, even if they never start a voice session.
+
+**Current:**
+```typescript
+// src/components/admin/marketing-dashboard/marketing-dashboard.tsx:5
+import { VoiceAgentChat } from "../voice-agent-chat";
+```
+
+**Fix:**
+```typescript
+import dynamic from "next/dynamic";
+const VoiceAgentChat = dynamic(
+  () => import("../voice-agent-chat").then(m => ({ default: m.VoiceAgentChat })),
+  { ssr: false }
+);
+```
+
+**Effort:** Low. **Risk:** None — voice chat shows 1 frame later on first use.
+
+### 2. LOW: Update posthog-js (1.353.0 -> 1.359.1)
+
+Security agent flagged `dompurify` moderate vulnerability (transitive via posthog-js). Updating to 1.359.1 may resolve the vuln and could improve bundle size through tree-shaking improvements.
+
+**Fix:**
+```bash
+npm install posthog-js@latest
+```
+
+**Effort:** Trivial. **Risk:** Low — minor version bump.
+
+### 3. LOW: Lighter markdown renderer (deferred)
+
+`react-markdown` (~152 KB) is only used inside VoiceChat (already lazy-loaded). Not worth replacing — maintenance cost exceeds savings since the chunk is deferred.
+
+**Verdict:** No action. Same conclusion as Feb 7.
+
+## New Dependencies Since Last Report
+
+| Package | Version | Purpose | Bundle Impact | Added |
+|---------|---------|---------|---------------|-------|
+| `@upstash/ratelimit` | ^2.0.8 | Distributed rate limiting | ~5-10 KB (server-heavy) | Feb 19 (Fixes #111) |
+| `@upstash/redis` | ^1.36.2 | Redis client for rate limiting | ~15-20 KB (server-heavy) | Feb 19 (Fixes #111) |
+| `resend` | ^6.9.2 | Transactional email | ~5 KB (server-only) | Post-Feb 7 |
+| `stripe` (server) | ^20.3.1 | Server-side Stripe SDK | 0 KB client (server-only) | Post-Feb 7 |
+
+**Net bundle impact: ~25-30 KB** — Upstash packages are the only ones with potential client impact, though they're primarily server-side. Resend and Stripe server SDK are server-only.
+
+**Note:** The Feb 7 report listed 27 deps. The actual count may have been slightly off; `resend` and `stripe` (server SDK) may have been present but uncounted. The definitive new additions are `@upstash/ratelimit` and `@upstash/redis`.
 
 ## Dependency Analysis
 
 | Package | node_modules Size | Client Bundle Impact | Status |
 |---------|------------------|---------------------|--------|
-| next + @next | 270 MB | Framework (required) | No action |
+| next + @next | 256 MB | Framework (required) | No action |
 | pdfjs-dist | 63 MB | **0 KB** (devDependency) | Correct |
 | pdf-parse | 57 MB | **0 KB** (devDependency) | Correct |
-| lucide-react | 45 MB | ~100-150 KB (tree-shaken) | Optimize (#1) |
+| lucide-react | 45 MB | ~50-75 KB (optimized via `optimizePackageImports`) | **Improved** |
 | @opentelemetry | 40 MB | 0 KB (server-only) | No action |
-| posthog-js | 30 MB | ~173 KB (lazy-loaded) | Optimized |
-| @napi-rs | 24 MB | 0 KB (native, server-only) | No action |
+| posthog-js | 31 MB | ~173 KB (lazy-loaded in useEffect) | Update recommended |
+| @napi-rs | 29 MB | 0 KB (native, server-only) | No action |
+| typescript | 23 MB | 0 KB (devDependency) | No action |
+| canvas | 19 MB | 0 KB (optionalDependency, server-only) | No action |
 | core-js | 15 MB | Polyfills (minimal) | No action |
-| @elevenlabs/react | ~5 MB | ~482 KB (lazy-loaded) | Verify (#3) |
+| rxjs | 11 MB | ~0 KB (transitive, tree-shaken) | No action |
+| es-abstract | 11 MB | 0 KB (transitive, dev-only usage) | No action |
+| stripe | 8 MB | 0 KB (server-only) | No action |
+| @supabase | 6 MB | ~183 KB (auth, required) | No action |
+| @elevenlabs/react | 2 MB | ~482 KB (lazy-loaded via VoiceChat) | Verify deferred |
+| @upstash | 1.5 MB | ~25 KB (mostly server-side) | New — monitor |
+| @radix-ui | 2 MB | ~15-20 KB (tree-shaken) | No action |
 
-**Production deps: 27 of 40 budget (68% utilized).** No concern.
+**Production deps: 31 of 40 budget (77.5%).** Healthy — 9 remaining slots.
 
-## Comparison: 3-Run Trend
+## Outdated Dependencies (Performance-Relevant)
 
-| Metric | 2026-02-02 | 2026-02-06 | 2026-02-07 | Trend |
-|--------|-----------|-----------|-----------|-------|
-| Total JS | 2,660 KB | 2,889 KB | **2,455 KB** | Recovered |
-| Total CSS | 98 KB | 132 KB | **130 KB** | Stable (above Feb 2) |
-| Prod deps | 30 | 27 | **27** | Improved |
-| ElevenLabs chunks | 1 × 476 KB | 2 × 476 KB | **1 × 482 KB** | Fixed |
+| Package | Current | Latest | Type | Impact |
+|---------|---------|--------|------|--------|
+| posthog-js | 1.353.0 | 1.359.1 | prod | Security fix (dompurify), potential bundle improvements |
+| lucide-react | 0.575.0 | 0.577.0 | prod | Minor — unlikely bundle change |
+| @stripe/stripe-js | 8.8.0 | 8.9.0 | prod | Minor — patch-level |
+| @supabase/supabase-js | 2.97.0 | 2.98.0 | prod | Minor — patch-level |
+| stripe | 20.3.1 | 20.4.1 | prod | Server-only — no bundle impact |
+| postcss | 8.5.6 | 8.5.8 | dev | Build tool — no bundle impact |
 
-**Analysis:**
-- JS bundle spiked on Feb 6 due to ElevenLabs duplication, now resolved
-- CSS increased between Feb 2 and Feb 6 (+34 KB) and stabilized — likely new styles from features added that week, not a regression
-- The -434 KB drop from Feb 6 is almost exactly the size of one ElevenLabs chunk (476 KB), confirming the duplication fix
+No major version updates pending. All outdated packages are minor/patch bumps.
+
+## Dynamic Import Chain Verification
+
+### Public site (visitor-facing)
+
+```
+immersive-page-content.tsx
+  -> dynamic(() => import("./voice-chat"), { ssr: false })  // DEFERRED
+    -> voice-chat-elevenlabs.tsx
+      -> import { useConversation } from "@elevenlabs/react"  // 482 KB
+    -> import { usePostHog } from "posthog-js/react"          // static within module
+```
+
+The ElevenLabs SDK (482 KB) and react-markdown (152 KB) are properly deferred behind the VoiceChat dynamic import. They only load when a visitor opens the chat panel.
+
+**Note:** `voice-chat.tsx:23` has a static `import { usePostHog } from "posthog-js/react"`. Since PostHog is already loaded by the provider (via dynamic import in useEffect), this doesn't add bundle weight — but it does mean VoiceChat depends on PostHog being loaded.
+
+### Admin dashboard
+
+```
+admin/page.tsx
+  -> dynamic(() => import("marketing-dashboard"), { ssr: false })  // DEFERRED
+    -> import { VoiceAgentChat } from "../voice-agent-chat"        // STATIC - 482 KB LOADED
+      -> import { useConversation } from "@elevenlabs/react"
+```
+
+**Problem persists:** `VoiceAgentChat` is statically imported in `marketing-dashboard.tsx:5`. The 482 KB ElevenLabs chunk loads when the Marketing tab is opened, not when a voice session starts. This is the top remaining optimization opportunity.
+
+## Comparison: 4-Run Trend
+
+| Metric | 2026-02-02 | 2026-02-06 | 2026-02-07 | 2026-03-07 (est.) | Trend |
+|--------|-----------|-----------|-----------|------------------|-------|
+| Total JS | 2,660 KB | 2,889 KB | 2,455 KB | **~2,395 KB** | Improving |
+| Prod deps | 30 | 27 | 27 | **31** | Growing (within budget) |
+| node_modules | - | 850 MB | 856 MB | **861 MB** | Stable |
+| ElevenLabs chunks | 1x476 KB | 2x476 KB | 1x482 KB | **1x482 KB** | Fixed (Feb 7) |
+| Key optimizations | framer-motion removed | ElevenLabs dedup | optimizePackageImports | **Build blocked** | Action needed |
 
 ## Action Plan
 
 | Priority | Action | Estimated Savings | Effort | Blocked By |
 |----------|--------|-------------------|--------|-----------|
-| P1 | Add `optimizePackageImports: ['lucide-react']` | 50-100 KB | Trivial | Nothing |
-| P1 | Lazy-load StoryEditorDialog + CreateStoryDialog | 50-70 KB | Low | Nothing |
+| **P0** | **Delete corrupted `coverage/` directory** | Unblocks builds | Trivial | Sandbox permission |
+| **P0** | **Fix agent-config route TypeScript error** | Unblocks CI build | Low | Nothing |
 | P2 | Lazy-load VoiceAgentChat in MarketingDashboard | 482 KB deferred | Low | Nothing |
-| P2 | Run `build:analyze` to identify unknown chunks | 0 KB (diagnostic) | Low | Nothing |
-| P3 | Verify ElevenLabs chunk is fully deferred on public pages | 0-482 KB | Low | DevTools |
+| P2 | Run `build:analyze` for chunk identification | Diagnostic | Low | P0 fixes |
+| P2 | Update posthog-js to 1.359.1 | Security + possible size improvement | Trivial | Nothing |
+| P3 | Verify ElevenLabs chunk deferred on public pages | 0-482 KB | Low | DevTools |
 
-**Total potential savings from P1 actions: 100-170 KB** — would bring Total JS to ~2,285-2,355 KB, creating a comfortable 145-215 KB buffer under budget.
+**Immediate action needed:** P0 items must be resolved before the next build or deployment.
 
 ## Disk Usage
 
 | Directory | Size | Notes |
 |-----------|------|-------|
-| node_modules | 856 MB | Stable (pdfjs-dist + pdf-parse account for 120 MB as devDeps — expected) |
-| .next | 2,102 MB | High but stable. Clear with `rm -rf .next && npm run build` if it grows |
+| node_modules | 861 MB | Stable (+5 MB from new deps, expected) |
+| .next | 843 MB | Dev server cache only — not comparable to prod build |
+| coverage | ~2 MB | **Corrupted** — 65535 hard links in `coverage/src`. Delete to unblock builds. |
+
+## Next.js 16 Turbopack Notes
+
+Next.js 16 uses Turbopack by default for production builds. Key differences from webpack:
+
+1. **No per-route size output** — The route table only shows static (circle) vs dynamic (f) markers, not KB sizes
+2. **No webpack fallback** — `--webpack` flag exists but fails on `node:` protocol imports used in this project
+3. **Bundle analyzer** — `@next/bundle-analyzer` still works with Turbopack via `ANALYZE=true`, but requires a successful build
+4. **Chunk naming** — Turbopack uses different chunk strategies; previous chunk hashes are not comparable
+
+To get accurate bundle sizes, the P0 build blockers must be resolved first.
 
 ---
 
 ## Cross-Agent Context
 
-**For Security Agent:** No new production dependencies added. Bundle is within budget.
+**For Security Agent:** 4 new production deps added (`@upstash/ratelimit`, `@upstash/redis`, `resend`, `stripe`). posthog-js update to 1.359.1 recommended to resolve dompurify vuln. No new client-heavy dependencies.
 
-**For Code Quality Agent:** All 5 critical complexity hotspots have been resolved (2026-02-09):
-- `costs-analytics-panel.tsx` (1,498 lines) → split into `costs-analytics-panel/` directory (7 files)
-- `story-editor-dialog.tsx` (1,154 lines) → split into `story-editor-dialog/` directory (6 files)
-- `marketing-dashboard.tsx` (1,096 lines) → split into `marketing-dashboard/` directory (9 files)
-- `admin-api.ts` (892 lines) → split into `admin-api/` directory (7 files)
-- `agents-dashboard.tsx` (835 lines) → split into `agents-dashboard/` directory (10 files)
+**For Code Quality Agent:** Fix TypeScript error in `src/app/api/admin/agent-config/route.ts` — `GET` handler returns `AuthResult | NextResponse` but should always return `NextResponse`. This blocks CI builds. Also: `VoiceAgentChat` static import in `marketing-dashboard.tsx:5` should be converted to `dynamic()`.
 
-See `docs/agents/code-quality-report.md` for full details.
+**For QA Agent:** CI build step is broken on `develop` since Mar 5 — agent-config route type error. QA journeys relying on voice chat may see timing issues if VoiceChat dynamic import takes >5s on production (ElevenLabs 482 KB chunk).
 
-**For Performance Agent (next run):** Speed Insights optimizations (P1+P2) were applied on 2026-02-09. Key changes affecting bundle/runtime: lazy-mount analytics sub-panels, dynamic-import admin dialogs, lazy-load translation files, typewriter extraction to avoid parent re-renders. See `docs/engineering/perf-optimization-2026-02.md` for full details. Re-measure bundle sizes and check if `optimizePackageImports` for lucide-react is still the top opportunity.
+**For Coverage Agent:** Cannot generate coverage locally — the `coverage/` directory needs to be deleted and recreated. After deletion, run `npm run test:coverage` to regenerate clean coverage data.
 
-**For Dependencies Agent:** All heavy packages (`pdfjs-dist`, `pdf-parse`) correctly in devDependencies. No duplicate package versions detected in `package-lock.json` for `@elevenlabs/react`.
+**For Cost Analyst Agent:** No cost-impacting changes. New Upstash deps are for rate limiting (operational cost is Upstash Redis plan, tracked separately).
 
 ---
 
-*Report generated by Performance Agent — Last updated: 2026-02-07*
-*Cross-agent section updated: 2026-02-09 (code quality + perf optimization work)*
-*Based on production build metrics*
+*Report generated by Performance Agent — 2026-03-07*
+*Bundle sizes estimated (build blocked) — accurate measurement pending P0 fixes*

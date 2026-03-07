@@ -278,4 +278,59 @@ describe("DraftsPanel", () => {
       expect(screen.getByText("1 draft ready to post")).toBeInTheDocument();
     });
   });
+
+  it("handles delete fetch error gracefully", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    // First call loads drafts, second call (DELETE) throws
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockDrafts }) })
+      .mockRejectedValueOnce(new Error("Network failure"));
+    global.fetch = fetchMock;
+
+    render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTitle("Delete draft")).toHaveLength(2);
+    });
+
+    const deleteButtons = screen.getAllByTitle("Delete draft");
+    await user.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith("Failed to delete draft:", expect.any(Error));
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("handles mark-as-posted fetch error gracefully", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockDrafts }) })
+      .mockRejectedValueOnce(new Error("Network failure"));
+    global.fetch = fetchMock;
+
+    render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTitle("Mark as posted")).toHaveLength(2);
+    });
+
+    const postedButtons = screen.getAllByTitle("Mark as posted");
+    await user.click(postedButtons[0]);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith("Failed to mark as posted:", expect.any(Error));
+    });
+
+    // onDraftPosted should NOT have been called on error
+    expect(onDraftPosted).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
 });

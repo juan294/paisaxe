@@ -172,4 +172,130 @@ describe("AgentCard", () => {
     await user.click(card);
     expect(onClick).toHaveBeenCalled();
   });
+
+  it("handles keyboard Enter to trigger onClick", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+
+    render(
+      <AgentCard
+        agent={mockAgent}
+        isRunning={false}
+        onRun={vi.fn()}
+        onStop={vi.fn()}
+        onClick={onClick}
+      />
+    );
+
+    const card = screen.getByText("Coverage Agent").closest("[role='button']")!;
+    (card as HTMLElement).focus();
+    await user.keyboard("{Enter}");
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles keyboard Space to trigger onClick", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+
+    render(
+      <AgentCard
+        agent={mockAgent}
+        isRunning={false}
+        onRun={vi.fn()}
+        onStop={vi.fn()}
+        onClick={onClick}
+      />
+    );
+
+    const card = screen.getByText("Coverage Agent").closest("[role='button']")!;
+    (card as HTMLElement).focus();
+    await user.keyboard(" ");
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not have keyboard handler when onClick is not provided", () => {
+    render(
+      <AgentCard
+        agent={mockAgent}
+        isRunning={false}
+        onRun={vi.fn()}
+        onStop={vi.fn()}
+      />
+    );
+
+    // The outer card should NOT have role="button" when onClick is not provided
+    const card = screen.getByText("Coverage Agent").closest("div")!;
+    expect(card).not.toHaveAttribute("role", "button");
+    expect(card).not.toHaveAttribute("tabindex");
+  });
+
+  it("calls onStop when stop button is clicked (not onClick)", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const onStop = vi.fn();
+
+    render(
+      <AgentCard
+        agent={mockAgent}
+        isRunning={true}
+        onRun={vi.fn()}
+        onStop={onStop}
+        onClick={onClick}
+      />
+    );
+
+    await user.click(screen.getByLabelText("Stop Coverage Agent"));
+    expect(onStop).toHaveBeenCalledTimes(1);
+    // onClick should NOT have been called (stopPropagation)
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("calls onRun when run button is clicked (not onClick)", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    const onRun = vi.fn();
+
+    render(
+      <AgentCard
+        agent={mockAgent}
+        isRunning={false}
+        onRun={onRun}
+        onStop={vi.fn()}
+        onClick={onClick}
+      />
+    );
+
+    await user.click(screen.getByLabelText("Run Coverage Agent"));
+    expect(onRun).toHaveBeenCalledTimes(1);
+    // onClick should NOT have been called (stopPropagation)
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("shows 'Last run stopped by user' when status is stopped", () => {
+    render(
+      <AgentCard
+        agent={mockAgent}
+        isRunning={false}
+        lastRunResult={{ status: "stopped", time: new Date().toISOString() }}
+        onRun={vi.fn()}
+        onStop={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Last run stopped by user")).toBeInTheDocument();
+  });
+
+  it("shows 'Last run completed successfully' for success status", () => {
+    render(
+      <AgentCard
+        agent={mockAgent}
+        isRunning={false}
+        lastRunResult={{ status: "success", time: new Date().toISOString() }}
+        onRun={vi.fn()}
+        onStop={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Last run completed successfully")).toBeInTheDocument();
+  });
 });

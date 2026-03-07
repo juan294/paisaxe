@@ -59,14 +59,14 @@ describe("SERVICE_TIERS config", () => {
     const el = SERVICE_TIERS.find((t) => t.serviceId === "elevenlabs");
     expect(el).toBeDefined();
     expect(el!.currentTierName).toBe("Creator");
-    expect(el!.currentMonthlyCostUsd).toBe(18.33);
+    expect(el!.currentMonthlyCostUsd).toBe(22.18);
     expect(el!.limits[0].monthlyLimit).toBe(100);
   });
 
   it("should include Vercel tier", () => {
     const vercel = SERVICE_TIERS.find((t) => t.serviceId === "vercel");
     expect(vercel).toBeDefined();
-    expect(vercel!.currentTierName).toBe("Hobby");
+    expect(vercel!.currentTierName).toBe("Pro");
   });
 
   it("should include PostHog tier", () => {

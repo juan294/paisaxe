@@ -303,5 +303,130 @@ describe("/api/mcp/places", () => {
       const response = await POST(request);
       expect(response.status).toBe(400);
     });
+
+    it("should support flat format from ElevenLabs", async () => {
+      const mockPlacesResponse = createPlacesApiResponse([
+        {
+          name: "Sidrería Tierra Astur",
+          address: "Oviedo, Asturias",
+          rating: 4.2,
+          reviewsCount: 500,
+          priceLevel: "PRICE_LEVEL_MODERATE",
+          lat: 43.3619,
+          lng: -5.8494,
+          id: "ChIJ789ghi",
+        },
+      ]);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockPlacesResponse),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          query: "sidra",
+          type: "restaurant",
+          city: "Oviedo",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.places).toHaveLength(1);
+      expect(data.places[0].name).toBe("Sidrería Tierra Astur");
+    });
+
+    it("should return 500 if API key is not configured", async () => {
+      delete process.env.GOOGLE_PLACES_API_KEY;
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Places API not configured");
+    });
+
+    it("should handle fetch throwing", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toContain("Network error");
+    });
+  });
+
+  describe("GET - additional coverage", () => {
+    it("should handle API returning error in response body", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            error: {
+              message: "API quota exceeded",
+              status: "RESOURCE_EXHAUSTED",
+            },
+          }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toContain("API quota exceeded");
+    });
+
+    it("should handle no results", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ places: [] }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=nonexistent+place+xyz",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.places).toEqual([]);
+    });
+
+    it("should handle fetch throwing", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toContain("Network error");
+    });
   });
 });
