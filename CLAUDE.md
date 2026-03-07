@@ -373,7 +373,7 @@ Core tables (see `supabase/migrations/` for full DDL):
 ## Development Guardrails
 
 1. **No secrets in code** — Use env vars. Gitleaks scans git history.
-2. **No copyleft dependencies** — MIT, Apache-2.0, BSD, ISC only.
+2. **No copyleft dependencies** — MIT, Apache-2.0, BSD, ISC only. See `docs/project/license-exceptions.md` for approved exceptions.
 3. **Performance budgets** — Lighthouse: Perf >= 70%, A11y >= 80%, LCP < 4s.
 4. **No dead code** — Knip reports unused exports on PRs.
 5. **Health endpoint is sacred** — `/api/health` monitored 24/7. Don't break it.
