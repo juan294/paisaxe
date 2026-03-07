@@ -10,15 +10,18 @@ import type {
   AgentsDashboardData,
 } from "@/types/agents-dashboard";
 
+/** Directory where all agent reports live (relative to project root). */
+const REPORTS_DIR = "docs/agents";
+
 const AGENTS = [
-  { flagKey: "coverage_agent_enabled", name: "Coverage", schedule: "Daily at 2:00 AM", reportFile: "docs/agents/coverage-report.md" },
-  { flagKey: "security_agent_enabled", name: "Security", schedule: "Weekly Monday 9:00 AM", reportFile: "docs/agents/security-report.md" },
-  { flagKey: "documentation_agent_enabled", name: "Documentation", schedule: "Weekly Sunday 6:00 AM", reportFile: "docs/agents/documentation-report.md" },
-  { flagKey: "performance_agent_enabled", name: "Performance", schedule: "Weekly Saturday 10:00 AM", reportFile: "docs/agents/performance-report.md" },
-  { flagKey: "qa_agent_enabled", name: "QA", schedule: "Weekly Sunday 8:00 AM", reportFile: "docs/agents/qa-report.md" },
-  { flagKey: "localization_agent_enabled", name: "Localization", schedule: "Weekly Sunday 7:00 AM", reportFile: "docs/agents/localization-report.md" },
-  { flagKey: "cost_analyst_agent_enabled", name: "Cost Analyst", schedule: "Daily at 3:00 AM", reportFile: "docs/agents/cost-analyst-report.md" },
-  { flagKey: "subscription_optimizer_enabled", name: "Subscription Optimizer", schedule: "Weekly Sunday 4:00 AM", reportFile: "docs/agents/subscription-optimizer-report.md" },
+  { flagKey: "coverage_agent_enabled", name: "Coverage", schedule: "Daily at 2:00 AM", reportFilename: "coverage-report.md" },
+  { flagKey: "security_agent_enabled", name: "Security", schedule: "Weekly Monday 9:00 AM", reportFilename: "security-report.md" },
+  { flagKey: "documentation_agent_enabled", name: "Documentation", schedule: "Weekly Sunday 6:00 AM", reportFilename: "documentation-report.md" },
+  { flagKey: "performance_agent_enabled", name: "Performance", schedule: "Weekly Saturday 10:00 AM", reportFilename: "performance-report.md" },
+  { flagKey: "qa_agent_enabled", name: "QA", schedule: "Weekly Sunday 8:00 AM", reportFilename: "qa-report.md" },
+  { flagKey: "localization_agent_enabled", name: "Localization", schedule: "Weekly Sunday 7:00 AM", reportFilename: "localization-report.md" },
+  { flagKey: "cost_analyst_agent_enabled", name: "Cost Analyst", schedule: "Daily at 3:00 AM", reportFilename: "cost-analyst-report.md" },
+  { flagKey: "subscription_optimizer_enabled", name: "Subscription Optimizer", schedule: "Weekly Sunday 4:00 AM", reportFilename: "subscription-optimizer-report.md" },
 ];
 
 // Map flag keys to display names for shared context parsing.
@@ -186,11 +189,13 @@ export async function GET() {
   }
 
   try {
-    const projectRoot = process.cwd();
+    // Use specific subdirectory to avoid Turbopack tracing the entire project root.
+    const reportsDir = path.join(process.cwd(), "docs", "agents");
     const agentStatuses: AgentStatus[] = [];
 
     for (const agent of AGENTS) {
-      const filePath = path.join(projectRoot, agent.reportFile);
+      const filePath = path.join(reportsDir, agent.reportFilename);
+      const reportFile = `${REPORTS_DIR}/${agent.reportFilename}`;
       let lastRun: string | null = null;
       let health: AgentHealthStatus = "unknown";
       let healthSummary = "Report not found.";
@@ -210,7 +215,7 @@ export async function GET() {
         flagKey: agent.flagKey,
         name: agent.name,
         schedule: agent.schedule,
-        reportFile: agent.reportFile,
+        reportFile,
         lastRun,
         health,
         healthSummary,
@@ -220,7 +225,7 @@ export async function GET() {
     // Parse shared context
     let sharedContext: SharedContextEntry[] = [];
     try {
-      const sharedContextPath = path.join(projectRoot, "docs/agents/shared-context.md");
+      const sharedContextPath = path.join(reportsDir, "shared-context.md");
       const sharedContextContent = await fs.readFile(sharedContextPath, "utf-8");
       sharedContext = parseSharedContext(sharedContextContent);
     } catch {
