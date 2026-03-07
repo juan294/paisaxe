@@ -4,16 +4,16 @@
 > See `docs/health-report-[DATE].md` for the latest coverage data.
 > This file is kept for historical reference only and is no longer updated.
 
-> Last updated: 2026-02-16 (final standalone run)
+> Last updated: 2026-03-07
 
 ## Summary
 
-- **Total tests:** 4243 passed
-- **Test files:** 274 passed (100%)
-- **Statement coverage:** 88.29%
-- **Branch coverage:** 80.18%
-- **Function coverage:** 85.30%
-- **Line coverage:** 89.25%
+- **Total tests:** 4782 passed
+- **Test files:** 292 passed (100%)
+- **Statement coverage:** 93.08%
+- **Branch coverage:** 85.83%
+- **Function coverage:** 91.84%
+- **Line coverage:** 93.90%
 - **TypeScript:** ✅ No errors
 
 *Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
@@ -142,55 +142,53 @@
 | `src/components/admin/marketing-dashboard/constants.ts` | Marketing |
 | `src/components/admin/marketing-dashboard/account-card.tsx` | Marketing |
 | `src/components/admin/story-card.tsx` | Admin |
+| `src/lib/admin-api/agent-config.ts` | Admin API |
+| `src/app/api/admin/agent-config/route.ts` | API |
+| `src/components/admin/costs-analytics-panel/modals.tsx` | Admin |
+| `src/components/admin/costs-analytics-panel/skeletons.tsx` | Admin |
+| `src/lib/rerank.ts` | Lib |
+| `src/app/privacy/layout.tsx` | App |
+| `src/app/terms/layout.tsx` | App |
+| `src/app/favorites/page.tsx` | App |
+| `src/components/admin/agents-dashboard/agent-card.tsx` | Admin |
 
 ## Files Below 100%
 
 | File | Stmts | Branch | Funcs | Lines | Reason |
 |------|-------|--------|-------|-------|--------|
-| `src/proxy.ts` | 97% | 93% | 94% | 98% | Lines 21 (NODE_ENV guard), 253 (mock limitation in cookie callback) |
-| `src/app/admin/page.tsx` | 56% | 61% | 47% | 58% | Complex admin UI with many interactive states that require browser-specific testing |
+| `src/proxy.ts` | 98% | 94% | 96% | 98% | Lines 29, 327 (NODE_ENV guard at module load, cookie callback) |
+| `src/app/admin/page.tsx` | 56% | 47% | 58% | 56% | Complex admin UI with many interactive states |
 | `src/app/api/admin/agent-reports/route.ts` | 92% | 100% | 100% | 92% | File system operations with fs.stat edge cases |
-| `src/app/api/admin/elevenlabs-analytics/route.ts` | 91% | 81% | 95% | 90% | Some ElevenLabs API response edge cases not testable without live API |
-| `src/app/api/admin/marketing/accounts/route.ts` | 76% | 85% | 100% | 76% | Error handling branches for database constraint violations |
-| `src/app/api/admin/marketing/agent/route.ts` | 81% | 71% | 100% | 81% | Complex AI agent response handling edge cases |
-| `src/app/api/admin/marketing/dashboard/route.ts` | 86% | 65% | 86% | 86% | Complex aggregation logic with multiple database queries |
-| `src/app/api/admin/marketing/schedule/route.ts` | 96% | 97% | 100% | 96% | Minor edge cases in PUT validation |
+| `src/app/api/admin/elevenlabs-analytics/route.ts` | 91% | 81% | 100% | 91% | ElevenLabs API response edge cases |
+| `src/app/api/admin/marketing/accounts/route.ts` | 81% | 70% | 100% | 80% | Error handling branches |
+| `src/app/api/admin/marketing/agent/route.ts` | 84% | 92% | 100% | 84% | AI agent response handling edge cases |
+| `src/app/api/admin/marketing/dashboard/route.ts` | 90% | 79% | 100% | 90% | Time-range aggregation edge cases |
+| `src/app/api/admin/marketing/schedule/route.ts` | 90% | 94% | 100% | 90% | Minor edge cases in PUT validation |
 | `src/app/api/admin/stories/[id]/content-images/route.ts` | 90% | 79% | 100% | 90% | Edge cases in image URL parsing |
 | `src/app/api/admin/stories/[id]/image/route.ts` | 90% | 88% | 100% | 90% | Supabase storage error handling paths |
 | `src/app/api/admin/stories/[id]/status/route.ts` | 95% | 92% | 100% | 95% | RLS policy bypass branch |
-| `src/app/api/admin/stories/bulk-delete/route.ts` | 88% | 90% | 100% | 88% | Cascade delete edge cases |
+| `src/app/api/admin/stories/bulk-delete/route.ts` | 89% | 93% | 100% | 89% | Cascade delete edge cases |
 | `src/app/api/admin/stories/bulk-status/route.ts` | 89% | 93% | 100% | 89% | Partial update scenarios |
-| `src/app/api/chat/route.ts` | 91% | 70% | 100% | 91% | Claude API streaming edge cases |
-| `src/app/api/favorites/route.ts` | 93% | 100% | 70% | 92% | Middleware auth bypass path not reachable in tests |
-| `src/app/api/health/route.ts` | 90% | 61% | 100% | 90% | Database storage calculation branches |
-| `src/app/api/suggestions/route.ts` | 88% | 94% | 67% | 88% | Rate limiting internal state management |
+| `src/app/api/chat/route.ts` | 91% | 67% | 100% | 91% | Claude API streaming edge cases |
+| `src/app/api/favorites/route.ts` | 73% | 75% | 100% | 73% | Auth callback cookie handling |
+| `src/app/api/health/route.ts` | 78% | 68% | 100% | 78% | Database storage calculation branches |
 | `src/app/api/voice-access/route.ts` | 84% | 100% | 50% | 84% | getSupabaseClient helper function coverage |
 | `src/app/api/webhooks/supabase/route.ts` | 95% | 95% | 100% | 100% | HMAC validation branch |
-| `src/app/auth/callback/route.ts` | 73% | 100% | 25% | 73% | Supabase Auth cookie handling (setAll catch block unreachable in jsdom) |
-| `src/app/favorites/page.tsx` | 86% | 77% | 82% | 89% | Complex RSC with suspense boundaries |
-| `src/app/immersive/page.tsx` | 69% | 46% | 69% | 70% | Complex client interactions with story navigation |
-| `src/components/posthog-provider.tsx` | 62% | 29% | 78% | 57% | PostHog analytics initialization — dynamic imports hard to test in vitest |
-| `src/components/admin/*` (multiple) | 0-42% | 0-48% | 0-40% | 0-42% | Complex admin UI components with browser-specific interactions |
-| `src/components/immersive/fullscreen-button.tsx` | 94% | 91% | 100% | 100% | Remaining: fullscreenchange event edge cases |
-| `src/components/immersive/share-button.tsx` | 96% | 93% | 100% | 100% | Minor branch for window.location origin edge case |
-| `src/components/immersive/toolbar-overflow-menu.tsx` | 96% | 93% | 91% | 96% | Line 69: ref cleanup edge case |
-| `src/components/immersive/volume-button.tsx` | 0% | 0% | 0% | 0% | Audio control component - requires browser audio APIs |
-| `src/hooks/use-feature-flags.ts` | 100% | 91% | 100% | 100% | Branch-only gaps in deferred loading conditionals |
-| `src/hooks/use-reduced-motion.ts` | 92% | 50% | 100% | 100% | SSR check branch |
-| `src/hooks/use-stories.ts` | 97% | 88% | 100% | 99% | LocalStorage quota exceeded handling |
-| `src/lib/admin-api/stories.ts` | 93% | 93% | 92% | 93% | Lines 276-289: bulk operation edge cases |
-| `src/lib/admin-api/optimizer.ts` | 100% | 83% | 100% | 100% | Branch-only gap in optimizer config |
-| `src/lib/chat-action-detection.ts` | 97% | 75% | 100% | 99% | Regex edge cases |
-| `src/lib/claude.ts` | 99% | 90% | 100% | 99% | Line 323: unreachable TypeScript safety net in retry loop |
-| `src/lib/image-optimization.ts` | 95% | 69% | 100% | 96% | Sharp library edge cases |
-| `src/lib/localize-story.ts` | 100% | 87% | 100% | 100% | Branch coverage only - all statements covered |
-| `src/lib/rate-limit.ts` | 97% | 82% | 100% | 97% | Token bucket edge case |
-| `src/lib/costs/manual-costs.ts` | 93% | 92% | 100% | 93% | Supabase admin client null-check branches |
-| `src/lib/rerank.ts` | 89% | 86% | 100% | 89% | Voyage API error handling |
-| `src/lib/seasonal-weighting.ts` | 100% | 83% | 100% | 100% | Branch coverage only |
-| `src/lib/translate-story.ts` | 97% | 84% | 100% | 97% | Lines 235, 241: internal throw statements in error handling |
-| `src/lib/i18n/detect-language.ts` | 91% | 83% | 100% | 97% | Navigator.languages fallback |
-| `src/lib/i18n/resolve.ts` | 92% | 88% | 100% | 92% | Translation key fallback chain |
+| `src/app/immersive/immersive-page-content.tsx` | 81% | 73% | 82% | 81% | Complex client interactions with story navigation |
+| `src/components/posthog-provider.tsx` | 61% | 41% | 77% | 63% | PostHog analytics — dynamic imports hard to test in vitest |
+| `src/components/admin/voice-agent-chat.tsx` | 45% | 42% | 39% | 46% | ElevenLabs SDK integration — better suited for E2E |
+| `src/components/admin/agents-dashboard/index.tsx` | 48% | 47% | 52% | 50% | Complex admin dashboard — better suited for E2E |
+| `src/components/admin/story-editor-dialog/index.tsx` | 40% | 66% | 25% | 43% | Complex dialog component — better suited for E2E |
+| `src/components/immersive/fullscreen-button.tsx` | 94% | 91% | 100% | 100% | Fullscreenchange event edge cases |
+| `src/components/immersive/share-button.tsx` | 95% | 93% | 100% | 100% | Minor branch for window.location origin edge case |
+| `src/hooks/use-voice-session.ts` | 93% | 85% | 100% | 96% | SSR guard (line 53, unreachable in jsdom) |
+| `src/lib/claude.ts` | 99% | 89% | 100% | 99% | Line 323: unreachable TypeScript safety net in retry loop |
+| `src/lib/image-optimization.ts` | 94% | 68% | 100% | 96% | Sharp library edge cases |
+| `src/lib/rate-limit.ts` | 98% | 89% | 100% | 98% | Token bucket edge case |
+| `src/lib/costs/manual-costs.ts` | 92% | 90% | 100% | 92% | Supabase admin client null-check branches |
+| `src/lib/costs/recurring-costs.ts` | 93% | 60% | 100% | 100% | Branch-only gaps |
+| `src/lib/translate-story.ts` | 97% | 84% | 100% | 97% | Lines 235, 241: internal throw statements |
+| `src/lib/i18n/provider.tsx` | 92% | 100% | 80% | 92% | Lazy loading edge cases |
 | `src/lib/i18n/index.ts` | 0% | 0% | 0% | 0% | Re-export only file (no executable code) |
 | `src/lib/i18n/types.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
 | `src/types/analytics.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
@@ -220,6 +218,75 @@ These are deliberately untested and considered acceptable:
 9. **Admin tunnel route** (`src/app/api/admin/tunnel/route.ts`): Uses child_process spawn/exec for Cloudflare tunnel management. This is a development-only feature that requires actual shell execution and cannot be meaningfully tested in jsdom/vitest without mocking the entire child_process module, which would provide no real test value.
 
 ## Changes Made This Run
+
+### Test files modified (2026-03-07):
+- `src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx` (+12 tests) - CostChart direct tests ($Xk format, empty data, SVG bars), ServiceBreakdownTable direct tests (empty, manual edit/delete, notes, dashboard links), formatDateShort, TierAlertsSection expand-after-collapse re-fetch
+- `src/components/admin/agents-dashboard/agent-card.test.tsx` (+7 tests) - Keyboard Enter/Space navigation, stopPropagation for run/stop buttons, stopped/success last run status
+- `src/app/api/admin/marketing/dashboard/route.test.ts` (+3 tests) - Posts fetch error, schedules fetch error, failed posts + recent posts stats
+- `src/hooks/use-voice-session.test.ts` (+3 tests) - Existing localStorage state, malformed JSON, missing conversationCount field
+- `src/components/immersive/author-typewriter.test.tsx` (+1 test) - Full animation cycle (erase/type loop past HOME_HOLD)
+- `src/components/admin/marketing-dashboard/drafts-panel.test.tsx` (+2 tests) - Delete fetch error, mark-as-posted fetch error
+- `src/app/api/admin/elevenlabs-analytics/route.test.ts` (+3 tests) - Local config fallback naming, truncated ID fallback, status breakdown with failed
+- `src/proxy.test.ts` (+2 tests) - Invalid Supabase URL catch block, setAll cookie update on response
+- `src/app/favorites/page.test.tsx` (+2 tests) - IntersectionObserver triggers loadMore, guard clause when hasMore is false
+
+### Coverage improvements (2026-03-07):
+- **src/components/admin/agents-dashboard/agent-card.tsx**: 61% → 100% (+39%)
+- **src/app/favorites/page.tsx**: 85% → 100% (+15%)
+- **src/components/immersive/author-typewriter.tsx**: 72% → 85% (+13%)
+- **src/components/admin/costs-analytics-panel/chart.tsx**: 89% → 97% (+8%)
+- **src/hooks/use-voice-session.ts**: 87% → 93% (+6%)
+- **src/components/admin/costs-analytics-panel/alerts.tsx**: 95% → 97% (+2%)
+- **src/app/api/admin/marketing/dashboard/route.ts**: 85% → 90% (+5%)
+- **src/components/admin/marketing-dashboard/drafts-panel.tsx**: 83% → 87% (+4%)
+- **src/proxy.ts**: 97% → 98% (+1%)
+
+### Overall improvement (2026-03-07):
+- Statement coverage: 92.65% → 93.08% (+0.43%)
+- Branch coverage: 85.24% → 85.83% (+0.59%)
+- Function coverage: 91.52% → 91.84% (+0.32%)
+- Line coverage: 93.51% → 93.90% (+0.39%)
+- Total tests: 4748 → 4782 (+34 tests)
+- Test files: 292 (0 new files, 9 enhanced)
+
+---
+
+### Test files created (2026-03-06):
+- `src/lib/admin-api/agent-config.test.ts` (20 tests) - fetchAgentConfig, updateAgentConfig, enableAgent, disableAgent
+- `src/app/api/admin/agent-config/route.test.ts` (17 tests) - GET/PUT handlers with fs operations, error paths
+- `src/components/admin/suggestions-panel.test.tsx` (21 tests) - Rendering, filtering, approve/dismiss, refresh, error states
+
+### Test files modified (2026-03-06):
+- `src/components/admin/costs-analytics-panel/modals.test.tsx` (+5 tests) - Custom service fields onChange, category change, date/notes onChange
+- `src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx` (+5 tests) - Delete error, empty state add cost, edit modal success/error
+- `src/app/api/webhooks/stripe/route.test.ts` (+2 tests) - Catch block, null payment_intent fallback
+- `src/app/api/webhooks/translate/route.test.ts` (+1 test) - Catch block (unexpected error)
+- `src/lib/rerank.test.ts` (+1 test) - Null data fallback path
+- `src/app/privacy/layout.test.tsx` (+1 test) - Render children
+- `src/app/terms/layout.test.tsx` (+1 test) - Render children
+- `src/app/api/mcp/make-booking/route.test.ts` (enhanced) - Additional coverage for booking flow
+- `src/app/api/mcp/places/route.test.ts` (enhanced) - Additional coverage for Places API
+- `src/app/api/mcp/weather/route.test.ts` (enhanced) - Additional coverage for Weather API
+
+### Coverage improvements (2026-03-06):
+- **src/lib/admin-api/agent-config.ts**: 3% → 100% (+97%)
+- **src/app/api/admin/agent-config/route.ts**: 0% → 100% (+100%)
+- **src/components/admin/costs-analytics-panel/modals.tsx**: 72% → 100% (+28%)
+- **src/components/admin/suggestions-panel.tsx**: 54% → 89% (+35%)
+- **src/lib/rerank.ts**: 89% → 100% (+11%)
+- **src/app/privacy/layout.tsx**: 50% → 100% (+50%)
+- **src/app/terms/layout.tsx**: 50% → 100% (+50%)
+- **src/components/admin/costs-analytics-panel/index.tsx**: 76% → 95% (+19%)
+
+### Overall improvement (2026-03-06):
+- Statement coverage: 88.29% → 92.65% (+4.36%)
+- Branch coverage: 80.18% → 85.24% (+5.06%)
+- Function coverage: 85.30% → 91.52% (+6.22%)
+- Line coverage: 89.25% → 93.51% (+4.26%)
+- Total tests: 4243 → 4748 (+505 tests)
+- Test files: 274 → 292 (+18 files)
+
+---
 
 ### Test files created (2026-02-16):
 - `src/components/admin/agents-dashboard/constants.test.ts` (18 tests) - relativeTime, formatElapsed, AGENT_FLAG_KEYS, AGENT_NAMES, HEALTH_* constants
@@ -434,6 +501,11 @@ Run manually anytime:
   - 3 files near-100%: claude (99%), proxy (97%), translate-story (97%)
   - Largest single-run improvement to date: +5.33% statement coverage, +481 tests
   - Used 8 parallel background agents for maximum throughput
+- **2026-03-06**: Coverage Agent run -- 4748 tests, 292 files (+505 tests, +18 files, +4.36% statement coverage)
+  - Created 3 new test files: admin-api/agent-config (20 tests), api/admin/agent-config route (17 tests), suggestions-panel (21 tests)
+  - Enhanced 10 existing test files: costs modals (+5), costs panel (+5), stripe webhook (+2), translate webhook (+1), rerank (+1), privacy/terms layouts (+2), MCP routes (make-booking, places, weather)
+  - 7 files reached 100%: admin-api/agent-config, agent-config route, costs modals, rerank, privacy layout, terms layout, costs-analytics skeletons
+  - 3 files significantly improved: suggestions-panel (54→89%), costs panel (76→95%), agent-config (3→100%)
 - **2026-02-16**: Coverage Agent run -- 4243 tests, 274 files (+168 tests, +8 files, +2.37% statement coverage)
   - Created 8 new test files: agents-dashboard constants/use-agent-runner/use-agent-terminal, story-editor types/use-story-editor-state, costs-analytics modals, marketing stat-card/post-row
   - Enhanced 6 existing test files: story-card (+17), accounts route (+11), story-viewer (+7), drafts-panel (+8), marketing-dashboard (+15), account-card (+3)

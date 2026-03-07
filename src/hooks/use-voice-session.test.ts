@@ -84,6 +84,32 @@ describe("useVoiceSession", () => {
     expect(result.current.isReturning).toBe(false);
   });
 
+  it("should read existing conversation count from localStorage", () => {
+    localStorageMock.setItem("paisaxe_voice_session", JSON.stringify({ conversationCount: 5 }));
+
+    const { result } = renderHook(() => useVoiceSession());
+
+    expect(result.current.conversationCount).toBe(5);
+    expect(result.current.isReturning).toBe(true);
+  });
+
+  it("should handle malformed JSON in localStorage gracefully", () => {
+    localStorageMock.setItem("paisaxe_voice_session", "not-valid-json{");
+
+    const { result } = renderHook(() => useVoiceSession());
+
+    expect(result.current.conversationCount).toBe(0);
+    expect(result.current.isReturning).toBe(false);
+  });
+
+  it("should handle missing conversationCount field in stored JSON", () => {
+    localStorageMock.setItem("paisaxe_voice_session", JSON.stringify({}));
+
+    const { result } = renderHook(() => useVoiceSession());
+
+    expect(result.current.conversationCount).toBe(0);
+  });
+
   it("should return user locale from navigator", () => {
     // Mock navigator.language
     Object.defineProperty(navigator, "language", {

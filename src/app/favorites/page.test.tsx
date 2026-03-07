@@ -403,6 +403,79 @@ describe("FavoritesPage", () => {
     });
   });
 
+  describe("infinite scroll / loadMore", () => {
+    // Create 25 stories to exceed the ITEMS_PER_PAGE (20) threshold
+    const manyStories = Array.from({ length: 25 }, (_, i) => ({
+      id: `story-${i}`,
+      slug: `story-slug-${i}`,
+      title: `Story Title ${i}`,
+      subtitle: `Subtitle ${i}`,
+      description: `Description ${i}`,
+      image: `/images/story-${i}.jpg`,
+      category: "nature" as const,
+      sourcePdf: "nature.pdf",
+    }));
+    const manyFavoriteIds = manyStories.map((s) => s.id);
+
+    beforeEach(() => {
+      mockUseStories.mockReturnValue({
+        stories: manyStories,
+        isLoading: false,
+        error: null,
+        refresh: vi.fn(),
+      });
+      mockUseFavorites.mockReturnValue({
+        favorites: manyFavoriteIds,
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+    });
+
+    it("should trigger loadMore via IntersectionObserver and display more items", async () => {
+      render(<FavoritesPage />);
+
+      // The IntersectionObserver mock fires immediately with isIntersecting: true,
+      // triggering loadMore. loadMore uses a 300ms setTimeout internally.
+      // Wait for the additional items to appear after the timeout completes.
+      await waitFor(() => {
+        expect(screen.getByText("Story Title 24")).toBeInTheDocument();
+      });
+
+      // All 25 stories should now be displayed
+      expect(screen.getByText("Story Title 0")).toBeInTheDocument();
+      expect(screen.getByText("Story Title 20")).toBeInTheDocument();
+    }, 10_000);
+
+    it("should not load more when hasMore is false", async () => {
+      // Use exactly 20 stories so hasMore starts as false
+      const exactStories = manyStories.slice(0, 20);
+      const exactFavoriteIds = exactStories.map((s) => s.id);
+
+      mockUseStories.mockReturnValue({
+        stories: exactStories,
+        isLoading: false,
+        error: null,
+        refresh: vi.fn(),
+      });
+      mockUseFavorites.mockReturnValue({
+        favorites: exactFavoriteIds,
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Story Title 0")).toBeInTheDocument();
+        expect(screen.getByText("Story Title 19")).toBeInTheDocument();
+      });
+
+      // With exactly 20 items, hasMore is false so the guard clause prevents loading.
+      // All 20 are displayed, confirm the count header.
+      expect(screen.getByText(`20 ${mockT("favorites.place_plural")}`)).toBeInTheDocument();
+    });
+  });
+
   describe("sync banner", () => {
     it("should show sync banner when user is not logged in and has favorites", async () => {
       mockUseFavorites.mockReturnValue({

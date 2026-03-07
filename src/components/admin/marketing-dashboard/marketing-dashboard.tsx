@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, AlertCircle } from "lucide-react";
-import { VoiceAgentChat } from "../voice-agent-chat";
+import dynamic from "next/dynamic";
+const VoiceAgentChat = dynamic(
+  () => import("../voice-agent-chat").then(m => ({ default: m.VoiceAgentChat })),
+  { ssr: false }
+);
 import { ELEVENLABS_AGENT_IDS } from "@/config/elevenlabs-agents";
 import { csrfHeaders } from "@/lib/csrf-client";
 import type {

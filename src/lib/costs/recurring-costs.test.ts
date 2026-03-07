@@ -5,8 +5,8 @@ describe("generateRecurringCosts", () => {
   it("should generate costs for the current month", () => {
     const costs = generateRecurringCosts("2026-02-01", "2026-02-28");
 
-    // Should include Supabase, ElevenLabs, AWS Domains, GitHub Pro, Anthropic, and Claude Code Max
-    expect(costs.length).toBe(6);
+    // Should include Supabase, ElevenLabs, AWS Domains, GitHub Pro, Anthropic, Claude Code Max, Vercel, and Twilio Phone
+    expect(costs.length).toBe(8);
 
     const supabase = costs.find((c) => c.serviceId === "supabase");
     expect(supabase).toBeDefined();

@@ -43,8 +43,8 @@ export async function GET() {
     );
   }
 
-  const authError = await validateAdminAuth();
-  if (authError) return authError;
+  const auth = await validateAdminAuth();
+  if (!auth.valid) return auth.error;
 
   try {
     const config = await readConfig();
@@ -73,8 +73,8 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  const authError = await validateAdminAuth();
-  if (authError) return authError;
+  const auth = await validateAdminAuth();
+  if (!auth.valid) return auth.error;
 
   try {
     const body = await request.json();

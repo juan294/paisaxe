@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { CostsAnalyticsPanel } from "./index";
 import { TierAlertsSection } from "./alerts";
 import { ScalingForecastSection } from "./forecast";
+import { ServiceBreakdownTable, CostChart, formatDateShort } from "./chart";
 import { AnalyticsCacheProvider } from "../analytics-cache-context";
 import type {
   CostsAnalyticsDashboardData,
@@ -525,6 +526,160 @@ describe("CostsAnalyticsPanel", () => {
       expect(screen.getByText("Refresh")).toBeInTheDocument();
     });
   });
+
+  it("handleDeleteCost error — shows mutation error", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    vi.mocked(adminApi.deleteManualCostEntry).mockResolvedValue({
+      error: "Cannot delete: entry is referenced",
+    });
+
+    render(<CostsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Supabase")).toBeInTheDocument();
+    });
+
+    const supabaseRow = screen.getByText("Supabase").closest("tr")! as HTMLElement;
+    const deleteButton = within(supabaseRow).getAllByRole("button").pop()!;
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("Cannot delete: entry is referenced")).toBeInTheDocument();
+    });
+
+    confirmSpy.mockRestore();
+  });
+
+  it("opens Add Manual Cost modal from empty state", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
+      data: {
+        ...mockCostsData,
+        services: [],
+        summary: {
+          ...mockCostsData.summary,
+          totalMonthlyUsd: 0,
+          totalMonthlyFormatted: "$0.00",
+          servicesTracked: 0,
+          automatedServices: 0,
+        },
+      },
+    });
+
+    render(<CostsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("No cost data yet")).toBeInTheDocument();
+    });
+
+    // Click the "Add Manual Cost" button in the empty state
+    await user.click(screen.getByText("Add Manual Cost"));
+
+    // Modal should open — now the form fields are visible
+    expect(screen.getByLabelText("Service")).toBeInTheDocument();
+    expect(screen.getByLabelText("Cost (USD)")).toBeInTheDocument();
+  });
+
+  it("edit cost modal — success closes modal and refreshes", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(adminApi.updateManualCostEntry).mockResolvedValue({
+      data: {
+        id: "supabase-2026-01-01",
+        serviceId: "supabase",
+        serviceName: "Supabase",
+        category: "infrastructure" as const,
+        costUsd: 30,
+        billingPeriodStart: "2026-01-01",
+        billingPeriodEnd: "2026-01-31",
+        notes: "Updated",
+        createdBy: null,
+        createdAt: "2026-01-15T00:00:00Z",
+        updatedAt: "2026-01-15T00:00:00Z",
+      },
+    });
+
+    render(<CostsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Supabase")).toBeInTheDocument();
+    });
+
+    // Click the edit button on the manual cost row (Supabase has source: "manual")
+    const supabaseRow = screen.getByText("Supabase").closest("tr")! as HTMLElement;
+    const editButton = within(supabaseRow).getAllByRole("button")[0];
+    await user.click(editButton);
+
+    // Edit modal should open
+    await waitFor(() => {
+      expect(screen.getByText(/Edit Cost: Supabase/)).toBeInTheDocument();
+    });
+
+    // Change cost
+    const costInput = screen.getByLabelText("Cost (USD)");
+    await user.clear(costInput);
+    await user.type(costInput, "30");
+
+    // Submit
+    await user.click(screen.getByText("Save Changes"));
+
+    await waitFor(() => {
+      expect(adminApi.updateManualCostEntry).toHaveBeenCalledTimes(1);
+    });
+
+    // Modal should close on success
+    await waitFor(() => {
+      expect(screen.queryByText(/Edit Cost: Supabase/)).not.toBeInTheDocument();
+    });
+  });
+
+  it("edit cost modal — error shows mutation error", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(adminApi.updateManualCostEntry).mockResolvedValue({
+      error: "Update failed: invalid data",
+    });
+
+    render(<CostsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Supabase")).toBeInTheDocument();
+    });
+
+    const supabaseRow = screen.getByText("Supabase").closest("tr")! as HTMLElement;
+    const editButton = within(supabaseRow).getAllByRole("button")[0];
+    await user.click(editButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Edit Cost: Supabase/)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Save Changes"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Update failed: invalid data")).toBeInTheDocument();
+    });
+  });
+
+  it("renders chart Y-axis with $Xk format when costs are very high", async () => {
+    vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
+      data: {
+        ...mockCostsData,
+        costsByDay: [
+          { date: "2026-01-01", costUsd: 1500 },
+          { date: "2026-01-02", costUsd: 2000 },
+        ],
+      },
+    });
+
+    render(<CostsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("$2.0k")).toBeInTheDocument();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -822,6 +977,41 @@ describe("TierAlertsSection", () => {
       expect(dashes.length).toBeGreaterThanOrEqual(2);
     });
   });
+
+  it("re-fetches data when expanded after being collapsed without data", async () => {
+    // Start with no data
+    vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
+      data: { ...mockCostsData, usageMetrics: undefined },
+    });
+
+    render(<TierAlertsSection dateRange={dateRange} />, { wrapper });
+
+    // Wait for initial render
+    await waitFor(() => {
+      expect(screen.getByText("No usage data available yet")).toBeInTheDocument();
+    });
+
+    const fetchCount = vi.mocked(adminApi.fetchCostsAnalytics).mock.calls.length;
+
+    // Collapse
+    const toggleButton = screen.getByRole("button", { name: /tier upgrade alerts/i });
+    fireEvent.click(toggleButton);
+
+    // Clear the usage metrics to simulate "no data loaded"
+    // Now set up mock to return data
+    vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
+      data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
+    });
+    vi.mocked(costsLib.computeTierAlerts).mockReturnValue([makeTierAlert()]);
+
+    // Expand again — should trigger loadData since usageMetrics is null
+    fireEvent.click(toggleButton);
+
+    // Should have called fetchCostsAnalytics again
+    await waitFor(() => {
+      expect(vi.mocked(adminApi.fetchCostsAnalytics).mock.calls.length).toBeGreaterThan(fetchCount);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1070,5 +1260,124 @@ describe("ScalingForecastSection", () => {
     expect(screen.getByText("12")).toBeInTheDocument();
     // voiceMinutes: 35.5 with decimals=1 -> "35.5"
     expect(screen.getByText("35.5")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ServiceBreakdownTable (direct)
+// ---------------------------------------------------------------------------
+
+describe("ServiceBreakdownTable (direct)", () => {
+  it("renders empty message when services is empty", () => {
+    render(
+      <ServiceBreakdownTable
+        services={[]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("No cost data available")).toBeInTheDocument();
+  });
+
+  it("renders edit and delete buttons for manual source entries", () => {
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+
+    render(
+      <ServiceBreakdownTable
+        services={[makeService({ source: "manual", serviceName: "Manual Svc" })]}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    );
+
+    expect(screen.getByLabelText("Edit Manual Svc cost")).toBeInTheDocument();
+    expect(screen.getByLabelText("Delete Manual Svc cost")).toBeInTheDocument();
+  });
+
+  it("renders dash for non-manual source entries (no edit/delete)", () => {
+    render(
+      <ServiceBreakdownTable
+        services={[makeService({ source: "api", serviceName: "API Svc" })]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    // Non-manual entries show a dash instead of edit/delete buttons
+    expect(screen.queryByLabelText("Edit API Svc cost")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Delete API Svc cost")).not.toBeInTheDocument();
+  });
+
+  it("renders notes when service has notes", () => {
+    render(
+      <ServiceBreakdownTable
+        services={[makeService({ notes: "Monthly billing" })]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Monthly billing")).toBeInTheDocument();
+  });
+
+  it("renders dashboard link when service has dashboardUrl", () => {
+    render(
+      <ServiceBreakdownTable
+        services={[makeService({ dashboardUrl: "https://example.com" })]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText("Open Anthropic Claude dashboard")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CostChart (direct)
+// ---------------------------------------------------------------------------
+
+describe("CostChart (direct)", () => {
+  it("returns null when data is empty", () => {
+    const { container } = render(
+      <CostChart data={[]} />
+    );
+
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("renders SVG bars for data points", () => {
+    const { container } = render(
+      <CostChart data={[
+        { date: "2026-01-01", costUsd: 5 },
+        { date: "2026-01-02", costUsd: 10 },
+      ]} />
+    );
+
+    const rects = container.querySelectorAll("rect");
+    expect(rects.length).toBe(2);
+  });
+
+  it("renders $Xk Y-axis label for amounts >= 1000", () => {
+    render(
+      <CostChart data={[
+        { date: "2026-01-01", costUsd: 1500 },
+      ]} />
+    );
+
+    expect(screen.getByText("$1.5k")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatDateShort
+// ---------------------------------------------------------------------------
+
+describe("formatDateShort", () => {
+  it("formats date string to M/D", () => {
+    expect(formatDateShort("2026-01-15")).toBe("1/15");
+    expect(formatDateShort("2026-12-01")).toBe("12/1");
   });
 });

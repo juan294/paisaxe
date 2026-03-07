@@ -126,4 +126,22 @@ describe("translate webhook", () => {
     expect(json.success).toBe(false);
     expect(json.error).toBe("API error");
   });
+
+  it("should return 500 when an unexpected error is thrown", async () => {
+    const { translateStory } = await import("@/lib/translate-story");
+
+    vi.mocked(translateStory).mockRejectedValue(new Error("Unexpected crash"));
+
+    const request = new NextRequest("http://localhost/api/webhooks/translate", {
+      method: "POST",
+      headers: { "x-webhook-secret": VALID_SECRET },
+      body: JSON.stringify({ storyId: "test-story-id" }),
+    });
+
+    const response = await POST(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(json.error).toBe("Internal server error");
+  });
 });

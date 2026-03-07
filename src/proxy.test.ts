@@ -813,6 +813,32 @@ describe("Auth session refresh - setAll cookie callback", () => {
     expect(sessionCookie?.value).toBe("session-data");
   });
 
+  it("should update response cookies when session is refreshed", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://abc.supabase.co");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
+
+    // Make getUser trigger setAll
+    mockGetUser.mockImplementation(async () => {
+      if (capturedCookiesConfig?.setAll) {
+        capturedCookiesConfig.setAll([
+          { name: "sb-abc-auth-token", value: "new-token", options: { path: "/" } },
+        ]);
+      }
+      return { data: { user: { id: "user-1" } }, error: null };
+    });
+
+    const request = new NextRequest("http://localhost:3000/some-page", {
+      headers: { origin: "https://paisaxe.es" },
+    });
+    request.cookies.set("sb-abc-auth-token", "old-token");
+
+    const response = await proxy(request);
+
+    // The response should have the updated cookie
+    const setCookieHeader = response.headers.get("set-cookie");
+    expect(setCookieHeader).toContain("sb-abc-auth-token");
+  });
+
   it("should handle setAll with multiple cookies", async () => {
     mockGetUser.mockImplementation(async () => {
       if (capturedCookiesConfig?.setAll) {
@@ -1249,6 +1275,16 @@ describe("hasSupabaseAuthCookies", () => {
       headers: { cookie: "__csrf=abc123; theme=dark" },
     });
     expect(hasSupabaseAuthCookies(request)).toBe(false);
+  });
+
+  it("returns false for invalid Supabase URL", () => {
+    const original = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "not-a-valid-url";
+
+    const request = new NextRequest("http://localhost:3000/test");
+    expect(hasSupabaseAuthCookies(request)).toBe(false);
+
+    process.env.NEXT_PUBLIC_SUPABASE_URL = original;
   });
 });
 

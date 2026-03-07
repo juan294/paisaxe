@@ -232,6 +232,179 @@ describe("GET /api/admin/marketing/dashboard", () => {
     expect(data.error).toBe("Failed to fetch accounts");
   });
 
+  it("should return 500 when posts fetch fails", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "marketing_accounts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        };
+      }
+      if (table === "marketing_posts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } }),
+            }),
+          }),
+        };
+      }
+      if (table === "marketing_schedule") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      }
+      return { select: vi.fn() };
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to fetch posts");
+  });
+
+  it("should return 500 when schedules fetch fails", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "marketing_accounts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        };
+      }
+      if (table === "marketing_posts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "marketing_schedule") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } }),
+            }),
+          }),
+        };
+      }
+      return { select: vi.fn() };
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to fetch schedules");
+  });
+
+  it("should count failed posts and recent posts in stats", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const now = new Date();
+    const recentDate = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
+    const postsWithFailed = [
+      {
+        id: "post-recent",
+        account_id: "acc-1",
+        platform: "x",
+        content: "Recent post",
+        media_urls: [],
+        hashtags: [],
+        link_url: null,
+        scheduled_for: null,
+        posted_at: recentDate.toISOString(),
+        status: "posted",
+        platform_post_id: "456",
+        post_url: "https://x.com/paisaxe/456",
+        error_message: null,
+        engagement: { likes: 5, retweets: 2 },
+        story_id: null,
+        content_theme: null,
+        created_at: recentDate.toISOString(),
+        updated_at: recentDate.toISOString(),
+      },
+      {
+        id: "post-failed",
+        account_id: "acc-1",
+        platform: "x",
+        content: "Failed post",
+        media_urls: [],
+        hashtags: [],
+        link_url: null,
+        scheduled_for: null,
+        posted_at: null,
+        status: "failed",
+        platform_post_id: null,
+        post_url: null,
+        error_message: "API rate limit",
+        engagement: {},
+        story_id: null,
+        content_theme: null,
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      },
+    ];
+
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "marketing_accounts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: mockAccounts, error: null }),
+          }),
+        };
+      }
+      if (table === "marketing_posts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: postsWithFailed, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "marketing_schedule") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: mockSchedules, error: null }),
+            }),
+          }),
+        };
+      }
+      return { select: vi.fn() };
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.stats.failedPosts).toBe(1);
+    expect(data.data.stats.postsThisWeek).toBe(1);
+    expect(data.data.stats.postsThisMonth).toBe(1);
+    // Engagement should be aggregated
+    expect(data.data.stats.totalEngagement.likes).toBe(5);
+    expect(data.data.stats.totalEngagement.retweets).toBe(2);
+  });
+
   it("should return 500 on unexpected error", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
     vi.mocked(createAdminClient).mockImplementation(() => {

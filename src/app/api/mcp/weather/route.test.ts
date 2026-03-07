@@ -220,5 +220,146 @@ describe("/api/mcp/weather", () => {
       const response = await POST(request);
       expect(response.status).toBe(400);
     });
+
+    it("should support flat format from ElevenLabs", async () => {
+      const mockWeatherResponse = {
+        name: "Oviedo",
+        main: { temp: 15, feels_like: 14, humidity: 70 },
+        weather: [{ description: "scattered clouds", icon: "03d" }],
+        wind: { speed: 3.5 },
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockWeatherResponse),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.city).toBe("Oviedo");
+      expect(data.temperature).toBe(15);
+    });
+
+    it("should return 500 if API key is not configured", async () => {
+      delete process.env.OPENWEATHERMAP_API_KEY;
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Weather API not configured");
+    });
+
+    it("should return 404 if city not found", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "InvalidCity123" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(404);
+      const data = await response.json();
+      expect(data.error).toBe("City not found");
+    });
+
+    it("should handle general API errors", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toContain("Weather API error: 500");
+    });
+
+    it("should handle fetch throwing", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toContain("Network error");
+    });
+  });
+
+  describe("GET - additional coverage", () => {
+    it("should handle general Weather API errors", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Weather API error: 500");
+    });
+
+    it("should use coordinates for known Asturias cities", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            name: "Oviedo",
+            main: { temp: 15, feels_like: 14, humidity: 70 },
+            weather: [{ description: "scattered clouds", icon: "03d" }],
+            wind: { speed: 3.5 },
+          }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      await GET(request);
+
+      // Should use coordinates endpoint, not city name search
+      const fetchUrl = mockFetch.mock.calls[0][0] as string;
+      expect(fetchUrl).toContain("lat=43.3619");
+      expect(fetchUrl).toContain("lon=-5.8494");
+      expect(fetchUrl).not.toContain("q=oviedo");
+    });
   });
 });
