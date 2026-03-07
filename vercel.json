@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["cdg1"],
+  "regions": ["cdg1", "bah1"],
   "crons": [
     {
       "path": "/api/cron/github-traffic-sync",
