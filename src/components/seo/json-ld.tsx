@@ -11,10 +11,9 @@ import { LOCATION_CONFIG, getRegionCoordinates } from "@/config/location";
 
 interface JsonLdProps {
   type: "website" | "tourist-destination";
-  nonce?: string;
 }
 
-export function JsonLd({ type, nonce }: JsonLdProps) {
+export function JsonLd({ type }: JsonLdProps) {
   const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
   const data =
@@ -25,7 +24,6 @@ export function JsonLd({ type, nonce }: JsonLdProps) {
   return (
     <script
       type="application/ld+json"
-      nonce={nonce}
       suppressHydrationWarning
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -81,10 +79,9 @@ function getTouristDestinationData(siteUrl: string) {
 
 interface StoryJsonLdProps {
   story: Story;
-  nonce?: string;
 }
 
-export function StoryJsonLd({ story, nonce }: StoryJsonLdProps) {
+export function StoryJsonLd({ story }: StoryJsonLdProps) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
   const storyUrl = `${siteUrl}/immersive?story=${story.slug || story.id}`;
   const imageUrl = story.image.startsWith("http")
@@ -126,7 +123,6 @@ export function StoryJsonLd({ story, nonce }: StoryJsonLdProps) {
     return (
       <script
         type="application/ld+json"
-        nonce={nonce}
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
@@ -144,7 +140,6 @@ export function StoryJsonLd({ story, nonce }: StoryJsonLdProps) {
   return (
     <script
       type="application/ld+json"
-      nonce={nonce}
       suppressHydrationWarning
       dangerouslySetInnerHTML={{
         __html: JSON.stringify({
@@ -178,10 +173,9 @@ interface BreadcrumbItem {
 
 interface BreadcrumbJsonLdProps {
   items: BreadcrumbItem[];
-  nonce?: string;
 }
 
-export function BreadcrumbJsonLd({ items, nonce }: BreadcrumbJsonLdProps) {
+export function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
 
   const data = {
@@ -201,7 +195,6 @@ export function BreadcrumbJsonLd({ items, nonce }: BreadcrumbJsonLdProps) {
   return (
     <script
       type="application/ld+json"
-      nonce={nonce}
       suppressHydrationWarning
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
@@ -215,10 +208,9 @@ interface FAQQuestion {
 
 interface FAQJsonLdProps {
   questions: FAQQuestion[];
-  nonce?: string;
 }
 
-export function FAQJsonLd({ questions, nonce }: FAQJsonLdProps) {
+export function FAQJsonLd({ questions }: FAQJsonLdProps) {
   if (!questions || questions.length === 0) {
     return null;
   }
@@ -239,7 +231,6 @@ export function FAQJsonLd({ questions, nonce }: FAQJsonLdProps) {
   return (
     <script
       type="application/ld+json"
-      nonce={nonce}
       suppressHydrationWarning
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
