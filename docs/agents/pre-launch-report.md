@@ -1,210 +1,259 @@
 # Pre-Launch Audit Report
 
-> Generated on 2026-02-24
-> Previous audits: 2026-02-07 through 2026-02-24
-> Branch: `develop` (commit `0dc756f`)
+> Generated on 2026-03-07 | Branch: `develop` | Commit: `63f08d2` | 6 parallel specialists
+> Previous audit: 2026-02-24 (verdict: READY)
 
-## Verdict: READY
+## Verdict: CONDITIONAL
 
-**No blockers found.** The codebase is production-ready. Test coverage at 91.6% (4,674 tests, 290 files, 100% pass rate). Zero type errors, zero lint errors, zero npm audit vulnerabilities.
+No hard blockers in code quality, security, or UX. Three YELLOW ratings from DevOps (unpushed commits / broken remote CI), Security (2 npm audit vulns), and Performance (build warnings). All are fixable before release.
 
-### Score: 57/60
+### Score: 53/60
 
 | Category | Score | Max | Status |
 |----------|-------|-----|--------|
-| Architecture | 10 | 10 | Zero type errors, zero dead code, clean deps |
-| Quality Assurance | 8 | 10 | Stale visual snapshots; some flaky E2E |
-| Security | 9 | 10 | Checkout endpoints lack rate limiting |
-| Performance | 10 | 10 | All chunks < 500KB; lazy loading in place |
-| UX & Accessibility | 10 | 10 | 5 minor a11y warnings (cosmetic) |
-| DevOps & Infrastructure | 10 | 10 | All systems operational |
+| Architecture | 10 | 10 | GREEN — Zero type errors, zero circular deps, 1 unused export |
+| Quality Assurance | 10 | 10 | GREEN — 4,782 tests, 100% pass, 93.08% coverage |
+| Security | 8 | 10 | YELLOW — 2 npm audit vulns (fixable), 1 LGPL dep |
+| Performance | 8 | 10 | YELLOW — Build warnings, 512 KB shared JS |
+| UX & Accessibility | 9 | 10 | GREEN — 2 modals missing focus trap, low contrast footer |
+| DevOps & Infrastructure | 8 | 10 | YELLOW — Unpushed commits, broken remote CI |
 
 ---
 
-## Blockers (must fix before deploy)
+## Blockers (must fix before release)
 
-**None.**
-
----
-
-## Warnings (should fix soon)
-
-### Quality Assurance
-
-1. **W-QA1: Stale visual regression snapshots for immersive page.** Both `[visual-desktop]` and `[visual-mobile]` immersive page screenshots fail consistently. Snapshots need regeneration with `npx playwright test --update-snapshots`. File: `e2e/visual-regression.spec.ts`.
-
-2. **W-QA2: Flaky E2E tests.** Between 3 and 17 failures depending on the run (visual regressions on pricing/favorites/about pages, chat messageIndex timing, author pill visibility). Consider increasing timeouts or adding `waitForLoadState` guards.
-
-### Security
-
-3. **W-SEC1: Checkout endpoints lack rate limiting.** `/api/checkout/day-pass` and `/api/checkout/embedded` have no rate limiting. While both require authentication, a compromised account could spam Stripe checkout session creation. Recommend 5 sessions/min per user.
-
-### UX & Accessibility
-
-4. **W-UX1: Hardcoded Spanish aria-label in `question-prompts.tsx:19`.** Uses `"Preguntas sugeridas"` instead of `t("accessibility.suggested_questions")`. Not localized for non-Spanish users.
-
-5. **W-UX2: Image alt text uses untranslated title.** `story-viewer.tsx:250` uses `story.title` (always Spanish) instead of `localizedStory.title` for alt text.
-
-6. **W-UX3: Inconsistent focus style in `site-info-menu.tsx:41`.** Uses `focus:ring-2 focus:ring-white/50` instead of project standard `focus-visible:ring-2 focus-visible:ring-white/70`.
-
-7. **W-UX4: Navigation hint overlay lacks semantic role.** `navigation-hint.tsx` has no `role="status"` or `aria-hidden="true"` — screen readers may be confused by its presence.
-
-8. **W-UX5: Error pages lack `role="alert"`.** `error.tsx` and `immersive/error.tsx` containers don't have `role="alert"`, so screen readers won't auto-announce errors.
-
-### Performance
-
-9. **W-PERF1: Largest chunk at 471KB.** Approaching 500KB threshold. Monitor with `npm run build:analyze` — after gzip this is ~140-190KB, which is acceptable.
-
-### DevOps
-
-10. **W-OPS1: No dedicated error monitoring.** PostHog captures basic errors via autocapture, but there's no structured error tracking (Sentry/Bugsnag) with source maps, grouping, or alerting.
+| # | Issue | Found by | Fix |
+|---|-------|----------|-----|
+| B1 | **2 unpushed commits on `develop`** — remote CI is broken (last 3 runs failed on Build step). Local commits `63f08d2` and `07e50bc` contain fixes but were never pushed. | devops | `git push origin develop` and verify CI passes |
 
 ---
 
-## Recommendations (nice to have)
+## Warnings
 
-- Clean up 3 redundant knip ignore patterns in `knip.json`
-- Add `role="menu"` to `site-info-menu.tsx:77` dropdown (inconsistent with `ToolbarOverflowMenu`)
-- Add `motion-reduce:animate-none` to `NavigationHint` pulse animation
-- Test 4 feature flags by name (`related_stories`, `story_sharing`, `seasonal_surfacing`, `ambient_discovery`) — currently covered generically
-- Improve branch coverage in `recurring-costs.ts` (60%) and `image-optimization.ts` (69%)
-- Improve `voice-agent-chat.tsx` coverage (#145) — admin-only component
+| # | Issue | Severity | Found by | Risk |
+|---|-------|----------|----------|------|
+| W1 | `npm audit`: 2 vulnerabilities — DOMPurify XSS (moderate, transitive), minimatch ReDoS x2 (high, dev-only) | Medium | security | Fix with `npm audit fix` |
+| W2 | LGPL-3.0-or-later dependency: `@img/sharp-libvips-darwin-arm64` (sharp native binary) | Low | security | Dynamically linked — add explicit policy exception |
+| W3 | Lighthouse workflow missing canvas system dependencies | Medium | devops | Add `apt-get install` step to `.github/workflows/lighthouse.yml` |
+| W4 | 3 of 5 recent Vercel preview deployments show "Error" status | Medium | devops | Investigate — likely same build issue fixed locally |
+| W5 | Turbopack build warnings: overly broad file patterns in `agents-summary/route.ts:193` and `agents/run/route.ts:92` | Low | performance | Use specific file paths |
+| W6 | Shared/framework first-load JS ~512 KB | Low | performance | Within acceptable range — monitor |
+| W7 | Admin "Approve All" dialog + SignInPrompt modal missing `role="dialog"` and focus trap | Low | ux | Add ARIA attributes and `useFocusTrap` |
+| W8 | Footer text `text-white/40` has ~2.6:1 contrast ratio (below WCAG AA 4.5:1) | Low | ux | Increase to `text-white/60` |
+| W9 | Auth response inconsistency in `content-discovery/route.ts:75` | Low | architect | Standardize to `return auth.error` |
+| W10 | 6 files over 500 lines (admin panels, proxy.ts, story-viewer) | Low | architect | Consider sub-component extraction |
 
 ---
 
 ## Detailed Findings
 
-### Architecture
+### 1. Quality Assurance (qa-lead) — GREEN
 
-**Auditor: architect | 0 blockers, 0 warnings, 14 info**
+**Test Suite**: 4,782 tests across 292 files — **100% pass rate**, zero failures, zero flaky tests.
 
-- TypeScript strict mode enabled, `tsc --noEmit` passes with zero errors
-- ESLint passes with zero errors
-- Knip reports zero unused exports, files, or dependencies (3 redundant ignore patterns only)
-- `next.config.ts` production-ready: AVIF/WebP images, 30-day cache, security headers, server external packages, output file tracing exclusions
-- `src/proxy.ts` well-architected: canonical domain redirect, maintenance mode, CORS, CSRF, CSP with per-request nonces, 1.5s auth timeout
-- No `middleware.ts` conflict — `proxy.ts` is the sole request interceptor
-- No circular dependencies in `lib/`, `hooks/`, or `components/immersive/`
-- Import direction follows clean architecture: `app -> components -> hooks -> lib`
-- `vercel.json` properly configured: `cdg1` region, 3 cron jobs, canonical redirects
-- Zero npm audit vulnerabilities
-- `engines: >=23.0.0` — compatible with current Vercel deployment
+**Coverage**: 93.08% statements / 85.83% branches / 91.85% functions / 93.91% lines
 
-### Quality Assurance
+| Critical Path | Coverage |
+|---------------|----------|
+| Auth (components, lib, callback) | 100% |
+| Payments (stripe.ts, checkout routes) | 96.87% |
+| Chat (API route, claude.ts) | 91.30% / 99.39% |
+| Voice (use-voice-session, voice-chat) | 93.93% / 100% |
+| Webhooks (stripe, elevenlabs, translate, supabase) | All tested, all passing |
 
-**Auditor: qa-lead | 0 blockers, 2 warnings, 3 info**
+**Coverage Gaps** (admin-only, not user-facing):
+- `src/app/admin/page.tsx`: 56.56% statements
+- `src/components/admin/story-editor-dialog/index.tsx`: 40.74% statements
 
-- **4,674 unit tests across 290 files — 100% pass rate**
-- **91.6% statement coverage, 84.3% branch, 89.6% function, 92.5% line**
-- All critical paths have test files: proxy, stories-server, feature-flags-server, chat API, admin stories, all Stripe/checkout routes
-- All 28 feature flags covered (individually or via generic infrastructure)
-- All recently changed files (last 7 days) have corresponding test coverage
-- 0% coverage files are all barrel exports or type definitions (no runtime logic)
-- E2E: 139-153 passing, 28 intentionally skipped, 3-17 flaky (mostly visual regressions)
-- Visual regression snapshots for immersive page consistently stale
+**TypeCheck**: Clean (0 errors). **Lint**: Clean (0 errors/warnings).
 
-### Security
+**Slow Tests**: No test exceeds 5 seconds. Slowest is `posthog-query.test.ts` at ~4s (intentional retry timeouts).
 
-**Auditor: security-reviewer | 0 blockers, 1 warning, 10 info**
+### 2. Security (security-reviewer) — YELLOW
 
-- Zero npm audit vulnerabilities
-- No hardcoded secrets in source (only test placeholders)
-- No `.env` files with real secrets committed
-- Admin auth uses server-side `getUser()` + role check with proper 401/403 responses
-- Proxy auth has 1.5s timeout protection against Supabase hangs
-- RLS enabled on all 20 tables
-- CORS: strict origin allowlist, no wildcards, dev-only localhost
-- CSP: nonce-based `strict-dynamic`, well-tested, comprehensive directives
-- CSRF: double-submit cookie with timing-safe comparison, `SameSite=Strict`
-- All 4 webhook endpoints verify signatures/secrets
-- Rate limiting on chat (10/min), suggestions (1/min), MCP endpoints — distributed via Upstash Redis
-- Checkout endpoints (`day-pass`, `embedded`) lack rate limiting (auth-gated but unmetered)
-- DB security-definer functions use `search_path = public, extensions` (acceptable for pg_net)
+**npm audit**: 2 vulnerabilities (both fixable via `npm audit fix`)
+- DOMPurify 3.1.3-3.3.1: XSS (moderate) — transitive dep, not directly used
+- minimatch 10.0.0-10.2.2: 2x ReDoS (high) — dev/build tooling only
 
-### Performance
+**Hardcoded Secrets**: CLEAN — no real API keys, tokens, or passwords in `src/` or `scripts/`
 
-**Auditor: performance-eng | 0 blockers, 1 warning, 7 info**
+**Auth Implementation**: SOLID
+- All 30 admin API routes use `validateAdminAuth()` consistently
+- Supabase session + `user_profiles.role = 'admin'` double-check
+- Cron routes use `verifyVercelCron()` with timing-safe comparison
+- CSRF: double-submit cookie with timing-safe comparison
 
-- Build completes successfully, 130 pages
-- Largest chunk 471KB (under 500KB threshold, ~150KB after gzip)
-- Zero raw `<img>` tags in production — all use `next/image` with AVIF/WebP
-- 9 `dynamic()` imports: VoiceChat, all 8 admin panels
-- Stripe.js lazy-loaded via singleton pattern (tested)
-- PostHog dynamically imported, production-only
-- ElevenLabs SDK deferred behind dynamic VoiceChat
-- `next/font` (Inter) self-hosted, no external font links
-- Lighthouse CI enforces LCP < 4s and CLS < 0.25 at error severity
-- Vercel Analytics + Speed Insights + PostHog RUM in production
-- `lucide-react` and `posthog-js` in `optimizePackageImports`
-- Bundle analyzer available via `npm run build:analyze`
+**Injection Vectors**: CLEAN
+- No raw SQL — all parameterized Supabase queries
+- No command injection — all `spawn`/`exec` use whitelisted paths behind admin auth + dev-only checks
+- `dangerouslySetInnerHTML`: 3 uses, all properly sanitized
 
-### UX & Accessibility
+**CORS**: Properly configured — origin whitelist, no wildcards
 
-**Auditor: ux-reviewer | 0 blockers, 5 warnings, 4 info**
+**Security Headers**: Comprehensive — HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, per-request CSP with nonce + `strict-dynamic`
 
-- All key interactive elements have proper ARIA labels (story-viewer, share, surprise-me, mood-overlay, bookmark, toolbar, language-switcher, fullscreen, voice-chat)
-- Full keyboard support: arrow keys for story navigation, roving tabindex on progress bar, focus trapping in modals
-- 6 complete locales (es, en, fr, de, pt, ast) with automated completeness tests
-- Strong responsive design: Tailwind breakpoints, safe-area-inset support, mobile overflow menu
-- `prefers-reduced-motion` respected at both JS and CSS levels (30+ occurrences)
-- Error boundaries on all routes with localized messages and retry buttons
-- `ComponentErrorBoundary` uses `role="alert"` (but page-level error boundaries do not)
-- One hardcoded Spanish aria-label in question-prompts
-- Image alt text not localized (uses Spanish title for all locales)
-- Inconsistent focus style on site-info-menu trigger
-- Navigation hint overlay lacks semantic role
+**Chat Safety**: Input sanitization, injection detection, output leakage detection, rate limiting, max input length
 
-### DevOps & Infrastructure
+**License Compliance**: 1 LGPL dependency (sharp native binary) — all others MIT/Apache/BSD/ISC
 
-**Auditor: devops | 0 blockers, 1 warning, 7 info**
+### 3. Infrastructure (devops) — YELLOW
 
-- Health endpoint operational: `https://paisaxe.es/api/health` returns HTTP 200 with Supabase connected (252ms latency), DB at 0.5% capacity
-- All security headers confirmed on production responses (HSTS preload, X-Frame-Options DENY, CSP with nonces)
-- CI healthy: latest push has 3 workflows in progress, 1 passed; no failures in recent history
-- Main branch has zero failures in last 10 CI runs
-- Branch protection fully configured: 4 required checks, enforce admins, force push/deletion blocked
-- All 31 env vars in CLAUDE.md present in `.env.example`
-- 3 cron jobs configured and authenticated via `CRON_SECRET`
-- 9 GitHub Actions workflows covering CI, E2E, Lighthouse, security, knip, license, bundle size, AI review, visual baselines
-- PostHog provides basic error visibility but no dedicated error monitoring (Sentry/Bugsnag) with source maps and alerting
+**CI Status** (remote — last 5 runs):
+| Workflow | Status | Notes |
+|----------|--------|-------|
+| CI | FAILURE | Build step failed (commit `1c35d8d`, Mar 5) |
+| E2E Tests | FAILURE | Build step failed |
+| Lighthouse CI | FAILURE | Build step + missing canvas deps |
+| Security Scan | SUCCESS | |
+| Security Scan | SUCCESS | |
+
+**Root cause**: Fix exists locally (`63f08d2`) but was never pushed. 2 commits ahead of `origin/develop`.
+
+**Production Health**: HEALTHY
+```json
+{
+  "status": "healthy",
+  "uptime": 743.82,
+  "services": {
+    "supabase": {"status": "connected", "latency_ms": 114},
+    "database": {"size_mb": 39, "usage_percent": 0.5}
+  }
+}
+```
+
+**Error Pages**: All 3 custom error pages exist with i18n support (404, 500, global-error)
+
+**GitHub Actions**: 9 well-structured workflows
+
+**Env Vars**: `.env.example` covers all 28 documented variables. All `NEXT_PUBLIC_*` vars are non-secret.
+
+**Git State**: 40 files changed locally vs remote (3,605 insertions, 713 deletions). 11 stale git stashes.
+
+### 4. Architecture (architect) — GREEN
+
+**TypeScript**: Clean — 0 errors
+
+**Circular Dependencies**: None found (609 files scanned)
+
+**Dead Code**: 1 unused export (`updateAgentConfigValue` in `src/lib/admin-api/index.ts:66`)
+
+**Outdated Dependencies** (notable):
+| Package | Current | Latest | Risk |
+|---------|---------|--------|------|
+| `@supabase/ssr` | 0.8.0 | 0.9.0 | Pre-1.0 minor — review changelog |
+| `voyageai` | 0.1.0 | 0.2.1 | Pre-1.0 minor — review changelog |
+| `pdfjs-dist` | 5.4.624 | 5.5.207 | Minor bump |
+
+Safe patch bumps available for 11+ packages.
+
+**Code Quality**: Only 1 `as any` in production (justified — Safari PWA API). Zero TODO/FIXME/HACK comments.
+
+### 5. Performance (performance-eng) — YELLOW
+
+**Build**: PASS in 12.9s (Turbopack)
+
+| Metric | Value |
+|--------|-------|
+| Shared/framework first-load JS | ~512 KB |
+| Largest lazy chunk | 471 KB (ElevenLabs/LiveKit — voice only) |
+| React DOM | 219 KB |
+| PostHog (lazy) | 173 KB |
+| Supabase Realtime (lazy) | 164 KB |
+| Global CSS | 121 KB |
+| Static pages | 2 (robots.txt, sitemap.xml) |
+| Dynamic pages | 69 |
+
+**Code Splitting**: Excellent — 8 dynamic imports on admin page, VoiceChat lazy + conditional, PostHog lazy after hydration, Stripe lazy singleton
+
+**Image Optimization**: All production code uses `next/image`. AVIF + WebP configured. 30-day cache TTL.
+
+### 6. UX/Accessibility (ux-reviewer) — GREEN
+
+**Accessibility Checklist**:
+- [x] Heading hierarchy — proper h1-h6 on all pages
+- [x] ARIA labels — extensive labeling on all interactive elements
+- [x] Focus indicators — consistent `focus-visible:ring` patterns
+- [x] Motion preferences — `useReducedMotion()` hook + `motion-reduce:` classes + CSS catch-all
+- [x] Alt text — all images have meaningful alt text
+- [x] Keyboard navigation — focus trapping, roving tabindex, keyboard shortcuts
+- [x] Error/loading/empty states — skeletons, error boundaries, empty states throughout
+
+**Gaps**:
+- Admin "Approve All" dialog + SignInPrompt modal: missing `role="dialog"` and focus trap
+- Admin StatCard buttons: missing `aria-label`
+- Footer text: `text-white/40` below WCAG AA contrast threshold
 
 ---
 
-## Changes Since Last Audit (2026-02-17 → 2026-02-24)
+## Recommended Actions
 
-| Change | Impact |
-|--------|--------|
-| Deep-link fix for shuffled story order (`0dc756f`) | Share links now resolve correctly with `randomized_order` enabled |
-| `randomized_order` feature flag enabled | Stories shuffled per-session for visitor discovery |
-| 2 new tests for deep-link + shuffle interaction | Regression coverage for new fix |
-| Test count: 4,672 → 4,674 | +2 tests |
-| Statement coverage: 91.2% → 91.6% | Slight improvement |
+### Priority 1: Must-do before release
+1. **Push unpushed commits** — `git push origin develop` to fix remote CI
+2. **Run `npm audit fix`** — patch DOMPurify and minimatch vulnerabilities
+3. **Verify CI passes** after push — all 4 status checks must be green
+
+### Priority 2: Should-do (quick fixes)
+4. Add canvas deps to `lighthouse.yml` — match `ci.yml` install step
+5. Standardize auth response in `content-discovery/route.ts:75`
+6. Remove unused export `updateAgentConfigValue` from `src/lib/admin-api/index.ts:66`
+7. Increase footer text contrast — `text-white/40` to `text-white/60`
+
+### Priority 3: Post-release improvements
+8. Add `role="dialog"` + focus trap to admin "Approve All" dialog and SignInPrompt
+9. Dynamically import `VoiceChatElevenLabs` to defer 471 KB chunk until voice toggle
+10. Investigate converting `/about`, `/terms`, `/privacy` to server components
+11. Fix Turbopack warnings in admin route file patterns
+12. Upgrade `@supabase/ssr` and `voyageai` after reviewing changelogs
+13. Increase admin dashboard test coverage (currently 56%)
+14. Add LGPL exception to license policy for sharp native binary
+15. Apply safe patch dependency upgrades (11+ packages)
+16. Clean up 11 stale git stashes
+
+---
+
+## Changes Since Last Audit (2026-02-24 → 2026-03-07)
+
+| Metric | Previous | Current | Delta |
+|--------|----------|---------|-------|
+| Tests | 4,674 | 4,782 | +108 |
+| Test files | 290 | 292 | +2 |
+| Pass rate | 100% | 100% | — |
+| Statement coverage | 91.6% | 93.08% | +1.48% |
+| Branch coverage | 84.3% | 85.83% | +1.53% |
+| Function coverage | 89.6% | 91.85% | +2.25% |
+| Line coverage | 92.5% | 93.91% | +1.41% |
+| npm audit vulns | 0 | 2 | +2 (new transitive deps) |
+| Type errors | 0 | 0 | — |
+| Lint errors | 0 | 0 | — |
+| Unused exports | 0 | 1 | +1 |
+| Build time | — | 12.9s | — |
+
+Notable changes:
+- Agent config moved from Supabase to local JSON (`1c35d8d`)
+- cc-rpi blueprint sync to v1.4.0 (`07e50bc`)
+- CI build blocker fixed locally but not pushed
+- Coverage improved significantly (+108 tests, +1.5% across all metrics)
 
 ---
 
 ## Historical Action Items
 
-### P1 — All resolved
+### From 2026-02-24 audit — Status
+
 - [x] Resolve `qs` override (#147)
 - [x] Add auth to checkout health endpoint (#148)
 - [x] Fix flaky E2E `ask-button` locators (#151)
 - [x] Fix Stripe.js lockfile mismatch (#150)
-
-### P2 — All resolved
 - [x] Update outdated deps (#150)
 - [x] Fix low contrast text (#158)
 - [x] Add MoodOverlay focus trap (#159)
 - [x] Resolve minimatch/dependabot issue (#154)
 - [x] Lazy-load Stripe.js (#156)
-
-### P3 — Mostly resolved
 - [x] Add ISR to static pages (#163)
-- [x] Add `generateStaticParams` for stories (#163)
 - [x] Pin Vercel region (#164)
 - [x] Improve admin component coverage (#152, #167)
 - [x] Promote LCP/CLS to error in Lighthouse (#157)
 - [ ] Improve voice-agent-chat.tsx coverage (#145) — backlog
 - [ ] Consider Supabase lazy-loading (#155) — backlog
-- [ ] Add rate limiting to checkout endpoints — new
-- [ ] Update stale visual regression snapshots — new
-- [ ] Add dedicated error monitoring (Sentry) — new
+- [ ] Add rate limiting to checkout endpoints — open
+- [ ] Add dedicated error monitoring (Sentry) — open
