@@ -1,8 +1,46 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StoryEditorDialog } from "./index";
 import type { AdminStory } from "@/types/admin";
+
+// Mock admin-api for save/approve/mark-pending actions
+const mockUpdateStoryStatus = vi.fn();
+const mockUpdateStory = vi.fn();
+const mockUpdateStoryImageUrl = vi.fn();
+const mockUploadStoryImage = vi.fn();
+const mockUpdateStoryImageSource = vi.fn();
+const mockUpdateStoryTranslation = vi.fn();
+
+vi.mock("@/lib/admin-api", () => ({
+  updateStoryStatus: (...args: unknown[]) => mockUpdateStoryStatus(...args),
+  updateStory: (...args: unknown[]) => mockUpdateStory(...args),
+  updateStoryImageUrl: (...args: unknown[]) => mockUpdateStoryImageUrl(...args),
+  uploadStoryImage: (...args: unknown[]) => mockUploadStoryImage(...args),
+  updateStoryImageSource: (...args: unknown[]) => mockUpdateStoryImageSource(...args),
+  updateStoryTranslation: (...args: unknown[]) => mockUpdateStoryTranslation(...args),
+}));
+
+// Mock Dialog to bypass portals for coverage
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ children, open }: { children: React.ReactNode; open: boolean; onOpenChange?: (open: boolean) => void }) =>
+    open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="dialog-content">{children}</div>
+  ),
+  DialogHeader: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="dialog-header">{children}</div>
+  ),
+  DialogTitle: ({ children }: { children: React.ReactNode }) => (
+    <h2>{children}</h2>
+  ),
+  DialogDescription: ({ children }: { children: React.ReactNode }) => (
+    <p>{children}</p>
+  ),
+  DialogFooter: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="dialog-footer">{children}</div>
+  ),
+}));
 
 // Mock child components
 vi.mock("../story-translations-tab", () => ({
@@ -153,4 +191,157 @@ describe("StoryEditorDialog", () => {
 
     expect(screen.getByText("Mark as pending")).toBeInTheDocument();
   });
+
+  describe("approve/pending actions", () => {
+    it("calls updateStoryStatus with 'approved' when clicking Mark as approved", async () => {
+      mockUpdateStoryStatus.mockResolvedValue({ data: { id: "story1", curationStatus: "approved" } });
+      const user = userEvent.setup();
+
+      render(
+        <StoryEditorDialog story={mockStory} onClose={onClose} onUpdate={onUpdate} />
+      );
+
+      await user.click(screen.getByText("Mark as approved"));
+
+      await waitFor(() => {
+        expect(mockUpdateStoryStatus).toHaveBeenCalledWith("story1", "approved");
+      });
+
+      // onUpdate should be called to reflect the status change
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenCalledWith("story1", { curationStatus: "approved" });
+      });
+    });
+
+    it("calls updateStoryStatus with 'needs_curation' when clicking Mark as pending", async () => {
+      mockUpdateStoryStatus.mockResolvedValue({ data: { id: "story1", curationStatus: "needs_curation" } });
+      const user = userEvent.setup();
+
+      render(
+        <StoryEditorDialog
+          story={{ ...mockStory, curationStatus: "approved" }}
+          onClose={onClose}
+          onUpdate={onUpdate}
+        />
+      );
+
+      await user.click(screen.getByText("Mark as pending"));
+
+      await waitFor(() => {
+        expect(mockUpdateStoryStatus).toHaveBeenCalledWith("story1", "needs_curation");
+      });
+
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenCalledWith("story1", { curationStatus: "needs_curation" });
+      });
+    });
+
+    it("shows error when approve fails", async () => {
+      mockUpdateStoryStatus.mockResolvedValue({ error: "Approve failed" });
+      const user = userEvent.setup();
+
+      render(
+        <StoryEditorDialog story={mockStory} onClose={onClose} onUpdate={onUpdate} />
+      );
+
+      await user.click(screen.getByText("Mark as approved"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Approve failed")).toBeInTheDocument();
+      });
+    });
+
+    it("shows error when mark pending fails", async () => {
+      mockUpdateStoryStatus.mockResolvedValue({ error: "Pending failed" });
+      const user = userEvent.setup();
+
+      render(
+        <StoryEditorDialog
+          story={{ ...mockStory, curationStatus: "approved" }}
+          onClose={onClose}
+          onUpdate={onUpdate}
+        />
+      );
+
+      await user.click(screen.getByText("Mark as pending"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Pending failed")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("cancel button", () => {
+    it("calls onClose when clicking Cancel", async () => {
+      const user = userEvent.setup();
+
+      render(
+        <StoryEditorDialog story={mockStory} onClose={onClose} onUpdate={onUpdate} />
+      );
+
+      await user.click(screen.getByText("Cancel"));
+
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  describe("save button", () => {
+    it("save button is disabled when no changes have been made", () => {
+      render(
+        <StoryEditorDialog story={mockStory} onClose={onClose} onUpdate={onUpdate} />
+      );
+
+      const saveBtn = screen.getByText("Save Changes").closest("button")!;
+      expect(saveBtn).toBeDisabled();
+    });
+  });
+
+  describe("switching back to details tab from image", () => {
+    it("shows details tab content when switching back from image tab", async () => {
+      const user = userEvent.setup();
+
+      render(
+        <StoryEditorDialog story={mockStory} onClose={onClose} onUpdate={onUpdate} />
+      );
+
+      // Switch to image tab
+      await user.click(screen.getByText("Image"));
+      expect(screen.getByTestId("image-tab")).toBeInTheDocument();
+      expect(screen.queryByTestId("details-tab")).not.toBeInTheDocument();
+
+      // Switch back to details
+      await user.click(screen.getByText("Details"));
+      expect(screen.getByTestId("details-tab")).toBeInTheDocument();
+      expect(screen.queryByTestId("image-tab")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("dialog footer rendering", () => {
+    it("renders footer with approve button and action buttons for needs_curation story", () => {
+      render(
+        <StoryEditorDialog story={mockStory} onClose={onClose} onUpdate={onUpdate} />
+      );
+
+      const footer = screen.getByTestId("dialog-footer");
+      expect(footer).toBeInTheDocument();
+      expect(screen.getByText("Mark as approved")).toBeInTheDocument();
+      expect(screen.getByText("Cancel")).toBeInTheDocument();
+      expect(screen.getByText("Save Changes")).toBeInTheDocument();
+    });
+
+    it("renders footer with mark pending button for approved story", () => {
+      render(
+        <StoryEditorDialog
+          story={{ ...mockStory, curationStatus: "approved" }}
+          onClose={onClose}
+          onUpdate={onUpdate}
+        />
+      );
+
+      const footer = screen.getByTestId("dialog-footer");
+      expect(footer).toBeInTheDocument();
+      expect(screen.getByText("Mark as pending")).toBeInTheDocument();
+    });
+  });
 });
+
