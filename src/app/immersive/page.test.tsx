@@ -350,4 +350,9 @@ describe("ImmersivePage (server component)", () => {
     expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith("randomized_order");
     expect(mockGetStoriesServer).toHaveBeenCalledTimes(1);
   });
+
+  it("should export revalidate = 60 for ISR", async () => {
+    const pageModule = await import("./page");
+    expect(pageModule.revalidate).toBe(60);
+  });
 });
