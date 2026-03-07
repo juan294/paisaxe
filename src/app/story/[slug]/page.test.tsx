@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { redirect } from "next/navigation";
-import StoryPage, { generateMetadata, generateStaticParams, revalidate } from "./page";
+import StoryPage, { generateMetadata, generateStaticParams } from "./page";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
@@ -22,12 +22,6 @@ const mockRedirect = vi.mocked(redirect);
 describe("StoryPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe("revalidate", () => {
-    it("should export revalidate set to 3600 (1 hour)", () => {
-      expect(revalidate).toBe(3600);
-    });
   });
 
   describe("generateStaticParams", () => {

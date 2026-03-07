@@ -9,6 +9,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@anthropic-ai/sdk", "sharp"],
   experimental: {
+    cacheComponents: true,
     // Tree-shake barrel exports — avoids bundling all 1,000+ lucide icons
     optimizePackageImports: ["lucide-react", "posthog-js"],
   },
