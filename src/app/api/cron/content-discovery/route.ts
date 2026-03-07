@@ -72,7 +72,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!verifyWebhookSecret(request)) {
     const auth = await validateAdminAuth();
     if (!auth.valid) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return auth.error;
     }
   }
   return discoverContent();

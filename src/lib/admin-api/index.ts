@@ -63,5 +63,4 @@ export {
   fetchAgentConfig,
   updateAgentMaster,
   updateAgentEnabled,
-  updateAgentConfigValue,
 } from "./agent-config";
