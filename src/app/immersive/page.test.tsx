@@ -290,7 +290,11 @@ describe("ImmersivePage (server component)", () => {
     mockGetStoriesServer = vi.fn().mockResolvedValue(mockServerStories);
   });
 
-  async function importAndRender() {
+  async function importAndRenderDataLoader() {
+    vi.doMock("next/server", () => ({
+      connection: vi.fn().mockResolvedValue(undefined),
+    }));
+
     vi.doMock("@/lib/feature-flags-server", () => ({
       isFeatureFlagEnabled: mockIsFeatureFlagEnabled,
     }));
@@ -305,18 +309,49 @@ describe("ImmersivePage (server component)", () => {
       ),
     }));
 
+    // Await ImmersiveDataLoader directly — vitest can't render async
+    // components through Suspense (that's a server-only feature).
+    const { ImmersiveDataLoader } = await import("./page");
+    const element = await ImmersiveDataLoader();
+    return render(element);
+  }
+
+  it("should render StoryCardSkeleton as Suspense fallback", async () => {
+    // Make data loader never resolve so Suspense shows the fallback
+    mockIsFeatureFlagEnabled.mockReturnValue(new Promise(() => {}));
+    mockGetStoriesServer.mockReturnValue(new Promise(() => {}));
+
+    vi.doMock("next/server", () => ({
+      connection: () => new Promise(() => {}), // Never resolves
+    }));
+
+    vi.doMock("@/lib/feature-flags-server", () => ({
+      isFeatureFlagEnabled: mockIsFeatureFlagEnabled,
+    }));
+
+    vi.doMock("@/lib/stories-server", () => ({
+      getStoriesServer: mockGetStoriesServer,
+    }));
+
+    vi.doMock("./immersive-page-content", () => ({
+      ImmersivePageContent: () => <div data-testid="immersive-content" />,
+    }));
+
     vi.doMock("@/components/immersive/skeleton-story-card", () => ({
       StoryCardSkeleton: () => <div data-testid="skeleton-fallback" />,
     }));
 
     const { default: ImmersivePage } = await import("./page");
-    const element = await ImmersivePage();
-    return render(element);
-  }
+    const element = ImmersivePage();
+    render(element);
+
+    // Skeleton fallback should be visible while data loads
+    expect(screen.getByTestId("skeleton-fallback")).toBeInTheDocument();
+  });
 
   it("should render with null seed when randomized_order is disabled", async () => {
     mockIsFeatureFlagEnabled.mockResolvedValue(false);
-    await importAndRender();
+    await importAndRenderDataLoader();
 
     const content = screen.getByTestId("immersive-content");
     expect(content).toHaveAttribute("data-seed", "null");
@@ -325,7 +360,7 @@ describe("ImmersivePage (server component)", () => {
 
   it("should render with numeric seed when randomized_order is enabled", async () => {
     mockIsFeatureFlagEnabled.mockResolvedValue(true);
-    await importAndRender();
+    await importAndRenderDataLoader();
 
     const content = screen.getByTestId("immersive-content");
     const seed = content.getAttribute("data-seed");
@@ -337,7 +372,7 @@ describe("ImmersivePage (server component)", () => {
   });
 
   it("should pass server-fetched stories as initialStories prop", async () => {
-    await importAndRender();
+    await importAndRenderDataLoader();
 
     const content = screen.getByTestId("immersive-content");
     expect(content).toHaveAttribute("data-stories", String(mockServerStories.length));
@@ -345,14 +380,14 @@ describe("ImmersivePage (server component)", () => {
   });
 
   it("should fetch stories and flags in parallel", async () => {
-    await importAndRender();
+    await importAndRenderDataLoader();
 
     expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith("randomized_order");
     expect(mockGetStoriesServer).toHaveBeenCalledTimes(1);
   });
 
-  it("should export revalidate = 60 for ISR", async () => {
+  it("should export ImmersiveDataLoader for streaming", async () => {
     const pageModule = await import("./page");
-    expect(pageModule.revalidate).toBe(60);
+    expect(pageModule.ImmersiveDataLoader).toBeTypeOf("function");
   });
 });

@@ -3,22 +3,31 @@ import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
 import { ImmersivePageContent } from "./immersive-page-content";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { getStoriesServer } from "@/lib/stories-server";
+import { connection } from "next/server";
 
 /**
- * ISR: Cache this page at the CDN edge for 60 seconds.
- * After 60s, the next request triggers a background regeneration.
- * Stories and feature flags also have 60s data cache (revalidate: 60).
+ * Synchronous page component — PPR prebuilds this as the static shell.
+ * The skeleton fallback is baked into the CDN-cached HTML.
+ * Dynamic content streams in via ImmersiveDataLoader inside Suspense.
  */
-export const revalidate = 60;
+export default function ImmersivePage() {
+  return (
+    <Suspense fallback={<StoryCardSkeleton />}>
+      <ImmersiveDataLoader />
+    </Suspense>
+  );
+}
 
 /**
- * Server Component wrapper that:
- * 1. Fetches stories and randomized_order flag in parallel (server-side)
- * 2. Generates a random seed if shuffle is enabled
- * 3. Passes both seed and stories to the client to avoid waterfall + flicker
+ * Async server component — the dynamic "hole" that streams in after the shell.
+ * Fetches stories and feature flag in parallel, then renders the client content.
  */
-export default async function ImmersivePage() {
-  // Fetch stories and flag in parallel — both use Next.js cache
+/** @internal Exported for testing — not part of the public API. */
+export async function ImmersiveDataLoader() {
+  // Mark this component as dynamic — it's inside Suspense (the PPR boundary).
+  // Required because Math.random() can't be used in cached components.
+  await connection();
+
   const [isRandomEnabled, serverStories] = await Promise.all([
     isFeatureFlagEnabled("randomized_order"),
     getStoriesServer(),
@@ -29,11 +38,9 @@ export default async function ImmersivePage() {
     : null;
 
   return (
-    <Suspense fallback={<StoryCardSkeleton />}>
-      <ImmersivePageContent
-        serverShuffleSeed={serverShuffleSeed}
-        initialStories={serverStories}
-      />
-    </Suspense>
+    <ImmersivePageContent
+      serverShuffleSeed={serverShuffleSeed}
+      initialStories={serverStories}
+    />
   );
 }
