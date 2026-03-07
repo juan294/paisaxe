@@ -7,7 +7,6 @@
  */
 
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
 
@@ -49,16 +48,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ImmersiveLayout({
+export default function ImmersiveLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const nonce = (await headers()).get("x-csp-nonce") ?? undefined;
-
   return (
     <>
-      <JsonLd type="tourist-destination" nonce={nonce} />
+      <JsonLd type="tourist-destination" />
       {children}
     </>
   );
