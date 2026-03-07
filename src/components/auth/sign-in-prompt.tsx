@@ -26,6 +26,8 @@ export function SignInPrompt({ open, onClose, className }: SignInPromptProps) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className="relative w-full max-w-sm mx-4 bg-gradient-to-br from-gray-900/95 to-black/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >

@@ -50,4 +50,18 @@ describe("SiteFooter", () => {
     render(<SiteFooter />);
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
   });
+
+  describe("contrast (#182)", () => {
+    it("uses text-white/60 instead of text-white/40 for WCAG AA contrast", () => {
+      const { container } = render(<SiteFooter />);
+
+      // The footer text wrapper should NOT use low-contrast text-white/40
+      const textContainer = container.querySelector(".text-white\\/40");
+      expect(textContainer).toBeNull();
+
+      // Should use higher-contrast text-white/60
+      const highContrastContainer = container.querySelector(".text-white\\/60");
+      expect(highContrastContainer).not.toBeNull();
+    });
+  });
 });
