@@ -4,14 +4,15 @@ import { spawn, ChildProcess } from "child_process";
 import path from "path";
 import type { AgentLogLine } from "@/types/agents-dashboard";
 
+/** Map agent flag keys to their script filenames (all live in scripts/). */
 const AGENT_SCRIPTS: Record<string, string> = {
-  coverage_agent_enabled: "scripts/coverage-agent.sh",
-  security_agent_enabled: "scripts/security-agent.sh",
-  documentation_agent_enabled: "scripts/documentation-agent.sh",
-  performance_agent_enabled: "scripts/performance-agent.sh",
-  qa_agent_enabled: "scripts/qa-agent.sh",
-  localization_agent_enabled: "scripts/localization-agent.sh",
-  cost_analyst_agent_enabled: "scripts/cost-analyst-agent.sh",
+  coverage_agent_enabled: "coverage-agent.sh",
+  security_agent_enabled: "security-agent.sh",
+  documentation_agent_enabled: "documentation-agent.sh",
+  performance_agent_enabled: "performance-agent.sh",
+  qa_agent_enabled: "qa-agent.sh",
+  localization_agent_enabled: "localization-agent.sh",
+  cost_analyst_agent_enabled: "cost-analyst-agent.sh",
 };
 
 const MAX_LOG_LINES = 500;
@@ -88,8 +89,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Use specific subdirectory to avoid Turbopack tracing the entire project root.
   const projectRoot = process.cwd();
-  const scriptPath = path.join(projectRoot, AGENT_SCRIPTS[agentKey]);
+  const scriptPath = path.join(projectRoot, "scripts", AGENT_SCRIPTS[agentKey]);
   const startedAt = new Date().toISOString();
 
   const child = spawn("bash", [scriptPath], {
