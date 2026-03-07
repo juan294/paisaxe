@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 
+// vi.hoisted runs before vi.mock hoisting, so mockAuthError is available in the factory
+const { mockAuthError } = vi.hoisted(() => {
+  // Cannot use NextResponse here (not imported yet), so use a plain sentinel object
+  const mockAuthError = new Response(JSON.stringify({ error: "Unauthorized" }), {
+    status: 401,
+    headers: { "content-type": "application/json" },
+  }) as unknown as import("next/server").NextResponse;
+  return { mockAuthError };
+});
+
 // Mock dependencies before importing route
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn().mockResolvedValue({
     valid: false,
-    error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }),
+    error: mockAuthError,
   }),
 }));
 
@@ -49,6 +59,13 @@ describe("POST /api/cron/content-discovery", () => {
   it("rejects requests without auth", async () => {
     const res = await POST(makeRequest());
     expect(res.status).toBe(401);
+  });
+
+  it("returns auth.error from validateAdminAuth (not a manual response)", async () => {
+    const res = await POST(makeRequest());
+    // The route should return the exact auth.error object from validateAdminAuth,
+    // not construct a new NextResponse.json({ error: "Unauthorized" }, { status: 401 }).
+    expect(res).toBe(mockAuthError);
   });
 
   it("rejects requests with wrong secret", async () => {
