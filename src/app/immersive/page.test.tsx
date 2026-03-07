@@ -290,18 +290,14 @@ describe("ImmersivePage (server component)", () => {
     mockGetStoriesServer = vi.fn().mockResolvedValue(mockServerStories);
   });
 
+  function setupPageMocks(connectionFn: () => Promise<void> = vi.fn().mockResolvedValue(undefined)) {
+    vi.doMock("next/server", () => ({ connection: connectionFn }));
+    vi.doMock("@/lib/feature-flags-server", () => ({ isFeatureFlagEnabled: mockIsFeatureFlagEnabled }));
+    vi.doMock("@/lib/stories-server", () => ({ getStoriesServer: mockGetStoriesServer }));
+  }
+
   async function importAndRenderDataLoader() {
-    vi.doMock("next/server", () => ({
-      connection: vi.fn().mockResolvedValue(undefined),
-    }));
-
-    vi.doMock("@/lib/feature-flags-server", () => ({
-      isFeatureFlagEnabled: mockIsFeatureFlagEnabled,
-    }));
-
-    vi.doMock("@/lib/stories-server", () => ({
-      getStoriesServer: mockGetStoriesServer,
-    }));
+    setupPageMocks();
 
     vi.doMock("./immersive-page-content", () => ({
       ImmersivePageContent: ({ serverShuffleSeed, initialStories }: { serverShuffleSeed: number | null; initialStories?: unknown[] }) => (
@@ -317,21 +313,11 @@ describe("ImmersivePage (server component)", () => {
   }
 
   it("should render StoryCardSkeleton as Suspense fallback", async () => {
-    // Make data loader never resolve so Suspense shows the fallback
+    // Make everything never resolve so Suspense shows the fallback
     mockIsFeatureFlagEnabled.mockReturnValue(new Promise(() => {}));
     mockGetStoriesServer.mockReturnValue(new Promise(() => {}));
 
-    vi.doMock("next/server", () => ({
-      connection: () => new Promise(() => {}), // Never resolves
-    }));
-
-    vi.doMock("@/lib/feature-flags-server", () => ({
-      isFeatureFlagEnabled: mockIsFeatureFlagEnabled,
-    }));
-
-    vi.doMock("@/lib/stories-server", () => ({
-      getStoriesServer: mockGetStoriesServer,
-    }));
+    setupPageMocks(() => new Promise(() => {}));
 
     vi.doMock("./immersive-page-content", () => ({
       ImmersivePageContent: () => <div data-testid="immersive-content" />,
@@ -342,10 +328,8 @@ describe("ImmersivePage (server component)", () => {
     }));
 
     const { default: ImmersivePage } = await import("./page");
-    const element = ImmersivePage();
-    render(element);
+    render(ImmersivePage());
 
-    // Skeleton fallback should be visible while data loads
     expect(screen.getByTestId("skeleton-fallback")).toBeInTheDocument();
   });
 

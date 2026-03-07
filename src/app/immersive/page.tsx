@@ -21,8 +21,9 @@ export default function ImmersivePage() {
 /**
  * Async server component — the dynamic "hole" that streams in after the shell.
  * Fetches stories and feature flag in parallel, then renders the client content.
+ *
+ * @internal Exported for testing — not part of the public API.
  */
-/** @internal Exported for testing — not part of the public API. */
 export async function ImmersiveDataLoader() {
   // Mark this component as dynamic — it's inside Suspense (the PPR boundary).
   // Required because Math.random() can't be used in cached components.
