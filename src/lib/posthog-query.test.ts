@@ -94,6 +94,30 @@ describe("queryPostHog", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it("should log console.warn when retrying a retryable error", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchFailedError = new Error("fetch failed");
+
+    mockFetch
+      .mockRejectedValueOnce(fetchFailedError)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ results: [[99]] }),
+      });
+
+    const result = await queryPostHog(
+      "SELECT 1",
+      "project-123",
+      "phx_api-key"
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("PostHog query retry 1/2")
+    );
+    expect(result).toEqual({ results: [[99]] });
+    warnSpy.mockRestore();
+  });
 });
 
 describe("formatForHogQL", () => {

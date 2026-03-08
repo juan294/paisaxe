@@ -250,4 +250,133 @@ describe("ElevenLabsAnalyticsPanel", () => {
       expect(screen.getByText("Active calls: 2")).toBeInTheDocument();
     });
   });
+
+  it("shows refreshing pulse bar during background refresh", async () => {
+    const user = userEvent.setup();
+    let resolveRefresh: (value: unknown) => void;
+    const refreshPromise = new Promise((resolve) => {
+      resolveRefresh = resolve;
+    });
+
+    // First load resolves immediately
+    vi.mocked(adminApi.fetchElevenLabsAnalytics).mockResolvedValueOnce({
+      data: mockData,
+    });
+
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
+
+    // Wait for initial load to complete
+    await waitFor(() => {
+      expect(screen.getByText("Refresh")).toBeInTheDocument();
+    });
+
+    // Second call hangs to trigger refreshing state
+    vi.mocked(adminApi.fetchElevenLabsAnalytics).mockImplementationOnce(
+      () => refreshPromise as Promise<{ data: typeof mockData }>
+    );
+
+    await user.click(screen.getByText("Refresh"));
+
+    // The refreshing pulse bar should appear (line 87-88)
+    await waitFor(() => {
+      expect(screen.getByText("Refreshing...")).toBeInTheDocument();
+    });
+
+    // Resolve to clean up
+    resolveRefresh!({ data: mockData });
+  });
+
+  it("displays status breakdown table", async () => {
+    vi.mocked(adminApi.fetchElevenLabsAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("03 — By Status")).toBeInTheDocument();
+    });
+
+    // The formatStatus function maps "done" -> "Completed", "failed" -> "Failed"
+    expect(screen.getAllByText("Completed").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Failed").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("displays active calls with zero calls styling", async () => {
+    vi.mocked(adminApi.fetchElevenLabsAnalytics).mockResolvedValue({
+      data: { ...mockData, activeCalls: 0 },
+    });
+
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Active calls: 0")).toBeInTheDocument();
+    });
+  });
+
+  it("displays conversation with no duration", async () => {
+    vi.mocked(adminApi.fetchElevenLabsAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        recentConversations: [
+          {
+            conversation_id: "conv3",
+            agent_id: "agent1",
+            status: "initiated" as const,
+            start_time_unix: undefined as unknown as number,
+            call_duration_secs: undefined as unknown as number,
+          },
+        ],
+      },
+    });
+
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("04 — Recent Conversations")).toBeInTheDocument();
+    });
+
+    // formatTime returns "—" for falsy unix, call_duration_secs shows "—" when falsy
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
+    // formatStatus maps "initiated" -> "Initiated"
+    expect(screen.getByText("Initiated")).toBeInTheDocument();
+  });
+
+  it("shows zero failed conversations with stone color", async () => {
+    vi.mocked(adminApi.fetchElevenLabsAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        summary: { ...mockData.summary, failedConversations: 0 },
+      },
+    });
+
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("25")).toBeInTheDocument();
+    });
+
+    // The "Failed" stat card should show 0 with "stone" color
+    expect(screen.getAllByText("0").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("handles unknown language code in breakdown", async () => {
+    vi.mocked(adminApi.fetchElevenLabsAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        conversationsByLanguage: [
+          { language: "ja", count: 5 },
+        ],
+      },
+    });
+
+    render(<ElevenLabsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("02 — By Language")).toBeInTheDocument();
+    });
+
+    // "ja" is not in the languageNames map, so it should be returned as-is
+    expect(screen.getByText("ja")).toBeInTheDocument();
+  });
 });

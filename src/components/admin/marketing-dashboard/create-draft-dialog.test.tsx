@@ -412,4 +412,21 @@ describe("CreateDraftDialog", () => {
 
     expect(screen.getByText("Content")).toBeInTheDocument();
   });
+
+  it("calls onClose when dialog is closed via onOpenChange", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+
+    render(
+      <CreateDraftDialog {...defaultProps} onClose={onClose} />
+    );
+
+    // The dialog has a close button (X) provided by DialogContent
+    // which triggers onOpenChange(false) -> onClose()
+    const closeButton = screen.getByRole("button", { name: /close/i });
+    if (closeButton) {
+      await user.click(closeButton);
+      expect(onClose).toHaveBeenCalled();
+    }
+  });
 });

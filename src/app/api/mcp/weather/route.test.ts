@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// Mock rate-limit module
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 29, retryAfter: 0 }),
+}));
+
 import { GET, POST } from "./route";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Mock the fetch API
 const mockFetch = vi.fn();
@@ -13,6 +20,8 @@ describe("/api/mcp/weather", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    // Re-establish default rate-limit mock after resetAllMocks clears it
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, remaining: 29, limit: 30, resetAt: Date.now() + 60000 });
     process.env = {
       ...originalEnv,
       OPENWEATHERMAP_API_KEY: "test-api-key",
@@ -317,6 +326,28 @@ describe("/api/mcp/weather", () => {
       const data = await response.json();
       expect(data.error).toContain("Network error");
     });
+
+    it("should return 429 when rate limited on POST", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 15,
+        limit: 10,
+        resetAt: Date.now() + 15000,
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(429);
+      const data = await response.json();
+      expect(data.error).toBe("Too many requests");
+      expect(response.headers.get("Retry-After")).toBe("15");
+    });
   });
 
   describe("GET - additional coverage", () => {
@@ -335,6 +366,42 @@ describe("/api/mcp/weather", () => {
       expect(response.status).toBe(500);
       const data = await response.json();
       expect(data.error).toBe("Weather API error: 500");
+    });
+
+    it("should return 429 when rate limited on GET", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 20,
+        limit: 10,
+        resetAt: Date.now() + 20000,
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(429);
+      const data = await response.json();
+      expect(data.error).toBe("Too many requests");
+      expect(response.headers.get("Retry-After")).toBe("20");
+    });
+
+    it("should return 500 via fetchWeather when OPENWEATHERMAP_API_KEY is set but empty after trim", async () => {
+      // The env var exists (so the early check passes) but fetchWeather trims to empty
+      process.env.OPENWEATHERMAP_API_KEY = "   ";
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Weather API not configured");
     });
 
     it("should use coordinates for known Asturias cities", async () => {

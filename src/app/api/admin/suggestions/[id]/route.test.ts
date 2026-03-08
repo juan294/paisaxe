@@ -29,43 +29,59 @@ const createMockSuggestion = (overrides?: Partial<StorySuggestionRow>): StorySug
   ...overrides,
 });
 
+// Controllable mock result for single() — allows per-test override
+let mockSingleResult: { data: StorySuggestionRow | null; error: { message: string; code?: string } | null } = {
+  data: createMockSuggestion({ status: "reviewed", admin_notes: "Reviewed" }),
+  error: null,
+};
+
+// Controllable mock result for delete eq() — allows per-test override
+let mockDeleteEqResult: { error: { message: string; code?: string } | null } = {
+  error: null,
+};
+
+// Flag to make createAdminClient throw (for catch block coverage)
+let mockCreateAdminClientThrows = false;
+
 // Mock Supabase
 vi.mock("@/lib/supabase", () => ({
-  createAdminClient: () => ({
-    from: () => ({
-      update: (...args: unknown[]) => {
-        mockUpdate(...args);
-        return {
-          eq: (...eqArgs: unknown[]) => {
-            mockEq(...eqArgs);
-            return {
-              select: (...selectArgs: unknown[]) => {
-                mockSelect(...selectArgs);
-                return {
-                  single: () => {
-                    mockSingle();
-                    return Promise.resolve({
-                      data: createMockSuggestion({ status: "reviewed", admin_notes: "Reviewed" }),
-                      error: null,
-                    });
-                  },
-                };
-              },
-            };
-          },
-        };
-      },
-      delete: () => {
-        mockDelete();
-        return {
-          eq: (...eqArgs: unknown[]) => {
-            mockEq(...eqArgs);
-            return Promise.resolve({ error: null });
-          },
-        };
-      },
-    }),
-  }),
+  createAdminClient: () => {
+    if (mockCreateAdminClientThrows) {
+      throw new Error("Supabase client creation failed");
+    }
+    return {
+      from: () => ({
+        update: (...args: unknown[]) => {
+          mockUpdate(...args);
+          return {
+            eq: (...eqArgs: unknown[]) => {
+              mockEq(...eqArgs);
+              return {
+                select: (...selectArgs: unknown[]) => {
+                  mockSelect(...selectArgs);
+                  return {
+                    single: () => {
+                      mockSingle();
+                      return Promise.resolve(mockSingleResult);
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+        delete: () => {
+          mockDelete();
+          return {
+            eq: (...eqArgs: unknown[]) => {
+              mockEq(...eqArgs);
+              return Promise.resolve(mockDeleteEqResult);
+            },
+          };
+        },
+      }),
+    };
+  },
 }));
 
 // Import after mocks
@@ -75,6 +91,13 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 describe("/api/admin/suggestions/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset controllable mock state to defaults
+    mockSingleResult = {
+      data: createMockSuggestion({ status: "reviewed", admin_notes: "Reviewed" }),
+      error: null,
+    };
+    mockDeleteEqResult = { error: null };
+    mockCreateAdminClientThrows = false;
   });
 
   describe("PUT", () => {
@@ -183,6 +206,59 @@ describe("/api/admin/suggestions/[id]", () => {
         expect(mockUpdate).toHaveBeenCalledWith({ status });
       }
     });
+
+    it("should return 400 if id param is empty", async () => {
+      const emptyParams = Promise.resolve({ id: "" });
+      const request = createRequest({ status: "reviewed" });
+
+      const response = await PUT(request, { params: emptyParams });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Suggestion ID is required");
+    });
+
+    it("should return 404 when suggestion not found (PGRST116)", async () => {
+      mockSingleResult = {
+        data: null,
+        error: { message: "Row not found", code: "PGRST116" },
+      };
+
+      const request = createRequest({ status: "reviewed" });
+
+      const response = await PUT(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(data.error).toBe("Suggestion not found");
+    });
+
+    it("should return 500 on generic Supabase update error", async () => {
+      mockSingleResult = {
+        data: null,
+        error: { message: "Database connection failed", code: "PGRST500" },
+      };
+
+      const request = createRequest({ status: "reviewed" });
+
+      const response = await PUT(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to update suggestion");
+    });
+
+    it("should return 500 on unexpected exception during update", async () => {
+      mockCreateAdminClientThrows = true;
+
+      const request = createRequest({ status: "reviewed" });
+
+      const response = await PUT(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+    });
   });
 
   describe("DELETE", () => {
@@ -217,6 +293,49 @@ describe("/api/admin/suggestions/[id]", () => {
       expect(data.data).toEqual({ id: "suggestion-1", deleted: true });
       expect(mockDelete).toHaveBeenCalled();
       expect(mockEq).toHaveBeenCalledWith("id", "suggestion-1");
+    });
+
+    it("should return 400 if id param is empty", async () => {
+      const emptyParams = Promise.resolve({ id: "" });
+      const request = new NextRequest("http://localhost/api/admin/suggestions/", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, { params: emptyParams });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Suggestion ID is required");
+    });
+
+    it("should return 500 on Supabase delete error", async () => {
+      mockDeleteEqResult = {
+        error: { message: "Foreign key violation" },
+      };
+
+      const request = new NextRequest("http://localhost/api/admin/suggestions/suggestion-1", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to delete suggestion");
+    });
+
+    it("should return 500 on unexpected exception during delete", async () => {
+      mockCreateAdminClientThrows = true;
+
+      const request = new NextRequest("http://localhost/api/admin/suggestions/suggestion-1", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
     });
   });
 });

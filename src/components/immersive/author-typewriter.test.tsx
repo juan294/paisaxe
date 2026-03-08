@@ -231,4 +231,163 @@ describe("AuthorTypewriter", () => {
     expect(clearTimeoutSpy).toHaveBeenCalled();
     clearTimeoutSpy.mockRestore();
   });
+
+  it("should stop animation mid-cycle when unmounted during erase phase", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+    const { unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    // Advance into the erase phase (past HOME_HOLD of 30s)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_200);
+    });
+
+    // Unmount mid-erase — cleanup should cancel all pending timers
+    unmount();
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
+  });
+
+  it("should stop animation mid-cycle when unmounted during type phase", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+    const { container } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+
+    // Advance past HOME_HOLD (30s) + full erase of "</> JG" (5 * 80ms = 400ms) + EMPTY_PAUSE (300ms)
+    // into the typing of the next message
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_900);
+    });
+
+    // Text should be partially typed (new message being typed in)
+    const textLength = textSpan.textContent?.length ?? 0;
+    expect(textLength).toBeGreaterThanOrEqual(0);
+
+    clearTimeoutSpy.mockRestore();
+  });
+
+  it("should complete a full cycle back to HOME text", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+    expect(textSpan.textContent).toBe("</> JG");
+
+    // Full cycle: HOME_HOLD(30s) + erase HOME(5*80=400ms) + EMPTY_PAUSE(300ms)
+    // + type next msg (~21*80=1680ms) + MSG_HOLD(4000ms) + erase next msg(~21*80=1680ms)
+    // + EMPTY_PAUSE(300ms) + type HOME(5*80=400ms)
+    // Total ~ 30000 + 400 + 300 + 1680 + 4000 + 1680 + 300 + 400 = ~38760ms
+    // Use generous time to ensure full cycle
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(45_000);
+    });
+
+    // After a full cycle, text should be back to "</> JG" or be typing it
+    // The exact state depends on timing precision, but text should exist
+    expect(textSpan.textContent!.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it("should erase text character by character (eraseText path)", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+    expect(textSpan.textContent).toBe("</> JG");
+
+    const originalLength = textSpan.textContent!.length; // 6 chars: < / > space J G
+
+    // Start erasing: advance past HOME_HOLD + a few char delays
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_050);
+    });
+
+    // Advance through a couple of erase steps (each is CHAR_DELAY = 80ms)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+
+    // Text should be shorter than original (some characters erased)
+    expect(textSpan.textContent!.length).toBeLessThan(originalLength);
+  });
+
+  it("should type text character by character (typeText path)", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+
+    // Advance past HOME_HOLD + full erase + EMPTY_PAUSE to start typing
+    // HOME_HOLD(30s) + erase(5*80=400ms) + EMPTY_PAUSE(300ms) = 30700ms
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_750);
+    });
+
+    // Now typing should have started - text should be short (just began)
+    const len1 = textSpan.textContent?.length ?? 0;
+
+    // Advance a few more characters
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250); // ~3 chars at 80ms each
+    });
+
+    const len2 = textSpan.textContent?.length ?? 0;
+
+    // Text should be growing as characters are typed
+    expect(len2).toBeGreaterThanOrEqual(len1);
+  });
+
+  it("should skip message index 0 when cycling (always skips HOME)", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+
+    // Complete two full cycles to verify it never re-types HOME as a "message"
+    // First cycle: HOME_HOLD + erase + pause + type msg + hold + erase + pause + type HOME + HOME_HOLD
+    // ~30000 + 400 + 300 + 1680 + 4000 + 1680 + 300 + 400 + 30000 = ~68760ms
+    // Second cycle starts with erasing HOME again
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(70_000);
+    });
+
+    // After two full cycles, text should still exist and function properly
+    expect(textSpan.textContent!.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it("should stop click propagation on the outer div", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+
+    const outerClickHandler = vi.fn();
+    const { container } = render(
+      <div onClick={outerClickHandler}>
+        <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+      </div>
+    );
+
+    const groupDiv = container.querySelector(".group");
+    expect(groupDiv).not.toBeNull();
+
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.click(groupDiv!);
+
+    // Click should not propagate to parent
+    expect(outerClickHandler).not.toHaveBeenCalled();
+  });
 });

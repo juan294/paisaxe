@@ -63,6 +63,28 @@ describe("POST /api/admin/stories/approve-all", () => {
     expect(mockEq).toHaveBeenCalledWith("curation_status", "needs_curation");
   });
 
+  it("should handle null data response gracefully", async () => {
+    const mockSelect = vi.fn().mockResolvedValue({
+      data: null,
+      error: null,
+    });
+    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+    mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+      method: "POST",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    const data = await response.json();
+    expect(data.data.approvedCount).toBe(0);
+    expect(data.data.approvedIds).toEqual([]);
+  });
+
   it("should return success with 0 count when no pending stories", async () => {
     const mockSelect = vi.fn().mockResolvedValue({
       data: [],
@@ -83,6 +105,21 @@ describe("POST /api/admin/stories/approve-all", () => {
     const data = await response.json();
     expect(data.data.approvedCount).toBe(0);
     expect(data.data.approvedIds).toEqual([]);
+  });
+
+  it("should return 500 on unexpected error (catch block)", async () => {
+    mockCreateAdminClient.mockImplementation(() => {
+      throw new Error("Unexpected error");
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+      method: "POST",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe("Internal server error");
   });
 
   it("should return 500 on database error", async () => {

@@ -398,6 +398,20 @@ describe("Marketing Accounts API", () => {
       expect(response.status).toBe(500);
     });
 
+    it("GET should return 500 on unexpected exception", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+    });
+
     it("POST should return 500 when database upsert fails", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
@@ -420,6 +434,29 @@ describe("Marketing Accounts API", () => {
 
       const response = await POST(request);
       expect(response.status).toBe(500);
+    });
+
+    it("POST should return 500 on unexpected exception", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/admin/marketing/accounts", {
+        method: "POST",
+        body: JSON.stringify({
+          platform: "x",
+          accountName: "Test",
+          credentials: { accessToken: "token" },
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
     });
 
     it("POST should return 500 when encryption is not configured", async () => {
@@ -445,6 +482,44 @@ describe("Marketing Accounts API", () => {
 
       // Restore mock
       vi.mocked(isEncryptionConfigured).mockReturnValue(true);
+    });
+
+    it("PATCH should return 500 on unexpected exception", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/admin/marketing/accounts?platform=x&action=pause",
+        { method: "PATCH" }
+      );
+
+      const response = await PATCH(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+    });
+
+    it("DELETE should return 500 on unexpected exception", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/admin/marketing/accounts?platform=x",
+        { method: "DELETE" }
+      );
+
+      const response = await DELETE(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
     });
   });
 });

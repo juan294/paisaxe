@@ -4,16 +4,16 @@
 > See `docs/health-report-[DATE].md` for the latest coverage data.
 > This file is kept for historical reference only and is no longer updated.
 
-> Last updated: 2026-03-07
+> Last updated: 2026-03-08
 
 ## Summary
 
-- **Total tests:** 4782 passed
+- **Total tests:** 5059 passed
 - **Test files:** 292 passed (100%)
-- **Statement coverage:** 93.08%
-- **Branch coverage:** 85.83%
-- **Function coverage:** 91.84%
-- **Line coverage:** 93.90%
+- **Statement coverage:** 96.53%
+- **Branch coverage:** 89.60%
+- **Function coverage:** 94.75%
+- **Line coverage:** 97.37%
 - **TypeScript:** ✅ No errors
 
 *Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
@@ -40,8 +40,21 @@
 | `src/app/api/admin/marketing/agent-logs/route.ts` | API |
 | `src/app/api/admin/marketing/posts/route.ts` | API |
 | `src/app/api/admin/stories/route.ts` | API |
+| `src/app/api/admin/stories/[id]/route.ts` | API |
+| `src/app/api/admin/stories/[id]/image/route.ts` | API |
 | `src/app/api/admin/stories/[id]/image-source/route.ts` | API |
+| `src/app/api/admin/stories/[id]/status/route.ts` | API |
+| `src/app/api/admin/stories/[id]/translations/route.ts` | API |
+| `src/app/api/admin/stories/approve-all/route.ts` | API |
+| `src/app/api/admin/stories/bulk-delete/route.ts` | API |
+| `src/app/api/admin/stories/bulk-status/route.ts` | API |
+| `src/app/api/admin/stories/content-images/route.ts` | API |
+| `src/app/api/admin/suggestions/[id]/route.ts` | API |
+| `src/app/api/admin/marketing/accounts/route.ts` | API |
+| `src/app/api/admin/marketing/schedule/route.ts` | API |
 | `src/app/api/chat/stream/route.ts` | API |
+| `src/app/api/cron/content-discovery/route.ts` | API |
+| `src/app/api/cron/github-traffic-sync/route.ts` | API |
 | `src/app/api/feature-flags/route.ts` | API |
 | `src/app/api/health/db/route.ts` | API |
 | `src/app/coming-soon/page.tsx` | App |
@@ -59,11 +72,19 @@
 | `src/components/a11y/lang-sync.tsx` | A11y |
 | `src/components/a11y/skip-link.tsx` | A11y |
 | `src/components/admin/admin-tabs.tsx` | Admin |
+| `src/components/admin/agent-config-panel.tsx` | Admin |
 | `src/components/admin/curation-badge.tsx` | Admin |
 | `src/components/admin/placeholder-badge.tsx` | Admin |
 | `src/components/admin/selection-toolbar.tsx` | Admin |
 | `src/components/admin/story-grid.tsx` | Admin |
 | `src/components/admin/visitor-voice-config-panel.tsx` | Admin |
+| `src/components/admin/costs-analytics-panel/alerts.tsx` | Admin |
+| `src/components/admin/costs-analytics-panel/chart.tsx` | Admin |
+| `src/components/admin/costs-analytics-panel/forecast.tsx` | Admin |
+| `src/components/admin/costs-analytics-panel/index.tsx` | Admin |
+| `src/components/admin/costs-analytics-panel/modals.tsx` | Admin |
+| `src/components/admin/costs-analytics-panel/skeletons.tsx` | Admin |
+| `src/components/admin/marketing-dashboard/create-draft-dialog.tsx` | Marketing |
 | `src/components/auth/sign-in-prompt.tsx` | Auth |
 | `src/components/immersive/chat-upsell-cta.tsx` | Immersive |
 | `src/components/immersive/favorite-button.tsx` | Immersive |
@@ -95,44 +116,57 @@
 | `src/hooks/use-viewed-stories.ts` | Hooks |
 | `src/hooks/use-visitor-voice-access.ts` | Hooks |
 | `src/hooks/use-voice-access.ts` | Hooks |
+| `src/lib/admin-auth.ts` | Lib |
 | `src/lib/asturianu.ts` | Lib |
 | `src/lib/chat-config.ts` | Lib |
 | `src/lib/chat-safety.ts` | Lib |
+| `src/lib/credentials.ts` | Lib |
+| `src/lib/csrf.ts` | Lib |
+| `src/lib/csrf-client.ts` | Lib |
+| `src/lib/email.ts` | Lib |
 | `src/lib/embedding-cache.ts` | Lib |
 | `src/lib/embeddings.ts` | Lib |
+| `src/lib/encryption.ts` | Lib |
 | `src/lib/freshness.ts` | Lib |
 | `src/lib/mood-mapping.ts` | Lib |
 | `src/lib/og-image-helpers.ts` | Lib |
 | `src/lib/realtime.ts` | Lib |
 | `src/lib/related-stories.ts` | Lib |
+| `src/lib/rerank.ts` | Lib |
 | `src/lib/search.ts` | Lib |
 | `src/lib/shuffle.ts` | Lib |
 | `src/lib/stories-data.ts` | Lib |
+| `src/lib/stripe.ts` | Lib |
 | `src/lib/supabase-auth.ts` | Lib |
 | `src/lib/supabase-browser.ts` | Lib |
 | `src/lib/supabase.ts` | Lib |
 | `src/lib/unsplash-placeholders.ts` | Lib |
 | `src/lib/utils.ts` | Lib |
 | `src/lib/validation.ts` | Lib |
+| `src/lib/costs/elevenlabs-costs.ts` | Costs |
+| `src/lib/costs/forecast.ts` | Costs |
+| `src/lib/costs/manual-costs.ts` | Costs |
+| `src/lib/costs/recurring-costs.ts` | Costs |
 | `src/lib/costs/twilio-costs.ts` | Costs |
 | `src/lib/i18n/de.ts` | i18n |
 | `src/lib/i18n/en.ts` | i18n |
 | `src/lib/i18n/es.ts` | i18n |
 | `src/lib/i18n/fr.ts` | i18n |
-| `src/lib/i18n/provider.tsx` | i18n |
+| `src/lib/i18n/resolve.ts` | i18n |
 | `src/lib/i18n/pt.ts` | i18n |
 | `src/lib/i18n/use-translation.ts` | i18n |
+| `src/lib/admin-api/analytics.ts` | Admin API |
+| `src/lib/admin-api/agents.ts` | Admin API |
+| `src/lib/admin-api/agent-config.ts` | Admin API |
+| `src/lib/admin-api/costs.ts` | Admin API |
+| `src/lib/admin-api/feature-flags.ts` | Admin API |
+| `src/lib/admin-api/stories.ts` | Admin API |
+| `src/lib/admin-api/suggestions.ts` | Admin API |
 | `src/types/admin.ts` | Types |
 | `src/types/auth.ts` | Types |
 | `src/types/feature-flags.ts` | Types |
 | `src/types/immersive.ts` | Types |
 | `src/types/marketing.ts` | Types |
-| `src/lib/admin-api/analytics.ts` | Admin API |
-| `src/lib/admin-api/agents.ts` | Admin API |
-| `src/lib/admin-api/costs.ts` | Admin API |
-| `src/lib/admin-api/feature-flags.ts` | Admin API |
-| `src/lib/admin-api/suggestions.ts` | Admin API |
-| `src/lib/admin-auth.ts` | Lib |
 | `src/components/immersive/voice-chat.tsx` | Immersive |
 | `src/components/admin/agents-dashboard/constants.ts` | Admin |
 | `src/components/admin/agents-dashboard/use-agent-runner.ts` | Admin |
@@ -142,11 +176,7 @@
 | `src/components/admin/marketing-dashboard/constants.ts` | Marketing |
 | `src/components/admin/marketing-dashboard/account-card.tsx` | Marketing |
 | `src/components/admin/story-card.tsx` | Admin |
-| `src/lib/admin-api/agent-config.ts` | Admin API |
 | `src/app/api/admin/agent-config/route.ts` | API |
-| `src/components/admin/costs-analytics-panel/modals.tsx` | Admin |
-| `src/components/admin/costs-analytics-panel/skeletons.tsx` | Admin |
-| `src/lib/rerank.ts` | Lib |
 | `src/app/privacy/layout.tsx` | App |
 | `src/app/terms/layout.tsx` | App |
 | `src/app/favorites/page.tsx` | App |
@@ -156,44 +186,41 @@
 
 | File | Stmts | Branch | Funcs | Lines | Reason |
 |------|-------|--------|-------|-------|--------|
-| `src/proxy.ts` | 98% | 94% | 96% | 98% | Lines 29, 327 (NODE_ENV guard at module load, cookie callback) |
-| `src/app/admin/page.tsx` | 56% | 47% | 58% | 56% | Complex admin UI with many interactive states |
-| `src/app/api/admin/agent-reports/route.ts` | 92% | 100% | 100% | 92% | File system operations with fs.stat edge cases |
-| `src/app/api/admin/elevenlabs-analytics/route.ts` | 91% | 81% | 100% | 91% | ElevenLabs API response edge cases |
-| `src/app/api/admin/marketing/accounts/route.ts` | 81% | 70% | 100% | 80% | Error handling branches |
-| `src/app/api/admin/marketing/agent/route.ts` | 84% | 92% | 100% | 84% | AI agent response handling edge cases |
-| `src/app/api/admin/marketing/dashboard/route.ts` | 90% | 79% | 100% | 90% | Time-range aggregation edge cases |
-| `src/app/api/admin/marketing/schedule/route.ts` | 90% | 94% | 100% | 90% | Minor edge cases in PUT validation |
-| `src/app/api/admin/stories/[id]/content-images/route.ts` | 90% | 79% | 100% | 90% | Edge cases in image URL parsing |
-| `src/app/api/admin/stories/[id]/image/route.ts` | 90% | 88% | 100% | 90% | Supabase storage error handling paths |
-| `src/app/api/admin/stories/[id]/status/route.ts` | 95% | 92% | 100% | 95% | RLS policy bypass branch |
-| `src/app/api/admin/stories/bulk-delete/route.ts` | 89% | 93% | 100% | 89% | Cascade delete edge cases |
-| `src/app/api/admin/stories/bulk-status/route.ts` | 89% | 93% | 100% | 89% | Partial update scenarios |
-| `src/app/api/chat/route.ts` | 91% | 67% | 100% | 91% | Claude API streaming edge cases |
-| `src/app/api/favorites/route.ts` | 73% | 75% | 100% | 73% | Auth callback cookie handling |
-| `src/app/api/health/route.ts` | 78% | 68% | 100% | 78% | Database storage calculation branches |
-| `src/app/api/voice-access/route.ts` | 84% | 100% | 50% | 84% | getSupabaseClient helper function coverage |
-| `src/app/api/webhooks/supabase/route.ts` | 95% | 95% | 100% | 100% | HMAC validation branch |
-| `src/app/immersive/immersive-page-content.tsx` | 81% | 73% | 82% | 81% | Complex client interactions with story navigation |
-| `src/components/posthog-provider.tsx` | 61% | 41% | 77% | 63% | PostHog analytics — dynamic imports hard to test in vitest |
+| `src/proxy.ts` | 98% | 94% | 96% | 98% | NODE_ENV guard at module load, cookie callback |
+| `src/app/admin/page.tsx` | 97% | 84% | 100% | 99% | Line 821: dead code StatCard `<div>` fallback |
+| `src/app/immersive/immersive-page-content.tsx` | 90% | 85% | 94% | 91% | Dynamic import loading/error states |
+| `src/components/posthog-provider.tsx` | 61% | 41% | 77% | 63% | PostHog analytics — browser-only dynamic imports |
 | `src/components/admin/voice-agent-chat.tsx` | 45% | 42% | 39% | 46% | ElevenLabs SDK integration — better suited for E2E |
 | `src/components/admin/agents-dashboard/index.tsx` | 48% | 47% | 52% | 50% | Complex admin dashboard — better suited for E2E |
-| `src/components/admin/story-editor-dialog/index.tsx` | 40% | 66% | 25% | 43% | Complex dialog component — better suited for E2E |
-| `src/components/immersive/fullscreen-button.tsx` | 94% | 91% | 100% | 100% | Fullscreenchange event edge cases |
-| `src/components/immersive/share-button.tsx` | 95% | 93% | 100% | 100% | Minor branch for window.location origin edge case |
-| `src/hooks/use-voice-session.ts` | 93% | 85% | 100% | 96% | SSR guard (line 53, unreachable in jsdom) |
-| `src/lib/claude.ts` | 99% | 89% | 100% | 99% | Line 323: unreachable TypeScript safety net in retry loop |
-| `src/lib/image-optimization.ts` | 94% | 68% | 100% | 96% | Sharp library edge cases |
-| `src/lib/rate-limit.ts` | 98% | 89% | 100% | 98% | Token bucket edge case |
-| `src/lib/costs/manual-costs.ts` | 92% | 90% | 100% | 92% | Supabase admin client null-check branches |
-| `src/lib/costs/recurring-costs.ts` | 93% | 60% | 100% | 100% | Branch-only gaps |
-| `src/lib/translate-story.ts` | 97% | 84% | 100% | 97% | Lines 235, 241: internal throw statements |
-| `src/lib/i18n/provider.tsx` | 92% | 100% | 80% | 92% | Lazy loading edge cases |
-| `src/lib/i18n/index.ts` | 0% | 0% | 0% | 0% | Re-export only file (no executable code) |
+| `src/components/admin/story-editor-dialog/index.tsx` | 62% | 76% | 58% | 69% | Complex dialog — better suited for E2E |
+| `src/components/admin/create-story-dialog.tsx` | 76% | 72% | 66% | 76% | Complex dialog — better suited for E2E |
+| `src/components/admin/suggestions-panel.tsx` | 93% | 87% | 87% | 92% | Callbacks to mocked child dialogs |
+| `src/components/admin/marketing-dashboard/marketing-dashboard.tsx` | 98% | 83% | 100% | 100% | Minor branch gaps in JSX ternaries |
+| `src/components/admin/marketing-dashboard/drafts-panel.tsx` | 95% | 86% | 85% | 97% | onCreated callback in mocked dialog |
+| `src/components/immersive/story-viewer.tsx` | 92% | 86% | 90% | 93% | Complex animation/gesture handlers |
+| `src/components/immersive/voice-dialog.tsx` | 88% | 82% | 87% | 88% | Voice permission/media stream edge cases |
+| `src/components/immersive/author-typewriter.tsx` | 85% | 64% | 100% | 100% | requestAnimationFrame timing branches |
+| `src/hooks/use-voice-session.ts` | 93% | 85% | 100% | 96% | SSR guard (typeof window, unreachable in jsdom) |
+| `src/hooks/use-reduced-motion.ts` | 92% | 50% | 100% | 100% | SSR guard (typeof window, unreachable in jsdom) |
+| `src/lib/claude.ts` | 99% | 89% | 100% | 99% | Unreachable TypeScript safety net in retry loop |
+| `src/lib/content-discovery.ts` | 93% | 79% | 100% | 92% | Complex async processing edge cases |
+| `src/lib/geo-optimization.ts` | 94% | 68% | 100% | 96% | Sharp library edge cases |
+| `src/lib/system-optimizer.ts` | 97% | 67% | 93% | 98% | Defensive fallback branches |
+| `src/lib/i18n/provider.tsx` | 96% | 100% | 90% | 95% | es/en lazy loaders never called (pre-cached by design) |
+| `src/lib/platforms/x-client.ts` | 98% | 85% | 100% | 98% | Unreachable `error instanceof Error` in defensive code |
+| `src/lib/i18n/index.ts` | 0% | 0% | 0% | 0% | Re-export only (no executable code) |
 | `src/lib/i18n/types.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
+| `src/lib/admin-api/index.ts` | 0% | 0% | 0% | 0% | Re-export only (no executable code) |
+| `src/lib/costs/index.ts` | 0% | 0% | 0% | 0% | Re-export only (no executable code) |
 | `src/types/analytics.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
-| `src/types/elevenlabs-analytics.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
-| `src/types/index.ts` | 0% | 0% | 0% | 0% | Re-export only file (no executable code) |
+| `src/types/index.ts` | 0% | 0% | 0% | 0% | Re-export only (no executable code) |
+| `src/types/agent-config.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
+| `src/types/agents-dashboard.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
+| `src/types/costs-analytics.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
+| `src/types/revenue-analytics.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
+| `src/types/voice-analytics.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
+| `src/components/admin/costs-analytics-panel/types.ts` | 0% | 0% | 0% | 0% | Type definitions only (no executable code) |
+| `src/components/admin/marketing-dashboard/index.ts` | 0% | 0% | 0% | 0% | Re-export only (no executable code) |
 
 ## Tests Not Worth Writing
 
@@ -218,6 +245,125 @@ These are deliberately untested and considered acceptable:
 9. **Admin tunnel route** (`src/app/api/admin/tunnel/route.ts`): Uses child_process spawn/exec for Cloudflare tunnel management. This is a development-only feature that requires actual shell execution and cannot be meaningfully tested in jsdom/vitest without mocking the entire child_process module, which would provide no real test value.
 
 ## Changes Made This Run
+
+### Test files modified (2026-03-08):
+
+**API Routes — error paths and edge cases:**
+- `src/app/api/admin/suggestions/[id]/route.test.ts` (+7 tests) — PUT/DELETE validation, PGRST116 error, catch blocks
+- `src/app/api/cron/github-traffic-sync/route.test.ts` (+12 tests) — Full sync path, dailyMap merge, upsert/insert errors, GitHub API errors
+- `src/app/api/admin/stories/[id]/translations/route.test.ts` (+13 tests) — GET/PATCH/POST auth, validation, JSON parse, catch blocks
+- `src/app/api/admin/marketing/schedule/route.test.ts` (+8 tests) — DB errors and catch blocks for all HTTP methods
+- `src/app/api/admin/marketing/agent/route.test.ts` (+6 tests) — Message validation, persona file errors, system prompt context
+- `src/app/api/admin/marketing/posts/route.test.ts` (+4 tests) — Catch blocks for POST/PATCH/DELETE
+- `src/app/api/admin/marketing/agent-logs/route.test.ts` (+2 tests) — DB error branch, outer catch block
+- `src/app/api/cron/content-discovery/route.test.ts` (+3 tests) — Admin auth, runDiscovery throws (Error and non-Error)
+- `src/app/api/cron/subscription-optimizer/route.test.ts` (+3 tests) — readFile catch, shared context write, usageMetrics merge
+- `src/app/api/admin/stories/route.test.ts` (+3 tests) — Suggestion update failure, catch block, slug error
+- `src/app/api/admin/stories/[id]/route.test.ts` (+3 tests) — Slug error, not found after update, catch block
+- `src/app/api/admin/stories/content-images/route.test.ts` (+3 tests) — Empty ID, page scoring, null chunks
+- `src/app/api/admin/stories/[id]/image/route.test.ts` (+6 tests) — Empty ID, blur placeholder, fetch failures
+- `src/app/api/admin/stories/approve-all/route.test.ts` (+2 tests) — Catch block, null data fallback
+- `src/app/api/admin/stories/bulk-delete/route.test.ts` (+2 tests) — Catch block, null data fallback
+- `src/app/api/admin/stories/bulk-status/route.test.ts` (+2 tests) — Catch block, null data fallback
+- `src/app/api/admin/stories/[id]/status/route.test.ts` (+1 test) — Empty story ID
+- `src/app/api/webhooks/elevenlabs/route.test.ts` (+5 tests) — Missing secret, DB error, invalid JSON, transcript types
+- `src/app/api/mcp/places/route.test.ts` (+3 tests) — Rate limiting, non-ok HTTP response
+- `src/app/api/mcp/weather/route.test.ts` (+3 tests) — Rate limiting, empty API key
+- `src/app/api/mcp/make-booking/route.test.ts` (+4 tests) — Phone normalization, date/time formatting
+- `src/app/api/admin/costs-analytics/route.test.ts` (+2 tests) — ElevenLabs/PostHog fetch failures
+- `src/app/api/admin/stripe-analytics/route.test.ts` (+2 tests) — Payment status mapping branches
+- `src/app/api/admin/agent-reports/route.test.ts` (+1 test) — File stat ISO date
+- `src/app/api/admin/marketing/accounts/route.test.ts` (+4 tests) — Catch blocks for all methods
+- `src/app/api/chat/route.test.ts` (+2 tests) — MAX_INPUT_LENGTH check, dev error debug info
+- `src/app/api/admin/tunnel/route.test.ts` (+2 tests) — pgrep throw, spawn throw
+- `src/app/api/admin/elevenlabs-analytics/route.test.ts` (+3 tests) — Auth failure, non-ok API, agent name fallback
+- `src/app/api/admin/github-analytics/route.test.ts` (+2 tests) — Daily query failure, outer catch
+- `src/app/api/admin/agents-summary/route.test.ts` (+3 tests) — Unknown health, no summary, outer catch
+
+**Library files:**
+- `src/lib/costs/recurring-costs.test.ts` (+3 tests) — endDate filtering, PLATFORM_SERVICES fallback
+- `src/lib/costs/manual-costs.test.ts` (+2 tests) — updateManualCost/getManualCost catch blocks
+- `src/lib/i18n/resolve.test.ts` (+1 test) — String intermediate traversal
+- `src/lib/i18n/provider.test.tsx` (+1 test) — Asturian locale lazy loader
+- `src/lib/costs/elevenlabs-costs.test.ts` (+3 tests) — Zero counts, zero timestamps, missing billing_period
+- `src/lib/csrf.test.ts` (+1 test) — Cookie parsing with missing __csrf
+- `src/lib/csrf-client.test.ts` (+2 tests) — Server-side guard, POST without CSRF token
+- `src/lib/content-discovery.test.ts` (+4 tests) — Processing errors, empty drafts, insert/fetch errors
+- `src/lib/posthog-query.test.ts` (+1 test) — Retry warning log
+- `src/lib/translate-story.test.ts` (+2 tests) — No text block, invalid JSON response
+- `src/lib/twilio-sms.test.ts` (+1 test) — Natural language time format
+- `src/lib/stripe.test.ts` (+1 test) — Unknown purchase type error
+- `src/lib/platforms/index.test.ts` (+1 test) — Client returns null on 403
+- `src/lib/platforms/x-client.test.ts` (+2 tests) — data.detail error field, non-Error throw
+
+**Components and hooks:**
+- `src/hooks/use-voice-session.test.ts` (+2 tests) — localStorage.setItem throw
+- `src/hooks/use-admin-role.test.ts` (+2 tests) — User change re-check, logout ref reset
+- `src/components/immersive/chat-actions.test.tsx` (+3 tests) — No assistant messages, double-click copy, clipboard failure
+- `src/components/immersive/author-typewriter.test.tsx` (+7 tests) — Unmount during phases, full cycle, click propagation
+- `src/components/immersive/story-viewer.test.tsx` (+10 tests) — Form element guards, chat keyboard, auto-play, navigator.share
+- `src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx` (+7 tests) — StatCard types, label skip, modals, alerts
+- `src/components/admin/marketing-dashboard/drafts-panel.test.tsx` (+3 tests) — onCreated callback, clipboard failure, create dialog
+- `src/components/admin/marketing-dashboard/marketing-dashboard.test.tsx` (+7 tests) — Disconnect/toggle errors, config dialog callbacks
+- `src/app/immersive/immersive-page-content.test.tsx` (+2 tests) — Mood select, mood dismiss
+- `src/app/admin/page.test.tsx` (+1 test) — Missing translations branch
+- `src/components/admin/elevenlabs-analytics-panel.test.tsx` (+6 tests) — Status breakdown, zero calls, unknown language
+- `src/components/admin/suggestions-panel.test.tsx` (+5 tests) — Location labels, notes error, reject, filter
+- `src/components/admin/visitors-analytics-panel.test.tsx` (+9 tests) — localStorage, URL formatting, chart rendering
+- `src/components/admin/stripe-analytics-panel.test.tsx` (+9 tests) — Revenue chart, refunds, empty states
+- `src/components/admin/agent-config-panel.test.tsx` (+4 tests) — Missing prompt, save success, null config
+- `src/components/admin/maintenance-config-panel.test.tsx` (+3 tests) — Save success, preview toggle
+- `src/components/admin/marketing-dashboard/account-config-dialog.test.tsx` (+1 test) — Dialog close
+- `src/components/admin/marketing-dashboard/create-draft-dialog.test.tsx` (+1 test) — Dialog close
+
+### Coverage improvements (2026-03-08):
+
+**API routes reaching 100% line coverage:**
+- `suggestions/[id]/route.ts`: 73% → 100%
+- `github-traffic-sync/route.ts`: 76% → 100%
+- `translations/route.ts`: 78% → 100%
+- `marketing/schedule/route.ts`: 80% → 98%
+- `marketing/accounts/route.ts`: 89% → 100%
+- `stories/route.ts`: 90% → 100%
+- `stories/[id]/route.ts`: 88% → 100%
+- `stories/content-images/route.ts`: 90% → 100%
+- `stories/[id]/image/route.ts`: 89% → 100%
+- `stories/[id]/status/route.ts`: 95% → 100%
+- `stories/approve-all/route.ts`: 84% → 100%
+- `stories/bulk-delete/route.ts`: 88% → 100%
+- `stories/bulk-status/route.ts`: 89% → 100%
+- `content-discovery/route.ts`: 90% → 100%
+
+**Library files reaching 100%:**
+- `csrf.ts`: 95% → 100%
+- `csrf-client.ts`: 95% → 100%
+- `costs/recurring-costs.ts`: 93% → 100%
+- `costs/manual-costs.ts`: 92% → 100%
+- `costs/elevenlabs-costs.ts`: 72% branch → 100% branch
+- `i18n/resolve.ts`: 91% → 100%
+- `stripe.ts`: 96% → 100%
+- `translate-story.ts`: 97% → 100% stmts
+
+**Components:**
+- `agent-config-panel.tsx`: 97% → 100%
+- `create-draft-dialog.tsx`: 96% → 100%
+- `costs-analytics-panel/alerts.tsx`: 97% → 100%
+- `costs-analytics-panel/chart.tsx`: 97% → 100%
+- `costs-analytics-panel/forecast.tsx`: 97% → 100%
+- `costs-analytics-panel/index.tsx`: 95% → 100%
+- `marketing-dashboard.tsx`: 75% → 98%
+- `drafts-panel.tsx`: 87% → 95%
+- `story-viewer.tsx`: 87% → 92%
+
+### Overall improvement (2026-03-08):
+- Statement coverage: 93.08% → 96.53% (+3.45%)
+- Branch coverage: 85.83% → 89.60% (+3.77%)
+- Function coverage: 91.84% → 94.75% (+2.91%)
+- Line coverage: 93.90% → 97.37% (+3.47%)
+- Total tests: 4782 → 5059 (+277 tests)
+- Test files: 292 (0 new files, 50+ enhanced)
+
+---
 
 ### Test files modified (2026-03-07):
 - `src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx` (+12 tests) - CostChart direct tests ($Xk format, empty data, SVG bars), ServiceBreakdownTable direct tests (empty, manual edit/delete, notes, dashboard links), formatDateShort, TierAlertsSection expand-after-collapse re-fetch

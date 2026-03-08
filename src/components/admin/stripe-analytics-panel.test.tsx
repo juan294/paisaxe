@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { StripeAnalyticsPanel } from "./stripe-analytics-panel";
 import { AnalyticsCacheProvider } from "./analytics-cache-context";
 import * as adminApi from "@/lib/admin-api";
@@ -223,6 +224,223 @@ describe("StripeAnalyticsPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("View Full Dashboard on Stripe")).toBeInTheDocument();
+    });
+  });
+
+  it("clears warning when subsequent fetch has no warning", async () => {
+    const user = userEvent.setup();
+
+    // First fetch returns a warning
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValueOnce({
+      data: mockData,
+      warning: "Using test API key",
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Using test API key")).toBeInTheDocument();
+    });
+
+    // Second fetch has no warning
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValueOnce({
+      data: mockData,
+    });
+
+    await user.click(screen.getByText("Refresh"));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Using test API key")).not.toBeInTheDocument();
+    });
+  });
+
+  it("displays revenue chart when revenueByDay has data", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Revenue Over Time")).toBeInTheDocument();
+    });
+
+    // Chart legend
+    expect(screen.getByText("Daily Revenue")).toBeInTheDocument();
+  });
+
+  it("displays refunded order with strikethrough amount", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("02 — Recent Orders")).toBeInTheDocument();
+    });
+
+    // The second order has refundedAmount > 0, showing strikethrough + refund amount
+    expect(screen.getByText("-€3.00")).toBeInTheDocument();
+  });
+
+  it("displays revenue breakdown text", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Gross: €45.00/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows Open Stripe Dashboard link in empty state", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        summary: {
+          totalOrders: 0,
+          thirtyDayOrders: 0,
+          totalRevenue: 0,
+          totalRevenueFormatted: "€0.00",
+          totalRefunds: 0,
+          totalRefundsFormatted: "€0.00",
+          netRevenue: 0,
+          netRevenueFormatted: "€0.00",
+          thirtyDayRevenue: 0,
+          thirtyDayRevenueFormatted: "€0.00",
+          thirtyDayRefunds: 0,
+          thirtyDayRefundsFormatted: "€0.00",
+          thirtyDayNetRevenue: 0,
+          thirtyDayNetRevenueFormatted: "€0.00",
+          averageOrderValue: 0,
+          averageOrderValueFormatted: "€0.00",
+          currency: "EUR",
+        },
+        recentOrders: [],
+        productBreakdown: [],
+        revenueByDay: [],
+        dateRange: { from: "2024-01-15", to: "2024-01-16" },
+      },
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Open Stripe Dashboard")).toBeInTheDocument();
+    });
+  });
+
+  it("shows refreshing state during background refresh", async () => {
+    const user = userEvent.setup();
+    let resolveRefresh: (value: unknown) => void;
+    const refreshPromise = new Promise((resolve) => {
+      resolveRefresh = resolve;
+    });
+
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValueOnce({
+      data: mockData,
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Refresh")).toBeInTheDocument();
+    });
+
+    vi.mocked(adminApi.fetchStripeAnalytics).mockImplementationOnce(
+      () => refreshPromise as Promise<{ data: typeof mockData }>
+    );
+
+    await user.click(screen.getByText("Refresh"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Refreshing...")).toBeInTheDocument();
+    });
+
+    resolveRefresh!({ data: mockData });
+  });
+
+  it("shows empty product breakdown table when no products", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        summary: { ...mockData.summary, totalOrders: 1 },
+        productBreakdown: [],
+        recentOrders: [mockData.recentOrders[0]],
+      },
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("01 — Revenue by Product")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("No product data available")).toBeInTheDocument();
+  });
+
+  it("shows empty orders table when no orders but has products", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        summary: { ...mockData.summary, totalOrders: 1 },
+        recentOrders: [],
+        productBreakdown: [mockData.productBreakdown[0]],
+      },
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("02 — Recent Orders")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("No orders yet")).toBeInTheDocument();
+  });
+
+  it("renders revenue chart with many days to trigger label skipping", async () => {
+    const manyDays = Array.from({ length: 14 }, (_, i) => ({
+      date: `2024-01-${String(i + 1).padStart(2, "0")}`,
+      revenue: 100 + i * 50,
+      orders: 1 + i,
+    }));
+
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        revenueByDay: manyDays,
+      },
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Revenue Over Time")).toBeInTheDocument();
+    });
+
+    // Chart should render with some labels skipped (x-axis label skipping logic)
+    expect(screen.getByText("Daily Revenue")).toBeInTheDocument();
+  });
+
+  it("displays pending order status badge", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        recentOrders: [
+          {
+            ...mockData.recentOrders[0],
+            status: "pending" as const,
+          },
+        ],
+      },
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Pending")).toBeInTheDocument();
     });
   });
 });

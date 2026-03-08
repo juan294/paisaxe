@@ -1376,6 +1376,79 @@ describe("AdminPage", () => {
           expect(screen.getByTestId("story-story-3")).toBeInTheDocument();
         });
       });
+
+      it("counts story with content but incomplete status as missing translations", async () => {
+        const completeTranslation = {
+          title: "Translated Title",
+          subtitle: "Translated Subtitle",
+          description: "Translated Description",
+        };
+
+        const storiesWithPartialStatus: AdminStory[] = [
+          {
+            ...mockStories[0],
+            metadata: {
+              translations: {
+                en: completeTranslation,
+                fr: completeTranslation,
+                de: completeTranslation,
+                pt: completeTranslation,
+                ast: completeTranslation,
+              },
+              translation_status: {
+                en: { status: "complete" },
+                fr: { status: "complete" },
+                de: { status: "pending" }, // Not complete — line 110
+                pt: { status: "complete" },
+                ast: { status: "complete" },
+              },
+            },
+          },
+          {
+            ...mockStories[1],
+            metadata: {
+              translations: {
+                en: completeTranslation,
+                fr: completeTranslation,
+                de: completeTranslation,
+                pt: completeTranslation,
+                ast: completeTranslation,
+              },
+              translation_status: {
+                en: { status: "complete" },
+                fr: { status: "complete" },
+                de: { status: "complete" },
+                pt: { status: "complete" },
+                ast: { status: "complete" },
+              },
+            },
+          },
+        ];
+
+        mockFetchStories.mockResolvedValue({ data: storiesWithPartialStatus });
+
+        await navigateToStories();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        // Click "Missing i18n" filter card
+        const missingI18nCard = screen.getAllByRole("button").find(btn =>
+          btn.classList.contains("rounded-2xl") && btn.textContent?.includes("Missing i18n")
+        );
+
+        await act(async () => {
+          fireEvent.click(missingI18nCard!);
+        });
+
+        // story-1 has 'de' with status "pending" — should appear as missing
+        // story-2 has all complete — should be excluded
+        await waitFor(() => {
+          expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
+          expect(screen.queryByTestId("story-story-2")).not.toBeInTheDocument();
+        });
+      });
     });
 
     describe("Story editor interaction", () => {

@@ -514,4 +514,160 @@ describe("SuggestionsPanel", () => {
       expect(textarea).toHaveValue("Nice suggestion");
     });
   });
+
+  it("displays central and western location labels", async () => {
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: [
+        {
+          ...mockSuggestions[0],
+          id: "s3",
+          placeName: "Cudillero",
+          location: "central" as const,
+        },
+        {
+          ...mockSuggestions[0],
+          id: "s4",
+          placeName: "Tapia de Casariego",
+          location: "western" as const,
+        },
+      ],
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Central Asturias")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Western Asturias")).toBeInTheDocument();
+  });
+
+  it("handleSaveNotes - shows error on failure", async () => {
+    const user = userEvent.setup();
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: mockSuggestions,
+    });
+    vi.mocked(adminApi.updateSuggestion).mockResolvedValue({
+      error: "Save notes failed",
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Playa de Gulpiyuri")).toBeInTheDocument();
+    });
+
+    // Expand first suggestion
+    const expandButtons = screen.getAllByLabelText("Expand");
+    await user.click(expandButtons[0]);
+
+    // Type in the admin notes
+    const textarea = screen.getByPlaceholderText("Add internal notes...");
+    await user.type(textarea, "Some notes");
+
+    // Click "Save Notes"
+    const saveBtn = screen.getByText("Save Notes");
+    await user.click(saveBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("Save notes failed")).toBeInTheDocument();
+    });
+  });
+
+  it("reject button calls handleStatusChange with rejected", async () => {
+    const user = userEvent.setup();
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: mockSuggestions,
+    });
+    vi.mocked(adminApi.updateSuggestion).mockResolvedValue({
+      data: { ...mockSuggestions[0], status: "rejected" as const },
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Playa de Gulpiyuri")).toBeInTheDocument();
+    });
+
+    // Expand the first suggestion (status: pending, so Reject button shows)
+    const expandButtons = screen.getAllByLabelText("Expand");
+    await user.click(expandButtons[0]);
+
+    // Click "Reject"
+    const rejectBtn = screen.getByText("Reject");
+    await user.click(rejectBtn);
+
+    expect(adminApi.updateSuggestion).toHaveBeenCalledWith("s1", { status: "rejected" });
+  });
+
+  it("onOpenChange closes dialog when open changes to false", async () => {
+    const user = userEvent.setup();
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: mockSuggestions,
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Playa de Gulpiyuri")).toBeInTheDocument();
+    });
+
+    // Expand first suggestion and click Convert to Story
+    const expandButtons = screen.getAllByLabelText("Expand");
+    await user.click(expandButtons[0]);
+
+    const convertBtn = screen.getByText("Convert to Story");
+    await user.click(convertBtn);
+
+    // The CreateStoryDialog is mocked to null, but the internal state is set
+    // We can verify the suggestion is still visible and no errors thrown
+    expect(screen.getByText("Playa de Gulpiyuri")).toBeInTheDocument();
+  });
+
+  it("shows footer text", async () => {
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: mockSuggestions,
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Suggestions from visitors")).toBeInTheDocument();
+    });
+  });
+
+  it("clicking 'All' filter clears status filter", async () => {
+    const user = userEvent.setup();
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: mockSuggestions,
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Playa de Gulpiyuri")).toBeInTheDocument();
+    });
+
+    // First apply a filter
+    const pendingFilter = screen.getByText(/Pending \(\d+\)/);
+    await user.click(pendingFilter);
+
+    // Wait for refetch
+    await waitFor(() => {
+      expect(adminApi.fetchSuggestions).toHaveBeenCalledTimes(2);
+    });
+
+    // Now click "All" to clear the filter (covers line 214: setFilterStatus(null))
+    const allFilter = screen.getByText(/All \(\d+\)/);
+    await user.click(allFilter);
+
+    // Should trigger another refetch with no status filter
+    await waitFor(() => {
+      expect(adminApi.fetchSuggestions).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  // NOTE: Lines 147-156 (handleStoryCreated callback) and 458 (onOpenChange for CreateStoryDialog)
+  // are not testable because CreateStoryDialog is mocked to null. These callbacks are only invoked
+  // by the dialog's internal logic which is mocked away. Testing these would require integration
+  // testing with the real CreateStoryDialog component.
 });

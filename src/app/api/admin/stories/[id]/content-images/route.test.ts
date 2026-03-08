@@ -107,6 +107,19 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
     });
   });
 
+  describe("validation", () => {
+    it("should return 400 when story ID is empty", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories//content-images");
+      const response = await GET(request, { params: Promise.resolve({ id: "" }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Story ID is required");
+    });
+  });
+
   describe("chunk-based filtering", () => {
     beforeEach(() => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
@@ -145,6 +158,27 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
 
       expect(response.status).toBe(200);
       expect(data.data.images).toHaveLength(0);
+    });
+
+    it("should skip chunks with null page_number", async () => {
+      const mockClient = createMockSupabase({
+        story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
+        chunks: [
+          { page_number: 1 },
+          { page_number: null as unknown as number },
+        ],
+        images: [mockImages[0]],
+      });
+      vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
+      const response = await GET(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Only page 1 should be included, null page_number should be skipped
+      expect(data.data.images).toHaveLength(1);
+      expect(data.data.images[0].pageNumber).toBe(1);
     });
 
     it("should deduplicate pages when multiple chunks reference same page", async () => {
@@ -280,6 +314,35 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
     });
   });
 
+  describe("score edge cases", () => {
+    beforeEach(() => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    });
+
+    it("should score pages 4-5 with +10 points (medium priority)", async () => {
+      const page5Image = {
+        path: "https://supabase.co/storage/v1/object/public/pdf-images/test-pdf/test-pdf_page5_full.png",
+        caption: "Page 5 image",
+        source_pdf: "test-pdf.pdf",
+        page_number: 5,
+      };
+      const mockClient = createMockSupabase({
+        story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
+        chunks: [{ page_number: 5 }],
+        images: [page5Image],
+      });
+      vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
+      const response = await GET(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Page 5 (<=5) gets +10, not an _img_ URL so no +100 — score should be 10
+      expect(data.data.images[0].score).toBe(10);
+    });
+  });
+
   describe("error handling", () => {
     beforeEach(() => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
@@ -313,6 +376,19 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe("Failed to search chunks");
+    });
+
+    it("should return 500 on unexpected error (catch block)", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("Unexpected error");
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
+      const response = await GET(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
     });
 
     it("should return 500 when images database query fails", async () => {

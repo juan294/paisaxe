@@ -208,6 +208,77 @@ describe("PATCH /api/admin/stories/[id]", () => {
     expect(data.data.duration).toBeNull();
   });
 
+  it("should return 500 when slug check has non-PGRST116 error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockNeq = vi.fn().mockReturnValue({
+      single: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "UNEXPECTED_ERROR", message: "Something went wrong" },
+      }),
+    });
+    const mockEq = vi.fn().mockReturnValue({ neq: mockNeq });
+    const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ slug: "some-slug" }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to validate slug");
+  });
+
+  it("should return 404 when story not found after update (no data returned)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: null,
+            error: null,
+          }),
+        }),
+      }),
+    });
+
+    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Updated" }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(data.error).toBe("Story not found");
+  });
+
+  it("should return 500 on unexpected error (catch block)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    // Make request.json() throw to trigger the outer catch block
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: "not valid json",
+    });
+    vi.spyOn(request, "json").mockRejectedValue(new Error("Unexpected parse error"));
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
+  });
+
   it("should return 500 when update fails", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 

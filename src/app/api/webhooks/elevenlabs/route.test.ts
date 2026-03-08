@@ -547,4 +547,87 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.smsSent).toBe(false);
     expect(data.smsError).toBe("Invalid phone number");
   });
+
+  it("should return 401 when ELEVENLABS_WEBHOOK_SECRET is not configured", async () => {
+    delete process.env.ELEVENLABS_WEBHOOK_SECRET;
+
+    const payload = JSON.stringify({ conversation_id: "conv_456" });
+    const request = new NextRequest(
+      "http://localhost:3000/api/webhooks/elevenlabs",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "elevenlabs-signature": "t=12345,v0=abc123",
+        },
+        body: payload,
+      }
+    );
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error).toBe("Invalid signature");
+  });
+
+  it("should handle database update error gracefully", async () => {
+    mockUpdate.mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: { message: "DB update failed" } }),
+    });
+
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      transcript: buildTranscript(
+        { role: "user", message: "Confirmado, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    // Should still return 200 since SMS was already sent
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.outcome).toBe("confirmed");
+  });
+
+  it("should return 500 when request body is not valid JSON", async () => {
+    const invalidPayload = "not valid json{{{";
+    const sigHeader = createSignatureHeader(invalidPayload);
+    const request = new NextRequest(
+      "http://localhost:3000/api/webhooks/elevenlabs",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "elevenlabs-signature": sigHeader,
+        },
+        body: invalidPayload,
+      }
+    );
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
+  });
+
+  it("should handle transcript as non-array non-string type gracefully", async () => {
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      // transcript is an object (neither string nor array)
+      transcript: { unexpected: "format" },
+      analysis: { call_successful: "unknown" },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // With no matching keywords and unknown call status, should default to failed
+    expect(data.outcome).toBe("failed");
+  });
 });

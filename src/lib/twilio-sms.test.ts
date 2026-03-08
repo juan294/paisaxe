@@ -119,6 +119,16 @@ describe("twilio-sms", () => {
       expect(message).toContain("Pelayo (paisaxe.es)");
     });
 
+    it("should handle natural language time format (non HH:MM)", () => {
+      const bookingWithNaturalTime = {
+        ...mockBooking,
+        booking_time: "a las nueve de la noche",
+      };
+      const message = buildConfirmationSMS(bookingWithNaturalTime);
+
+      expect(message).toContain("a las nueve de la noche");
+    });
+
     it("should use singular 'persona' for party of 1", () => {
       const singleBooking = { ...mockBooking, party_size: 1 };
       const message = buildConfirmationSMS(singleBooking);

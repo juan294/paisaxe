@@ -1,263 +1,278 @@
 # Performance Report
 
-> Updated on 2026-03-07
+> Updated on 2026-03-08
 
-## Health Status: YELLOW (build blocked locally + CI broken)
+## Health Status: YELLOW (JS budget exceeded by 226 KB)
 
-**Bundle sizes could not be measured this cycle.** Two independent blockers prevent a production build:
+**Build blockers from last report are RESOLVED.** Both the corrupted `coverage/` directory and the TypeScript error in `agent-config/route.ts` have been fixed. This is the first actual bundle measurement since Feb 7.
 
-1. **Local:** Corrupted `coverage/src` directory (65535 hard links, 2 MB) causes Turbopack `EAGAIN` deadlock (os error 11)
-2. **CI:** TypeScript error in `src/app/api/admin/agent-config/route.ts` — `AuthResult` type not assignable to `Response` (build step fails on develop)
+**Total JS: 2,726 KB — exceeds 2,500 KB budget by 226 KB (9% over).** The previous report estimated ~2,395 KB, but that estimate was based on Feb 7's 2,455 KB baseline minus projected savings — the actual measurement shows the bundle has grown by 271 KB since Feb 7, likely from new features (ISR, PPR, additional app code).
 
-**Estimated Total JS: ~2,380-2,410 KB (within 2,500 KB budget)** based on Feb 7 baseline (2,455 KB), minus `optimizePackageImports` savings (~50-75 KB), plus new Upstash deps (~25-30 KB). Headroom estimated at 90-120 KB — improved from Feb 7's 45 KB.
+**Good news:** Code-splitting is well-implemented. ~914 KB of the total is deferred behind dynamic imports (ElevenLabs, PostHog, VoiceChat UI, admin panels). The initial page load JS is estimated at ~1,500 KB — well under budget. The budget violation is in *total* JS, not initial load.
 
-**Production deps: 31 of 40 budget (77.5%).** Four new deps since last report.
+**Production deps: 31 of 40 budget (77.5%).** Unchanged from last report.
 
 ## Key Metrics
 
-| Metric | Current (2026-03-07) | Previous (2026-02-07) | Change | Budget | Status |
+| Metric | Current (2026-03-08) | Previous (2026-02-07) | Change | Budget | Status |
 |--------|---------------------|----------------------|--------|--------|--------|
-| Total JS | ~2,380-2,410 KB (est.) | 2,455 KB | **~-45 to -75 KB** | 2,500 KB | Within budget (est.) |
-| Total CSS | Unknown | 130 KB | - | - | Cannot measure |
-| Production deps | 31 | 27 | **+4** | 40 | Good |
-| node_modules | 861 MB | 856 MB | +5 MB | - | Stable |
-| .next (dev cache) | 843 MB | 2,102 MB (prod) | N/A | - | Dev cache only |
-
-**Note:** `.next` is 843 MB (dev server cache), not comparable to the 2,102 MB production build artifact from Feb 7.
+| Total JS | **2,726 KB** | 2,455 KB | **+271 KB (+11%)** | 2,500 KB | **Over budget** |
+| Total CSS | **122 KB** | 130 KB | **-8 KB (-6%)** | - | Good |
+| Production deps | 31 | 27 | +4 | 40 | Good |
+| node_modules | 865 MB | 856 MB | +9 MB | - | Stable |
+| .next | 1,027 MB | 2,102 MB (Feb 7 prod) | N/A | - | Expected |
 
 ## Budget Status
 
 | Budget | Limit | Current | Headroom | Status |
 |--------|-------|---------|----------|--------|
-| Total JS | 2,500 KB | ~2,395 KB (est.) | **~105 KB (4.2%)** | Improved (est.) |
+| Total JS | 2,500 KB | **2,726 KB** | **-226 KB (-9%)** | Over budget |
 | Production deps | 40 | 31 | 9 | Good |
 
-## Build Blockers (P0)
+## Top 10 Chunks Identified
 
-### 1. CRITICAL: Corrupted `coverage/` directory blocks local builds
+| Rank | Chunk | Size | Contents | Loading | Actionable? |
+|------|-------|------|----------|---------|-------------|
+| 1 | d33d3b23 | **482 KB** | ElevenLabs SDK + protobuf | **Deferred** (dynamic import) | No — already optimized |
+| 2 | aee6c772 | **224 KB** | Next.js app bootstrap + hydration | Static (framework) | No — required |
+| 3 | 89702102 | **181 KB** | PostHog analytics SDK | **Deferred** (useEffect dynamic import) | No — already lazy |
+| 4 | 0df916ae | **168 KB** | Supabase SDK (auth, postgrest, realtime) | Static | See P3 below |
+| 5 | ed8f8767 | **146 KB** | Chat interface component | **Deferred** (VoiceChat dynamic import) | No — already optimized |
+| 6 | bddf0896 | **124 KB** | Error boundary + localization/i18n | Static | See P2 below |
+| 7 | a6dad97d | **113 KB** | Polyfills (Object.assign, Promise, fetch) | Static | **Yes — see P1** |
+| 8 | fd368131 | **111 KB** | App Router + navigation (PPR, prefetch) | Static (framework) | No — required |
+| 9 | 9d279aa7 | **105 KB** | Admin analytics dashboard | **Deferred** (admin tab dynamic import) | No — already optimized |
+| 10 | 681953fa | **75 KB** | Dynamic route imports / module loaders | Static (framework) | No — required |
 
-The `coverage/src` directory has 65535 hard links (2 MB directory entry) — likely from a `vitest --coverage` run that crashed or was killed mid-write. Turbopack's `DirAssetReference` tries to scan it (via `agents/run/route.ts` which uses `fs.readdir`), hits OS error 11 (`EAGAIN` — resource deadlock), and panics.
+### Load Profile Summary
 
-**Impact:** Cannot run `npm run build` or `npm run build:analyze` locally.
+| Category | Size | % of Total | Notes |
+|----------|------|-----------|-------|
+| **Deferred (dynamic imports)** | ~914 KB | 33.5% | Loads on-demand only |
+| **Framework (Next.js core)** | ~410 KB | 15.0% | Bootstrap, router, module loaders |
+| **Vendor (static)** | ~281 KB | 10.3% | Supabase, polyfills |
+| **App code (static)** | ~124 KB | 4.5% | Error boundary, i18n |
+| **Other smaller chunks** | ~997 KB | 36.6% | Page routes, shared modules |
 
-**Fix:**
-```bash
-rm -rf coverage
+**Estimated initial load: ~1,500-1,600 KB** (total minus deferred). This is within budget for initial load performance.
+
+## Optimization Opportunities
+
+### P1: Eliminate polyfills chunk (~113 KB savings) — HIGH IMPACT
+
+Chunk `a6dad97d` (113 KB) contains browser compatibility polyfills for `Object.assign`, `String` methods, `Array.flat`, `Promise.finally`, and `fetch` API shimming. Modern browsers (Chrome 90+, Safari 15+, Firefox 90+) don't need these.
+
+**Root cause:** Next.js defaults to a broad `browserslist` target. This project's audience (tourists in Asturias, 2026) uses overwhelmingly modern browsers.
+
+**Fix:** Add a `browserslist` to `package.json`:
+```json
+{
+  "browserslist": [
+    "last 2 Chrome versions",
+    "last 2 Firefox versions",
+    "last 2 Safari versions",
+    "last 2 Edge versions",
+    "> 0.5%, not dead"
+  ]
+}
 ```
 
-The `coverage/` directory is gitignored and regenerated by `npm run test:coverage`. Deleting it is safe.
-
-**Why webpack fallback fails:** Next.js 16 uses `node:` protocol imports (`node:child_process`, `node:timers/promises`) which the webpack bundler doesn't support. Turbopack is required.
-
-### 2. CRITICAL: CI build fails on `develop`
-
-TypeScript error in `src/app/api/admin/agent-config/route.ts`:
-```
-Type 'AuthResult' is not assignable to type 'void | Response'.
-Type '{ valid: true; userId: string; }' is not assignable to type 'void | Response'.
+**Alternative (faster):** Add to `next.config.ts`:
+```typescript
+const nextConfig: NextConfig = {
+  // ... existing config
+  transpilePackages: [], // Ensure no unnecessary transpilation
+};
 ```
 
-The `GET` handler returns `AuthResult` on success instead of always returning a `NextResponse`. This blocks the build step in CI (lint+typecheck passes, but Next.js build-time type checking is stricter about route handler return types).
+**Effort:** Trivial (1 line in package.json). **Risk:** Very low — only drops IE11/legacy Android. **Savings:** ~80-113 KB.
 
-**Impact:** No production builds on CI since Mar 5.
+### P2: Preload ElevenLabs chunk after page idle — MEDIUM IMPACT (UX)
 
-## Optimization Progress (Since Feb 7)
+QA Agent reports 3 persistent E2E journey failures (Journeys 3, 7, 14) due to the VoiceChat dynamic import exceeding 5s timeout. The 482 KB ElevenLabs chunk loads on-demand when the chat panel opens, but this is too slow for first interaction.
 
-### Implemented
+**Fix:** Add an idle-time prefetch in `immersive-page-content.tsx`:
+```typescript
+useEffect(() => {
+  // Prefetch voice chat chunk after page is idle
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(() => {
+      import("@/components/immersive/voice-chat");
+    });
+  }
+}, []);
+```
 
-| Optimization | Date | Estimated Savings | Source |
-|-------------|------|-------------------|--------|
-| `optimizePackageImports: ['lucide-react', 'posthog-js']` | Feb 9 | ~50-100 KB | P1 from Feb 7 report |
-| Dynamic-import StoryEditorDialog | Feb 9 | ~30-40 KB deferred | P1 from Feb 7 report |
-| Dynamic-import CreateStoryDialog | Feb 9 | ~20-30 KB deferred | P1 from Feb 7 report |
-| Dynamic-import SelectionToolbar | Feb 9 | ~10 KB deferred | Speed Insights work |
-| Lazy-mount analytics sub-panels | Feb 9 | ~3,200 lines deferred | Speed Insights P1 |
-| Lazy-load translation files (non-es/en) | Feb 9 | ~65 KB deferred | Speed Insights P2 |
-| Typewriter extraction (ref-based DOM) | Feb 9 | Runtime perf | Speed Insights P1 |
-| Removed unused font preconnects | Feb 9 | DNS latency | Speed Insights P2 |
+**Effort:** Low (4 lines). **Risk:** None — downloads during idle time, doesn't block initial render. **Impact:** Eliminates 5s cold-start latency on first chat open. Fixes 3 QA E2E failures.
+
+### P3: Tree-shake Supabase realtime module (~20-30 KB savings) — LOW IMPACT
+
+Chunk `0df916ae` (168 KB) includes the full Supabase client with auth, postgrest, AND realtime. The realtime module adds ~20-30 KB but is only used for admin features (if at all). The public-facing immersive page doesn't use realtime subscriptions.
+
+**Fix:** If realtime is not used on the public site, create the Supabase client without it:
+```typescript
+import { createBrowserClient } from "@supabase/ssr";
+
+// For public pages — no realtime needed
+const supabase = createBrowserClient(url, key, {
+  realtime: { enabled: false },
+});
+```
+
+**Effort:** Medium (requires auditing Supabase usage across pages). **Risk:** Low. **Savings:** ~20-30 KB.
+
+### P4: Consider splitting the JS budget — LOW PRIORITY (PROCESS)
+
+The 2,500 KB budget measures *total* JS including deferred chunks. With 914 KB deferred behind dynamic imports, the initial load is ~1,500 KB — well below any reasonable performance threshold.
+
+**Recommendation:** Split the budget:
+- **Initial load JS:** ≤ 1,800 KB (currently ~1,500 KB — 300 KB headroom)
+- **Total JS:** ≤ 3,000 KB (currently 2,726 KB — 274 KB headroom)
+
+This better reflects the actual user experience. The current 2,500 KB total budget penalizes good code-splitting practices — deferred chunks don't affect page load performance.
+
+## Optimization Progress
+
+### Implemented Since Last Report
+
+| Optimization | Date | Actual Impact | Source |
+|-------------|------|---------------|--------|
+| **VoiceAgentChat dynamic import** | Since Mar 7 | 482 KB deferred from Marketing tab load | P2 from Mar 7 report |
+| **Build blockers resolved** | Since Mar 7 | Actual measurement possible | P0 from Mar 7 report |
+| **posthog-js updated to 1.359.1** | Since Mar 7 | Security vuln resolved | Security Agent recommendation |
 
 ### Still Pending
 
-| Optimization | Priority | Estimated Savings | Effort | Status |
-|-------------|----------|-------------------|--------|--------|
-| Lazy-load VoiceAgentChat in MarketingDashboard | P2 | 482 KB deferred from Marketing tab | Low | **Still static import** |
-| Run `build:analyze` to identify unknown chunks | P2 | Diagnostic | Low | **Blocked by build** |
-| Verify ElevenLabs chunk deferred on public pages | P3 | 0-482 KB | Low | Unverified |
+| Optimization | Priority | Estimated Savings | Effort |
+|-------------|----------|-------------------|--------|
+| Browserslist modernization (drop polyfills) | **P1** | ~80-113 KB | Trivial |
+| Preload ElevenLabs on idle | **P2** | UX (fixes 3 E2E failures) | Low |
+| Tree-shake Supabase realtime | **P3** | ~20-30 KB | Medium |
+| Split JS budget (initial vs total) | **P4** | Process improvement | Trivial |
 
-## Remaining Optimization Opportunities
+## Dynamic Import Chain Verification
 
-### 1. MEDIUM: Lazy-load VoiceAgentChat in MarketingDashboard (~482 KB deferred)
+### Public site (visitor-facing) — PROPERLY DEFERRED ✓
 
-`marketing-dashboard.tsx:5` statically imports `VoiceAgentChat`, which pulls in the entire ElevenLabs SDK (482 KB). This loads the moment an admin opens the Marketing tab, even if they never start a voice session.
-
-**Current:**
-```typescript
-// src/components/admin/marketing-dashboard/marketing-dashboard.tsx:5
-import { VoiceAgentChat } from "../voice-agent-chat";
+```
+immersive-page-content.tsx
+  -> dynamic(() => import("./voice-chat"), { ssr: false })     // DEFERRED ✓
+    -> dynamic(() => import("./voice-chat-elevenlabs"))         // DEFERRED ✓
+      -> import { useConversation } from "@elevenlabs/react"    // 482 KB
+    -> import ReactMarkdown from "react-markdown"               // ~40 KB (inside deferred chunk)
+    -> import { usePostHog } from "posthog-js/react"            // ~181 KB (already loaded by provider)
 ```
 
-**Fix:**
-```typescript
-import dynamic from "next/dynamic";
-const VoiceAgentChat = dynamic(
-  () => import("../voice-agent-chat").then(m => ({ default: m.VoiceAgentChat })),
-  { ssr: false }
-);
+### Admin dashboard — PROPERLY DEFERRED ✓ (FIXED since last report)
+
+```
+admin/page.tsx
+  -> dynamic(() => import("marketing-dashboard"), { ssr: false })  // DEFERRED ✓
+    -> dynamic(() => import("../voice-agent-chat"))                // DEFERRED ✓ (was static — NOW FIXED)
+      -> import { useConversation } from "@elevenlabs/react"       // 482 KB
 ```
 
-**Effort:** Low. **Risk:** None — voice chat shows 1 frame later on first use.
+### PostHog — LAZILY LOADED ✓
 
-### 2. LOW: Update posthog-js (1.353.0 -> 1.359.1)
-
-Security agent flagged `dompurify` moderate vulnerability (transitive via posthog-js). Updating to 1.359.1 may resolve the vuln and could improve bundle size through tree-shaking improvements.
-
-**Fix:**
-```bash
-npm install posthog-js@latest
+```
+providers.tsx -> PostHogProviderWrapper
+  -> posthog-provider.tsx
+    -> useEffect(() => Promise.all([
+        import("posthog-js"),
+        import("posthog-js/react")
+      ]))                                                          // 181 KB after hydration
 ```
 
-**Effort:** Trivial. **Risk:** Low — minor version bump.
+### Stripe — STATIC BUT ROUTE-SCOPED
 
-### 3. LOW: Lighter markdown renderer (deferred)
+```
+pricing/checkout/page.tsx
+  -> import { EmbeddedCheckoutProvider } from "@stripe/react-stripe-js"  // Static
+  -> import { loadStripe } from "@stripe/stripe-js"                       // Static, lazy init
+```
 
-`react-markdown` (~152 KB) is only used inside VoiceChat (already lazy-loaded). Not worth replacing — maintenance cost exceeds savings since the chunk is deferred.
-
-**Verdict:** No action. Same conclusion as Feb 7.
-
-## New Dependencies Since Last Report
-
-| Package | Version | Purpose | Bundle Impact | Added |
-|---------|---------|---------|---------------|-------|
-| `@upstash/ratelimit` | ^2.0.8 | Distributed rate limiting | ~5-10 KB (server-heavy) | Feb 19 (Fixes #111) |
-| `@upstash/redis` | ^1.36.2 | Redis client for rate limiting | ~15-20 KB (server-heavy) | Feb 19 (Fixes #111) |
-| `resend` | ^6.9.2 | Transactional email | ~5 KB (server-only) | Post-Feb 7 |
-| `stripe` (server) | ^20.3.1 | Server-side Stripe SDK | 0 KB client (server-only) | Post-Feb 7 |
-
-**Net bundle impact: ~25-30 KB** — Upstash packages are the only ones with potential client impact, though they're primarily server-side. Resend and Stripe server SDK are server-only.
-
-**Note:** The Feb 7 report listed 27 deps. The actual count may have been slightly off; `resend` and `stripe` (server SDK) may have been present but uncounted. The definitive new additions are `@upstash/ratelimit` and `@upstash/redis`.
+Not dynamically imported, but only used on `/pricing/checkout` — not loaded on home or immersive pages.
 
 ## Dependency Analysis
 
 | Package | node_modules Size | Client Bundle Impact | Status |
 |---------|------------------|---------------------|--------|
-| next + @next | 256 MB | Framework (required) | No action |
+| next + @next | 257 MB | Framework (required) | No action |
 | pdfjs-dist | 63 MB | **0 KB** (devDependency) | Correct |
 | pdf-parse | 57 MB | **0 KB** (devDependency) | Correct |
-| lucide-react | 45 MB | ~50-75 KB (optimized via `optimizePackageImports`) | **Improved** |
+| lucide-react | 45 MB | ~50-75 KB (tree-shaken via `optimizePackageImports`) | Optimized |
 | @opentelemetry | 40 MB | 0 KB (server-only) | No action |
-| posthog-js | 31 MB | ~173 KB (lazy-loaded in useEffect) | Update recommended |
+| posthog-js | 35 MB | ~181 KB (lazy-loaded in useEffect) | Updated to 1.359.1 |
 | @napi-rs | 29 MB | 0 KB (native, server-only) | No action |
 | typescript | 23 MB | 0 KB (devDependency) | No action |
-| canvas | 19 MB | 0 KB (optionalDependency, server-only) | No action |
-| core-js | 15 MB | Polyfills (minimal) | No action |
-| rxjs | 11 MB | ~0 KB (transitive, tree-shaken) | No action |
-| es-abstract | 11 MB | 0 KB (transitive, dev-only usage) | No action |
-| stripe | 8 MB | 0 KB (server-only) | No action |
-| @supabase | 6 MB | ~183 KB (auth, required) | No action |
-| @elevenlabs/react | 2 MB | ~482 KB (lazy-loaded via VoiceChat) | Verify deferred |
-| @upstash | 1.5 MB | ~25 KB (mostly server-side) | New — monitor |
-| @radix-ui | 2 MB | ~15-20 KB (tree-shaken) | No action |
+| canvas | 19 MB | 0 KB (optionalDep, server-only) | No action |
+| @img | 16 MB | 0 KB (sharp image processing, server-only) | No action |
+| core-js | 15 MB | Polyfills (~113 KB) | **P1: browserslist** |
+| rxjs | 12 MB | ~0 KB (transitive, tree-shaken) | No action |
+| @babel | 12 MB | 0 KB (build tool) | No action |
+| es-abstract | 11 MB | 0 KB (transitive, dev-only) | No action |
 
-**Production deps: 31 of 40 budget (77.5%).** Healthy — 9 remaining slots.
+## Comparison: 5-Run Trend
 
-## Outdated Dependencies (Performance-Relevant)
+| Metric | 2026-02-02 | 2026-02-06 | 2026-02-07 | 2026-03-07 (est.) | **2026-03-08** | Trend |
+|--------|-----------|-----------|-----------|------------------|------------|-------|
+| Total JS | 2,660 KB | 2,889 KB | 2,455 KB | ~2,395 KB (est.) | **2,726 KB** | ↑ Regression |
+| CSS | - | - | 130 KB | Unknown | **122 KB** | ↓ Improved |
+| Prod deps | 30 | 27 | 27 | 31 | **31** | Stable |
+| node_modules | - | 850 MB | 856 MB | 861 MB | **865 MB** | Stable |
+| ElevenLabs deferred | ✗ (1x476) | ✗ (2x476) | ✓ (1x482) | ✓ (1x482) | **✓ (1x482)** | Stable |
+| VoiceAgentChat deferred | ✗ | ✗ | ✗ | ✗ | **✓** | Fixed! |
+| Key event | framer-motion removed | ElevenLabs dedup | optimizePkgImports | Build blocked | **Build unblocked** | — |
 
-| Package | Current | Latest | Type | Impact |
-|---------|---------|--------|------|--------|
-| posthog-js | 1.353.0 | 1.359.1 | prod | Security fix (dompurify), potential bundle improvements |
-| lucide-react | 0.575.0 | 0.577.0 | prod | Minor — unlikely bundle change |
-| @stripe/stripe-js | 8.8.0 | 8.9.0 | prod | Minor — patch-level |
-| @supabase/supabase-js | 2.97.0 | 2.98.0 | prod | Minor — patch-level |
-| stripe | 20.3.1 | 20.4.1 | prod | Server-only — no bundle impact |
-| postcss | 8.5.6 | 8.5.8 | dev | Build tool — no bundle impact |
+**Why the regression?** The Mar 7 estimate (~2,395 KB) was based on Feb 7's baseline minus projected savings — not an actual measurement. The actual growth from Feb 7 (2,455 KB) to now (2,726 KB) is +271 KB, attributable to:
+1. New ISR/PPR infrastructure (commits `dbcd6c5`, `0c13c00`)
+2. Additional app code for new features
+3. Turbopack chunk strategy differences between builds
+4. 392 UI translation keys (up from 221 in Feb) — more i18n data bundled
 
-No major version updates pending. All outdated packages are minor/patch bumps.
+## ISR/PPR Performance Impact
 
-## Dynamic Import Chain Verification
+Recent commits enabled ISR (`revalidate: 60`) and PPR (`cacheComponents: true`) for the immersive page. While these improve runtime TTFB:
 
-### Public site (visitor-facing)
-
-```
-immersive-page-content.tsx
-  -> dynamic(() => import("./voice-chat"), { ssr: false })  // DEFERRED
-    -> voice-chat-elevenlabs.tsx
-      -> import { useConversation } from "@elevenlabs/react"  // 482 KB
-    -> import { usePostHog } from "posthog-js/react"          // static within module
-```
-
-The ElevenLabs SDK (482 KB) and react-markdown (152 KB) are properly deferred behind the VoiceChat dynamic import. They only load when a visitor opens the chat panel.
-
-**Note:** `voice-chat.tsx:23` has a static `import { usePostHog } from "posthog-js/react"`. Since PostHog is already loaded by the provider (via dynamic import in useEffect), this doesn't add bundle weight — but it does mean VoiceChat depends on PostHog being loaded.
-
-### Admin dashboard
-
-```
-admin/page.tsx
-  -> dynamic(() => import("marketing-dashboard"), { ssr: false })  // DEFERRED
-    -> import { VoiceAgentChat } from "../voice-agent-chat"        // STATIC - 482 KB LOADED
-      -> import { useConversation } from "@elevenlabs/react"
-```
-
-**Problem persists:** `VoiceAgentChat` is statically imported in `marketing-dashboard.tsx:5`. The 482 KB ElevenLabs chunk loads when the Marketing tab is opened, not when a voice session starts. This is the top remaining optimization opportunity.
-
-## Comparison: 4-Run Trend
-
-| Metric | 2026-02-02 | 2026-02-06 | 2026-02-07 | 2026-03-07 (est.) | Trend |
-|--------|-----------|-----------|-----------|------------------|-------|
-| Total JS | 2,660 KB | 2,889 KB | 2,455 KB | **~2,395 KB** | Improving |
-| Prod deps | 30 | 27 | 27 | **31** | Growing (within budget) |
-| node_modules | - | 850 MB | 856 MB | **861 MB** | Stable |
-| ElevenLabs chunks | 1x476 KB | 2x476 KB | 1x482 KB | **1x482 KB** | Fixed (Feb 7) |
-| Key optimizations | framer-motion removed | ElevenLabs dedup | optimizePackageImports | **Build blocked** | Action needed |
-
-## Action Plan
-
-| Priority | Action | Estimated Savings | Effort | Blocked By |
-|----------|--------|-------------------|--------|-----------|
-| **P0** | **Delete corrupted `coverage/` directory** | Unblocks builds | Trivial | Sandbox permission |
-| **P0** | **Fix agent-config route TypeScript error** | Unblocks CI build | Low | Nothing |
-| P2 | Lazy-load VoiceAgentChat in MarketingDashboard | 482 KB deferred | Low | Nothing |
-| P2 | Run `build:analyze` for chunk identification | Diagnostic | Low | P0 fixes |
-| P2 | Update posthog-js to 1.359.1 | Security + possible size improvement | Trivial | Nothing |
-| P3 | Verify ElevenLabs chunk deferred on public pages | 0-482 KB | Low | DevTools |
-
-**Immediate action needed:** P0 items must be resolved before the next build or deployment.
+- **Bundle impact:** PPR adds framework code for partial rendering support (contributes to the 224 KB bootstrap chunk)
+- **QA concern:** ISR caching may serve stale English translations during client-side navigation (QA Agent reports Spanish→English title switching in Journey 1)
+- **Recommendation:** Monitor ISR cache invalidation for locale-specific content. Consider using `revalidateTag()` for translation-dependent pages.
 
 ## Disk Usage
 
 | Directory | Size | Notes |
 |-----------|------|-------|
-| node_modules | 861 MB | Stable (+5 MB from new deps, expected) |
-| .next | 843 MB | Dev server cache only — not comparable to prod build |
-| coverage | ~2 MB | **Corrupted** — 65535 hard links in `coverage/src`. Delete to unblock builds. |
+| node_modules | 865 MB | Stable (+9 MB from Feb 7, expected) |
+| .next | 1,027 MB | Production build artifact |
 
-## Next.js 16 Turbopack Notes
+## Action Plan
 
-Next.js 16 uses Turbopack by default for production builds. Key differences from webpack:
+| Priority | Action | Estimated Savings | Effort | Blocked By |
+|----------|--------|-------------------|--------|-----------|
+| **P1** | **Add browserslist to drop polyfills** | ~80-113 KB | Trivial | Nothing |
+| **P2** | **Preload ElevenLabs on idle** | UX improvement (fixes 3 E2E failures) | Low | Nothing |
+| P3 | Tree-shake Supabase realtime | ~20-30 KB | Medium | Audit needed |
+| P4 | Split JS budget (initial vs total) | Process clarity | Trivial | Decision |
 
-1. **No per-route size output** — The route table only shows static (circle) vs dynamic (f) markers, not KB sizes
-2. **No webpack fallback** — `--webpack` flag exists but fails on `node:` protocol imports used in this project
-3. **Bundle analyzer** — `@next/bundle-analyzer` still works with Turbopack via `ANALYZE=true`, but requires a successful build
-4. **Chunk naming** — Turbopack uses different chunk strategies; previous chunk hashes are not comparable
-
-To get accurate bundle sizes, the P0 build blockers must be resolved first.
+**If P1 is implemented:** Total JS drops to ~2,613-2,646 KB — still over the 2,500 KB budget by ~113-146 KB. Combined with P3, total could reach ~2,583-2,616 KB. To fully close the gap, the budget should be reconsidered (P4) since ~914 KB is deferred and doesn't affect page load.
 
 ---
 
 ## Cross-Agent Context
 
-**For Security Agent:** 4 new production deps added (`@upstash/ratelimit`, `@upstash/redis`, `resend`, `stripe`). posthog-js update to 1.359.1 recommended to resolve dompurify vuln. No new client-heavy dependencies.
+**For Security Agent:** posthog-js dompurify vuln resolved (updated to 1.359.1, confirmed clean audit Mar 8). No new client-heavy dependencies. Browserslist change (P1) has no security implications.
 
-**For Code Quality Agent:** Fix TypeScript error in `src/app/api/admin/agent-config/route.ts` — `GET` handler returns `AuthResult | NextResponse` but should always return `NextResponse`. This blocks CI builds. Also: `VoiceAgentChat` static import in `marketing-dashboard.tsx:5` should be converted to `dynamic()`.
+**For Code Quality Agent:** Bundle growth of +271 KB since Feb 7 warrants investigation. ISR/PPR commits may have added framework overhead. Check if PPR `cacheComponents` is adding unnecessary serialization code. The polyfills chunk (113 KB) can be eliminated with a `browserslist` entry in `package.json`.
 
-**For QA Agent:** CI build step is broken on `develop` since Mar 5 — agent-config route type error. QA journeys relying on voice chat may see timing issues if VoiceChat dynamic import takes >5s on production (ElevenLabs 482 KB chunk).
+**For QA Agent:** ElevenLabs chunk preloading (P2) should fix Journeys 3, 7, 14 — the 482 KB chunk loads on-demand within idle time instead of on first click. ISR caching (`revalidate: 60`) may be serving stale translations (Journey 1 regression) — investigate locale-aware cache keys.
 
-**For Coverage Agent:** Cannot generate coverage locally — the `coverage/` directory needs to be deleted and recreated. After deletion, run `npm run test:coverage` to regenerate clean coverage data.
+**For Coverage Agent:** No new dependencies affect bundle composition. Test suite additions (5059 tests) are devDependency-only — zero impact on production bundle.
 
-**For Cost Analyst Agent:** No cost-impacting changes. New Upstash deps are for rate limiting (operational cost is Upstash Redis plan, tracked separately).
+**For Cost Analyst Agent:** No cost-impacting changes. ElevenLabs SDK loading path unchanged. Browserslist optimization (P1) reduces bandwidth costs marginally.
+
+**For Localization Agent:** Translation key count growth (221→392) adds bundled i18n data. Lazy-loading (es+en static, others dynamic) is properly in place. ISR may serve stale translations — verify locale consistency during client navigation.
 
 ---
 
-*Report generated by Performance Agent — 2026-03-07*
-*Bundle sizes estimated (build blocked) — accurate measurement pending P0 fixes*
+*Report generated by Performance Agent — 2026-03-08*
+*First actual bundle measurement since Feb 7 — build blockers resolved*

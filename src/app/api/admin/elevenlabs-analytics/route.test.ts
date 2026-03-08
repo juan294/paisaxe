@@ -418,6 +418,138 @@ describe("ElevenLabs Analytics API Route", () => {
     expect(data.data.summary.totalConversations).toBe(0);
   });
 
+  it("returns 401 when auth fails", async () => {
+    const { validateAdminAuth } = await import("@/lib/admin-auth");
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: false,
+      error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+
+    expect(response.status).toBe(401);
+
+    // Restore valid auth for subsequent tests
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin-user" });
+  });
+
+  it("throws on non-ok API response (fetchElevenLabs error path)", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            agents: [{ agent_id: "agent1", name: "Paisaxe - Test" }],
+          }),
+        });
+      }
+      // Conversations endpoint returns non-ok
+      return Promise.resolve({
+        ok: false,
+        status: 403,
+        text: () => Promise.resolve("Forbidden"),
+      });
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    // Should fall into catch block and return empty data
+    expect(response.status).toBe(200);
+    expect(data.data.summary.totalConversations).toBe(0);
+  });
+
+  it("falls back to local config name for agent without name in API", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            agents: [
+              // Agent in API list but with no name — agent_id matches local config
+              { agent_id: "agent_test_xander", name: "Paisaxe" },
+            ],
+          }),
+        });
+      }
+      if (url.includes("/convai/analytics/live-count")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ count: 0 }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          conversations: [
+            {
+              conversation_id: "conv1",
+              agent_id: "agent_test_xander",
+              status: "done",
+              call_duration_secs: 30,
+            },
+          ],
+        }),
+      });
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(data.data.summary.totalConversations).toBe(1);
+    // Name should be "Paisaxe" (the full name since the pattern doesn't match "Paisaxe - X")
+    expect(data.data.conversationsByAgent).toHaveLength(1);
+    expect(data.data.conversationsByAgent[0].agentName).toBe("Paisaxe");
+  });
+
+  it("falls back to truncated ID for completely unknown agent in Paisaxe list", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            agents: [
+              // Agent with name "Paisaxe" prefix but no name property set (undefined)
+              { agent_id: "agent_unknown_xyz12345", name: "Paisaxe - New Agent" },
+            ],
+          }),
+        });
+      }
+      if (url.includes("/convai/analytics/live-count")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ count: 1 }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          conversations: [
+            {
+              conversation_id: "conv1",
+              agent_id: "agent_unknown_xyz12345",
+              status: "done",
+              call_duration_secs: 45,
+            },
+          ],
+        }),
+      });
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(data.data.summary.totalConversations).toBe(1);
+    expect(data.data.activeCalls).toBe(1);
+    expect(data.data.conversationsByAgent).toHaveLength(1);
+    // The name should come from the API match "Paisaxe - New Agent" -> "New Agent"
+    expect(data.data.conversationsByAgent[0].agentName).toBe("New Agent");
+  });
+
   it("aggregates conversations by status including failed", async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes("/convai/agents")) {

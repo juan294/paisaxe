@@ -86,6 +86,42 @@ describe("DELETE /api/admin/stories/bulk-delete", () => {
     expect(mockIn).toHaveBeenCalledWith("id", ["1", "2"]);
   });
 
+  it("should handle null data response gracefully", async () => {
+    const mockSelect = vi.fn().mockResolvedValue({
+      data: null,
+      error: null,
+    });
+    const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockDelete = vi.fn().mockReturnValue({ in: mockIn });
+    const mockFrom = vi.fn().mockReturnValue({ delete: mockDelete });
+    mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+    const request = new NextRequest("http://localhost/api/admin/stories/bulk-delete", {
+      method: "DELETE",
+      body: JSON.stringify({ storyIds: ["1", "2"] }),
+    });
+
+    const response = await DELETE(request);
+    expect(response.status).toBe(200);
+
+    const data = await response.json();
+    expect(data.data.deletedIds).toEqual([]);
+  });
+
+  it("should return 500 on unexpected error (catch block)", async () => {
+    // Make request.json() throw to trigger the outer catch block
+    const request = new NextRequest("http://localhost/api/admin/stories/bulk-delete", {
+      method: "DELETE",
+      body: "not valid json",
+    });
+    vi.spyOn(request, "json").mockRejectedValue(new Error("Unexpected parse error"));
+
+    const response = await DELETE(request);
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe("Internal server error");
+  });
+
   it("should return 500 on database error", async () => {
     const mockSelect = vi.fn().mockResolvedValue({
       data: null,

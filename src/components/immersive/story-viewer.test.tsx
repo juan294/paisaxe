@@ -1108,6 +1108,233 @@ describe("StoryViewer", () => {
     });
   });
 
+  describe("keyboard navigation edge cases", () => {
+    it("should not navigate when keydown target is an INPUT element", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+
+      fireEvent.keyDown(input, { key: "ArrowRight" });
+
+      expect(onIndexChange).not.toHaveBeenCalled();
+
+      document.body.removeChild(input);
+    });
+
+    it("should not navigate when keydown target is a TEXTAREA element", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const textarea = document.createElement("textarea");
+      document.body.appendChild(textarea);
+
+      fireEvent.keyDown(textarea, { key: "ArrowRight" });
+
+      expect(onIndexChange).not.toHaveBeenCalled();
+
+      document.body.removeChild(textarea);
+    });
+
+    it("should not navigate when keydown target is a SELECT element", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const select = document.createElement("select");
+      document.body.appendChild(select);
+
+      fireEvent.keyDown(select, { key: "ArrowRight" });
+
+      expect(onIndexChange).not.toHaveBeenCalled();
+
+      document.body.removeChild(select);
+    });
+
+    it("should not navigate when keydown target is contentEditable", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const div = document.createElement("div");
+      div.contentEditable = "true";
+      document.body.appendChild(div);
+
+      fireEvent.keyDown(div, { key: "ArrowRight" });
+
+      expect(onIndexChange).not.toHaveBeenCalled();
+
+      document.body.removeChild(div);
+    });
+
+    it("should not handle keyboard events when chat is open", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ chatOpen: true })} />
+      );
+
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+
+      expect(onIndexChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("auto-play when chat is open", () => {
+    beforeEach(() => {
+      mockIsEnabled.mockImplementation((flag: string) => flag === "autoplay_button");
+    });
+
+    afterEach(() => {
+      mockIsEnabled.mockReturnValue(false);
+    });
+
+    it("should pause auto-play when chat is open", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ chatOpen: true })} />
+      );
+
+      // Try to enable autoplay even though chat is open
+      const autoPlayButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
+      );
+      if (autoPlayButton) {
+        fireEvent.click(autoPlayButton);
+
+        // Advance time — should NOT auto-advance because chat is open
+        act(() => {
+          vi.advanceTimersByTime(6000);
+        });
+        act(() => {
+          vi.advanceTimersByTime(300);
+        });
+
+        expect(onIndexChange).not.toHaveBeenCalled();
+      }
+    });
+  });
+
+  describe("mobile overflow share with navigator.share", () => {
+    it("should use navigator.share when available", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "story_sharing"
+      );
+
+      const mockShare = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "share", {
+        value: mockShare,
+        writable: true,
+        configurable: true,
+      });
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      const shareItem = screen.getByText("Compartir");
+      fireEvent.click(shareItem);
+
+      expect(mockShare).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringContaining("/stories/story-1"),
+        })
+      );
+
+      // Clean up
+      Object.defineProperty(navigator, "share", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+      mockIsEnabled.mockReturnValue(false);
+    });
+  });
+
+  describe("mobile overflow suggest place", () => {
+    it("should click the suggest-place trigger when suggest place item is clicked", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "user_story_suggestions"
+      );
+
+      // Create a mock trigger button in the DOM
+      const triggerButton = document.createElement("button");
+      triggerButton.setAttribute("data-suggest-place-trigger", "");
+      const clickSpy = vi.fn();
+      triggerButton.addEventListener("click", clickSpy);
+      document.body.appendChild(triggerButton);
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      const suggestItem = screen.getByText("suggestions.suggest_short");
+      fireEvent.click(suggestItem);
+
+      expect(clickSpy).toHaveBeenCalled();
+
+      // Clean up
+      document.body.removeChild(triggerButton);
+      mockIsEnabled.mockReturnValue(false);
+    });
+  });
+
+  describe("mobile overflow ambient toggle", () => {
+    it("should toggle ambient mode from overflow menu when ambient_discovery is enabled", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "autoplay_button" || flag === "ambient_discovery"
+      );
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      // Find the play/pause item in the overflow
+      const playItem = screen.getByText("accessibility.play_short");
+      fireEvent.click(playItem);
+
+      // After clicking, auto-play should start — advance ambient interval (12s)
+      act(() => {
+        vi.advanceTimersByTime(12000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(onIndexChange).toHaveBeenCalledWith(1);
+
+      mockIsEnabled.mockReturnValue(false);
+    });
+  });
+
+  describe("bookmarks button navigation", () => {
+    it("should sign in with Google when requiresAuth is true", async () => {
+      // Override useFavorites to requireAuth
+      const favModule = await import("@/hooks/use-favorites");
+      const mockSignIn = vi.fn();
+      const authModule = await import("@/hooks/use-auth");
+      vi.spyOn(authModule, "useAuth").mockReturnValue({
+        user: null,
+        session: null,
+        isLoading: false,
+        signInWithGoogle: mockSignIn,
+        signOut: vi.fn(),
+      });
+      vi.spyOn(favModule, "useFavorites").mockReturnValue({
+        favorites: [],
+        isFavorite: vi.fn().mockReturnValue(false),
+        toggleFavorite: vi.fn(),
+        isLoading: false,
+        requiresAuth: true,
+      });
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Find and click the Bookmarks button (not the bookmark toggle)
+      const bookmarksBtn = screen.getByText("Guardados");
+      fireEvent.click(bookmarksBtn.closest("button")!);
+
+      expect(mockSignIn).toHaveBeenCalled();
+
+      vi.restoreAllMocks();
+    });
+  });
+
   describe("fullscreen button feature flag", () => {
     it("should not render FullscreenButton when flag is disabled", async () => {
       mockIsEnabled.mockReturnValue(false);

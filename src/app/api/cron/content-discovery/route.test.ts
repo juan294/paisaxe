@@ -28,6 +28,7 @@ vi.mock("@supabase/supabase-js", () => ({
 
 import { GET, POST } from "./route";
 import { runDiscovery } from "@/lib/content-discovery";
+import { validateAdminAuth } from "@/lib/admin-auth";
 
 function makeRequest(headers: Record<string, string> = {}, method = "POST") {
   return new Request("http://localhost:3000/api/cron/content-discovery", {
@@ -125,6 +126,49 @@ describe("POST /api/cron/content-discovery", () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.created).toBe(0);
+  });
+
+  it("runs discovery when admin auth succeeds (no webhook secret)", async () => {
+    (validateAdminAuth as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      valid: true,
+    });
+    (runDiscovery as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      discovered: 1,
+      created: 1,
+      skippedDuplicates: 0,
+      errors: [],
+      stories: [{ id: "uuid-1", title: "Place 1", slug: "place-1", category: "nature" }],
+    });
+
+    // No webhook secret — falls through to admin auth which is valid
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+  });
+
+  it("returns 500 with error details when runDiscovery throws an Error", async () => {
+    (runDiscovery as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("Google Places API rate limit exceeded")
+    );
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Discovery failed");
+    expect(body.details).toBe("Google Places API rate limit exceeded");
+  });
+
+  it("returns 500 with 'Unknown error' when runDiscovery throws a non-Error", async () => {
+    (runDiscovery as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      "unexpected string error"
+    );
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Discovery failed");
+    expect(body.details).toBe("Unknown error");
   });
 });
 
