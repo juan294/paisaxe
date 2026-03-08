@@ -346,6 +346,91 @@ describe("GET /api/admin/agents-summary", () => {
     expect(optimizer.healthSummary).toContain("Analyzed 11 services");
   });
 
+  it("should return 'unknown' health for short/empty reports without indicators", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("coverage-report.md")) {
+        // Very short content, no heading, no health status — should be "unknown"
+        return "Pending...";
+      }
+      return "## Health Status: GREEN\n\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const coverageAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "coverage_agent_enabled"
+    );
+    expect(coverageAgent.health).toBe("unknown");
+  });
+
+  it("should return 'No summary available.' when no summary patterns match", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("coverage-report.md")) {
+        // Content that has a heading (so parseHealth returns green) but no
+        // Executive Summary, no Summary, and no paragraph after ## heading
+        return "# Report\n\n" + "x".repeat(101) + "\n\n| col1 | col2 |\n|---|---|\n| a | b |";
+      }
+      return "## Health Status: GREEN\n\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const coverageAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "coverage_agent_enabled"
+    );
+    // Health should be green (has heading + enough content)
+    expect(coverageAgent.health).toBe("green");
+  });
+
+  it("should return 500 when an unexpected error occurs", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    // Make mockStat throw a non-ENOENT error that bypasses the try/catch inside the loop
+    // We need to cause an error in the outer try block, not the per-agent try block
+    // Override process.cwd to throw
+    const originalCwd = process.cwd;
+    process.cwd = () => { throw new Error("cwd failed"); };
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to build agents summary");
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Error building agents summary:",
+      expect.any(Error)
+    );
+
+    process.cwd = originalCwd;
+    consoleSpy.mockRestore();
+  });
+
   it("should set Cache-Control header", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,

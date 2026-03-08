@@ -223,6 +223,20 @@ describe("/api/admin/marketing/posts", () => {
       expect(data.error).toBe("Validation failed");
       expect(data.validationErrors).toEqual(["Content too long"]);
     });
+
+    it("should return 500 when createDraft throws", async () => {
+      mockCreateDraft.mockRejectedValueOnce(new Error("DB connection lost"));
+
+      const request = new NextRequest("http://localhost/api/admin/marketing/posts", {
+        method: "POST",
+        body: JSON.stringify({ platform: "x", content: "Test" }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+    });
   });
 
   describe("PATCH", () => {
@@ -333,6 +347,40 @@ describe("/api/admin/marketing/posts", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Update failed");
     });
+
+    it("should return 500 when mark-posted throws", async () => {
+      mockMarkAsPosted.mockRejectedValueOnce(new Error("Network error"));
+
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/posts?id=post-1&action=mark-posted",
+        {
+          method: "PATCH",
+          body: JSON.stringify({}),
+        }
+      );
+      const response = await PATCH(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+    });
+
+    it("should return 500 when updateDraft throws", async () => {
+      mockUpdateDraft.mockRejectedValueOnce(new Error("DB error"));
+
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/posts?id=post-1",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ content: "Updated" }),
+        }
+      );
+      const response = await PATCH(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+    });
   });
 
   describe("DELETE", () => {
@@ -390,6 +438,20 @@ describe("/api/admin/marketing/posts", () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe("Delete failed");
+    });
+
+    it("should return 500 when deleteDraft throws", async () => {
+      mockDeleteDraft.mockRejectedValueOnce(new Error("DB connection lost"));
+
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/posts?id=post-1",
+        { method: "DELETE" }
+      );
+      const response = await DELETE(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
     });
   });
 });

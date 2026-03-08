@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// Mock rate-limit module
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 19, retryAfter: 0 }),
+}));
+
 import { GET, POST } from "./route";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Mock the fetch API
 const mockFetch = vi.fn();
@@ -50,6 +57,8 @@ describe("/api/mcp/places", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    // Re-establish default rate-limit mock after resetAllMocks clears it
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, remaining: 19, limit: 20, resetAt: Date.now() + 60000 });
     process.env = {
       ...originalEnv,
       GOOGLE_PLACES_API_KEY: "test-api-key",
@@ -371,6 +380,74 @@ describe("/api/mcp/places", () => {
       expect(response.status).toBe(500);
       const data = await response.json();
       expect(data.error).toContain("Network error");
+    });
+  });
+
+  describe("GET - rate limiting", () => {
+    it("should return 429 when rate limited on GET", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 30,
+        limit: 10,
+        resetAt: Date.now() + 30000,
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(429);
+      const data = await response.json();
+      expect(data.error).toBe("Too many requests");
+      expect(response.headers.get("Retry-After")).toBe("30");
+    });
+  });
+
+  describe("POST - rate limiting", () => {
+    it("should return 429 when rate limited on POST", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 45,
+        limit: 10,
+        resetAt: Date.now() + 45000,
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(429);
+      const data = await response.json();
+      expect(data.error).toBe("Too many requests");
+      expect(response.headers.get("Retry-After")).toBe("45");
+    });
+  });
+
+  describe("GET - Places API HTTP errors", () => {
+    it("should return 500 when Places API returns non-ok HTTP response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        text: () => Promise.resolve("Forbidden: API key invalid"),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toContain("Places API error: 403");
+      expect(data.error).toContain("Forbidden");
     });
   });
 

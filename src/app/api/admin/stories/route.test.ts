@@ -326,6 +326,45 @@ describe("POST /api/admin/stories", () => {
     expect(data.error).toBe("A story with this slug already exists");
   });
 
+  it("should use provided displayOrder when specified", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: {
+            id: "new-id",
+            slug: "test-story",
+            title: "Test Story",
+            category: "nature",
+            display_order: 42,
+            curation_status: "needs_curation",
+            created_at: "2024-01-01T00:00:00Z",
+          },
+          error: null,
+        }),
+      }),
+    });
+    const mockSelect = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+      }),
+    });
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect, insert: mockInsert });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: JSON.stringify({ title: "Test Story", category: "nature", displayOrder: 42 }),
+    });
+    await POST(request);
+
+    const insertCall = mockInsert.mock.calls[0][0];
+    // Should use the provided displayOrder, not auto-calculate
+    expect(insertCall.display_order).toBe(42);
+  });
+
   it("should auto-calculate next display_order", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
@@ -494,6 +533,114 @@ describe("POST /api/admin/stories", () => {
     expect(insertCall.source_pdf).toBe("guide.pdf");
     expect(insertCall.best_months).toEqual([6, 7, 8]);
     expect(insertCall.metadata).toEqual({ tags: ["cultural"] });
+  });
+
+  it("should log error but succeed when suggestion status update fails", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: { message: "Suggestion update failed" } }),
+    });
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: {
+            id: "new-story-id",
+            slug: "suggested-place",
+            title: "Suggested Place",
+            category: "nature",
+            display_order: 1,
+            curation_status: "needs_curation",
+            created_at: "2024-01-01T00:00:00Z",
+          },
+          error: null,
+        }),
+      }),
+    });
+    const mockSelect = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+      }),
+      order: vi.fn().mockReturnValue({
+        limit: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      }),
+    });
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "story_suggestions") {
+        return { update: mockUpdate };
+      }
+      return { select: mockSelect, insert: mockInsert };
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "Suggested Place",
+        category: "nature",
+        suggestionId: "suggestion-123",
+        sourceType: "user_submitted",
+      }),
+    });
+    const response = await POST(request);
+
+    // Story creation should still succeed even though suggestion update failed
+    expect(response.status).toBe(201);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Error updating suggestion status:",
+      expect.objectContaining({ message: "Suggestion update failed" })
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it("should return 500 on unexpected POST error (catch block)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    // Make request.json() throw to trigger the outer catch block
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: "not valid json",
+    });
+    // Override .json() to throw
+    vi.spyOn(request, "json").mockRejectedValue(new Error("Unexpected parse error"));
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
+  });
+
+  it("should return 500 when slug check has non-PGRST116 error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockSelect = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: null,
+          error: { code: "UNEXPECTED_ERROR", message: "Something went wrong" },
+        }),
+      }),
+    });
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: JSON.stringify({ title: "Test Story", category: "nature" }),
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to validate slug");
   });
 
   it("should return 500 when insert fails", async () => {

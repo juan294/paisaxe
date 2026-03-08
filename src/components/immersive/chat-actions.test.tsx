@@ -299,4 +299,89 @@ describe("ChatActions", () => {
       ).toBeInTheDocument();
     });
   });
+
+  describe("edge cases", () => {
+    it("shows copy button but no actions when messages contain only user messages", () => {
+      const messages: Message[] = [
+        { role: "user", content: "Hello" },
+        { role: "user", content: "Anyone there?" },
+      ];
+
+      render(<ChatActions messages={messages} />);
+
+      // Copy button should still render (messages exist, not loading)
+      expect(
+        screen.getByRole("button", { name: /copiar conversación/i })
+      ).toBeInTheDocument();
+
+      // No call or directions buttons (no assistant message to analyze)
+      expect(screen.queryByRole("link", { name: /llamar/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /cómo llegar/i })).not.toBeInTheDocument();
+    });
+
+    it("clears existing timer when copy is clicked twice quickly", async () => {
+      const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+      const messages: Message[] = [
+        { role: "assistant", content: "Hello!" },
+      ];
+
+      render(<ChatActions messages={messages} />);
+
+      const copyButton = screen.getByRole("button", {
+        name: /copiar conversación/i,
+      });
+
+      // Click copy first time
+      fireEvent.click(copyButton);
+      await waitFor(() => {
+        expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
+      });
+
+      // Click copy again immediately (before the 2s reset timer fires)
+      // This should trigger clearTimeout on the existing timer
+      fireEvent.click(copyButton);
+      await waitFor(() => {
+        expect(mockClipboard.writeText).toHaveBeenCalledTimes(2);
+      });
+
+      // clearTimeout should have been called to cancel the first timer
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it("handles clipboard writeText failure gracefully", async () => {
+      const originalWriteText = mockClipboard.writeText;
+      mockClipboard.writeText = vi.fn().mockRejectedValue(new Error("Clipboard API not available"));
+
+      const messages: Message[] = [
+        { role: "assistant", content: "Hello!" },
+      ];
+
+      const { container } = render(<ChatActions messages={messages} />);
+
+      const copyButton = screen.getByRole("button", {
+        name: /copiar conversación/i,
+      });
+
+      // Should not throw even though clipboard fails
+      fireEvent.click(copyButton);
+
+      // Wait for the rejection to be handled
+      await waitFor(() => {
+        expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
+      });
+
+      // The copy icon should still be shown (not the check icon, since copy failed)
+      // Wait a tick to allow the catch block to execute
+      await waitFor(() => {
+        const copyIcon = container.querySelector(".lucide-copy");
+        expect(copyIcon).toBeInTheDocument();
+      });
+
+      // Restore
+      mockClipboard.writeText = originalWriteText;
+    });
+  });
 });

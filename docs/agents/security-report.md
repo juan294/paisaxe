@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-03-07
+> Auto-generated on 2026-03-08
 
 ## Health Status: GREEN
 
-**Executive Summary:** 2 advisories detected, 0 exploitable in production. One high-severity `minimatch` ReDoS — dev-only (eslint), not deployed. One moderate `dompurify` XSS — transitive via `posthog-js`, not directly used by application code. Both fixable via `npm audit fix`. CSP remains nonce-based with `strict-dynamic`. All 4 webhook endpoints timing-safe. No copyleft license violations. Gitleaks still not running in CI (open gap since Feb 9 — 5th consecutive report flagging this).
+**Executive Summary:** 0 advisories detected, 0 exploitable. Clean `npm audit` — both previous advisories (minimatch ReDoS, dompurify XSS) are resolved. The minimatch override was corrected to `>=10.2.3`. All 4 webhook endpoints remain timing-safe. No copyleft license violations. CSP is nonce-based with `strict-dynamic`. Gitleaks still not running in CI (open gap since Feb 9 — **6th consecutive report** flagging this).
 
 ---
 
@@ -12,100 +12,38 @@
 
 | Severity | Package | Advisory | CVE | Attack Vector | Fixable | In Production | Risk Assessment |
 |----------|---------|----------|-----|---------------|---------|---------------|-----------------|
-| High | minimatch 10.2.2 | [GHSA-7r86-cg39-jmmj](https://github.com/advisories/GHSA-7r86-cg39-jmmj) | — | ReDoS via GLOBSTAR segments | Yes | **No** (dev-only) | **Not exploitable** |
-| High | minimatch 10.2.2 | [GHSA-23c5-xmqv-rm74](https://github.com/advisories/GHSA-23c5-xmqv-rm74) | — | ReDoS via nested extglobs | Yes | **No** (dev-only) | **Not exploitable** |
-| Moderate | dompurify 3.3.1 | [GHSA-v2wj-7wpq-c8vv](https://github.com/advisories/GHSA-v2wj-7wpq-c8vv) | — | XSS via crafted HTML | Yes | **Yes** (transitive) | **Not exploitable** |
+| — | — | — | — | — | — | — | **No active advisories** |
 
-### Detailed Exploitability Analysis
+**`npm audit` returns 0 vulnerabilities.** Both previous advisories have been resolved:
 
-#### minimatch ReDoS (GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74) — HIGH severity, NOT exploitable
+### Previously Resolved (This Cycle)
 
-**Dependency Chain:**
-```
-paisaxe -> eslint -> @eslint/config-array -> minimatch (vulnerable)
-paisaxe -> eslint -> @eslint/eslintrc -> minimatch (vulnerable)
-paisaxe -> eslint-plugin-react -> minimatch (vulnerable)
-paisaxe -> @typescript-eslint/eslint-plugin -> ... -> minimatch (vulnerable)
-```
+| Advisory | Resolution | When |
+|----------|-----------|------|
+| minimatch 10.2.2 ReDoS (GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74) | Override updated to `>=10.2.3` in `package.json` | Between Mar 7–8 |
+| dompurify 3.3.1 XSS (GHSA-v2wj-7wpq-c8vv) | Resolved via dependency update | Between Mar 7–8 |
 
-**Why This Is Not Exploitable:**
+### Previously Resolved (Earlier)
 
-1. **Dev-only dependency**: All consumers are ESLint and its plugins — development tooling only. `npm audit --omit=dev` does not flag this.
-2. **Not in deployed application**: minimatch is never bundled into the Next.js build. It runs only during linting in local dev or CI.
-3. **No user input**: ESLint processes file paths from the local filesystem against static config patterns. No user-supplied input ever reaches minimatch.
-4. **Override insufficient**: Current `package.json` override `"minimatch": ">=10.2.1"` does not fix this (10.2.2 is still in the vulnerable range). Update override or run `npm audit fix`.
-
-**Production impact: None.** This is a developer-tooling issue only. Worst case: ESLint hangs on a pathological glob pattern in developer's local environment.
-
-#### dompurify XSS (GHSA-v2wj-7wpq-c8vv) — MODERATE severity, NOT exploitable
-
-**Dependency Chain:**
-```
-paisaxe -> posthog-js -> dompurify (vulnerable)
-```
-
-**Why This Is Not Exploitable:**
-
-1. **Not directly imported**: Zero imports of `dompurify` exist in `src/`. Paisaxe code never calls DOMPurify directly.
-2. **Internal PostHog usage**: PostHog uses DOMPurify internally to sanitize DOM elements captured during session replay and autocapture. The vulnerable code path requires processing attacker-crafted HTML through DOMPurify's sanitize function.
-3. **Limited attack surface**: An attacker would need to inject crafted HTML into the DOM *and* have PostHog capture that specific element *and* have DOMPurify process it in a way that triggers the bypass. PostHog captures metadata, not re-renders sanitized HTML to users.
-4. **Admin-only context**: PostHog analytics data is only viewed in the PostHog dashboard (external service), not rendered in the Paisaxe application.
-
-**Production impact: Negligible.** The XSS would only affect PostHog's internal processing of captured DOM elements, not Paisaxe's rendered output.
+- **GHSA-w7fw-mjwx-w883** (qs arrayLimit bypass) — Fixed via override `qs >= 6.14.2`
+- **GHSA-9g9p-9gw9-jx7f** (Next.js Image Optimizer DoS) — Fixed in next@16.1.6
+- **GHSA-5f7q-jpqc-wp7h** (Next.js PPR Memory DoS) — Fixed in next@16.1.6
+- **GHSA-h25m-26qc-wcjf** (Next.js RSC Deserialization DoS) — Fixed in next@16.1.6
 
 ---
 
-## Changes Since Last Report (2026-03-06)
+## Changes Since Last Report (2026-03-07)
 
-| Area | Mar 6 | Mar 7 | Change |
+| Area | Mar 7 | Mar 8 | Change |
 |------|-------|-------|--------|
-| Vulnerability count | 1 High + 1 Moderate | 1 High + 1 Moderate | Unchanged |
+| Vulnerability count | 1 High + 1 Moderate | **0** | **Resolved** |
 | Exploitable vulns | 0 | 0 | Unchanged |
-| minimatch | 10.2.2 (dev-only) | 10.2.2 (dev-only) | Unchanged — override still at `>=10.2.1` |
-| dompurify | 3.3.1 (via posthog-js) | 3.3.1 (via posthog-js) | Unchanged — posthog-js still at 1.353.0 |
+| minimatch override | `>=10.2.1` (stale) | `>=10.2.3` (correct) | **Fixed** |
+| dompurify | 3.3.1 (via posthog-js) | Not flagged | **Resolved** |
 | CSP | Nonce + strict-dynamic | Nonce + strict-dynamic | Unchanged |
-| Gitleaks in CI | Not in workflow | Not in workflow | **Still open** — 5th consecutive report flagging this |
+| Gitleaks in CI | Not in workflow | Not in workflow | **Still open** — 6th consecutive report |
 
-**No new vulnerabilities or regressions since yesterday's report.** The same two advisories remain, both non-exploitable.
-
----
-
-## Prioritized Remediation
-
-### Priority 1: Run `npm audit fix` (Low effort, resolves both advisories)
-
-Both vulnerabilities have fixes available:
-
-```bash
-npm audit fix
-```
-
-This should update `dompurify` to a patched version (via posthog-js update) and `minimatch` to a patched version.
-
-### Priority 2: Update minimatch override
-
-The current override `"minimatch": ">=10.2.1"` in `package.json` does not protect against the advisory (10.2.2 is still vulnerable). Update to:
-
-```json
-"overrides": {
-  "qs": ">=6.14.2",
-  "minimatch": ">=10.2.3"
-}
-```
-
-Or remove the minimatch override entirely after `npm audit fix` resolves it.
-
-### Priority 3: Add Gitleaks to CI (5th consecutive report flagging this)
-
-`.gitleaks.toml` exists but gitleaks is not running in CI. This has been flagged in every security report since Feb 9:
-
-```yaml
-# Add to .github/workflows/security.yml
-- name: Run gitleaks
-  uses: gitleaks/gitleaks-action@v2
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
+**Both advisories from the previous 5 reports are now resolved.** Clean vulnerability slate.
 
 ---
 
@@ -140,7 +78,7 @@ All security-critical comparisons use `timingSafeEqual`:
 | `src/app/api/webhooks/supabase/route.ts` | Webhook secret |
 | `src/app/api/webhooks/elevenlabs/route.ts` | HMAC signature |
 | `src/app/api/webhooks/translate/route.ts` | Webhook secret |
-| `src/lib/cron-auth.ts` | Vercel Cron bearer token |
+| `src/lib/cron-auth.ts` (x2) | Vercel Cron bearer token + webhook secret |
 | `src/lib/csrf.ts` | CSRF token validation |
 | `src/lib/mcp-auth.ts` | MCP API secret |
 
@@ -249,7 +187,7 @@ form-action 'self'
 |---------|---------|-------|------|
 | @img/sharp-libvips-darwin-arm64@1.2.4 | LGPL-3.0-or-later | Native binary dep of `sharp` (production) | **Low** — Dynamic linking, SaaS deployment, no source distribution |
 | @vercel/analytics@1.6.1 | MPL-2.0 | Direct production dependency | **Low** — Used as-is, no modifications to MPL files |
-| dompurify@3.3.1 | (MPL-2.0 OR Apache-2.0) | Transitive via `posthog-js` | **None** — Dual-licensed, Apache-2.0 applies |
+| dompurify@3.3.2 | (MPL-2.0 OR Apache-2.0) | Transitive via `posthog-js` | **None** — Dual-licensed, Apache-2.0 applies |
 | expand-template@2.0.3 | (MIT OR WTFPL) | Transitive | **None** — MIT applies |
 | paisaxe@1.0.0 | UNLICENSED | This project's package.json | **None** — Private/internal project |
 
@@ -261,23 +199,13 @@ form-action 'self'
 
 | Package | Current | Latest | Dep Type | Security Impact | Priority |
 |---------|---------|--------|----------|-----------------|----------|
-| @stripe/react-stripe-js | 5.6.0 | 5.6.1 | prod | None known | Low |
-| @stripe/stripe-js | 8.8.0 | 8.9.0 | prod | None known | Low |
 | @supabase/ssr | 0.8.0 | 0.9.0 | prod | Minor — auth library | Medium |
-| @supabase/supabase-js | 2.97.0 | 2.98.0 | prod | Minor — database client | Medium |
-| @types/node | 25.3.0 | 25.3.5 | dev | None (types only) | None |
-| @upstash/ratelimit | 2.0.8 | 2.0.8 | prod | Up to date (version format) | None |
-| @upstash/redis | 1.36.2 | 1.36.3 | prod | None known | Low |
-| eslint | 9.39.3 | 9.39.4 | dev | Build tool — low risk | Low |
+| knip | 5.85.0 | 5.86.0 | dev | None (dev tooling) | Low |
 | lucide-react | 0.575.0 | 0.577.0 | prod | None known | None |
 | pdfjs-dist | 5.4.624 | 5.5.207 | prod | PDF parsing — monitor | Medium |
-| postcss | 8.5.6 | 8.5.8 | dev | Build tool — low risk | Low |
-| posthog-js | 1.353.0 | 1.359.1 | prod | **May fix dompurify vuln** | **High** |
-| resend | 6.9.2 | 6.9.3 | prod | None known | Low |
-| stripe | 20.3.1 | 20.4.1 | prod | Payments — monitor | Medium |
-| voyageai | 0.1.0 | 0.2.1 | prod | None known (qs already fixed) | Low |
+| voyageai | 0.1.0 | 0.2.1 | prod | None known | Low |
 
-**Key update:** `posthog-js` 1.353.0 -> 1.359.1 may bundle a patched `dompurify` — updating PostHog is the recommended path to resolve GHSA-v2wj-7wpq-c8vv.
+**Note:** `@upstash/ratelimit`, `@upstash/redis`, `jsdom`, and `vitest` show version format mismatches in `npm outdated` output (e.g., `v2.0.8` vs `2.0.8`) — these are likely at the latest version. No security implications.
 
 ---
 
@@ -287,15 +215,18 @@ form-action 'self'
 |---------|--------|-------|
 | Dependabot | Enabled | Weekly, grouped PRs for npm + GitHub Actions |
 | Renovate | Not configured | Not needed with Dependabot |
-| Gitleaks | Config exists (`.gitleaks.toml`) | **Not in CI workflow** — 5th consecutive report flagging this |
+| Gitleaks | Config exists (`.gitleaks.toml`) | **Not in CI workflow** — 6th consecutive report flagging this |
 | npm audit | In CI | `--omit=dev --audit-level=high`, runs on push + weekly |
 | License check | In CI | Blocks GPL, AGPL, SSPL, and other strong copyleft |
+| Knip (dead code) | In CI | Blocks unused exports on PRs |
 | Branch protection | Enabled on `main` | 4 required status checks, force push blocked |
 | Claude Code Review | In CI | Runs on PRs, uses `claude-sonnet-4-5-20250929` |
+| Pre-commit hooks | Active | Typecheck + lint + test via Husky |
+| npm overrides | Active | `qs >= 6.14.2`, `minimatch >= 10.2.3` |
 
 ### CI npm audit configuration note
 
-The security workflow (`security.yml`) runs `npm audit --omit=dev --audit-level=high`. This is correct — it only flags production dependencies at high severity. The minimatch ReDoS (dev-only) won't block CI. The dompurify moderate won't block CI either (below high threshold). Both are tracked here for visibility but neither is a CI-blocking issue.
+The security workflow (`security.yml`) runs `npm audit --omit=dev --audit-level=high`. This is correct — it only flags production dependencies at high severity. With 0 advisories currently, the workflow passes cleanly.
 
 ---
 
@@ -303,13 +234,13 @@ The security workflow (`security.yml`) runs `npm audit --omit=dev --audit-level=
 
 | Metric | Value |
 |--------|-------|
-| Total Advisories | 2 (3 advisory IDs across 2 packages) |
+| Total Advisories | **0** |
 | Critical | 0 |
-| High | 1 (dev-only) |
-| Moderate | 1 (transitive, not directly used) |
+| High | 0 |
+| Moderate | 0 |
 | Low | 0 |
 | **Exploitable** | **0** |
-| Fixable via npm audit | 2 |
+| Fixable via npm audit | 0 (none needed) |
 | License Compliant | Yes |
 | Webhook Security | All timing-safe (4/4 endpoints) |
 | CSRF Protection | Yes (double-submit cookie) |
@@ -319,11 +250,11 @@ The security workflow (`security.yml`) runs `npm audit --omit=dev --audit-level=
 
 ### Architecture Mitigations
 
-1. **Dev-only isolation** — minimatch is only in eslint/TypeScript tooling, never bundled for production
+1. **Clean dependency tree** — No active advisories; npm overrides proactively patch transitive vulnerabilities
 2. **No direct DOMPurify usage** — Paisaxe code has zero imports of `dompurify`; PostHog uses it internally
 3. **Nonce-based CSP** — Per-request nonce + `strict-dynamic` eliminates inline script XSS surface
 4. **CSRF protection** — Double-submit cookie with timing-safe validation on all mutating requests
-5. **Timing-safe everywhere** — All 6 security-critical comparison points use `timingSafeEqual`
+5. **Timing-safe everywhere** — All 7 security-critical comparison points use `timingSafeEqual`
 6. **Input sanitization** — `sanitizeInput()` + `escapeHtml()` cover all user-facing input paths
 7. **HTML escaping** — All `dangerouslySetInnerHTML` instances pre-escape content via `escapeHtml()` or `JSON.stringify()`
 
@@ -331,20 +262,14 @@ The security workflow (`security.yml`) runs `npm audit --omit=dev --audit-level=
 
 | Item | Priority | Effort | Impact | Status |
 |------|----------|--------|--------|--------|
-| Run `npm audit fix` | High | Low | Resolves both current advisories | Open |
-| Update minimatch override to `>=10.2.3` | Medium | Low | Ensures override matches patched version | Open |
-| Add gitleaks to CI workflow | Medium | Low | Prevents secret leaks in commits | Open (5th report) |
-| Update posthog-js to latest | Medium | Low | Likely resolves dompurify vuln | Open |
+| Add gitleaks to CI workflow | Medium | Low | Prevents secret leaks in commits | Open (6th report) |
+| Update @supabase/ssr to 0.9.0 | Low | Low | Auth library update | Open |
+| Update pdfjs-dist to 5.5.207 | Low | Medium | PDF parsing update, may have fixes | Open |
+| ~~Run `npm audit fix`~~ | — | — | — | **DONE** (resolved both advisories) |
+| ~~Update minimatch override to `>=10.2.3`~~ | — | — | — | **DONE** |
 | ~~Migrate CSP to nonce-based~~ | — | — | — | **DONE** (Feb 16) |
 | ~~Distributed rate limiting~~ | — | — | — | **DONE** (Feb 16) |
 | ~~CSRF protection~~ | — | — | — | **DONE** (Feb 16) |
-
-### Previous Issues (Resolved)
-
-- **GHSA-w7fw-mjwx-w883** (qs arrayLimit bypass) — Fixed via override `qs >= 6.14.2`
-- **GHSA-9g9p-9gw9-jx7f** (Next.js Image Optimizer DoS) — Fixed in next@16.1.6
-- **GHSA-5f7q-jpqc-wp7h** (Next.js PPR Memory DoS) — Fixed in next@16.1.6
-- **GHSA-h25m-26qc-wcjf** (Next.js RSC Deserialization DoS) — Fixed in next@16.1.6
 
 ---
 

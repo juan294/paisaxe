@@ -58,6 +58,12 @@ describe('resolveTranslation', () => {
     expect(resolveTranslation('a.b.c.d.e', testTranslations)).toBe('a.b.c.d.e');
   });
 
+  it('returns the key when an intermediate value is a string (not an object)', () => {
+    // 'simple' resolves to "Simple value" (a string), then trying to access 'child' on it
+    // should hit the typeof !== 'object' branch and return the full key
+    expect(resolveTranslation('simple.child', testTranslations)).toBe('simple.child');
+  });
+
   it('does not crash with empty translations object', () => {
     expect(resolveTranslation('anything', {})).toBe('anything');
   });

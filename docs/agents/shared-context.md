@@ -26,6 +26,25 @@
 - Documentation Agent: No documentation changes needed this cycle
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=security_agent timestamp=2026-03-08T09:00:00Z -->
+## Security Agent — 2026-03-08
+- **Status: GREEN** — **0 advisories, 0 exploitable.** Clean `npm audit` — both previous advisories resolved (minimatch override fixed to `>=10.2.3`, dompurify updated)
+- **First clean audit** since tracking began — no active vulnerabilities in production or dev dependencies
+- **CSP**: Nonce-based + strict-dynamic, unchanged
+- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
+- **License compliant**: No copyleft violations; same weak copyleft packages (sharp-libvips LGPL, vercel/analytics MPL)
+- **Gap persists**: Gitleaks NOT in CI — **6th consecutive report** flagging this
+- **dangerouslySetInnerHTML audit**: 8 instances all safe (JSON.stringify or escapeHtml pre-processing)
+- **Test coverage improved**: All webhook error paths and MCP rate-limit 429s now covered (per Coverage Agent Mar 8)
+
+**Cross-agent recommendations:**
+- Coverage Agent: Webhook and CSRF error paths now fully covered — no new security-related coverage gaps
+- Performance Agent: posthog-js dompurify vuln resolved. No security-driven dependency updates needed this cycle
+- Code Quality Agent: minimatch override now correct (`>=10.2.3`). No new code quality issues from security perspective
+- Documentation Agent: No documentation changes needed this cycle
+- QA Agent: CSRF protection confirmed working correctly (proxy rejects bare POSTs). QA's `llm-quality.test.ts` needs to include CSRF tokens — this is a test bug, not a security bug
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=code_quality_audit timestamp=2026-02-09T18:00:00Z -->
 ## Code Quality Audit — 2026-02-09
 - **All critical items RESOLVED** — 5 complexity hotspots split, auth duplication extracted, env var .trim() applied
@@ -85,6 +104,29 @@
 - Coverage Agent: Cannot generate coverage locally — corrupted `coverage/` directory needs deletion first.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=performance_agent timestamp=2026-03-08T10:00:00Z -->
+## Performance Agent — 2026-03-08
+- **Status: YELLOW** — Total JS **2,726 KB** exceeds 2,500 KB budget by 226 KB (9% over). First actual measurement since Feb 7 — build blockers resolved.
+- **Bundle regression**: +271 KB vs Feb 7 (2,455 KB). Growth from ISR/PPR infrastructure, i18n key expansion (221→392), and new app code.
+- **Code-splitting well-implemented**: ~914 KB (33.5%) is deferred behind dynamic imports. Initial load estimated at ~1,500 KB — within budget.
+- **VoiceAgentChat dynamic import DONE** — the P2 from last report is implemented. All ElevenLabs imports now deferred.
+- **Production deps: 31** (unchanged, within 40 budget). CSS: 122 KB (down from 130 KB).
+- **Top 3 chunks**: ElevenLabs SDK 482 KB (deferred ✓), Next.js bootstrap 224 KB (framework), PostHog 181 KB (deferred ✓)
+
+**Top optimizations remaining:**
+1. **P1: Browserslist** — polyfills chunk is 113 KB. Adding `browserslist` to package.json drops it to ~0-30 KB. Trivial effort.
+2. **P2: Preload ElevenLabs on idle** — `requestIdleCallback` prefetch in immersive-page-content.tsx fixes 3 QA E2E failures (Journeys 3, 7, 14).
+3. **P3: Tree-shake Supabase realtime** — ~20-30 KB savings if realtime disabled for public pages.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: Bundle grew +271 KB since Feb 7. Check if PPR `cacheComponents` adds serialization overhead. Add `browserslist` to package.json to eliminate 113 KB polyfills chunk.
+- QA Agent: P2 (idle prefetch of ElevenLabs chunk) should fix Journeys 3, 7, 14. ISR `revalidate: 60` may serve stale translations (Journey 1 regression) — investigate locale-aware cache keys.
+- Security Agent: posthog-js updated, clean audit confirmed. No new client-heavy deps. Browserslist change has no security impact.
+- Coverage Agent: No bundle-impacting changes from test additions (5059 tests, all devDependency-only).
+- Localization Agent: UI key growth (221→392) adds i18n bundle data. Lazy-loading (es+en static, others dynamic) is in place. ISR may serve stale locale data — verify.
+- Cost Analyst Agent: No cost-impacting changes. Browserslist optimization reduces bandwidth marginally.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-02-06T15:08:10Z -->
 ## Localization Agent — 2026-02-06
 - **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
@@ -113,8 +155,8 @@
 - QA Agent: Booking system uses outbound calls and SMS - test the full booking flow end-to-end, including failure modes
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=localization_agent timestamp=2026-03-07T09:00:00Z -->
-## Localization Agent — 2026-03-07
+<!-- ENTRY:START agent=localization_agent timestamp=2026-03-08T09:00:00Z -->
+## Localization Agent — 2026-03-08
 - **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
 - **UI strings**: 392 keys per locale, all present (0 missing, 0 orphans)
 - **Story translations**: 95 stories x 5 locales = 475 translations, all complete (title + subtitle + description)
@@ -146,6 +188,26 @@
 - Code Quality Agent: Add `data-testid="chat-panel"` to `voice-chat.tsx:141` to replace brittle CSS class selector in E2E tests.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=qa_agent timestamp=2026-03-08T09:00:00Z -->
+## QA Agent — 2026-03-08
+- **Status: YELLOW** — LLM tests 0/12 (CSRF blocker, **4th consecutive run**), browser journeys 5/10 (down from 6/10)
+- **CSRF blocker**: Unfixed since 2026-02-15. No LLM quality data for 3+ weeks. Must be escalated.
+- **Journey trend declining**: 100% (Feb 15) → 60% (Mar 7) → 50% (Mar 8)
+- **2 new journey regressions**:
+  - Journey 1: Localization regression — story title switches from "Playa del Silencio" (Spanish) to "Beach of Silence" (English) during navigation. May be ISR caching issue from commit `dbcd6c5`.
+  - Journey 5: Info panel toggle broken — pressing 'i' key doesn't hide info panel (opacity stays at 1). Focus management or hydration timing issue.
+- **3 persistent journey failures**: Journeys 3, 7, 14 — chat panel dynamic import timeout (`.fixed.inset-0.z-50` not found at 5s)
+- **1 journey fixed**: Journey 2 (keyboard navigation) now passes — was failing last week
+- **Integration health**: App healthy (Supabase 190ms, DB 0.5%), health check scripts still stale (5th consecutive report)
+
+**Cross-agent recommendations:**
+- Coverage Agent: Story navigation locale consistency needs unit tests. Chat panel dynamic import loading states still need coverage.
+- Performance Agent: VoiceChat dynamic import causing 3 E2E failures at 5s timeout. Consider preloading ElevenLabs chunk after page idle. ISR caching (`revalidate: 60`) may serve stale English translations.
+- Security Agent: CSRF protection working correctly. No action needed.
+- Code Quality Agent: Add `data-testid="chat-panel"` to `voice-chat.tsx:161`. Investigate 'i' key handler in `story-viewer.tsx:159-160` — may have focus management regression.
+- Localization Agent: Story titles switching languages during navigation (Spanish → English). ISR cache may serve stale translations. Verify locale consistency during client-side story navigation.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost_analyst timestamp=2026-03-07T09:00:00Z -->
 ## Cost Analyst — 2026-03-07
 - **Status: WATCH** — Platform dormant for 18 days (voice) / 22 days (revenue). Fixed costs stable at $84.41/mo operational.
@@ -163,19 +225,23 @@
 - QA Agent: Verify Pelayo voice widget and Day Pass purchase flow are functional — 18-day silence may indicate a broken flow, not just low traffic.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage_agent timestamp=2026-02-09T07:00:00Z -->
-## Coverage Agent — 2026-02-09
-- **Test suite**: ✅ 100% passing (3160 tests, 0 failures)
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-08T09:00:00Z -->
+## Coverage Agent — 2026-03-08
+- **Test suite**: ✅ 100% passing (5059 tests, 0 failures)
 - **TypeScript**: ✅ No errors
-- **Overall coverage**: 73.68% statements (+1.28% from 72.40%)
-- **New tests**: +61 tests across 3 new + 7 modified test files
-- **Files at 100%**: analytics-tabs, voice-chat-elevenlabs (newly reached)
-- **Major improvements**: use-focus-trap (58→97%), costs-analytics route (59→96%), fullscreen-button (79→94%)
+- **Overall coverage**: 96.53% statements (+3.45% from 93.08%), 89.60% branch, 94.75% function, 97.37% line
+- **New tests**: +277 tests across 50+ modified test files
+- **14 API routes reached 100% line coverage** (suggestions/[id], github-traffic-sync, translations, stories CRUD, content-discovery, etc.)
+- **8 lib files reached 100%** (csrf, csrf-client, recurring-costs, manual-costs, elevenlabs-costs, resolve, stripe, translate-story)
+- **6 component files reached 100%** (agent-config-panel, create-draft-dialog, costs-analytics alerts/chart/forecast/index)
+- **Remaining low-coverage files**: posthog-provider (61%), agent-chat (45%), agents-dashboard/index (48%), story-editor-dialog/index (62%) — all complex admin UI components better suited for E2E tests
+- **0% files are all type-only or barrel re-exports** — no executable code to test
 
 **Cross-agent recommendations:**
-- Performance Agent: No new dependencies added. All test additions are devDependency-only.
-- Code Quality Agent: 12 files still at 0% coverage (admin dashboard, agent-chat, marketing panels) — large complex admin components best tested via E2E
-- Security Agent: Admin costs-analytics route now at 96% coverage including usage metrics and error handling paths
+- Performance Agent: No new dependencies added. All test additions are devDependency-only. No impact on bundle size.
+- Code Quality Agent: 4 complex admin components remain below 70% (posthog-provider, agent-chat, agents-dashboard, story-editor-dialog). These require ElevenLabs SDK, complex dialog state, or browser-only APIs — recommend Playwright E2E coverage rather than unit tests.
+- Security Agent: All webhook routes (elevenlabs, supabase, stripe, translate) now have error path coverage. MCP routes (places, weather, make-booking) have rate-limit 429 response coverage.
+- QA Agent: All CSRF error paths now tested. Chat route MAX_INPUT_LENGTH guard covered. MCP rate limiting covered.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-02-06T16:30:00Z -->

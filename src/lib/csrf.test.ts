@@ -60,6 +60,16 @@ describe("validateCsrfToken", () => {
     expect(validateCsrfToken(request)).toBe(false);
   });
 
+  it("returns false when cookies exist but __csrf cookie is not among them", () => {
+    const request = new Request("http://localhost/api/test", {
+      headers: {
+        [CSRF_HEADER_NAME]: "some-token",
+        cookie: "session=abc123; theme=dark",
+      },
+    });
+    expect(validateCsrfToken(request)).toBe(false);
+  });
+
   it("returns false when tokens don't match", () => {
     const request = new Request("http://localhost/api/test", {
       headers: {

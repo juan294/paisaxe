@@ -154,6 +154,51 @@ describe("useVoiceSession", () => {
 
     expect(result.current.preferredLanguage).toBe("English");
   });
+
+  it("should handle localStorage.setItem throwing (storage full)", () => {
+    // Simulate storage being full
+    const originalSetItem = localStorageMock.setItem;
+    localStorageMock.setItem = () => {
+      throw new Error("QuotaExceededError");
+    };
+
+    const { result } = renderHook(() => useVoiceSession());
+
+    // incrementConversation should not throw even when storage fails
+    act(() => {
+      result.current.incrementConversation();
+    });
+
+    // State should still update in memory even if persistence fails
+    expect(result.current.conversationCount).toBe(1);
+
+    // Restore
+    localStorageMock.setItem = originalSetItem;
+  });
+
+  it("should handle localStorage.setItem throwing on resetSession", () => {
+    // First set some valid state
+    localStorageMock.setItem("paisaxe_voice_session", JSON.stringify({ conversationCount: 3 }));
+
+    const { result } = renderHook(() => useVoiceSession());
+    expect(result.current.conversationCount).toBe(3);
+
+    // Now simulate storage being full on reset
+    const originalSetItem = localStorageMock.setItem;
+    localStorageMock.setItem = () => {
+      throw new Error("QuotaExceededError");
+    };
+
+    // resetSession should not throw even when storage fails
+    act(() => {
+      result.current.resetSession();
+    });
+
+    expect(result.current.conversationCount).toBe(0);
+
+    // Restore
+    localStorageMock.setItem = originalSetItem;
+  });
 });
 
 describe("getTimeOfDay", () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { generateRecurringCosts } from "./recurring-costs";
 
 describe("generateRecurringCosts", () => {
@@ -83,5 +83,105 @@ describe("generateRecurringCosts", () => {
   it("should return empty array for date range before any subscriptions", () => {
     const costs = generateRecurringCosts("2024-01-01", "2024-12-31");
     expect(costs).toEqual([]);
+  });
+
+});
+
+describe("generateRecurringCosts with endDate subscriptions", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("should skip subscriptions whose endDate is before the query start", async () => {
+    vi.doMock("@/config/recurring-costs", () => ({
+      RECURRING_SUBSCRIPTIONS: [
+        {
+          serviceId: "old-service",
+          serviceName: "Old Service",
+          category: "infrastructure",
+          costUsd: 10,
+          billingCycle: "monthly",
+          notes: "Cancelled subscription",
+          dashboardUrl: "https://example.com",
+          startDate: "2024-01-01",
+          endDate: "2024-06-30", // Ended June 2024
+        },
+        {
+          serviceId: "active-service",
+          serviceName: "Active Service",
+          category: "infrastructure",
+          costUsd: 20,
+          billingCycle: "monthly",
+          notes: "Still active",
+          dashboardUrl: "https://example.com/active",
+          startDate: "2024-01-01",
+          // No endDate = ongoing
+        },
+      ],
+    }));
+
+    const { generateRecurringCosts: genCosts } = await import("./recurring-costs");
+
+    // Query for July 2024 — old-service ended in June, so it should be skipped
+    const costs = genCosts("2024-07-01", "2024-07-31");
+
+    expect(costs).toHaveLength(1);
+    expect(costs[0].serviceId).toBe("active-service");
+  });
+
+  it("should include subscriptions whose endDate overlaps the query period", async () => {
+    vi.doMock("@/config/recurring-costs", () => ({
+      RECURRING_SUBSCRIPTIONS: [
+        {
+          serviceId: "ending-service",
+          serviceName: "Ending Service",
+          category: "ai",
+          costUsd: 15,
+          billingCycle: "monthly",
+          notes: "Ending mid-month",
+          dashboardUrl: "https://example.com/ending",
+          startDate: "2024-01-01",
+          endDate: "2024-07-15", // Ends mid-July
+        },
+      ],
+    }));
+
+    const { generateRecurringCosts: genCosts } = await import("./recurring-costs");
+
+    // Query for July — endDate (July 15) is within the range, so it should be included
+    const costs = genCosts("2024-07-01", "2024-07-31");
+
+    expect(costs).toHaveLength(1);
+    expect(costs[0].serviceId).toBe("ending-service");
+    expect(costs[0].costUsd).toBe(15);
+  });
+
+  it("should fall back to sub.dashboardUrl when service not in PLATFORM_SERVICES", async () => {
+    vi.doMock("@/config/recurring-costs", () => ({
+      RECURRING_SUBSCRIPTIONS: [
+        {
+          serviceId: "unknown-service",
+          serviceName: "Unknown Service",
+          category: "infrastructure",
+          costUsd: 5,
+          billingCycle: "monthly",
+          notes: "Not in PLATFORM_SERVICES",
+          dashboardUrl: "https://unknown.example.com/billing",
+          startDate: "2024-01-01",
+        },
+      ],
+    }));
+
+    const { generateRecurringCosts: genCosts } = await import("./recurring-costs");
+
+    const costs = genCosts("2024-07-01", "2024-07-31");
+
+    expect(costs).toHaveLength(1);
+    // Should fall back to the subscription's own dashboardUrl
+    expect(costs[0].dashboardUrl).toBe("https://unknown.example.com/billing");
   });
 });

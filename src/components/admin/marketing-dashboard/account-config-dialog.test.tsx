@@ -708,4 +708,24 @@ describe("AccountConfigDialog", () => {
     // Should show validation error for Consumer Key (whitespace-only)
     expect(screen.getByText(/Please fill in: Consumer Key/)).toBeInTheDocument();
   });
+
+  it("calls onClose when dialog is closed via onOpenChange", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+
+    render(
+      <AccountConfigDialog
+        {...defaultProps}
+        onClose={onClose}
+      />
+    );
+
+    // The dialog has a close button (X) provided by DialogContent
+    // which triggers onOpenChange(false) -> onClose()
+    const closeButton = screen.getByRole("button", { name: /close/i });
+    if (closeButton) {
+      await user.click(closeButton);
+      expect(onClose).toHaveBeenCalled();
+    }
+  });
 });

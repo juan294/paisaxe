@@ -191,5 +191,62 @@ describe("/api/admin/marketing/agent-logs", () => {
       // The conversion should happen via rowToMarketingAgentLog
       expect(data.data).toBeDefined();
     });
+
+    it("should return 500 when database query returns an error", async () => {
+      vi.resetModules();
+
+      vi.doMock("@/lib/admin-auth", () => ({
+        validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
+      }));
+
+      vi.doMock("@/lib/supabase", () => ({
+        createAdminClient: () => ({
+          from: () => ({
+            select: () => ({
+              order: () => ({
+                range: () =>
+                  Promise.resolve({
+                    data: null,
+                    error: { message: "relation does not exist", code: "42P01" },
+                    count: null,
+                  }),
+              }),
+            }),
+          }),
+        }),
+      }));
+
+      const { GET: GET3 } = await import("./route");
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
+
+      const response = await GET3(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to fetch logs");
+    });
+
+    it("should return 500 when an unexpected exception is thrown", async () => {
+      vi.resetModules();
+
+      vi.doMock("@/lib/admin-auth", () => ({
+        validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
+      }));
+
+      vi.doMock("@/lib/supabase", () => ({
+        createAdminClient: () => {
+          throw new Error("Connection refused");
+        },
+      }));
+
+      const { GET: GET4 } = await import("./route");
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
+
+      const response = await GET4(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+    });
   });
 });

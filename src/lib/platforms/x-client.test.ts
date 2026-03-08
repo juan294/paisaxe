@@ -333,6 +333,29 @@ describe("XClient", () => {
       expect(result.error).toContain("Insufficient permissions");
       expect(result.errorCode).toBe("FORBIDDEN");
     });
+
+    it("handles API error with data.detail field", async () => {
+      const apiError = new Error("API error") as any;
+      apiError.data = { detail: "Detailed error description", title: "SomeTitle" };
+      mockTweet.mockRejectedValue(apiError);
+
+      const client = new XClient(validCredentials);
+      const result = await client.postTweet("Hello");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Detailed error description");
+      expect(result.errorCode).toBe("SomeTitle");
+    });
+
+    it("handles non-Error thrown value", async () => {
+      mockTweet.mockRejectedValue("string error");
+
+      const client = new XClient(validCredentials);
+      const result = await client.postTweet("Hello");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Failed to post tweet");
+    });
   });
 });
 

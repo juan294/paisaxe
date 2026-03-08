@@ -38,11 +38,15 @@ vi.mock("@/components/immersive/skeleton-story-card", () => ({
   StoryCardSkeleton: () => <div data-testid="skeleton" />,
 }));
 vi.mock("@/components/immersive/mood-overlay", () => ({
-  MoodOverlay: (props: { onSelectMood: (mood: string) => void }) => (
-    <div
-      data-testid="mood-overlay"
-      onClick={() => props.onSelectMood("adventure")}
-    />
+  MoodOverlay: (props: { onSelectMood: (mood: string) => void; onDismiss: () => void }) => (
+    <div data-testid="mood-overlay">
+      <button data-testid="mood-dismiss" onClick={props.onDismiss}>
+        Dismiss
+      </button>
+      <button data-testid="mood-select" onClick={() => props.onSelectMood("adventure")}>
+        Adventure
+      </button>
+    </div>
   ),
 }));
 vi.mock("@/lib/shuffle", () => ({
@@ -231,7 +235,62 @@ describe("ImmersivePageContent", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 5. ?story= query param sets initial index
+  // 5. Mood overlay: selecting a mood calls handleMoodSelect
+  // -----------------------------------------------------------------------
+  it("selecting a mood dismisses overlay and resets index", () => {
+    setupDefaults();
+    // Enable mood_discovery flag
+    vi.mocked(useFeatureFlags).mockReturnValue({
+      flags: [],
+      isReady: true,
+      isEnabled: (flag: string) => flag === "mood_discovery",
+      isEnabledWithDefault: () => false,
+    });
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // Mood overlay should be shown
+    const overlay = screen.getByTestId("mood-overlay");
+    expect(overlay).toBeInTheDocument();
+
+    // Click the mood select button (mock fires onSelectMood("adventure"))
+    const selectBtn = screen.getByTestId("mood-select");
+    fireEvent.click(selectBtn);
+
+    // Overlay should be dismissed (handleMoodSelect sets moodDismissed = true)
+    expect(screen.queryByTestId("mood-overlay")).not.toBeInTheDocument();
+
+    // sessionStorage should be set
+    expect(sessionStorage.getItem("paisaxe-mood-dismissed")).toBe("true");
+  });
+
+  // -----------------------------------------------------------------------
+  // 5b. Mood overlay: dismissing without selecting
+  // -----------------------------------------------------------------------
+  it("dismissing mood overlay sets session flag", () => {
+    setupDefaults();
+    // Enable mood_discovery
+    vi.mocked(useFeatureFlags).mockReturnValue({
+      flags: [],
+      isReady: true,
+      isEnabled: (flag: string) => flag === "mood_discovery",
+      isEnabledWithDefault: () => false,
+    });
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    const dismissBtn = screen.getByTestId("mood-dismiss");
+    fireEvent.click(dismissBtn);
+
+    // Overlay should be gone
+    expect(screen.queryByTestId("mood-overlay")).not.toBeInTheDocument();
+
+    // sessionStorage should be set
+    expect(sessionStorage.getItem("paisaxe-mood-dismissed")).toBe("true");
+  });
+
+  // -----------------------------------------------------------------------
+  // 6. ?story= query param sets initial index
   // -----------------------------------------------------------------------
   it("?story= query param sets initial index", () => {
     setupDefaults();

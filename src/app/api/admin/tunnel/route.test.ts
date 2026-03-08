@@ -93,6 +93,22 @@ describe("GET /api/admin/tunnel", () => {
     expect(data.running).toBe(false);
     expect(data.url).toBeNull();
   });
+
+  it("should return not running when pgrep throws an error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockExec.mockRejectedValue(new Error("pgrep command failed"));
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.running).toBe(false);
+    expect(data.url).toBeNull();
+  });
 });
 
 describe("POST /api/admin/tunnel", () => {
@@ -178,6 +194,25 @@ describe("POST /api/admin/tunnel", () => {
       expect.objectContaining({ detached: true, stdio: "ignore" })
     );
     expect(mockProcess.unref).toHaveBeenCalled();
+  });
+
+  it("should return 500 when spawn throws an error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockExec.mockResolvedValue({ stdout: "" }); // not running
+    mockSpawn.mockImplementation(() => {
+      throw new Error("cloudflared not found");
+    });
+
+    const response = await POST();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toContain("Failed to start tunnel");
+    expect(data.error).toContain("cloudflared not found");
   });
 });
 

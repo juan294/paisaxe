@@ -153,4 +153,65 @@ describe("MaintenanceConfigPanel", () => {
     expect(screen.getByLabelText("Display Title")).toHaveValue("Pr\u00f3ximamente");
     expect(screen.getByLabelText("Additional Message (optional)")).toHaveValue("");
   });
+
+  it("shows 'Saved successfully' after successful save", async () => {
+    const user = userEvent.setup();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    const updatedFlag = {
+      ...mockFlag,
+      config: { title: "New Title", message: "We are updating the site.", show_tagline: true },
+    };
+    vi.mocked(adminApi.updateFeatureFlagConfig).mockResolvedValue({
+      data: updatedFlag,
+    });
+
+    render(<MaintenanceConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
+
+    const titleInput = screen.getByLabelText("Display Title");
+    await user.clear(titleInput);
+    await user.type(titleInput, "New Title");
+
+    await user.click(screen.getByText("Save"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Saved successfully")).toBeInTheDocument();
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(updatedFlag);
+
+    // After 2 seconds, "Saved successfully" should disappear
+    vi.advanceTimersByTime(2100);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Saved successfully")).not.toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("hides preview tagline when show_tagline is toggled off", async () => {
+    const user = userEvent.setup();
+    render(<MaintenanceConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
+
+    // Tagline should be visible initially (show_tagline: true)
+    expect(screen.getByText("Look. Ask. Discover.")).toBeInTheDocument();
+
+    // Toggle off
+    const toggle = screen.getByRole("switch");
+    await user.click(toggle);
+
+    // Tagline should disappear from preview
+    expect(screen.queryByText("Look. Ask. Discover.")).not.toBeInTheDocument();
+  });
+
+  it("shows preview message when message is set", () => {
+    render(<MaintenanceConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
+
+    // The preview section should show the current message
+    // "Under Maintenance" appears in the title input and in the preview
+    // "We are updating the site." appears in both the textarea and the preview
+    const previewMessages = screen.getAllByText("We are updating the site.");
+    expect(previewMessages.length).toBeGreaterThanOrEqual(1);
+  });
 });

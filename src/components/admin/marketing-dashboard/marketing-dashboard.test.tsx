@@ -20,8 +20,14 @@ vi.mock("./account-card", () => ({
   ),
 }));
 vi.mock("./account-config-dialog", () => ({
-  AccountConfigDialog: ({ platform }: { platform: string | null }) => (
-    platform ? <div data-testid="config-dialog">{platform}</div> : null
+  AccountConfigDialog: ({ platform, onClose, onSaved }: { platform: string | null; onClose: () => void; onSaved: () => void }) => (
+    platform ? (
+      <div data-testid="config-dialog">
+        {platform}
+        <button data-testid="config-close" onClick={onClose}>Close Config</button>
+        <button data-testid="config-save" onClick={onSaved}>Save Config</button>
+      </div>
+    ) : null
   ),
 }));
 vi.mock("./post-row", () => ({
@@ -408,6 +414,229 @@ describe("MarketingDashboard", () => {
 
     // Only the initial load should have been called
     expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles disconnect account error when response is not ok", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) }) // initial load
+      .mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: "Disconnect failed" }),
+      }); // DELETE fails
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("disconnect-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("disconnect-x"));
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Disconnect account error:",
+        expect.any(Error)
+      );
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("handles toggle account error when pause response is not ok", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) }) // initial load
+      .mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: "Pause failed" }),
+      }); // PATCH pause fails
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-x")).toBeInTheDocument();
+    });
+
+    // X account is active with credentials, so toggling should try to pause
+    await user.click(screen.getByTestId("toggle-x"));
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Toggle account error:",
+        expect.any(Error)
+      );
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("resumes inactive account with credentials on toggle", async () => {
+    const user = userEvent.setup();
+    const dataWithInactiveAccount = {
+      ...mockData,
+      accounts: [
+        { platform: "x", isActive: false, hasCredentials: true, accountHandle: "@elpaisaxe" },
+      ],
+    };
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: dataWithInactiveAccount }) }) // initial load
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) }) // PATCH resume
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) }); // reload
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("toggle-x"));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("action=resume"),
+        expect.objectContaining({ method: "PATCH" })
+      );
+    });
+  });
+
+  it("opens configure dialog when toggling account without credentials", async () => {
+    const user = userEvent.setup();
+    const dataWithNoCredentials = {
+      ...mockData,
+      accounts: [
+        { platform: "x", isActive: false, hasCredentials: false, accountHandle: null },
+      ],
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: dataWithNoCredentials }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("toggle-x"));
+
+    // Should open config dialog instead of making API call
+    await waitFor(() => {
+      expect(screen.getByTestId("config-dialog")).toBeInTheDocument();
+    });
+
+    // Only the initial fetch should have been called (no PATCH/reload)
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes config dialog via onClose callback", async () => {
+    const user = userEvent.setup();
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: mockData }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("configure-instagram")).toBeInTheDocument();
+    });
+
+    // Open config dialog
+    await user.click(screen.getByTestId("configure-instagram"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("config-dialog")).toBeInTheDocument();
+    });
+
+    // Close config dialog (line 323: onClose={() => setConfiguringPlatform(null)))
+    await user.click(screen.getByTestId("config-close"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("config-dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("handleAccountSaved closes dialog and reloads data", async () => {
+    const user = userEvent.setup();
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) }) // initial load
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) }); // reload after save
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("configure-instagram")).toBeInTheDocument();
+    });
+
+    // Open config dialog
+    await user.click(screen.getByTestId("configure-instagram"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("config-dialog")).toBeInTheDocument();
+    });
+
+    // Save config (triggers handleAccountSaved: setConfiguringPlatform(null) + loadData())
+    await user.click(screen.getByTestId("config-save"));
+
+    // Dialog should close
+    await waitFor(() => {
+      expect(screen.queryByTestId("config-dialog")).not.toBeInTheDocument();
+    });
+
+    // loadData should have been called again
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("handles resume account error when response is not ok", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const dataWithInactiveAccount = {
+      ...mockData,
+      accounts: [
+        { platform: "x", isActive: false, hasCredentials: true, accountHandle: "@elpaisaxe" },
+      ],
+    };
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: dataWithInactiveAccount }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: "Resume failed" }),
+      });
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("toggle-x"));
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Toggle account error:",
+        expect.any(Error)
+      );
+    });
+
+    consoleSpy.mockRestore();
   });
 
   it("shows Refresh button and refreshes on click", async () => {

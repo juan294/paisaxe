@@ -229,6 +229,64 @@ describe("Stripe Analytics API Route", () => {
     expect(orders.find((o: { id: string }) => o.id === "pi_failed").status).toBe("failed");
   });
 
+  it("maps requires_payment_method status to pending", async () => {
+    vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+    const now = Math.floor(Date.now() / 1000);
+
+    mockPaymentIntentsList.mockResolvedValue({
+      data: [
+        {
+          id: "pi_requires_pm",
+          amount: 199,
+          currency: "eur",
+          status: "requires_payment_method",
+          created: now,
+          receipt_email: "user@example.com",
+          metadata: {},
+          latest_charge: null,
+        },
+      ],
+    });
+
+    mockBalanceTransactionsList.mockResolvedValue({ data: [] });
+
+    const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(data.data.recentOrders[0].status).toBe("pending");
+  });
+
+  it("maps requires_confirmation status to pending", async () => {
+    vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+    const now = Math.floor(Date.now() / 1000);
+
+    mockPaymentIntentsList.mockResolvedValue({
+      data: [
+        {
+          id: "pi_requires_confirm",
+          amount: 199,
+          currency: "eur",
+          status: "requires_confirmation",
+          created: now,
+          receipt_email: "user@example.com",
+          metadata: {},
+          latest_charge: null,
+        },
+      ],
+    });
+
+    mockBalanceTransactionsList.mockResolvedValue({ data: [] });
+
+    const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(data.data.recentOrders[0].status).toBe("pending");
+  });
+
   describe("Refund detection", () => {
     const now = Math.floor(Date.now() / 1000);
 

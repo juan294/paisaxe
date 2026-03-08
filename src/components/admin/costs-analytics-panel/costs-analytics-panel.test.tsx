@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { CostsAnalyticsPanel } from "./index";
 import { TierAlertsSection } from "./alerts";
 import { ScalingForecastSection } from "./forecast";
-import { ServiceBreakdownTable, CostChart, formatDateShort } from "./chart";
+import { StatCard, ServiceBreakdownTable, CostChart, formatDateShort } from "./chart";
 import { AnalyticsCacheProvider } from "../analytics-cache-context";
 import type {
   CostsAnalyticsDashboardData,
@@ -680,6 +680,60 @@ describe("CostsAnalyticsPanel", () => {
       expect(screen.getByText("$2.0k")).toBeInTheDocument();
     });
   });
+
+  it("closes Add Cost modal via onClose callback", async () => {
+    const user = userEvent.setup();
+
+    render(<CostsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Add Cost")).toBeInTheDocument();
+    });
+
+    // Open modal
+    await user.click(screen.getByText("Add Cost"));
+    expect(screen.getByText("Add Manual Cost")).toBeInTheDocument();
+
+    // Close modal via Cancel button
+    const modal = screen.getByText("Add Manual Cost").closest("div.fixed")! as HTMLElement;
+    const cancelBtn = within(modal).getByRole("button", { name: "Cancel" });
+    await user.click(cancelBtn);
+
+    // Modal should close
+    await waitFor(() => {
+      expect(screen.queryByText("Add Manual Cost")).not.toBeInTheDocument();
+    });
+  });
+
+  it("closes Edit Cost modal via onClose callback", async () => {
+    const user = userEvent.setup();
+
+    render(<CostsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Supabase")).toBeInTheDocument();
+    });
+
+    // Click edit button on the manual cost row
+    const supabaseRow = screen.getByText("Supabase").closest("tr")! as HTMLElement;
+    const editButton = within(supabaseRow).getAllByRole("button")[0];
+    await user.click(editButton);
+
+    // Edit modal should open
+    await waitFor(() => {
+      expect(screen.getByText(/Edit Cost: Supabase/)).toBeInTheDocument();
+    });
+
+    // Close modal via Cancel
+    const modal = screen.getByText(/Edit Cost: Supabase/).closest("div.fixed")! as HTMLElement;
+    const cancelBtn = within(modal).getByRole("button", { name: "Cancel" });
+    await user.click(cancelBtn);
+
+    // Modal should close
+    await waitFor(() => {
+      expect(screen.queryByText(/Edit Cost: Supabase/)).not.toBeInTheDocument();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -978,6 +1032,46 @@ describe("TierAlertsSection", () => {
     });
   });
 
+  it("shows 'All services within safe limits' and allows showing all when only safe alerts exist", async () => {
+    const safeAlerts: TierAlert[] = [
+      makeTierAlert({
+        alertLevel: "safe",
+        serviceId: "vercel",
+        serviceName: "Vercel",
+        metricLabel: "Monthly Visitors",
+        projectedDaysToLimit: null,
+        projectedDate: null,
+        recommendation: undefined,
+      }),
+    ];
+
+    vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
+      data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
+    });
+    vi.mocked(costsLib.computeTierAlerts).mockReturnValue(safeAlerts);
+
+    render(<TierAlertsSection dateRange={dateRange} />, { wrapper });
+
+    // Initially showAll is true, so the safe alert is displayed
+    await waitFor(() => {
+      expect(screen.getByText("Vercel")).toBeInTheDocument();
+    });
+
+    // Click "Hide safe services" to set showAll to false
+    const hideLink = screen.getByText("Hide safe services");
+    fireEvent.click(hideLink);
+
+    // Now all alerts are safe and showAll is false -> shows the empty safe state
+    expect(screen.getByText("All services within safe limits")).toBeInTheDocument();
+
+    // Click "Show all services" button (line 115 in alerts.tsx)
+    const showAllButton = screen.getByText("Show all services");
+    fireEvent.click(showAllButton);
+
+    // Vercel should be visible again
+    expect(screen.getByText("Vercel")).toBeInTheDocument();
+  });
+
   it("re-fetches data when expanded after being collapsed without data", async () => {
     // Start with no data
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
@@ -1219,6 +1313,42 @@ describe("ScalingForecastSection", () => {
     expect(screen.queryByText("Growth Projections")).not.toBeInTheDocument();
   });
 
+  it("re-fetches data when expanded after being collapsed without usage data", async () => {
+    // Start with no usage data
+    vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
+      data: { ...mockCostsData, usageMetrics: undefined },
+    });
+
+    render(
+      <ScalingForecastSection services={mockServices} dateRange={dateRange} />,
+      { wrapper }
+    );
+
+    // Wait for "no usage data" state
+    await waitFor(() => {
+      expect(screen.getByText("No usage data available yet")).toBeInTheDocument();
+    });
+
+    const fetchCountBefore = vi.mocked(adminApi.fetchCostsAnalytics).mock.calls.length;
+
+    // Collapse the section
+    const toggleButton = screen.getByRole("button", { name: /scaling forecast/i });
+    fireEvent.click(toggleButton);
+
+    // Now set up mock to return data
+    vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
+      data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
+    });
+    vi.mocked(costsLib.computeForecasts).mockReturnValue(mockForecasts);
+
+    // Expand again — should trigger loadUsageData since usageMetrics is null (line 44)
+    fireEvent.click(toggleButton);
+
+    await waitFor(() => {
+      expect(vi.mocked(adminApi.fetchCostsAnalytics).mock.calls.length).toBeGreaterThan(fetchCountBefore);
+    });
+  });
+
   it("calls computeForecasts with services and usage metrics", async () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
@@ -1339,6 +1469,22 @@ describe("ServiceBreakdownTable (direct)", () => {
 // CostChart (direct)
 // ---------------------------------------------------------------------------
 
+describe("StatCard (direct)", () => {
+  it("renders numeric value with toLocaleString", () => {
+    render(<StatCard value={1500} label="Test Label" />);
+
+    // 1500 should be formatted via toLocaleString (e.g., "1,500")
+    expect(screen.getByText("1,500")).toBeInTheDocument();
+    expect(screen.getByText("Test Label")).toBeInTheDocument();
+  });
+
+  it("renders string value as-is", () => {
+    render(<StatCard value="$99.99" label="Price" />);
+
+    expect(screen.getByText("$99.99")).toBeInTheDocument();
+  });
+});
+
 describe("CostChart (direct)", () => {
   it("returns null when data is empty", () => {
     const { container } = render(
@@ -1368,6 +1514,28 @@ describe("CostChart (direct)", () => {
     );
 
     expect(screen.getByText("$1.5k")).toBeInTheDocument();
+  });
+
+  it("skips some X-axis labels when data has more than 7 points", () => {
+    // Create 14 data points — labels should be shown for only some
+    const data = Array.from({ length: 14 }, (_, i) => ({
+      date: `2026-01-${String(i + 1).padStart(2, "0")}`,
+      costUsd: (i + 1) * 5,
+    }));
+
+    const { container } = render(<CostChart data={data} />);
+
+    // Should render bars for all 14 data points
+    const rects = container.querySelectorAll("rect");
+    expect(rects.length).toBe(14);
+
+    // Should have fewer than 14 text labels for dates (some are skipped)
+    // Only labels where i % Math.ceil(14/7) === 0 are shown (Math.ceil(14/7) = 2)
+    // So labels at indices 0, 2, 4, 6, 8, 10, 12 = 7 labels
+    const dateLabels = container.querySelectorAll("text");
+    // Total text elements: date labels + Y-axis labels (2: max and $0)
+    // With 7 date labels + 2 Y-axis labels = 9
+    expect(dateLabels.length).toBeLessThan(14 + 2);
   });
 });
 

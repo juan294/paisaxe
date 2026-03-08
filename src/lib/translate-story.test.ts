@@ -587,6 +587,98 @@ describe("translate-story", () => {
       expect(result.results?.fr?.error).toBe("Translation not returned by API");
     });
 
+    it("should throw when Claude returns no text block", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const { callAnthropicAPI } = await import("./claude");
+
+      const mockStory = {
+        id: "test-story-id",
+        title: "Test Story",
+        subtitle: "Test Subtitle",
+        description: "Test Description",
+        metadata: {},
+      };
+
+      const updateMock = vi.fn().mockResolvedValue({ error: null });
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: mockStory, error: null }),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: updateMock,
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      // Return response with no text block (e.g., tool_use only)
+      vi.mocked(callAnthropicAPI).mockResolvedValue({
+        content: [{ type: "tool_use", id: "tool-1", name: "test", input: {} }],
+        id: "test",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4-20250514",
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 100, output_tokens: 200 },
+      } as never);
+
+      const result = await translateStory("test-story-id", { locales: ["en"] });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("No text response from Claude");
+      expect(result.failedCount).toBe(1);
+    });
+
+    it("should throw when translation response fails to parse", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const { callAnthropicAPI } = await import("./claude");
+
+      const mockStory = {
+        id: "test-story-id",
+        title: "Test Story",
+        subtitle: "Test Subtitle",
+        description: "Test Description",
+        metadata: {},
+      };
+
+      const updateMock = vi.fn().mockResolvedValue({ error: null });
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: mockStory, error: null }),
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: updateMock,
+          })),
+        })),
+      };
+      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+
+      // Return invalid JSON text that will fail to parse
+      vi.mocked(callAnthropicAPI).mockResolvedValue({
+        content: [{ type: "text", text: "This is not valid JSON at all" }],
+        id: "test",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4-20250514",
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 100, output_tokens: 200 },
+      } as never);
+
+      const result = await translateStory("test-story-id", { locales: ["en"] });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Failed to parse");
+      expect(result.failedCount).toBe(1);
+    });
+
     it("should retranslate when forceRetranslate is true", async () => {
       const { createAdminClient } = await import("./supabase");
       const { callAnthropicAPI } = await import("./claude");

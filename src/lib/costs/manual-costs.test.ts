@@ -209,6 +209,14 @@ describe("manual-costs", () => {
       const result = await updateManualCost("cost-1", { costUsd: 25 });
       expect(result).toBeNull();
     });
+
+    it("returns null when createAdminClient throws", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+      });
+      const result = await updateManualCost("cost-1", { costUsd: 25 });
+      expect(result).toBeNull();
+    });
   });
 
   describe("deleteManualCost", () => {
@@ -285,6 +293,14 @@ describe("manual-costs", () => {
       });
 
       const result = await getManualCost("non-existent");
+      expect(result).toBeNull();
+    });
+
+    it("returns null when createAdminClient throws", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+      });
+      const result = await getManualCost("cost-1");
       expect(result).toBeNull();
     });
   });
