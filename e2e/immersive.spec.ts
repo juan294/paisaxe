@@ -65,7 +65,8 @@ test.describe("Immersive story viewer", () => {
     await expect(title).toBeVisible({ timeout: 15000 });
 
     // Info is visible by default - check the info panel is at full opacity
-    const infoPanel = page.getByTestId("story-info-panel");
+    // Use .first() because the carousel may render multiple story panels simultaneously
+    const infoPanel = page.getByTestId("story-info-panel").first();
     await expect(infoPanel).toHaveCSS("opacity", "1");
 
     // Press 'i' to hide info overlay
