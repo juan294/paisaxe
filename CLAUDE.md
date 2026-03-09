@@ -572,6 +572,7 @@ git worktree remove --force <path>; git branch -D <branch>
 - When creating a team: break work so each teammate owns different files (avoid conflicts)
 - Teammates don't inherit conversation history — include full context in spawn prompts
 - Use subagents for focused tasks (result is all that matters); use teams for collaborative work requiring discussion
+- **Only the main agent handles git commit/push.** Sub-agents and teammates write changes to their working directories. The main agent reviews the changes, runs tests, and commits centrally. This prevents wrong-branch pushes and merge conflicts from parallel agents.
 
 ## Memory Management
 
