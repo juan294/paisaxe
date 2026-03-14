@@ -158,7 +158,7 @@ npm install  # Required — worktrees don't share node_modules
 # ... write tests first, then implement, then commit
 
 # 3. MERGE — After tests pass, merge back into develop
-cd /Users/juan/Documents/GenAI_Projects/paisaxe
+cd /Users/juan/Documents/code/paisaxe
 git merge feature/short-name
 
 # 4. CLEAN UP — Always remove the worktree and branch after merge
@@ -586,6 +586,20 @@ What to save proactively:
 - Permission configurations that required adjustment
 
 After completing `/bootstrap`, `/adopt`, or any significant configuration change, save the key decisions and project context to auto memory so future sessions start with full awareness.
+
+## Project File Locations
+
+Go directly to these paths — never search the codebase for them.
+
+| Topic | Path | Notes |
+|-------|------|-------|
+| Agent reports | `docs/agents/*-report.md` | Flag YELLOW/RED items. Cross-agent context in `shared-context.md` |
+| Agent logs | `logs/<name>.log`, `<name>.error.log` | Read alongside reports to diagnose failures |
+| Agent scripts | `scripts/agents/` | Standalone bash files invoking Claude CLI headless |
+| ADRs | `docs/decisions/` | Architecture decision records |
+| PR descriptions | `docs/prs/{number}_description.md` | |
+| Research docs | `docs/research/YYYY-MM-DD-description.md` | |
+| Plans | `docs/plans/YYYY-MM-DD-description.md` | Phase files in `-phases/phase-N.md` |
 
 ## Issue Tracking (GitHub Issues)
 
