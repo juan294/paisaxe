@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   FALLBACK_STORIES,
   getStoriesByCategory,
@@ -13,6 +13,7 @@ import {
   getStoriesByLocationFromDB,
   getStoriesByDurationFromDB,
   getStoryBySlugFromDB,
+  isBuildPhase,
 } from "./stories-data";
 import { supabase } from "./supabase";
 
@@ -629,6 +630,131 @@ describe("stories-data", () => {
       const result = await getStoryBySlugFromDB("completely-nonexistent-slug-xyz");
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe("isBuildPhase", () => {
+    const originalEnv = process.env;
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it("should return true when NEXT_PHASE is phase-production-build", () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      expect(isBuildPhase()).toBe(true);
+    });
+
+    it("should return false when NEXT_PHASE is not set", () => {
+      process.env = { ...originalEnv };
+      delete process.env.NEXT_PHASE;
+      expect(isBuildPhase()).toBe(false);
+    });
+
+    it("should return false when NEXT_PHASE is a different value", () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-development-server" };
+      expect(isBuildPhase()).toBe(false);
+    });
+  });
+
+  describe("prerender warning suppression", () => {
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+      warnSpy.mockRestore();
+    });
+
+    it("should NOT log warnings during build phase for getStoryBySlugFromDB", async () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      mockSupabaseFrom.mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      const result = await getStoryBySlugFromDB("fabada");
+
+      expect(result).not.toBeNull();
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should NOT log warnings during build phase for getStoriesFromDB", async () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      mockSupabaseFrom.mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      const result = await getStoriesFromDB();
+
+      expect(result).toEqual(FALLBACK_STORIES);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should NOT log warnings during build phase for getStoriesByCategoryFromDB", async () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      mockSupabaseFrom.mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      const result = await getStoriesByCategoryFromDB("nature");
+
+      expect(result.length).toBeGreaterThan(0);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should NOT log warnings during build phase for getStoriesByLocationFromDB", async () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      mockSupabaseFrom.mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      const result = await getStoriesByLocationFromDB("eastern");
+
+      expect(result.length).toBeGreaterThan(0);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should NOT log warnings during build phase for getStoriesByDurationFromDB", async () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      mockSupabaseFrom.mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      const result = await getStoriesByDurationFromDB("weekend");
+
+      expect(result.length).toBeGreaterThan(0);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should log warnings at runtime (non-build phase) for getStoryBySlugFromDB", async () => {
+      process.env = { ...originalEnv };
+      delete process.env.NEXT_PHASE;
+      mockSupabaseFrom.mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      await getStoryBySlugFromDB("fabada");
+
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it("should log warnings at runtime for getStoriesFromDB on DB error", async () => {
+      process.env = { ...originalEnv };
+      delete process.env.NEXT_PHASE;
+      const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } });
+      const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      await getStoriesFromDB();
+
+      expect(warnSpy).toHaveBeenCalled();
     });
   });
 });
