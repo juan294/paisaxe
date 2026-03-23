@@ -360,6 +360,16 @@ All request interception logic goes in `proxy.ts`:
 
 **Never create a `middleware.ts` file in this project.**
 
+### CSP and PPR Compatibility (IMPORTANT)
+
+**PPR (`cacheComponents`) prerenders HTML at build time WITHOUT CSP nonces.** This means:
+
+1. **Never use `'strict-dynamic'` in CSP** — it overrides `'self'` per CSP Level 3, blocking ALL scripts when nonces aren't in the HTML
+2. **Never use nonce-only CSP** — prerendered pages don't have nonces, so nonce-gated scripts won't execute
+3. **Current policy**: `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com` — `'self'` covers same-origin external scripts, `'unsafe-inline'` covers Next.js hydration inline scripts
+4. **If re-enabling nonces**: Must restore `headers()` call in root layout to read `x-csp-nonce`, which makes the layout dynamic (incompatible with PPR static shell)
+5. **E2E canary**: `e2e/smoke.spec.ts` has a "CSP canary" test that verifies JavaScript executes. If CSP ever blocks scripts again, this test fails immediately.
+
 ## Database Schema
 
 Core tables (see `supabase/migrations/` for full DDL):
