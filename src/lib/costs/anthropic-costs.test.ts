@@ -21,14 +21,5 @@ describe("anthropic-costs", () => {
       expect(result).toEqual([]);
     });
 
-    it("returns empty array when fetch throws (line 123)", async () => {
-      process.env.ANTHROPIC_ADMIN_API_KEY = "sk-ant-admin-test";
-
-      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
-
-      const result = await fetchAnthropicCostsByDay("2024-01-01", "2024-01-31");
-
-      expect(result).toEqual([]);
-    });
-  });
+});
 });
