@@ -8,7 +8,7 @@ export function SiteFooter() {
 
   return (
     <footer className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
-      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-2 text-[10px] text-white/60">
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-2 text-xs text-white/60">
         <span>{t("footer.content_attribution")}</span>
         <span className="hidden sm:inline" aria-hidden="true">·</span>
         <span>{t("footer.ai_disclaimer")}</span>
