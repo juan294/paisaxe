@@ -639,6 +639,29 @@ describe("MarketingDashboard", () => {
     consoleSpy.mockRestore();
   });
 
+  it("returns null when API responds ok but data is null", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: null }),
+    });
+
+    const { container } = render(<MarketingDashboard />);
+
+    // Wait for loading to finish (spinner disappears)
+    await waitFor(() => {
+      expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
+    });
+
+    // No error is shown (error state is empty)
+    expect(screen.queryByText("Retry")).not.toBeInTheDocument();
+
+    // No dashboard content is rendered (line 133: if (!data) return null)
+    expect(screen.queryByText("Marketing Automation")).not.toBeInTheDocument();
+
+    // Container should be empty since component returns null
+    expect(container.innerHTML).toBe("");
+  });
+
   it("shows Refresh button and refreshes on click", async () => {
     const user = userEvent.setup();
 
@@ -657,5 +680,157 @@ describe("MarketingDashboard", () => {
 
     // Should have been called twice: initial + refresh
     expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("handles non-Error thrown in loadData (line 43 else branch)", async () => {
+    // When the thrown value is not an Error instance, the message should be "Unknown error"
+    global.fetch = vi.fn().mockRejectedValue("string error");
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Unknown error")).toBeInTheDocument();
+    });
+  });
+
+  it("uses fallback error message when API error response has no error field (line 38/68)", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      json: () => Promise.resolve({}), // no "error" field
+    });
+
+    render(<MarketingDashboard />);
+
+    // result.error is undefined, so fallback "Failed to fetch marketing data" should appear
+    await waitFor(() => {
+      expect(screen.getByText("Failed to fetch marketing data")).toBeInTheDocument();
+    });
+  });
+
+  it("uses fallback error message when pause response has no error field (line 68)", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({}), // no error field
+      });
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("toggle-x"));
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Toggle account error:",
+        expect.objectContaining({ message: "Failed to pause account" })
+      );
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("uses fallback error message when resume response has no error field (line 78)", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const dataWithInactiveAccount = {
+      ...mockData,
+      accounts: [
+        { platform: "x", isActive: false, hasCredentials: true, accountHandle: "@elpaisaxe" },
+      ],
+    };
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: dataWithInactiveAccount }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({}), // no error field
+      });
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("toggle-x"));
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Toggle account error:",
+        expect.objectContaining({ message: "Failed to resume account" })
+      );
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("handles toggle for platform with no account (line 169 ?? false fallback)", async () => {
+    const user = userEvent.setup();
+    // mockData has an x account but no instagram/pinterest account
+    // Toggling instagram should trigger handleToggleAccount with isActive=false, hasCredentials=false
+    // which should open the configure dialog (the "no credentials" branch)
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: mockData }),
+    });
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-instagram")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("toggle-instagram"));
+
+    // account is undefined for instagram, so account?.isActive ?? false = false
+    // and account?.hasCredentials ?? false = false
+    // This triggers the "else" branch in handleToggleAccount which opens config dialog
+    await waitFor(() => {
+      expect(screen.getByTestId("config-dialog")).toBeInTheDocument();
+    });
+
+    // Only the initial fetch should have been called (no PATCH)
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses fallback error message when disconnect response has no error field (line 102)", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({}), // no error field
+      });
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("disconnect-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("disconnect-x"));
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Disconnect account error:",
+        expect.objectContaining({ message: "Failed to disconnect account" })
+      );
+    });
+
+    consoleSpy.mockRestore();
   });
 });

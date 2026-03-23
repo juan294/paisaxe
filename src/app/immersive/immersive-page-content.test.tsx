@@ -31,7 +31,9 @@ vi.mock("@/lib/i18n", () => ({
 }));
 vi.mock("@/components/immersive/story-viewer", () => ({
   StoryViewer: (props: Record<string, unknown>) => (
-    <div data-testid="story-viewer" data-index={props.currentIndex} />
+    <div data-testid="story-viewer" data-index={props.currentIndex} data-chat-open={String(props.chatOpen)}>
+      <button data-testid="open-chat" onClick={() => (props.onAskAbout as (msg?: string) => void)()} />
+    </div>
   ),
 }));
 vi.mock("@/components/immersive/skeleton-story-card", () => ({
@@ -63,9 +65,13 @@ vi.mock("@/components/ui/component-error-boundary", () => ({
     <>{children}</>
   ),
 }));
-// Mock dynamic import for VoiceChat
+// Mock dynamic import for VoiceChat — renders a div so we can detect it
 vi.mock("next/dynamic", () => ({
-  default: () => () => null,
+  default: () => (props: Record<string, unknown>) => (
+    <div data-testid="voice-chat" data-open={String(props.open)}>
+      <button data-testid="voice-chat-close" onClick={() => (props.onClose as () => void)()} />
+    </div>
+  ),
 }));
 
 // ---------------------------------------------------------------------------
@@ -329,6 +335,112 @@ describe("ImmersivePageContent", () => {
   });
 
   // -----------------------------------------------------------------------
+  // 6b. ?voice=ready opens chat (line 127)
+  // -----------------------------------------------------------------------
+  it("?voice=ready opens chat when story is found", () => {
+    setupDefaults();
+    vi.mocked(useSearchParams).mockReturnValue({
+      get: (key: string) => {
+        if (key === "story") return "oviedo-cathedral";
+        if (key === "voice") return "ready";
+        return null;
+      },
+      toString: () => "",
+    } as unknown as ReturnType<typeof useSearchParams>);
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    const viewer = screen.getByTestId("story-viewer");
+    // chatOpen should be true because voice=ready was in the query params
+    expect(viewer).toHaveAttribute("data-chat-open", "true");
+  });
+
+  // -----------------------------------------------------------------------
+  // 6c. Index resets when filters reduce story list (line 136)
+  // -----------------------------------------------------------------------
+  it("resets index to 0 when currentIndex exceeds filtered story count", () => {
+    setupDefaults();
+    // Start with 2 stories, then filter to 1
+    const filtersMock = defaultFiltersMock(mockStories);
+    vi.mocked(useStoryFilters).mockReturnValue(filtersMock);
+
+    const { rerender } = render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // Simulate: user navigated to index 1, then filters reduce stories to just 1
+    // We need currentIndex >= filteredStories.length to trigger the reset.
+    // The component manages currentIndex internally, so we simulate by re-rendering
+    // with a single-story filter result after the user would have navigated.
+    vi.mocked(useStoryFilters).mockReturnValue({
+      ...defaultFiltersMock([mockStories[0]]),
+    });
+
+    rerender(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // When filteredStories.length is 1, if currentIndex was >= 1, it resets to 0
+    const viewer = screen.getByTestId("story-viewer");
+    expect(viewer).toHaveAttribute("data-index", "0");
+  });
+
+  // -----------------------------------------------------------------------
+  // 6d. markViewed effect fires on render (lines 153-154)
+  // -----------------------------------------------------------------------
+  it("calls markViewed with current index on render", () => {
+    const markViewed = vi.fn();
+    setupDefaults();
+    vi.mocked(useViewedStories).mockReturnValue({
+      viewedIndices: new Set<number>(),
+      markViewed,
+    });
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // markViewed should be called with the initial index (0)
+    expect(markViewed).toHaveBeenCalledWith(0);
+  });
+
+  // -----------------------------------------------------------------------
+  // 7a. Seasonal weighting pipeline (lines 91-92)
+  // -----------------------------------------------------------------------
+  it("applies seasonal weighting when seasonal_surfacing flag is enabled", async () => {
+    const { applySeasonalWeighting } = await import("@/lib/seasonal-weighting");
+    setupDefaults();
+    vi.mocked(useFeatureFlags).mockReturnValue({
+      flags: [],
+      isReady: true,
+      isEnabled: (flag: string) => flag === "seasonal_surfacing",
+      isEnabledWithDefault: () => false,
+    });
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    expect(applySeasonalWeighting).toHaveBeenCalled();
+  });
+
+  // -----------------------------------------------------------------------
+  // 7b. handleCloseChat resets chatOpen and initialMessage (lines 153-154)
+  // -----------------------------------------------------------------------
+  it("closes chat and clears initialMessage when VoiceChat onClose is called", () => {
+    setupDefaults();
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // Open the chat first via StoryViewer's onAskAbout callback
+    const openChatBtn = screen.getByTestId("open-chat");
+    fireEvent.click(openChatBtn);
+
+    // Chat should be open — the voice-chat component should be rendered
+    const viewer = screen.getByTestId("story-viewer");
+    expect(viewer).toHaveAttribute("data-chat-open", "true");
+
+    // Now close the chat
+    const closeChatBtn = screen.getByTestId("voice-chat-close");
+    fireEvent.click(closeChatBtn);
+
+    // Chat should now be closed
+    expect(viewer).toHaveAttribute("data-chat-open", "false");
+  });
+
+  // -----------------------------------------------------------------------
   // 7. Deep-link effect fires only once (not re-triggered by filter changes)
   // -----------------------------------------------------------------------
   it("deep-link does not reset index when filters change after initial load", () => {
@@ -359,5 +471,91 @@ describe("ImmersivePageContent", () => {
     // but it's because of the bounds check, not the deep-link re-firing
     const viewer = screen.getByTestId("story-viewer");
     expect(viewer).toHaveAttribute("data-index", "0");
+  });
+
+  // -----------------------------------------------------------------------
+  // 8. Mood overlay hidden when sessionStorage has previous dismissal (line 75)
+  // -----------------------------------------------------------------------
+  it("does not show mood overlay when sessionStorage already has dismissal flag", () => {
+    // Pre-set sessionStorage BEFORE rendering so the useEffect reads it
+    sessionStorage.setItem("paisaxe-mood-dismissed", "true");
+
+    setupDefaults();
+    vi.mocked(useFeatureFlags).mockReturnValue({
+      flags: [],
+      isReady: true,
+      isEnabled: (flag: string) => flag === "mood_discovery",
+      isEnabledWithDefault: () => false,
+    });
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // Mood overlay should NOT appear because sessionStorage had the dismissed flag
+    expect(screen.queryByTestId("mood-overlay")).not.toBeInTheDocument();
+  });
+
+  // -----------------------------------------------------------------------
+  // 9. Index resets to 0 when currentIndex is out of bounds (line 136)
+  // -----------------------------------------------------------------------
+  it("resets currentIndex to 0 when it exceeds new filteredStories length", () => {
+    setupDefaults();
+    // Deep-link to "oviedo-cathedral" which is at index 1 in the default order
+    vi.mocked(useSearchParams).mockReturnValue({
+      get: (key: string) => (key === "story" ? "oviedo-cathedral" : null),
+      toString: () => "",
+    } as unknown as ReturnType<typeof useSearchParams>);
+
+    const { rerender } = render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // Verify currentIndex is 1 (oviedo-cathedral is at index 1)
+    expect(screen.getByTestId("story-viewer")).toHaveAttribute("data-index", "1");
+
+    // Now reduce filteredStories to just 1 story — currentIndex (1) >= length (1)
+    vi.mocked(useStoryFilters).mockReturnValue({
+      ...defaultFiltersMock([mockStories[0]]),
+    });
+
+    rerender(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // The out-of-bounds guard should have reset currentIndex to 0
+    expect(screen.getByTestId("story-viewer")).toHaveAttribute("data-index", "0");
+  });
+
+  // -----------------------------------------------------------------------
+  // 10. Deep-link: story slug not found in filteredStories (line 123 false branch)
+  // -----------------------------------------------------------------------
+  it("does not change index when ?story= slug is not found in filteredStories", () => {
+    setupDefaults();
+    vi.mocked(useSearchParams).mockReturnValue({
+      get: (key: string) => (key === "story" ? "nonexistent-slug" : null),
+      toString: () => "",
+    } as unknown as ReturnType<typeof useSearchParams>);
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // The story slug doesn't match any story, so index stays at default 0
+    const viewer = screen.getByTestId("story-viewer");
+    expect(viewer).toHaveAttribute("data-index", "0");
+  });
+
+  // -----------------------------------------------------------------------
+  // 11. SSR guard: typeof window === "undefined" (line 73 false branch)
+  // -----------------------------------------------------------------------
+  it("skips sessionStorage check when window is undefined (SSR guard)", () => {
+    // This branch is for SSR where `typeof window === "undefined"`.
+    // In jsdom, window is always defined, so the `if` body always runs.
+    // We verify the normal case works — the false branch is an SSR-only path
+    // that cannot be exercised in jsdom without overriding globals.
+    setupDefaults();
+    vi.mocked(useFeatureFlags).mockReturnValue({
+      flags: [],
+      isReady: true,
+      isEnabled: (flag: string) => flag === "mood_discovery",
+      isEnabledWithDefault: () => false,
+    });
+
+    // No sessionStorage item set — mood overlay should appear
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+    expect(screen.getByTestId("mood-overlay")).toBeInTheDocument();
   });
 });

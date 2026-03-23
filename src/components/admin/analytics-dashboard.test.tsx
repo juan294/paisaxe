@@ -107,4 +107,98 @@ describe("AnalyticsDashboard lazy-mount", () => {
     // Same DOM node — not re-mounted
     expect(voiceEl1).toBe(voiceEl2);
   });
+
+  it("mounts the GitHub panel when its tab is clicked", async () => {
+    const user = userEvent.setup();
+    render(<AnalyticsDashboard />);
+
+    // GitHub panel not mounted yet
+    expect(screen.queryByTestId("github-panel")).not.toBeInTheDocument();
+
+    // Click the GitHub tab
+    await user.click(screen.getByRole("tab", { name: /GitHub/i }));
+
+    // GitHub panel should now be mounted and visible
+    expect(screen.getByTestId("github-panel")).toBeInTheDocument();
+    const githubTabpanel = screen.getByTestId("github-panel").closest('[role="tabpanel"]');
+    expect(githubTabpanel).toHaveAttribute("aria-hidden", "false");
+    expect(githubTabpanel).toHaveStyle({ display: "block" });
+  });
+
+  it("mounts the Revenue panel when its tab is clicked", async () => {
+    const user = userEvent.setup();
+    render(<AnalyticsDashboard />);
+
+    // Revenue panel not mounted yet
+    expect(screen.queryByTestId("revenue-panel")).not.toBeInTheDocument();
+
+    // Click the Revenue tab
+    await user.click(screen.getByRole("tab", { name: /Revenue/i }));
+
+    // Revenue panel should now be mounted and visible
+    expect(screen.getByTestId("revenue-panel")).toBeInTheDocument();
+    const revenueTabpanel = screen.getByTestId("revenue-panel").closest('[role="tabpanel"]');
+    expect(revenueTabpanel).toHaveAttribute("aria-hidden", "false");
+    expect(revenueTabpanel).toHaveStyle({ display: "block" });
+  });
+
+  it("hides GitHub panel when switching to another tab after visiting it", async () => {
+    const user = userEvent.setup();
+    render(<AnalyticsDashboard />);
+
+    // Visit GitHub tab
+    await user.click(screen.getByRole("tab", { name: /GitHub/i }));
+    expect(screen.getByTestId("github-panel")).toBeInTheDocument();
+
+    // Switch back to Visitors
+    await user.click(screen.getByRole("tab", { name: /Visitors/i }));
+
+    // GitHub panel should still be in DOM but hidden
+    const githubTabpanel = screen.getByTestId("github-panel").closest('[role="tabpanel"]');
+    expect(githubTabpanel).toHaveAttribute("aria-hidden", "true");
+    expect(githubTabpanel).toHaveStyle({ display: "none" });
+  });
+
+  it("hides Revenue panel when switching to another tab after visiting it", async () => {
+    const user = userEvent.setup();
+    render(<AnalyticsDashboard />);
+
+    // Visit Revenue tab
+    await user.click(screen.getByRole("tab", { name: /Revenue/i }));
+    expect(screen.getByTestId("revenue-panel")).toBeInTheDocument();
+
+    // Switch to Costs
+    await user.click(screen.getByRole("tab", { name: /Costs/i }));
+
+    // Revenue panel should still be in DOM but hidden
+    const revenueTabpanel = screen.getByTestId("revenue-panel").closest('[role="tabpanel"]');
+    expect(revenueTabpanel).toHaveAttribute("aria-hidden", "true");
+    expect(revenueTabpanel).toHaveStyle({ display: "none" });
+  });
+
+  it("mounts all five panels after visiting each tab", async () => {
+    const user = userEvent.setup();
+    render(<AnalyticsDashboard />);
+
+    // Visit all tabs
+    await user.click(screen.getByRole("tab", { name: /Voice/i }));
+    await user.click(screen.getByRole("tab", { name: /GitHub/i }));
+    await user.click(screen.getByRole("tab", { name: /Costs/i }));
+    await user.click(screen.getByRole("tab", { name: /Revenue/i }));
+
+    // All five panels should be in the DOM
+    expect(screen.getByTestId("visitors-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("voice-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("github-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("costs-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("revenue-panel")).toBeInTheDocument();
+
+    // Only Revenue (last clicked) should be visible
+    const revenueTabpanel = screen.getByTestId("revenue-panel").closest('[role="tabpanel"]');
+    expect(revenueTabpanel).toHaveStyle({ display: "block" });
+
+    // Others should be hidden
+    const visitorsTabpanel = screen.getByTestId("visitors-panel").closest('[role="tabpanel"]');
+    expect(visitorsTabpanel).toHaveStyle({ display: "none" });
+  });
 });

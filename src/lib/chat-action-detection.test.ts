@@ -207,6 +207,24 @@ describe("chat-action-detection", () => {
       expect(result).toHaveLength(1);
       expect(result[0].text).toContain("Carretera de la Costa");
     });
+
+    it("removes trailing period from address text (line 321)", () => {
+      // The address regex can match a trailing period from the sentence.
+      // The code at line 320-321 strips it: if (addressText.endsWith(".")) { addressText = addressText.slice(0, -1); }
+      const text = "Está en Calle Mayor.";
+      const result = detectAddresses(text);
+
+      expect(result).toHaveLength(1);
+      // The trailing period should be stripped from the detected address
+      expect(result[0].text.endsWith(".")).toBe(false);
+      expect(result[0].text).toContain("Calle Mayor");
+    });
+
+    // NOTE: Line 321 (trailing-period removal branch) is effectively dead code.
+    // The street regex patterns use character classes [A-Za-zÀ-ÿ\s] which do not
+    // include "." — so the regex match never captures a trailing period.
+    // The existing test above verifies the guard doesn't break anything, but
+    // the `endsWith(".")` condition is never true during normal execution.
   });
 
   describe("detectPlaceNames", () => {

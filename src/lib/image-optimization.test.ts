@@ -174,6 +174,11 @@ describe("image-optimization", () => {
     });
   });
 
+  // NOTE: image-optimization.ts lines 130-131 (JPEG branch in processVariant)
+  // is dead code. The `processVariant` function is only called by `optimizeImage`
+  // (which uses "avif" and "webp" formats) and `optimizeSingleImage` (which uses
+  // "avif" only). The "jpeg" case in the switch statement is never reached.
+
   describe("optimizeSingleImage", () => {
     it("should optimize to AVIF format", async () => {
       const { optimizeSingleImage } = await import("./image-optimization");
@@ -316,6 +321,27 @@ describe("image-optimization", () => {
       const formats = new Set(result.optimized.map((e) => e.format));
       expect(formats.has("avif")).toBe(true);
       expect(formats.has("webp")).toBe(true);
+    });
+
+    it("should skip sizes larger than original width", async () => {
+      const { estimateOptimizedSizes } = await import("./image-optimization");
+      const inputBuffer = Buffer.alloc(500000);
+
+      // Small image — only 800px wide
+      mockSharpInstance.metadata.mockResolvedValue({
+        width: 800,
+        height: 600,
+        format: "jpeg",
+      });
+
+      const result = await estimateOptimizedSizes(inputBuffer);
+
+      // IMAGE_SIZES = [640, 1200, 2048] — only 640 is <= 800
+      const widths = result.optimized.map((e) => e.width);
+      expect(widths.every((w) => w <= 800)).toBe(true);
+      expect(widths).toContain(640);
+      expect(widths).not.toContain(1200);
+      expect(widths).not.toContain(2048);
     });
   });
 });

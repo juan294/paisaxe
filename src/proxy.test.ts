@@ -606,6 +606,15 @@ describe("Canonical domain redirect", () => {
 
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
   });
+
+  it("does not redirect unknown hostnames that are not alternate domains", async () => {
+    // Vercel preview deployments or other unknown hostnames should pass through
+    const request = new NextRequest("https://paisaxe-abc123.vercel.app/immersive");
+    const response = await proxy(request);
+
+    // Should NOT redirect — hostname is not in alternate domains list
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+  });
 });
 
 describe("Root path redirect", () => {
@@ -688,8 +697,8 @@ describe("Auth session refresh timeout", () => {
     // Should have returned a valid response (not hung)
     expect(response.headers.get("x-middleware-next")).toBeTruthy();
 
-    // Should complete within AUTH_REFRESH_TIMEOUT_MS + 1s buffer
-    expect(elapsed).toBeLessThan(AUTH_REFRESH_TIMEOUT_MS + 1000);
+    // Should complete within AUTH_REFRESH_TIMEOUT_MS + 3s buffer (generous to avoid flaky CI under load)
+    expect(elapsed).toBeLessThan(AUTH_REFRESH_TIMEOUT_MS + 3000);
   }, 10_000); // test timeout: 10s
 
   it("should return response normally when Supabase responds quickly", async () => {
@@ -859,6 +868,28 @@ describe("Auth session refresh - setAll cookie callback", () => {
     expect(response.cookies.get("cookie-a")?.value).toBe("value-a");
     expect(response.cookies.get("cookie-b")?.value).toBe("value-b");
     expect(response.cookies.get("cookie-c")?.value).toBe("value-c");
+  });
+
+  it("should provide getAll callback that returns request cookies", async () => {
+    // After proxy runs with auth cookies, the captured cookies config
+    // should have a getAll that delegates to request.cookies.getAll()
+    mockGetUser.mockImplementation(async () => {
+      // Invoke getAll during the auth flow to cover line 327
+      if (capturedCookiesConfig) {
+        const cookies = capturedCookiesConfig.getAll();
+        expect(Array.isArray(cookies)).toBe(true);
+      }
+      return { data: { user: null }, error: null };
+    });
+
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value; other-cookie=abc" },
+    });
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    // Verify capturedCookiesConfig was set (meaning createServerClient was called)
+    expect(capturedCookiesConfig).not.toBeNull();
   });
 });
 

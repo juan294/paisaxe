@@ -279,6 +279,58 @@ describe("PATCH /api/admin/stories/[id]", () => {
     expect(data.error).toBe("Internal server error");
   });
 
+  it("should handle empty string subtitle/description/sourcePdf by converting to null (lines 96-97,101)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              id: "story-1",
+              slug: "story",
+              title: "Story",
+              subtitle: null,
+              description: null,
+              category: "nature",
+              location: null,
+              duration: null,
+              source_pdf: null,
+              metadata: null,
+              updated_at: "2024-01-01T00:00:00Z",
+            },
+            error: null,
+          }),
+        }),
+      }),
+    });
+
+    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({
+        subtitle: "  ", // whitespace-only, should become null via trim() || null
+        description: "", // empty string, should become null
+        sourcePdf: "  ", // whitespace-only, should become null
+        bestMonths: [1, 2, 3],
+        metadata: { custom: "value" },
+      }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+
+    expect(response.status).toBe(200);
+
+    // Verify update was called — the data passed should have null values
+    const updateCall = mockUpdate.mock.calls[0][0];
+    expect(updateCall.subtitle).toBeNull();
+    expect(updateCall.description).toBeNull();
+    expect(updateCall.source_pdf).toBeNull();
+    expect(updateCall.best_months).toEqual([1, 2, 3]);
+    expect(updateCall.metadata).toEqual({ custom: "value" });
+  });
+
   it("should return 500 when update fails", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 

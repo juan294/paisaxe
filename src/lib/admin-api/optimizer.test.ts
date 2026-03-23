@@ -62,4 +62,15 @@ describe("triggerOptimizerRun", () => {
 
     expect(result).toEqual({ error: "Network error" });
   });
+
+  it("returns fallback error message when response has no error field", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      json: () => Promise.resolve({}),
+    });
+
+    const result = await triggerOptimizerRun();
+
+    expect(result).toEqual({ error: "Failed to run optimizer" });
+  });
 });

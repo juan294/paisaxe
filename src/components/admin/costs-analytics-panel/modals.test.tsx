@@ -198,6 +198,27 @@ describe("AddCostModal", () => {
     expect(submittedData.notes).toBe("March billing");
   });
 
+  it("shows empty value for custom service ID input when serviceId is 'custom'", async () => {
+    const user = userEvent.setup();
+    render(<AddCostModal {...defaultProps} />);
+
+    await user.selectOptions(screen.getByLabelText("Service"), "custom");
+
+    // When serviceId === "custom", the input value should be "" (line 99 ternary)
+    const serviceIdInput = screen.getByLabelText("Service ID") as HTMLInputElement;
+    expect(serviceIdInput.value).toBe("");
+    // Also verify the input is rendered (the conditional block is active)
+    expect(serviceIdInput).toBeInTheDocument();
+  });
+
+  // Line 99: `formData.serviceId === "custom" ? "" : formData.serviceId`
+  // The `false` branch (formData.serviceId !== "custom") is architecturally unreachable.
+  // The entire block at line 90 only renders when `formData.serviceId === "custom"`.
+  // If the user types into the Service ID input, the serviceId changes from "custom" to
+  // the typed value, which unmounts the entire custom fields block (line 90 condition
+  // becomes false). Therefore the ternary's false branch can never execute while the
+  // input is mounted. This is verified by the "custom service ID onChange" test above.
+
   it("sets serviceId without name for unrecognized service", async () => {
     const user = userEvent.setup();
     render(<AddCostModal {...defaultProps} />);

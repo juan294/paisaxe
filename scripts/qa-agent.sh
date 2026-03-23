@@ -3,7 +3,7 @@
 # Performs automated LLM testing and provides actionable analysis of failures
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/Documents/code/paisaxe"
+PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/qa-agent-$(date +%Y-%m-%d).log"
@@ -96,7 +96,7 @@ HEALTH_CHECK_DETAILS=""
 # Check 1: App Health Endpoint
 log_info "Checking app health..." | tee -a "$LOG_FILE"
 HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3000/api/health" 2>&1)
-if echo "$HEALTH_RESPONSE" | grep -q '"status":"ok"'; then
+if echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
   log_success "App health: OK" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
 else
@@ -121,9 +121,9 @@ else
   HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Database check failed: $DB_RESPONSE"
 fi
 
-# Check 3: Stripe Connectivity (production endpoint)
+# Check 3: Stripe Connectivity (checkout health endpoint)
 log_info "Checking Stripe connectivity..." | tee -a "$LOG_FILE"
-STRIPE_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/stripe-test" 2>&1)
+STRIPE_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/checkout/health" 2>&1)
 if echo "$STRIPE_RESPONSE" | grep -q '"success":true'; then
   STRIPE_PRICE=$(echo "$STRIPE_RESPONSE" | grep -oE '"unitAmount":[0-9]+' | cut -d':' -f2 || echo "unknown")
   log_success "Stripe connectivity: OK (Day Pass: ${STRIPE_PRICE} cents)" | tee -a "$LOG_FILE"
@@ -149,7 +149,7 @@ if [[ $HEALTH_CHECKS_FAILED -gt 0 ]]; then
 
   # Build list of failed checks
   FAILED_CHECK_NAMES=""
-  if ! echo "$HEALTH_RESPONSE" | grep -q '"status":"ok"' 2>/dev/null; then
+  if ! echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"' 2>/dev/null; then
     FAILED_CHECK_NAMES="App Health"
   fi
   if ! echo "$DB_RESPONSE" | grep -q '"success":true' 2>/dev/null; then
@@ -334,7 +334,7 @@ $(cat "$HEALTH_METRICS_FILE" 2>/dev/null || echo "No details available")
 **Troubleshooting:**
 - For Stripe issues, check CLAUDE.md troubleshooting section
 - Verify environment variables on Vercel don't have trailing whitespace
-- Test manually: \`curl https://paisaxe.es/api/stripe-test\`"
+- Test manually: \`curl https://paisaxe.es/api/checkout/health\`"
 
     create_journey_failure_issue "Integration Health Check Failures" "$HEALTH_ISSUE_BODY" "" 2>&1 | tee -a "$LOG_FILE" || {
       log_warn "Failed to create health check failure issue" | tee -a "$LOG_FILE"

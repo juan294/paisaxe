@@ -3,9 +3,11 @@ import { renderHook, act } from "@testing-library/react";
 import { useStoryEditorState } from "./use-story-editor-state";
 import type { AdminStory } from "@/types/admin";
 import type { ImageEditorState } from "./use-image-editor";
+import { generateSlug } from "./types";
 
-// Mock useImageEditor
+// Mock useImageEditor — capture the setError callback passed to it (line 33-34 of source)
 const mockResetImageState = vi.fn();
+let capturedSetError: ((e: string) => void) | undefined;
 const mockImageEditor: ImageEditorState = {
   imageSourceTab: "content" as const,
   setImageSourceTab: vi.fn(),
@@ -37,7 +39,10 @@ const mockImageEditor: ImageEditorState = {
 };
 
 vi.mock("./use-image-editor", () => ({
-  useImageEditor: () => mockImageEditor,
+  useImageEditor: (_story: unknown, setError: (e: string) => void) => {
+    capturedSetError = setError;
+    return mockImageEditor;
+  },
 }));
 
 const mockStory: AdminStory = {
@@ -133,6 +138,50 @@ describe("useStoryEditorState", () => {
 
       // Slug should remain the original since slugManuallyEdited defaults to true
       expect(result.current.slug).toBe("test-story");
+    });
+
+    it("auto-generates slug from title when slug not manually edited", async () => {
+      // The slugManuallyEdited state defaults to true in use-story-editor-state.
+      // To test the auto-slug path (line 104), we reset module registry and
+      // mock React's useState so that useState(true) → useState(false).
+      // This is the only useState(true) call in the hook.
+      vi.resetModules();
+
+      vi.doMock("react", async () => {
+        const actual = await vi.importActual<typeof import("react")>("react");
+        const origUseState = actual.useState;
+        return {
+          ...actual,
+          useState: ((initial: unknown) => {
+            if (initial === true) {
+              return origUseState(false);
+            }
+            return origUseState(initial);
+          }) as typeof actual.useState,
+        };
+      });
+
+      // Must also re-mock use-image-editor since we reset modules
+      vi.doMock("./use-image-editor", () => ({
+        useImageEditor: () => mockImageEditor,
+      }));
+
+      // Re-import the hook so it picks up the mocked useState
+      const { useStoryEditorState: patchedHook } = await import("./use-story-editor-state");
+
+      // Use null story so the useEffect doesn't reset slugManuallyEdited to true
+      const { result } = renderHook(() => patchedHook(null));
+
+      act(() => {
+        result.current.handleTitleChange("My New Story");
+      });
+
+      expect(result.current.title).toBe("My New Story");
+      expect(result.current.slug).toBe(generateSlug("My New Story"));
+
+      // Clean up
+      vi.doUnmock("react");
+      vi.doUnmock("./use-image-editor");
     });
   });
 
@@ -262,6 +311,22 @@ describe("useStoryEditorState", () => {
       expect(result.current.activeTab).toBe("details");
       expect(mockResetImageState).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  describe("setErrorStable callback (line 33)", () => {
+    it("sets error state when invoked by useImageEditor", () => {
+      const { result } = renderHook(() => useStoryEditorState(mockStory));
+
+      // The mock captures the setErrorStable callback passed to useImageEditor
+      expect(capturedSetError).toBeDefined();
+
+      // Invoke the captured callback (line 33: useCallback((e: string) => setError(e), []))
+      act(() => {
+        capturedSetError!("Image upload failed");
+      });
+
+      expect(result.current.error).toBe("Image upload failed");
     });
   });
 

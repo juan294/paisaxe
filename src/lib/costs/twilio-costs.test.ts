@@ -220,6 +220,35 @@ describe("twilio-costs", () => {
       expect(result).toEqual([]);
     });
 
+    it("treats non-numeric price as zero", async () => {
+      process.env.TWILIO_ACCOUNT_SID = "AC123";
+      process.env.TWILIO_AUTH_TOKEN = "token123";
+
+      const mockResponse = {
+        usage_records: [
+          { category: "sms", description: "SMS", price: "invalid", price_unit: "USD", count: "0", usage: "0", usage_unit: "messages" },
+        ],
+        end: 0,
+        first_page_uri: "",
+        next_page_uri: null,
+        page: 0,
+        page_size: 50,
+        previous_page_uri: null,
+        start: 0,
+        uri: "",
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await fetchTwilioCostsByDay("2024-01-15", "2024-01-15");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].costUsd).toBe(0);
+    });
+
     it("handles empty usage records", async () => {
       process.env.TWILIO_ACCOUNT_SID = "AC123";
       process.env.TWILIO_AUTH_TOKEN = "token123";

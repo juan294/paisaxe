@@ -176,6 +176,13 @@ describe("useVoiceSession", () => {
     localStorageMock.setItem = originalSetItem;
   });
 
+  // Line 52-53: `if (typeof window === "undefined") return { conversationCount: 0 }`
+  // in getStoredState() is an SSR guard. This branch is unreachable in jsdom because
+  // React DOM itself requires `window` to render. The guard is called inside
+  // useState(getStoredState), and React DOM cannot execute without a window object.
+  // This is a standard SSR safety pattern that can only be covered in a Node.js
+  // server-side rendering environment (e.g., renderToString).
+
   it("should handle localStorage.setItem throwing on resetSession", () => {
     // First set some valid state
     localStorageMock.setItem("paisaxe_voice_session", JSON.stringify({ conversationCount: 3 }));
@@ -199,6 +206,7 @@ describe("useVoiceSession", () => {
     // Restore
     localStorageMock.setItem = originalSetItem;
   });
+
 });
 
 describe("getTimeOfDay", () => {

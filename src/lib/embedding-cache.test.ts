@@ -81,4 +81,9 @@ describe("EmbeddingCache", () => {
     expect(cache.size).toBe(1);
     expect(cache.get("test")).toEqual([4, 5, 6]);
   });
+
+  // NOTE: embedding-cache.ts line 55 (`if (firstKey !== undefined)`) has an
+  // uncovered false branch. This guard is defensive: when `cache.size >= maxSize`,
+  // `cache.keys().next().value` will always return a defined key because the Map
+  // is non-empty. The `undefined` check is unreachable during normal operation.
 });

@@ -3,7 +3,7 @@
 # Analyzes bundle sizes, identifies optimization opportunities, tracks regressions
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/Documents/code/paisaxe"
+PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/performance-agent-$(date +%Y-%m-%d).log"

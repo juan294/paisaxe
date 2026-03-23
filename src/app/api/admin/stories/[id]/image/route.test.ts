@@ -616,6 +616,25 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
   });
 
+  describe("content-type fallback", () => {
+    it("should default to empty string when content-type header is missing and handle body parsing error", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      vi.mocked(createAdminClient).mockReturnValue({ from: vi.fn() } as never);
+
+      // Request with NO body — content-type is null, triggering || "" fallback
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        // No body, no content-type => content-type is null => falls to "" via || ""
+      });
+
+      const response = await PUT(request, mockParams);
+
+      // Falls into the JSON path (non-multipart), request.json() throws => caught by outer catch
+      expect(response.status).toBe(500);
+      expect((await response.json()).error).toBe("Internal server error");
+    });
+  });
+
   describe("database errors", () => {
     it("should return 404 when story not found", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });

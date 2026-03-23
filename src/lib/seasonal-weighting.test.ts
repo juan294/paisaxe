@@ -91,4 +91,16 @@ describe("applySeasonalWeighting", () => {
     expect(result.boostedCount).toBe(0);
     expect(result.stories.map((s) => s.id)).toEqual(["x1", "x2"]);
   });
+
+  it("should default to current month when currentMonth is omitted", () => {
+    const currentMonth = new Date().getMonth() + 1; // 1-12
+    const testStories: Story[] = [
+      makeStory({ id: "m1", title: "Current Month", bestMonths: [currentMonth] }),
+      makeStory({ id: "m2", title: "Other" }),
+    ];
+
+    const result = applySeasonalWeighting(testStories);
+    expect(result.boostedCount).toBe(1);
+    expect(result.stories[0].id).toBe("m1");
+  });
 });

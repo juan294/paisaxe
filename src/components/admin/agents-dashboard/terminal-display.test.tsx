@@ -277,6 +277,33 @@ describe("AgentTerminal", () => {
         expect(container.querySelector(".lucide-check")).toBeInTheDocument();
       });
     });
+
+    it("resets check icon back to copy icon after 2s timeout (line 91)", async () => {
+      vi.useRealTimers();
+      const user = userEvent.setup();
+
+      const { container } = render(<AgentTerminal {...defaultProps} />);
+
+      // Before clicking: Copy icon is shown
+      expect(container.querySelector(".lucide-copy")).toBeInTheDocument();
+
+      // Click copy button
+      await user.click(screen.getByLabelText("Copy terminal output"));
+
+      // After clicking: Check icon appears
+      await waitFor(() => {
+        expect(container.querySelector(".lucide-check")).toBeInTheDocument();
+      });
+
+      // Wait for the 2s setTimeout callback at line 91 to fire
+      await waitFor(
+        () => {
+          expect(container.querySelector(".lucide-copy")).toBeInTheDocument();
+          expect(container.querySelector(".lucide-check")).not.toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
+    });
   });
 
   describe("auto-scroll", () => {

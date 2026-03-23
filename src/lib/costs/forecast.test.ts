@@ -154,4 +154,13 @@ describe("computeForecasts", () => {
     const forecasts = computeForecasts(mockServices, zeroDay);
     expect(forecasts).toHaveLength(3);
   });
+
+  it("should use fallback labels for multipliers beyond the 3 named ones", () => {
+    const forecasts = computeForecasts(mockServices, mockUsage, [1, 3, 10, 50]);
+    expect(forecasts).toHaveLength(4);
+    expect(forecasts[0].label).toBe("Current");
+    expect(forecasts[1].label).toBe("3x Growth");
+    expect(forecasts[2].label).toBe("10x Growth");
+    expect(forecasts[3].label).toBe("50x");
+  });
 });

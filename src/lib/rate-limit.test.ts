@@ -85,6 +85,26 @@ describe("rate-limit", () => {
       expect(getRateLimitStore().size).toBeLessThanOrEqual(10_000);
     });
 
+    it("deletes expired entries when store exceeds maxEntries", async () => {
+      const config = { windowMs: 1_000, maxRequests: 10, maxEntries: 3 };
+
+      // Add 3 entries to fill the store
+      await checkRateLimit("a", config);
+      await checkRateLimit("b", config);
+      await checkRateLimit("c", config);
+      expect(getRateLimitStore().size).toBe(3);
+
+      // Expire all entries by advancing past the window
+      vi.advanceTimersByTime(1_001);
+
+      // Adding a new entry should trigger cleanup of the expired entries
+      await checkRateLimit("d", config);
+
+      // The expired entries should have been deleted, leaving only "d"
+      expect(getRateLimitStore().has("d")).toBe(true);
+      expect(getRateLimitStore().size).toBeLessThanOrEqual(3);
+    });
+
     it("resetRateLimit clears all entries", async () => {
       await checkRateLimit("user1");
       await checkRateLimit("user2");

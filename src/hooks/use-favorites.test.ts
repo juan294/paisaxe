@@ -125,6 +125,25 @@ describe("useFavorites", () => {
       expect(result.current.favorites).toEqual([]);
     });
 
+    it("should handle invalid JSON in localStorage for logged-in users (catch branch)", async () => {
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
+      localStorageMock.getItem.mockReturnValue("not-valid-json{{{");
+
+      // Mock the cloud sync to avoid secondary effects
+      mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // The catch block on line 35-37 sets favorites to []
+      expect(result.current.favorites).toEqual([]);
+    });
+
     it("should handle non-array values in localStorage", async () => {
       localStorageMock.getItem.mockReturnValue(
         JSON.stringify({ not: "an array" })
@@ -136,6 +155,30 @@ describe("useFavorites", () => {
         expect(result.current.isLoading).toBe(false);
       });
 
+      expect(result.current.favorites).toEqual([]);
+    });
+
+    it("should handle non-array values in localStorage for logged-in user (line 34 branch)", async () => {
+      // Line 34: setFavorites(Array.isArray(parsed) ? parsed : [])
+      // When localStorage contains valid JSON that is not an array (e.g., an object),
+      // favorites should be set to [].
+      mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
+      mockAuthReturn.session = { access_token: "test-token" };
+
+      localStorageMock.getItem.mockReturnValue(
+        JSON.stringify({ not: "an array" })
+      );
+
+      // Mock the cloud sync to avoid secondary effects
+      mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      // The non-array value should be replaced with []
       expect(result.current.favorites).toEqual([]);
     });
   });

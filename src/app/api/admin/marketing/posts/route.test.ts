@@ -44,14 +44,12 @@ vi.mock("@/lib/supabase", () => ({
                     mockSupabaseEq(...eqArgs2);
                     return {
                       limit: (...limitArgs: unknown[]) => {
-                        mockSupabaseLimit(...limitArgs);
-                        return Promise.resolve({ data: [], error: null });
+                        return mockSupabaseLimit(...limitArgs);
                       },
                     };
                   },
                   limit: (...limitArgs: unknown[]) => {
-                    mockSupabaseLimit(...limitArgs);
-                    return Promise.resolve({ data: [], error: null });
+                    return mockSupabaseLimit(...limitArgs);
                   },
                 };
               },
@@ -71,6 +69,7 @@ describe("/api/admin/marketing/posts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Set up default mock responses
+    mockSupabaseLimit.mockReturnValue(Promise.resolve({ data: [], error: null }));
     mockGetDrafts.mockResolvedValue([]);
     mockCreateDraft.mockResolvedValue({
       success: true,
@@ -141,6 +140,53 @@ describe("/api/admin/marketing/posts", () => {
 
       expect(mockSupabaseEq).toHaveBeenCalledWith("status", "posted");
       expect(mockSupabaseEq).toHaveBeenCalledWith("platform", "instagram");
+    });
+
+    it("should return 500 when supabase query returns error", async () => {
+      // Make limit() return an error for this test
+      mockSupabaseLimit.mockReturnValueOnce(
+        Promise.resolve({ data: null, error: { message: "DB error" } })
+      );
+
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/posts?status=posted"
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to fetch posts");
+    });
+
+    it("should return empty array when supabase returns null data", async () => {
+      mockSupabaseLimit.mockReturnValueOnce(
+        Promise.resolve({ data: null, error: null })
+      );
+
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/posts?status=posted"
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data).toEqual([]);
+    });
+
+    it("should return 500 on unexpected error", async () => {
+      // Make limit() throw to trigger the outer catch block
+      mockSupabaseLimit.mockReturnValueOnce(
+        Promise.reject(new Error("Unexpected failure"))
+      );
+
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/posts?status=posted"
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
     });
   });
 
@@ -380,6 +426,27 @@ describe("/api/admin/marketing/posts", () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
+    });
+
+    it("should handle mark-posted with invalid JSON body gracefully", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/posts?id=post-1&action=mark-posted",
+        {
+          method: "PATCH",
+          body: "not valid json",
+        }
+      );
+      const response = await PATCH(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      // .catch(() => ({})) provides empty object, so platformPostId and postUrl are undefined
+      expect(mockMarkAsPosted).toHaveBeenCalledWith({
+        postId: "post-1",
+        platformPostId: undefined,
+        postUrl: undefined,
+      });
     });
   });
 

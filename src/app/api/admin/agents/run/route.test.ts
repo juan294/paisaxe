@@ -165,8 +165,10 @@ describe("POST /api/admin/agents/run", () => {
     Object.assign(mockChild, { pid: undefined });
     mockSpawn.mockReturnValue(mockChild);
 
+    // Use a different agentKey to avoid 409 from the in-memory runningAgents Map
+    // (previous test registered qa_agent_enabled and the Map persists across tests)
     const response = await POST(
-      makeRequest({ agentKey: "qa_agent_enabled" })
+      makeRequest({ agentKey: "coverage_agent_enabled" })
     );
     expect(response.status).toBe(500);
     const data = await response.json();

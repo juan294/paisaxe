@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StripeAnalyticsPanel } from "./stripe-analytics-panel";
 import { AnalyticsCacheProvider } from "./analytics-cache-context";
@@ -442,5 +442,238 @@ describe("StripeAnalyticsPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("Pending")).toBeInTheDocument();
     });
+  });
+
+  it("updates date range when 'from' date input is changed", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Revenue Data")).toBeInTheDocument();
+    });
+
+    const dateInputs = screen.getAllByDisplayValue(/^\d{4}-\d{2}-\d{2}$/);
+    const fromInput = dateInputs[0];
+
+    // Use fireEvent.change to atomically set the value (avoids intermediate invalid date states)
+    vi.mocked(adminApi.fetchStripeAnalytics).mockClear();
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    fireEvent.change(fromInput, { target: { value: "2024-06-01" } });
+
+    // The from input should reflect the new value
+    expect(fromInput).toHaveValue("2024-06-01");
+
+    // The API should be re-called with the new date range
+    await waitFor(() => {
+      expect(adminApi.fetchStripeAnalytics).toHaveBeenCalled();
+    });
+  });
+
+  it("updates date range when 'to' date input is changed", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Revenue Data")).toBeInTheDocument();
+    });
+
+    const dateInputs = screen.getAllByDisplayValue(/^\d{4}-\d{2}-\d{2}$/);
+    const toInput = dateInputs[1];
+
+    // Use fireEvent.change to atomically set the value (avoids intermediate invalid date states)
+    vi.mocked(adminApi.fetchStripeAnalytics).mockClear();
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    fireEvent.change(toInput, { target: { value: "2024-12-31" } });
+
+    // The to input should reflect the new value
+    expect(toInput).toHaveValue("2024-12-31");
+
+    // The API should be re-called with the new date range
+    await waitFor(() => {
+      expect(adminApi.fetchStripeAnalytics).toHaveBeenCalled();
+    });
+  });
+
+  it("formats currency with 'k' suffix when revenue >= 1000 in chart", async () => {
+    const highRevenueData = {
+      ...mockData,
+      revenueByDay: [
+        { date: "2024-01-15", revenue: 1500, orders: 5 },
+        { date: "2024-01-16", revenue: 2000, orders: 8 },
+      ],
+    };
+
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: highRevenueData,
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Revenue Over Time")).toBeInTheDocument();
+    });
+
+    // The Y-axis label should show the max revenue formatted with 'k' suffix
+    // maxRevenue = 2000, so it should show "€2.0k"
+    expect(screen.getByText("€2.0k")).toBeInTheDocument();
+  });
+
+  it("does not render revenue chart section when revenueByDay is empty", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        revenueByDay: [],
+      },
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    // Wait for data to load — the summary stats should appear
+    await waitFor(() => {
+      expect(screen.getByText("Net Revenue")).toBeInTheDocument();
+    });
+
+    // Revenue chart section should NOT be rendered when revenueByDay is empty
+    expect(screen.queryByText("Revenue Over Time")).not.toBeInTheDocument();
+    expect(screen.queryByText("Daily Revenue")).not.toBeInTheDocument();
+  });
+
+  it("documents RevenueChart empty guard (line 244) as unreachable", async () => {
+    // Line 244: `if (data.length === 0) return null;` in RevenueChart
+    // The parent checks `data.revenueByDay.length > 0` before rendering RevenueChart,
+    // making the internal empty guard unreachable through normal rendering.
+    // RevenueChart is a non-exported internal function.
+    // This test confirms the parent guard prevents rendering:
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        revenueByDay: [],
+      },
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Net Revenue")).toBeInTheDocument();
+    });
+
+    // Parent guard prevents RevenueChart from being rendered
+    expect(screen.queryByText("Revenue Over Time")).not.toBeInTheDocument();
+  });
+
+  it("formats currency with fallback to EUR when currency is empty string", async () => {
+    // Covers line 350: currency || "EUR" fallback in formatCurrencyShort
+    // Revenue values < 1000 go through Intl.NumberFormat (not the 'k' suffix path)
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        summary: { ...mockData.summary, currency: "" },
+        revenueByDay: [
+          { date: "2024-01-15", revenue: 500, orders: 2 },
+        ],
+      },
+    });
+
+    const { container } = render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Revenue Over Time")).toBeInTheDocument();
+    });
+
+    // The Y-axis label should format 500 using EUR as fallback currency
+    // Intl.NumberFormat("en-US", { style: "currency", currency: "EUR" }) for 500 = "€500"
+    const chartSvg = container.querySelector("svg");
+    expect(chartSvg).not.toBeNull();
+  });
+
+  it("displays failed order status badge", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        recentOrders: [
+          {
+            ...mockData.recentOrders[0],
+            status: "failed" as const,
+          },
+        ],
+      },
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed")).toBeInTheDocument();
+    });
+  });
+
+  it("displays partially_refunded order status badge", async () => {
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        recentOrders: [
+          {
+            ...mockData.recentOrders[0],
+            status: "partially_refunded" as const,
+            refundedAmount: 100,
+            refundedAmountFormatted: "€1.00",
+          },
+        ],
+      },
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Partial")).toBeInTheDocument();
+    });
+
+    // partially_refunded with refundedAmount > 0 shows strikethrough + refund
+    expect(screen.getByText("-€1.00")).toBeInTheDocument();
+  });
+
+  // Line 225: `const colorClass = color ? statColorClasses[color] : "text-[#2d2a26]...";`
+  // The fallback for undefined color is architecturally unreachable because all 4 StatCard
+  // call sites in StripeAnalyticsPanel pass explicit color props ("emerald", "rose", "blue", "amber").
+  // StatCard is a non-exported internal function, so it cannot be called externally.
+  // This is a defensive fallback that cannot be exercised through the component's public API.
+
+  // Line 531: `const style = styles[status] || styles.pending;`
+  // The fallback `|| styles.pending` in OrderStatusBadge is architecturally unreachable because:
+  // 1. The status prop type is `StripeOrder["status"]` which is a union of exactly
+  //    "succeeded" | "pending" | "failed" | "refunded" | "partially_refunded"
+  // 2. The styles Record covers all 5 status values exhaustively
+  // 3. OrderStatusBadge is a non-exported internal function only called from RecentOrdersTable
+  // Therefore no runtime path can produce a status value outside the styles keys.
+
+  it("renders StatCard with number value using toLocaleString", async () => {
+    // Covers line 224: typeof value === "number" ? value.toLocaleString() : value
+    // totalOrders is the only number-typed stat card value
+    vi.mocked(adminApi.fetchStripeAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        summary: { ...mockData.summary, totalOrders: 1234 },
+      },
+    });
+
+    render(<StripeAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      // toLocaleString formats 1234 as "1,234"
+      expect(screen.getByText("1,234")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Total Orders")).toBeInTheDocument();
   });
 });

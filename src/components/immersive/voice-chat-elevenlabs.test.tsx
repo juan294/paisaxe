@@ -557,6 +557,118 @@ describe("VoiceChatElevenLabs", () => {
     });
   });
 
+  describe("onMessage with empty message (line 136 false branch)", () => {
+    it("should not add a message when message.message is falsy", async () => {
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connected",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+        };
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Simulate a message with no message text (empty/undefined)
+      act(() => {
+        conversationHandlers.onMessage?.({ source: "ai" });
+      });
+
+      // No transcript section should appear since no message was added
+      expect(screen.queryByText("Pelayo:")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("language override for non-Spanish (line 185)", () => {
+    it("should set language override to 'en' when preferredLanguage is not Spanish", async () => {
+      // Override voice session mock to return English preference
+      const voiceSessionModule = await import("@/hooks/use-voice-session");
+      vi.spyOn(voiceSessionModule, "useVoiceSession").mockReturnValue({
+        conversationCount: 2,
+        isReturning: true,
+        userLocale: "en-US",
+        preferredLanguage: "English" as "Spanish" | "English",
+        timeOfDay: "afternoon" as "morning" | "afternoon" | "evening",
+        incrementConversation: mockIncrementConversation,
+        resetSession: vi.fn(),
+      });
+
+      mockStartSession.mockResolvedValue(undefined);
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent-123"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(mockStartSession).toHaveBeenCalledWith(
+          expect.objectContaining({
+            overrides: {
+              agent: {
+                language: "en",
+              },
+            },
+            dynamicVariables: expect.objectContaining({
+              preferred_language: "English",
+              is_returning: "true",
+              conversation_count: "2",
+            }),
+          })
+        );
+      });
+
+      vi.restoreAllMocks();
+    });
+  });
+
+  describe("story category/location fallbacks (lines 195-196)", () => {
+    it("should use 'general' when story has no category and 'Asturias' when no location", async () => {
+      mockStartSession.mockResolvedValue(undefined);
+
+      const storyWithoutCategoryLocation: Story = {
+        ...mockStory,
+        category: undefined as unknown as Story["category"],
+        location: undefined,
+      };
+
+      render(
+        <VoiceChatElevenLabs
+          story={storyWithoutCategoryLocation}
+          agentId="test-agent-123"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(mockStartSession).toHaveBeenCalledWith(
+          expect.objectContaining({
+            dynamicVariables: expect.objectContaining({
+              story_category: "general",
+              story_location: "Asturias",
+            }),
+          })
+        );
+      });
+    });
+  });
+
   describe("endConversation error handling", () => {
     it("should handle endSession throwing an error gracefully", async () => {
       mockEndSession.mockRejectedValue(new Error("disconnect failed"));

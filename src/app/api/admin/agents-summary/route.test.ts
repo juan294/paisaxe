@@ -431,6 +431,204 @@ describe("GET /api/admin/agents-summary", () => {
     consoleSpy.mockRestore();
   });
 
+  it("should parse 'Status: HEALTHY' as green health (Pattern 2)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("cost-analyst-report.md")) {
+        return [
+          "# Cost Analyst Report",
+          "",
+          "**Financial health: HEALTHY**",
+          "",
+          "## Executive Summary",
+          "All costs within budget.",
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\n## Executive Summary\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const costAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "cost_analyst_agent_enabled"
+    );
+    expect(costAgent.health).toBe("green");
+  });
+
+  it("should parse '**Status:** Complete' as green health (Pattern 3)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("localization-report.md")) {
+        return [
+          "# Localization Report",
+          "",
+          "**Status:** Complete",
+          "",
+          "## Executive Summary",
+          "All translations up to date.",
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\n## Executive Summary\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const locAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "localization_agent_enabled"
+    );
+    expect(locAgent.health).toBe("green");
+  });
+
+  it("should use fallback heading paragraph for health summary when no standard summary patterns match", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("coverage-report.md")) {
+        // No "Executive Summary", no health status line, no "Summary" heading.
+        // Has a ## heading followed by a plain paragraph (not a table/code).
+        return [
+          "# Coverage Report",
+          "",
+          "## Results",
+          "",
+          "All 500 tests passed with no regressions detected in the suite.",
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\n## Executive Summary\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const coverageAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "coverage_agent_enabled"
+    );
+    expect(coverageAgent.healthSummary).toContain("All 500 tests passed");
+  });
+
+  it("should truncate health summary sentences longer than 120 characters", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    const longSentence = "A".repeat(150);
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("coverage-report.md")) {
+        return [
+          "# Coverage Report",
+          "",
+          "## Executive Summary",
+          "",
+          longSentence,
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\n## Executive Summary\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const coverageAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "coverage_agent_enabled"
+    );
+    // 117 chars + "..." = 120 chars total
+    expect(coverageAgent.healthSummary).toHaveLength(120);
+    expect(coverageAgent.healthSummary.endsWith("...")).toBe(true);
+  });
+
+  it("should compute overall health as yellow when any agent is unknown", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    // Some agents report unknown health (file not found), others green
+    mockStat.mockImplementation(async (filePath: string) => {
+      if (typeof filePath === "string" && filePath.includes("coverage-report.md")) {
+        throw new Error("ENOENT"); // This agent will have "unknown" health
+      }
+      return { mtime: new Date("2026-02-01T10:00:00Z") };
+    });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("coverage-report.md")) {
+        throw new Error("ENOENT");
+      }
+      return "## Health Status: GREEN\n\n## Executive Summary\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // One agent is unknown, so overall should be yellow
+    expect(data.data.overallHealth).toBe("yellow");
+  });
+
+  it("should parse health summary from line after health status when no executive summary exists", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("coverage-report.md")) {
+        return [
+          "# Coverage Report",
+          "",
+          "## Health Status: GREEN",
+          "",
+          "All 2800 tests passing with comprehensive coverage across modules.",
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\n## Executive Summary\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const coverageAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "coverage_agent_enabled"
+    );
+    expect(coverageAgent.healthSummary).toContain("All 2800 tests passing");
+  });
+
   it("should set Cache-Control header", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,

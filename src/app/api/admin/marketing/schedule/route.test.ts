@@ -275,10 +275,22 @@ describe("/api/admin/marketing/schedule", () => {
       expect(data.error).toContain("Invalid contentType");
     });
 
-    it("should return 400 for invalid dayOfWeek", async () => {
+    it("should return 400 for dayOfWeek greater than 6", async () => {
       const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
         method: "POST",
         body: JSON.stringify({ platform: "x", timeUtc: "14:00", dayOfWeek: 7 }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("Invalid dayOfWeek");
+    });
+
+    it("should return 400 for negative dayOfWeek in POST", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/schedule", {
+        method: "POST",
+        body: JSON.stringify({ platform: "x", timeUtc: "14:00", dayOfWeek: -1 }),
       });
       const response = await POST(request);
       const data = await response.json();
@@ -490,12 +502,27 @@ describe("/api/admin/marketing/schedule", () => {
       expect(data.error).toContain("Invalid contentType");
     });
 
-    it("should return 400 for invalid dayOfWeek", async () => {
+    it("should return 400 for dayOfWeek greater than 6", async () => {
       const request = new NextRequest(
         "http://localhost/api/admin/marketing/schedule?id=schedule-1",
         {
           method: "PUT",
           body: JSON.stringify({ dayOfWeek: 10 }),
+        }
+      );
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain("Invalid dayOfWeek");
+    });
+
+    it("should return 400 for negative dayOfWeek", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({ dayOfWeek: -1 }),
         }
       );
       const response = await PUT(request);
@@ -520,6 +547,20 @@ describe("/api/admin/marketing/schedule", () => {
       expect(data.data).toBeDefined();
       expect(mockUpdate).toHaveBeenCalledWith({ time_utc: "15:00" });
       expect(mockEq).toHaveBeenCalledWith("id", "schedule-1");
+    });
+
+    it("should update contentType successfully", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/schedule?id=schedule-1",
+        {
+          method: "PUT",
+          body: JSON.stringify({ contentType: "photo_caption" }),
+        }
+      );
+      const response = await PUT(request);
+
+      expect(response.status).toBe(200);
+      expect(mockUpdate).toHaveBeenCalledWith({ content_type: "photo_caption" });
     });
 
     it("should update isActive successfully", async () => {
