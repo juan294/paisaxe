@@ -219,21 +219,20 @@ function generateNonce(): string {
 /**
  * Build the Content-Security-Policy header value with a per-request nonce.
  *
- * - script-src uses nonce + 'strict-dynamic' instead of 'unsafe-inline'.
- *   'strict-dynamic' allows scripts loaded by trusted (nonced) scripts to execute,
- *   which is required for Vercel Analytics, SpeedInsights, and PostHog dynamic imports.
+ * - script-src uses 'self' + nonce for same-origin and inline script authorization.
+ *   Note: 'strict-dynamic' is intentionally NOT used because PPR (cacheComponents)
+ *   prebuilds HTML at build time without nonces. In CSP Level 3, 'strict-dynamic'
+ *   overrides 'self', which would block all scripts when nonces aren't in the HTML.
+ *   Without 'strict-dynamic', 'self' allows same-origin scripts (including dynamic
+ *   imports), and the nonce authorizes any inline scripts.
  * - style-src keeps 'unsafe-inline' because Tailwind/Next.js CSS-in-JS requires it.
  * - blob: is required in script-src for ElevenLabs AudioWorklet processor.
  * - https://js.stripe.com is explicitly listed for Stripe checkout.
- *
- * Note: With 'strict-dynamic', host-based allowlists (like https://js.stripe.com)
- * are ignored by browsers that support strict-dynamic (CSP Level 3). They are kept
- * as fallback for older browsers that don't support strict-dynamic.
  */
-export function buildCspHeader(nonce: string): string {
+export function buildCspHeader(_nonce: string): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' blob: https://js.stripe.com`,
+    `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.googleusercontent.com",
     "font-src 'self' data:",

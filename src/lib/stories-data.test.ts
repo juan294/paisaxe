@@ -279,6 +279,7 @@ describe("stories-data", () => {
   describe("getStoriesFromDB", () => {
     beforeEach(() => {
       vi.clearAllMocks();
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
     });
 
     it("should return stories from database when successful", async () => {
@@ -347,6 +348,7 @@ describe("stories-data", () => {
   describe("getStoriesByCategoryFromDB", () => {
     beforeEach(() => {
       vi.clearAllMocks();
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
     });
 
     it("should call getStoriesFromDB when category is null", async () => {
@@ -417,6 +419,7 @@ describe("stories-data", () => {
   describe("getStoriesByLocationFromDB", () => {
     beforeEach(() => {
       vi.clearAllMocks();
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
     });
 
     it("should return stories filtered by location from database", async () => {
@@ -476,6 +479,7 @@ describe("stories-data", () => {
   describe("getStoriesByDurationFromDB", () => {
     beforeEach(() => {
       vi.clearAllMocks();
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
     });
 
     it("should return stories filtered by duration from database", async () => {
@@ -535,6 +539,7 @@ describe("stories-data", () => {
   describe("getStoryBySlugFromDB", () => {
     beforeEach(() => {
       vi.clearAllMocks();
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
     });
 
     it("should return story from database when found", async () => {

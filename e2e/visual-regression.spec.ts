@@ -1,4 +1,5 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect } from "./fixtures/base-test";
+import type { Page } from "@playwright/test";
 import { MOCK_FEATURE_FLAGS } from "./fixtures/mock-data";
 
 /**

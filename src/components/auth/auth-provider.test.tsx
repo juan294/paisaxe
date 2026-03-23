@@ -81,6 +81,7 @@ describe("AuthProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupDefaultMocks();
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
   });
 
   it("renders children", async () => {
@@ -486,6 +487,7 @@ describe("useAuthContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupDefaultMocks();
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
   });
 
   it("throws when used outside AuthProvider", () => {
