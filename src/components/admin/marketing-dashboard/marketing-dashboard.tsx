@@ -138,9 +138,9 @@ export function MarketingDashboard() {
       <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">Admin / Marketing</p>
-          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+          <h2 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
             Marketing Automation
-          </h1>
+          </h2>
         </div>
         <button
           onClick={loadData}

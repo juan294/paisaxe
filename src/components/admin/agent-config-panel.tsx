@@ -122,7 +122,7 @@ export function AgentConfigPanel({ flag, onUpdate }: AgentConfigPanelProps) {
             setSaved(false);
           }}
           rows={12}
-          className="w-full resize-y border border-[#e5e3de] bg-transparent px-4 py-3 font-mono text-xs leading-relaxed text-[#2d2a26] placeholder-[#a39e98] focus:border-[#c9a55c] focus:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
+          className="w-full resize-y border border-[#e5e3de] bg-transparent px-4 py-3 font-mono text-xs leading-relaxed text-[#2d2a26] placeholder-[#a39e98] focus-visible:border-[#c9a55c] focus-visible:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
           placeholder="Enter the prompt/instructions for this agent..."
         />
         <p className="text-xs text-[#6b6560] dark:text-[#a39e98]">

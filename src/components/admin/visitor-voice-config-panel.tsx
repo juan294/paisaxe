@@ -105,7 +105,7 @@ export function VisitorVoiceConfigPanel({
           value={agentId}
           onChange={(e) => setAgentId(e.target.value)}
           placeholder="Enter agent ID from ElevenLabs dashboard"
-          className="w-full border border-[#e5e3de] bg-transparent px-4 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] focus:border-[#a39e98] focus:outline-none focus:ring-1 focus:ring-[#c9a55c] dark:border-[#3d3a36] dark:text-[#f5f3ee]"
+          className="w-full border border-[#e5e3de] bg-transparent px-4 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] focus-visible:border-[#a39e98] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:border-[#3d3a36] dark:text-[#f5f3ee]"
         />
       </div>
 
@@ -123,7 +123,7 @@ export function VisitorVoiceConfigPanel({
             onChange={(e) => setNewEmail(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="user@example.com"
-            className="flex-1 border border-[#e5e3de] bg-transparent px-4 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] focus:border-[#a39e98] focus:outline-none focus:ring-1 focus:ring-[#c9a55c] dark:border-[#3d3a36] dark:text-[#f5f3ee]"
+            className="flex-1 border border-[#e5e3de] bg-transparent px-4 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] focus-visible:border-[#a39e98] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:border-[#3d3a36] dark:text-[#f5f3ee]"
           />
           <button
             type="button"
