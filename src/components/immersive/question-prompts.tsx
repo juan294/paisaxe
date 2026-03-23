@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
 
 interface QuestionPromptsProps {
   prompts: string[];
@@ -9,6 +10,8 @@ interface QuestionPromptsProps {
 }
 
 export function QuestionPrompts({ prompts, storyId: _storyId, onSelectPrompt }: QuestionPromptsProps) {
+  const { t } = useTranslation();
+
   if (!prompts || prompts.length === 0) return null;
 
   const handleClick = (prompt: string) => {
@@ -16,7 +19,7 @@ export function QuestionPrompts({ prompts, storyId: _storyId, onSelectPrompt }: 
   };
 
   return (
-    <div role="group" aria-label="Preguntas sugeridas" className="flex flex-wrap gap-2 mt-3">
+    <div role="group" aria-label={t("accessibility.suggested_questions")} className="flex flex-wrap gap-2 mt-3">
       {prompts.slice(0, 3).map((prompt) => (
         <button
           key={prompt}
