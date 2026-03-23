@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/base-test";
 
 test.describe("Smoke tests", () => {
   test("/ redirects to /immersive", async ({ page }) => {

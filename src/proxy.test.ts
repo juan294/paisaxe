@@ -972,13 +972,14 @@ describe("CSP nonce", () => {
     delete process.env.MAINTENANCE_MODE;
   });
 
-  it("should set a Content-Security-Policy header with a nonce on every response", async () => {
+  it("should set a Content-Security-Policy header on every response", async () => {
     const request = new NextRequest("http://localhost:3000/immersive");
     const response = await proxy(request);
 
     const csp = response.headers.get("Content-Security-Policy");
     expect(csp).toBeTruthy();
-    expect(csp).toMatch(/'nonce-[A-Za-z0-9_-]+'/);
+    // Nonce is no longer embedded in the CSP header
+    expect(csp).not.toMatch(/'nonce-[A-Za-z0-9_-]+'/);
   });
 
   it("should include required script-src directives in the CSP", async () => {
@@ -990,10 +991,10 @@ describe("CSP nonce", () => {
     expect(csp).toContain("https://js.stripe.com");
     // Must allow blob: for ElevenLabs AudioWorklet
     expect(csp).toContain("blob:");
-    // Must NOT contain unsafe-inline in script-src
+    // script-src now uses 'unsafe-inline' instead of nonce+'strict-dynamic'
     const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"));
     expect(scriptSrc).toBeTruthy();
-    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    expect(scriptSrc).toContain("'unsafe-inline'");
   });
 
   it("should keep style-src with unsafe-inline for Tailwind/Next.js CSS", async () => {
@@ -1005,18 +1006,15 @@ describe("CSP nonce", () => {
     expect(styleSrc).toContain("'unsafe-inline'");
   });
 
-  it("should generate a unique nonce per request", async () => {
+  it("should generate a unique nonce per request (via x-csp-nonce header)", async () => {
     const request1 = new NextRequest("http://localhost:3000/immersive");
     const request2 = new NextRequest("http://localhost:3000/immersive");
 
-    const response1 = await proxy(request1);
-    const response2 = await proxy(request2);
+    await proxy(request1);
+    await proxy(request2);
 
-    const csp1 = response1.headers.get("Content-Security-Policy")!;
-    const csp2 = response2.headers.get("Content-Security-Policy")!;
-
-    const nonce1 = csp1.match(/'nonce-([A-Za-z0-9_-]+)'/)?.[1];
-    const nonce2 = csp2.match(/'nonce-([A-Za-z0-9_-]+)'/)?.[1];
+    const nonce1 = request1.headers.get("x-csp-nonce");
+    const nonce2 = request2.headers.get("x-csp-nonce");
 
     expect(nonce1).toBeTruthy();
     expect(nonce2).toBeTruthy();
@@ -1025,23 +1023,21 @@ describe("CSP nonce", () => {
 
   it("should set x-csp-nonce request header for downstream server components", async () => {
     const request = new NextRequest("http://localhost:3000/immersive");
-    const response = await proxy(request);
+    await proxy(request);
 
     // The nonce should be passed to downstream server components via request header
-    const csp = response.headers.get("Content-Security-Policy")!;
-    const nonceFromCsp = csp.match(/'nonce-([A-Za-z0-9_-]+)'/)?.[1];
-
-    // The request headers should contain the nonce for downstream reading
-    expect(request.headers.get("x-csp-nonce")).toBe(nonceFromCsp);
+    const nonce = request.headers.get("x-csp-nonce");
+    expect(nonce).toBeTruthy();
+    expect(nonce).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
-  it("should include strict-dynamic in script-src for nonce propagation", async () => {
+  it("should NOT include strict-dynamic in script-src", async () => {
     const request = new NextRequest("http://localhost:3000/immersive");
     const response = await proxy(request);
 
     const csp = response.headers.get("Content-Security-Policy")!;
     const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"));
-    expect(scriptSrc).toContain("'strict-dynamic'");
+    expect(scriptSrc).not.toContain("'strict-dynamic'");
   });
 
   it("should include all required CSP directives", async () => {

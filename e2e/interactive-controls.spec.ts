@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/base-test";
 import {
   withFeatureFlags,
   MOCK_SUGGESTION_RESPONSE,

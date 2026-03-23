@@ -15,6 +15,12 @@ export const FALLBACK_STORIES: Story[] = fallbackStoriesData.stories as Story[];
  * Falls back to hardcoded stories if database is unavailable
  */
 export async function getStoriesFromDB(): Promise<Story[]> {
+  // Skip fetch with dummy credentials (CI/E2E) — real Supabase anon keys are JWTs starting with 'eyJ'
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!key || !key.startsWith("eyJ")) {
+    return FALLBACK_STORIES;
+  }
+
   try {
     const { data, error } = await supabase
       .from("stories")
