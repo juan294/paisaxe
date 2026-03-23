@@ -1,6 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { QuestionPrompts } from "./question-prompts";
+import { createMockT } from "@/test/i18n-mock";
+
+// Use a sentinel value for the aria-label key to prove the component calls t()
+// instead of using a hardcoded Spanish string
+const SENTINEL = "__I18N_SUGGESTED_QUESTIONS__";
+const mockT = (key: string) => {
+  if (key === "accessibility.suggested_questions") return SENTINEL;
+  return createMockT()(key);
+};
+
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    locale: "es",
+    setLocale: vi.fn(),
+    t: (key: string) => mockT(key),
+  }),
+}));
 
 describe("QuestionPrompts", () => {
   const mockOnSelectPrompt = vi.fn();
@@ -81,5 +98,15 @@ describe("QuestionPrompts", () => {
       <QuestionPrompts prompts={["Single prompt"]} storyId="test-1" onSelectPrompt={mockOnSelectPrompt} />
     );
     expect(screen.getByText("Single prompt")).toBeInTheDocument();
+  });
+
+  it("uses translated aria-label from t('accessibility.suggested_questions')", () => {
+    render(
+      <QuestionPrompts prompts={defaultPrompts} storyId="test-1" onSelectPrompt={mockOnSelectPrompt} />
+    );
+    const group = screen.getByRole("group");
+    // If the component uses t(), the aria-label will be the sentinel value
+    // If it uses a hardcoded string, it will be "Preguntas sugeridas" and this fails
+    expect(group).toHaveAttribute("aria-label", SENTINEL);
   });
 });
