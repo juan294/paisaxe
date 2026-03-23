@@ -263,6 +263,8 @@ ANTHROPIC_API_KEY=       # Claude API
 VOYAGE_API_KEY=          # Voyage AI embeddings
 ELEVENLABS_API_KEY=      # Voice agents (optional)
 ELEVENLABS_WEBHOOK_SECRET=   # ElevenLabs webhook signature verification
+ELEVENLABS_PHONE_NUMBER_ID=             # ElevenLabs phone number for outbound booking calls
+ELEVENLABS_BOOKING_AGENT_ID=            # ElevenLabs booking agent ID (dedicated booking agent)
 GITHUB_TOKEN=            # GitHub PAT with `repo` scope (traffic analytics)
 
 NEXT_PUBLIC_SUPABASE_URL=
@@ -290,6 +292,9 @@ QA_ALERT_PHONE=                         # Phone for critical alerts (E.164: +346
 # Credentials encryption
 CREDENTIALS_ENCRYPTION_KEY=             # AES-256 encryption key for stored credentials
 
+# MCP tool authentication
+MCP_API_SECRET=                         # Shared secret for authenticating MCP tool requests
+
 # Voice Agent MCP tools (optional)
 OPENWEATHERMAP_API_KEY=                 # Weather data for voice agent
 GOOGLE_PLACES_API_KEY=                  # Places data for voice agent
@@ -306,8 +311,13 @@ UPSTASH_REDIS_REST_TOKEN=              # Upstash Redis REST token
 CRON_SECRET=                           # Vercel Cron authentication secret
 
 # PostHog analytics (optional)
-NEXT_PUBLIC_POSTHOG_KEY=                # PostHog project API key
-NEXT_PUBLIC_POSTHOG_HOST=               # PostHog ingestion host
+NEXT_PUBLIC_POSTHOG_KEY=                # PostHog project API key (client-side)
+NEXT_PUBLIC_POSTHOG_HOST=               # PostHog ingestion host (client-side)
+POSTHOG_PROJECT_ID=                     # PostHog project ID for server-side analytics API
+POSTHOG_PERSONAL_API_KEY=               # PostHog personal API key for server-side analytics API
+
+# Agent execution (optional)
+# ALLOW_AGENT_RUN=                      # Gates agent execution outside dev mode
 
 # Maintenance mode (optional)
 MAINTENANCE_MODE=                       # "true" forces maintenance on, "false" forces off, unset checks DB flag
