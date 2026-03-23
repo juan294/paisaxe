@@ -172,12 +172,48 @@ HEALTH_METRICS_FILE="$PROJECT_DIR/.qa-health-metrics.tmp"
   echo "INTEGRATION HEALTH CHECKS:"
   echo "- Passed: $HEALTH_CHECKS_PASSED"
   echo "- Failed: $HEALTH_CHECKS_FAILED"
+  echo "- CI E2E Status: $CI_E2E_STATUS"
   if [[ -n "$HEALTH_CHECK_DETAILS" ]]; then
     echo ""
     echo "FAILURE DETAILS:"
     echo -e "$HEALTH_CHECK_DETAILS"
   fi
+  if [[ "$CI_E2E_STATUS" == "FAIL" ]]; then
+    echo ""
+    echo "CI E2E REGRESSION: E2E tests are failing on develop (run $CI_E2E_RUN_ID)."
+    echo "This blocks production releases. Investigate immediately:"
+    echo "  gh run view $CI_E2E_RUN_ID --log-failed"
+  fi
 } > "$HEALTH_METRICS_FILE"
+
+# =============================================================================
+# PHASE 0.5: CI E2E Status Check
+# =============================================================================
+log_info "=== Phase 0.5: CI E2E Status Check ===" | tee -a "$LOG_FILE"
+
+CI_E2E_STATUS="unknown"
+CI_E2E_CONCLUSION=""
+if command -v gh &>/dev/null; then
+  # Get the latest E2E workflow run on develop
+  CI_E2E_JSON=$(gh run list --workflow=e2e.yml --branch=develop --limit=1 --json conclusion,status,databaseId 2>/dev/null || echo "[]")
+  CI_E2E_CONCLUSION=$(echo "$CI_E2E_JSON" | jq -r '.[0].conclusion // "unknown"' 2>/dev/null || echo "unknown")
+  CI_E2E_RUN_ID=$(echo "$CI_E2E_JSON" | jq -r '.[0].databaseId // ""' 2>/dev/null || echo "")
+
+  if [[ "$CI_E2E_CONCLUSION" == "success" ]]; then
+    CI_E2E_STATUS="PASS"
+    log_success "CI E2E: PASS (run $CI_E2E_RUN_ID)" | tee -a "$LOG_FILE"
+  elif [[ "$CI_E2E_CONCLUSION" == "failure" ]]; then
+    CI_E2E_STATUS="FAIL"
+    log_error "CI E2E: FAIL (run $CI_E2E_RUN_ID) — E2E tests are failing on develop!" | tee -a "$LOG_FILE"
+    log_error "  -> This means production-blocking regressions may exist." | tee -a "$LOG_FILE"
+    log_error "  -> Investigate: gh run view $CI_E2E_RUN_ID --log-failed" | tee -a "$LOG_FILE"
+  else
+    CI_E2E_STATUS="$CI_E2E_CONCLUSION"
+    log_warn "CI E2E: $CI_E2E_CONCLUSION (run $CI_E2E_RUN_ID)" | tee -a "$LOG_FILE"
+  fi
+else
+  log_warn "CI E2E: gh CLI not available — skipping check" | tee -a "$LOG_FILE"
+fi
 
 # =============================================================================
 # PHASE 1: LLM Quality Tests

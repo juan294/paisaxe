@@ -19,6 +19,18 @@ test.describe("Smoke tests", () => {
     expect(response?.status()).toBe(404);
   });
 
+  test("client-side JavaScript executes (CSP canary)", async ({ page }) => {
+    // Canary test: if CSP blocks scripts (e.g., nonce mismatch from PPR),
+    // pages never hydrate and stay on the loading spinner forever.
+    // This test catches that by verifying a client-rendered page resolves.
+    await page.goto("/favorites");
+    // The favorites page shows "Cargando..." while JS loads, then renders
+    // interactive content. If JS is blocked, it stays on the spinner.
+    await expect(
+      page.getByRole("link", { name: /immersive/i })
+    ).toBeVisible({ timeout: 10000 });
+  });
+
   test("health endpoint responds with JSON", async ({ request }) => {
     const response = await request.get("/api/health");
     // Health endpoint returns 200 (healthy) or 503 (degraded) — both are valid
