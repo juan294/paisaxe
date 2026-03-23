@@ -267,17 +267,17 @@ test.describe("Navigation behavior", () => {
     // Keyboard shortcut hints are hidden on touch devices (desktop-pointer-only)
     test.skip(isMobile, "Keyboard shortcut 'i' toggle is desktop-only");
 
-    // Info should be visible initially
-    const article = page.locator("article").first();
-    await expect(article).toHaveClass(/opacity-100/);
+    // Info should be visible initially — use testid for precise targeting
+    const infoPanel = page.getByTestId("story-info-panel").first();
+    await expect(infoPanel).toHaveClass(/opacity-100/);
 
     // Press i to hide
     await page.keyboard.press("i");
-    await expect(article).toHaveClass(/opacity-0/);
+    await expect(infoPanel).toHaveClass(/opacity-0/, { timeout: 5000 });
 
     // Press i again to show
     await page.keyboard.press("i");
-    await expect(article).toHaveClass(/opacity-100/);
+    await expect(infoPanel).toHaveClass(/opacity-100/, { timeout: 5000 });
   });
 
   test("progress bar segments are clickable and navigate", async ({

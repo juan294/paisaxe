@@ -24,10 +24,11 @@ test.describe("Smoke tests", () => {
     // pages never hydrate and stay on the loading spinner forever.
     // This test catches that by verifying a client-rendered page resolves.
     await page.goto("/favorites");
-    // The favorites page shows "Cargando..." while JS loads, then renders
+    // The favorites page shows a loading spinner while JS loads, then renders
     // interactive content. If JS is blocked, it stays on the spinner.
+    // Check for the "Explore stories" link which only appears after hydration.
     await expect(
-      page.getByRole("link", { name: /immersive/i })
+      page.getByRole("link", { name: /explore stories|explorar historias/i })
     ).toBeVisible({ timeout: 10000 });
   });
 

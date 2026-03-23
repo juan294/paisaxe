@@ -59,9 +59,8 @@ test.describe("QA Journey: Anonymous User", () => {
     expect(firstTitle).toBeTruthy();
 
     // Step 2: Navigate to next story via arrow
-    const nextButton = page
-      .locator("button")
-      .filter({ has: page.locator("svg.lucide-chevron-right") });
+    // Use .first() to avoid strict mode violations during i18n hydration overlap
+    const nextButton = page.getByTestId("next-story-button").first();
     await expect(nextButton).toBeVisible();
     await nextButton.click();
 
@@ -73,9 +72,7 @@ test.describe("QA Journey: Anonymous User", () => {
     expect(secondTitle).not.toBe(firstTitle);
 
     // Step 4: Navigate back with previous arrow
-    const prevButton = page
-      .locator("button")
-      .filter({ has: page.locator("svg.lucide-chevron-left") });
+    const prevButton = page.getByTestId("prev-story-button").first();
     await prevButton.click();
 
     await page.waitForTimeout(500);
@@ -208,10 +205,20 @@ test.describe("QA Journey: Anonymous User", () => {
     const titleText = await page.locator("h1").first().textContent();
     if (titleText) titles.push(titleText);
 
-    // Navigate through 3 more stories
+    // Navigate through 3 more stories, waiting for title to actually change
     for (let i = 0; i < 3; i++) {
+      const prevTitle = titles[titles.length - 1];
       await page.keyboard.press("ArrowRight");
-      await page.waitForTimeout(500);
+      // Wait for the h1 text to change (300ms transition + React re-render)
+      // instead of a fixed timeout — much more reliable on slow CI runners
+      await page.waitForFunction(
+        (prev) => {
+          const h1 = document.querySelector("h1");
+          return h1 && h1.textContent !== prev;
+        },
+        prevTitle,
+        { timeout: 5000 }
+      );
       const title = await page.locator("h1").first().textContent();
       if (title) titles.push(title);
     }

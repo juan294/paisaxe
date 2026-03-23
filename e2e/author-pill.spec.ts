@@ -26,7 +26,7 @@ test.describe("Author pill", () => {
 
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    const pill = page.locator('[aria-label="Made by Juan González"]');
+    const pill = page.locator('[aria-label="Made by Juan González"]').first();
     await expect(pill).toBeVisible();
     await expect(pill).toContainText("</> JG");
   });
@@ -34,7 +34,9 @@ test.describe("Author pill", () => {
   test("pill is hidden on mobile viewport", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
 
-    const pill = page.locator('[aria-label="Made by Juan González"]');
+    // Use .first() to avoid strict mode violations when multiple elements
+    // with this aria-label exist during SSR/hydration overlap
+    const pill = page.locator('[aria-label="Made by Juan González"]').first();
     await expect(pill).toBeHidden();
   });
 
@@ -46,7 +48,7 @@ test.describe("Author pill", () => {
 
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    const pillGroup = page.locator('[aria-label="Made by Juan González"]').locator("..");
+    const pillGroup = page.locator('[aria-label="Made by Juan González"]').first().locator("..");
 
     // Hover over the pill group
     await pillGroup.hover();
@@ -99,11 +101,11 @@ test.describe("Author pill", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Verify info is visible initially
-    const bottomPanel = page.locator("article.absolute.bottom-0");
+    const bottomPanel = page.getByTestId("story-info-panel").first();
     await expect(bottomPanel).toHaveCSS("opacity", "1");
 
     // Click the pill
-    const pill = page.locator('[aria-label="Made by Juan González"]');
+    const pill = page.locator('[aria-label="Made by Juan González"]').first();
     await pill.click();
 
     // Wait for any potential transition
@@ -118,7 +120,8 @@ test.describe("Author pill", () => {
 
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    const pill = page.locator('[aria-label="Made by Juan González"]');
+    // Use .first() to avoid strict mode violations during hydration overlap
+    const pill = page.locator('[aria-label="Made by Juan González"]').first();
     // The cursor span inside the pill should have the animation class
     const cursor = pill.locator(".animate-cursor-blink");
     await expect(cursor).toBeVisible();
@@ -129,7 +132,7 @@ test.describe("Author pill", () => {
 
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    const pillGroup = page.locator('[aria-label="Made by Juan González"]').locator("..");
+    const pillGroup = page.locator('[aria-label="Made by Juan González"]').first().locator("..");
     await pillGroup.hover();
 
     await expect(page.locator("text=Juan González")).toBeVisible();
