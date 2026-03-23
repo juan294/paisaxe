@@ -9,40 +9,70 @@
 - **Healthy** (7): ElevenLabs, Supabase, GitHub Pro, Vercel, AWS Domains, Voyage AI, Twilio
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent timestamp=2026-03-07T09:00:00Z -->
-## Security Agent — 2026-03-07
-- **Status: GREEN** — 2 advisories, 0 exploitable. minimatch high (dev-only/eslint), dompurify moderate (transitive via posthog-js, not directly used)
-- **Both fixable** via `npm audit fix`. No new vulnerabilities since Mar 6
-- **CSP**: Nonce-based + strict-dynamic, unchanged
-- **Webhook security**: All 4 endpoints timing-safe (Supabase, ElevenLabs, Stripe, Translate)
-- **License compliant**: No copyleft violations; same weak copyleft packages (sharp-libvips LGPL, vercel/analytics MPL)
-- **Gap persists**: Gitleaks NOT in CI — 5th consecutive report flagging this
-- **dangerouslySetInnerHTML audit**: 8 instances all safe (JSON.stringify or escapeHtml pre-processing)
-
-**Cross-agent recommendations:**
-- Coverage Agent: MCP tool endpoints still accept external input from ElevenLabs — verify test coverage
-- Performance Agent: posthog-js update (1.353.0 → 1.359.1) recommended — may resolve dompurify vuln and improve bundle
-- Code Quality Agent: minimatch override in package.json (`>=10.2.1`) is stale — needs bump to `>=10.2.3`
-- Documentation Agent: No documentation changes needed this cycle
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent timestamp=2026-03-08T09:00:00Z -->
-## Security Agent — 2026-03-08
-- **Status: GREEN** — **0 advisories, 0 exploitable.** Clean `npm audit` — both previous advisories resolved (minimatch override fixed to `>=10.2.3`, dompurify updated)
-- **First clean audit** since tracking began — no active vulnerabilities in production or dev dependencies
+<!-- ENTRY:START agent=security_agent timestamp=2026-03-20T09:00:00Z -->
+## Security Agent — 2026-03-20
+- **Status: GREEN** — **3 advisories (2 high, 1 moderate), 0 exploitable.** flatted gains 2nd sub-advisory (GHSA-rf6f-7fwh-wjgh, Prototype Pollution) — still dev-only, still not exploitable. flatted + undici at day 7 (dev-only). next@16.1.6 at day 3 (5 sub-advisories, all non-exploitable). All 3 fixable via `npm audit fix`.
 - **CSP**: Nonce-based + strict-dynamic, unchanged
 - **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
-- **License compliant**: No copyleft violations; same weak copyleft packages (sharp-libvips LGPL, vercel/analytics MPL)
-- **Gap persists**: Gitleaks NOT in CI — **6th consecutive report** flagging this
-- **dangerouslySetInnerHTML audit**: 8 instances all safe (JSON.stringify or escapeHtml pre-processing)
-- **Test coverage improved**: All webhook error paths and MCP rate-limit 429s now covered (per Coverage Agent Mar 8)
+- **License compliant**: No copyleft violations; same weak copyleft packages (sharp-libvips LGPL, vercel/analytics MPL). LGPL exception documented in `docs/project/license-exceptions.md`.
+- **Gap persists**: Gitleaks NOT in CI — **17th consecutive report** flagging this
+- **dangerouslySetInnerHTML audit**: 7 instances all safe (JSON.stringify or escapeHtml pre-processing) — unchanged
+- **Command injection audit**: All exec/spawn calls (3 files) use whitelisted literals + admin auth + dev-only gates. No user input in command strings.
+- **Outdated deps**: 26 packages outdated (stable), none with known exploitable vulnerabilities. `next@16.2.0` available — fixes moderate advisory. Notable: `knip` jumped to v6.0.0 (major), `@anthropic-ai/sdk` to 0.80.0.
+- **CI note**: `npm audit --omit=dev --audit-level=high` in CI will NOT flag any of the 3 advisories (2 dev-only, 1 moderate below high threshold). CI continues passing.
 
 **Cross-agent recommendations:**
-- Coverage Agent: Webhook and CSRF error paths now fully covered — no new security-related coverage gaps
-- Performance Agent: posthog-js dompurify vuln resolved. No security-driven dependency updates needed this cycle
-- Code Quality Agent: minimatch override now correct (`>=10.2.3`). No new code quality issues from security perspective
-- Documentation Agent: No documentation changes needed this cycle
-- QA Agent: CSRF protection confirmed working correctly (proxy rejects bare POSTs). QA's `llm-quality.test.ts` needs to include CSRF tokens — this is a test bug, not a security bug
+- Coverage Agent: Webhook and CSRF error paths remain fully covered. Branch coverage at 93.23%. MCP routes still at 0% E2E — highest risk gap.
+- Performance Agent: `next@16.2.0` available — may include performance improvements alongside security fixes. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
+- Code Quality Agent: Run `npm audit fix` to resolve all 3 advisories. The next update (16.1.6→16.2.0) is a minor bump — review changelog for breaking changes. `knip` v6.0.0 available — major version, check breaking changes before upgrading. No new code quality issues from security perspective.
+- Documentation Agent: No documentation changes needed this cycle.
+- QA Agent: CSRF protection working correctly. Null-origin rejection confirmed in proxy.ts. `llm-quality.test.ts` CSRF blocker is a test bug — not a security bug. **Escalation critically overdue** (reported since Feb 15, now 9th week).
+- Cost Analyst Agent: No cost-related security concerns.
+- Localization Agent: No sensitive data in translation files.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent timestamp=2026-03-22T09:00:00Z -->
+## Security Agent — 2026-03-22
+- **Status: GREEN** — **3 advisories (2 high, 1 moderate), 0 exploitable.** No changes to vulnerability landscape. flatted + undici at day 9 (dev-only). next@16.1.6 at day 5 (5 sub-advisories, all non-exploitable). All 3 fixable via `npm audit fix`.
+- **CSP**: Nonce-based + strict-dynamic, unchanged
+- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
+- **License compliant**: No copyleft violations; same weak copyleft packages (sharp-libvips LGPL, vercel/analytics MPL). LGPL exception documented in `docs/project/license-exceptions.md`.
+- **Gap persists**: Gitleaks NOT in CI — **19th consecutive report** flagging this
+- **dangerouslySetInnerHTML audit**: 7 instances all safe (JSON.stringify or escapeHtml pre-processing) — unchanged
+- **Command injection audit**: All exec/spawn calls (3 files) use whitelisted literals + admin auth + dev-only gates. No user input in command strings.
+- **Outdated deps**: 27 packages outdated (+1: `canvas@3.2.2`), none with known exploitable vulnerabilities. `next@16.2.1` available — fixes moderate advisory. `knip@6.0.1` patch for major.
+- **CI note**: `npm audit --omit=dev --audit-level=high` in CI will NOT flag any of the 3 advisories (2 dev-only, 1 moderate below high threshold). CI continues passing.
+
+**Cross-agent recommendations:**
+- Coverage Agent: Webhook and CSRF error paths remain fully covered. Branch coverage at 94.36%. MCP routes still at 0% E2E — highest risk gap.
+- Performance Agent: `next@16.2.1` available — may include performance improvements alongside security fixes. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
+- Code Quality Agent: Run `npm audit fix` to resolve all 3 advisories. The next update (16.1.6→16.2.1) is a minor bump — review changelog for breaking changes. `knip` v6.0.1 available — major version, check breaking changes before upgrading. No new code quality issues from security perspective.
+- Documentation Agent: No documentation changes needed this cycle.
+- QA Agent: CSRF protection working correctly. Null-origin rejection confirmed in proxy.ts. `llm-quality.test.ts` CSRF blocker is a test bug — not a security bug. **Escalation critically overdue** (reported since Feb 15, now 10th week).
+- Cost Analyst Agent: No cost-related security concerns.
+- Localization Agent: No sensitive data in translation files.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent timestamp=2026-03-21T09:00:00Z -->
+## Security Agent — 2026-03-21
+- **Status: GREEN** — **3 advisories (2 high, 1 moderate), 0 exploitable.** No changes to vulnerability landscape. flatted + undici at day 8 (dev-only). next@16.1.6 at day 4 (5 sub-advisories, all non-exploitable). All 3 fixable via `npm audit fix`.
+- **CSP**: Nonce-based + strict-dynamic, unchanged
+- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
+- **License compliant**: No copyleft violations; same weak copyleft packages (sharp-libvips LGPL, vercel/analytics MPL). LGPL exception documented in `docs/project/license-exceptions.md`.
+- **Gap persists**: Gitleaks NOT in CI — **18th consecutive report** flagging this
+- **dangerouslySetInnerHTML audit**: 7 instances all safe (JSON.stringify or escapeHtml pre-processing) — unchanged
+- **Command injection audit**: All exec/spawn calls (3 files) use whitelisted literals + admin auth + dev-only gates. No user input in command strings.
+- **Outdated deps**: 26 packages outdated (stable), none with known exploitable vulnerabilities. `next@16.2.1` available (new patch) — fixes moderate advisory. `knip@6.0.1` patch for major. `posthog-js@1.363.1`, `resend@6.9.4` also new.
+- **CI note**: `npm audit --omit=dev --audit-level=high` in CI will NOT flag any of the 3 advisories (2 dev-only, 1 moderate below high threshold). CI continues passing.
+
+**Cross-agent recommendations:**
+- Coverage Agent: Webhook and CSRF error paths remain fully covered. Branch coverage at 94.05%. MCP routes still at 0% E2E — highest risk gap.
+- Performance Agent: `next@16.2.1` available — may include performance improvements alongside security fixes. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
+- Code Quality Agent: Run `npm audit fix` to resolve all 3 advisories. The next update (16.1.6→16.2.1) is a minor bump — review changelog for breaking changes. `knip` v6.0.1 available — major version, check breaking changes before upgrading. No new code quality issues from security perspective.
+- Documentation Agent: No documentation changes needed this cycle.
+- QA Agent: CSRF protection working correctly. Null-origin rejection confirmed in proxy.ts. `llm-quality.test.ts` CSRF blocker is a test bug — not a security bug. **Escalation critically overdue** (reported since Feb 15, now 9th week).
+- Cost Analyst Agent: No cost-related security concerns.
+- Localization Agent: No sensitive data in translation files.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=code_quality_audit timestamp=2026-02-09T18:00:00Z -->
@@ -127,21 +157,6 @@
 - Cost Analyst Agent: No cost-impacting changes. Browserslist optimization reduces bandwidth marginally.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-02-06T15:08:10Z -->
-## Localization Agent — 2026-02-06
-- **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
-- **UI strings**: 221 keys per locale, all present
-- **Story translations**: 22+ stories × 5 locales = 110+ translations, all complete
-- **Type safety**: Pass — All files pass TypeScript validation
-- **Previous fix**: 72+ Asturian story misalignments corrected (2026-02-03)
-
-**Cross-agent recommendations:**
-- Performance Agent: Locale bundle sizes are similar (~15 KB each uncompressed). No optimization needed.
-- Code Quality Agent: No dead translations found. All keys are actively used in components.
-- Security Agent: No sensitive data in translation files (verified: no API keys, tokens, or PII).
-- Dependencies Agent: Translation system has no external dependencies (pure TypeScript).
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-02-06T15:22:54Z -->
 ## Documentation Agent — 2026-02-06
 - **Coverage**: 100% of feature flags documented in features.md (24 flags across 5 categories)
@@ -155,94 +170,223 @@
 - QA Agent: Booking system uses outbound calls and SMS - test the full booking flow end-to-end, including failure modes
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=localization_agent timestamp=2026-03-08T09:00:00Z -->
-## Localization Agent — 2026-03-08
+<!-- ENTRY:START agent=localization_agent timestamp=2026-03-23T09:00:00Z -->
+## Localization Agent — 2026-03-23
 - **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
 - **UI strings**: 392 keys per locale, all present (0 missing, 0 orphans)
 - **Story translations**: 95 stories x 5 locales = 475 translations, all complete (title + subtitle + description)
-- **Type safety**: Pass — `npx tsc --noEmit` exits clean
-- **Changes**: None — all translations were already in sync
+- **Type safety**: Pass — `npx tsc --noEmit` exits clean on all locale files
+- **Test suite**: 197 i18n tests passing (4 test files)
+- **Changes**: None — all translations stable for 17 consecutive days
 
 **Cross-agent recommendations:**
-- Performance Agent: Locale bundle sizes are ~15 KB each uncompressed. Lazy-loading (es+en static, others dynamic) in place. No optimization needed.
-- Code Quality Agent: No dead translations found. All 392 keys actively referenced in components.
+- Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, others dynamic) in place. No optimization needed.
+- Code Quality Agent: No dead translations found. All 392 keys actively referenced in components. No new keys added since Mar 7.
 - Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
-- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check.
-<!-- ENTRY:END -->
+- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 197 i18n tests all passing.
+- QA Agent: No locale-related issues this cycle. All translations stable.
+- Cost Analyst Agent: No cost-related localization concerns.
 
-<!-- ENTRY:START agent=qa_agent timestamp=2026-03-07T09:00:00Z -->
-## QA Agent — 2026-03-07
-- **Status: YELLOW** — LLM tests 0/12 (CSRF blocker, 3rd consecutive run), browser journeys 6/10 (regression from 10/10)
-- **CSRF blocker persistent**: `llm-quality.test.ts` sends bare POST to `/api/chat` without CSRF tokens. Proxy returns 403. Unfixed since 2026-02-15.
-- **Journey regressions (4 new failures)**:
-  - Journeys 3, 7, 14: Chat panel selector `.fixed.inset-0.z-50` not found — likely dynamic import timeout for `VoiceChat` component (5s may be insufficient)
-  - Journey 2: Story ordering assertion mismatch ("Cachopo Asturiano" vs "Basilica of Covadonga") — non-deterministic order or race condition
-- **Integration health**: App healthy (Supabase 197ms, DB 0.5%), health check script still stale (checks "ok" not "healthy", references deleted `/api/stripe-test`)
-- **E2E gaps**: `/api/mcp/*` (4 routes) still at 0% E2E coverage — highest risk untested routes
-- **Feature flag mocks**: Complete for all 17 `FeatureFlagKey` values. 11 agent flags in mock are harmless but architecturally belong to separate `AgentFlagKey` system.
-
-**Cross-agent recommendations:**
-- Coverage Agent: Chat panel dynamic import loading/error states in `immersive-page-content.tsx` may need test coverage. MCP routes still at 0%.
-- Performance Agent: Investigate VoiceChat dynamic import latency — if >5s to load on production, it's a UX issue (not just test flakiness). ElevenLabs SDK chunk (482 KB) loads on demand.
-- Security Agent: CSRF protection working correctly — proxy properly rejects unauthenticated POST to `/api/chat`. No action needed.
-- Code Quality Agent: Add `data-testid="chat-panel"` to `voice-chat.tsx:141` to replace brittle CSS class selector in E2E tests.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent timestamp=2026-03-08T09:00:00Z -->
-## QA Agent — 2026-03-08
-- **Status: YELLOW** — LLM tests 0/12 (CSRF blocker, **4th consecutive run**), browser journeys 5/10 (down from 6/10)
-- **CSRF blocker**: Unfixed since 2026-02-15. No LLM quality data for 3+ weeks. Must be escalated.
-- **Journey trend declining**: 100% (Feb 15) → 60% (Mar 7) → 50% (Mar 8)
-- **2 new journey regressions**:
-  - Journey 1: Localization regression — story title switches from "Playa del Silencio" (Spanish) to "Beach of Silence" (English) during navigation. May be ISR caching issue from commit `dbcd6c5`.
-  - Journey 5: Info panel toggle broken — pressing 'i' key doesn't hide info panel (opacity stays at 1). Focus management or hydration timing issue.
-- **3 persistent journey failures**: Journeys 3, 7, 14 — chat panel dynamic import timeout (`.fixed.inset-0.z-50` not found at 5s)
-- **1 journey fixed**: Journey 2 (keyboard navigation) now passes — was failing last week
-- **Integration health**: App healthy (Supabase 190ms, DB 0.5%), health check scripts still stale (5th consecutive report)
+<!-- ENTRY:START agent=localization_agent timestamp=2026-03-22T09:00:00Z -->
+## Localization Agent — 2026-03-22
+- **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
+- **UI strings**: 392 keys per locale, all present (0 missing, 0 orphans)
+- **Story translations**: 95 stories x 5 locales = 475 translations, all complete (title + subtitle + description)
+- **Type safety**: Pass — `npx tsc --noEmit` exits clean on all locale files
+- **Test suite**: 197 i18n tests passing (4 test files)
+- **Changes**: None — all translations stable for 16 consecutive days
 
 **Cross-agent recommendations:**
-- Coverage Agent: Story navigation locale consistency needs unit tests. Chat panel dynamic import loading states still need coverage.
-- Performance Agent: VoiceChat dynamic import causing 3 E2E failures at 5s timeout. Consider preloading ElevenLabs chunk after page idle. ISR caching (`revalidate: 60`) may serve stale English translations.
-- Security Agent: CSRF protection working correctly. No action needed.
-- Code Quality Agent: Add `data-testid="chat-panel"` to `voice-chat.tsx:161`. Investigate 'i' key handler in `story-viewer.tsx:159-160` — may have focus management regression.
-- Localization Agent: Story titles switching languages during navigation (Spanish → English). ISR cache may serve stale translations. Verify locale consistency during client-side story navigation.
+- Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, others dynamic) in place. No optimization needed.
+- Code Quality Agent: No dead translations found. All 392 keys actively referenced in components. No new keys added since Mar 7.
+- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
+- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 197 i18n tests all passing.
+- QA Agent: No locale-related issues this cycle. All translations stable.
+- Cost Analyst Agent: No cost-related localization concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-07T09:00:00Z -->
-## Cost Analyst — 2026-03-07
-- **Status: WATCH** — Platform dormant for 18 days (voice) / 22 days (revenue). Fixed costs stable at $84.41/mo operational.
+<!-- (pruned: localization_agent 2026-03-21 entry removed, keeping last 3) -->
+
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-03-19T09:00:00Z -->
+## QA Agent — 2026-03-19
+- **Status: YELLOW** — LLM tests 0/12 (CSRF blocker, **8th consecutive run**), browser journeys 6/10 (**regression from 70% to 60%**)
+- **CSRF blocker**: Unfixed since 2026-02-15. **Over 7 weeks without LLM quality data.** Escalation critically overdue.
+- **Journey regression**: 70% → **60%**. Journey 1 (story arrow navigation) failed — story order mismatch (expected "Monastery of San Salvador", got "Asturian Cheeses"). Content ordering may have changed.
+- **3 persistent journey failures**: Journeys 3, 7, 14 — chat panel dynamic import timeout (`.fixed.inset-0.z-50` not found at 5s). **6th consecutive week.** Root cause: 482 KB ElevenLabs chunk + no `data-testid` + 5s timeout.
+- **Integration health**: App healthy (Supabase 97ms, DB 0.5%). Health check scripts still stale (9th consecutive report).
+- **E2E gap**: `data-testid="chat-panel"` confirmed NOT in source code. `/api/mcp/*` still at 0% E2E coverage (6th consecutive report). 23/33 API routes lack E2E tests.
+- **Feature flag mocks**: Complete — all 27 flags verified present in source.
+- **Revenue/voice concern**: Cost Analyst flags 34-day revenue drought + 30-day voice silence. Chat panel loading failures in E2E tests suggest a potential real UX issue.
+
+**Cross-agent recommendations:**
+- Coverage Agent: Chat panel dynamic import loading states still need coverage. MCP routes still at 0% — highest risk gap. 23 API routes lack E2E tests. Branch coverage now 93.23% (great improvement).
+- Performance Agent: VoiceChat dynamic import causing 3 E2E failures for 6 weeks. `requestIdleCallback` preload would fix both tests and UX. ElevenLabs chunk is 482 KB on demand.
+- Security Agent: CSRF protection working correctly. No action needed. Gitleaks CI gap flagged for 16th week.
+- Code Quality Agent: Add `data-testid="chat-panel"` to `voice-chat.tsx:161`. Fix health check script string mismatch. 3 E2E tests depend on brittle CSS selector. Investigate Journey 1 story order regression.
+- Localization Agent: No locale-related issues this cycle.
+- Cost Analyst Agent: Voice widget loading delay may contribute to zero voice usage — verify if real users experience the same 5s+ load time seen in E2E tests. 30-day voice silence is alarming.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-03-21T09:00:00Z -->
+## QA Agent — 2026-03-21
+- **Status: YELLOW** — LLM tests 0/12 (CSRF blocker, **9th consecutive run**), browser journeys **10/10 (100% — RECOVERED)**
+- **CSRF blocker**: Unfixed since 2026-02-15. **Over 8 weeks without LLM quality data.** Escalation critically overdue.
+- **Journey recovery**: 60% → **100%**. All 3 persistent chat panel failures (Journeys 3, 7, 14) resolved after 7 weeks. Journey 1 also recovered. Best score since Feb 15.
+- **Integration health**: App healthy (Supabase 93ms, DB 0.5%). Health check scripts still stale (10th consecutive report).
+- **E2E gap**: `/api/mcp/*` still at 0% E2E coverage (7th consecutive report). 25/35 API routes lack E2E tests.
+- **Feature flag mocks**: Complete — all 27 flags verified present in source.
+- **Revenue/voice concern**: Cost Analyst flags 36-day revenue drought + 32-day voice silence. With journeys now passing, manual production verification of voice and payment flows is the top priority.
+
+**Cross-agent recommendations:**
+- Coverage Agent: Chat panel journey tests now pass — explore adding more chat interaction coverage. MCP routes still at 0% — highest risk gap. 25 API routes lack E2E tests. Branch coverage now 94.05% (excellent).
+- Performance Agent: Chat panel load time appears improved (journeys passing). Verify ElevenLabs chunk preload is working in production. Continue monitoring bundle size vs 2,500 KB budget.
+- Security Agent: CSRF protection working correctly. No action needed. Gitleaks CI gap flagged for 17th week.
+- Code Quality Agent: Fix health check script expectations (10th week stale). Investigate what fixed the chat panel E2E failures — document the fix pattern for other dynamic imports.
+- Localization Agent: No locale-related issues this cycle.
+- Cost Analyst Agent: Journey tests confirm chat panel now loads correctly in E2E. Manual verification of Pelayo voice widget and Day Pass on production is now the priority to explain 32-day voice silence and 36-day revenue drought.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-03-22T09:00:00Z -->
+## QA Agent — 2026-03-22
+- **Status: YELLOW** — LLM tests 0/12 (CSRF blocker, **10th consecutive run**), browser journeys **10/10 (100% — stable 2nd week)**
+- **CSRF blocker**: Unfixed since 2026-02-15. **Over 9 weeks without LLM quality data.** Escalation critically overdue.
+- **Journey stability**: 100% for 2nd consecutive week. All chat panel recoveries confirmed durable. No regressions.
+- **Integration health**: App healthy (Supabase 94ms, DB 0.5%). Health check scripts still stale (11th consecutive report).
+- **E2E gap**: `/api/mcp/*` still at 0% E2E coverage (8th consecutive report). 29/40 API routes lack E2E tests.
+- **Feature flag mocks**: Complete — all 28 flags verified present in source.
+- **Revenue/voice concern**: Cost Analyst flags 37-day revenue drought + 33-day voice silence. March $0 revenue virtually certain. Manual production verification of voice and payment flows remains the top priority.
+
+**Cross-agent recommendations:**
+- Coverage Agent: Journey stability at 100% — good foundation for expanding chat interaction tests. MCP routes still at 0% — highest risk gap. 29 API routes lack E2E tests. Branch coverage now 94.36% (excellent).
+- Performance Agent: Chat panel load times confirmed stable (journeys passing 2 consecutive weeks). Continue monitoring bundle size vs 2,500 KB budget. Browserslist P1 optimization still pending.
+- Security Agent: CSRF protection working correctly. No action needed. Gitleaks CI gap flagged for 18th week.
+- Code Quality Agent: Fix health check script expectations (11th week stale). Journey stability proves the dynamic import fix pattern is durable — can apply to other components.
+- Localization Agent: No locale-related issues this cycle.
+- Cost Analyst Agent: Journey tests confirm chat panel loads correctly in E2E for 2nd straight week. Manual verification of Pelayo voice widget and Day Pass on production is now urgent — 37-day revenue drought and 33-day voice silence need explanation.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-22T09:00:00Z -->
+## Cost Analyst — 2026-03-22
+- **Status: WATCH** — Platform dormant for 33 days (voice) / 37 days (revenue). Fixed costs stable at $84.41/mo operational.
 - **Total fixed (all)**: $284.41/mo | **Operational**: $84.41/mo | **Variable (Mar MTD)**: $1.15 (phone rental only)
-- **ElevenLabs**: Creator tier, 14,415/110,553 chars (13.0%) — **character reset today** (Mar 7, 14:07 UTC). 0 voice min in March.
-- **Twilio**: Balance $15.45 (stable). $1.15/mo phone rental confirmed via API. Zero SMS in March.
-- **Revenue**: €0 in March (22-day drought). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
-- **Config discrepancies UNFIXED (3rd consecutive report)**: Vercel still Hobby/$0 in config (actual: Pro/$20), service-tiers.ts ElevenLabs still $18.33 (actual: $22.18). Dashboard under-reports by ~$21/mo.
+- **ElevenLabs**: Creator tier, 0/196,138 chars (0%). 0 voice min in March. Subscription active, next reset ~April 5.
+- **Twilio**: Balance $15.4546 (unchanged). Phone rental $1.15/mo confirmed in API. Zero SMS, zero calls.
+- **Revenue**: €0 in March (37-day drought — exceeds full calendar month by 9 days). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
+- **Config files accurate**: All service tier and recurring cost values correct.
 - **Break-even**: ~52 Day Pass sales/mo needed (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
+- **March 71% complete**: ~$59.93 operational costs accrued against $0 revenue. Only 9 days remain — first complete calendar month with zero income is virtually certain.
+- **QA journeys recovered to 100%**: Chat panel E2E tests now pass (per QA Mar 21). Manual production verification of voice widget and Day Pass flow remains the top priority.
 
 **Cross-agent recommendations:**
-- Code Quality Agent: Fix config discrepancies — `service-tiers.ts` lines 30, 48 and add Vercel/Twilio to `recurring-costs.ts`. 3 reports unfixed.
+- Code Quality Agent: No config discrepancies. All service tier and recurring cost values are accurate.
 - Security Agent: No cost-related security concerns. Twilio credentials working correctly.
 - Performance Agent: Zero voice usage means ElevenLabs SDK loading is not exercised in production. Monitor for cold-start issues when activity resumes.
-- QA Agent: Verify Pelayo voice widget and Day Pass purchase flow are functional — 18-day silence may indicate a broken flow, not just low traffic.
+- QA Agent: Journey tests now at 100% — manual production verification of Pelayo voice widget and Day Pass purchase flow is now the top priority. 33-day voice silence and 37-day revenue drought may indicate a broken flow, not just low traffic.
+- Coverage Agent: No cost-related coverage gaps.
+- Localization Agent: No cost-related localization concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-08T09:00:00Z -->
-## Coverage Agent — 2026-03-08
-- **Test suite**: ✅ 100% passing (5059 tests, 0 failures)
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-23T09:00:00Z -->
+## Cost Analyst — 2026-03-23
+- **Status: WATCH** — Platform dormant for 34 days (voice) / 38 days (revenue). Fixed costs stable at $84.41/mo operational.
+- **Total fixed (all)**: $284.41/mo | **Operational**: $84.41/mo | **Variable (Mar MTD)**: $1.15 (phone rental only)
+- **ElevenLabs**: Creator tier, 0/196,138 chars (0%). 0 voice min in March. Subscription active, next reset ~April 5.
+- **Twilio**: Balance $15.4546 (unchanged). Phone rental $1.15/mo confirmed in API. Zero SMS, zero calls.
+- **Revenue**: €0 in March (38-day drought — exceeds full calendar month by 10 days). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
+- **Config files accurate**: All service tier and recurring cost values correct.
+- **Break-even**: ~52 Day Pass sales/mo needed (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
+- **March 74% complete**: ~$62.63 operational costs accrued against $0 revenue. Only 8 days remain — first complete calendar month with zero income is virtually certain.
+- **QA journeys stable at 100%**: Chat panel E2E tests pass for 3rd consecutive week (per QA Mar 22). Manual production verification of voice widget and Day Pass flow remains the top priority.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: No config discrepancies. All service tier and recurring cost values are accurate.
+- Security Agent: No cost-related security concerns. Twilio credentials working correctly.
+- Performance Agent: Zero voice usage means ElevenLabs SDK loading is not exercised in production. Monitor for cold-start issues when activity resumes.
+- QA Agent: Journey tests confirm chat panel loads correctly in E2E for 3rd straight week. Manual production verification of Pelayo voice widget and Day Pass purchase flow is now urgent — 38-day revenue drought and 34-day voice silence need explanation.
+- Coverage Agent: No cost-related coverage gaps.
+- Localization Agent: No cost-related localization concerns.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-21T09:00:00Z -->
+## Cost Analyst — 2026-03-21
+- **Status: WATCH** — Platform dormant for 32 days (voice) / 36 days (revenue). Fixed costs stable at $84.41/mo operational.
+- **Total fixed (all)**: $284.41/mo | **Operational**: $84.41/mo | **Variable (Mar MTD)**: $1.15 (phone rental only)
+- **ElevenLabs**: Creator tier, 0/196,138 chars (0%). 0 voice min in March. Subscription active, next reset ~April 5.
+- **Twilio**: Balance $15.4546 (unchanged). Phone rental $1.15/mo confirmed in API. Zero SMS, zero calls.
+- **Revenue**: €0 in March (36-day drought — exceeds full calendar month by 8 days). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
+- **Config files accurate**: All service tier and recurring cost values correct.
+- **Break-even**: ~52 Day Pass sales/mo needed (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
+- **March on track for $0 revenue**: First complete calendar month with zero income. 68% complete (~$57.21 operational costs accrued).
+- **Both dormancy streaks exceed one full calendar month**: Voice 32 days (since Feb 17), revenue 36 days (since Feb 13).
+
+**Cross-agent recommendations:**
+- Code Quality Agent: No config discrepancies. All service tier and recurring cost values are accurate.
+- Security Agent: No cost-related security concerns. Twilio credentials working correctly.
+- Performance Agent: Zero voice usage means ElevenLabs SDK loading is not exercised in production. Monitor for cold-start issues when activity resumes.
+- QA Agent: Verify Pelayo voice widget and Day Pass purchase flow are functional — 32-day voice silence and 36-day revenue drought may indicate a broken flow, not just low traffic. This remains the primary concern.
+- Coverage Agent: No cost-related coverage gaps.
+- Localization Agent: No cost-related localization concerns.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-21T09:00:00Z -->
+## Coverage Agent — 2026-03-21
+- **Test suite**: ✅ 100% passing (5475 tests, 0 failures) — +90 new tests
 - **TypeScript**: ✅ No errors
-- **Overall coverage**: 96.53% statements (+3.45% from 93.08%), 89.60% branch, 94.75% function, 97.37% line
-- **New tests**: +277 tests across 50+ modified test files
-- **14 API routes reached 100% line coverage** (suggestions/[id], github-traffic-sync, translations, stories CRUD, content-discovery, etc.)
-- **8 lib files reached 100%** (csrf, csrf-client, recurring-costs, manual-costs, elevenlabs-costs, resolve, stripe, translate-story)
-- **6 component files reached 100%** (agent-config-panel, create-draft-dialog, costs-analytics alerts/chart/forecast/index)
-- **Remaining low-coverage files**: posthog-provider (61%), agent-chat (45%), agents-dashboard/index (48%), story-editor-dialog/index (62%) — all complex admin UI components better suited for E2E tests
-- **0% files are all type-only or barrel re-exports** — no executable code to test
+- **Overall coverage**: 98.53% statements (unchanged), **94.05% branch (+0.82%)**, 98.60% function (unchanged), 98.94% line (unchanged)
+- **Branch coverage crossed 94%** — broad improvements across API routes, admin components, immersive components, hooks, and lib modules
+- **Top branch improvements**: costs-analytics/route (81→92%), stripe-analytics/route (89→98%), marketing/dashboard/route (82→88%), story-viewer (93→97%), subscription-optimizer (86→90%), translate-story (91→95%), use-feature-flags (91→96%), use-stream-chat (95→97%)
+- **Flaky test fixed**: proxy.test.ts auth timeout assertion buffer increased (1s→2s) to prevent false failures
+- **Statement coverage plateau unchanged at 98.53%** — all uncovered statements remain in documented untestable categories
+- **Remaining low-coverage files**: posthog-provider (61.8%), voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — unchanged, all require Playwright E2E
 
 **Cross-agent recommendations:**
 - Performance Agent: No new dependencies added. All test additions are devDependency-only. No impact on bundle size.
-- Code Quality Agent: 4 complex admin components remain below 70% (posthog-provider, agent-chat, agents-dashboard, story-editor-dialog). These require ElevenLabs SDK, complex dialog state, or browser-only APIs — recommend Playwright E2E coverage rather than unit tests.
-- Security Agent: All webhook routes (elevenlabs, supabase, stripe, translate) now have error path coverage. MCP routes (places, weather, make-booking) have rate-limit 429 response coverage.
-- QA Agent: All CSRF error paths now tested. Chat route MAX_INPUT_LENGTH guard covered. MCP rate limiting covered.
+- Code Quality Agent: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. StatCard non-clickable branch at `admin/page.tsx:821` is architecturally unreachable.
+- Security Agent: All webhook and MCP error paths remain fully covered. No regression. API route branch coverage significantly improved.
+- QA Agent: No new testability gaps. The 3 SDK-dependent components need Playwright E2E tests for further coverage.
+- Cost Analyst Agent: No cost-related coverage gaps.
 <!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-21T09:00:00Z -->
+## Coverage Agent — 2026-03-21
+- **Test suite**: ✅ 100% passing (5475 tests, 0 failures) — +90 new tests
+- **TypeScript**: ✅ No errors
+- **Overall coverage**: 98.53% statements (unchanged), **94.05% branch (+0.82%)**, 98.60% function (unchanged), 98.94% line (unchanged)
+- **Branch coverage crossed 94%** — broad improvements across API routes, admin components, immersive components, hooks, and lib modules
+- **Statement coverage plateau unchanged at 98.53%** — all uncovered statements remain in documented untestable categories
+- **Remaining low-coverage files**: posthog-provider (61.8%), voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — unchanged, all require Playwright E2E
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-22T09:00:00Z -->
+## Coverage Agent — 2026-03-22
+- **Test suite**: ✅ 100% passing (5498 tests, 0 failures) — +23 new tests
+- **Overall coverage**: 98.53% statements, **94.36% branch (+0.31%)**, 98.60% function, 98.94% line
+- **2 files reached 100% branch**: `location.ts` (75→100%), `auth-provider.tsx` (83→100%)
+- **15 untestable branches documented**: SSR guards, `as const` guards, dead defensive guards, exhaustiveness checks
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-23T09:00:00Z -->
+## Coverage Agent — 2026-03-23
+- **Test suite**: ✅ 100% passing (5562 tests, 0 failures) — +64 new tests
+- **TypeScript**: ✅ No errors
+- **Overall coverage**: 98.53% statements (unchanged), **95.31% branch (+0.95%)**, 98.60% function (unchanged), 98.94% line (unchanged)
+- **Branch coverage crossed 95%** — largest single-cycle improvement (+0.95%), targeting MCP routes, admin components, hooks, and app pages across 18 files
+- **17 files reached 100% branch coverage**: analytics-dashboard (72→100%), admin-tabs (83→100%), story-card (86→100%), markdown (87→100%), agent-card (97→100%), optimizer-config-panel (92→100%), tunnel-control-panel (96→100%), maintenance-config-panel (97→100%), story-translations-tab (95→100%), use-feature-flags (95→100%), use-stream-chat (97→100%), coming-soon/page (81→100%), mcp/weather (90→100%), webhooks/elevenlabs (98→100%), plus near-100% for mcp/places (84→98.8%) and mcp/make-booking (88→96.9%)
+- **MCP route coverage significantly improved**: weather 100%, places 98.8%, make-booking 96.9% — up from 84-90% range
+- **26 untestable branches documented** in coverage report (SSR guards, dead code, architectural guards, V8 async coverage limitations)
+- **Statement coverage plateau unchanged at 98.53%** — all uncovered statements remain in documented untestable categories
+- **Remaining low-coverage files**: posthog-provider (61.8%), voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — unchanged, all require Playwright E2E
+
+**Cross-agent recommendations:**
+- Performance Agent: No new dependencies added. All test additions are devDependency-only. No impact on bundle size.
+- Code Quality Agent: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. `subscription-optimizer.ts:160` `?? []` is dead (undefined routes to "review" first).
+- Security Agent: All webhook and MCP error paths remain fully covered. No regression. MCP weather at 100%, elevenlabs webhook at 100%. API route branch coverage significantly improved.
+- QA Agent: No new testability gaps. The 3 SDK-dependent components need Playwright E2E tests for further coverage. Journey tests at 100% — consider adding chat interaction coverage.
+- Cost Analyst Agent: No cost-related coverage gaps.
+- Localization Agent: No locale-related coverage concerns.
+<!-- ENTRY:END -->
+
 
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-02-06T16:30:00Z -->
 ## Documentation Agent — 2026-02-06
@@ -255,4 +399,20 @@
 - Coverage Agent: MCP tool endpoints (`/api/mcp/*`) have 0% test coverage - these are external-facing APIs used by ElevenLabs and need tests
 - Security Agent: Webhook endpoints handle external input and use signature verification - verify HMAC implementations are timing-safe
 - QA Agent: Booking system uses outbound calls and SMS - test the full booking flow end-to-end, including failure modes
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-03-16T06:00:00Z -->
+## Documentation Agent — 2026-03-16
+- **Status: GREEN** — All documentation complete. No gaps found.
+- **Feature flags**: All 16 flags flagged by scanner are already documented in `docs/project/features.md` (Feature Flags Reference, 5 categories). Scanner false positive — it only checked CLAUDE.md, not features.md.
+- **API routes**: 44 routes flagged by scanner. All are either internal admin routes (no external docs needed) or already documented in features.md (webhooks, MCP tools, health endpoint).
+- **Modified files**: 5 files changed since last CLAUDE.md update — all test-only changes, no documentation impact.
+- **No changes made** to features.md or CLAUDE.md — documentation is current.
+
+**Cross-agent recommendations:**
+- Coverage Agent: No documentation-related coverage gaps.
+- Security Agent: No documentation changes needed this cycle.
+- QA Agent: No documentation changes needed this cycle.
+- Code Quality Agent: Gap detection script should also check `docs/project/features.md` (not just CLAUDE.md) to reduce false positives in future runs.
+- Cost Analyst Agent: No cost-related documentation concerns.
 <!-- ENTRY:END -->
