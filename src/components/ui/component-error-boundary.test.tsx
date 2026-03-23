@@ -119,4 +119,18 @@ describe("ComponentErrorBoundary", () => {
       expect.objectContaining({ componentStack: expect.any(String) })
     );
   });
+
+  it("uses translation key as fallback text when rendered without LanguageProvider", () => {
+    // Render WITHOUT LanguageProvider so this.context is null,
+    // covering the fallback: (key: string) => key
+    render(
+      <ComponentErrorBoundary>
+        <ThrowingChild shouldThrow={true} />
+      </ComponentErrorBoundary>
+    );
+
+    // Without a provider, t falls back to identity function — renders raw translation keys
+    expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "errors.retry" })).toBeInTheDocument();
+  });
 });

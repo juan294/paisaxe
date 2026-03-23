@@ -298,4 +298,25 @@ describe("AgentCard", () => {
 
     expect(screen.getByText("Last run completed successfully")).toBeInTheDocument();
   });
+
+  it("does not trigger onClick for non-Enter/Space keys (onKeyDown false branch, line 58)", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+
+    render(
+      <AgentCard
+        agent={mockAgent}
+        isRunning={false}
+        onRun={vi.fn()}
+        onStop={vi.fn()}
+        onClick={onClick}
+      />
+    );
+
+    const card = screen.getByText("Coverage Agent").closest("[role='button']")!;
+    (card as HTMLElement).focus();
+    // Press Tab key, which should NOT trigger onClick
+    await user.keyboard("{Tab}");
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });

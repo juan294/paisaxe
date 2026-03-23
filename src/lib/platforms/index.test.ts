@@ -166,5 +166,19 @@ describe("XClientAdapter", () => {
         impressions: undefined,
       });
     });
+
+    it("returns null when underlying client returns null (no metrics)", async () => {
+      // Simulate singleTweet returning data without public_metrics
+      mockSingleTweet.mockResolvedValueOnce({
+        data: {
+          public_metrics: undefined,
+        },
+      });
+
+      const client = createPlatformClient("x", validCredentials);
+      const result = await client.getEngagement("tweet-456");
+
+      expect(result).toBeNull();
+    });
   });
 });

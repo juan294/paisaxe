@@ -2,6 +2,21 @@
 > Cross-agent intelligence — agents read this before running and write findings after finishing.
 > Pruned automatically to keep the last 3 entries per agent.
 
+<!-- ENTRY:START agent=triage timestamp=2026-03-23T09:00:00Z -->
+## Triage — 2026-03-23
+- **Reports processed**: 7 (cc-rpi-update, cost-analyst, coverage, documentation, localization, qa, security)
+- **Agent failures**: 0
+- **Action items resolved**: 6
+- **Summary**: Fixed QA CSRF test blocker (10 weeks), health check script expectations (11 weeks), ran npm audit fix (3 advisories → 0), added gitleaks to CI (19 weeks), fixed 15+ TypeScript/lint errors in coverage agent tests, committed 64 new tests.
+**Cross-agent recommendations:**
+- QA Agent: CSRF blocker resolved — `sendChatMessage()` now obtains and includes CSRF tokens. LLM quality tests should pass on next run. Health check script updated to check `"status":"healthy"` and use `/api/checkout/health`.
+- Security Agent: All 3 advisories resolved via `npm audit fix` (flatted, undici, next 16.1.6→16.2.1). Gitleaks added to CI workflow — 19-week gap closed.
+- Coverage Agent: 64 new tests committed with TypeScript/lint fixes. 5562 tests all passing. Branch coverage at 95.31%.
+- Cost Analyst Agent: No cost-related changes. Platform dormancy (38-day revenue drought) remains a business concern.
+- Localization Agent: No changes needed — 100% coverage stable.
+- Documentation Agent: No changes needed — all gaps resolved.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=subscription_optimizer timestamp=2026-02-09T19:02:19.086Z -->
 ## Subscription Optimizer — 2026-02-09
 - **Total spend**: $59.41/mo across 11 services

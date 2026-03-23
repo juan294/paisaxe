@@ -8,7 +8,7 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/bin/bash</string>
-		<string>/Users/juan/Documents/code/paisaxe/scripts/coverage-agent.sh</string>
+		<string>/Users/juan/code/paisaxe/scripts/coverage-agent.sh</string>
 	</array>
 
 	<key>StartCalendarInterval</key>
@@ -20,13 +20,13 @@
 	</dict>
 
 	<key>StandardOutPath</key>
-	<string>/Users/juan/Documents/code/paisaxe/logs/coverage-agent-launchd.log</string>
+	<string>/Users/juan/code/paisaxe/logs/coverage-agent-launchd.log</string>
 
 	<key>StandardErrorPath</key>
-	<string>/Users/juan/Documents/code/paisaxe/logs/coverage-agent-launchd-err.log</string>
+	<string>/Users/juan/code/paisaxe/logs/coverage-agent-launchd-err.log</string>
 
 	<key>WorkingDirectory</key>
-	<string>/Users/juan/Documents/code/paisaxe</string>
+	<string>/Users/juan/code/paisaxe</string>
 
 	<key>EnvironmentVariables</key>
 	<dict>

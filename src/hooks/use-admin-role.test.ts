@@ -192,6 +192,32 @@ describe("useAdminRole", () => {
     expect(result.current.isAdmin).toBe(false);
   });
 
+  it("skips re-checking when effect re-runs with same user ID but new object reference", async () => {
+    const user1 = { id: "user-same", email: "admin@example.com" };
+    mockUseAuth.mockReturnValue({ user: user1, isLoading: false });
+    setupSupabaseMock({ role: "admin" });
+
+    const { result, rerender } = renderHook(() => useAdminRole());
+
+    // Wait for first check to complete
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.isAdmin).toBe(true);
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+
+    // Create a NEW object with the SAME id — triggers useEffect (new ref) but
+    // checkedUserIdRef.current === user.id is true, so it returns early (line 33)
+    const user2 = { id: "user-same", email: "admin@example.com" };
+    mockUseAuth.mockReturnValue({ user: user2, isLoading: false });
+
+    rerender();
+
+    // Should still be admin, and no additional query was made (line 33 early return)
+    expect(result.current.isAdmin).toBe(true);
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+  });
+
   it("resets checked user ref when user logs out", async () => {
     // Start with an admin user
     const user = { id: "user-ccc", email: "admin@example.com" };

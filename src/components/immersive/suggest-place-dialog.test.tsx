@@ -323,6 +323,75 @@ describe("SuggestPlaceDialog", () => {
       ).toBeInTheDocument();
     });
   });
+  it("prevents closing dialog while submission is in progress", async () => {
+    // Use a fetch that never resolves to keep loading state
+    mockFetch.mockImplementation(() => new Promise(() => {}));
+
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    fireEvent.change(placeNameInput, { target: { value: "Lago Enol" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    // Verify loading state is active
+    expect(screen.getByText("Submitting...")).toBeInTheDocument();
+
+    // Try to close the dialog via the X close button (triggers onOpenChange(false))
+    const closeButton = screen.getByRole("button", { name: /close/i });
+    fireEvent.click(closeButton);
+
+    // onClose should NOT have been called because submission is in progress
+    expect(mockOnClose).not.toHaveBeenCalled();
+  });
+
+  it("resets state when dialog closes while idle", async () => {
+    // First, trigger an error to set errorMessage and submitState to "error"
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    const longName = "A".repeat(101);
+    fireEvent.change(placeNameInput, { target: { value: longName } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    // Verify error state is active
+    await waitFor(() => {
+      expect(
+        screen.getByText("Place name must be 3-100 characters")
+      ).toBeInTheDocument();
+    });
+
+    // Close the dialog via the X close button (triggers onOpenChange(false))
+    const closeButton = screen.getByRole("button", { name: /close/i });
+    fireEvent.click(closeButton);
+
+    // onClose should have been called since we're not in loading state
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it("shows generic error when catch receives a non-Error value (line 83 else branch)", async () => {
+    // Make fetch throw a non-Error value (string) to hit the else branch
+    mockFetch.mockImplementationOnce(() => {
+      throw "some string error";
+    });
+
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    fireEvent.change(placeNameInput, { target: { value: "Lago Enol" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+    });
+  });
+
+  // Line 89: `if (!open)` false branch — handleOpenChange is called with open=true.
+  // This is a no-op path: when Radix Dialog calls onOpenChange(true), the handler
+  // intentionally does nothing. This branch is architecturally unreachable in tests
+  // because the dialog is controlled via the `isOpen` prop, and Radix only calls
+  // onOpenChange(false) when the user dismisses the dialog. The no-op is defensive
+  // and protects against unexpected open-state changes.
+
   it("renders error message with role=alert for screen readers", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,

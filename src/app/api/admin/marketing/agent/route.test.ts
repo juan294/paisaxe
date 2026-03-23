@@ -223,6 +223,20 @@ describe("/api/admin/marketing/agent", () => {
       expect(data.error).toBe("Agent persona files not found");
     });
 
+    it("should return 500 with generic error for non-Error thrown object", async () => {
+      mocks.anthropicCreate.mockRejectedValueOnce("string error without Error class");
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent", {
+        method: "POST",
+        body: JSON.stringify({ agentId: "xander", message: "Hello" }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to process agent request");
+    });
+
     it("should return 500 with generic error for unexpected failures", async () => {
       mocks.anthropicCreate.mockRejectedValueOnce(new Error("API rate limit exceeded"));
       const request = new NextRequest("http://localhost/api/admin/marketing/agent", {
@@ -296,6 +310,18 @@ describe("/api/admin/marketing/agent", () => {
         "iris",
         "penny",
       ]);
+    });
+
+    it("should include voice details for agents with voice config", async () => {
+      const response = await GET();
+      const data = await response.json();
+
+      // All current agents have voice configs
+      for (const agent of data.agents) {
+        expect(agent.voice).toBeDefined();
+        expect(agent.voice.style).toBeTruthy();
+        expect(agent.voice.tone).toBeTruthy();
+      }
     });
   });
 });

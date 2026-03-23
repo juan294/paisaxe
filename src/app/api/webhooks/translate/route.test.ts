@@ -36,6 +36,20 @@ describe("translate webhook", () => {
     expect(response.status).toBe(401);
   });
 
+  it("should reject requests when body is null", async () => {
+    // JSON.parse("null") returns null — exercises the `body === null` branch in isValidPayload
+    const request = new NextRequest("http://localhost/api/webhooks/translate", {
+      method: "POST",
+      headers: { "x-webhook-secret": VALID_SECRET },
+      body: "null",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+    const json = await response.json();
+    expect(json.error).toContain("storyId");
+  });
+
   it("should reject requests without storyId", async () => {
     const request = new NextRequest("http://localhost/api/webhooks/translate", {
       method: "POST",

@@ -256,6 +256,26 @@ describe("LanguageSwitcher", () => {
       expect(parentHandler).not.toHaveBeenCalled();
     });
 
+    it("stops propagation when clicking inside the dropdown", () => {
+      const parentHandler = vi.fn();
+      render(
+        <div onClick={parentHandler}>
+          <LanguageSwitcher />
+        </div>
+      );
+
+      // Expand the dropdown
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      // Click on the dropdown container itself (the listbox), not a language option
+      const listbox = screen.getByRole("listbox");
+      fireEvent.click(listbox);
+
+      // The parent handler should NOT have been called because stopPropagation is on the dropdown
+      expect(parentHandler).not.toHaveBeenCalled();
+    });
+
     it("should stop event propagation on language selection", () => {
       const parentHandler = vi.fn();
       render(
@@ -438,6 +458,117 @@ describe("LanguageSwitcher", () => {
       // EN is index 2 in the languages array
       expect(options[2]).toHaveAttribute("aria-selected", "true");
       expect(options[0]).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("should handle Enter key when no option is focused (currentIndex < 0)", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const listbox = screen.getByRole("listbox");
+
+      // Blur all options so activeElement is not in the options list (currentIndex = -1)
+      (document.activeElement as HTMLElement)?.blur();
+
+      // Press Enter — should not call setLocale since currentIndex < 0
+      fireEvent.keyDown(listbox, { key: "Enter" });
+      expect(mockSetLocale).not.toHaveBeenCalled();
+    });
+
+    it("should do nothing for unrecognized keys", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      const listbox = screen.getByRole("listbox");
+      const options = screen.getAllByRole("option");
+      options[0].focus();
+
+      // Press an unrecognized key — nothing should change
+      fireEvent.keyDown(listbox, { key: "x" });
+      expect(document.activeElement).toBe(options[0]);
+      expect(mockSetLocale).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("unreachable guards in handleListboxKeyDown", () => {
+    // Lines 72 and 75: `if (!listbox) return;` and `if (options.length === 0) return;`
+    // are architecturally unreachable. The listboxRef inner div (line 151) is always
+    // rendered in the DOM (just hidden via CSS when collapsed), so listboxRef.current
+    // is never null. Similarly, the 6 language option buttons are always rendered inside
+    // the listbox, so options.length is always 6. These guards are defensive programming
+    // and cannot be exercised via the component's public API.
+
+    it("listboxRef is always set — guard on line 72 is unreachable", () => {
+      render(<LanguageSwitcher />);
+
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      // The listbox always contains 6 option elements
+      const options = screen.getAllByRole("option");
+      expect(options).toHaveLength(6);
+
+      // Arrow key navigation works, proving listboxRef.current is valid
+      const listbox = screen.getByRole("listbox");
+      options[0].focus();
+      fireEvent.keyDown(listbox, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(options[1]);
+    });
+  });
+
+  describe("locale fallback", () => {
+    it("should fall back to first language (ES) when locale does not match any language", () => {
+      // Set locale to a value not in the languages array
+      mockLocale = "ja" as "es";
+      render(<LanguageSwitcher />);
+
+      // The toggle button should show the first language's label (ES) as fallback
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      expect(within(toggleButton).getByText("ES")).toBeInTheDocument();
+    });
+  });
+
+  describe("click outside behavior", () => {
+    it("should close dropdown when clicking outside the container", () => {
+      mockLocale = "es";
+      render(
+        <div>
+          <button data-testid="outside-button">Outside</button>
+          <LanguageSwitcher />
+        </div>
+      );
+
+      // Open the dropdown
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      // Verify it is expanded
+      expect(toggleButton).toHaveAttribute("aria-expanded", "true");
+
+      // Click outside the container using mousedown (the handler listens to mousedown)
+      fireEvent.mouseDown(screen.getByTestId("outside-button"));
+
+      // Dropdown should now be closed
+      expect(toggleButton).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("should not close dropdown when clicking inside the container", () => {
+      mockLocale = "es";
+      render(<LanguageSwitcher />);
+
+      // Open the dropdown
+      const toggleButton = screen.getByRole("button", { expanded: false });
+      fireEvent.click(toggleButton);
+
+      // Click inside the container (on the listbox)
+      const listbox = screen.getByRole("listbox");
+      fireEvent.mouseDown(listbox);
+
+      // Dropdown should remain open
+      expect(toggleButton).toHaveAttribute("aria-expanded", "true");
     });
   });
 });

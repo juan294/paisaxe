@@ -286,5 +286,26 @@ describe("agents-dashboard/markdown", () => {
       expect(result).toHaveLength(1);
       expect(result[0].content).toBe("new");
     });
+
+    it("skips older duplicate when a newer entry was already seen (line 51 false branch)", () => {
+      const entries: SharedContextEntry[] = [
+        {
+          agentFlag: "coverage_agent_enabled",
+          agentName: "Coverage Agent",
+          content: "newer report",
+          timestamp: "2026-02-16T10:00:00Z",
+        },
+        {
+          agentFlag: "coverage_agent_enabled",
+          agentName: "Coverage Agent",
+          content: "older report",
+          timestamp: "2026-02-16T06:00:00Z",
+        },
+      ];
+      const result = deduplicateByAgent(entries);
+      expect(result).toHaveLength(1);
+      // Should keep the newer entry, not replace with the older one
+      expect(result[0].content).toBe("newer report");
+    });
   });
 });

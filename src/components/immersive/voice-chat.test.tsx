@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -82,6 +83,10 @@ vi.mock("next/dynamic", async () => {
       loader: () => Promise<React.ComponentType<Record<string, unknown>> | { default: React.ComponentType<Record<string, unknown>> }>,
       opts?: { loading?: () => React.ReactElement; ssr?: boolean }
     ) => {
+      // Capture the loading fallback function on globalThis for direct testing (voice-chat.tsx line 32)
+      if (opts?.loading) {
+        (globalThis as Record<string, unknown>).__capturedDynamicLoadingFn = opts.loading;
+      }
       let Resolved: React.ComponentType<Record<string, unknown>> | null = null;
       const pending = loader().then((mod) => {
         // Handle both named export (component returned directly) and default export ({ default: Comp })
@@ -1118,6 +1123,24 @@ describe("VoiceChat dynamic import", () => {
 
     // Verify the text content to confirm it's the mocked dynamic component
     expect(screen.getByText("Voice chat active for Lagos de Covadonga")).toBeInTheDocument();
+  });
+});
+
+// Test for dynamic import loading fallback (voice-chat.tsx line 32)
+describe("VoiceChat dynamic loading fallback", () => {
+  it("should define a loading fallback that renders the voice-loading-fallback placeholder (line 32)", () => {
+    // The loading callback at line 31-44 of voice-chat.tsx is captured by our next/dynamic mock
+    // on globalThis during module initialization.
+    const loadingFn = (globalThis as Record<string, unknown>).__capturedDynamicLoadingFn as (() => React.ReactElement) | undefined;
+    expect(loadingFn).toBeDefined();
+
+    const { container } = render(loadingFn!());
+
+    // The loading fallback should have the voice-loading-fallback testid
+    expect(screen.getByTestId("voice-loading-fallback")).toBeInTheDocument();
+
+    // It should contain the Spanish loading text
+    expect(container.textContent).toContain("Cargando asistente de voz...");
   });
 });
 

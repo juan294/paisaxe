@@ -49,6 +49,35 @@ describe("computeTierAlerts", () => {
     expect(alerts[0].projectedDaysToLimit).toBe(0);
   });
 
+  it("should return critical via projection when limit hit in less than 7 days", () => {
+    const tiers: ServiceTierConfig[] = [
+      {
+        serviceId: "test",
+        serviceName: "Test",
+        currentTierName: "Free",
+        currentMonthlyCostUsd: 0,
+        limits: [
+          { metricKey: "testMetric", label: "Test", monthlyLimit: 100, unit: "calls" },
+        ],
+        nextTier: { tierName: "Pro", monthlyCostUsd: 10 },
+      },
+    ];
+
+    // 95 usage in 30 days = 95/month, remaining = 5, daily = 95/30 ≈ 3.17
+    // daysToLimit = ceil(5 / 3.17) = 2 → critical (< 7)
+    const alerts = computeTierAlerts(
+      tiers,
+      { testMetric: 95 },
+      30,
+      refDate
+    );
+
+    expect(alerts[0].alertLevel).toBe("critical");
+    expect(alerts[0].projectedDaysToLimit).toBeGreaterThan(0);
+    expect(alerts[0].projectedDaysToLimit).toBeLessThan(7);
+    expect(alerts[0].recommendation).toBeDefined();
+  });
+
   it("should return warning when limit hit in 7-30 days", () => {
     const tiers: ServiceTierConfig[] = [
       {
@@ -230,6 +259,43 @@ describe("computeTierAlerts", () => {
 
     expect(alerts[0].alertLevel).toBe("critical");
     expect(alerts[1].alertLevel).toBe("safe");
+  });
+
+  it("should default to current date when referenceDate is omitted", () => {
+    const tiers: ServiceTierConfig[] = [
+      {
+        serviceId: "test",
+        serviceName: "Test",
+        currentTierName: "Free",
+        currentMonthlyCostUsd: 0,
+        limits: [
+          { metricKey: "testMetric", label: "Test", monthlyLimit: 100, unit: "calls" },
+        ],
+      },
+    ];
+
+    // Should not throw and should return valid alerts
+    const alerts = computeTierAlerts(tiers, { testMetric: 50 }, 30);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].alertLevel).toBeDefined();
+  });
+
+  it("should return 0 usagePercent when monthlyLimit is 0", () => {
+    const tiers: ServiceTierConfig[] = [
+      {
+        serviceId: "test",
+        serviceName: "Test",
+        currentTierName: "Free",
+        currentMonthlyCostUsd: 0,
+        limits: [
+          { metricKey: "testMetric", label: "Test", monthlyLimit: 0, unit: "calls" },
+        ],
+      },
+    ];
+
+    const alerts = computeTierAlerts(tiers, { testMetric: 50 }, 30, refDate);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].usagePercent).toBe(0);
   });
 
   it("should compute correct projected date", () => {

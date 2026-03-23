@@ -10,8 +10,13 @@ vi.mock("@/lib/admin-api", () => ({
   deleteSuggestion: vi.fn(),
 }));
 
+// Store the latest props passed to CreateStoryDialog so tests can invoke callbacks
+let createStoryDialogProps: Record<string, unknown> = {};
 vi.mock("./create-story-dialog", () => ({
-  CreateStoryDialog: () => null,
+  CreateStoryDialog: (props: Record<string, unknown>) => {
+    createStoryDialogProps = props;
+    return props.open ? <div data-testid="create-story-dialog">Dialog Open</div> : null;
+  },
 }));
 
 const mockSuggestions = [
@@ -666,8 +671,252 @@ describe("SuggestionsPanel", () => {
     });
   });
 
-  // NOTE: Lines 147-156 (handleStoryCreated callback) and 458 (onOpenChange for CreateStoryDialog)
-  // are not testable because CreateStoryDialog is mocked to null. These callbacks are only invoked
-  // by the dialog's internal logic which is mocked away. Testing these would require integration
-  // testing with the real CreateStoryDialog component.
+  it("handleStoryCreated updates suggestion status to converted", async () => {
+    const user = userEvent.setup();
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: mockSuggestions,
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Playa de Gulpiyuri")).toBeInTheDocument();
+    });
+
+    // Expand and click Convert to Story to set convertingSuggestion
+    const expandButtons = screen.getAllByLabelText("Expand");
+    await user.click(expandButtons[0]);
+    const convertBtn = screen.getByText("Convert to Story");
+    await user.click(convertBtn);
+
+    // Dialog should now be open
+    await waitFor(() => {
+      expect(screen.getByTestId("create-story-dialog")).toBeInTheDocument();
+    });
+
+    // Invoke the onCreated callback via the captured props
+    const { act } = await import("@testing-library/react");
+    await act(async () => {
+      const onCreated = createStoryDialogProps.onCreated as (story: { id: string }) => void;
+      onCreated({ id: "new-story-id" });
+    });
+
+    // The suggestion should now show as "Converted"
+    await waitFor(() => {
+      expect(screen.getAllByText("Converted").length).toBeGreaterThanOrEqual(1);
+    });
+
+    // Dialog should be closed (convertingSuggestion set to null)
+    expect(screen.queryByTestId("create-story-dialog")).not.toBeInTheDocument();
+  });
+
+  it("onOpenChange(false) closes the dialog", async () => {
+    const user = userEvent.setup();
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: mockSuggestions,
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Playa de Gulpiyuri")).toBeInTheDocument();
+    });
+
+    // Expand and click Convert to Story
+    const expandButtons = screen.getAllByLabelText("Expand");
+    await user.click(expandButtons[0]);
+    const convertBtn = screen.getByText("Convert to Story");
+    await user.click(convertBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("create-story-dialog")).toBeInTheDocument();
+    });
+
+    // Invoke onOpenChange(false) via captured props
+    const { act } = await import("@testing-library/react");
+    await act(async () => {
+      const onOpenChange = createStoryDialogProps.onOpenChange as (open: boolean) => void;
+      onOpenChange(false);
+    });
+
+    // Dialog should be closed
+    await waitFor(() => {
+      expect(screen.queryByTestId("create-story-dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows 'Unknown user' when userId is set but userEmail is null", async () => {
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: [
+        {
+          ...mockSuggestions[0],
+          id: "s-unknown",
+          placeName: "Senda del Oso",
+          userId: "user-no-email",
+          userEmail: null,
+        },
+      ],
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Senda del Oso")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Unknown user")).toBeInTheDocument();
+  });
+
+  it("falls back to raw location value when not in LOCATION_LABELS", async () => {
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: [
+        {
+          ...mockSuggestions[0],
+          id: "s-custom-loc",
+          placeName: "Mysterious Place",
+          location: "southern" as never,
+        },
+      ],
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Mysterious Place")).toBeInTheDocument();
+    });
+
+    // "southern" is not in LOCATION_LABELS, so the raw value is displayed
+    expect(screen.getByText("southern")).toBeInTheDocument();
+  });
+
+  it("handleSaveNotes sends empty string when no notes have been typed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: [
+        {
+          ...mockSuggestions[0],
+          id: "s-no-notes",
+          placeName: "Cabo Peñas",
+          adminNotes: null,
+        },
+      ],
+    });
+    vi.mocked(adminApi.updateSuggestion).mockResolvedValue({
+      data: { ...mockSuggestions[0], id: "s-no-notes", adminNotes: "" },
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Cabo Peñas")).toBeInTheDocument();
+    });
+
+    // Expand the suggestion
+    const expandBtn = screen.getByLabelText("Expand");
+    await user.click(expandBtn);
+
+    // Click Save Notes without typing anything — adminNotes[id] is undefined
+    const saveBtn = screen.getByText("Save Notes");
+    await user.click(saveBtn);
+
+    // The fallback || "" should send empty string
+    expect(adminApi.updateSuggestion).toHaveBeenCalledWith("s-no-notes", {
+      adminNotes: "",
+    });
+  });
+
+  it("handleStoryCreated without convertingSuggestion is a no-op", async () => {
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: mockSuggestions,
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Playa de Gulpiyuri")).toBeInTheDocument();
+    });
+
+    // The dialog is not open (convertingSuggestion is null).
+    // Invoke onCreated directly — should be a safe no-op.
+    const { act } = await import("@testing-library/react");
+    await act(async () => {
+      const onCreated = createStoryDialogProps.onCreated as (story: { id: string }) => void;
+      onCreated({ id: "orphan-story-id" });
+    });
+
+    // Suggestions should remain unchanged — s1 is still "Pending"
+    const pendingBadges = screen.getAllByText("Pending");
+    expect(pendingBadges.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("handles fetchSuggestions returning neither error nor data (line 79 false branch)", async () => {
+    // fetchSuggestions returns an object with neither error nor data
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({});
+
+    render(<SuggestionsPanel />);
+
+    // Should finish loading and show empty state (suggestions stays empty)
+    await waitFor(() => {
+      expect(screen.getByText("No suggestions yet")).toBeInTheDocument();
+    });
+  });
+
+  it("handles updateSuggestion returning neither error nor data (line 103 false branch)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: mockSuggestions,
+    });
+    // updateSuggestion returns neither error nor data
+    vi.mocked(adminApi.updateSuggestion).mockResolvedValue({});
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Playa de Gulpiyuri")).toBeInTheDocument();
+    });
+
+    // Expand first suggestion and click Mark Reviewed
+    const expandButtons = screen.getAllByLabelText("Expand");
+    await user.click(expandButtons[0]);
+
+    const markReviewedBtn = screen.getByText("Mark Reviewed");
+    await user.click(markReviewedBtn);
+
+    // No error should be shown (no error returned)
+    expect(screen.queryByText("Update failed")).not.toBeInTheDocument();
+    // Suggestion should still show as Pending (data was null so state wasn't updated)
+    expect(screen.getAllByText("Pending").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows converted status buttons correctly for a reviewed suggestion", async () => {
+    const user = userEvent.setup();
+    vi.mocked(adminApi.fetchSuggestions).mockResolvedValue({
+      data: [
+        {
+          ...mockSuggestions[0],
+          id: "s-converted",
+          placeName: "Playa del Silencio",
+          status: "converted" as const,
+          convertedStoryId: "story-123",
+        },
+      ],
+    });
+
+    render(<SuggestionsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Playa del Silencio")).toBeInTheDocument();
+    });
+
+    // Expand the converted suggestion
+    const expandBtn = screen.getByLabelText("Expand");
+    await user.click(expandBtn);
+
+    // For a "converted" suggestion, "Convert to Story" should NOT be shown
+    expect(screen.queryByText("Convert to Story")).not.toBeInTheDocument();
+    // But "Mark Reviewed" and "Reject" should still be available
+    expect(screen.getByText("Mark Reviewed")).toBeInTheDocument();
+    expect(screen.getByText("Reject")).toBeInTheDocument();
+    expect(screen.getByText("Delete")).toBeInTheDocument();
+  });
 });

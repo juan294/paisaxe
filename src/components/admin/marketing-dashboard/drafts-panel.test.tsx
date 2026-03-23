@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DraftsPanel } from "./drafts-panel";
 
-// Mock the create-draft-dialog — expose onCreated for testing
+// Mock the create-draft-dialog — expose onCreated and onClose for testing
 vi.mock("./create-draft-dialog", () => ({
-  CreateDraftDialog: ({ open, onCreated }: { open: boolean; onCreated: () => void; onClose: () => void }) => (
-    open ? <button data-testid="mock-create-done" onClick={onCreated}>Done</button> : null
+  CreateDraftDialog: ({ open, onCreated, onClose }: { open: boolean; onCreated: () => void; onClose: () => void }) => (
+    open ? (
+      <>
+        <button data-testid="mock-create-done" onClick={onCreated}>Done</button>
+        <button data-testid="mock-create-close" onClick={onClose}>Close Dialog</button>
+      </>
+    ) : null
   ),
 }));
 
@@ -160,6 +165,44 @@ describe("DraftsPanel", () => {
     await user.click(copyButtons[0]);
 
     expect(writeText).toHaveBeenCalledWith("Check out the stunning Covadonga lakes!");
+  });
+
+  it("resets copied state after 2s timeout (line 39)", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      writable: true,
+      configurable: true,
+    });
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: mockDrafts }),
+    });
+
+    const { container } = render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    // Wait for drafts to load
+    await waitFor(() => {
+      expect(screen.getByText("Check out the stunning Covadonga lakes!")).toBeInTheDocument();
+    });
+
+    // Click copy on first draft
+    const copyButtons = screen.getAllByTitle("Copy content");
+    fireEvent.click(copyButtons[0]);
+
+    // Check icon should be shown after clipboard write resolves
+    await waitFor(() => {
+      expect(container.querySelector(".lucide-check")).toBeInTheDocument();
+    });
+
+    // Wait for the 2s timeout at line 39 to reset the copied state
+    await waitFor(
+      () => {
+        expect(container.querySelector(".lucide-check")).not.toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
   });
 
   it("marks draft as posted and reloads", async () => {
@@ -395,6 +438,36 @@ describe("DraftsPanel", () => {
     expect(screen.getByText("New Draft")).toBeInTheDocument();
   });
 
+  it("closes create draft dialog via onClose callback", async () => {
+    const user = userEvent.setup();
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [] }),
+    });
+
+    render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("New Draft")).toBeInTheDocument();
+    });
+
+    // Open the create dialog
+    await user.click(screen.getByText("New Draft"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mock-create-close")).toBeInTheDocument();
+    });
+
+    // Click "Close Dialog" to trigger onClose (line 164: setShowCreateDialog(false))
+    await user.click(screen.getByTestId("mock-create-close"));
+
+    // Dialog should close
+    await waitFor(() => {
+      expect(screen.queryByTestId("mock-create-close")).not.toBeInTheDocument();
+    });
+  });
+
   it("handles mark-as-posted fetch error gracefully", async () => {
     const user = userEvent.setup();
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -421,5 +494,76 @@ describe("DraftsPanel", () => {
     expect(onDraftPosted).not.toHaveBeenCalled();
 
     consoleSpy.mockRestore();
+  });
+
+  it("handles null data in ok response by setting empty drafts (line 22 fallback)", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: null }),
+    });
+
+    render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    // result.data is null, so result.data || [] should give empty array
+    await waitFor(() => {
+      expect(screen.getByText("No drafts yet. Chat with the marketing agents to create content.")).toBeInTheDocument();
+    });
+  });
+
+  it("does not reload or call onDraftPosted when mark-as-posted response is not ok (line 51 false)", async () => {
+    const user = userEvent.setup();
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockDrafts }) })
+      .mockResolvedValueOnce({ ok: false, json: () => Promise.resolve({ error: "Unauthorized" }) });
+    global.fetch = fetchMock;
+
+    render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTitle("Mark as posted")).toHaveLength(2);
+    });
+
+    const postedButtons = screen.getAllByTitle("Mark as posted");
+    await user.click(postedButtons[0]);
+
+    // Wait for the PATCH call to complete
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    // onDraftPosted should NOT have been called because response.ok was false
+    expect(onDraftPosted).not.toHaveBeenCalled();
+    // loadDrafts should NOT have been called again (only 2 total fetches: initial + PATCH)
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not reload when delete response is not ok (line 67 false)", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockDrafts }) })
+      .mockResolvedValueOnce({ ok: false, json: () => Promise.resolve({ error: "Forbidden" }) });
+    global.fetch = fetchMock;
+
+    render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTitle("Delete draft")).toHaveLength(2);
+    });
+
+    const deleteButtons = screen.getAllByTitle("Delete draft");
+    await user.click(deleteButtons[0]);
+
+    // Wait for the DELETE call to complete
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    // loadDrafts should NOT have been called again (only 2 total fetches: initial + DELETE)
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Drafts should still be visible (not reloaded)
+    expect(screen.getByText("Check out the stunning Covadonga lakes!")).toBeInTheDocument();
   });
 });

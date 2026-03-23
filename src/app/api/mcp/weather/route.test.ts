@@ -429,4 +429,90 @@ describe("/api/mcp/weather", () => {
       expect(fetchUrl).not.toContain("q=oviedo");
     });
   });
+
+  describe("fetchWeather - empty weather array fallbacks", () => {
+    it("should fall back to 'Unknown' description and '01d' icon when weather array is empty", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            name: "Oviedo",
+            main: { temp: 12, feels_like: 10, humidity: 80 },
+            weather: [], // empty weather array
+            wind: { speed: 2.0 },
+          }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.description).toBe("Unknown");
+      expect(data.icon).toBe("01d");
+    });
+  });
+
+  describe("GET - non-Error throw coverage", () => {
+    it("should return 'Unknown error' when GET catch receives a non-Error object", async () => {
+      mockFetch.mockRejectedValueOnce("string error");
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Unknown error");
+    });
+  });
+
+  describe("POST - non-Error throw coverage", () => {
+    it("should return 'Unknown error' when POST catch receives a non-Error object", async () => {
+      mockFetch.mockRejectedValueOnce(null);
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Unknown error");
+    });
+  });
+
+  describe("fetchWeather - unknown city fallback to city name search", () => {
+    it("should use q= parameter for unknown cities not in ASTURIAS_CITIES", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            name: "Santander",
+            main: { temp: 16, feels_like: 15, humidity: 75 },
+            weather: [{ description: "cloudy", icon: "04d" }],
+            wind: { speed: 5.0 },
+          }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Santander",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      await GET(request);
+
+      const fetchUrl = mockFetch.mock.calls[0][0] as string;
+      expect(fetchUrl).toContain("q=Santander");
+      expect(fetchUrl).toContain(",ES");
+      expect(fetchUrl).not.toContain("lat=");
+    });
+  });
 });

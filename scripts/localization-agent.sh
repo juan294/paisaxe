@@ -3,7 +3,7 @@
 # Checks for missing translations across all locales and fills gaps automatically
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/Documents/code/paisaxe"
+PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/localization-agent-$(date +%Y-%m-%d).log"

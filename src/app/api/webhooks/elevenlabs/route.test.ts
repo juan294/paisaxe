@@ -223,6 +223,94 @@ describe("POST /api/webhooks/elevenlabs", () => {
       expect(data.error).toBe("Signature expired");
     });
 
+    it("should return 401 when signature hex length differs from expected", async () => {
+      // Provide a truncated hex signature so sigBuffer.length !== expectedBuffer.length (line 138)
+      const now = Math.floor(Date.now() / 1000);
+      const payload = JSON.stringify({ conversation_id: "conv_456" });
+      const request = new NextRequest(
+        "http://localhost:3000/api/webhooks/elevenlabs",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "elevenlabs-signature": `t=${now},v0=aabb`,
+          },
+          body: payload,
+        }
+      );
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toBe("Invalid signature");
+    });
+
+    it("should return 401 when signature contains invalid hex causing an exception", async () => {
+      // Non-hex chars in v0 can cause Buffer.from to produce unexpected results
+      // or createHmac/timingSafeEqual to throw — exercises the catch block (line 143)
+      const now = Math.floor(Date.now() / 1000);
+      const payload = JSON.stringify({ conversation_id: "conv_456" });
+      const request = new NextRequest(
+        "http://localhost:3000/api/webhooks/elevenlabs",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // Use a very long non-hex string that might cause issues in Buffer comparison
+            "elevenlabs-signature": `t=${now},v0=${"zz".repeat(32)}`,
+          },
+          body: payload,
+        }
+      );
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toBe("Invalid signature");
+    });
+
+    it("should return 401 when crypto operations throw (catch block line 143)", async () => {
+      // Temporarily override Buffer.from to throw when called with "hex" encoding
+      // inside verifySignature's try block, exercising the catch block
+      const originalBufferFrom = Buffer.from;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Buffer.from = function (...args: any[]) {
+        // The route calls Buffer.from(signature, "hex") and Buffer.from(expected, "hex")
+        // Throw on the first "hex" call to trigger the catch block
+        if (args[1] === "hex") {
+          throw new TypeError("Simulated Buffer.from error");
+        }
+        return originalBufferFrom.apply(Buffer, args as never);
+      } as typeof Buffer.from;
+
+      try {
+        const now = Math.floor(Date.now() / 1000);
+        const payload = JSON.stringify({ conversation_id: "conv_456" });
+        const request = new NextRequest(
+          "http://localhost:3000/api/webhooks/elevenlabs",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "elevenlabs-signature": `t=${now},v0=${"ab".repeat(32)}`,
+            },
+            body: payload,
+          }
+        );
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(401);
+        expect(data.error).toBe("Invalid signature");
+      } finally {
+        // Always restore Buffer.from
+        Buffer.from = originalBufferFrom;
+      }
+    });
+
     it("should accept valid signature with current timestamp", async () => {
       const request = createSignedRequest({
         conversation_id: "conv_456",
@@ -615,6 +703,40 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.error).toBe("Internal server error");
   });
 
+  it("should handle undefined transcript gracefully", async () => {
+    // Exercises extractTranscriptText line 161: `if (!transcript) return ""`
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      // No transcript field at all — undefined
+      analysis: {
+        call_successful: "success",
+        transcript_summary: "Reserva confirmada para 4 personas.",
+      },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // "confirmada" matches CONFIRMED_PATTERNS via the summary
+    expect(data.outcome).toBe("confirmed");
+  });
+
+  it("should handle string transcript (legacy format)", async () => {
+    // Exercises extractTranscriptText line 163: `if (typeof transcript === "string") return transcript`
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      transcript: "Hola, le esperamos a las nueve. Perfecto, confirmado.",
+      analysis: { call_successful: "success" },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.outcome).toBe("confirmed");
+  });
+
   it("should handle transcript as non-array non-string type gracefully", async () => {
     const request = createSignedRequest({
       conversation_id: "conv_456",
@@ -629,5 +751,27 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(response.status).toBe(200);
     // With no matching keywords and unknown call status, should default to failed
     expect(data.outcome).toBe("failed");
+  });
+
+  it("should handle transcript entries with missing message field (line 167 fallback)", async () => {
+    // Exercises `entry.message || ""` in extractTranscriptText — the "" fallback
+    // when entry.message is undefined/null/empty
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      transcript: [
+        { role: "agent", message: undefined, time_in_call_secs: 0 },
+        { role: "user", message: "", time_in_call_secs: 5 },
+        { role: "agent", message: null, time_in_call_secs: 10 },
+        { role: "user", message: "Confirmado, le esperamos.", time_in_call_secs: 15 },
+      ],
+      analysis: { call_successful: "success" },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // The last entry has "confirmado" which matches CONFIRMED_PATTERNS
+    expect(data.outcome).toBe("confirmed");
   });
 });

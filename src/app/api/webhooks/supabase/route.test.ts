@@ -134,6 +134,27 @@ describe("POST /api/webhooks/supabase", () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
+  it("should return 400 when payload body is null", async () => {
+    // JSON.parse("null") returns null — exercises the `body === null` branch in isValidPayload
+    const request = new NextRequest(
+      "http://localhost:3000/api/webhooks/supabase",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-webhook-secret": "test-webhook-secret",
+        },
+        body: "null",
+      }
+    );
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Bad request: missing required fields");
+  });
+
   it("should return 500 when an unexpected error occurs", async () => {
     // Create a request that will cause JSON parsing to fail
     const request = new NextRequest(

@@ -74,3 +74,30 @@ describe("AdminTabs", () => {
     );
   });
 });
+
+describe("TABS export — development branch (line 22)", () => {
+  it("should include the Agents tab when NODE_ENV is 'development'", async () => {
+    vi.resetModules();
+    // Stub NODE_ENV to development before importing the module
+    vi.stubEnv("NODE_ENV", "development");
+
+    const { TABS: devTabs } = await import("./admin-tabs");
+
+    expect(devTabs.find((t) => t.value === "agents")).toBeDefined();
+    expect(devTabs).toHaveLength(6); // all 6 tabs including Agents
+
+    vi.unstubAllEnvs();
+  });
+
+  it("should exclude the Agents tab when NODE_ENV is not 'development'", async () => {
+    vi.resetModules();
+    vi.stubEnv("NODE_ENV", "production");
+
+    const { TABS: prodTabs } = await import("./admin-tabs");
+
+    expect(prodTabs.find((t) => t.value === "agents")).toBeUndefined();
+    expect(prodTabs).toHaveLength(5); // 5 tabs without Agents
+
+    vi.unstubAllEnvs();
+  });
+});

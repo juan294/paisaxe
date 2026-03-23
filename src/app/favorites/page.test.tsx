@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import FavoritesPage from "./page";
 import { createMockT } from "@/test/i18n-mock";
 
@@ -473,6 +473,403 @@ describe("FavoritesPage", () => {
       // With exactly 20 items, hasMore is false so the guard clause prevents loading.
       // All 20 are displayed, confirm the count header.
       expect(screen.getByText(`20 ${mockT("favorites.place_plural")}`)).toBeInTheDocument();
+    });
+  });
+
+  describe("loadMore guard (line 36)", () => {
+    it("should guard loadMore when already loading or no more items (line 36)", async () => {
+      // With exactly 20 stories (= ITEMS_PER_PAGE), hasMore starts as false,
+      // so the loadMore guard `if (isLoadingMore || !hasMore) return;` triggers
+      // on the `!hasMore` branch. This verifies the guard prevents unnecessary loading.
+      const exactStories = Array.from({ length: 20 }, (_, i) => ({
+        id: `story-${i}`,
+        slug: `story-slug-${i}`,
+        title: `Story Title ${i}`,
+        subtitle: `Subtitle ${i}`,
+        description: `Description ${i}`,
+        image: `/images/story-${i}.jpg`,
+        category: "nature" as const,
+        sourcePdf: "nature.pdf",
+      }));
+
+      mockUseStories.mockReturnValue({
+        stories: exactStories,
+        isLoading: false,
+        error: null,
+        refresh: vi.fn(),
+      });
+      mockUseFavorites.mockReturnValue({
+        favorites: exactStories.map((s) => s.id),
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      // All 20 items fit in the first page, so hasMore = false.
+      // The IntersectionObserver fires, but loadMore's guard (line 36) returns early.
+      await waitFor(() => {
+        expect(screen.getByText("Story Title 0")).toBeInTheDocument();
+        expect(screen.getByText("Story Title 19")).toBeInTheDocument();
+      });
+
+      // Verify the count — all 20 are shown, no extra items loaded
+      expect(screen.getByText(`20 ${mockT("favorites.place_plural")}`)).toBeInTheDocument();
+    });
+  });
+
+  describe("loadMore isLoadingMore guard (line 36)", () => {
+    // Create 25 stories to exceed ITEMS_PER_PAGE (20), so hasMore starts as true
+    const manyStories = Array.from({ length: 25 }, (_, i) => ({
+      id: `story-${i}`,
+      slug: `story-slug-${i}`,
+      title: `Story Title ${i}`,
+      subtitle: `Subtitle ${i}`,
+      description: `Description ${i}`,
+      image: `/images/story-${i}.jpg`,
+      category: "nature" as const,
+      sourcePdf: "nature.pdf",
+    }));
+    const manyFavoriteIds = manyStories.map((s) => s.id);
+
+    it("should prevent concurrent loadMore calls when isLoadingMore is true", async () => {
+      // Override IntersectionObserver so we control when callbacks fire
+      let pageLoadMoreCallback: IntersectionObserverCallback | null = null;
+      let pageLoadMoreTarget: Element | null = null;
+      const originalIO = global.IntersectionObserver;
+
+      try {
+        class ControlledObserver implements IntersectionObserver {
+          readonly root: Element | null = null;
+          readonly rootMargin: string = "";
+          readonly thresholds: ReadonlyArray<number> = [];
+
+          constructor(
+            private callback: IntersectionObserverCallback,
+            _options?: IntersectionObserverInit
+          ) {}
+
+          observe(target: Element): void {
+            // Store the first observer's callback (page-level loadMore sentinel)
+            // but only fire immediately for GalleryItem observers
+            if (!pageLoadMoreCallback) {
+              pageLoadMoreCallback = this.callback;
+              pageLoadMoreTarget = target;
+              // Fire immediately for the page-level observer to trigger first loadMore
+              this.callback(
+                [
+                  {
+                    isIntersecting: true,
+                    target,
+                    boundingClientRect: target.getBoundingClientRect(),
+                    intersectionRatio: 1,
+                    intersectionRect: target.getBoundingClientRect(),
+                    rootBounds: null,
+                    time: Date.now(),
+                  },
+                ],
+                this
+              );
+            } else {
+              // GalleryItem observers: fire immediately for visibility
+              this.callback(
+                [
+                  {
+                    isIntersecting: true,
+                    target,
+                    boundingClientRect: target.getBoundingClientRect(),
+                    intersectionRatio: 1,
+                    intersectionRect: target.getBoundingClientRect(),
+                    rootBounds: null,
+                    time: Date.now(),
+                  },
+                ],
+                this
+              );
+            }
+          }
+
+          unobserve(): void {}
+          disconnect(): void {}
+          takeRecords(): IntersectionObserverEntry[] {
+            return [];
+          }
+        }
+
+        global.IntersectionObserver = ControlledObserver as unknown as typeof IntersectionObserver;
+
+        vi.useFakeTimers();
+
+        mockUseStories.mockReturnValue({
+          stories: manyStories,
+          isLoading: false,
+          error: null,
+          refresh: vi.fn(),
+        });
+        mockUseFavorites.mockReturnValue({
+          favorites: manyFavoriteIds,
+          toggleFavorite: mockToggleFavorite,
+          isLoading: false,
+        });
+
+        const { unmount } = render(<FavoritesPage />);
+
+        // Initially only 20 stories displayed (ITEMS_PER_PAGE)
+        expect(screen.getByText("Story Title 0")).toBeInTheDocument();
+        expect(screen.getByText("Story Title 19")).toBeInTheDocument();
+        expect(screen.queryByText("Story Title 20")).not.toBeInTheDocument();
+
+        // The first IntersectionObserver callback already fired (from the page-level
+        // observer on the loadMore sentinel), setting isLoadingMore = true.
+        // The 300ms timeout hasn't elapsed yet, so isLoadingMore is still true.
+
+        // Fire the observer callback a second time to simulate a rapid intersection.
+        // This should hit the `isLoadingMore` guard on line 36 and return early.
+        act(() => {
+          if (pageLoadMoreCallback && pageLoadMoreTarget) {
+            (pageLoadMoreCallback as IntersectionObserverCallback)(
+              [
+                {
+                  isIntersecting: true,
+                  target: pageLoadMoreTarget,
+                  boundingClientRect: (pageLoadMoreTarget as Element).getBoundingClientRect(),
+                  intersectionRatio: 1,
+                  intersectionRect: (pageLoadMoreTarget as Element).getBoundingClientRect(),
+                  rootBounds: null,
+                  time: Date.now(),
+                },
+              ],
+              {} as IntersectionObserver
+            );
+          }
+        });
+
+        // Advance past the 300ms setTimeout in loadMore
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(300);
+        });
+
+        // After advancing timers, the first loadMore completes and shows remaining items.
+        // Only one batch of additional items loaded (not two), proving the guard worked.
+        expect(screen.getByText("Story Title 24")).toBeInTheDocument();
+
+        // Total stories shown: all 25 (20 initial + 5 from one loadMore call)
+        expect(screen.getByText(`25 ${mockT("favorites.place_plural")}`)).toBeInTheDocument();
+
+        unmount();
+      } finally {
+        vi.useRealTimers();
+        global.IntersectionObserver = originalIO;
+      }
+    });
+  });
+
+  describe("GalleryItem IntersectionObserver (lines 210-227)", () => {
+    it("should render placeholder before intersection and content after", async () => {
+      // Override IntersectionObserver so GalleryItem items start as not visible
+      const galleryObserveCallbacks: Array<{
+        callback: IntersectionObserverCallback;
+        target: Element;
+        observer: IntersectionObserver;
+      }> = [];
+      const originalIO = global.IntersectionObserver;
+
+      try {
+        class LazyObserver implements IntersectionObserver {
+          readonly root: Element | null = null;
+          readonly rootMargin: string = "";
+          readonly thresholds: ReadonlyArray<number> = [];
+          private disconnected = false;
+
+          constructor(
+            private callback: IntersectionObserverCallback,
+            _options?: IntersectionObserverInit
+          ) {}
+
+          observe(target: Element): void {
+            if (!this.disconnected) {
+              galleryObserveCallbacks.push({
+                callback: this.callback,
+                target,
+                observer: this,
+              });
+            }
+          }
+
+          unobserve(): void {}
+          disconnect(): void {
+            this.disconnected = true;
+          }
+          takeRecords(): IntersectionObserverEntry[] {
+            return [];
+          }
+        }
+
+        global.IntersectionObserver = LazyObserver as unknown as typeof IntersectionObserver;
+
+        mockUseFavorites.mockReturnValue({
+          favorites: ["story-1"],
+          toggleFavorite: mockToggleFavorite,
+          isLoading: false,
+        });
+
+        render(<FavoritesPage />);
+
+        // Before intersection fires, the GalleryItem should show a placeholder (no image)
+        expect(screen.queryByAltText("Lagos de Covadonga")).not.toBeInTheDocument();
+
+        // Now simulate the GalleryItem observer firing isIntersecting: true
+        // The last observer callback is for the GalleryItem (the first is the page-level loadMore sentinel)
+        const galleryEntry = galleryObserveCallbacks[galleryObserveCallbacks.length - 1];
+        expect(galleryEntry).toBeDefined();
+
+        // Verify we have callbacks stored (page-level + GalleryItem)
+        expect(galleryObserveCallbacks.length).toBeGreaterThanOrEqual(2);
+
+        // Fire all stored observer callbacks with isIntersecting: true
+        // This ensures the GalleryItem observer receives the intersection event
+        for (const entry of galleryObserveCallbacks) {
+          await act(async () => {
+            entry.callback(
+              [
+                {
+                  isIntersecting: true,
+                  target: entry.target,
+                  boundingClientRect: entry.target.getBoundingClientRect(),
+                  intersectionRatio: 1,
+                  intersectionRect: entry.target.getBoundingClientRect(),
+                  rootBounds: null,
+                  time: Date.now(),
+                },
+              ],
+              entry.observer
+            );
+          });
+        }
+
+        // After intersection, the image should be visible
+        expect(screen.getByAltText("Lagos de Covadonga")).toBeInTheDocument();
+      } finally {
+        global.IntersectionObserver = originalIO;
+      }
+    });
+
+    it("should disconnect observer after becoming visible", () => {
+      const disconnectSpy = vi.fn();
+      const originalIO = global.IntersectionObserver;
+
+      try {
+        class TrackingObserver implements IntersectionObserver {
+          readonly root: Element | null = null;
+          readonly rootMargin: string = "";
+          readonly thresholds: ReadonlyArray<number> = [];
+
+          constructor(
+            private callback: IntersectionObserverCallback,
+            _options?: IntersectionObserverInit
+          ) {}
+
+          observe(target: Element): void {
+            // Immediately fire isIntersecting: true, like the default mock
+            this.callback(
+              [
+                {
+                  isIntersecting: true,
+                  target,
+                  boundingClientRect: target.getBoundingClientRect(),
+                  intersectionRatio: 1,
+                  intersectionRect: target.getBoundingClientRect(),
+                  rootBounds: null,
+                  time: Date.now(),
+                },
+              ],
+              this
+            );
+          }
+
+          unobserve(): void {}
+          disconnect(): void {
+            disconnectSpy();
+          }
+          takeRecords(): IntersectionObserverEntry[] {
+            return [];
+          }
+        }
+
+        global.IntersectionObserver = TrackingObserver as unknown as typeof IntersectionObserver;
+
+        mockUseFavorites.mockReturnValue({
+          favorites: ["story-1"],
+          toggleFavorite: mockToggleFavorite,
+          isLoading: false,
+        });
+
+        render(<FavoritesPage />);
+
+        // The GalleryItem observer calls disconnect() after isIntersecting fires (line 212).
+        // There are 2 observers: one for loadMore sentinel and one for GalleryItem.
+        // The GalleryItem one disconnects on intersection.
+        expect(disconnectSpy).toHaveBeenCalled();
+      } finally {
+        global.IntersectionObserver = originalIO;
+      }
+    });
+
+    it("should not trigger visibility when intersection is false", () => {
+      const originalIO = global.IntersectionObserver;
+
+      try {
+        class NonIntersectingObserver implements IntersectionObserver {
+          readonly root: Element | null = null;
+          readonly rootMargin: string = "";
+          readonly thresholds: ReadonlyArray<number> = [];
+
+          constructor(
+            private callback: IntersectionObserverCallback,
+            _options?: IntersectionObserverInit
+          ) {}
+
+          observe(target: Element): void {
+            // Fire with isIntersecting: false — element is not in viewport
+            this.callback(
+              [
+                {
+                  isIntersecting: false,
+                  target,
+                  boundingClientRect: target.getBoundingClientRect(),
+                  intersectionRatio: 0,
+                  intersectionRect: target.getBoundingClientRect(),
+                  rootBounds: null,
+                  time: Date.now(),
+                },
+              ],
+              this
+            );
+          }
+
+          unobserve(): void {}
+          disconnect(): void {}
+          takeRecords(): IntersectionObserverEntry[] {
+            return [];
+          }
+        }
+
+        global.IntersectionObserver = NonIntersectingObserver as unknown as typeof IntersectionObserver;
+
+        mockUseFavorites.mockReturnValue({
+          favorites: ["story-1"],
+          toggleFavorite: mockToggleFavorite,
+          isLoading: false,
+        });
+
+        render(<FavoritesPage />);
+
+        // With isIntersecting: false, the GalleryItem should remain in placeholder state
+        // (isVisible stays false), so no image is rendered
+        expect(screen.queryByAltText("Lagos de Covadonga")).not.toBeInTheDocument();
+      } finally {
+        global.IntersectionObserver = originalIO;
+      }
     });
   });
 

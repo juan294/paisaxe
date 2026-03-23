@@ -230,6 +230,31 @@ describe("useFocusTrap", () => {
     }).not.toThrow();
   });
 
+  it("should not prevent Shift+Tab when focus is in the middle of the trap (line 55 false branch)", () => {
+    // Line 55: if (document.activeElement === first) — when Shift+Tab is pressed
+    // and focus is NOT on the first element, the branch is false and default
+    // browser behavior handles the tab.
+    const ref = makeRef(container);
+    renderHook(() => useFocusTrap(ref, true));
+
+    const input = container.querySelector("input")!;
+    input.focus();
+    expect(document.activeElement).toBe(input);
+
+    // Press Shift+Tab while on the middle element
+    const event = new KeyboardEvent("keydown", {
+      key: "Tab",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+    container.dispatchEvent(event);
+
+    // Should NOT have prevented default — browser handles normal shift+tab
+    expect(preventDefaultSpy).not.toHaveBeenCalled();
+  });
+
   it("should skip disabled buttons in focus trap", () => {
     // Create a container with a disabled button
     const customContainer = document.createElement("div");

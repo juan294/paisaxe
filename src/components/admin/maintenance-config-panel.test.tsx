@@ -205,6 +205,38 @@ describe("MaintenanceConfigPanel", () => {
     expect(screen.queryByText("Look. Ask. Discover.")).not.toBeInTheDocument();
   });
 
+  it("updates message textarea and clears saved state", async () => {
+    const user = userEvent.setup();
+
+    const updatedFlag = {
+      ...mockFlag,
+      config: { title: "Under Maintenance", message: "We are updating the site.", show_tagline: false },
+    };
+    vi.mocked(adminApi.updateFeatureFlagConfig).mockResolvedValue({
+      data: updatedFlag,
+    });
+
+    render(<MaintenanceConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
+
+    // Make a change (toggle tagline off) so we can save
+    const toggle = screen.getByRole("switch");
+    await user.click(toggle);
+
+    // Save to enter the "saved" state
+    await user.click(screen.getByText("Save"));
+    await waitFor(() => {
+      expect(screen.getByText("Saved successfully")).toBeInTheDocument();
+    });
+
+    // Now type in the message textarea — this should clear the saved state
+    const textarea = screen.getByLabelText("Additional Message (optional)");
+    await user.clear(textarea);
+    await user.type(textarea, "New maintenance message");
+
+    expect(textarea).toHaveValue("New maintenance message");
+    expect(screen.queryByText("Saved successfully")).not.toBeInTheDocument();
+  });
+
   it("shows preview message when message is set", () => {
     render(<MaintenanceConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
 
@@ -213,5 +245,28 @@ describe("MaintenanceConfigPanel", () => {
     // "We are updating the site." appears in both the textarea and the preview
     const previewMessages = screen.getAllByText("We are updating the site.");
     expect(previewMessages.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not call onUpdate when API returns neither error nor data (line 62 false branch)", async () => {
+    const user = userEvent.setup();
+    // Return an empty result (no error and no data)
+    vi.mocked(adminApi.updateFeatureFlagConfig).mockResolvedValue({});
+
+    render(<MaintenanceConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
+
+    const titleInput = screen.getByLabelText("Display Title");
+    await user.clear(titleInput);
+    await user.type(titleInput, "Changed Title");
+
+    await user.click(screen.getByText("Save"));
+
+    await waitFor(() => {
+      expect(adminApi.updateFeatureFlagConfig).toHaveBeenCalled();
+    });
+
+    // onUpdate should NOT have been called (no data returned)
+    expect(onUpdate).not.toHaveBeenCalled();
+    // No error shown either
+    expect(screen.queryByText(/failed/i)).not.toBeInTheDocument();
   });
 });

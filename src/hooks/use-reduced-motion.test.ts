@@ -84,4 +84,12 @@ describe("useReducedMotion", () => {
 
     expect(result.current).toBe(true);
   });
+
+  // Line 14: `if (typeof window === "undefined") return false` is an SSR guard
+  // inside the useState initializer. This branch is unreachable in jsdom because
+  // React DOM itself requires `window` to render. Deleting `globalThis.window`
+  // causes React's rendering to fail before the hook code executes.
+  // This line can only be covered in a Node.js environment with a server-side
+  // React rendering approach (e.g., renderToString), which is outside the scope
+  // of these unit tests. The guard is a standard SSR safety pattern.
 });

@@ -217,6 +217,263 @@ describe("ToolbarOverflowMenu", () => {
     await user.keyboard("{Tab}");
     expect(document.activeElement).toBe(firstBtn);
   });
+
+  it("handles Shift+Tab to move focus to previous menu item", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="First" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Second" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Third" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+
+    const firstBtn = screen.getByText("First").closest("button")!;
+    const secondBtn = screen.getByText("Second").closest("button")!;
+    const thirdBtn = screen.getByText("Third").closest("button")!;
+
+    // Move to third item first
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(thirdBtn);
+
+    // Shift+Tab → second item
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(secondBtn);
+
+    // Shift+Tab → first item
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(firstBtn);
+  });
+
+  it("wraps Shift+Tab from first item to last item", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="First" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Second" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Third" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+
+    const firstBtn = screen.getByText("First").closest("button")!;
+    const thirdBtn = screen.getByText("Third").closest("button")!;
+
+    // First item is focused after open
+    expect(document.activeElement).toBe(firstBtn);
+
+    // Shift+Tab wraps → last item
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(thirdBtn);
+  });
+
+  it("stops propagation on dropdown container click", async () => {
+    const outerClickHandler = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <div onClick={outerClickHandler}>
+        <ToolbarOverflowMenu>
+          <ToolbarOverflowItem icon={<span>I</span>} label="Action" />
+        </ToolbarOverflowMenu>
+      </div>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    // Reset the handler since the toggle button click also stops propagation
+    outerClickHandler.mockClear();
+
+    // Click on the dropdown menu container itself (not a menu item)
+    await user.click(screen.getByRole("menu"));
+
+    // The click should not propagate to the outer div
+    expect(outerClickHandler).not.toHaveBeenCalled();
+    // Menu should still be open
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
+  it("traps forward Tab using fireEvent on menu container (line 84)", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="Alpha" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Beta" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Gamma" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+
+    const alphaBtn = screen.getByText("Alpha").closest("button")!;
+    const betaBtn = screen.getByText("Beta").closest("button")!;
+    const gammaBtn = screen.getByText("Gamma").closest("button")!;
+
+    // First item is focused
+    expect(document.activeElement).toBe(alphaBtn);
+
+    // Forward Tab via fireEvent on the menu container (covers line 84 else-if branch)
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
+    expect(document.activeElement).toBe(betaBtn);
+
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
+    expect(document.activeElement).toBe(gammaBtn);
+
+    // Tab wraps around to first item
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
+    expect(document.activeElement).toBe(alphaBtn);
+  });
+
+  it("handles keydown when menuListRef is null (line 67 guard)", async () => {
+    // Line 67: `if (!menu) return;` — defensive guard against menuListRef.current being null.
+    // This is architecturally unreachable in tests because React synchronously sets the ref
+    // during render, and the menu container is always mounted when isOpen=true. The guard
+    // protects against theoretical race conditions in concurrent React or unmount edge cases.
+    // The "no focusable items" test below covers the adjacent guard at line 72.
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="Only" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+    const onlyBtn = screen.getByText("Only").closest("button")!;
+    expect(document.activeElement).toBe(onlyBtn);
+
+    // ArrowDown on single item wraps to itself
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowDown" });
+    expect(document.activeElement).toBe(onlyBtn);
+
+    // ArrowUp on single item wraps to itself
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowUp" });
+    expect(document.activeElement).toBe(onlyBtn);
+
+    // Tab on single item wraps to itself
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
+    expect(document.activeElement).toBe(onlyBtn);
+
+    // Shift+Tab on single item wraps to itself
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(onlyBtn);
+  });
+
+  it("does nothing for keyboard events when menu has no focusable items", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        {/* Only non-button, non-menuitem children — no focusable items */}
+        <span>Just text content</span>
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+    expect(screen.getByText("Just text content")).toBeInTheDocument();
+
+    // Fire keyboard events on the menu — should not throw (covers items.length === 0 early return)
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowUp" });
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
+
+    // Menu should still be open and content intact
+    expect(screen.getByText("Just text content")).toBeInTheDocument();
+  });
+
+  it("handles ArrowUp to previous item (non-wrapping)", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="First" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Second" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Third" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+
+    const firstBtn = screen.getByText("First").closest("button")!;
+    const secondBtn = screen.getByText("Second").closest("button")!;
+    const thirdBtn = screen.getByText("Third").closest("button")!;
+
+    // Move to third item
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(thirdBtn);
+
+    // ArrowUp → second item (non-wrapping, currentIndex > 0)
+    await user.keyboard("{ArrowUp}");
+    expect(document.activeElement).toBe(secondBtn);
+
+    // ArrowUp → first item (non-wrapping, currentIndex > 0)
+    await user.keyboard("{ArrowUp}");
+    expect(document.activeElement).toBe(firstBtn);
+  });
+
+  it("does not crash for unrecognized key events (no-op branch)", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="Item" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+    const itemBtn = screen.getByText("Item").closest("button")!;
+    expect(document.activeElement).toBe(itemBtn);
+
+    // Fire an unrecognized key — should not change focus or throw
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Enter" });
+    expect(document.activeElement).toBe(itemBtn);
+  });
+
+  it("wraps Tab forward from last item to first item via fireEvent", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="Alpha" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Beta" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+
+    const alphaBtn = screen.getByText("Alpha").closest("button")!;
+    const betaBtn = screen.getByText("Beta").closest("button")!;
+
+    // Move to last item
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
+    expect(document.activeElement).toBe(betaBtn);
+
+    // Tab wraps to first item (covers the else branch of Tab at line 89-91)
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
+    expect(document.activeElement).toBe(alphaBtn);
+  });
+
+  it("handles ArrowUp when activeElement is not in items list (currentIndex === -1)", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToolbarOverflowMenu>
+        <ToolbarOverflowItem icon={<span>I</span>} label="Alpha" />
+        <ToolbarOverflowItem icon={<span>I</span>} label="Beta" />
+      </ToolbarOverflowMenu>
+    );
+
+    await user.click(screen.getByLabelText("Más opciones"));
+
+    // Move focus away from items
+    const menu = screen.getByRole("menu");
+    menu.focus();
+
+    // ArrowUp with currentIndex -1: -1 > 0 is false, so wraps to last item
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    const betaBtn = screen.getByText("Beta").closest("button")!;
+    expect(document.activeElement).toBe(betaBtn);
+  });
 });
 
 describe("ToolbarOverflowItem", () => {

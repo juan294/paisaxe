@@ -613,5 +613,17 @@ describe("stories-data", () => {
       expect(result).not.toBeNull();
       expect(result?.id).toBe("oviedo-catedral");
     });
+
+    it("should return null on exception when slug/id not found in fallback (line 154 || null)", async () => {
+      // Covers the `|| null` fallback at line 154 when the catch block
+      // searches FALLBACK_STORIES but finds no match.
+      mockSupabaseFrom.mockImplementation(() => {
+        throw new Error("Connection failed");
+      });
+
+      const result = await getStoryBySlugFromDB("completely-nonexistent-slug-xyz");
+
+      expect(result).toBeNull();
+    });
   });
 });

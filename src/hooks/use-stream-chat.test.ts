@@ -18,18 +18,19 @@ vi.mock("@/lib/i18n", () => ({
 }));
 
 // Mock upsell detection
+const mockDetectUpsellMarker = vi.fn().mockImplementation((content: string) => {
+  const match = content.match(/\s*\[\[VOICE_UPSELL:(\w+)\]\]\s*$/);
+  if (match) {
+    return {
+      hasUpsell: true,
+      reason: match[1],
+      cleanContent: content.replace(/\s*\[\[VOICE_UPSELL:\w+\]\]\s*$/, "").trim(),
+    };
+  }
+  return { hasUpsell: false, reason: null, cleanContent: content };
+});
 vi.mock("@/lib/chat-upsell-detection", () => ({
-  detectUpsellMarker: (content: string) => {
-    const match = content.match(/\s*\[\[VOICE_UPSELL:(\w+)\]\]\s*$/);
-    if (match) {
-      return {
-        hasUpsell: true,
-        reason: match[1],
-        cleanContent: content.replace(/\s*\[\[VOICE_UPSELL:\w+\]\]\s*$/, "").trim(),
-      };
-    }
-    return { hasUpsell: false, reason: null, cleanContent: content };
-  },
+  detectUpsellMarker: (...args: unknown[]) => mockDetectUpsellMarker(...args),
 }));
 
 // Mock upsell throttle
@@ -97,6 +98,18 @@ describe("useStreamChat", () => {
     mockFetch.mockReset();
     mockCanShowUpsell.mockReturnValue(true);
     mockRecordUpsellShown.mockReset();
+    // Restore the default detectUpsellMarker implementation
+    mockDetectUpsellMarker.mockImplementation((content: string) => {
+      const match = content.match(/\s*\[\[VOICE_UPSELL:(\w+)\]\]\s*$/);
+      if (match) {
+        return {
+          hasUpsell: true,
+          reason: match[1],
+          cleanContent: content.replace(/\s*\[\[VOICE_UPSELL:\w+\]\]\s*$/, "").trim(),
+        };
+      }
+      return { hasUpsell: false, reason: null, cleanContent: content };
+    });
   });
 
   it("should initialize with empty messages and not streaming", () => {
@@ -713,6 +726,242 @@ describe("useStreamChat", () => {
         messageIndex: 3,
       }),
     });
+  });
+
+  it("should push error message when assistantIndex is out of bounds (line 193)", async () => {
+    // This tests the else branch in the catch handler where updated[assistantIndex]
+    // is falsy. This happens when messages are reset while a send is in progress:
+    // 1. sendMessage starts → sets assistantIndex = messages.length + 1 = 1
+    // 2. User/assistant messages are added to state
+    // 3. resetMessages is called → messages becomes []
+    // 4. fetch fails → catch handler runs setMessages(prev => ...) where prev = []
+    // 5. updated[1] is undefined → else branch pushes the error message
+
+    let rejectFetch: (reason: Error) => void;
+    const pendingPromise = new Promise((_, reject) => {
+      rejectFetch = reject;
+    });
+    mockFetch.mockReturnValueOnce(pendingPromise);
+
+    const { result } = renderHook(() =>
+      useStreamChat({ canUseVoice: false })
+    );
+
+    // Start sending (don't await — we need to reset messages while it's in progress)
+    let sendPromise: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // isStreaming should be true, messages should have user + assistant placeholder
+    expect(result.current.isStreaming).toBe(true);
+    expect(result.current.messages).toHaveLength(2);
+
+    // Reset messages while the send is in progress
+    act(() => {
+      result.current.resetMessages();
+    });
+
+    // Messages are now empty
+    expect(result.current.messages).toEqual([]);
+
+    // Now make the fetch fail — the catch handler will try updated[assistantIndex]
+    // where assistantIndex = 1 but updated (from prev = []) has length 0
+    await act(async () => {
+      rejectFetch!(new Error("Network error"));
+      await sendPromise!;
+    });
+
+    // The else branch should have pushed an error message
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toEqual({
+      role: "assistant",
+      content: "Lo siento, hubo un error. Intenta de nuevo.",
+    });
+    expect(result.current.isStreaming).toBe(false);
+  });
+
+  it("should skip non-data SSE lines in processEvent (line 112)", async () => {
+    // processEvent skips lines that don't start with "data: ".
+    // This tests the early return on line 112.
+    const encoder = new TextEncoder();
+    const events = [
+      `:comment line\n\n`,  // SSE comment — not "data: " prefixed
+      `event: ping\n\n`,    // Named event — not "data: " prefixed
+      `data: ${JSON.stringify({ type: "text", content: "Hello" })}\n\n`,
+      `data: ${JSON.stringify({ type: "done", images: [], sources: [] })}\n\n`,
+    ];
+
+    const combined = encoder.encode(events.join(""));
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(combined);
+        controller.close();
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: stream,
+    });
+
+    const { result } = renderHook(() =>
+      useStreamChat({ canUseVoice: false })
+    );
+
+    await act(async () => {
+      await result.current.sendMessage("Test", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // Only the valid data events should have been processed
+    expect(result.current.messages[1].content).toBe("Hello");
+  });
+
+  it("should dismiss upsell at an invalid index without crashing (line 49 branch)", async () => {
+    // Line 49: if (updated[messageIndex]) — when messageIndex is out of bounds,
+    // the update function simply returns the array without modification.
+    const { result } = renderHook(() =>
+      useStreamChat({ canUseVoice: false })
+    );
+
+    // Dismiss at index 5 when there are no messages — exercises the falsy branch on line 49
+    act(() => {
+      result.current.dismissUpsell(5);
+    });
+
+    // Should not crash; messages remain empty
+    expect(result.current.messages).toEqual([]);
+  });
+
+  it("should handle JSON response with no message field (line 96 fallback)", async () => {
+    // Line 96: content: data.message || t("chat.error_processing")
+    // When data.message is undefined/empty, it falls back to the translation.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: () => Promise.resolve({ images: [] }), // no `message` field
+    });
+
+    const { result } = renderHook(() =>
+      useStreamChat({ canUseVoice: false })
+    );
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.messages[1].content).toBe(
+      "Lo siento, no pude procesar tu pregunta."
+    );
+  });
+
+  it("should set upsellReason to undefined when reason is null (line 147 nullish coalescing)", async () => {
+    // Lines 147-151: upsellReason: shouldShowUpsell ? reason ?? undefined : undefined
+    // When detectUpsellMarker returns hasUpsell=true but reason=null,
+    // the ?? undefined converts null to undefined.
+    // Override the mock to return hasUpsell=true with reason=null.
+    mockDetectUpsellMarker.mockReturnValue({
+      hasUpsell: true,
+      reason: null,
+      cleanContent: "Cleaned content",
+    });
+
+    const encoder = new TextEncoder();
+    const events = [
+      `data: ${JSON.stringify({ type: "text", content: "Some content" })}\n\n`,
+      `data: ${JSON.stringify({ type: "done", images: [], sources: [] })}\n\n`,
+    ];
+
+    let index = 0;
+    const stream = new ReadableStream({
+      pull(controller) {
+        if (index < events.length) {
+          controller.enqueue(encoder.encode(events[index]));
+          index++;
+        } else {
+          controller.close();
+        }
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: stream,
+    });
+
+    const { result } = renderHook(() =>
+      useStreamChat({ canUseVoice: false })
+    );
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // reason was null, so `reason ?? undefined` should produce undefined
+    // shouldShowUpsell is true (hasUpsell=true, canUseVoice=false, canShowUpsell=true)
+    // so the ternary takes the truthy path, but reason ?? undefined = undefined
+    expect(result.current.messages[1].upsellReason).toBeUndefined();
+    expect(result.current.messages[1].content).toBe("Cleaned content");
+  });
+
+  it("should ignore unrecognized SSE event types (implicit else after line 151)", async () => {
+    // This tests the case where event.type is neither "text", "done", nor "error".
+    // The if/else-if chain on lines 118/128/151 has no else clause, so unrecognized
+    // event types are silently ignored. This exercises the false branch of the
+    // `else if (event.type === "error")` condition on line 151.
+    const encoder = new TextEncoder();
+    const events = [
+      `data: ${JSON.stringify({ type: "text", content: "Hello" })}\n\n`,
+      `data: ${JSON.stringify({ type: "heartbeat", ts: 12345 })}\n\n`,
+      `data: ${JSON.stringify({ type: "done", images: [], sources: [] })}\n\n`,
+    ];
+
+    const combined = encoder.encode(events.join(""));
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(combined);
+        controller.close();
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: stream,
+    });
+
+    const { result } = renderHook(() =>
+      useStreamChat({ canUseVoice: false })
+    );
+
+    await act(async () => {
+      await result.current.sendMessage("Test", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // The "heartbeat" event should be silently ignored; only "text" content appears
+    expect(result.current.messages[1].content).toBe("Hello");
   });
 
   it("should handle malformed SSE data gracefully", async () => {

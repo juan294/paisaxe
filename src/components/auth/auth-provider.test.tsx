@@ -317,6 +317,61 @@ describe("AuthProvider", () => {
     });
   });
 
+  it("signInWithGoogle falls back to NEXT_PUBLIC_SITE_URL when window is undefined", async () => {
+    // Exercise the SSR fallback branch (line 75-76) by temporarily stubbing
+    // window to undefined. The callback evaluates `typeof window` at call time,
+    // so we can render normally, then stub window just for the callback invocation.
+    process.env.NEXT_PUBLIC_SITE_URL = "https://paisaxe.es";
+
+    const { result } = renderHook(() => useAuthContext(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Save real window and stub it to undefined
+    const realWindow = globalThis.window;
+    vi.stubGlobal("window", undefined);
+
+    let signInPromise: Promise<void>;
+    act(() => {
+      signInPromise = result.current.signInWithGoogle();
+    });
+    // Restore window before awaiting (React needs window for state updates)
+    vi.stubGlobal("window", realWindow);
+    await signInPromise!;
+
+    const callArgs = mockSignInWithOAuth.mock.calls[0][0];
+    expect(callArgs.options.redirectTo).toBe("https://paisaxe.es/auth/callback");
+
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+  });
+
+  it("signInWithGoogle falls back to localhost:3000 when window and SITE_URL are undefined", async () => {
+    // Exercise the final fallback branch (line 77) where both window and
+    // NEXT_PUBLIC_SITE_URL are unavailable.
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+
+    const { result } = renderHook(() => useAuthContext(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    const realWindow = globalThis.window;
+    vi.stubGlobal("window", undefined);
+
+    let signInPromise: Promise<void>;
+    act(() => {
+      signInPromise = result.current.signInWithGoogle();
+    });
+    vi.stubGlobal("window", realWindow);
+    await signInPromise!;
+
+    const callArgs = mockSignInWithOAuth.mock.calls[0][0];
+    expect(callArgs.options.redirectTo).toBe("http://localhost:3000/auth/callback");
+  });
+
   it("signInWithGoogle uses window.location.origin for redirect URL", async () => {
     // In jsdom, window.location.origin is "http://localhost" by default
     const { result } = renderHook(() => useAuthContext(), { wrapper });

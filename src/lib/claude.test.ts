@@ -462,6 +462,11 @@ describe("claude", () => {
     });
   });
 
+  // NOTE: claude.ts line 323 (`throw lastError || new Error("Max retries exceeded")`)
+  // is unreachable dead code. The for-loop (attempt 1..MAX_RETRIES) always either
+  // returns (on success) or throws (on non-retryable/final-attempt errors) within
+  // the loop body. The post-loop throw is a TypeScript exhaustiveness guard only.
+
   // ─── Asturian mode ──────────────────────────────────────────────────
 
   describe("asturianEnabled mode", () => {
@@ -1031,6 +1036,15 @@ describe("claude", () => {
       expect(result).toContain("general-guide.pdf");
       expect(result).not.toContain("null");
     });
+
+    it("should treat literal string 'null' caption as no caption", () => {
+      const images: ImageResult[] = [
+        { id: "1", path: "/images/map.jpg", caption: "null", sourcePdf: "general-guide.pdf" },
+      ];
+      const result = formatImagesForContext(images);
+      expect(result).toContain("(no caption)");
+      expect(result).not.toContain('"null"');
+    });
   });
 
   // ─── images in user content via generateChatResponse ────────────────
@@ -1054,6 +1068,25 @@ describe("claude", () => {
       const userContent = body.messages[0].content;
       expect(userContent).toContain("<available_images>");
       expect(userContent).toContain("Oviedo Cathedral");
+    });
+
+    it("should include available_images without context tags when no chunks but images provided", async () => {
+      setupMockAPIResponse({
+        content: [{ type: "text", text: "Response" }],
+      });
+
+      const images: ImageResult[] = [
+        { id: "img1", path: "/images/beach.jpg", caption: "Playa de Gulpiyuri", sourcePdf: "beaches.pdf" },
+      ];
+
+      await generateChatResponse("Show me beaches", [], false, 0, images);
+
+      const body = getCurlBody();
+      const userContent = body.messages[0].content;
+      expect(userContent).toContain("<available_images>");
+      expect(userContent).toContain("Playa de Gulpiyuri");
+      // Should NOT have context tags since no chunks
+      expect(userContent).not.toContain("<context>");
     });
 
     it("should NOT include available_images when no images provided", async () => {

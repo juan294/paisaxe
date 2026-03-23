@@ -94,6 +94,35 @@ describe("ChatActions", () => {
       });
     });
 
+    it("resets check icon back to copy icon after 2s timeout", async () => {
+      const messages: Message[] = [
+        { role: "assistant", content: "Hello!" },
+      ];
+
+      const { container } = render(<ChatActions messages={messages} />);
+
+      const copyButton = screen.getByRole("button", {
+        name: /copiar conversación/i,
+      });
+
+      // Click copy
+      fireEvent.click(copyButton);
+
+      // Check icon should be shown after clipboard write resolves
+      await waitFor(() => {
+        expect(container.querySelector(".lucide-check")).toBeInTheDocument();
+      });
+
+      // Wait for the 2s timeout at line 66 to reset copied state
+      await waitFor(
+        () => {
+          expect(container.querySelector(".lucide-copy")).toBeInTheDocument();
+          expect(container.querySelector(".lucide-check")).not.toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
+    });
+
     it("does not render when isLoading is true", () => {
       const messages: Message[] = [
         { role: "user", content: "Hello" },

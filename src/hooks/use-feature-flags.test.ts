@@ -404,4 +404,74 @@ describe("useFeatureFlags cache behavior", () => {
 
     dateNowSpy.mockRestore();
   });
+
+  it("should not update state when component unmounts before fetch rejects (line 81 mounted=false in catch)", async () => {
+    // This exercises the `if (mounted)` guard on line 81 inside the catch block of load().
+    // When the component unmounts before fetchFlags() rejects, mounted becomes false,
+    // so setFlags/setIsReady should NOT be called.
+    //
+    // To reach the catch block (lines 80-84), fetchFlags() itself must throw.
+    // The inner .catch() in fetchFlags handles fetch rejections by resolving.
+    // We force fetchFlags to throw by making Date.now() throw synchronously.
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+
+    const dateNowSpy = vi.spyOn(Date, "now").mockImplementation(() => {
+      throw new Error("Date.now exploded");
+    });
+
+    const { result, unmount } = renderHook(() => useFeatureFlags());
+
+    // Hook starts loading — fetchFlags will throw synchronously due to Date.now
+    // but the error is caught asynchronously in load(). Unmount before the
+    // microtask resolves.
+    unmount();
+
+    // Give the microtask queue time to process
+    await new Promise((r) => setTimeout(r, 10));
+
+    // The mounted guard in the catch block should have prevented state updates.
+    // isReady should still be false (initial value) since we unmounted before
+    // the catch handler could set it.
+    expect(result.current.isReady).toBe(false);
+
+    dateNowSpy.mockRestore();
+  });
+
+  it("should not update state when component unmounts before fetch resolves (line 76 mounted=false)", async () => {
+    // This exercises the `if (mounted)` guard on line 76 inside the try block of load().
+    // When the component unmounts before the fetch resolves, mounted becomes false,
+    // so setFlags/setIsReady should NOT be called, preventing a React state-update warning.
+
+    let resolveFetch!: (value: Response) => void;
+    mockFetch.mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      })
+    );
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result, unmount } = renderHook(() => useFeatureFlags());
+
+    // Hook is loading — fetch is pending
+    expect(result.current.isReady).toBe(false);
+
+    // Unmount the component before the fetch resolves
+    unmount();
+
+    // Now resolve the fetch — the mounted guard should prevent state updates
+    const flags = [makeFlag("contextual_prompts", true)];
+    resolveFetch({
+      ok: true,
+      json: async () => ({ data: flags }),
+    } as Response);
+
+    // Give the microtask queue time to process
+    await new Promise((r) => setTimeout(r, 10));
+
+    // The key assertion: no React warnings about state updates on unmounted components.
+    // We can't directly check that setFlags wasn't called, but the absence of errors
+    // and the fact that isReady stayed false confirms the mounted guard worked.
+    expect(result.current.isReady).toBe(false);
+  });
 });

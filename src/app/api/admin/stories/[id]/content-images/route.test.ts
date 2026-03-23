@@ -391,6 +391,104 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       expect(data.error).toBe("Internal server error");
     });
 
+    it("should return empty images when chunks data is null (line 112 falsy branch)", async () => {
+      // Create a custom mock that returns null chunks data
+      const mockStorySingle = vi.fn().mockResolvedValue({
+        data: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
+        error: null,
+      });
+      const mockStoryEq = vi.fn().mockReturnValue({ single: mockStorySingle });
+      const mockStorySelect = vi.fn().mockReturnValue({ eq: mockStoryEq });
+
+      const mockChunksIlike = vi.fn().mockResolvedValue({
+        data: null, // null chunks data
+        error: null,
+      });
+      const mockChunksEq = vi.fn().mockReturnValue({ ilike: mockChunksIlike });
+      const mockChunksSelect = vi.fn().mockReturnValue({ eq: mockChunksEq });
+
+      const mockFrom = vi.fn().mockImplementation((table: string) => {
+        if (table === "stories") return { select: mockStorySelect };
+        if (table === "chunks") return { select: mockChunksSelect };
+        return { select: vi.fn() };
+      });
+
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
+      const response = await GET(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data.images).toHaveLength(0);
+      expect(data.data.total).toBe(0);
+    });
+
+    it("should return empty images when images array is null (line 142 null check)", async () => {
+      // Create mock where images query returns null data
+      const mockStorySingle = vi.fn().mockResolvedValue({
+        data: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
+        error: null,
+      });
+      const mockStoryEq = vi.fn().mockReturnValue({ single: mockStorySingle });
+      const mockStorySelect = vi.fn().mockReturnValue({ eq: mockStoryEq });
+
+      const mockChunksIlike = vi.fn().mockResolvedValue({
+        data: [{ page_number: 1 }],
+        error: null,
+      });
+      const mockChunksEq = vi.fn().mockReturnValue({ ilike: mockChunksIlike });
+      const mockChunksSelect = vi.fn().mockReturnValue({ eq: mockChunksEq });
+
+      const mockImagesIn = vi.fn().mockResolvedValue({
+        data: null, // null images data
+        error: null,
+      });
+      const mockImagesEq = vi.fn().mockReturnValue({ in: mockImagesIn });
+      const mockImagesSelect = vi.fn().mockReturnValue({ eq: mockImagesEq });
+
+      const mockFrom = vi.fn().mockImplementation((table: string) => {
+        if (table === "stories") return { select: mockStorySelect };
+        if (table === "chunks") return { select: mockChunksSelect };
+        if (table === "images") return { select: mockImagesSelect };
+        return { select: vi.fn() };
+      });
+
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
+      const response = await GET(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data.images).toHaveLength(0);
+      expect(data.data.total).toBe(0);
+    });
+
+    it("should score page 6+ images with 0 page points", async () => {
+      const page10Image = {
+        path: "https://supabase.co/storage/v1/object/public/pdf-images/test/test_page10_full.png",
+        caption: null as unknown as string,
+        source_pdf: "test-pdf.pdf",
+        page_number: 10,
+      };
+      const mockClient = createMockSupabase({
+        story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
+        chunks: [{ page_number: 10 }],
+        images: [page10Image],
+      });
+      vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
+      const response = await GET(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Page 10 gets 0 page points, not an _img_ URL so 0 total
+      expect(data.data.images[0].score).toBe(0);
+      expect(data.data.images[0].caption).toBeNull();
+    });
+
     it("should return 500 when images database query fails", async () => {
       const mockClient = createMockSupabase({
         story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },

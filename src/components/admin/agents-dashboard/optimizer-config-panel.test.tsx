@@ -117,4 +117,98 @@ describe("OptimizerConfigPanel", () => {
       expect(onUpdate).toHaveBeenCalledWith(updatedFlag);
     });
   });
+
+  it("shows 'Saved successfully' and hides it after 2s timeout (line 95)", async () => {
+    const updatedFlag = baseFlagFactory({
+      optimizer: { usageMetrics: { voiceMinutes: 50 } },
+    });
+    vi.mocked(updateFeatureFlagConfig).mockResolvedValue({
+      data: updatedFlag,
+    });
+
+    const onUpdate = vi.fn();
+    render(
+      <OptimizerConfigPanel flag={baseFlagFactory()} onUpdate={onUpdate} />
+    );
+
+    const voiceInput = screen.getByLabelText("Voice Minutes");
+    fireEvent.change(voiceInput, { target: { value: "50" } });
+
+    const saveButton = screen.getByRole("button", { name: /save/i });
+    fireEvent.click(saveButton);
+
+    // "Saved successfully" should appear after the async save completes
+    await waitFor(() => {
+      expect(screen.getByText("Saved successfully")).toBeInTheDocument();
+    });
+
+    // Wait for the 2s timeout at line 95 to fire: setTimeout(() => setSaved(false), 2000)
+    await waitFor(
+      () => {
+        expect(screen.queryByText("Saved successfully")).not.toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
+  });
+
+  it("shows error message when save fails", async () => {
+    vi.mocked(updateFeatureFlagConfig).mockResolvedValue({
+      error: "Save failed",
+    });
+
+    const onUpdate = vi.fn();
+    render(
+      <OptimizerConfigPanel flag={baseFlagFactory()} onUpdate={onUpdate} />
+    );
+
+    const voiceInput = screen.getByLabelText("Voice Minutes");
+    fireEvent.change(voiceInput, { target: { value: "50" } });
+
+    const saveButton = screen.getByRole("button", { name: /save/i });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("Save failed")).toBeInTheDocument();
+    });
+
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("ignores NaN metric values (line 66 false branch)", () => {
+    render(
+      <OptimizerConfigPanel flag={baseFlagFactory()} onUpdate={vi.fn()} />
+    );
+
+    const voiceInput = screen.getByLabelText("Voice Minutes");
+    // Change to a non-numeric value — parseFloat("abc") is NaN
+    fireEvent.change(voiceInput, { target: { value: "abc" } });
+
+    // The input should still hold the default value since NaN is rejected
+    expect((voiceInput as HTMLInputElement).value).toBe("15");
+  });
+
+  it("does not call onUpdate when API returns neither error nor data (line 92 false branch)", async () => {
+    // Return an empty result (no error, no data)
+    vi.mocked(updateFeatureFlagConfig).mockResolvedValue({});
+
+    const onUpdate = vi.fn();
+    render(
+      <OptimizerConfigPanel flag={baseFlagFactory()} onUpdate={onUpdate} />
+    );
+
+    const voiceInput = screen.getByLabelText("Voice Minutes");
+    fireEvent.change(voiceInput, { target: { value: "50" } });
+
+    const saveButton = screen.getByRole("button", { name: /save/i });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(updateFeatureFlagConfig).toHaveBeenCalled();
+    });
+
+    // onUpdate should NOT have been called (no data returned)
+    expect(onUpdate).not.toHaveBeenCalled();
+    // No error shown either
+    expect(screen.queryByText(/failed/i)).not.toBeInTheDocument();
+  });
 });

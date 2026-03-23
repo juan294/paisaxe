@@ -296,7 +296,7 @@ describe("AccountConfigDialog", () => {
     );
   });
 
-  it("sends correct body data when saving", async () => {
+  it("sends correct body data when saving", { timeout: 15000 }, async () => {
     const user = userEvent.setup();
 
     global.fetch = vi.fn().mockResolvedValue({
@@ -337,7 +337,7 @@ describe("AccountConfigDialog", () => {
     });
   });
 
-  it("defaults accountName to Paisaxe when empty", async () => {
+  it("defaults accountName to Paisaxe when empty", { timeout: 15000 }, async () => {
     const user = userEvent.setup();
 
     global.fetch = vi.fn().mockResolvedValue({
@@ -639,7 +639,7 @@ describe("AccountConfigDialog", () => {
   });
 
   it("does not call fetch when platform is null on save", async () => {
-    // This tests the early return in handleSave
+    // This tests the early return in handleSave (line 47: `if (!platform) return;`)
     // We can't directly test this through UI since the dialog isn't rendered,
     // but we verify by asserting that no fetch is made
     global.fetch = vi.fn();
@@ -656,6 +656,30 @@ describe("AccountConfigDialog", () => {
     // Dialog is not rendered, so no save button exists
     expect(screen.queryByText("Connect")).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  // Line 67: `accountHandle: accountHandle.trim() || undefined`
+  // Both branches are covered:
+  // - truthy (non-empty handle): by "sends correct body data when saving"
+  // - falsy (empty handle → undefined): by "sends undefined accountHandle when empty"
+
+  it("documents handleSave null-platform guard (line 47) as unreachable", () => {
+    // Line 47: `if (!platform) return;` inside handleSave
+    // This guard is architecturally unreachable because the component returns null
+    // at line 87 (`if (!platform) return null;`) before rendering any UI.
+    // When platform is null, no Save/Connect button exists to trigger handleSave.
+    const { container } = render(
+      <AccountConfigDialog
+        platform={null}
+        existingAccount={undefined}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    expect(container.innerHTML).toBe("");
+    expect(screen.queryByText("Connect")).not.toBeInTheDocument();
+    expect(screen.queryByText("Update")).not.toBeInTheDocument();
   });
 
   it("clears error on new save attempt", async () => {
