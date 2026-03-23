@@ -115,7 +115,7 @@ export function CreateDraftDialog({
               onChange={(e) => setContent(e.target.value)}
               placeholder={`Write your ${PLATFORM_NAMES[platform]} post...`}
               rows={5}
-              className="w-full resize-none border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
+              className="w-full resize-none border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus-visible:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
             />
           </div>
 

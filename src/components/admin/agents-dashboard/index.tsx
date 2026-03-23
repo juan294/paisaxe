@@ -142,9 +142,9 @@ function AgentsDashboardInner() {
         <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
           Admin / Agents
         </p>
-        <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+        <h2 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
           Agent Intelligence
-        </h1>
+        </h2>
       </div>
 
       {/* Overall Health Banner */}

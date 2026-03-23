@@ -183,9 +183,9 @@ export function SuggestionsPanel() {
       <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">Admin / Content</p>
-          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+          <h2 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
             Story Suggestions
-          </h1>
+          </h2>
         </div>
         <div className="flex items-center gap-6">
           <p className="font-mono text-xs uppercase tracking-widest text-[#a39e98]">
@@ -366,7 +366,7 @@ export function SuggestionsPanel() {
                       }
                       placeholder="Add internal notes..."
                       rows={3}
-                      className="w-full rounded-lg border border-[#e5e3de] bg-[#f5f3ee] px-3 py-2 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus:border-[#a39e98] focus:outline-none dark:border-[#4d4944] dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
+                      className="w-full rounded-lg border border-[#e5e3de] bg-[#f5f3ee] px-3 py-2 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:border-[#a39e98] focus-visible:outline-none dark:border-[#4d4944] dark:bg-[#3d3a36] dark:text-[#f5f3ee]"
                     />
                     <button
                       onClick={() => handleSaveNotes(suggestion.id)}

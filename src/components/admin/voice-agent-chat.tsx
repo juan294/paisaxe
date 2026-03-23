@@ -444,7 +444,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
               ? "Type while on call..."
               : `Message ${selectedAgent.name}...`
           }
-          className="flex-1 border border-[#e5e3de] bg-transparent px-4 py-3 text-sm text-[#2d2a26] placeholder-[#a39e98] focus:border-[#a39e98] focus:outline-none focus:ring-1 focus:ring-[#c9a55c] dark:border-[#4d4944] dark:text-[#f5f3ee]"
+          className="flex-1 border border-[#e5e3de] bg-transparent px-4 py-3 text-sm text-[#2d2a26] placeholder-[#a39e98] focus-visible:border-[#a39e98] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:border-[#4d4944] dark:text-[#f5f3ee]"
           disabled={isTextLoading}
         />
         <button

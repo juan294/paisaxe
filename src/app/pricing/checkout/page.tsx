@@ -82,9 +82,9 @@ export default function CheckoutPage() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <h1 className="ml-3 text-sm font-medium text-neutral-400">
+          <span className="ml-3 text-sm font-medium text-neutral-400">
             {t("premium.checkout_title")}
-          </h1>
+          </span>
         </div>
       </header>
 

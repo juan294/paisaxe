@@ -101,7 +101,7 @@ export function MaintenanceConfigPanel({
             setSaved(false);
           }}
           placeholder="Próximamente"
-          className="w-full border border-[#e5e3de] bg-transparent px-4 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] focus:border-[#c9a55c] focus:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
+          className="w-full border border-[#e5e3de] bg-transparent px-4 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] focus-visible:border-[#c9a55c] focus-visible:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
         />
         <p className="text-xs text-[#6b6560] dark:text-[#a39e98]">
           The main text shown on the maintenance page (e.g., &quot;Próximamente&quot;, &quot;We&apos;ll be back soon&quot;)
@@ -125,7 +125,7 @@ export function MaintenanceConfigPanel({
           }}
           rows={3}
           placeholder="Under maintenance. Check back soon!"
-          className="w-full resize-y border border-[#e5e3de] bg-transparent px-4 py-3 text-sm leading-relaxed text-[#2d2a26] placeholder-[#a39e98] focus:border-[#c9a55c] focus:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
+          className="w-full resize-y border border-[#e5e3de] bg-transparent px-4 py-3 text-sm leading-relaxed text-[#2d2a26] placeholder-[#a39e98] focus-visible:border-[#c9a55c] focus-visible:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
         />
         <p className="text-xs text-[#6b6560] dark:text-[#a39e98]">
           Optional additional message displayed below the title
