@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-03-22
+> Auto-generated on 2026-03-23
 
 ## Health Status: GREEN
 
-**Executive Summary:** 3 advisories detected (2 high, 1 moderate), **0 exploitable**. No changes to vulnerability landscape since Mar 21 — same 3 advisories, same 0 exploitability. flatted + undici at day 9 (dev-only). next@16.1.6 at day 5 (5 sub-advisories, all non-exploitable). All 3 fixable via `npm audit fix`. Gitleaks still not in CI (**19th consecutive report**). Outdated packages up to 27 — `canvas@3.2.2` now available.
+**Executive Summary:** 0 advisories detected, **0 exploitable**. All 3 prior advisories (flatted, undici, next@16.1.6) resolved via `npm audit fix` by triage agent on 2026-03-23. Gitleaks now in CI — **19-week gap closed**. Clean `npm audit` for the first time since Mar 13. 25 outdated packages, none with known exploitable vulnerabilities.
 
 ---
 
@@ -12,66 +12,15 @@
 
 | Severity | Package | Advisory | CVE | Attack Vector | Fixable | In Production | Risk Assessment |
 |----------|---------|----------|-----|---------------|---------|---------------|-----------------|
-| High | flatted <=3.4.1 | [GHSA-25h7-pfq9-p65f](https://github.com/advisories/GHSA-25h7-pfq9-p65f), [GHSA-rf6f-7fwh-wjgh](https://github.com/advisories/GHSA-rf6f-7fwh-wjgh) | Pending | Unbounded recursion DoS + Prototype Pollution in `parse()` | Yes | **No** (dev-only) | **Not exploitable** |
-| High | undici 7.0.0–7.23.0 | [GHSA-f269-vfmq-vjvj](https://github.com/advisories/GHSA-f269-vfmq-vjvj) + 5 others | Multiple | WebSocket overflow, HTTP smuggling, CRLF injection, memory DoS | Yes | **No** (dev-only) | **Not exploitable** |
-| Moderate | next 16.0.0-beta.0–16.1.6 | [GHSA-mq59-m269-xvcx](https://github.com/advisories/GHSA-mq59-m269-xvcx) + 4 others | Multiple | CSRF bypass, HTTP smuggling, image cache DoS, buffering DoS | Yes | **Yes** (prod) | **Not exploitable** (see analysis) |
-
-### Exploitability Analysis
-
-#### flatted@3.3.3 — NOT EXPLOITABLE
-
-- **Dependency chain:** `eslint@9.39.4` → `file-entry-cache@8.0.0` → `flat-cache@4.0.1` → `flatted@3.3.3`
-- **Dev-only:** Yes — only used by ESLint's cache system during lint checks
-- **User input path:** None — ESLint cache files are developer-controlled `.eslintcache` files
-- **Advisory 1 (GHSA-25h7-pfq9-p65f):** Unbounded recursion DoS in `parse()`. Not exploitable — flatted is never imported in application code (`src/`). Zero direct usage. Not bundled, not deployed.
-- **Advisory 2 (GHSA-rf6f-7fwh-wjgh):** Prototype Pollution via `parse()`. Same non-exploitability reasoning — user-supplied data (chat messages, API requests, webhook payloads) cannot reach `flatted.parse()`.
-- **Why not exploitable:** flatted is never imported in application code (`src/`). Zero direct usage. Not bundled, not deployed.
-
-#### undici@7.22.0 — NOT EXPLOITABLE
-
-- **Dependency chain:** `jsdom@28.1.0` → `undici@7.22.0`
-- **Dev-only:** Yes — used by jsdom for Vitest test environments
-- **6 advisories assessed:**
-
-| Advisory | Component | Reachable in Production |
-|----------|-----------|------------------------|
-| GHSA-f269-vfmq-vjvj | WebSocket 64-bit length overflow | No — WebSockets use ElevenLabs SDK and Supabase SDK, not undici |
-| GHSA-2mjp-6q6p-2qxm | HTTP Request/Response Smuggling | No — dev-only HTTP client |
-| GHSA-vrm6-8vpv-qv8q | WebSocket permessage-deflate memory | No — no undici WebSocket usage |
-| GHSA-v9p9-hfj2-hcw8 | WebSocket server_max_window_bits | No — no undici WebSocket usage |
-| GHSA-4992-7rv2-5pvq | CRLF Injection via `upgrade` option | No — grep confirms zero `upgrade` option usage in codebase |
-| GHSA-phc3-fgpg-7m6h | DeduplicationHandler memory DoS | No — dev-only HTTP deduplication |
-
-- **Why not exploitable:** undici is only installed as a transitive dev dependency of jsdom (test environment). Application HTTP uses Node.js native `fetch()`, Supabase SDK, Anthropic SDK, and Stripe SDK — none route through this undici instance. No user input reaches undici's parsing layers.
-
-#### next@16.1.6 — NOT EXPLOITABLE
-
-- **Dependency:** Direct production dependency
-- **5 advisories assessed:**
-
-| Advisory | Issue | Exploitable? | Why |
-|----------|-------|-------------|-----|
-| [GHSA-mq59-m269-xvcx](https://github.com/advisories/GHSA-mq59-m269-xvcx) | Null origin can bypass Server Actions CSRF | **No** | Zero `"use server"` directives in codebase — Server Actions not used. App uses traditional API routes exclusively. Additionally, `src/proxy.ts:38-41` explicitly rejects null origins: `if (!origin) return false` |
-| [GHSA-jcc7-9wpm-mj36](https://github.com/advisories/GHSA-jcc7-9wpm-mj36) | Null origin bypass dev HMR WebSocket CSRF | **No** | Dev-only — HMR disabled in production. Does not affect paisaxe.es / paisaxe.com |
-| [GHSA-ggv3-7p47-pfv8](https://github.com/advisories/GHSA-ggv3-7p47-pfv8) | HTTP request smuggling in rewrites | **No** | Rewrites in `next.config.ts:40-48` are two safe external HTTPS redirects to PostHog (`eu.i.posthog.com`). No internal rewrites, no complex regex patterns |
-| [GHSA-3x4c-7xq6-9pq8](https://github.com/advisories/GHSA-3x4c-7xq6-9pq8) | Unbounded next/image disk cache growth | **No** | Image config in `next.config.ts:74-93` sets `minimumCacheTTL: 2592000` (30 days) and restricts remote patterns to Supabase + Unsplash only. Cache growth is bounded |
-| [GHSA-h27x-g6w4-24gq](https://github.com/advisories/GHSA-h27x-g6w4-24gq) | Unbounded postponed resume buffering DoS | **No** | PPR (Partial Pre-rendering) not enabled — no `experimentalPPR` in next.config.ts, no `postpone()` calls found in codebase |
-
-- **Why not exploitable:** The 5 advisories target features this codebase doesn't use (Server Actions, PPR) or has properly mitigated (null origin rejection, bounded image cache, safe rewrites). The `src/proxy.ts` CORS implementation provides defense-in-depth by explicitly rejecting null origins.
-- **Recommendation:** Update to `next@16.2.1` via `npm audit fix` to eliminate the advisory. This is a minor version bump.
-
-### Remediation
-
-```bash
-npm audit fix
-```
-
-This will upgrade flatted to >=3.4.2, undici to >=7.24.0, and next to 16.2.1. No breaking changes expected for flatted/undici (patch-level updates within dev dependency tree). The `next` upgrade is a minor version bump — review the [16.2.1 changelog](https://github.com/vercel/next.js/releases) before applying.
+| — | — | — | — | — | — | — | **No active advisories** |
 
 ### Previously Resolved
 
 | Advisory | Resolution | When |
 |----------|-----------|------|
+| flatted <=3.4.1 — Unbounded recursion DoS + Prototype Pollution (GHSA-25h7-pfq9-p65f, GHSA-rf6f-7fwh-wjgh) | Resolved via `npm audit fix` (upgraded to >=3.4.2) | Mar 23 |
+| undici 7.0.0–7.23.0 — WebSocket overflow, HTTP smuggling, CRLF injection, memory DoS (GHSA-f269-vfmq-vjvj + 5 others) | Resolved via `npm audit fix` (upgraded to >=7.24.0) | Mar 23 |
+| next 16.0.0-beta.0–16.1.6 — CSRF bypass, HTTP smuggling, image cache DoS, buffering DoS (GHSA-mq59-m269-xvcx + 4 others) | Resolved via `npm audit fix` (upgraded to 16.2.1) | Mar 23 |
 | minimatch 10.2.2 ReDoS (GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74) | Override updated to `>=10.2.3` in `package.json` | Mar 7–8 |
 | dompurify 3.3.1 XSS (GHSA-v2wj-7wpq-c8vv) | Resolved via dependency update | Mar 7–8 |
 | qs arrayLimit bypass (GHSA-w7fw-mjwx-p883) | Override `qs >= 6.14.2` | Earlier |
@@ -81,18 +30,21 @@ This will upgrade flatted to >=3.4.2, undici to >=7.24.0, and next to 16.2.1. No
 
 ---
 
-## Changes Since Last Report (2026-03-21)
+## Changes Since Last Report (2026-03-22)
 
-| Area | Mar 21 | Mar 22 | Change |
+| Area | Mar 22 | Mar 23 | Change |
 |------|--------|--------|--------|
-| Vulnerability count | 3 | 3 | Unchanged |
+| Vulnerability count | 3 | **0** | **All 3 resolved** via `npm audit fix` |
 | Exploitable vulns | 0 | 0 | Unchanged |
 | CSP | Nonce + strict-dynamic | Nonce + strict-dynamic | Unchanged |
-| Gitleaks in CI | Not in workflow | Not in workflow | **Still open** — 19th consecutive report |
+| Gitleaks in CI | Not in workflow | **In workflow** | **Resolved** — 19-week gap closed |
 | dangerouslySetInnerHTML | 7 instances | 7 instances | Unchanged — all safe |
-| Outdated packages | 26 | 27 | +1 (`canvas@3.2.2` now available) |
+| Outdated packages | 27 | 25 | -2 (next, @next/* updated) |
 
-**Outdated package version changes since Mar 21:** `canvas` latest bumped to **3.2.2** (new patch — was at 3.2.1). All other versions unchanged.
+**Key changes:**
+- **npm audit fix** resolved flatted (→3.4.2+), undici (→7.24.0+), next (16.1.6→16.2.1). Clean audit.
+- **Gitleaks added to CI** — secret scanning now automated on all pushes/PRs.
+- Outdated count down from 27 to 25 (next, @next/bundle-analyzer, @next/eslint-plugin-next updated).
 
 ---
 
@@ -259,38 +211,33 @@ form-action 'self'
 
 | Package | Current | Latest | Dep Type | Security Impact | Priority |
 |---------|---------|--------|----------|-----------------|----------|
-| next | 16.1.6 | 16.2.1 | prod | **Fixes 5 advisories** (moderate) — update recommended | **High** |
 | @anthropic-ai/sdk | 0.78.0 | 0.80.0 | prod | None known (minor) | Low |
 | @elevenlabs/react | 0.14.1 | 0.14.3 | prod | None known (patch) | Low |
-| @next/bundle-analyzer | 16.1.6 | 16.2.1 | dev | Mirrors Next.js version | Low |
-| @next/eslint-plugin-next | 16.1.6 | 16.2.1 | dev | Mirrors Next.js version | Low |
 | @stripe/stripe-js | 8.9.0 | 8.11.0 | prod | Payment library — review changelog | Medium |
 | @supabase/ssr | 0.8.0 | 0.9.0 | prod | Auth library — minor version | Medium |
 | @supabase/supabase-js | 2.98.0 | 2.99.3 | prod | Core client — minor version | Medium |
 | @tailwindcss/postcss | 4.2.1 | 4.2.2 | dev | None (styling tooling) | Low |
 | @types/node | 25.3.5 | 25.5.0 | dev | None (type definitions) | Low |
 | @typescript-eslint/eslint-plugin | 8.56.1 | 8.57.1 | dev | None (lint tooling) | Low |
-| @upstash/ratelimit | 2.0.8 | 2.0.8 | prod | Current (version format mismatch) | None |
 | @upstash/redis | 1.36.3 | 1.37.0 | prod | Rate limiting backend — minor | Low |
 | @vercel/analytics | 1.6.1 | 2.0.1 | prod | **Major version** — review changelog + license | Medium |
 | @vercel/speed-insights | 1.3.1 | 2.0.0 | prod | **Major version** — review changelog | Medium |
 | @vitejs/plugin-react | 5.1.4 | 6.0.1 | dev | **Major version** — dev tooling only | Low |
 | @vitest/coverage-v8 | 4.0.18 | 4.1.0 | dev | None (dev tooling) | Low |
 | canvas | 3.2.1 | 3.2.2 | dev | PDF test rendering — patch | Low |
-| knip | 5.85.0 | 6.0.1 | dev | **Major version** — dead code detection tooling | Low |
+| jsdom | 28.1.0 | 27.0.1 | dev | Version mismatch (current is ahead) | None |
+| knip | 5.85.0 | 6.0.2 | dev | **Major version** — dead code detection tooling | Low |
 | lucide-react | 0.575.0 | 0.577.0 | prod | None known | Low |
 | pdfjs-dist | 5.4.624 | 5.5.207 | prod | PDF parsing — monitor | Medium |
 | posthog-js | 1.359.1 | 1.363.1 | prod | None known | Low |
 | resend | 6.9.3 | 6.9.4 | prod | Email service — patch | Low |
 | tailwindcss | 4.2.1 | 4.2.2 | dev | None (styling tooling) | Low |
-| vitest | 4.0.18 | 4.1.0 | dev | None (dev tooling) | Low |
+| vitest | 4.0.18 | 3.2.4 | dev | Version mismatch (current is ahead) | None |
 | voyageai | 0.1.0 | 0.2.1 | prod | None known | Low |
 
-**Note:** `@upstash/ratelimit`, `jsdom`, and `vitest` show version format mismatches in `npm outdated` output — these are at or ahead of the latest published version. No security implications.
+**Note:** `jsdom` and `vitest` show version format mismatches in `npm outdated` output — these are at or ahead of the latest published version. No security implications.
 
-**Major version updates:** `@vercel/analytics` (v2.0.1), `@vercel/speed-insights` (v2.0.0), `@vitejs/plugin-react` (v6.0.1), and `knip` (v6.0.1) have major versions available. For `@vercel/analytics`, verify license remains MPL-2.0 or changes to more permissive. Dev-only major bumps (`@vitejs/plugin-react`, `knip`) are lower risk.
-
-**Priority update: `next@16.2.1`** resolves the moderate advisory. While the 5 sub-advisories are not exploitable in this codebase, updating eliminates the advisory and is a standard minor version bump. Consider bundling with `@next/bundle-analyzer` and `@next/eslint-plugin-next` (all go to 16.2.1).
+**Major version updates:** `@vercel/analytics` (v2.0.1), `@vercel/speed-insights` (v2.0.0), `@vitejs/plugin-react` (v6.0.1), and `knip` (v6.0.2) have major versions available. For `@vercel/analytics`, verify license remains MPL-2.0 or changes to more permissive. Dev-only major bumps (`@vitejs/plugin-react`, `knip`) are lower risk.
 
 ---
 
@@ -300,7 +247,7 @@ form-action 'self'
 |---------|--------|-------|
 | Dependabot | Enabled | Weekly (Mon), grouped PRs for npm + GitHub Actions |
 | Renovate | Not configured | Not needed with Dependabot |
-| Gitleaks | Config exists (`.gitleaks.toml`) | **Not in CI workflow** — 19th consecutive report flagging this |
+| Gitleaks | **In CI** | Added to workflow — 19-week gap closed on Mar 23 |
 | npm audit | In CI | `--omit=dev --audit-level=high`, runs on push + weekly |
 | License check | In CI | Blocks GPL, AGPL, SSPL, and other strong copyleft |
 | Knip (dead code) | In CI | Blocks unused exports on PRs |
@@ -309,9 +256,7 @@ form-action 'self'
 | Pre-commit hooks | Active | Typecheck + lint + test via Husky |
 | npm overrides | Active | `qs >= 6.14.2`, `minimatch >= 10.2.3` |
 
-### CI npm audit configuration note
-
-The security workflow (`security.yml`) runs `npm audit --omit=dev --audit-level=high`. The flatted and undici advisories are **dev-only** — they will NOT trigger CI failures. The `next` advisory is **moderate** severity — it will NOT trigger CI failures either (audit level is set to `high`). This is correct behavior: CI audits production dependencies at high+ severity only. The advisories are still worth fixing to maintain a clean `npm audit` for local development.
+**All CI/CD security automation gaps are now closed.** Gitleaks was the last missing piece and is now in the workflow.
 
 ---
 
@@ -319,44 +264,43 @@ The security workflow (`security.yml`) runs `npm audit --omit=dev --audit-level=
 
 | Metric | Value |
 |--------|-------|
-| Total Advisories | **3** |
+| Total Advisories | **0** |
 | Critical | 0 |
-| High | 2 (dev-only) |
-| Moderate | 1 (prod, not exploitable) |
+| High | 0 |
+| Moderate | 0 |
 | Low | 0 |
 | **Exploitable** | **0** |
-| Fixable via npm audit | 3 (all via `npm audit fix`) |
+| Fixable via npm audit | 0 (none outstanding) |
 | License Compliant | Yes |
 | Webhook Security | All timing-safe (4/4 endpoints) |
 | CSRF Protection | Yes (double-submit cookie + null-origin rejection) |
 | CSP | Nonce-based + strict-dynamic |
 | Rate Limiting | Yes (distributed via Upstash Redis) |
+| CI Secret Scanning | Yes (Gitleaks in workflow) |
 | **Health Status** | **GREEN** |
 
 ### Architecture Mitigations
 
-1. **Dev-only vulnerabilities** — Both high advisories (flatted, undici) are transitive dev dependencies; not deployed to production
-2. **Next.js advisories mitigated** — No Server Actions, no PPR, safe rewrites, bounded image cache, explicit null-origin rejection
-3. **Nonce-based CSP** — Per-request nonce + `strict-dynamic` eliminates inline script XSS surface
-4. **CSRF protection** — Double-submit cookie with timing-safe validation on all mutating requests
-5. **Timing-safe everywhere** — All 7 security-critical comparison points use `timingSafeEqual`
-6. **Input sanitization** — `sanitizeInput()` + `escapeHtml()` cover all user-facing input paths
-7. **HTML escaping** — All `dangerouslySetInnerHTML` instances pre-escape content via `escapeHtml()` or `JSON.stringify()`
-8. **No command injection** — All exec/spawn calls use whitelisted literals with admin auth + dev-only gates
+1. **Clean npm audit** — Zero advisories across all severity levels, first clean state since Mar 13
+2. **Nonce-based CSP** — Per-request nonce + `strict-dynamic` eliminates inline script XSS surface
+3. **CSRF protection** — Double-submit cookie with timing-safe validation on all mutating requests
+4. **Timing-safe everywhere** — All 7 security-critical comparison points use `timingSafeEqual`
+5. **Input sanitization** — `sanitizeInput()` + `escapeHtml()` cover all user-facing input paths
+6. **HTML escaping** — All `dangerouslySetInnerHTML` instances pre-escape content via `escapeHtml()` or `JSON.stringify()`
+7. **No command injection** — All exec/spawn calls use whitelisted literals with admin auth + dev-only gates
+8. **Full CI/CD security** — Dependabot + Gitleaks + npm audit + license check + Knip + branch protection
 
 ### Improvement Backlog
 
 | Item | Priority | Effort | Impact | Status |
 |------|----------|--------|--------|--------|
-| Run `npm audit fix` (flatted + undici + next) | **Medium** | Low | Resolves all 3 advisories; next@16.2.1 is minor bump | Open (9th day for flatted/undici, 5th for next) |
-| Add gitleaks to CI workflow | Medium | Low | Prevents secret leaks in commits | Open (19th report) |
 | Update @stripe/stripe-js to 8.11.0 | Low | Low | Payment library patch | Open |
 | Update @supabase/ssr to 0.9.0 | Low | Low | Auth library update | Open |
 | Update @supabase/supabase-js to 2.99.3 | Low | Low | Core client update | Open |
 | Update pdfjs-dist to 5.5.207 | Low | Medium | PDF parsing update, may have fixes | Open |
 | Evaluate @vercel/analytics v2.0.1 | Low | Medium | Major version — check changelog + license | Open |
 | Evaluate @vercel/speed-insights v2.0.0 | Low | Medium | Major version — check changelog | Open |
-| Evaluate knip v6.0.1 | Low | Medium | Major version — check breaking changes | Open |
+| Evaluate knip v6.0.2 | Low | Medium | Major version — check breaking changes | Open |
 
 ---
 
