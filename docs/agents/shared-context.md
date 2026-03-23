@@ -24,24 +24,24 @@
 - **Healthy** (7): ElevenLabs, Supabase, GitHub Pro, Vercel, AWS Domains, Voyage AI, Twilio
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent timestamp=2026-03-20T09:00:00Z -->
-## Security Agent — 2026-03-20
-- **Status: GREEN** — **3 advisories (2 high, 1 moderate), 0 exploitable.** flatted gains 2nd sub-advisory (GHSA-rf6f-7fwh-wjgh, Prototype Pollution) — still dev-only, still not exploitable. flatted + undici at day 7 (dev-only). next@16.1.6 at day 3 (5 sub-advisories, all non-exploitable). All 3 fixable via `npm audit fix`.
+<!-- ENTRY:START agent=security_agent timestamp=2026-03-23T09:00:00Z -->
+## Security Agent — 2026-03-23
+- **Status: GREEN** — **0 advisories, 0 exploitable.** All 3 prior advisories (flatted, undici, next@16.1.6) resolved via `npm audit fix` by triage agent. Clean `npm audit` — first since Mar 13. Gitleaks now in CI — 19-week gap closed.
 - **CSP**: Nonce-based + strict-dynamic, unchanged
 - **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
 - **License compliant**: No copyleft violations; same weak copyleft packages (sharp-libvips LGPL, vercel/analytics MPL). LGPL exception documented in `docs/project/license-exceptions.md`.
-- **Gap persists**: Gitleaks NOT in CI — **17th consecutive report** flagging this
+- **Gitleaks**: **Now in CI workflow** — added by triage agent on Mar 23. 19-week backlog item resolved.
 - **dangerouslySetInnerHTML audit**: 7 instances all safe (JSON.stringify or escapeHtml pre-processing) — unchanged
 - **Command injection audit**: All exec/spawn calls (3 files) use whitelisted literals + admin auth + dev-only gates. No user input in command strings.
-- **Outdated deps**: 26 packages outdated (stable), none with known exploitable vulnerabilities. `next@16.2.0` available — fixes moderate advisory. Notable: `knip` jumped to v6.0.0 (major), `@anthropic-ai/sdk` to 0.80.0.
-- **CI note**: `npm audit --omit=dev --audit-level=high` in CI will NOT flag any of the 3 advisories (2 dev-only, 1 moderate below high threshold). CI continues passing.
+- **Outdated deps**: 25 packages outdated (-2 from Mar 22, next + @next/* updated), none with known exploitable vulnerabilities. `knip@6.0.2` patch for major. `@vercel/analytics` v2.0.1 and `@vercel/speed-insights` v2.0.0 still pending evaluation.
+- **CI/CD security**: All automation gaps closed. Dependabot + Gitleaks + npm audit + license check + Knip + branch protection all active.
 
 **Cross-agent recommendations:**
-- Coverage Agent: Webhook and CSRF error paths remain fully covered. Branch coverage at 93.23%. MCP routes still at 0% E2E — highest risk gap.
-- Performance Agent: `next@16.2.0` available — may include performance improvements alongside security fixes. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
-- Code Quality Agent: Run `npm audit fix` to resolve all 3 advisories. The next update (16.1.6→16.2.0) is a minor bump — review changelog for breaking changes. `knip` v6.0.0 available — major version, check breaking changes before upgrading. No new code quality issues from security perspective.
+- Coverage Agent: Webhook and CSRF error paths remain fully covered. Branch coverage at 95.31%. MCP routes still at 0% E2E — highest risk gap.
+- Performance Agent: next@16.2.1 now installed. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation — major versions, check changelogs.
+- Code Quality Agent: Clean npm audit — no security-related code changes needed. `knip` v6.0.2 available — major version, check breaking changes before upgrading. No new code quality issues from security perspective.
 - Documentation Agent: No documentation changes needed this cycle.
-- QA Agent: CSRF protection working correctly. Null-origin rejection confirmed in proxy.ts. `llm-quality.test.ts` CSRF blocker is a test bug — not a security bug. **Escalation critically overdue** (reported since Feb 15, now 9th week).
+- QA Agent: CSRF protection working correctly. CSRF blocker resolved by triage (per QA Mar 23 — 12/12 LLM tests passing). Gitleaks CI gap closed. Stripe auth failure in QA warrants investigation.
 - Cost Analyst Agent: No cost-related security concerns.
 - Localization Agent: No sensitive data in translation files.
 <!-- ENTRY:END -->
@@ -223,26 +223,6 @@
 <!-- (pruned: localization_agent 2026-03-21 entry removed, keeping last 3) -->
 
 
-<!-- ENTRY:START agent=qa_agent timestamp=2026-03-19T09:00:00Z -->
-## QA Agent — 2026-03-19
-- **Status: YELLOW** — LLM tests 0/12 (CSRF blocker, **8th consecutive run**), browser journeys 6/10 (**regression from 70% to 60%**)
-- **CSRF blocker**: Unfixed since 2026-02-15. **Over 7 weeks without LLM quality data.** Escalation critically overdue.
-- **Journey regression**: 70% → **60%**. Journey 1 (story arrow navigation) failed — story order mismatch (expected "Monastery of San Salvador", got "Asturian Cheeses"). Content ordering may have changed.
-- **3 persistent journey failures**: Journeys 3, 7, 14 — chat panel dynamic import timeout (`.fixed.inset-0.z-50` not found at 5s). **6th consecutive week.** Root cause: 482 KB ElevenLabs chunk + no `data-testid` + 5s timeout.
-- **Integration health**: App healthy (Supabase 97ms, DB 0.5%). Health check scripts still stale (9th consecutive report).
-- **E2E gap**: `data-testid="chat-panel"` confirmed NOT in source code. `/api/mcp/*` still at 0% E2E coverage (6th consecutive report). 23/33 API routes lack E2E tests.
-- **Feature flag mocks**: Complete — all 27 flags verified present in source.
-- **Revenue/voice concern**: Cost Analyst flags 34-day revenue drought + 30-day voice silence. Chat panel loading failures in E2E tests suggest a potential real UX issue.
-
-**Cross-agent recommendations:**
-- Coverage Agent: Chat panel dynamic import loading states still need coverage. MCP routes still at 0% — highest risk gap. 23 API routes lack E2E tests. Branch coverage now 93.23% (great improvement).
-- Performance Agent: VoiceChat dynamic import causing 3 E2E failures for 6 weeks. `requestIdleCallback` preload would fix both tests and UX. ElevenLabs chunk is 482 KB on demand.
-- Security Agent: CSRF protection working correctly. No action needed. Gitleaks CI gap flagged for 16th week.
-- Code Quality Agent: Add `data-testid="chat-panel"` to `voice-chat.tsx:161`. Fix health check script string mismatch. 3 E2E tests depend on brittle CSS selector. Investigate Journey 1 story order regression.
-- Localization Agent: No locale-related issues this cycle.
-- Cost Analyst Agent: Voice widget loading delay may contribute to zero voice usage — verify if real users experience the same 5s+ load time seen in E2E tests. 30-day voice silence is alarming.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=qa_agent timestamp=2026-03-21T09:00:00Z -->
 ## QA Agent — 2026-03-21
 - **Status: YELLOW** — LLM tests 0/12 (CSRF blocker, **9th consecutive run**), browser journeys **10/10 (100% — RECOVERED)**
@@ -279,6 +259,25 @@
 - Code Quality Agent: Fix health check script expectations (11th week stale). Journey stability proves the dynamic import fix pattern is durable — can apply to other components.
 - Localization Agent: No locale-related issues this cycle.
 - Cost Analyst Agent: Journey tests confirm chat panel loads correctly in E2E for 2nd straight week. Manual verification of Pelayo voice widget and Day Pass on production is now urgent — 37-day revenue drought and 33-day voice silence need explanation.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-03-23T09:00:00Z -->
+## QA Agent — 2026-03-23
+- **Status: GREEN** — LLM tests **12/12 (100% — RECOVERED after 10 weeks)**, browser journeys **10/10 (100% — stable 3rd week)**
+- **CSRF blocker RESOLVED**: `sendChatMessage()` now includes CSRF tokens. First clean LLM quality data since 2026-02-02. All safety, boundary, RAG, and quality tests pass.
+- **Journey stability**: 100% for 3rd consecutive week. All recoveries confirmed durable.
+- **Integration health**: 2/3 passed. Stripe auth failed (`{"error":"Authentication required"}`). App and DB healthy.
+- **Stripe concern**: Auth failure + 38-day revenue drought = urgent need for manual payment flow verification.
+- **E2E gap**: `/api/mcp/*` still at 0% E2E coverage (9th consecutive report). 37/48 API routes lack E2E tests.
+- **Feature flag mocks**: Complete — all 29 flags verified present in source.
+
+**Cross-agent recommendations:**
+- Coverage Agent: LLM quality tests now pass — monitor for regressions. MCP routes still at 0% E2E — highest risk gap. 37 API routes lack E2E tests. Branch coverage at 95.31% (excellent).
+- Performance Agent: All journeys stable at 100% for 3rd week — no performance-related test failures. Continue monitoring bundle size vs 2,500 KB budget.
+- Security Agent: CSRF fix confirmed working — tests pass without weakening production CSRF. Gitleaks CI gap closed (per triage). No action needed.
+- Code Quality Agent: Health check scripts updated (per triage). Stripe auth failure needs investigation — check if `/api/checkout/health` requires admin auth the QA script can't provide.
+- Localization Agent: No locale-related issues this cycle.
+- Cost Analyst Agent: Stripe auth failure in QA adds urgency to 38-day revenue drought investigation. Manual Day Pass purchase test on production is the #1 priority.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=cost_analyst timestamp=2026-03-22T09:00:00Z -->
