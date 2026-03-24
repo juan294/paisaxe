@@ -294,6 +294,23 @@ describe("handleSave", () => {
       });
     });
 
+    it("passes undefined for imageSource when empty on upload (line 124 falsy branch)", async () => {
+      const mockFile = new File(["data"], "photo.jpg", { type: "image/jpeg" });
+      (uploadStoryImage as Mock).mockResolvedValue({
+        data: { id: "story-1", image: "/images/uploaded.jpg", imageSource: null },
+      });
+
+      const params = makeParams({
+        hasImageChanges: true,
+        imageSourceTab: "upload",
+        selectedFile: mockFile,
+        imageSource: "", // falsy — triggers `imageSource || undefined` → undefined
+      });
+      await handleSave(params);
+
+      expect(uploadStoryImage).toHaveBeenCalledWith("story-1", mockFile, undefined);
+    });
+
     it("saves image from content when imageSourceTab is 'content'", async () => {
       const contentImage: ContentImage = {
         filename: "img.jpg",
@@ -325,6 +342,37 @@ describe("handleSave", () => {
       );
     });
 
+    it("passes undefined for imageSource when empty on content image (line 126 falsy branch)", async () => {
+      const contentImage: ContentImage = {
+        filename: "img.jpg",
+        sourcePdf: "guide.pdf",
+        pageNumber: 1,
+        width: 800,
+        height: 600,
+        aspectRatio: 1.33,
+        type: "jpeg",
+        url: "/content/images/img.jpg",
+        score: 0.95,
+      };
+      (updateStoryImageUrl as Mock).mockResolvedValue({
+        data: { id: "story-1", image: "/content/images/img.jpg", imageSource: null },
+      });
+
+      const params = makeParams({
+        hasImageChanges: true,
+        imageSourceTab: "content",
+        currentContentImage: contentImage,
+        imageSource: "", // falsy — triggers `imageSource || undefined` → undefined
+      });
+      await handleSave(params);
+
+      expect(updateStoryImageUrl).toHaveBeenCalledWith(
+        "story-1",
+        "/content/images/img.jpg",
+        undefined
+      );
+    });
+
     it("updates only image source when only imageSource changed", async () => {
       const storyWithSource = {
         ...mockStory,
@@ -349,6 +397,28 @@ describe("handleSave", () => {
         imageSource: "New Source",
       });
       expect(params.resetAndClose).toHaveBeenCalled();
+    });
+
+    it("uses empty string fallback when story.imageSource is undefined (line 127 falsy branch)", async () => {
+      // story.imageSource is undefined → `story.imageSource || ""` evaluates the falsy branch
+      const storyNoSource = { ...mockStory, imageSource: undefined } as AdminStory;
+      (updateStoryImageSource as Mock).mockResolvedValue({
+        data: { id: "story-1", imageSource: "Added Source" },
+      });
+
+      const params = makeParams({
+        story: storyNoSource,
+        hasImageChanges: true,
+        imageSourceTab: "url",
+        imageUrl: "", // no URL — skip url branch
+        imageSource: "Added Source", // differs from fallback "" → enters source-only branch
+      });
+      await handleSave(params);
+
+      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", "Added Source");
+      expect(params.onUpdate).toHaveBeenCalledWith("story-1", {
+        imageSource: "Added Source",
+      });
     });
 
     it("shows error when image update fails", async () => {

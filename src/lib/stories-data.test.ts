@@ -283,6 +283,18 @@ describe("stories-data", () => {
       vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
     });
 
+    it("should return fallback stories when anon key is not a JWT (line 30 !startsWith branch)", async () => {
+      // Covers the `!key.startsWith("eyJ")` branch at line 29-30 where key exists
+      // but is not a valid JWT (e.g., a dummy test key)
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-dummy-key");
+
+      const result = await getStoriesFromDB();
+
+      expect(result).toEqual(FALLBACK_STORIES);
+      // Should NOT call supabase — early return before any DB query
+      expect(mockSupabaseFrom).not.toHaveBeenCalled();
+    });
+
     it("should return stories from database when successful", async () => {
       const mockOrder = vi.fn().mockResolvedValue({ data: [mockStoryRow], error: null });
       const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });

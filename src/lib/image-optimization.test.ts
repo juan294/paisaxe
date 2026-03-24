@@ -174,10 +174,21 @@ describe("image-optimization", () => {
     });
   });
 
-  // NOTE: image-optimization.ts lines 130-131 (JPEG branch in processVariant)
-  // is dead code. The `processVariant` function is only called by `optimizeImage`
-  // (which uses "avif" and "webp" formats) and `optimizeSingleImage` (which uses
-  // "avif" only). The "jpeg" case in the switch statement is never reached.
+  // COVERAGE GAP: Lines 130-131 — JPEG branch in processVariant (untestable)
+  //
+  // Why untestable in vitest/jsdom:
+  //   `processVariant` is a module-private function (not exported). It is only called
+  //   by `optimizeImage` (which hardcodes "avif" and "webp" formats on lines 91 and 95)
+  //   and is NOT used by `optimizeSingleImage` (which calls sharp directly).
+  //   Therefore, the `case "jpeg":` branch (lines 129-131) cannot be reached through
+  //   any public API. ESM does not expose non-exported bindings, so we cannot import
+  //   `processVariant` directly in tests.
+  //
+  // Recommendations to cover this code:
+  //   1. Export `processVariant` (makes it testable but exposes internal API), or
+  //   2. Remove the JPEG case entirely (it is dead code), or
+  //   3. Accept the gap — the branch is structurally identical to the avif/webp cases
+  //      and is covered by analogy.
 
   describe("optimizeSingleImage", () => {
     it("should optimize to AVIF format", async () => {

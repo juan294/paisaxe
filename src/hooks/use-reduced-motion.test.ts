@@ -2,6 +2,20 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useReducedMotion } from "./use-reduced-motion";
 
+// Capture useState initializers so we can test the SSR guard (line 14).
+// vi.mock hoists above imports, so this wraps every useState call in the test file.
+const capturedInitializers: Array<(() => boolean) | boolean> = [];
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+  return {
+    ...actual,
+    useState: (initializer: (() => boolean) | boolean) => {
+      capturedInitializers.push(initializer);
+      return actual.useState(initializer);
+    },
+  };
+});
+
 describe("useReducedMotion", () => {
   let matchMediaMock: {
     matches: boolean;
@@ -10,6 +24,8 @@ describe("useReducedMotion", () => {
   };
 
   beforeEach(() => {
+    capturedInitializers.length = 0;
+
     matchMediaMock = {
       matches: false,
       addEventListener: vi.fn(),
@@ -85,11 +101,26 @@ describe("useReducedMotion", () => {
     expect(result.current).toBe(true);
   });
 
-  // Line 14: `if (typeof window === "undefined") return false` is an SSR guard
-  // inside the useState initializer. This branch is unreachable in jsdom because
-  // React DOM itself requires `window` to render. Deleting `globalThis.window`
-  // causes React's rendering to fail before the hook code executes.
-  // This line can only be covered in a Node.js environment with a server-side
-  // React rendering approach (e.g., renderToString), which is outside the scope
-  // of these unit tests. The guard is a standard SSR safety pattern.
+  it("should return false from useState initializer when window is undefined (SSR guard)", () => {
+    // Render the hook so our mocked useState captures the initializer function
+    renderHook(() => useReducedMotion());
+
+    // The first captured initializer is from our hook's useState call
+    const initializer = capturedInitializers[0];
+    expect(typeof initializer).toBe("function");
+
+    // Temporarily remove window to simulate SSR environment
+    const originalWindow = globalThis.window;
+    // @ts-expect-error -- intentionally deleting window to simulate SSR
+    delete globalThis.window;
+
+    try {
+      // Call the initializer without window — exercises the SSR guard (line 14)
+      const result = (initializer as () => boolean)();
+      expect(result).toBe(false);
+    } finally {
+      // Always restore window for subsequent tests
+      globalThis.window = originalWindow;
+    }
+  });
 });

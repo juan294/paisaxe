@@ -638,6 +638,42 @@ describe("TierAlertsSection", () => {
     });
   });
 
+  it("does not re-fetch in useEffect when data already loaded (line 49 !usageMetrics false branch)", async () => {
+    // The useEffect guard on line 49 is `if (!usageMetrics && !isLoading)`.
+    // When usageMetrics is already loaded (non-null), the condition is false
+    // and loadData is NOT called again on rerender.
+    mockFetchCostsAnalytics.mockResolvedValue({
+      data: {
+        usageMetrics: {
+          voiceMinutes: 50,
+          visitors: 100,
+          posthogEvents: 500,
+          chatConversations: 10,
+          voiceConversations: 5,
+          periodDays: 30,
+        },
+      },
+    });
+    mockComputeTierAlerts.mockReturnValue(makeMockAlerts());
+
+    const { rerender } = render(<TierAlertsSection dateRange={dateRange} />);
+
+    // Wait for initial data load to complete
+    await waitFor(() => {
+      expect(screen.getByText("ElevenLabs")).toBeInTheDocument();
+    });
+
+    // Data is now loaded (usageMetrics is non-null).
+    expect(mockFetchCostsAnalytics).toHaveBeenCalledTimes(1);
+
+    // Rerender with same props — useEffect fires but !usageMetrics is false,
+    // so loadData is NOT called again
+    rerender(<TierAlertsSection dateRange={dateRange} />);
+
+    // Still only 1 call — the guard prevented a refetch
+    expect(mockFetchCostsAnalytics).toHaveBeenCalledTimes(1);
+  });
+
   it("does not re-fetch in useEffect when already loading (line 49 false branch)", async () => {
     // The useEffect guard on line 49 is `if (!usageMetrics && !isLoading)`.
     // When isLoading is true (fetch already in progress), the condition is false

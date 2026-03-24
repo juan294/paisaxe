@@ -1,120 +1,166 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-03-23 06:00:05
-
-## Health Status: GREEN
-
-All feature flags and key API routes are documented. No documentation gaps found.
+> Auto-generated on 2026-03-24 06:00:05
 
 ## CLAUDE.md Status
 
-Last modified: **2026-03-21**
+Last modified: **2026-03-23**
 
 ## Files Modified Since Documentation Update
 
-These source files have been modified since CLAUDE.md was last updated. All are test files — no documentation updates needed.
+These source files have been modified since CLAUDE.md was last updated and may need documentation updates.
 
 ### Source Files (src/)
 
 ```
-src/app/api/mcp/make-booking/route.test.ts
-src/app/api/mcp/places/route.test.ts
-src/app/api/mcp/weather/route.test.ts
-src/app/api/webhooks/elevenlabs/route.test.ts
-src/app/coming-soon/page.test.tsx
-src/app/favorites/page.test.tsx
-src/components/admin/admin-tabs.test.tsx
-src/components/admin/agents-dashboard/agent-card.test.tsx
-src/components/admin/agents-dashboard/markdown.test.ts
-src/components/admin/agents-dashboard/optimizer-config-panel.test.tsx
-src/components/admin/analytics-dashboard.test.tsx
+src/app/pricing/checkout/page.tsx
+src/app/pricing/loading.tsx
+src/app/providers.test.tsx
+src/app/providers.tsx
+src/components/admin/a11y-heading-focus.test.tsx
+src/components/admin/agent-config-panel.tsx
+src/components/admin/agents-dashboard/index.tsx
+src/components/admin/agents-dashboard/optimizer-config-panel.tsx
+src/components/admin/analytics-tabs.tsx
 src/components/admin/costs-analytics-panel/alerts.test.tsx
 src/components/admin/costs-analytics-panel/forecast.test.tsx
-src/components/admin/elevenlabs-analytics-panel.test.tsx
-src/components/admin/feature-toggles-panel.test.tsx
-src/components/admin/github-analytics-panel.test.tsx
-src/components/admin/maintenance-config-panel.test.tsx
-src/components/admin/story-card.test.tsx
-src/components/admin/story-translations-tab.test.tsx
-src/components/admin/stripe-analytics-panel.test.tsx
-src/components/admin/tunnel-control-panel.test.tsx
-src/components/auth/auth-provider.test.tsx
-src/components/immersive/site-info-menu.test.tsx
-src/components/immersive/story-progress-bar.test.tsx
-src/components/immersive/story-viewer.test.tsx
-src/components/immersive/suggest-place-dialog.test.tsx
-src/components/immersive/toolbar-overflow-menu.test.tsx
-src/config/elevenlabs-agents.test.ts
-src/config/location.test.ts
-src/hooks/use-feature-flags.test.ts
+src/components/admin/costs-analytics-panel/index.tsx
+src/components/admin/date-input-focus.test.tsx
+src/components/admin/elevenlabs-analytics-panel.tsx
+src/components/admin/feature-toggles-panel.tsx
+src/components/admin/github-analytics-panel.tsx
+src/components/admin/maintenance-config-panel.tsx
+src/components/admin/marketing-dashboard/account-config-dialog.test.tsx
+src/components/admin/marketing-dashboard/account-config-dialog.tsx
+src/components/admin/marketing-dashboard/create-draft-dialog.tsx
+src/components/admin/marketing-dashboard/marketing-dashboard.tsx
+src/components/admin/story-editor-dialog/story-editor-dialog.test.tsx
+src/components/admin/story-editor-dialog/story-editor-fullscreen.test.tsx
+src/components/admin/story-editor-dialog/use-story-editor-save.test.ts
+src/components/admin/stripe-analytics-panel.tsx
+src/components/admin/suggestions-panel.tsx
+src/components/admin/visitor-voice-config-panel.tsx
+src/components/admin/visitors-analytics-panel.tsx
+src/components/admin/voice-agent-chat.tsx
+src/components/immersive/author-typewriter.test.tsx
+src/components/immersive/question-prompts.test.tsx
+src/components/immersive/question-prompts.tsx
+src/components/site-footer.test.tsx
+src/components/site-footer.tsx
+src/hooks/use-reduced-motion.test.ts
 src/hooks/use-stories.test.ts
-src/hooks/use-stream-chat.test.ts
+src/hooks/use-voice-session.ssr.test.ts
+src/hooks/use-voice-session.test.ts
+src/lib/chat-action-detection.test.ts
 src/lib/claude.test.ts
-src/lib/subscription-optimizer.test.ts
-src/lib/translate-story.test.ts
+src/lib/costs/anthropic-costs.test.ts
+src/lib/costs/anthropic-costs.ts
+src/lib/image-optimization.test.ts
+src/lib/localize-story.test.ts
+src/lib/posting-service.test.ts
+src/lib/stories-data.test.ts
+src/lib/stories-data.ts
 ```
 
 No new migrations since documentation update.
 
-## Documentation Gaps Analysis
+## Documentation Gaps
 
-### Feature Flags — All Documented
+### Potentially Undocumented API Routes
 
-All 16 feature flags flagged by the gap detection script are already documented in `docs/project/features.md` (Feature Flags Reference, lines 660-717). The gap detection was checking against CLAUDE.md rather than features.md.
+These API routes may not be documented in CLAUDE.md:
 
-| Flag | Documented In |
-|------|---------------|
-| `ambient_discovery` | features.md — Experience Flags |
-| `asturianu_touches` | features.md — Experience Flags |
-| `autoplay_button` | features.md — Experience Flags |
-| `booking_system` | features.md — Voice Flags |
-| `contextual_prompts` | features.md — Discovery Flags |
-| `fullscreen_button` | features.md — Experience Flags |
-| `maintenance_mode` | features.md — System Flags |
-| `mood_discovery` | features.md — Discovery Flags |
-| `randomized_order` | features.md — Discovery Flags |
-| `related_stories` | features.md — Discovery Flags |
-| `seasonal_surfacing` | features.md — Discovery Flags |
-| `sms_booking_confirmation` | features.md — Voice Flags |
-| `story_freshness` | features.md — Discovery Flags |
-| `story_sharing` | features.md — Social Flags |
-| `surprise_me` | features.md — Discovery Flags |
-| `user_story_suggestions` | features.md — Social Flags |
+```
+admin/agent-reports
+admin/agents-summary
+admin/agents/run
+admin/analytics
+admin/costs-analytics
+admin/costs-analytics/[id]
+admin/elevenlabs-analytics
+admin/feature-flags/[key]
+admin/github-analytics
+admin/marketing/accounts
+admin/marketing/agent
+admin/marketing/agent-logs
+admin/marketing/dashboard
+admin/marketing/posts
+admin/marketing/schedule
+admin/stories
+admin/stories/[id]
+admin/stories/[id]/content-images
+admin/stories/[id]/image
+admin/stories/[id]/image-source
+admin/stories/[id]/status
+admin/stories/[id]/translations
+admin/stories/approve-all
+admin/stories/bulk-delete
+admin/stories/bulk-status
+admin/stripe-analytics
+admin/suggestions
+admin/suggestions/[id]
+admin/tunnel
+chat/stream
+checkout/day-pass
+checkout/embedded
+checkout/health
+cron/content-discovery
+cron/github-traffic-sync
+cron/subscription-optimizer
+favorites
+feature-flags
+health/db
+mcp/make-booking
+mcp/make-booking/status
+mcp/places
+mcp/weather
+suggestions
+voice-access
+webhooks/elevenlabs
+webhooks/stripe
+webhooks/supabase
+webhooks/translate
 
-### API Routes — Internal, No Documentation Needed
+```
 
-All 49 API routes flagged are internal endpoints consumed by the admin panel, cron system, or external webhooks. Key routes that serve external consumers (webhooks, MCP tools, health) are already documented in `docs/project/features.md`:
+### Potentially Undocumented Feature Flags
 
-- **Webhooks** (4 endpoints): Documented in features.md Infrastructure section (lines 624-629)
-- **MCP tools** (3 endpoints): Documented in features.md Voice section (lines 128-132)
-- **Health** (`/api/health`): Documented in features.md Infrastructure section (line 590)
-- **Admin routes** (30 endpoints): Internal admin panel CRUD — not for external consumption
-- **Cron routes** (3 endpoints): Internal Vercel Cron triggers
-- **Checkout routes** (3 endpoints): Internal Stripe checkout flow
+These feature flags may not be documented in CLAUDE.md:
 
-## Changes Made This Run (2026-03-23)
+```
+ambient_discovery
+asturianu_touches
+autoplay_button
+booking_system
+contextual_prompts
+fullscreen_button
+maintenance_mode
+mood_discovery
+randomized_order
+related_stories
+seasonal_surfacing
+sms_booking_confirmation
+story_freshness
+story_sharing
+surprise_me
+user_story_suggestions
 
-- **No feature flag updates needed** — all 16 flagged items were already documented in `docs/project/features.md`
-- **No API route documentation added** — all flagged routes are internal; externally-consumed routes (webhooks, MCP, health) are already documented
-- **Updated this report** with detailed gap resolution analysis
-- **Recommendation**: Update the gap detection script to check `docs/project/features.md` in addition to `CLAUDE.md` to avoid false positives
+```
+
+## Changes Made This Run (2026-03-24)
+
+**Feature Flags**: All 16 flagged feature flags are already documented in `docs/project/features.md` (Feature Flags Reference, lines 660-717). The gap detection script checked CLAUDE.md but the canonical location is features.md — false positive. No changes needed.
+
+**API Routes**: All 48 flagged routes reviewed. External-facing routes (webhooks, MCP tools) are already documented in features.md (lines 625-631, 128-133). Remaining routes are internal admin panel, cron, checkout, and utility APIs — not meant for external consumption. No changes needed.
+
+**Result**: No documentation gaps found. All items are either already documented or are internal implementation details.
 
 ## Documentation File Ages
 
 | File | Last Modified |
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
-| CLAUDE.md | 2026-03-21 |
+| CLAUDE.md | 2026-03-23 |
 | README.md | 2026-02-16 |
-
-## Cross-Agent Recommendations
-
-- **Coverage Agent**: No documentation-related coverage concerns.
-- **Security Agent**: No sensitive information in documentation. No changes needed.
-- **QA Agent**: Gap detection script produces false positives for feature flags — it checks CLAUDE.md but flags are documented in features.md. Consider fixing the script.
-- **Performance Agent**: No documentation-related performance concerns.
-- **Code Quality Agent**: The documentation gap detection script (`scripts/documentation-agent.sh` or related) should be updated to also scan `docs/project/features.md` for feature flag documentation.
-- **Cost Analyst Agent**: No cost-related documentation concerns.
-- **Localization Agent**: No localization-related documentation concerns.
 
 ---
 
