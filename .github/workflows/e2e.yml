@@ -65,7 +65,7 @@ jobs:
           STRIPE_DAY_PASS_PRICE_ID: price_test_dummy_for_e2e
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
@@ -73,7 +73,7 @@ jobs:
           retention-days: 14
 
       - name: Upload visual diff artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: visual-regression-results
