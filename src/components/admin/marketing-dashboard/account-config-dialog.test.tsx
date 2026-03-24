@@ -364,6 +364,41 @@ describe("AccountConfigDialog", () => {
     expect(body.accountName).toBe("Paisaxe");
   });
 
+  it("falls back accountName to Paisaxe when field is cleared to empty (line 67 || fallback)", { timeout: 15000 }, async () => {
+    // Covers the `accountName.trim() || "Paisaxe"` fallback at line 67 where
+    // accountName.trim() is falsy (empty string), triggering the "Paisaxe" default.
+    const user = userEvent.setup();
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: { id: "new-acc" } }),
+    });
+
+    render(<AccountConfigDialog {...defaultProps} />);
+
+    // Clear the account name field (useEffect pre-fills it with "Paisaxe")
+    const accountNameInput = screen.getByLabelText("Account Name");
+    await user.clear(accountNameInput);
+    expect(accountNameInput).toHaveValue("");
+
+    // Fill required credentials
+    await user.type(screen.getByPlaceholderText("Your X Consumer Key"), "key-1");
+    await user.type(screen.getByPlaceholderText("Your X Consumer Secret"), "secret-1");
+    await user.type(screen.getByPlaceholderText("Your Access Token"), "token-1");
+    await user.type(screen.getByPlaceholderText("Your Access Token Secret"), "refresh-1");
+
+    await user.click(screen.getByText("Connect"));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    // accountName.trim() returns "" which is falsy, so || "Paisaxe" kicks in
+    expect(body.accountName).toBe("Paisaxe");
+  });
+
   it("sends undefined accountHandle when empty", async () => {
     const user = userEvent.setup();
 

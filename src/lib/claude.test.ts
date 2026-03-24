@@ -462,10 +462,28 @@ describe("claude", () => {
     });
   });
 
-  // NOTE: claude.ts line 323 (`throw lastError || new Error("Max retries exceeded")`)
-  // is unreachable dead code. The for-loop (attempt 1..MAX_RETRIES) always either
-  // returns (on success) or throws (on non-retryable/final-attempt errors) within
-  // the loop body. The post-loop throw is a TypeScript exhaustiveness guard only.
+  // COVERAGE NOTE: claude.ts line 323 (`throw lastError || new Error("Max retries exceeded")`)
+  // contributes the sole uncovered branch (90.29% branch coverage).
+  //
+  // This line is unreachable dead code — a TypeScript exhaustiveness guard. Proof:
+  // The for-loop runs attempt = 1..MAX_RETRIES (3). On every iteration, exactly one
+  // of these terminal outcomes occurs:
+  //   1. execFile throws + retryable + attempt < MAX_RETRIES → sets lastError, `continue`
+  //   2. execFile throws + non-retryable OR final attempt → `throw` (line 283)
+  //   3. Empty stdout + attempt < MAX_RETRIES → sets lastError, `continue`
+  //   4. Empty stdout + final attempt → `throw` (line 298)
+  //   5. Invalid JSON → `throw` (line 306)
+  //   6. API error in response → `throw` (line 312)
+  //   7. Valid response → `return` (line 319)
+  //
+  // Cases 1 and 3 are the only ones that `continue` to the next iteration. On the
+  // final iteration (attempt === MAX_RETRIES), their guards (`attempt < MAX_RETRIES`)
+  // are false, so they fall through to the `throw` on lines 283/298 respectively.
+  // Therefore the loop always returns or throws — line 323 is never reached.
+  //
+  // MAX_RETRIES is a module-level `const = 3` and cannot be mocked to 0 without
+  // modifying source code, which is out of scope for test-only changes.
+  // This branch is genuinely untestable in vitest without source modifications.
 
   // ─── Asturian mode ──────────────────────────────────────────────────
 

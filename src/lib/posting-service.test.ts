@@ -260,6 +260,29 @@ describe("posting-service", () => {
       expect(chain.eq).toHaveBeenCalledWith("platform", "instagram");
     });
 
+    it("should use fallback defaults when row fields are null", async () => {
+      const rowWithNulls = {
+        ...samplePostRow,
+        media_urls: null,
+        hashtags: null,
+        engagement: null,
+      };
+
+      const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+      chain.select = vi.fn(() => chain);
+      chain.eq = vi.fn(() => chain);
+      chain.order = vi.fn(() => Promise.resolve({ data: [rowWithNulls], error: null }));
+
+      mockFrom.mockReturnValue(chain);
+
+      const result = await getDrafts();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].mediaUrls).toEqual([]);
+      expect(result[0].hashtags).toEqual([]);
+      expect(result[0].engagement).toEqual({});
+    });
+
     it("should return empty array on database error", async () => {
       const chain: Record<string, ReturnType<typeof vi.fn>> = {};
       chain.select = vi.fn(() => chain);

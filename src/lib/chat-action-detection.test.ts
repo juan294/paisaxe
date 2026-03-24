@@ -220,11 +220,22 @@ describe("chat-action-detection", () => {
       expect(result[0].text).toContain("Calle Mayor");
     });
 
-    // NOTE: Line 321 (trailing-period removal branch) is effectively dead code.
-    // The street regex patterns use character classes [A-Za-zÀ-ÿ\s] which do not
-    // include "." — so the regex match never captures a trailing period.
-    // The existing test above verifies the guard doesn't break anything, but
-    // the `endsWith(".")` condition is never true during normal execution.
+    // COVERAGE NOTE: Line 321 — the `true` branch of `if (addressText.endsWith("."))`
+    // is unreachable dead code. All five street regex patterns terminate with character
+    // classes `[A-Za-zÀ-ÿ\s]`, `\d`, or literal `,`/`km` — none of which match the
+    // period character (U+002E, outside the À-ÿ range of U+00C0–U+00FF). The postal
+    // code pattern similarly ends with `[A-Za-zÀ-ÿ]+` or literal city names (no dots).
+    //
+    // Therefore, `match[0].trim()` can never end with "." under any input, making the
+    // `endsWith(".")` condition permanently false. The guard is defensive code that
+    // would only become reachable if the regex patterns were modified to capture periods.
+    //
+    // Vitest branch coverage reports this as an uncovered branch (line 321). This is
+    // correct — the branch genuinely cannot execute. It is NOT testable without
+    // modifying the source regex patterns (which is out of scope for test-only changes).
+    //
+    // The test above ("removes trailing period from address text") validates that the
+    // false-branch path works correctly (no crash, no spurious modification).
   });
 
   describe("detectPlaceNames", () => {

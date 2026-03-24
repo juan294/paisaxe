@@ -79,24 +79,24 @@
 - Localization Agent: No sensitive data in translation files.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent timestamp=2026-03-21T09:00:00Z -->
-## Security Agent — 2026-03-21
-- **Status: GREEN** — **3 advisories (2 high, 1 moderate), 0 exploitable.** No changes to vulnerability landscape. flatted + undici at day 8 (dev-only). next@16.1.6 at day 4 (5 sub-advisories, all non-exploitable). All 3 fixable via `npm audit fix`.
-- **CSP**: Nonce-based + strict-dynamic, unchanged
+<!-- ENTRY:START agent=security_agent timestamp=2026-03-24T09:00:00Z -->
+## Security Agent — 2026-03-24
+- **Status: GREEN** — **0 advisories, 0 exploitable.** Clean `npm audit` for 2nd consecutive day. No new vulnerabilities.
+- **CSP corrected**: Previous reports inaccurately stated `nonce + strict-dynamic`. Actual implementation is `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com` — nonce param unused (`_nonce`), `strict-dynamic` intentionally omitted for PPR compatibility. This is the correct design per CLAUDE.md.
 - **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
 - **License compliant**: No copyleft violations; same weak copyleft packages (sharp-libvips LGPL, vercel/analytics MPL). LGPL exception documented in `docs/project/license-exceptions.md`.
-- **Gap persists**: Gitleaks NOT in CI — **18th consecutive report** flagging this
+- **Gitleaks**: In CI — running on push/PR + weekly schedule. No gaps.
 - **dangerouslySetInnerHTML audit**: 7 instances all safe (JSON.stringify or escapeHtml pre-processing) — unchanged
 - **Command injection audit**: All exec/spawn calls (3 files) use whitelisted literals + admin auth + dev-only gates. No user input in command strings.
-- **Outdated deps**: 26 packages outdated (stable), none with known exploitable vulnerabilities. `next@16.2.1` available (new patch) — fixes moderate advisory. `knip@6.0.1` patch for major. `posthog-js@1.363.1`, `resend@6.9.4` also new.
-- **CI note**: `npm audit --omit=dev --audit-level=high` in CI will NOT flag any of the 3 advisories (2 dev-only, 1 moderate below high threshold). CI continues passing.
+- **Outdated deps**: 27 packages outdated (+2: `typescript@6.0.2` and `lucide-react@1.0.1` — both new major versions), none with known exploitable vulnerabilities.
+- **CI/CD security**: All automation active. No gaps.
 
 **Cross-agent recommendations:**
-- Coverage Agent: Webhook and CSRF error paths remain fully covered. Branch coverage at 94.05%. MCP routes still at 0% E2E — highest risk gap.
-- Performance Agent: `next@16.2.1` available — may include performance improvements alongside security fixes. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
-- Code Quality Agent: Run `npm audit fix` to resolve all 3 advisories. The next update (16.1.6→16.2.1) is a minor bump — review changelog for breaking changes. `knip` v6.0.1 available — major version, check breaking changes before upgrading. No new code quality issues from security perspective.
-- Documentation Agent: No documentation changes needed this cycle.
-- QA Agent: CSRF protection working correctly. Null-origin rejection confirmed in proxy.ts. `llm-quality.test.ts` CSRF blocker is a test bug — not a security bug. **Escalation critically overdue** (reported since Feb 15, now 9th week).
+- Coverage Agent: All webhook and CSRF error paths remain fully covered. Branch coverage at 95.41% (excellent). MCP routes improved but still below E2E targets.
+- Performance Agent: `lucide-react@1.0.1` is a major version bump — check for tree-shaking changes or bundle size impact. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
+- Code Quality Agent: `typescript@6.0.2` available (major). `knip@6.0.4` patch available. `lucide-react@1.0.1` may have renamed/removed icons — check migration guide. No security-related code changes needed.
+- Documentation Agent: CSP description in any documentation referencing `nonce + strict-dynamic` should be corrected to match actual implementation (`'self' 'unsafe-inline'`).
+- QA Agent: CSRF protection working correctly. No action needed. All CI gaps closed.
 - Cost Analyst Agent: No cost-related security concerns.
 - Localization Agent: No sensitive data in translation files.
 <!-- ENTRY:END -->
@@ -196,6 +196,23 @@
 - QA Agent: Booking system uses outbound calls and SMS - test the full booking flow end-to-end, including failure modes
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=localization_agent timestamp=2026-03-24T09:00:00Z -->
+## Localization Agent — 2026-03-24
+- **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
+- **UI strings**: 392 keys per locale, all present (0 missing, 0 orphans)
+- **Story translations**: 95 stories x 5 locales = 475 translations, all complete (title + subtitle + description)
+- **Type safety**: Pass — `npx tsc --noEmit` exits clean on all locale files
+- **Test suite**: 197 i18n tests passing (4 test files)
+- **Changes**: None — all translations stable for 18 consecutive days
+
+**Cross-agent recommendations:**
+- Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, others dynamic) in place. No optimization needed.
+- Code Quality Agent: No dead translations found. All 392 keys actively referenced in components. No new keys added since Mar 7.
+- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
+- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 197 i18n tests all passing.
+- QA Agent: No locale-related issues this cycle. All translations stable.
+- Cost Analyst Agent: No cost-related localization concerns.
+
 <!-- ENTRY:START agent=localization_agent timestamp=2026-03-23T09:00:00Z -->
 ## Localization Agent — 2026-03-23
 - **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
@@ -212,26 +229,9 @@
 - Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 197 i18n tests all passing.
 - QA Agent: No locale-related issues this cycle. All translations stable.
 - Cost Analyst Agent: No cost-related localization concerns.
-
-<!-- ENTRY:START agent=localization_agent timestamp=2026-03-22T09:00:00Z -->
-## Localization Agent — 2026-03-22
-- **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
-- **UI strings**: 392 keys per locale, all present (0 missing, 0 orphans)
-- **Story translations**: 95 stories x 5 locales = 475 translations, all complete (title + subtitle + description)
-- **Type safety**: Pass — `npx tsc --noEmit` exits clean on all locale files
-- **Test suite**: 197 i18n tests passing (4 test files)
-- **Changes**: None — all translations stable for 16 consecutive days
-
-**Cross-agent recommendations:**
-- Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, others dynamic) in place. No optimization needed.
-- Code Quality Agent: No dead translations found. All 392 keys actively referenced in components. No new keys added since Mar 7.
-- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
-- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 197 i18n tests all passing.
-- QA Agent: No locale-related issues this cycle. All translations stable.
-- Cost Analyst Agent: No cost-related localization concerns.
 <!-- ENTRY:END -->
 
-<!-- (pruned: localization_agent 2026-03-21 entry removed, keeping last 3) -->
+<!-- (pruned: localization_agent 2026-03-22 entry removed, keeping last 3) -->
 
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-03-21T09:00:00Z -->
@@ -333,62 +333,47 @@
 - Localization Agent: No cost-related localization concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-21T09:00:00Z -->
-## Cost Analyst — 2026-03-21
-- **Status: WATCH** — Platform dormant for 32 days (voice) / 36 days (revenue). Fixed costs stable at $84.41/mo operational.
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-24T09:00:00Z -->
+## Cost Analyst — 2026-03-24
+- **Status: WATCH** — Platform dormant for 35 days (voice) / 39 days (revenue). Fixed costs stable at $84.41/mo operational.
 - **Total fixed (all)**: $284.41/mo | **Operational**: $84.41/mo | **Variable (Mar MTD)**: $1.15 (phone rental only)
 - **ElevenLabs**: Creator tier, 0/196,138 chars (0%). 0 voice min in March. Subscription active, next reset ~April 5.
 - **Twilio**: Balance $15.4546 (unchanged). Phone rental $1.15/mo confirmed in API. Zero SMS, zero calls.
-- **Revenue**: €0 in March (36-day drought — exceeds full calendar month by 8 days). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
+- **Revenue**: €0 in March (39-day drought — exceeds full calendar month by 11 days). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
 - **Config files accurate**: All service tier and recurring cost values correct.
 - **Break-even**: ~52 Day Pass sales/mo needed (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
-- **March on track for $0 revenue**: First complete calendar month with zero income. 68% complete (~$57.21 operational costs accrued).
-- **Both dormancy streaks exceed one full calendar month**: Voice 32 days (since Feb 17), revenue 36 days (since Feb 13).
+- **March 77% complete**: ~$65.35 operational costs accrued against $0 revenue. Only 7 days remain — first complete calendar month with zero income is virtually certain.
+- **QA CSRF blocker resolved**: LLM tests 12/12 per QA Mar 23. Stripe auth failure confirmed as test bug (per triage Mar 23 PM). Manual production verification of voice widget and Day Pass flow still the top priority.
 
 **Cross-agent recommendations:**
 - Code Quality Agent: No config discrepancies. All service tier and recurring cost values are accurate.
 - Security Agent: No cost-related security concerns. Twilio credentials working correctly.
 - Performance Agent: Zero voice usage means ElevenLabs SDK loading is not exercised in production. Monitor for cold-start issues when activity resumes.
-- QA Agent: Verify Pelayo voice widget and Day Pass purchase flow are functional — 32-day voice silence and 36-day revenue drought may indicate a broken flow, not just low traffic. This remains the primary concern.
+- QA Agent: Journey tests confirm chat panel loads correctly in E2E for 4th straight week. Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 39-day revenue drought and 35-day voice silence need explanation.
 - Coverage Agent: No cost-related coverage gaps.
 - Localization Agent: No cost-related localization concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-21T09:00:00Z -->
-## Coverage Agent — 2026-03-21
-- **Test suite**: ✅ 100% passing (5475 tests, 0 failures) — +90 new tests
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-24T09:00:00Z -->
+## Coverage Agent — 2026-03-24
+- **Test suite**: ✅ 100% passing (5605 tests, 0 failures) — +19 new tests
 - **TypeScript**: ✅ No errors
-- **Overall coverage**: 98.53% statements (unchanged), **94.05% branch (+0.82%)**, 98.60% function (unchanged), 98.94% line (unchanged)
-- **Branch coverage crossed 94%** — broad improvements across API routes, admin components, immersive components, hooks, and lib modules
-- **Top branch improvements**: costs-analytics/route (81→92%), stripe-analytics/route (89→98%), marketing/dashboard/route (82→88%), story-viewer (93→97%), subscription-optimizer (86→90%), translate-story (91→95%), use-feature-flags (91→96%), use-stream-chat (95→97%)
-- **Flaky test fixed**: proxy.test.ts auth timeout assertion buffer increased (1s→2s) to prevent false failures
-- **Statement coverage plateau unchanged at 98.53%** — all uncovered statements remain in documented untestable categories
+- **Overall coverage**: 98.52% statements (+0.03%), **95.41% branch (+0.18%)**, 98.45% function (unchanged), 98.92% line (+0.02%)
+- **4 files reached 100% branch coverage**: `use-reduced-motion.ts` (50→100%), `localize-story.ts` (86→100%), `posting-service.ts` (94→100%), `use-story-editor-save.ts` (96→100%)
+- **Other improvements**: `use-voice-session.ts` (85→90%), `stories-data.ts` (93→94.8%), `account-config-dialog.tsx` (95→97.5%)
+- **10 new author-typewriter tests** covering cancellation guards — tests pass but V8 doesn't register coverage due to async/fake-timer instrumentation limitations
+- **31 untestable branches documented** in coverage report — comprehensive audit of all remaining gaps: dead code (5 files), defensive guards (15+ files), V8 artifacts (3 files), SSR guards (5 files)
+- **Source bug found**: `story-editor-dialog/index.tsx` has disconnected fullscreen state — `state.isFullscreen` never set to `true` (not fixed per test-only constraint)
+- **Statement coverage plateau slightly broken at 98.52%** — up from 98.49% baseline
 - **Remaining low-coverage files**: posthog-provider (61.8%), voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — unchanged, all require Playwright E2E
 
 **Cross-agent recommendations:**
 - Performance Agent: No new dependencies added. All test additions are devDependency-only. No impact on bundle size.
-- Code Quality Agent: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. StatCard non-clickable branch at `admin/page.tsx:821` is architecturally unreachable.
-- Security Agent: All webhook and MCP error paths remain fully covered. No regression. API route branch coverage significantly improved.
+- Code Quality Agent: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. `subscription-optimizer.ts:160` `?? []` is dead. **New**: `story-editor-dialog/index.tsx` has disconnected fullscreen state — `state.isFullscreen` (line 267) is never set to `true`.
+- Security Agent: All webhook and MCP error paths remain fully covered. No regression. API route branch coverage stable.
 - QA Agent: No new testability gaps. The 3 SDK-dependent components need Playwright E2E tests for further coverage.
 - Cost Analyst Agent: No cost-related coverage gaps.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-21T09:00:00Z -->
-## Coverage Agent — 2026-03-21
-- **Test suite**: ✅ 100% passing (5475 tests, 0 failures) — +90 new tests
-- **TypeScript**: ✅ No errors
-- **Overall coverage**: 98.53% statements (unchanged), **94.05% branch (+0.82%)**, 98.60% function (unchanged), 98.94% line (unchanged)
-- **Branch coverage crossed 94%** — broad improvements across API routes, admin components, immersive components, hooks, and lib modules
-- **Statement coverage plateau unchanged at 98.53%** — all uncovered statements remain in documented untestable categories
-- **Remaining low-coverage files**: posthog-provider (61.8%), voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — unchanged, all require Playwright E2E
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-22T09:00:00Z -->
-## Coverage Agent — 2026-03-22
-- **Test suite**: ✅ 100% passing (5498 tests, 0 failures) — +23 new tests
-- **Overall coverage**: 98.53% statements, **94.36% branch (+0.31%)**, 98.60% function, 98.94% line
-- **2 files reached 100% branch**: `location.ts` (75→100%), `auth-provider.tsx` (83→100%)
-- **15 untestable branches documented**: SSR guards, `as const` guards, dead defensive guards, exhaustiveness checks
+- Localization Agent: No locale-related coverage concerns.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-03-23T09:00:00Z -->

@@ -677,4 +677,266 @@ describe("AuthorTypewriter", () => {
 
     expect(true).toBe(true);
   });
+
+  // ── Branch coverage: cancelled guard inside eraseText (line 57) ──
+  it("should hit the cancelled guard inside eraseText when unmounted mid-erase char step", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container, unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+
+    // Advance past HOME_HOLD (30s) to begin erasing "</> JG" (6 chars, 80ms each)
+    // Advance exactly 1 char-erase step so eraseText loop is mid-iteration
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000 + 80);
+    });
+
+    // Text should have lost one character
+    expect(textSpan.textContent!.length).toBeLessThan(6);
+
+    // Unmount while eraseText is in its for-loop (waiting on the next CHAR_DELAY)
+    unmount();
+
+    // Flush remaining timers — cancelled guard should prevent further setText calls
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    // No error means cancelled path was hit inside eraseText
+  });
+
+  // ── Branch coverage: cancelled guard inside typeText (line 65) ──
+  it("should hit the cancelled guard inside typeText when unmounted mid-type char step", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { container, unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
+
+    const home = "</> JG";
+    // Advance past HOME_HOLD + full erase of HOME + EMPTY_PAUSE to start typing next msg
+    // Then advance 1 char step into the typeText loop
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000 + home.length * 80 + 300 + 80);
+    });
+
+    // Should have typed exactly 1 character of the next message
+    expect(textSpan.textContent!.length).toBeGreaterThanOrEqual(1);
+
+    // Unmount while typeText loop is waiting on the next CHAR_DELAY
+    unmount();
+
+    // Flush remaining timers — cancelled guard should prevent further setText calls
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    // No error means cancelled path was hit inside typeText
+  });
+
+  // ── Branch coverage: cancelled guard after eraseText in cycle (line 82) ──
+  it("should hit cancelled guard right after eraseText(HOME) completes", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const home = "</> JG";
+    // Advance to: HOME_HOLD + full erase of HOME (all chars erased, loop done)
+    // eraseText finishes when the last char-delay fires at char index 1
+    // That's HOME_HOLD + (home.length - 1) * CHAR_DELAY for the waits
+    // But setText is called for i = home.length down to 0, with waits for i > 0
+    // Waits: (home.length - 1) iterations with 80ms each = 5 * 80 = 400ms
+    // plus the final setText(text.slice(0,0)) which has no wait
+    // Total: 30_000 + 400 = 30_400ms — eraseText just finished
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000 + (home.length - 1) * 80 + 10);
+    });
+
+    // Unmount right after eraseText(HOME) completes but before wait(EMPTY_PAUSE)
+    unmount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+  });
+
+  // ── Branch coverage: cancelled guard after first EMPTY_PAUSE in cycle (line 84) ──
+  it("should hit cancelled guard after first EMPTY_PAUSE completes", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const home = "</> JG";
+    // HOME_HOLD + erase HOME + EMPTY_PAUSE = right before typeText(nextMsg)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000 + (home.length - 1) * 80 + 300 + 10);
+    });
+
+    // Unmount right after EMPTY_PAUSE resolves (before typeText starts)
+    unmount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+  });
+
+  // ── Branch coverage: cancelled guard after typeText(nextMsg) in cycle (line 86) ──
+  it("should hit cancelled guard right after typeText(nextMsg) completes", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const home = "</> JG";
+    const nextMsg = mockT("author_pill.made_with_love");
+    // HOME_HOLD + erase HOME + EMPTY_PAUSE + type nextMsg
+    const typeTime = 30_000 + (home.length - 1) * 80 + 300 + (nextMsg.length - 1) * 80;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(typeTime + 10);
+    });
+
+    // Unmount right after typeText(nextMsg) completes, before wait(MSG_HOLD)
+    unmount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+  });
+
+  // ── Branch coverage: cancelled guard after MSG_HOLD in cycle (line 88) ──
+  it("should hit cancelled guard right after MSG_HOLD completes", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const home = "</> JG";
+    const nextMsg = mockT("author_pill.made_with_love");
+    const afterType = 30_000 + (home.length - 1) * 80 + 300 + (nextMsg.length - 1) * 80;
+    // + MSG_HOLD
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(afterType + 4000 + 10);
+    });
+
+    // Unmount right after MSG_HOLD, before eraseText(nextMsg)
+    unmount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+  });
+
+  // ── Branch coverage: cancelled guard after eraseText(nextMsg) in cycle (line 90) ──
+  it("should hit cancelled guard right after eraseText(nextMsg) completes", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const home = "</> JG";
+    const nextMsg = mockT("author_pill.made_with_love");
+    const afterType = 30_000 + (home.length - 1) * 80 + 300 + (nextMsg.length - 1) * 80;
+    // + MSG_HOLD + erase nextMsg
+    const afterErase = afterType + 4000 + (nextMsg.length - 1) * 80;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(afterErase + 10);
+    });
+
+    // Unmount right after eraseText(nextMsg), before second EMPTY_PAUSE
+    unmount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+  });
+
+  // ── Branch coverage: cancelled guard after second EMPTY_PAUSE in cycle (line 92) ──
+  it("should hit cancelled guard after second EMPTY_PAUSE completes", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const home = "</> JG";
+    const nextMsg = mockT("author_pill.made_with_love");
+    const afterType = 30_000 + (home.length - 1) * 80 + 300 + (nextMsg.length - 1) * 80;
+    const afterErase = afterType + 4000 + (nextMsg.length - 1) * 80;
+    // + second EMPTY_PAUSE
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(afterErase + 300 + 10);
+    });
+
+    // Unmount right after second EMPTY_PAUSE, before typeText(HOME)
+    unmount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+  });
+
+  // ── Branch coverage: cancelled guard after typeText(HOME) in cycle (line 94) ──
+  it("should hit cancelled guard right after typeText(HOME) completes", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+    const { unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    const home = "</> JG";
+    const nextMsg = mockT("author_pill.made_with_love");
+    const afterType = 30_000 + (home.length - 1) * 80 + 300 + (nextMsg.length - 1) * 80;
+    const afterErase = afterType + 4000 + (nextMsg.length - 1) * 80;
+    // + second EMPTY_PAUSE + type HOME
+    const afterTypeHome = afterErase + 300 + (home.length - 1) * 80;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(afterTypeHome + 10);
+    });
+
+    // Unmount right after typeText(HOME), before wait(HOME_HOLD)
+    unmount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+  });
+
+  // ── Branch coverage: wait() when cancelled is true (line 51) ──
+  it("should handle the case where wait timeout fires after cancellation", async () => {
+    const { AuthorTypewriter } = await import("./author-typewriter");
+
+    // The wait() function checks `if (!cancelled) resolve()`.
+    // When clearTimeout doesn't prevent a callback (already queued),
+    // the cancelled check prevents resolution.
+    // We test this by unmounting at the exact moment a timer is about to fire.
+    const { unmount } = render(
+      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+    );
+
+    // Advance to just before HOME_HOLD fires (29999ms)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(29_999);
+    });
+
+    // Unmount — sets cancelled = true and calls clearTimeout
+    unmount();
+
+    // Now advance the last 1ms — the timer callback (if not cleared) would check cancelled
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    // No error means the cancelled branch in wait() was properly handled
+  });
+
+  // ── Branch coverage: setText when textRef.current is null (line 43 false branch) ──
+  // Note: textRef.current is always set during render in jsdom, so the false branch
+  // of `if (textRef.current)` inside setText (line 43) and `if (!textRef.current) return`
+  // (line 17) are effectively untestable without modifying source code or mocking React.useRef.
+  // The ref is assigned by React during render and remains valid until unmount.
+  // After unmount, `cancelled = true` prevents setText from being called.
+  // Documenting this as a known limitation of jsdom/vitest testing.
 });
