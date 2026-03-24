@@ -1,25 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
+import { promises as fsPromises } from "fs";
 
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
-
-// Mock fs - the stat function reads actual files, which is fine for testing
-// We just need to ensure auth is checked and the response format is correct
-vi.mock("fs", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("fs")>();
-  return {
-    ...actual,
-    default: actual,
-    promises: {
-      ...actual.promises,
-      // Always reject to simulate files not existing
-      stat: vi.fn().mockRejectedValue(new Error("ENOENT")),
-    },
-  };
-});
 
 import { GET } from "./route";
 import { validateAdminAuth } from "@/lib/admin-auth";
@@ -29,6 +15,7 @@ const mockValidateAdminAuth = vi.mocked(validateAdminAuth);
 describe("Agent Reports API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe("GET /api/admin/agent-reports", () => {
@@ -62,6 +49,9 @@ describe("Agent Reports API", () => {
         valid: true,
         userId: "admin-123",
       });
+
+      // Spy on stat to simulate missing files
+      vi.spyOn(fsPromises, "stat").mockRejectedValue(new Error("ENOENT"));
 
       const response = await GET();
 
