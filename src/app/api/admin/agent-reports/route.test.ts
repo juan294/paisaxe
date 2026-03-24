@@ -1,39 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 import type { Stats } from "fs";
+import { promises as fsPromises } from "fs";
 
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
-
-// Create the stat mock using vi.hoisted so it's available during vi.mock factory
-const { mockStat } = vi.hoisted(() => ({
-  mockStat: vi.fn(),
-}));
-
-// Mock fs - the route uses `import { promises as fs } from "fs"`
-vi.mock("node:fs/promises", () => ({
-  stat: mockStat,
-}));
-
-vi.mock("fs", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("fs")>();
-  return {
-    ...actual,
-    default: {
-      ...actual,
-      promises: {
-        ...actual.promises,
-        stat: mockStat,
-      },
-    },
-    promises: {
-      ...actual.promises,
-      stat: mockStat,
-    },
-  };
-});
 
 import { GET } from "./route";
 import { validateAdminAuth } from "@/lib/admin-auth";
@@ -43,8 +16,7 @@ const mockValidateAdminAuth = vi.mocked(validateAdminAuth);
 describe("Agent Reports API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: files don't exist
-    mockStat.mockRejectedValue(new Error("ENOENT"));
+    vi.restoreAllMocks();
   });
 
   describe("GET /api/admin/agent-reports", () => {
@@ -79,6 +51,9 @@ describe("Agent Reports API", () => {
         userId: "admin-123",
       });
 
+      // Spy on stat to simulate missing files
+      vi.spyOn(fsPromises, "stat").mockRejectedValue(new Error("ENOENT"));
+
       const response = await GET();
 
       expect(response.status).toBe(200);
@@ -94,7 +69,7 @@ describe("Agent Reports API", () => {
       });
 
       const mockMtime = new Date("2026-03-01T10:00:00.000Z");
-      mockStat.mockImplementation(async (filePath: string) => {
+      vi.spyOn(fsPromises, "stat").mockImplementation(async (filePath) => {
         const pathStr = String(filePath);
         if (pathStr.includes("coverage-report.md") || pathStr.includes("security-report.md")) {
           return { mtime: mockMtime } as Stats;
