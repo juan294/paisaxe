@@ -12,18 +12,45 @@ vi.mock("@/lib/supabase", () => ({
 
 import { supabase } from "@/lib/supabase";
 
+function createChainMock(resolveValue: unknown) {
+  const mock = {
+    select: vi.fn(),
+    limit: vi.fn(),
+    eq: vi.fn(),
+  };
+  mock.select.mockReturnValue(mock);
+  mock.limit.mockReturnValue(Promise.resolve(resolveValue));
+  mock.eq.mockReturnValue(mock);
+  // Terminal: when the chain ends without limit (stories uses head:true)
+  // The select with head:true returns a promise-like object
+  return mock;
+}
+
 function mockSupabaseSuccess() {
-  const mockLimit = vi.fn().mockResolvedValue({ error: null });
-  const mockSelect = vi.fn().mockReturnValue({ limit: mockLimit });
-  const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-  vi.mocked(supabase.from).mockImplementation(mockFrom);
+  vi.mocked(supabase.from).mockImplementation((table: string) => {
+    if (table === "stories") {
+      const mock = createChainMock({ data: [{ id: "1" }], error: null });
+      // For stories, select() with head:true returns the chain which resolves via .eq()
+      const lastEq = vi.fn().mockResolvedValue({ data: [{ id: "1" }], error: null });
+      const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+      mock.select.mockReturnValue({ eq: firstEq });
+      return mock as never;
+    }
+    // chunks: from("chunks").select("id").limit(1)
+    return createChainMock({ error: null }) as never;
+  });
 }
 
 function mockSupabaseError(message: string) {
-  const mockLimit = vi.fn().mockResolvedValue({ error: { message } });
-  const mockSelect = vi.fn().mockReturnValue({ limit: mockLimit });
-  const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-  vi.mocked(supabase.from).mockImplementation(mockFrom);
+  vi.mocked(supabase.from).mockImplementation((table: string) => {
+    if (table === "stories") {
+      const lastEq = vi.fn().mockResolvedValue({ data: null, error: { message } });
+      const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+      const mock = { select: vi.fn().mockReturnValue({ eq: firstEq }) };
+      return mock as never;
+    }
+    return createChainMock({ error: { message } }) as never;
+  });
 }
 
 // Database size in bytes: 123.4 MB = 129,394,278 bytes
@@ -298,6 +325,63 @@ describe("GET /api/health", () => {
     expect(data.status).toBe("degraded");
     expect(data.services.supabase.error).toBe("Unknown error");
     expect(data.services.database.error).toBe("Unknown error");
+  });
+
+  // --- Stories health check tests ---
+
+  it("should include stories status in healthy response", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.stories).toBeDefined();
+    expect(data.services.stories.status).toBe("ok");
+  });
+
+  it('should return degraded when stories check fails (permission denied)', async () => {
+    // Supabase connectivity works, but stories specifically fails
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        const lastEq = vi.fn().mockResolvedValue({
+          data: null,
+          error: { message: "permission denied for table stories" },
+        });
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
+      }
+      return createChainMock({ error: null }) as never;
+    });
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.status).toBe("degraded");
+    expect(data.services.stories.status).toBe("fallback");
+    expect(data.services.stories.error).toContain("permission denied");
+  });
+
+  it('should return degraded when stories returns zero approved rows', async () => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        const lastEq = vi.fn().mockResolvedValue({ data: [], error: null });
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
+      }
+      return createChainMock({ error: null }) as never;
+    });
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.status).toBe("degraded");
+    expect(data.services.stories.status).toBe("fallback");
+    expect(data.services.stories.count).toBe(0);
   });
 
   // --- Coverage for checkSupabase() non-Error exception (line 51) ---
