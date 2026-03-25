@@ -262,6 +262,42 @@ describe("search", () => {
       expect(result.images).toHaveLength(1);
     });
 
+    it("should handle chunks with null imageRefs (line 89 fallback)", async () => {
+      // Covers the `chunk.imageRefs || []` branch at line 89 —
+      // when a chunk has null/undefined imageRefs, the flatMap should
+      // use an empty array instead, producing no image lookups.
+      const mockChunks = [
+        {
+          id: "chunk-1",
+          content: "Content with no images",
+          source_pdf: "guide.pdf",
+          page_number: 1,
+          section_title: null,
+          image_refs: null, // null imageRefs to trigger the || [] fallback
+          similarity: 0.8,
+        },
+      ];
+
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        data: mockChunks,
+        error: null,
+      } as never);
+
+      const mockSelect = vi.fn().mockReturnValue({
+        in: vi.fn().mockResolvedValueOnce({ data: [], error: null }),
+      });
+      vi.mocked(supabase.from).mockReturnValue({
+        select: mockSelect,
+      } as never);
+
+      const embedding = new Array(512).fill(0.1);
+      const result = await search(embedding, 5);
+
+      expect(result.chunks).toHaveLength(1);
+      // With null imageRefs, no images should be fetched (empty refs list)
+      expect(result.images).toEqual([]);
+    });
+
     it("should use limit directly when no query text is provided", async () => {
       vi.mocked(supabase.rpc).mockResolvedValueOnce({
         data: [],

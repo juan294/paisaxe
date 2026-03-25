@@ -49,18 +49,18 @@ describe("CSP header via buildCspHeader (proxy.ts)", () => {
   const testNonce = "test-nonce-abc123";
   const csp = buildCspHeader(testNonce);
 
-  it("should include nonce in script-src", () => {
-    expect(csp).toContain(`'nonce-${testNonce}'`);
+  it("should NOT include nonce in script-src (nonce param is unused)", () => {
+    expect(csp).not.toContain(`'nonce-${testNonce}'`);
   });
 
-  it("should NOT include unsafe-inline in script-src", () => {
+  it("should include unsafe-inline in script-src", () => {
     const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
-    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    expect(scriptSrc).toContain("'unsafe-inline'");
   });
 
-  it("should include strict-dynamic in script-src", () => {
+  it("should NOT include strict-dynamic in script-src", () => {
     const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
-    expect(scriptSrc).toContain("'strict-dynamic'");
+    expect(scriptSrc).not.toContain("'strict-dynamic'");
   });
 
   it("should include blob: in script-src for AudioWorklet support", () => {

@@ -70,4 +70,35 @@ describe("OptimizerReportDialog", () => {
     fireEvent.click(closeButton);
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("calls onOpenChange when backdrop is clicked (line 27)", () => {
+    const onOpenChange = vi.fn();
+    render(
+      <OptimizerReportDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        reportMarkdown="# Report"
+        analyzedAt={null}
+      />
+    );
+
+    // The backdrop is the div with bg-black/40 class
+    const backdrop = document.querySelector(".bg-black\\/40");
+    expect(backdrop).toBeInTheDocument();
+    fireEvent.click(backdrop!);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("does not show analyzedAt timestamp when null", () => {
+    render(
+      <OptimizerReportDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        reportMarkdown="# Report"
+        analyzedAt={null}
+      />
+    );
+
+    expect(screen.queryByText(/Last analyzed/)).not.toBeInTheDocument();
+  });
 });

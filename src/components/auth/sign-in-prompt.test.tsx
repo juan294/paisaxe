@@ -129,4 +129,20 @@ describe("SignInPrompt", () => {
       expect(backdrop).toHaveClass("custom-class");
     });
   });
+
+  describe("accessibility (#181)", () => {
+    it("has role='dialog' on the modal panel", () => {
+      render(<SignInPrompt {...defaultProps} />);
+
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toBeInTheDocument();
+    });
+
+    it("has aria-modal='true' on the modal panel", () => {
+      render(<SignInPrompt {...defaultProps} />);
+
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toHaveAttribute("aria-modal", "true");
+    });
+  });
 });

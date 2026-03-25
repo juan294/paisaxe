@@ -186,22 +186,22 @@ See `supabase/functions/README.md` for full setup instructions.
 
 ## Automated Agents
 
-Local agents run via macOS launchd and are controllable via feature flags in the admin panel (System category). Each agent checks the `automated_agents` master toggle and its own flag before running.
+Local agents run via macOS launchd and are controlled by a local config file (`scripts/agent-config.json`). This file is gitignored — defaults are tracked in `scripts/agent-config.defaults.json`. Agents read flags via `jq` at startup — no HTTP/API dependency.
 
-### Feature Flag Control
+### Local Config Control
 
-| Flag Key | Label | Default |
-|----------|-------|---------:|
-| `automated_agents` | Automated Agents (Master) | Enabled |
-| `coverage_agent_enabled` | Coverage Agent | Enabled |
-| `security_agent_enabled` | Security Agent | Disabled |
-| `documentation_agent_enabled` | Documentation Agent | Disabled |
-| `performance_agent_enabled` | Performance Agent | Disabled |
-| `qa_agent_enabled` | QA Agent | Disabled |
-| `localization_agent_enabled` | Localization Agent | Disabled |
-| `cost_analyst_agent_enabled` | Cost Analyst Agent | Disabled |
+Manage via CLI:
+```bash
+scripts/agent-ctl.sh status              # Show all flags
+scripts/agent-ctl.sh enable <key|all>    # Enable agent(s)
+scripts/agent-ctl.sh disable <key|all>   # Disable agent(s)
+scripts/agent-ctl.sh master on|off       # Master toggle
+scripts/agent-ctl.sh reset               # Reset to defaults
+```
 
-Disable the master toggle to stop all agents. Individual flags control each agent independently.
+Or via the admin dashboard (dev-only): **Admin → Agents → Agent Toggles**.
+
+The `master_enabled` flag stops all agents. Individual flags control each agent independently.
 
 ### Agent Scripts
 

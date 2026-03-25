@@ -11,7 +11,7 @@ vi.mock("@/lib/admin-api", () => ({
 
 const mockFlag: FeatureFlag = {
   id: "2",
-  flagKey: "coverage_agent_enabled",
+  flagKey: "contextual_prompts" as FeatureFlag["flagKey"],
   label: "Coverage Agent",
   description: "Automated test coverage monitoring",
   enabled: true,
@@ -36,8 +36,8 @@ describe("AgentConfigPanel", () => {
     render(<AgentConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
 
     expect(screen.getByText("Schedule")).toBeInTheDocument();
-    // Schedule text comes from AGENT_PROMPT_DEFAULTS, not the flag config
-    expect(screen.getByText("Daily at 2:00 AM")).toBeInTheDocument();
+    // "contextual_prompts" has no entry in AGENT_PROMPT_DEFAULTS → fallback
+    expect(screen.getByText("Not scheduled")).toBeInTheDocument();
   });
 
   it("renders prompt editor with label", () => {
@@ -119,5 +119,77 @@ describe("AgentConfigPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("Update failed")).toBeInTheDocument();
     });
+  });
+
+  it("uses defaultPrompt when config has no prompt", () => {
+    const flagWithoutPrompt: FeatureFlag = {
+      ...mockFlag,
+      config: {
+        schedule_description: "Daily at 2:00 AM",
+        output_file: "docs/agents/coverage-report.md",
+      },
+    };
+
+    render(<AgentConfigPanel flag={flagWithoutPrompt} onUpdate={onUpdate} />);
+
+    // Without a prompt in config, it falls back to DEFAULT_PROMPTS[flag.flagKey]
+    // which for "contextual_prompts" is "" (empty string, since it's not in AGENT_PROMPT_DEFAULTS)
+    const textarea = screen.getByRole("textbox");
+    expect(textarea).toHaveValue("");
+  });
+
+  it("shows 'Saved successfully' and calls onUpdate on successful save", async () => {
+    const user = userEvent.setup();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    const updatedFlag = {
+      ...mockFlag,
+      config: { ...mockFlag.config, prompt: "New prompt text" },
+    };
+    vi.mocked(adminApi.updateFeatureFlagConfig).mockResolvedValue({
+      data: updatedFlag,
+    });
+
+    render(<AgentConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
+
+    const textarea = screen.getByRole("textbox");
+    await user.clear(textarea);
+    await user.type(textarea, "New prompt text");
+
+    await user.click(screen.getByText("Save"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Saved successfully")).toBeInTheDocument();
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(updatedFlag);
+
+    // After 2 seconds, "Saved successfully" should disappear
+    vi.advanceTimersByTime(2100);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Saved successfully")).not.toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("renders with null config using default prompt", () => {
+    const flagWithNullConfig: FeatureFlag = {
+      ...mockFlag,
+      config: null as unknown as Record<string, unknown>,
+    };
+
+    render(<AgentConfigPanel flag={flagWithNullConfig} onUpdate={onUpdate} />);
+
+    // With null config, initialPrompt should use defaultPrompt
+    const textarea = screen.getByRole("textbox");
+    expect(textarea).toBeInTheDocument();
+  });
+
+  it("shows 'No changes to save' when no changes and not saved", () => {
+    render(<AgentConfigPanel flag={mockFlag} onUpdate={onUpdate} />);
+
+    expect(screen.getByText("No changes to save")).toBeInTheDocument();
   });
 });

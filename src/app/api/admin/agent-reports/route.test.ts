@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
+import type { Stats } from "fs";
 import { promises as fsPromises } from "fs";
 
 // Mock admin auth
@@ -59,6 +60,31 @@ describe("Agent Reports API", () => {
       const json = await response.json();
       // All files mock-rejected with ENOENT, so lastRuns should be empty
       expect(json.lastRuns).toEqual({});
+    });
+
+    it("should return lastRuns with ISO dates when report files exist", async () => {
+      mockValidateAdminAuth.mockResolvedValue({
+        valid: true,
+        userId: "admin-123",
+      });
+
+      const mockMtime = new Date("2026-03-01T10:00:00.000Z");
+      vi.spyOn(fsPromises, "stat").mockImplementation(async (filePath) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes("coverage-report.md") || pathStr.includes("security-report.md")) {
+          return { mtime: mockMtime } as Stats;
+        }
+        throw new Error("ENOENT");
+      });
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json.lastRuns.coverage_agent_enabled).toBe("2026-03-01T10:00:00.000Z");
+      expect(json.lastRuns.security_agent_enabled).toBe("2026-03-01T10:00:00.000Z");
+      // Other files should not be in the response
+      expect(json.lastRuns.qa_agent_enabled).toBeUndefined();
     });
   });
 });

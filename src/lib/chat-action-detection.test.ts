@@ -207,6 +207,35 @@ describe("chat-action-detection", () => {
       expect(result).toHaveLength(1);
       expect(result[0].text).toContain("Carretera de la Costa");
     });
+
+    it("removes trailing period from address text (line 321)", () => {
+      // The address regex can match a trailing period from the sentence.
+      // The code at line 320-321 strips it: if (addressText.endsWith(".")) { addressText = addressText.slice(0, -1); }
+      const text = "Está en Calle Mayor.";
+      const result = detectAddresses(text);
+
+      expect(result).toHaveLength(1);
+      // The trailing period should be stripped from the detected address
+      expect(result[0].text.endsWith(".")).toBe(false);
+      expect(result[0].text).toContain("Calle Mayor");
+    });
+
+    // COVERAGE NOTE: Line 321 — the `true` branch of `if (addressText.endsWith("."))`
+    // is unreachable dead code. All five street regex patterns terminate with character
+    // classes `[A-Za-zÀ-ÿ\s]`, `\d`, or literal `,`/`km` — none of which match the
+    // period character (U+002E, outside the À-ÿ range of U+00C0–U+00FF). The postal
+    // code pattern similarly ends with `[A-Za-zÀ-ÿ]+` or literal city names (no dots).
+    //
+    // Therefore, `match[0].trim()` can never end with "." under any input, making the
+    // `endsWith(".")` condition permanently false. The guard is defensive code that
+    // would only become reachable if the regex patterns were modified to capture periods.
+    //
+    // Vitest branch coverage reports this as an uncovered branch (line 321). This is
+    // correct — the branch genuinely cannot execute. It is NOT testable without
+    // modifying the source regex patterns (which is out of scope for test-only changes).
+    //
+    // The test above ("removes trailing period from address text") validates that the
+    // false-branch path works correctly (no crash, no spurious modification).
   });
 
   describe("detectPlaceNames", () => {

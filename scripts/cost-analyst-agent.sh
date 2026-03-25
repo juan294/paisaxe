@@ -3,7 +3,7 @@
 # Queries billing APIs, analyzes costs, writes docs/agents/cost-analyst-report.md
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/Documents/GenAI_Projects/paisaxe"
+PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/cost-analyst-agent-$(date +%Y-%m-%d).log"
@@ -27,14 +27,11 @@ echo "=== Cost Analyst Agent started at $(date) ===" | tee -a "$LOG_FILE"
 
 cd "$PROJECT_DIR"
 
-# Fetch the prompt from the feature flag config
-log_info "Fetching agent prompt from config..." | tee -a "$LOG_FILE"
-AGENT_PROMPT=$(get_agent_prompt "cost_analyst_agent_enabled" 2>/dev/null) || {
-  log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
-  AGENT_PROMPT=$(get_default_prompt "cost_analyst_agent_enabled" 2>/dev/null) || {
-    log_error "No prompt available for cost_analyst_agent_enabled" | tee -a "$LOG_FILE"
-    exit 1
-  }
+# Load the agent prompt from shared TypeScript config
+log_info "Loading agent prompt..." | tee -a "$LOG_FILE"
+AGENT_PROMPT=$(get_default_prompt "cost_analyst_agent_enabled" 2>/dev/null) || {
+  log_error "No prompt available for cost_analyst_agent_enabled" | tee -a "$LOG_FILE"
+  exit 1
 }
 
 # Read shared context from other agents

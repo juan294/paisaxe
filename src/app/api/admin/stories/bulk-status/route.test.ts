@@ -121,6 +121,43 @@ describe("PUT /api/admin/stories/bulk-status", () => {
     expect(data.data.status).toBe("needs_curation");
   });
 
+  it("should handle null data response gracefully", async () => {
+    const mockSelect = vi.fn().mockResolvedValue({
+      data: null,
+      error: null,
+    });
+    const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockUpdate = vi.fn().mockReturnValue({ in: mockIn });
+    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+    mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+    const request = new NextRequest("http://localhost/api/admin/stories/bulk-status", {
+      method: "PUT",
+      body: JSON.stringify({ storyIds: ["1"], status: "approved" }),
+    });
+
+    const response = await PUT(request);
+    expect(response.status).toBe(200);
+
+    const data = await response.json();
+    expect(data.data.updatedIds).toEqual([]);
+    expect(data.data.status).toBe("approved");
+  });
+
+  it("should return 500 on unexpected error (catch block)", async () => {
+    // Make request.json() throw to trigger the outer catch block
+    const request = new NextRequest("http://localhost/api/admin/stories/bulk-status", {
+      method: "PUT",
+      body: "not valid json",
+    });
+    vi.spyOn(request, "json").mockRejectedValue(new Error("Unexpected parse error"));
+
+    const response = await PUT(request);
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe("Internal server error");
+  });
+
   it("should return 500 on database error", async () => {
     const mockSelect = vi.fn().mockResolvedValue({
       data: null,

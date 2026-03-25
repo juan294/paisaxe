@@ -102,4 +102,75 @@ describe("PostRow", () => {
     renderInTable(<PostRow post={igPost} index={0} />);
     expect(screen.getByText("IG")).toBeInTheDocument();
   });
+
+  it("shows status text when scheduled post has null scheduledFor", () => {
+    const scheduledNullDate: MarketingPost = {
+      ...mockPost,
+      status: "scheduled",
+      scheduledFor: null,
+      postedAt: null,
+      postUrl: null,
+    };
+    renderInTable(<PostRow post={scheduledNullDate} index={0} />);
+
+    // When scheduledFor is null the condition `post.status === "scheduled" && post.scheduledFor`
+    // is false, so it falls through to the status text branch
+    expect(screen.getByText("scheduled")).toBeInTheDocument();
+  });
+
+  it("shows em-dash when scheduled post has empty string scheduledFor", () => {
+    // Line 18: `if (!dateStr) return "—"` — formatDate with falsy dateStr
+    // When scheduledFor is an empty string, JS evaluates "" as falsy in the ternary
+    // `post.status === "scheduled" && post.scheduledFor`, so formatDate is never called
+    // with an empty string. The guard at line 18 is purely defensive code.
+    // This test documents that the empty-string branch results in the status text path.
+    const scheduledEmptyDate: MarketingPost = {
+      ...mockPost,
+      status: "scheduled",
+      scheduledFor: "",
+      postedAt: null,
+      postUrl: null,
+    };
+    renderInTable(<PostRow post={scheduledEmptyDate} index={0} />);
+
+    // Empty string is falsy, so falls through to status text
+    expect(screen.getByText("scheduled")).toBeInTheDocument();
+  });
+
+  // Line 18: `if (!dateStr) return "—"` inside formatDate
+  // This guard is architecturally unreachable via the component's UI. formatDate is only called
+  // inside the ternary `post.status === "scheduled" && post.scheduledFor ? formatDate(post.scheduledFor) : ...`
+  // The `&&` operator ensures post.scheduledFor is truthy before formatDate is invoked,
+  // so dateStr will always be a non-empty string. The guard is defensive programming.
+
+  it("shows posting status with blue styling", () => {
+    const postingPost: MarketingPost = {
+      ...mockPost,
+      status: "posting",
+      postUrl: null,
+    };
+    renderInTable(<PostRow post={postingPost} index={0} />);
+
+    const statusEl = screen.getByText("posting");
+    expect(statusEl.className).toContain("text-blue-600");
+  });
+
+  it("shows scheduled status with amber styling", () => {
+    const scheduledPost: MarketingPost = {
+      ...mockPost,
+      status: "scheduled",
+      scheduledFor: null,
+      postUrl: null,
+    };
+    renderInTable(<PostRow post={scheduledPost} index={0} />);
+
+    const statusEl = screen.getByText("scheduled");
+    expect(statusEl.className).toContain("text-amber-600");
+  });
+
+  it("renders pinterest platform badge", () => {
+    const pinPost = { ...mockPost, platform: "pinterest" as const };
+    renderInTable(<PostRow post={pinPost} index={0} />);
+    expect(screen.getByText("Pi")).toBeInTheDocument();
+  });
 });

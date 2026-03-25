@@ -81,7 +81,7 @@ export function CostsAnalyticsPanel() {
               onChange={(e) =>
                 setDateRange((prev) => ({ ...prev, from: e.target.value }))
               }
-              className="bg-transparent outline-none"
+              className="bg-transparent outline-none rounded focus-visible:ring-1 focus-visible:ring-white/40"
             />
             <span>—</span>
             <input
@@ -90,7 +90,7 @@ export function CostsAnalyticsPanel() {
               onChange={(e) =>
                 setDateRange((prev) => ({ ...prev, to: e.target.value }))
               }
-              className="bg-transparent outline-none"
+              className="bg-transparent outline-none rounded focus-visible:ring-1 focus-visible:ring-white/40"
             />
           </div>
           <button

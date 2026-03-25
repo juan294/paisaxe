@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/base-test";
 
 test.describe("Admin page", () => {
   test("shows Google sign-in page when not authenticated", async ({ page }) => {

@@ -294,6 +294,19 @@ describe('LanguageProvider', () => {
       expect(screen.getByTestId('chat-placeholder').textContent).toBe('Pergunte sobre este lugar...');
     });
   });
+
+  it('renders with locale "ast" after lazy load', async () => {
+    render(
+      <LanguageProvider initialLocale="ast">
+        <TestConsumer />
+      </LanguageProvider>
+    );
+
+    expect(screen.getByTestId('locale').textContent).toBe('ast');
+    await waitFor(() => {
+      expect(screen.getByTestId('translation').textContent).toBe('Cargando...');
+    });
+  });
 });
 
 describe('useTranslation', () => {

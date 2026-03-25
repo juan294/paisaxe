@@ -22,23 +22,30 @@ vi.mock("@/lib/admin-auth", () => ({
     Promise.resolve({ valid: false, error: { status: 401 } }),
 }));
 
-// Mock fs.promises.writeFile
+// Mock fs.promises.writeFile and readFile
 const mockWriteFile = vi.fn();
+const mockReadFile = vi.fn();
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
   return {
     ...actual,
-    default: { ...actual, promises: { ...actual.promises, writeFile: mockWriteFile } },
-    promises: { ...actual.promises, writeFile: mockWriteFile },
+    default: {
+      ...actual,
+      promises: { ...actual.promises, writeFile: mockWriteFile, readFile: mockReadFile },
+    },
+    promises: { ...actual.promises, writeFile: mockWriteFile, readFile: mockReadFile },
   };
 });
 
 // Mock the subscription optimizer module
 const mockAnalyze = vi.fn();
 const mockGenerateReport = vi.fn();
+const mockGenerateSharedContextEntry = vi.fn();
 vi.mock("@/lib/subscription-optimizer", () => ({
   analyzeSubscriptions: (...args: unknown[]) => mockAnalyze(...args),
   generateReport: (...args: unknown[]) => mockGenerateReport(...args),
+  generateSharedContextEntry: (...args: unknown[]) =>
+    mockGenerateSharedContextEntry(...args),
 }));
 
 describe("POST /api/cron/subscription-optimizer", () => {
@@ -55,8 +62,12 @@ describe("POST /api/cron/subscription-optimizer", () => {
     };
     mockAnalyze.mockReset();
     mockGenerateReport.mockReset();
+    mockGenerateSharedContextEntry.mockReset();
     mockWriteFile.mockReset();
+    mockReadFile.mockReset();
     mockWriteFile.mockResolvedValue(undefined);
+    mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
   });
 
   afterEach(() => {
@@ -165,7 +176,8 @@ describe("POST /api/cron/subscription-optimizer", () => {
     );
 
     await POST(request as never);
-    expect(mockWriteFile).toHaveBeenCalledTimes(1);
+    // writeFile is called twice: once for the report, once for shared context
+    expect(mockWriteFile).toHaveBeenCalledTimes(2);
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.stringContaining("docs/agents/subscription-optimizer-report.md"),
       reportContent,
@@ -240,6 +252,107 @@ describe("POST /api/cron/subscription-optimizer", () => {
       })
     );
   });
+
+  it("uses default header when shared-context.md does not exist (readFile throws)", async () => {
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+    // readFile rejects (default from beforeEach) — exercises the catch block at lines 59-62
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+    // writeFile should be called twice: once for the report, once for shared context
+    expect(mockWriteFile).toHaveBeenCalledTimes(2);
+    // The shared context write should include the default header
+    const sharedContextCall = mockWriteFile.mock.calls.find(
+      (call: string[]) => String(call[0]).includes("shared-context.md")
+    );
+    expect(sharedContextCall).toBeDefined();
+    expect(sharedContextCall![1]).toContain("Agent Shared Context");
+  });
+
+  it("prepends context entry to existing shared-context.md when readFile succeeds", async () => {
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+    // readFile succeeds with existing content that has \n\n separator
+    mockReadFile.mockResolvedValue(
+      "# Agent Shared Context\n> Cross-agent intelligence.\n\n## Old Entry\nOld content here"
+    );
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+    // The shared context write should prepend the new entry after the header
+    const sharedContextCall = mockWriteFile.mock.calls.find(
+      (call: string[]) => String(call[0]).includes("shared-context.md")
+    );
+    expect(sharedContextCall).toBeDefined();
+    // Should contain the header, new context entry, and old body
+    expect(sharedContextCall![1]).toContain("Agent Shared Context");
+    expect(sharedContextCall![1]).toContain("Subscription Optimizer");
+    expect(sharedContextCall![1]).toContain("Old Entry");
+  });
+
+  it("merges custom usageMetrics from POST body with defaults", async () => {
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    const { POST } = await import("./route");
+
+    // Create a real Request with a JSON body containing usageMetrics
+    const request = new Request(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      {
+        method: "POST",
+        headers: { "x-webhook-secret": WEBHOOK_SECRET, "content-type": "application/json" },
+        body: JSON.stringify({
+          usageMetrics: { voiceMinutes: 100, visitors: 20000 },
+        }),
+      }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+    // Verify the merged metrics were passed to analyzeSubscriptions
+    expect(mockAnalyze).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usageMetrics: expect.objectContaining({
+          voiceMinutes: 100,
+          visitors: 20000,
+          // defaults should still be present for non-overridden keys
+          chatConversations: 200,
+        }),
+      })
+    );
+  });
 });
 
 describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
@@ -255,8 +368,12 @@ describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
     };
     mockAnalyze.mockReset();
     mockGenerateReport.mockReset();
+    mockGenerateSharedContextEntry.mockReset();
     mockWriteFile.mockReset();
+    mockReadFile.mockReset();
     mockWriteFile.mockResolvedValue(undefined);
+    mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
   });
 
   afterEach(() => {

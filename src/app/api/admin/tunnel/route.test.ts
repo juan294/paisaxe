@@ -93,6 +93,22 @@ describe("GET /api/admin/tunnel", () => {
     expect(data.running).toBe(false);
     expect(data.url).toBeNull();
   });
+
+  it("should return not running when pgrep throws an error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockExec.mockRejectedValue(new Error("pgrep command failed"));
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.running).toBe(false);
+    expect(data.url).toBeNull();
+  });
 });
 
 describe("POST /api/admin/tunnel", () => {
@@ -179,6 +195,65 @@ describe("POST /api/admin/tunnel", () => {
     );
     expect(mockProcess.unref).toHaveBeenCalled();
   });
+
+  it("should return 500 when spawn throws an error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockExec.mockResolvedValue({ stdout: "" }); // not running
+    mockSpawn.mockImplementation(() => {
+      throw new Error("cloudflared not found");
+    });
+
+    const response = await POST();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toContain("Failed to start tunnel");
+    expect(data.error).toContain("cloudflared not found");
+  });
+
+  it("should return 500 with 'Unknown error' when spawn throws a non-Error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockExec.mockResolvedValue({ stdout: "" }); // not running
+    mockSpawn.mockImplementation(() => {
+      throw "string error";  
+    });
+
+    const response = await POST();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toContain("Failed to start tunnel");
+    expect(data.error).toContain("Unknown error");
+  });
+
+  it("should report 'Failed to start tunnel' when tunnel does not start", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    // Both calls return empty stdout = not running
+    mockExec.mockResolvedValue({ stdout: "" });
+
+    const mockProcess = { unref: vi.fn() };
+    mockSpawn.mockReturnValue(mockProcess);
+
+    const response = await POST();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.running).toBe(false);
+    expect(data.url).toBeNull();
+    expect(data.message).toBe("Failed to start tunnel");
+  });
 });
 
 describe("DELETE /api/admin/tunnel", () => {
@@ -248,5 +323,39 @@ describe("DELETE /api/admin/tunnel", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toContain("Failed to stop tunnel");
+    expect(data.error).toContain("Permission denied");
+  });
+
+  it("should return 500 with 'Unknown error' when pkill throws a non-Error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockExec.mockRejectedValue("non-error string");
+
+    const response = await DELETE();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toContain("Failed to stop tunnel");
+    expect(data.error).toContain("Unknown error");
+  });
+
+  it("should report 'Failed to stop tunnel' when process is still running after pkill", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    // First call (pkill) succeeds, second call (isTunnelRunning) returns still running
+    mockExec.mockResolvedValue({ stdout: "12345\n" });
+
+    const response = await DELETE();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.running).toBe(true);
+    expect(data.message).toBe("Failed to stop tunnel");
   });
 });

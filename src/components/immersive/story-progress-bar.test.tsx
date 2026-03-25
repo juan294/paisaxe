@@ -94,6 +94,31 @@ describe("StoryProgressBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  // Click/keydown on progressbar container (no segment target)
+  // -------------------------------------------------------------------------
+  it("does not call onIndexChange when clicking the progressbar container directly", () => {
+    const onIndexChange = vi.fn();
+    render(
+      <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
+    );
+    const progressbar = screen.getByRole("progressbar");
+    // Click directly on the progressbar div, not on a segment
+    fireEvent.click(progressbar);
+    expect(onIndexChange).not.toHaveBeenCalled();
+  });
+
+  it("does not call onIndexChange when pressing a key on the progressbar container directly", () => {
+    const onIndexChange = vi.fn();
+    render(
+      <StoryProgressBar {...defaultProps} onIndexChange={onIndexChange} />
+    );
+    const progressbar = screen.getByRole("progressbar");
+    // Fire keyDown directly on the progressbar div, not on a segment
+    fireEvent.keyDown(progressbar, { key: "Enter" });
+    expect(onIndexChange).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
   // Event delegation works on inner fill div
   // -------------------------------------------------------------------------
   it("event delegation works when clicking inner fill div", () => {
@@ -173,6 +198,115 @@ describe("StoryProgressBar", () => {
         expect(fillDiv!.className).toContain("w-0");
       }
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // Segment label with and without storyTitles (line 128 branch)
+  // -------------------------------------------------------------------------
+  it("returns base label without story title when storyTitles is not provided", () => {
+    render(<StoryProgressBar {...defaultProps} />);
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    // Without storyTitles, label should NOT contain a story title, just the base label
+    const label = segments[0].getAttribute("aria-label");
+    expect(label).toBeTruthy();
+    // Should just be the base label (the t() key with replacements)
+    expect(label).toBe("accessibility.go_to_story");
+  });
+
+  // -------------------------------------------------------------------------
+  // Boundary guards in handleKeyDown/handleClick (lines 42,62,75,86,98,110)
+  // When storiesLength > PAGE_SIZE, the last page may have segments that map
+  // to indices beyond storiesLength. E.g., storiesLength=25, currentIndex=22:
+  //   segmentCount=20, base=20, so segments 5-19 map to indices 25-39 (out of bounds).
+  // The guards prevent onIndexChange from being called for those segments.
+  //
+  // Line 86 (Home guard) is genuinely unreachable because base is always derived
+  // from a valid currentIndex, so base is always < storiesLength.
+  //
+  // Lines 38/52 (`if (!target) return`) are also defensive — event delegation
+  // always finds [data-segment-index] via closest() from the segment or its fill div.
+  // -------------------------------------------------------------------------
+  describe("boundary guards with multi-page overflow", () => {
+    // storiesLength=25, currentIndex=22 -> segmentCount=20, base=20, fillPosition=2
+    // Segments 5-19 map to indices 25-39 which are out of bounds.
+    const overflowProps = {
+      storiesLength: 25,
+      currentIndex: 22,
+      onIndexChange: vi.fn(),
+      t: (key: string) => key,
+    };
+
+    beforeEach(() => {
+      overflowProps.onIndexChange = vi.fn();
+    });
+
+    it("does NOT call onIndexChange when clicking an out-of-bounds segment (line 42)", () => {
+      render(<StoryProgressBar {...overflowProps} />);
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // Segment 5 -> targetIndex = 20 + 5 = 25 >= 25 -> guard prevents call
+      fireEvent.click(segments[5]);
+      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call onIndexChange on ArrowRight into out-of-bounds (line 62)", () => {
+      render(<StoryProgressBar {...overflowProps} />);
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // Segment 4 -> ArrowRight -> nextIdx=5, targetIndex=25 >= 25 -> guard
+      fireEvent.keyDown(segments[4], { key: "ArrowRight" });
+      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call onIndexChange on ArrowLeft wrapping to out-of-bounds (line 75)", () => {
+      render(<StoryProgressBar {...overflowProps} />);
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // Segment 0 -> ArrowLeft -> prevIdx=19, targetIndex=20+19=39 >= 25 -> guard
+      fireEvent.keyDown(segments[0], { key: "ArrowLeft" });
+      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call onIndexChange on End key when last segment is out-of-bounds (line 98)", () => {
+      render(<StoryProgressBar {...overflowProps} />);
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // End -> lastIdx=19, targetIndex=20+19=39 >= 25 -> guard
+      fireEvent.keyDown(segments[2], { key: "End" });
+      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call onIndexChange on Enter for out-of-bounds segment (line 110)", () => {
+      render(<StoryProgressBar {...overflowProps} />);
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // Segment 10 -> Enter -> targetIndex=20+10=30 >= 25 -> guard
+      fireEvent.keyDown(segments[10], { key: "Enter" });
+      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call onIndexChange on Space for out-of-bounds segment (line 110)", () => {
+      render(<StoryProgressBar {...overflowProps} />);
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // Segment 6 -> Space -> targetIndex=20+6=26 >= 25 -> guard
+      fireEvent.keyDown(segments[6], { key: " " });
+      expect(overflowProps.onIndexChange).not.toHaveBeenCalled();
+    });
+
+    it("still calls onIndexChange for in-bounds segments on the last page", () => {
+      render(<StoryProgressBar {...overflowProps} />);
+      const progressbar = screen.getByRole("progressbar");
+      const segments = progressbar.querySelectorAll('[role="button"]');
+      // Segment 4 -> targetIndex=20+4=24 < 25 -> valid
+      fireEvent.click(segments[4]);
+      expect(overflowProps.onIndexChange).toHaveBeenCalledWith(24);
+    });
+
+    // Line 86 (Home guard): base is always derived from a valid currentIndex,
+    // so base is always >= 0 and < storiesLength. The false branch of this guard
+    // is genuinely unreachable via the component's public API.
   });
 
   // -------------------------------------------------------------------------

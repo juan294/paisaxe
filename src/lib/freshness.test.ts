@@ -38,4 +38,10 @@ describe("isNewStory", () => {
     const farFutureNow = new Date("2025-07-01T00:00:00.000Z");
     expect(isNewStory(createdAt, farFutureNow)).toBe(false);
   });
+
+  it("should use current date when now parameter is omitted", () => {
+    // A story created right now should always be new
+    const createdAt = new Date().toISOString();
+    expect(isNewStory(createdAt)).toBe(true);
+  });
 });

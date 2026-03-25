@@ -115,7 +115,7 @@ export function AccountConfigDialog({
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
               placeholder="Paisaxe"
-              className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
+              className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus-visible:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
             />
           </div>
 
@@ -130,7 +130,7 @@ export function AccountConfigDialog({
               value={accountHandle}
               onChange={(e) => setAccountHandle(e.target.value)}
               placeholder="@paisaxe"
-              className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
+              className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus-visible:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
             />
           </div>
 
@@ -154,7 +154,7 @@ export function AccountConfigDialog({
                       setCredentials((prev) => ({ ...prev, [field.key]: e.target.value }))
                     }
                     placeholder={field.placeholder}
-                    className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 pr-10 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
+                    className="w-full border border-[#e5e3de] bg-transparent px-3 py-2 pr-10 text-sm text-[#2d2a26] placeholder-[#a39e98] outline-none transition-colors focus-visible:border-[#a39e98] dark:border-[#4d4944] dark:text-[#f5f3ee]"
                   />
                   <button
                     type="button"

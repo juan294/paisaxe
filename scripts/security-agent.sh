@@ -3,7 +3,7 @@
 # Performs npm audit, license checks, analyzes vulnerabilities, and provides remediation guidance
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/Documents/GenAI_Projects/paisaxe"
+PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/security-agent-$(date +%Y-%m-%d).log"
@@ -118,13 +118,10 @@ fi
 
 log_info "Metrics collected, invoking Claude for analysis..." | tee -a "$LOG_FILE"
 
-# Fetch the prompt from the feature flag config
-AGENT_PROMPT=$(get_agent_prompt "security_agent_enabled" 2>/dev/null) || {
-  log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
-  AGENT_PROMPT=$(get_default_prompt "security_agent_enabled" 2>/dev/null) || {
-    log_error "No prompt available for security_agent_enabled" | tee -a "$LOG_FILE"
-    exit 1
-  }
+# Load the agent prompt from shared TypeScript config
+AGENT_PROMPT=$(get_default_prompt "security_agent_enabled" 2>/dev/null) || {
+  log_error "No prompt available for security_agent_enabled" | tee -a "$LOG_FILE"
+  exit 1
 }
 
 # Read shared context from other agents

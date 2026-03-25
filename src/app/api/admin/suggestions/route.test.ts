@@ -43,50 +43,56 @@ const createMockData = (): StorySuggestionRow[] => [
 ];
 
 // Mock Supabase with fluent API
-vi.mock("@/lib/supabase", () => ({
-  createAdminClient: () => ({
-    from: () => ({
-      select: (...args: unknown[]) => {
-        mockSelect(...args);
-        return {
-          order: (...orderArgs: unknown[]) => {
-            mockOrder(...orderArgs);
-            return {
-              eq: (...eqArgs: unknown[]) => {
-                mockEq(...eqArgs);
-                return Promise.resolve({
-                  data: createMockData().filter((s) => s.status === eqArgs[1]),
-                  error: null,
-                });
-              },
-              then: (resolve: (result: { data: StorySuggestionRow[]; error: null }) => void) => {
-                resolve({ data: createMockData(), error: null });
-              },
-            };
-          },
-        };
-      },
-    }),
-    auth: {
-      admin: {
-        getUserById: (...args: unknown[]) => {
-          mockGetUserById(...args);
-          const userId = args[0] as string;
-          if (userId === "user-1") {
-            return Promise.resolve({
-              data: { user: { email: "user1@example.com" } },
-            });
-          }
-          if (userId === "user-2") {
-            return Promise.resolve({
-              data: { user: { email: "user2@example.com" } },
-            });
-          }
-          return Promise.resolve({ data: null });
+const mockCreateAdminClient = vi.fn();
+
+const defaultSupabaseClient = () => ({
+  from: () => ({
+    select: (...args: unknown[]) => {
+      mockSelect(...args);
+      return {
+        order: (...orderArgs: unknown[]) => {
+          mockOrder(...orderArgs);
+          return {
+            eq: (...eqArgs: unknown[]) => {
+              mockEq(...eqArgs);
+              return Promise.resolve({
+                data: createMockData().filter((s) => s.status === eqArgs[1]),
+                error: null,
+              });
+            },
+            then: (resolve: (result: { data: StorySuggestionRow[]; error: null }) => void) => {
+              resolve({ data: createMockData(), error: null });
+            },
+          };
         },
-      },
+      };
     },
   }),
+  auth: {
+    admin: {
+      getUserById: (...args: unknown[]) => {
+        mockGetUserById(...args);
+        const userId = args[0] as string;
+        if (userId === "user-1") {
+          return Promise.resolve({
+            data: { user: { email: "user1@example.com" } },
+          });
+        }
+        if (userId === "user-2") {
+          return Promise.resolve({
+            data: { user: { email: "user2@example.com" } },
+          });
+        }
+        return Promise.resolve({ data: null });
+      },
+    },
+  },
+});
+
+mockCreateAdminClient.mockImplementation(defaultSupabaseClient);
+
+vi.mock("@/lib/supabase", () => ({
+  createAdminClient: (...args: unknown[]) => mockCreateAdminClient(...args),
 }));
 
 // Import after mocks
@@ -96,6 +102,7 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 describe("/api/admin/suggestions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCreateAdminClient.mockImplementation(defaultSupabaseClient);
   });
 
   describe("GET", () => {
@@ -183,6 +190,145 @@ describe("/api/admin/suggestions", () => {
 
       expect(mockGetUserById).toHaveBeenCalledWith("user-1");
       expect(mockGetUserById).toHaveBeenCalledWith("user-2");
+    });
+
+    it("should return 500 when Supabase query returns an error", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      mockCreateAdminClient.mockReturnValueOnce({
+        from: () => ({
+          select: () => ({
+            order: () => ({
+              then: (resolve: (result: { data: null; error: { message: string } }) => void) => {
+                resolve({ data: null, error: { message: "Database error" } });
+              },
+            }),
+          }),
+        }),
+        auth: { admin: { getUserById: vi.fn() } },
+      });
+
+      const request = new NextRequest("http://localhost/api/admin/suggestions");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to fetch suggestions");
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error fetching suggestions:",
+        expect.objectContaining({ message: "Database error" })
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should return 500 when an unexpected exception is thrown", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      mockCreateAdminClient.mockReturnValueOnce({
+        from: () => {
+          throw new Error("Unexpected failure");
+        },
+      });
+
+      const request = new NextRequest("http://localhost/api/admin/suggestions");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Admin suggestions API error:",
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle suggestions where getUserById returns no email (line 55-56 branch)", async () => {
+      // Create mock data with suggestions that have user_ids but no emails found
+      const mockData: StorySuggestionRow[] = [
+        {
+          id: "suggestion-no-email",
+          user_id: "user-no-email",
+          place_name: "Picos de Europa",
+          comment: "Amazing views",
+          location: "eastern",
+          status: "pending",
+          admin_notes: null,
+          converted_story_id: null,
+          attribution: null,
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z",
+        },
+      ];
+
+      mockCreateAdminClient.mockReturnValueOnce({
+        from: () => ({
+          select: () => ({
+            order: () => ({
+              then: (resolve: (result: { data: StorySuggestionRow[]; error: null }) => void) => {
+                resolve({ data: mockData, error: null });
+              },
+            }),
+          }),
+        }),
+        auth: {
+          admin: {
+            getUserById: () =>
+              Promise.resolve({ data: { user: null } }), // No user found
+          },
+        },
+      });
+
+      const request = new NextRequest("http://localhost/api/admin/suggestions");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data).toHaveLength(1);
+    });
+
+    it("should handle suggestions with null user_id (anonymous)", async () => {
+      const mockData: StorySuggestionRow[] = [
+        {
+          id: "suggestion-anon",
+          user_id: null as unknown as string,
+          place_name: "Playa de Torimbia",
+          comment: "Great beach!",
+          location: "western",
+          status: "pending",
+          admin_notes: null,
+          converted_story_id: null,
+          attribution: null,
+          created_at: "2024-01-01T00:00:00Z",
+          updated_at: "2024-01-01T00:00:00Z",
+        },
+      ];
+
+      mockCreateAdminClient.mockReturnValueOnce({
+        from: () => ({
+          select: () => ({
+            order: () => ({
+              then: (resolve: (result: { data: StorySuggestionRow[]; error: null }) => void) => {
+                resolve({ data: mockData, error: null });
+              },
+            }),
+          }),
+        }),
+        auth: {
+          admin: {
+            getUserById: vi.fn(),
+          },
+        },
+      });
+
+      const request = new NextRequest("http://localhost/api/admin/suggestions");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data).toHaveLength(1);
     });
   });
 });

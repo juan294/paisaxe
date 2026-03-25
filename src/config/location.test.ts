@@ -71,5 +71,14 @@ describe("location config", () => {
       const coords = getRegionCoordinates(undefined);
       expect(coords).toEqual(LOCATION_CONFIG.regions.central.geo);
     });
+
+    it("should fall back to central coordinates for an unknown region ID", () => {
+      // Cast an invalid string to bypass TypeScript's union type — this exercises
+      // the nullish-coalescing fallback on line 136 that guards against runtime
+      // values not present in the config (e.g., from user input or URL params).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const coords = getRegionCoordinates("nonexistent" as any);
+      expect(coords).toEqual(LOCATION_CONFIG.regions.central.geo);
+    });
   });
 });

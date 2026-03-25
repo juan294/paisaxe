@@ -21,12 +21,29 @@ interface ChatResponse {
   sources?: Array<{ title: string; page?: number }>;
 }
 
+// Obtain CSRF token by requesting a page and reading the __csrf cookie
+async function getCsrfToken(): Promise<string> {
+  const pageResponse = await fetch(`${API_URL}/`, { redirect: 'follow' });
+  const setCookieHeader = pageResponse.headers.get('set-cookie') || '';
+  const match = setCookieHeader.match(/__csrf=([^;]+)/);
+  if (!match) {
+    throw new Error('Could not obtain CSRF token from page response');
+  }
+  return match[1];
+}
+
 // Helper to call the chat API with retry for rate limiting
 async function sendChatMessage(message: string, retries = 3): Promise<ChatResponse> {
+  const csrfToken = await getCsrfToken();
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     const response = await fetch(`${API_URL}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': csrfToken,
+        Cookie: `__csrf=${csrfToken}`,
+      },
       body: JSON.stringify({ message }),
     });
 

@@ -84,6 +84,32 @@ describe("useVoiceSession", () => {
     expect(result.current.isReturning).toBe(false);
   });
 
+  it("should read existing conversation count from localStorage", () => {
+    localStorageMock.setItem("paisaxe_voice_session", JSON.stringify({ conversationCount: 5 }));
+
+    const { result } = renderHook(() => useVoiceSession());
+
+    expect(result.current.conversationCount).toBe(5);
+    expect(result.current.isReturning).toBe(true);
+  });
+
+  it("should handle malformed JSON in localStorage gracefully", () => {
+    localStorageMock.setItem("paisaxe_voice_session", "not-valid-json{");
+
+    const { result } = renderHook(() => useVoiceSession());
+
+    expect(result.current.conversationCount).toBe(0);
+    expect(result.current.isReturning).toBe(false);
+  });
+
+  it("should handle missing conversationCount field in stored JSON", () => {
+    localStorageMock.setItem("paisaxe_voice_session", JSON.stringify({}));
+
+    const { result } = renderHook(() => useVoiceSession());
+
+    expect(result.current.conversationCount).toBe(0);
+  });
+
   it("should return user locale from navigator", () => {
     // Mock navigator.language
     Object.defineProperty(navigator, "language", {
@@ -128,6 +154,59 @@ describe("useVoiceSession", () => {
 
     expect(result.current.preferredLanguage).toBe("English");
   });
+
+  it("should handle localStorage.setItem throwing (storage full)", () => {
+    // Simulate storage being full
+    const originalSetItem = localStorageMock.setItem;
+    localStorageMock.setItem = () => {
+      throw new Error("QuotaExceededError");
+    };
+
+    const { result } = renderHook(() => useVoiceSession());
+
+    // incrementConversation should not throw even when storage fails
+    act(() => {
+      result.current.incrementConversation();
+    });
+
+    // State should still update in memory even if persistence fails
+    expect(result.current.conversationCount).toBe(1);
+
+    // Restore
+    localStorageMock.setItem = originalSetItem;
+  });
+
+  // Line 52-53: `if (typeof window === "undefined") return { conversationCount: 0 }`
+  // in getStoredState() is an SSR guard. This branch is unreachable in jsdom because
+  // React DOM itself requires `window` to render. The guard is called inside
+  // useState(getStoredState), and React DOM cannot execute without a window object.
+  // This is a standard SSR safety pattern that can only be covered in a Node.js
+  // server-side rendering environment (e.g., renderToString).
+
+  it("should handle localStorage.setItem throwing on resetSession", () => {
+    // First set some valid state
+    localStorageMock.setItem("paisaxe_voice_session", JSON.stringify({ conversationCount: 3 }));
+
+    const { result } = renderHook(() => useVoiceSession());
+    expect(result.current.conversationCount).toBe(3);
+
+    // Now simulate storage being full on reset
+    const originalSetItem = localStorageMock.setItem;
+    localStorageMock.setItem = () => {
+      throw new Error("QuotaExceededError");
+    };
+
+    // resetSession should not throw even when storage fails
+    act(() => {
+      result.current.resetSession();
+    });
+
+    expect(result.current.conversationCount).toBe(0);
+
+    // Restore
+    localStorageMock.setItem = originalSetItem;
+  });
+
 });
 
 describe("getTimeOfDay", () => {

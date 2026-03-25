@@ -449,6 +449,24 @@ describe("TunnelTableRow", () => {
         expect(rows.length).toBe(0);
       });
     });
+
+    it("does nothing when initial fetch returns non-ok, non-403 status (line 39 false branch)", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(null, { status: 500 })
+      );
+
+      renderRow();
+
+      // Should still render the row (not production), but with default off state
+      await waitFor(() => {
+        expect(screen.getByText("Dev Tunnel")).toBeInTheDocument();
+      });
+
+      // Should show Off (default state, since fetch didn't update status)
+      expect(screen.getByText("Off")).toBeInTheDocument();
+      // Should NOT show error (only catch block sets error)
+      expect(screen.queryByText(/Failed/)).not.toBeInTheDocument();
+    });
   });
 
   describe("initial status fetch", () => {

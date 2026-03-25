@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/base-test";
 
 test.describe("Smoke tests", () => {
   test("/ redirects to /immersive", async ({ page }) => {
@@ -17,6 +17,19 @@ test.describe("Smoke tests", () => {
   test("non-existent page returns 404", async ({ page }) => {
     const response = await page.goto("/this-page-does-not-exist");
     expect(response?.status()).toBe(404);
+  });
+
+  test("client-side JavaScript executes (CSP canary)", async ({ page }) => {
+    // Canary test: if CSP blocks scripts (e.g., nonce mismatch from PPR),
+    // pages never hydrate and stay on the loading spinner forever.
+    // This test catches that by verifying a client-rendered page resolves.
+    await page.goto("/favorites");
+    // The favorites page shows a loading spinner while JS loads, then renders
+    // interactive content. If JS is blocked, it stays on the spinner.
+    // Check for the "Explore stories" link which only appears after hydration.
+    await expect(
+      page.getByRole("link", { name: /explore stories|explorar historias/i })
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test("health endpoint responds with JSON", async ({ request }) => {

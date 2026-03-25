@@ -1,4 +1,5 @@
-import { test, expect, APIRequestContext } from "@playwright/test";
+import { test, expect } from "./fixtures/base-test";
+import type { APIRequestContext } from "@playwright/test";
 import {
   MOCK_CHAT_RESPONSE,
   MOCK_CHAT_RESPONSE_FOLLOWUP,

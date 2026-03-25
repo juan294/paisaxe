@@ -235,6 +235,25 @@ describe("POST /api/webhooks/stripe", () => {
     consoleSpy.mockRestore();
   });
 
+  it("should return 500 when an unexpected error is thrown", async () => {
+    const event = createCheckoutSessionEvent("user-123", "pi_test456");
+    vi.mocked(verifyWebhookSignature).mockReturnValue(event);
+
+    vi.mocked(createAdminClient).mockImplementation(() => {
+      throw new Error("Unexpected error");
+    });
+
+    const request = createRequest(JSON.stringify({}), {
+      "stripe-signature": "valid-signature",
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
+  });
+
   it("should use checkout session ID as fallback when payment_intent is null", async () => {
     const event: Stripe.Event = {
       id: "evt_test123",

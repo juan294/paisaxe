@@ -144,6 +144,27 @@ describe("rerank", () => {
       consoleSpy.mockRestore();
     });
 
+    it("should fall back to original order when rerank returns no data", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const chunks = makeChunks(5);
+      mockRerank.mockResolvedValue({
+        data: null,
+      });
+
+      const { rerankChunks } = await import("./rerank");
+      const result = await rerankChunks("query", chunks, 3);
+
+      expect(result).toHaveLength(3);
+      expect(result[0].id).toBe("chunk-0");
+      expect(result[1].id).toBe("chunk-1");
+      expect(result[2].id).toBe("chunk-2");
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Rerank returned no data")
+      );
+      consoleSpy.mockRestore();
+    });
+
     it("should handle when chunks count is less than topK", async () => {
       const chunks = makeChunks(2);
       mockRerank.mockResolvedValue({

@@ -1,134 +1,31 @@
 import type { ServiceCost } from "@/types/costs-analytics";
-import { PLATFORM_SERVICES } from "@/types/costs-analytics";
-
-interface AnthropicCostReportResponse {
-  data: Array<{
-    date: string;
-    cost_usd: number;
-    input_tokens: number;
-    output_tokens: number;
-    model: string;
-  }>;
-}
 
 /**
- * Fetches cost data from Anthropic Admin API.
- * REQUIRES ANTHROPIC_ADMIN_API_KEY (starts with sk-ant-admin-...).
- * The regular API key does NOT work for cost reports.
+ * Anthropic cost fetching — NOT AVAILABLE on personal accounts.
  *
- * Get an Admin key from: Console > Manage > API keys > Admin keys tab
- * @see https://docs.anthropic.com/en/api/admin-api/usage-cost/get-cost-report
+ * The Anthropic Admin API (/v1/organizations/cost_report) requires a
+ * Teams or Enterprise plan with an Admin API key (sk-ant-admin-...).
+ * This project uses a personal Anthropic account, so programmatic cost
+ * retrieval is impossible. The only way to check Anthropic spend is the
+ * console dashboard: https://console.anthropic.com/settings/billing
+ *
+ * These functions are kept as stubs (returning null / []) so that callers
+ * in the costs-analytics route don't need to be changed. If the project
+ * ever migrates to a Teams/Enterprise plan, re-implement the API calls here.
  */
+
 export async function fetchAnthropicCosts(
-  startDate: string,
-  endDate: string
+  _startDate: string,
+  _endDate: string
 ): Promise<ServiceCost | null> {
-  const adminKey = process.env.ANTHROPIC_ADMIN_API_KEY?.trim();
-
-  if (!adminKey) {
-    // Silently return null - admin key is optional
-    return null;
-  }
-
-  try {
-    const params = new URLSearchParams({
-      start_date: startDate,
-      end_date: endDate,
-      group_by: "none",
-    });
-
-    const response = await fetch(
-      `https://api.anthropic.com/v1/organizations/cost_report?${params}`,
-      {
-        headers: {
-          "x-api-key": adminKey,
-          "anthropic-version": "2023-06-01",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      console.error(
-        "Anthropic cost API error:",
-        response.status,
-        await response.text()
-      );
-      return null;
-    }
-
-    const data: AnthropicCostReportResponse = await response.json();
-
-    // Sum up costs across all days
-    const totalCostUsd = data.data.reduce((sum, day) => sum + day.cost_usd, 0);
-
-    return {
-      serviceId: PLATFORM_SERVICES.anthropic.id,
-      serviceName: PLATFORM_SERVICES.anthropic.name,
-      category: PLATFORM_SERVICES.anthropic.category,
-      costUsd: totalCostUsd,
-      costFormatted: formatUsd(totalCostUsd),
-      source: "api",
-      billingPeriodStart: startDate,
-      billingPeriodEnd: endDate,
-      dashboardUrl: PLATFORM_SERVICES.anthropic.dashboardUrl,
-    };
-  } catch (error) {
-    console.error("Error fetching Anthropic costs:", error);
-    return null;
-  }
+  // Admin API not available on personal Anthropic accounts.
+  return null;
 }
 
-/**
- * Fetches daily cost breakdown from Anthropic.
- * Requires ANTHROPIC_ADMIN_API_KEY.
- */
 export async function fetchAnthropicCostsByDay(
-  startDate: string,
-  endDate: string
+  _startDate: string,
+  _endDate: string
 ): Promise<Array<{ date: string; costUsd: number }>> {
-  const adminKey = process.env.ANTHROPIC_ADMIN_API_KEY?.trim();
-
-  if (!adminKey) {
-    return [];
-  }
-
-  try {
-    const params = new URLSearchParams({
-      start_date: startDate,
-      end_date: endDate,
-      group_by: "day",
-    });
-
-    const response = await fetch(
-      `https://api.anthropic.com/v1/organizations/cost_report?${params}`,
-      {
-        headers: {
-          "x-api-key": adminKey,
-          "anthropic-version": "2023-06-01",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      return [];
-    }
-
-    const data: AnthropicCostReportResponse = await response.json();
-
-    return data.data.map((day) => ({
-      date: day.date,
-      costUsd: day.cost_usd,
-    }));
-  } catch {
-    return [];
-  }
-}
-
-function formatUsd(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  // Admin API not available on personal Anthropic accounts.
+  return [];
 }

@@ -49,6 +49,27 @@ describe("csrfHeaders", () => {
   });
 });
 
+describe("getCsrfToken (server-side)", () => {
+  it("returns null when document is undefined (server-side)", () => {
+    const originalDocument = globalThis.document;
+    // Temporarily make document undefined to simulate server environment
+    Object.defineProperty(globalThis, "document", {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+
+    expect(getCsrfToken()).toBeNull();
+
+    // Restore document
+    Object.defineProperty(globalThis, "document", {
+      value: originalDocument,
+      writable: true,
+      configurable: true,
+    });
+  });
+});
+
 describe("fetchWithCsrf", () => {
   const originalFetch = global.fetch;
 
@@ -100,6 +121,21 @@ describe("fetchWithCsrf", () => {
         "Content-Type": "application/json",
         "x-csrf-token": "test-token",
       },
+    });
+  });
+
+  it("does not add CSRF header for POST when no token is available", async () => {
+    // Clear the __csrf cookie so getCsrfToken returns null
+    Object.defineProperty(document, "cookie", {
+      writable: true,
+      value: "session=abc",
+    });
+
+    await fetchWithCsrf("/api/test", { method: "POST" });
+
+    expect(global.fetch).toHaveBeenCalledWith("/api/test", {
+      method: "POST",
+      headers: {},
     });
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "./route";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
@@ -24,11 +24,25 @@ vi.mock("@/lib/stripe", () => ({
 }));
 
 import { isStripeConfigured } from "@/lib/stripe";
+import { validateAdminAuth } from "@/lib/admin-auth";
 
 describe("Stripe Analytics API Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin-1" });
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+  });
+
+  it("returns auth error when admin auth fails", async () => {
+    const errorResponse = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: false, error: errorResponse });
+
+    const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+    const response = await GET(request);
+
+    expect(response.status).toBe(401);
+    const data = await response.json();
+    expect(data.error).toBe("Unauthorized");
   });
 
   it("returns warning when Stripe is not configured", async () => {
@@ -229,6 +243,93 @@ describe("Stripe Analytics API Route", () => {
     expect(orders.find((o: { id: string }) => o.id === "pi_failed").status).toBe("failed");
   });
 
+  it("maps requires_payment_method status to pending", async () => {
+    vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+    const now = Math.floor(Date.now() / 1000);
+
+    mockPaymentIntentsList.mockResolvedValue({
+      data: [
+        {
+          id: "pi_requires_pm",
+          amount: 199,
+          currency: "eur",
+          status: "requires_payment_method",
+          created: now,
+          receipt_email: "user@example.com",
+          metadata: {},
+          latest_charge: null,
+        },
+      ],
+    });
+
+    mockBalanceTransactionsList.mockResolvedValue({ data: [] });
+
+    const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(data.data.recentOrders[0].status).toBe("pending");
+  });
+
+  it("maps requires_confirmation status to pending", async () => {
+    vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+    const now = Math.floor(Date.now() / 1000);
+
+    mockPaymentIntentsList.mockResolvedValue({
+      data: [
+        {
+          id: "pi_requires_confirm",
+          amount: 199,
+          currency: "eur",
+          status: "requires_confirmation",
+          created: now,
+          receipt_email: "user@example.com",
+          metadata: {},
+          latest_charge: null,
+        },
+      ],
+    });
+
+    mockBalanceTransactionsList.mockResolvedValue({ data: [] });
+
+    const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(data.data.recentOrders[0].status).toBe("pending");
+  });
+
+  it("maps unknown payment status to pending as fallback", async () => {
+    vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+    const now = Math.floor(Date.now() / 1000);
+
+    mockPaymentIntentsList.mockResolvedValue({
+      data: [
+        {
+          id: "pi_requires_action",
+          amount: 199,
+          currency: "eur",
+          status: "requires_action",
+          created: now,
+          receipt_email: "user@example.com",
+          metadata: {},
+          latest_charge: null,
+        },
+      ],
+    });
+
+    mockBalanceTransactionsList.mockResolvedValue({ data: [] });
+
+    const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(data.data.recentOrders[0].status).toBe("pending");
+  });
+
   describe("Refund detection", () => {
     const now = Math.floor(Date.now() / 1000);
 
@@ -394,6 +495,198 @@ describe("Stripe Analytics API Route", () => {
       expect(order.status).toBe("succeeded");
       expect(order.refundedAmount).toBe(0);
       expect(order.refundedAmountFormatted).toContain("0.00");
+    });
+
+    it("skips non-available charge transactions (line 216 branch)", async () => {
+      vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+      const now = Math.floor(Date.now() / 1000);
+
+      mockPaymentIntentsList.mockResolvedValue({ data: [] });
+
+      mockBalanceTransactionsList
+        .mockResolvedValueOnce({
+          data: [
+            { id: "txn_available", amount: 199, status: "available", created: now },
+            { id: "txn_pending", amount: 199, status: "pending", created: now }, // should be skipped
+          ],
+        })
+        .mockResolvedValueOnce({ data: [] });
+
+      const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+      const response = await GET(request);
+      const data = await response.json();
+
+      // Only the available transaction should count
+      expect(data.data.summary.totalRevenue).toBe(199);
+      expect(data.data.summary.totalOrders).toBe(1);
+    });
+
+    it("skips non-available refund transactions (line 227 branch)", async () => {
+      vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+      const now = Math.floor(Date.now() / 1000);
+
+      mockPaymentIntentsList.mockResolvedValue({ data: [] });
+
+      mockBalanceTransactionsList
+        .mockResolvedValueOnce({ data: [] })
+        .mockResolvedValueOnce({
+          data: [
+            { id: "txn_r1", amount: -100, status: "available", created: now },
+            { id: "txn_r2", amount: -50, status: "pending", created: now }, // should be skipped
+          ],
+        });
+
+      const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+      const response = await GET(request);
+      const data = await response.json();
+
+      // Only the available refund should count
+      expect(data.data.summary.totalRefunds).toBe(100);
+    });
+
+    it("handles succeeded payment with date outside initialized range (line 161 || fallback)", async () => {
+      vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+      const now = Math.floor(Date.now() / 1000);
+      // Payment at a date that's far from the query range
+      const farFuture = now + 365 * 24 * 60 * 60; // 1 year from now
+
+      mockPaymentIntentsList.mockResolvedValue({
+        data: [
+          {
+            id: "pi_future",
+            amount: 199,
+            currency: "eur",
+            status: "succeeded",
+            created: farFuture,
+            receipt_email: "user@example.com",
+            metadata: {},
+            latest_charge: null,
+          },
+        ],
+      });
+
+      mockBalanceTransactionsList.mockResolvedValue({ data: [] });
+
+      const from = "2024-01-01T00:00:00.000Z";
+      const to = "2024-01-02T00:00:00.000Z";
+      const request = new NextRequest(
+        `http://localhost/api/admin/stripe-analytics?from=${from}&to=${to}`
+      );
+      const response = await GET(request);
+
+      // The payment date falls outside the initialized range, so it hits the || fallback
+      expect(response.status).toBe(200);
+    });
+
+    it("uses customer metadata when receipt_email is null (line 133 || fallback)", async () => {
+      vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+      const now = Math.floor(Date.now() / 1000);
+
+      mockPaymentIntentsList.mockResolvedValue({
+        data: [
+          {
+            id: "pi_meta",
+            amount: 199,
+            currency: "eur",
+            status: "succeeded",
+            created: now,
+            receipt_email: null,
+            metadata: { user_email: "meta@example.com", user_name: "Meta User" },
+            latest_charge: null,
+          },
+        ],
+      });
+
+      mockBalanceTransactionsList.mockResolvedValue({ data: [] });
+
+      const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.data.recentOrders[0].customerEmail).toBe("meta@example.com");
+      expect(data.data.recentOrders[0].customerName).toBe("Meta User");
+    });
+
+    it("uses 'Unknown' when neither receipt_email nor metadata email exists (line 133)", async () => {
+      vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+      const now = Math.floor(Date.now() / 1000);
+
+      mockPaymentIntentsList.mockResolvedValue({
+        data: [
+          {
+            id: "pi_no_email",
+            amount: 199,
+            currency: "eur",
+            status: "succeeded",
+            created: now,
+            receipt_email: null,
+            metadata: {},
+            latest_charge: null,
+          },
+        ],
+      });
+
+      mockBalanceTransactionsList.mockResolvedValue({ data: [] });
+
+      const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.data.recentOrders[0].customerEmail).toBe("Unknown");
+      expect(data.data.recentOrders[0].customerName).toBeNull();
+    });
+
+    it("returns empty productBreakdown when no succeeded payments (line 185 ternary)", async () => {
+      vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+      const now = Math.floor(Date.now() / 1000);
+
+      mockPaymentIntentsList.mockResolvedValue({
+        data: [
+          {
+            id: "pi_cancelled",
+            amount: 199,
+            currency: "eur",
+            status: "canceled",
+            created: now,
+            receipt_email: "user@example.com",
+            metadata: {},
+            latest_charge: null,
+          },
+        ],
+      });
+
+      mockBalanceTransactionsList.mockResolvedValue({ data: [] });
+
+      const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.data.productBreakdown).toEqual([]);
+      expect(data.data.summary.averageOrderValue).toBe(0);
+    });
+
+    it("uses fallback date range in error handler when query params are present", async () => {
+      vi.mocked(isStripeConfigured).mockReturnValue(true);
+      mockPaymentIntentsList.mockRejectedValue(new Error("API error"));
+
+      const from = "2024-06-01T00:00:00.000Z";
+      const to = "2024-06-30T00:00:00.000Z";
+      const request = new NextRequest(
+        `http://localhost/api/admin/stripe-analytics?from=${from}&to=${to}`
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.error).toBe("Failed to fetch Stripe data");
+      expect(data.data.dateRange.from).toBe(from);
+      expect(data.data.dateRange.to).toBe(to);
     });
 
     it("includes net revenue fields in summary", async () => {

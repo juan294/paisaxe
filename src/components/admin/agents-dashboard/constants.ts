@@ -1,7 +1,8 @@
 import type { AgentHealthStatus } from "@/types/agents-dashboard";
+import type { AgentFlagKey } from "@/types/agent-config";
 
-export const AGENT_FLAG_KEYS = [
-  "automated_agents",
+/** Individual agent keys (master toggle handled separately). */
+export const AGENT_FLAG_KEYS: readonly AgentFlagKey[] = [
   "coverage_agent_enabled",
   "security_agent_enabled",
   "documentation_agent_enabled",
@@ -10,7 +11,7 @@ export const AGENT_FLAG_KEYS = [
   "localization_agent_enabled",
   "cost_analyst_agent_enabled",
   "subscription_optimizer_enabled",
-] as const;
+];
 
 /** Map flag keys to display names for the terminal header. */
 export const AGENT_NAMES: Record<string, string> = {

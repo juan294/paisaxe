@@ -1,23 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import ImmersiveLayout, { metadata } from "./layout";
-
-// Mock next/headers for async server component
-vi.mock("next/headers", () => ({
-  headers: () => Promise.resolve(new Map([["x-csp-nonce", "test-nonce"]])),
-}));
 
 const SITE_URL = "https://paisaxe.es";
 
 describe("ImmersiveLayout", () => {
-  it("renders children", async () => {
-    const Component = await ImmersiveLayout({ children: <div>Test content</div> });
+  it("renders children", () => {
+    const Component = ImmersiveLayout({ children: <div>Test content</div> });
     const { getByText } = render(Component);
     expect(getByText("Test content")).toBeInTheDocument();
   });
 
-  it("renders JsonLd TouristDestination component", async () => {
-    const Component = await ImmersiveLayout({ children: <div>Content</div> });
+  it("renders JsonLd TouristDestination component", () => {
+    const Component = ImmersiveLayout({ children: <div>Content</div> });
     const { container } = render(Component);
     const script = container.querySelector(
       'script[type="application/ld+json"]'

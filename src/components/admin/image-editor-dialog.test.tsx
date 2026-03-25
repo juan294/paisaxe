@@ -409,6 +409,26 @@ describe("ImageEditorDialog", () => {
 
       expect(screen.getByText("Failed to update image")).toBeInTheDocument();
     });
+
+    it("does nothing when URL save returns neither error nor data", async () => {
+      mockUpdateStoryImageUrl.mockResolvedValue({});
+
+      render(<ImageEditorDialog {...defaultProps} />);
+
+      fireEvent.click(screen.getByText("URL"));
+
+      const urlInput = screen.getByPlaceholderText("https://example.com/image.jpg");
+      fireEvent.change(urlInput, { target: { value: "https://example.com/new.jpg" } });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      // Neither error shown nor update/close called — just stops loading
+      expect(defaultProps.onUpdate).not.toHaveBeenCalled();
+      expect(defaultProps.onClose).not.toHaveBeenCalled();
+      expect(screen.queryByText(/Failed/)).not.toBeInTheDocument();
+    });
   });
 
   describe("Status actions", () => {
@@ -635,6 +655,26 @@ describe("ImageEditorDialog", () => {
     });
   });
 
+  describe("Upload zone click", () => {
+    it("clicking the upload zone triggers the hidden file input", () => {
+      render(<ImageEditorDialog {...defaultProps} />);
+
+      // Switch to upload tab
+      fireEvent.click(screen.getByText("Upload"));
+
+      // Get the hidden file input and spy on its click method
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const clickSpy = vi.spyOn(fileInput, "click");
+
+      // Click the drop zone div (the one with "Click or drag" text)
+      const dropZone = screen.getByText("Click or drag").closest("div[class*='cursor-pointer']")!;
+      fireEvent.click(dropZone);
+
+      expect(clickSpy).toHaveBeenCalled();
+      clickSpy.mockRestore();
+    });
+  });
+
   describe("Drag and drop", () => {
     it("handles drag enter and drag leave", () => {
       render(<ImageEditorDialog {...defaultProps} />);
@@ -683,6 +723,76 @@ describe("ImageEditorDialog", () => {
       const titleTexts = screen.getAllByText("Test Story");
       // Should have at least two: one in dialog header, one in fullscreen overlay
       expect(titleTexts.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("renders fullscreen image and close button in overlay", () => {
+      render(<ImageEditorDialog {...defaultProps} />);
+
+      // Open fullscreen
+      const maximizeIcons = screen.getAllByTestId("icon-maximize");
+      const maximizeButton = maximizeIcons[0].closest("button")!;
+      fireEvent.click(maximizeButton);
+
+      // Fullscreen overlay should contain a next-image with the story image
+      const images = screen.getAllByTestId("next-image");
+      const fullscreenImage = images.find(
+        (img) =>
+          img.getAttribute("data-src") === "https://example.com/current.jpg" &&
+          img.getAttribute("data-fill") === "true" &&
+          img.className.includes("object-contain")
+      );
+      expect(fullscreenImage).toBeTruthy();
+
+      // The overlay should have a close button with the X icon
+      const xIcons = screen.getAllByTestId("icon-x");
+      const fullscreenCloseButton = xIcons
+        .map((icon) => icon.closest("button"))
+        .find((btn) => btn && btn.className.includes("rounded-full"));
+      expect(fullscreenCloseButton).toBeTruthy();
+    });
+
+    it("closes fullscreen overlay when close button is clicked", () => {
+      render(<ImageEditorDialog {...defaultProps} />);
+
+      // Open fullscreen
+      const maximizeIcons = screen.getAllByTestId("icon-maximize");
+      const maximizeButton = maximizeIcons[0].closest("button")!;
+      fireEvent.click(maximizeButton);
+
+      // Verify overlay is visible (title appears twice)
+      expect(screen.getAllByText("Test Story").length).toBeGreaterThanOrEqual(2);
+
+      // Click the close button (the X icon inside a rounded-full button)
+      const xIcons = screen.getAllByTestId("icon-x");
+      const fullscreenCloseButton = xIcons
+        .map((icon) => icon.closest("button"))
+        .find((btn) => btn && btn.className.includes("rounded-full"));
+      fireEvent.click(fullscreenCloseButton!);
+
+      // Overlay should be gone — title should appear only once (in dialog header)
+      expect(screen.getAllByText("Test Story").length).toBe(1);
+    });
+
+    it("closes fullscreen overlay when backdrop is clicked", () => {
+      render(<ImageEditorDialog {...defaultProps} />);
+
+      // Open fullscreen
+      const maximizeIcons = screen.getAllByTestId("icon-maximize");
+      const maximizeButton = maximizeIcons[0].closest("button")!;
+      fireEvent.click(maximizeButton);
+
+      // Verify overlay is visible
+      expect(screen.getAllByText("Test Story").length).toBeGreaterThanOrEqual(2);
+
+      // Click the backdrop overlay div (the fixed inset-0 div)
+      const backdropDiv = screen.getAllByText("Test Story")
+        .map((el) => el.closest("div[class*='fixed inset-0']"))
+        .find(Boolean);
+      expect(backdropDiv).toBeTruthy();
+      fireEvent.click(backdropDiv!);
+
+      // Overlay should be dismissed
+      expect(screen.getAllByText("Test Story").length).toBe(1);
     });
   });
 
@@ -866,6 +976,27 @@ describe("ImageEditorDialog", () => {
 
       expect(screen.getByText("Failed to update image source")).toBeInTheDocument();
     });
+
+    it("does nothing when source-only update returns neither error nor data", async () => {
+      mockUpdateStoryImageSource.mockResolvedValue({});
+
+      const onClose = vi.fn();
+      const onUpdate = vi.fn();
+
+      render(<ImageEditorDialog story={storyWithRealImage} onClose={onClose} onUpdate={onUpdate} />);
+
+      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      fireEvent.change(sourceInput, { target: { value: "New Source" } });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      // Neither error shown nor update/close called — just stops loading
+      expect(onUpdate).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.queryByText(/Failed/)).not.toBeInTheDocument();
+    });
   });
 
   describe("Content images tab", () => {
@@ -975,6 +1106,30 @@ describe("ImageEditorDialog", () => {
       expect(screen.getByText(/No images found/i)).toBeInTheDocument();
     });
 
+    it("can navigate to previous image with chevron buttons", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      fireEvent.click(screen.getByText("Content"));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Should show 1 of 2
+      expect(screen.getByText(/1 of 2/i)).toBeInTheDocument();
+
+      // Click prev button — should wrap around to last image
+      const prevButton = screen.getByTestId("icon-chevron-left").closest("button")!;
+      fireEvent.click(prevButton);
+
+      // Should now show 2 of 2 (wraps around from first to last)
+      expect(screen.getByText(/2 of 2/i)).toBeInTheDocument();
+    });
+
     it("can navigate to next image with chevron buttons", async () => {
       mockSearchContentImages.mockResolvedValue({
         data: { images: mockContentImages, total: 2 },
@@ -1061,6 +1216,30 @@ describe("ImageEditorDialog", () => {
       expect(sourceInput).toHaveValue("Turismo de Asturias");
     });
 
+    it("calls onUpdate with curationStatus on successful mark as pending", async () => {
+      mockUpdateStoryStatus.mockResolvedValue({
+        data: { id: "story-1", curationStatus: "needs_curation" },
+      });
+
+      const approvedStory = { ...mockStory, curationStatus: "approved" as const };
+      const onUpdate = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <ImageEditorDialog story={approvedStory} onClose={onClose} onUpdate={onUpdate} />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Mark as pending"));
+      });
+
+      expect(onUpdate).toHaveBeenCalledWith("story-1", {
+        curationStatus: "needs_curation",
+      });
+      // Modal stays open after status change
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
     it("saves content image with auto-populated imageSource", async () => {
       mockSearchContentImages.mockResolvedValue({
         data: { images: mockContentImages, total: 2 },
@@ -1084,6 +1263,218 @@ describe("ImageEditorDialog", () => {
         mockContentImages[0].url,
         "Turismo de Asturias"
       );
+    });
+
+    it("calls onUpdate and onClose on successful content image save", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+      mockUpdateStoryImageUrl.mockResolvedValue({
+        data: { id: "story-1", image: mockContentImages[0].url, imageSource: "Turismo de Asturias" },
+      });
+
+      const onClose = vi.fn();
+      const onUpdate = vi.fn();
+
+      render(<ImageEditorDialog story={storyWithSourcePdf} onClose={onClose} onUpdate={onUpdate} />);
+
+      // Search for content images
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Save the selected content image
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      expect(onUpdate).toHaveBeenCalledWith("story-1", {
+        image: mockContentImages[0].url,
+        imageSource: "Turismo de Asturias",
+      });
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it("saves navigated content image (not just the first one)", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+      mockUpdateStoryImageUrl.mockResolvedValue({
+        data: { id: "story-1", image: mockContentImages[1].url, imageSource: "Turismo de Asturias" },
+      });
+
+      const onUpdate = vi.fn();
+
+      render(<ImageEditorDialog story={storyWithSourcePdf} onClose={vi.fn()} onUpdate={onUpdate} />);
+
+      // Search for content images
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Navigate to second image
+      const nextButton = screen.getByTestId("icon-chevron-right").closest("button")!;
+      fireEvent.click(nextButton);
+
+      // Should show 2 of 2
+      expect(screen.getByText(/2 of 2/i)).toBeInTheDocument();
+
+      // Save the second content image
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
+        "story-1",
+        mockContentImages[1].url,
+        "Turismo de Asturias"
+      );
+      expect(onUpdate).toHaveBeenCalledWith("story-1", {
+        image: mockContentImages[1].url,
+        imageSource: "Turismo de Asturias",
+      });
+    });
+
+    it("shows error from API response on content image save", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+      mockUpdateStoryImageUrl.mockResolvedValue({
+        error: "Failed to update image URL",
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      // Search for content images
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Save the selected content image
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      expect(screen.getByText("Failed to update image URL")).toBeInTheDocument();
+      expect(defaultProps.onUpdate).not.toHaveBeenCalled();
+      expect(defaultProps.onClose).not.toHaveBeenCalled();
+    });
+
+    it("shows generic error when content image save throws", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+      mockUpdateStoryImageUrl.mockRejectedValue(new Error("Network error"));
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      // Search for content images
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Save the selected content image
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      expect(screen.getByText("Failed to update image")).toBeInTheDocument();
+    });
+
+    it("saves content image with empty imageSource as undefined", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+      mockUpdateStoryImageUrl.mockResolvedValue({
+        data: { id: "story-1", image: mockContentImages[0].url, imageSource: undefined },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      // Search for content images
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Clear the auto-populated imageSource
+      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      fireEvent.change(sourceInput, { target: { value: "" } });
+
+      // Save the selected content image with no source
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
+        "story-1",
+        mockContentImages[0].url,
+        undefined
+      );
+    });
+
+    it("passes custom imageSource (not auto-populated) on content image save", async () => {
+      mockSearchContentImages.mockResolvedValue({
+        data: { images: mockContentImages, total: 2 },
+      });
+      mockUpdateStoryImageUrl.mockResolvedValue({
+        data: { id: "story-1", image: mockContentImages[0].url, imageSource: "Custom Attribution" },
+      });
+
+      render(<ImageEditorDialog {...defaultProps} story={storyWithSourcePdf} />);
+
+      // Search for content images
+      await act(async () => {
+        fireEvent.click(screen.getByText(/Search PDF/i));
+      });
+
+      // Override the auto-populated imageSource with a custom value
+      const sourceInput = screen.getByPlaceholderText("e.g., Photo by Juan on Unsplash");
+      fireEvent.change(sourceInput, { target: { value: "Custom Attribution" } });
+
+      // Save the selected content image
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      });
+
+      expect(mockUpdateStoryImageUrl).toHaveBeenCalledWith(
+        "story-1",
+        mockContentImages[0].url,
+        "Custom Attribution"
+      );
+    });
+  });
+
+  describe("Unreachable guards (lines 56, 109, 129)", () => {
+    // Lines 56, 109, 129: `if (!story) return;` in handleSave, handleApprove, handleMarkNeedsCuration
+    // are architecturally unreachable. When story is null, the component returns null on line 154
+    // (before rendering any UI), so no buttons exist that could trigger these handlers.
+    // These guards are defensive programming — they cannot be exercised via the component's public API.
+
+    it("renders nothing when story is null — handleSave guard (line 56) is unreachable", () => {
+      const { container } = render(
+        <ImageEditorDialog story={null} onClose={vi.fn()} onUpdate={vi.fn()} />
+      );
+      expect(container.innerHTML).toBe("");
+      // No Save button exists to trigger handleSave
+      expect(screen.queryByText("Save")).not.toBeInTheDocument();
+    });
+
+    it("renders nothing when story is null — handleApprove guard (line 109) is unreachable", () => {
+      const { container } = render(
+        <ImageEditorDialog story={null} onClose={vi.fn()} onUpdate={vi.fn()} />
+      );
+      expect(container.innerHTML).toBe("");
+      // No Approve button exists to trigger handleApprove
+      expect(screen.queryByText("Mark as approved")).not.toBeInTheDocument();
+    });
+
+    it("renders nothing when story is null — handleMarkNeedsCuration guard (line 129) is unreachable", () => {
+      const { container } = render(
+        <ImageEditorDialog story={null} onClose={vi.fn()} onUpdate={vi.fn()} />
+      );
+      expect(container.innerHTML).toBe("");
+      // No Pending button exists to trigger handleMarkNeedsCuration
+      expect(screen.queryByText("Mark as pending")).not.toBeInTheDocument();
     });
   });
 });

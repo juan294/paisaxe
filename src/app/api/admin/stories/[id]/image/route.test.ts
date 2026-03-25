@@ -80,6 +80,24 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     });
   });
 
+  describe("validation", () => {
+    it("should return 400 when story ID is empty", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories//image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+      });
+
+      const response = await PUT(request, { params: Promise.resolve({ id: "" }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Story ID is required");
+    });
+  });
+
   describe("URL-based image update", () => {
     it("should update image with valid URL", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
@@ -381,6 +399,27 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       expect(data.error).toBe("Corrupt image data");
     });
 
+    it("should return default error message when validation fails without error text", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      setupStorageMocks();
+
+      // Mock validateImageBuffer to return invalid without error message
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: false,
+      });
+
+      const formData = new FormData();
+      const mockFile = createMockFile("corrupt data", "test.jpg", "image/jpeg");
+      formData.append("file", mockFile);
+
+      const request = createFormDataRequest(formData);
+      const response = await PUT(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid image data");
+    });
+
     it("should return 500 on storage upload error", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       setupStorageMocks({ message: "Storage error" });
@@ -413,6 +452,186 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ image_source: "photographer-credit" })
       );
+    });
+  });
+
+  describe("external URL blur placeholder generation", () => {
+    it("should generate blur placeholder when fetching external image succeeds", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: { id: "story-123", image_path: "https://example.com/image.jpg", image_source: null },
+        error: null,
+      });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      // Mock global fetch for external image
+      const mockImageBuffer = new ArrayBuffer(8);
+      const mockFetchResponse = {
+        ok: true,
+        arrayBuffer: vi.fn().mockResolvedValue(mockImageBuffer),
+      };
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(mockFetchResponse as unknown as Response);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+      });
+
+      const response = await PUT(request, mockParams);
+
+      expect(response.status).toBe(200);
+      expect(fetchSpy).toHaveBeenCalledWith("https://example.com/image.jpg", {
+        headers: { Accept: "image/*" },
+      });
+
+      // Should include blur_data_url in update
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ blur_data_url: "data:image/webp;base64,mockblur" })
+      );
+
+      fetchSpy.mockRestore();
+    });
+
+    it("should skip blur generation when external image fetch fails", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: { id: "story-123", image_path: "https://example.com/image.jpg", image_source: null },
+        error: null,
+      });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      // Mock fetch to throw
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+      });
+
+      const response = await PUT(request, mockParams);
+
+      expect(response.status).toBe(200);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Could not fetch external image for blur generation:",
+        expect.any(Error)
+      );
+
+      // Should NOT include blur_data_url in update since fetch failed
+      expect(mockUpdate).toHaveBeenCalledWith({ image_path: "https://example.com/image.jpg" });
+
+      fetchSpy.mockRestore();
+      consoleSpy.mockRestore();
+    });
+
+    it("should skip blur generation when external image response is not ok", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: { id: "story-123", image_path: "https://example.com/image.jpg", image_source: null },
+        error: null,
+      });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      // Mock fetch to return non-ok response
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: false,
+        status: 404,
+      } as Response);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+      });
+
+      const response = await PUT(request, mockParams);
+
+      expect(response.status).toBe(200);
+      // Should NOT include blur_data_url
+      expect(mockUpdate).toHaveBeenCalledWith({ image_path: "https://example.com/image.jpg" });
+
+      fetchSpy.mockRestore();
+    });
+
+    it("should skip blur generation when image validation fails for external image", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: { id: "story-123", image_path: "https://example.com/image.jpg", image_source: null },
+        error: null,
+      });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      // Mock validateImageBuffer to return invalid for this test
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: false,
+        error: "Not a valid image",
+      });
+
+      // Mock fetch to return ok response with image data
+      const mockImageBuffer = new ArrayBuffer(8);
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: true,
+        arrayBuffer: vi.fn().mockResolvedValue(mockImageBuffer),
+      } as unknown as Response);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+      });
+
+      const response = await PUT(request, mockParams);
+
+      expect(response.status).toBe(200);
+      // Should NOT include blur_data_url since validation failed
+      expect(mockUpdate).toHaveBeenCalledWith({ image_path: "https://example.com/image.jpg" });
+
+      fetchSpy.mockRestore();
+    });
+  });
+
+  describe("content-type fallback", () => {
+    it("should default to empty string when content-type header is missing and handle body parsing error", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      vi.mocked(createAdminClient).mockReturnValue({ from: vi.fn() } as never);
+
+      // Request with NO body — content-type is null, triggering || "" fallback
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        // No body, no content-type => content-type is null => falls to "" via || ""
+      });
+
+      const response = await PUT(request, mockParams);
+
+      // Falls into the JSON path (non-multipart), request.json() throws => caught by outer catch
+      expect(response.status).toBe(500);
+      expect((await response.json()).error).toBe("Internal server error");
     });
   });
 

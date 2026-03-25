@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Chunk, ImageResult } from "@/types";
 import { EventEmitter } from "events";
@@ -460,6 +461,29 @@ describe("claude", () => {
       expect(mockSleep).toHaveBeenNthCalledWith(2, 1000);
     });
   });
+
+  // COVERAGE NOTE: claude.ts line 323 (`throw lastError || new Error("Max retries exceeded")`)
+  // contributes the sole uncovered branch (90.29% branch coverage).
+  //
+  // This line is unreachable dead code — a TypeScript exhaustiveness guard. Proof:
+  // The for-loop runs attempt = 1..MAX_RETRIES (3). On every iteration, exactly one
+  // of these terminal outcomes occurs:
+  //   1. execFile throws + retryable + attempt < MAX_RETRIES → sets lastError, `continue`
+  //   2. execFile throws + non-retryable OR final attempt → `throw` (line 283)
+  //   3. Empty stdout + attempt < MAX_RETRIES → sets lastError, `continue`
+  //   4. Empty stdout + final attempt → `throw` (line 298)
+  //   5. Invalid JSON → `throw` (line 306)
+  //   6. API error in response → `throw` (line 312)
+  //   7. Valid response → `return` (line 319)
+  //
+  // Cases 1 and 3 are the only ones that `continue` to the next iteration. On the
+  // final iteration (attempt === MAX_RETRIES), their guards (`attempt < MAX_RETRIES`)
+  // are false, so they fall through to the `throw` on lines 283/298 respectively.
+  // Therefore the loop always returns or throws — line 323 is never reached.
+  //
+  // MAX_RETRIES is a module-level `const = 3` and cannot be mocked to 0 without
+  // modifying source code, which is out of scope for test-only changes.
+  // This branch is genuinely untestable in vitest without source modifications.
 
   // ─── Asturian mode ──────────────────────────────────────────────────
 
@@ -1030,6 +1054,15 @@ describe("claude", () => {
       expect(result).toContain("general-guide.pdf");
       expect(result).not.toContain("null");
     });
+
+    it("should treat literal string 'null' caption as no caption", () => {
+      const images: ImageResult[] = [
+        { id: "1", path: "/images/map.jpg", caption: "null", sourcePdf: "general-guide.pdf" },
+      ];
+      const result = formatImagesForContext(images);
+      expect(result).toContain("(no caption)");
+      expect(result).not.toContain('"null"');
+    });
   });
 
   // ─── images in user content via generateChatResponse ────────────────
@@ -1053,6 +1086,25 @@ describe("claude", () => {
       const userContent = body.messages[0].content;
       expect(userContent).toContain("<available_images>");
       expect(userContent).toContain("Oviedo Cathedral");
+    });
+
+    it("should include available_images without context tags when no chunks but images provided", async () => {
+      setupMockAPIResponse({
+        content: [{ type: "text", text: "Response" }],
+      });
+
+      const images: ImageResult[] = [
+        { id: "img1", path: "/images/beach.jpg", caption: "Playa de Gulpiyuri", sourcePdf: "beaches.pdf" },
+      ];
+
+      await generateChatResponse("Show me beaches", [], false, 0, images);
+
+      const body = getCurlBody();
+      const userContent = body.messages[0].content;
+      expect(userContent).toContain("<available_images>");
+      expect(userContent).toContain("Playa de Gulpiyuri");
+      // Should NOT have context tags since no chunks
+      expect(userContent).not.toContain("<context>");
     });
 
     it("should NOT include available_images when no images provided", async () => {
