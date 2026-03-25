@@ -158,4 +158,32 @@ describe("GET /api/checkout/health", () => {
     expect(data.status).toBe("degraded");
     expect(data.checks.priceActive).toBe("fail");
   });
+
+  it("should use 0 as amount when price.unit_amount is null", async () => {
+    mockRetrieve.mockResolvedValue({
+      id: "price_123",
+      active: true,
+      unit_amount: null,
+      currency: "eur",
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
+    expect(data.price.amount).toBe(0);
+  });
+
+  it("should show 'Unknown error' when Stripe throws a non-Error value", async () => {
+    mockRetrieve.mockRejectedValue("unexpected failure");
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.status).toBe("degraded");
+    expect(data.checks.priceActive).toBe("fail");
+    expect(data.error).toBe("Unknown error");
+  });
 });
