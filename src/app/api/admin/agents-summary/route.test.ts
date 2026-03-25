@@ -644,4 +644,104 @@ describe("GET /api/admin/agents-summary", () => {
       "private, max-age=120, stale-while-revalidate=300"
     );
   });
+
+  it("should skip health summary line after health status when cleaned text is 5 chars or fewer", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockDate = new Date("2026-02-06T16:00:00Z");
+    mockStat.mockResolvedValue({ mtime: mockDate });
+
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) return "";
+      if (filePath.includes("coverage-report.md")) {
+        // Health status line followed by a very short line (<=5 chars after cleaning).
+        // parseHealthSummary should skip this line and fall through to later patterns.
+        return [
+          "# Coverage Report",
+          "",
+          "## Health Status: GREEN",
+          "",
+          "---",
+          "",
+          "## Summary",
+          "",
+          "Detailed coverage results for all modules in the project.",
+        ].join("\n");
+      }
+      return "## Health Status: GREEN\n\n## Executive Summary\nAll good.";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    const coverageAgent = data.data.agents.find(
+      (a: { flagKey: string }) => a.flagKey === "coverage_agent_enabled"
+    );
+    // Should fall through to the ## Summary pattern instead of using the short "---" line
+    expect(coverageAgent.healthSummary).toContain("Detailed coverage results");
+  });
+
+  it("should fall back to raw agent flag key when shared context has unknown agent", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockStat.mockRejectedValue(new Error("ENOENT"));
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) {
+        return [
+          "<!-- ENTRY:START agent=unknown_agent_flag timestamp=2026-02-06T16:00:00Z -->",
+          "Some content from an unknown agent.",
+          "<!-- ENTRY:END -->",
+        ].join("\n");
+      }
+      throw new Error("ENOENT");
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.data.sharedContext).toHaveLength(1);
+    // Should fall back to the raw flag key since it's not in FLAG_TO_NAME
+    expect(data.data.sharedContext[0].agentName).toBe("unknown_agent_flag");
+    expect(data.data.sharedContext[0].agentFlag).toBe("unknown_agent_flag");
+  });
+
+  it("should skip shared context entries with empty content between markers", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    mockStat.mockRejectedValue(new Error("ENOENT"));
+    mockReadFile.mockImplementation(async (filePath: string) => {
+      if (filePath.includes("shared-context.md")) {
+        return [
+          "<!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-02-06T16:00:00Z -->",
+          "Valid coverage entry with content.",
+          "<!-- ENTRY:END -->",
+          "",
+          "<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-02-06T15:00:00Z -->",
+          "<!-- ENTRY:END -->",
+          "",
+          "<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-02-06T14:00:00Z -->",
+          "   ",
+          "<!-- ENTRY:END -->",
+        ].join("\n");
+      }
+      throw new Error("ENOENT");
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    // Only the first entry should be included; the other two have empty content
+    expect(data.data.sharedContext).toHaveLength(1);
+    expect(data.data.sharedContext[0].agentName).toBe("Coverage");
+    expect(data.data.sharedContext[0].content).toBe("Valid coverage entry with content.");
+  });
 });

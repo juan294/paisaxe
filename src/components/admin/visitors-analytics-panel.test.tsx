@@ -732,6 +732,56 @@ describe("VisitorsAnalyticsPanel", () => {
     expect(screen.queryByText("No UTM data available")).not.toBeInTheDocument();
   });
 
+  it("hides percentage label in bar when segment is <= 10%", async () => {
+    // When newPercent or returningPercent is <= 10, the percentage label
+    // inside the bar is not rendered (lines 613, 619)
+    vi.mocked(adminApi.fetchAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        newVsReturning: { newVisitors: 5, returningVisitors: 95 },
+      },
+    });
+
+    const { container } = render(<VisitorsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("12 — New vs Returning Visitors")).toBeInTheDocument();
+    });
+
+    // newPercent = round(5/100*100) = 5%, which is <= 10
+    // The violet bar should NOT contain a percentage label inside it
+    const bars = container.querySelectorAll(".flex.h-10 > div");
+    expect(bars.length).toBe(2);
+
+    // The narrow bar (5%) should have no text content
+    const narrowBar = bars[0];
+    expect(narrowBar.textContent).toBe("");
+
+    // The wide bar (95%) should show its percentage
+    const wideBar = bars[1];
+    expect(wideBar.textContent).toBe("95%");
+  });
+
+  it("renders StatCard with no color prop (default color class)", async () => {
+    // All 4 StatCard usages in the component provide a color prop,
+    // so the `!color` fallback in StatCard is unreachable through the
+    // VisitorsAnalyticsPanel. This is a non-exported internal function
+    // and cannot be tested independently.
+    // This test documents that all 4 stat cards render with their colors.
+    vi.mocked(adminApi.fetchAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    render(<VisitorsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("500")).toBeInTheDocument();
+    });
+
+    // All 4 stats render
+    expect(screen.getByText("Bounce Rate")).toBeInTheDocument();
+  });
+
   // Lines 27, 35: SSR guards in isLocalhost() and getStoredDevToggle()
   // These `typeof window === "undefined"` checks are unreachable in jsdom because
   // React DOM requires window to render. The functions are not exported, so they

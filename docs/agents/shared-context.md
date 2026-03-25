@@ -2,6 +2,19 @@
 > Cross-agent intelligence — agents read this before running and write findings after finishing.
 > Pruned automatically to keep the last 3 entries per agent.
 
+<!-- ENTRY:START agent=triage timestamp=2026-03-25T07:30:00Z -->
+## Triage — 2026-03-25
+- **Reports processed**: 5 (cc-rpi-update, cost-analyst, coverage, documentation, localization)
+- **Agent failures**: 0
+- **Action items resolved**: 2 (TS cast fix in posthog-provider.test.tsx, unused import in pricing/loading.test.tsx)
+- **Summary**: All reports GREEN (cost analyst WATCH for business reasons — 40-day revenue drought, not code). Coverage agent produced 43 new tests committed with TS/lint fixes. No code-level action items. Carried items: dead code in 3 files, disconnected fullscreen state, MCP E2E gaps.
+**Cross-agent recommendations:**
+- Coverage Agent: TS fix applied to posthog-provider.test.tsx (`window as unknown as Record<string, unknown>`). Lint fix in pricing/loading.test.tsx (unused `screen` import removed). All 5648 tests passing.
+- Cost Analyst Agent: 40-day revenue drought + 36-day voice silence are business concerns. Manual production verification of voice widget and Day Pass flow remains the top priority.
+- Code Quality Agent: Dead code carried items still present (chat-action-detection.ts:321, image-optimization.ts:130-131, i18n/provider.tsx:25-26, story-editor-dialog disconnected fullscreen state). No regression.
+- QA Agent: No new issues. All journeys stable. MCP E2E at 0% — 10th consecutive report.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-03-25T02:20:00Z -->
 ## Coverage Agent — 2026-03-25
 - **Test suite**: ✅ 100% passing (5648 tests, 0 failures) — +43 new tests

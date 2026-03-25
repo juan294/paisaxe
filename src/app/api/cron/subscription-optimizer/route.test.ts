@@ -315,6 +315,129 @@ describe("POST /api/cron/subscription-optimizer", () => {
     expect(sharedContextCall![1]).toContain("Old Entry");
   });
 
+  it("returns 500 with 'Unknown error' when a non-Error value is thrown", async () => {
+    mockAnalyze.mockImplementation(() => {
+       
+      throw "something went wrong";
+    });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(500);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((response as any).body).toEqual(
+      expect.objectContaining({
+        error: "Analysis failed",
+        details: "Unknown error",
+      })
+    );
+  });
+
+  it("succeeds via admin auth fallback when webhook secret is invalid", async () => {
+    // Override admin auth mock to return valid BEFORE importing the route
+    vi.doMock("@/lib/admin-auth", () => ({
+      validateAdminAuth: () =>
+        Promise.resolve({ valid: true, userId: "admin-user-123" }),
+    }));
+
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    const { POST } = await import("./route");
+    // No webhook secret header — forces the admin auth fallback
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: {} }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((response as any).body).toEqual(
+      expect.objectContaining({
+        success: true,
+        totalMonthlySpend: 50,
+      })
+    );
+  });
+
+  it("uses default metrics when POST body is empty or invalid JSON", async () => {
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    const { POST } = await import("./route");
+    // MockNextRequest has no json() method, so request.json() will throw
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+    // Should have used default metrics
+    expect(mockAnalyze).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usageMetrics: expect.objectContaining({
+          voiceMinutes: 15,
+          visitors: 5000,
+          chatConversations: 200,
+        }),
+      })
+    );
+  });
+
+  it("uses default metrics when POST body has no usageMetrics field", async () => {
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    const { POST } = await import("./route");
+    // Real Request with valid JSON but no usageMetrics field
+    const request = new Request(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      {
+        method: "POST",
+        headers: { "x-webhook-secret": WEBHOOK_SECRET, "content-type": "application/json" },
+        body: JSON.stringify({ someOtherField: "value" }),
+      }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+    // Should have used default metrics since body.usageMetrics is falsy
+    expect(mockAnalyze).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usageMetrics: expect.objectContaining({
+          voiceMinutes: 15,
+          visitors: 5000,
+          chatConversations: 200,
+        }),
+      })
+    );
+  });
+
   it("merges custom usageMetrics from POST body with defaults", async () => {
     const mockReport = {
       recommendations: [],
