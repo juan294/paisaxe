@@ -263,3 +263,238 @@ describe("shouldInitializePostHog (tested via rendering behavior)", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("PostHog production initialization (non-localhost)", () => {
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUsePathname.mockReturnValue("/immersive");
+    mockUseSearchParams.mockReturnValue(null);
+    mockPosthog.__loaded = false;
+
+    // Replace window.location to simulate production hostname
+    // jsdom's location properties are not configurable, so we replace the whole object
+    Object.defineProperty(window, "location", {
+      value: { ...originalLocation, hostname: "paisaxe.es", origin: "https://paisaxe.es" },
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    // Restore original jsdom location
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
+    // Clean up window.posthog
+    delete (window as unknown as Record<string, unknown>).posthog;
+  });
+
+  it("initializes PostHog on production hostname with env key", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+
+    render(
+      <PostHogProviderWrapper>
+        <div data-testid="app">Content</div>
+      </PostHogProviderWrapper>
+    );
+
+    // Wait for dynamic import promise to resolve and PostHog to initialize
+    await vi.waitFor(() => {
+      expect(mockInit).toHaveBeenCalledWith("phc_test_key_12345", expect.objectContaining({
+        person_profiles: "never",
+        persistence: "memory",
+        capture_pageview: false,
+        capture_pageleave: true,
+        autocapture: true,
+      }));
+    });
+
+    expect(screen.getByTestId("app")).toBeInTheDocument();
+  });
+
+  it("renders PostHogProvider wrapper after initialization", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+
+    render(
+      <PostHogProviderWrapper>
+        <div data-testid="app">Content</div>
+      </PostHogProviderWrapper>
+    );
+
+    // After PostHog loads, it should render through the posthog-js/react PostHogProvider
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("posthog-react-provider")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("app")).toBeInTheDocument();
+  });
+
+  it("skips init when PostHog is already loaded (__loaded = true)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+    mockPosthog.__loaded = true;
+
+    render(
+      <PostHogProviderWrapper>
+        <div>Content</div>
+      </PostHogProviderWrapper>
+    );
+
+    // Wait for dynamic import to resolve
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("posthog-react-provider")).toBeInTheDocument();
+    });
+
+    // init should NOT be called because __loaded is true
+    expect(mockInit).not.toHaveBeenCalled();
+  });
+
+  it("uses window.posthog global singleton when available", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+
+    const windowPosthog = {
+      __loaded: true,
+      init: vi.fn(),
+      capture: vi.fn(),
+      register: vi.fn(),
+      identify: vi.fn(),
+      reset: vi.fn(),
+    };
+    (window as unknown as Record<string, unknown>).posthog = windowPosthog;
+
+    render(
+      <PostHogProviderWrapper>
+        <div>Content</div>
+      </PostHogProviderWrapper>
+    );
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("posthog-react-provider")).toBeInTheDocument();
+    });
+
+    // Should NOT have called init on either mock — window.posthog was already __loaded
+    expect(mockInit).not.toHaveBeenCalled();
+    expect(windowPosthog.init).not.toHaveBeenCalled();
+  });
+
+  it("uses NEXT_PUBLIC_POSTHOG_HOST env var for api_host", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://eu.posthog.com");
+
+    render(
+      <PostHogProviderWrapper>
+        <div>Content</div>
+      </PostHogProviderWrapper>
+    );
+
+    await vi.waitFor(() => {
+      expect(mockInit).toHaveBeenCalledWith("phc_test_key_12345", expect.objectContaining({
+        api_host: "https://eu.posthog.com",
+      }));
+    });
+  });
+
+  it("defaults api_host to /a when NEXT_PUBLIC_POSTHOG_HOST is not set", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+    delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
+
+    render(
+      <PostHogProviderWrapper>
+        <div>Content</div>
+      </PostHogProviderWrapper>
+    );
+
+    await vi.waitFor(() => {
+      expect(mockInit).toHaveBeenCalledWith("phc_test_key_12345", expect.objectContaining({
+        api_host: "/a",
+      }));
+    });
+  });
+});
+
+describe("PostHogPageViewTracker with loaded PostHog", () => {
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPosthog.__loaded = false;
+
+    Object.defineProperty(window, "location", {
+      value: { ...originalLocation, hostname: "paisaxe.es", origin: "https://paisaxe.es" },
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
+    delete (window as unknown as Record<string, unknown>).posthog;
+  });
+
+  it("captures pageview with pathname when PostHog is loaded", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+    mockUsePathname.mockReturnValue("/immersive");
+    mockUseSearchParams.mockReturnValue(null);
+
+    render(
+      <PostHogProviderWrapper>
+        <PostHogPageView />
+      </PostHogProviderWrapper>
+    );
+
+    // Wait for PostHog to initialize and then for pageview capture
+    // Component uses window.origin (not window.location.origin)
+    await vi.waitFor(() => {
+      expect(mockCapture).toHaveBeenCalledWith("$pageview", {
+        $current_url: `${window.origin}/immersive`,
+      });
+    });
+  });
+
+  it("captures pageview with search params appended", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+    mockUsePathname.mockReturnValue("/story/covadonga");
+    mockUseSearchParams.mockReturnValue(new URLSearchParams("lang=es&ref=social"));
+
+    render(
+      <PostHogProviderWrapper>
+        <PostHogPageView />
+      </PostHogProviderWrapper>
+    );
+
+    await vi.waitFor(() => {
+      expect(mockCapture).toHaveBeenCalledWith("$pageview", {
+        $current_url: `${window.origin}/story/covadonga?lang=es&ref=social`,
+      });
+    });
+  });
+
+  it("does not capture when pathname is null even with PostHog loaded", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+    mockUsePathname.mockReturnValue(null);
+    mockUseSearchParams.mockReturnValue(null);
+
+    render(
+      <PostHogProviderWrapper>
+        <PostHogPageView />
+      </PostHogProviderWrapper>
+    );
+
+    // Wait for PostHog to load
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("posthog-react-provider")).toBeInTheDocument();
+    });
+
+    // capture should NOT be called with null pathname
+    expect(mockCapture).not.toHaveBeenCalled();
+  });
+});

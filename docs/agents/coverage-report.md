@@ -4,23 +4,59 @@
 > See `docs/health-report-[DATE].md` for the latest coverage data.
 > This file is kept for historical reference only and is no longer updated.
 
-> Last updated: 2026-03-24
+> Last updated: 2026-03-25
 
 ## Summary
 
-- **Total tests:** 5605 passed (+19 from 5586)
-- **Test files:** 303 passed (100%)
-- **Statement coverage:** 98.52% (+0.03%)
-- **Branch coverage:** 95.41% (+0.18% from 95.23%)
-- **Function coverage:** 98.45%
-- **Line coverage:** ~98.92%
+- **Total tests:** 5648 passed (+43 from 5605)
+- **Test files:** 304 passed (100%)
+- **Statement coverage:** 98.68% (+0.16%)
+- **Branch coverage:** 96.08% (+0.67% from 95.41%)
+- **Function coverage:** 98.71% (+0.26%)
+- **Line coverage:** ~99.08% (+0.16%)
 - **TypeScript:** ✅ No errors
 
-**Branch coverage continues climbing past 95%.** This cycle added 19 new tests targeting remaining branch gaps across hooks, lib modules, admin components, and editor hooks. 4 files reached 100% branch coverage. Statement coverage ticked up to 98.52%. All remaining uncovered branches have been documented as untestable (dead code, defensive guards, V8 artifacts, or SSR-only paths).
+**Branch coverage crossed 96%.** This cycle added 43 new tests targeting the PostHog provider production initialization path, a new pricing/loading.tsx skeleton, visitors-analytics-panel percentage thresholds, and branch gaps across 7 API routes (github-analytics, subscription-optimizer, chat, checkout/day-pass, checkout/embedded, checkout/health, marketing/dashboard, agents-summary, elevenlabs-analytics). PostHog provider coverage jumped from 61.76% to ~90%+ with production hostname mocking. Statement coverage rose to 98.68%.
 
 *Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
 
-## Changes This Cycle (2026-03-24)
+## Changes This Cycle (2026-03-25)
+
+### New Tests Written (+43 tests across 12 files)
+
+#### New Test Files
+
+| File | Coverage Change | What Was Covered |
+|------|----------------|------------------|
+| `pricing/loading.test.tsx` | 0% → **100%** | New test file for the pricing page skeleton loading component |
+
+#### PostHog Provider (Major Improvement)
+
+| File | Coverage Change | What Was Covered |
+|------|----------------|------------------|
+| `posthog-provider.tsx` | 61.76% → **~90%+** | Production hostname mocking, PostHog initialization (lines 75-101), PostHogProvider rendering (line 114), pageview capture with/without search params (lines 32-36), `__loaded` skip path, `window.posthog` global singleton, `api_host` env var |
+
+#### API Route Branch Coverage
+
+| File | What Was Covered |
+|------|------------------|
+| `github-analytics/route.ts` | Default date fallbacks (lines 21-23), null data arrays for `?.` branches (lines 64-65, 82-83, 100), catch block date range fallback (lines 133-134) |
+| `subscription-optimizer/route.ts` | Non-Error throw (line 99), admin auth fallback (lines 118-119), empty POST body (lines 124-132) |
+| `chat/route.ts` | Various optional chaining and conditional branches |
+| `checkout/day-pass/route.ts` | Undefined `user.email` fallback (line 63), non-Error throw (line 75) |
+| `checkout/embedded/route.ts` | Undefined `user.email` fallback (line 63), non-Error throw (line 74) |
+| `checkout/health/route.ts` | Null `unit_amount` fallback (line 77), non-Error throw (line 88) |
+| `marketing/dashboard/route.ts` | Various branch gaps (lines 164, 173, 179-209) |
+| `agents-summary/route.ts` | Various branch gaps (lines 34, 104, 148-151) |
+| `elevenlabs-analytics/route.ts` | Various branch gaps (lines 112-120, 135) |
+
+#### Visitors Analytics Panel
+
+| File | What Was Covered |
+|------|------------------|
+| `visitors-analytics-panel.tsx` | NewVsReturningBar percentage display threshold (lines 613, 619) — segment <= 10% hides label |
+
+## Changes Previous Cycle (2026-03-24)
 
 ### New Tests Written (+19 tests across 10 files)
 
@@ -99,7 +135,7 @@
 | `make-booking/route.ts:137,157-158` | Dead guard | `numbers[hour12] \|\| String(hour12)` — hour12 is always 1-12 and all values exist in map |
 | `stories-data.ts:42,79,112,145,178` | Defensive guards | Repeated `!key.startsWith("eyJ")` pattern across fallback story functions — covered for one, structurally identical for rest |
 
-### Statement Coverage Plateau (Confirmed at 98.52%)
+### Statement Coverage Plateau (Confirmed at 98.68%)
 
 All remaining uncovered source files were re-audited. Every uncovered statement falls into one of 5 categories:
 
@@ -113,11 +149,10 @@ All remaining uncovered source files were re-audited. Every uncovered statement 
 
 | File | Stmts | Branch | Why |
 |------|-------|--------|-----|
-| `posthog-provider.tsx` | 61.8% | 41.7% | PostHog SDK initialization, browser-only APIs |
 | `voice-agent-chat.tsx` | 45.6% | 42.9% | ElevenLabs SDK, WebSocket connections |
 | `agents-dashboard/index.tsx` | 48.5% | 47.8% | Complex dialog state, terminal emulation |
 
-These 3 files account for the bulk of the remaining coverage gap and require Playwright E2E tests for meaningful improvement.
+These 2 files account for the bulk of the remaining coverage gap and require Playwright E2E tests for meaningful improvement. `posthog-provider.tsx` was improved from 61.8% to ~90%+ this cycle via production hostname mocking.
 
 ### Source Code Bugs Found (Not Fixed — Test-Only Changes)
 

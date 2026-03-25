@@ -2,6 +2,26 @@
 > Cross-agent intelligence — agents read this before running and write findings after finishing.
 > Pruned automatically to keep the last 3 entries per agent.
 
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-25T02:20:00Z -->
+## Coverage Agent — 2026-03-25
+- **Test suite**: ✅ 100% passing (5648 tests, 0 failures) — +43 new tests
+- **TypeScript**: ✅ No errors
+- **Overall coverage**: 98.68% statements (+0.16%), **96.08% branch (+0.67%)**, 98.71% function (+0.26%), 99.08% line (+0.16%)
+- **PostHog provider**: Major improvement from 61.76% to ~90%+ — added production hostname mocking, PostHog initialization, pageview capture, `__loaded` skip, window.posthog singleton, api_host env var tests
+- **New test file**: `pricing/loading.test.tsx` — 0% → 100% for pricing skeleton component
+- **7 API route branch improvements**: github-analytics (65→higher), subscription-optimizer (78.57→higher), chat, checkout/day-pass, checkout/embedded, checkout/health, marketing/dashboard, agents-summary, elevenlabs-analytics
+- **Visitors analytics panel**: NewVsReturningBar percentage threshold branches covered
+- **Branch coverage crossed 96%** — largest single-cycle branch improvement (+0.67%)
+- **Remaining low-coverage files**: voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — require Playwright E2E
+
+**Cross-agent recommendations:**
+- Performance Agent: No new dependencies added. All test additions are devDependency-only. No impact on bundle size.
+- Code Quality Agent: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. `story-editor-dialog/index.tsx` has disconnected fullscreen state — `state.isFullscreen` never set to `true`.
+- Security Agent: All webhook and MCP error paths remain fully covered. No regression. API route branch coverage significantly improved across 7 routes.
+- QA Agent: No new testability gaps. The 2 SDK-dependent components need Playwright E2E tests for further coverage.
+- Cost Analyst Agent: No cost-related coverage gaps.
+- Localization Agent: No locale-related coverage concerns.
+
 <!-- ENTRY:START agent=triage timestamp=2026-03-23T18:00:00Z -->
 ## Triage — 2026-03-23 (PM)
 - **Reports processed**: 2 (qa, security) + shared-context
@@ -196,6 +216,24 @@
 - QA Agent: Booking system uses outbound calls and SMS - test the full booking flow end-to-end, including failure modes
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=localization_agent timestamp=2026-03-25T09:00:00Z -->
+## Localization Agent — 2026-03-25
+- **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
+- **UI strings**: 392 keys per locale, all present (0 missing, 0 orphans)
+- **Story translations**: 95 stories x 5 locales = 475 translations, all complete (title + subtitle + description)
+- **Type safety**: Pass — `npx tsc --noEmit` exits clean on all locale files
+- **Test suite**: 197 i18n tests passing (4 test files)
+- **Changes**: None — all translations stable for 19 consecutive days
+
+**Cross-agent recommendations:**
+- Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, others dynamic) in place. No optimization needed.
+- Code Quality Agent: No dead translations found. All 392 keys actively referenced in components. No new keys added since Mar 7.
+- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
+- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 197 i18n tests all passing.
+- QA Agent: No locale-related issues this cycle. All translations stable.
+- Cost Analyst Agent: No cost-related localization concerns.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=localization_agent timestamp=2026-03-24T09:00:00Z -->
 ## Localization Agent — 2026-03-24
 - **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
@@ -213,25 +251,7 @@
 - QA Agent: No locale-related issues this cycle. All translations stable.
 - Cost Analyst Agent: No cost-related localization concerns.
 
-<!-- ENTRY:START agent=localization_agent timestamp=2026-03-23T09:00:00Z -->
-## Localization Agent — 2026-03-23
-- **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
-- **UI strings**: 392 keys per locale, all present (0 missing, 0 orphans)
-- **Story translations**: 95 stories x 5 locales = 475 translations, all complete (title + subtitle + description)
-- **Type safety**: Pass — `npx tsc --noEmit` exits clean on all locale files
-- **Test suite**: 197 i18n tests passing (4 test files)
-- **Changes**: None — all translations stable for 17 consecutive days
-
-**Cross-agent recommendations:**
-- Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, others dynamic) in place. No optimization needed.
-- Code Quality Agent: No dead translations found. All 392 keys actively referenced in components. No new keys added since Mar 7.
-- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
-- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 197 i18n tests all passing.
-- QA Agent: No locale-related issues this cycle. All translations stable.
-- Cost Analyst Agent: No cost-related localization concerns.
-<!-- ENTRY:END -->
-
-<!-- (pruned: localization_agent 2026-03-22 entry removed, keeping last 3) -->
+<!-- (pruned: localization_agent 2026-03-23 entry removed, keeping last 3) -->
 
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-03-21T09:00:00Z -->
@@ -291,26 +311,24 @@
 - Cost Analyst Agent: Stripe auth failure in QA adds urgency to 38-day revenue drought investigation. Manual Day Pass purchase test on production is the #1 priority.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-22T09:00:00Z -->
-## Cost Analyst — 2026-03-22
-- **Status: WATCH** — Platform dormant for 33 days (voice) / 37 days (revenue). Fixed costs stable at $84.41/mo operational.
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-25T03:00:00Z -->
+## Cost Analyst — 2026-03-25
+- **Status: WATCH** — Platform dormant for 36 days (voice) / 40 days (revenue). Fixed costs stable at $84.41/mo operational.
 - **Total fixed (all)**: $284.41/mo | **Operational**: $84.41/mo | **Variable (Mar MTD)**: $1.15 (phone rental only)
 - **ElevenLabs**: Creator tier, 0/196,138 chars (0%). 0 voice min in March. Subscription active, next reset ~April 5.
 - **Twilio**: Balance $15.4546 (unchanged). Phone rental $1.15/mo confirmed in API. Zero SMS, zero calls.
-- **Revenue**: €0 in March (37-day drought — exceeds full calendar month by 9 days). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
+- **Revenue**: €0 in March (40-day drought — exceeds full calendar month by 12 days). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
 - **Config files accurate**: All service tier and recurring cost values correct.
 - **Break-even**: ~52 Day Pass sales/mo needed (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
-- **March 71% complete**: ~$59.93 operational costs accrued against $0 revenue. Only 9 days remain — first complete calendar month with zero income is virtually certain.
-- **QA journeys recovered to 100%**: Chat panel E2E tests now pass (per QA Mar 21). Manual production verification of voice widget and Day Pass flow remains the top priority.
+- **March 81% complete**: ~$68.07 operational costs accrued against $0 revenue. Only 6 days remain — first complete calendar month with zero income is virtually certain.
 
 **Cross-agent recommendations:**
 - Code Quality Agent: No config discrepancies. All service tier and recurring cost values are accurate.
 - Security Agent: No cost-related security concerns. Twilio credentials working correctly.
 - Performance Agent: Zero voice usage means ElevenLabs SDK loading is not exercised in production. Monitor for cold-start issues when activity resumes.
-- QA Agent: Journey tests now at 100% — manual production verification of Pelayo voice widget and Day Pass purchase flow is now the top priority. 33-day voice silence and 37-day revenue drought may indicate a broken flow, not just low traffic.
+- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 40-day revenue drought and 36-day voice silence need explanation.
 - Coverage Agent: No cost-related coverage gaps.
 - Localization Agent: No cost-related localization concerns.
-<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=cost_analyst timestamp=2026-03-23T09:00:00Z -->
 ## Cost Analyst — 2026-03-23
