@@ -10,6 +10,12 @@ interface SupabaseServiceStatus {
   error?: string;
 }
 
+interface StoriesStatus {
+  status: "ok" | "fallback";
+  count?: number;
+  error?: string;
+}
+
 interface DatabaseSizeStatus {
   size_mb: number;
   limit_mb: number;
@@ -28,6 +34,7 @@ interface HealthResponse {
   uptime: number;
   services: {
     supabase: SupabaseServiceStatus;
+    stories: StoriesStatus;
     database: DatabaseSizeStatus | DatabaseSizeErrorStatus;
   };
 }
@@ -48,6 +55,33 @@ async function checkSupabase(): Promise<SupabaseServiceStatus> {
     return {
       status: "error",
       latency_ms,
+      error: err instanceof Error ? err.message : "Unknown error",
+    };
+  }
+}
+
+async function checkStories(): Promise<StoriesStatus> {
+  try {
+    const { data, error } = await supabase
+      .from("stories")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true)
+      .eq("curation_status", "approved");
+
+    if (error) {
+      return { status: "fallback", error: error.message };
+    }
+
+    const count = data?.length ?? 0;
+    // If zero approved stories, the immersive page will serve fallback content
+    if (count === 0) {
+      return { status: "fallback", count: 0, error: "No approved stories — fallback images will be served" };
+    }
+
+    return { status: "ok", count };
+  } catch (err) {
+    return {
+      status: "fallback",
       error: err instanceof Error ? err.message : "Unknown error",
     };
   }
@@ -85,18 +119,22 @@ async function checkDatabaseSize(): Promise<
 
 export async function GET(): Promise<NextResponse<HealthResponse>> {
   try {
-    const [supabaseStatus, databaseStatus] = await Promise.all([
+    const [supabaseStatus, storiesStatus, databaseStatus] = await Promise.all([
       checkSupabase(),
+      checkStories(),
       checkDatabaseSize(),
     ]);
 
     const isSupabaseError = supabaseStatus.status !== "connected";
+    const isStoriesFallback = storiesStatus.status !== "ok";
     const isDatabaseOverThreshold =
       "usage_percent" in databaseStatus &&
       databaseStatus.usage_percent >= STORAGE_WARNING_THRESHOLD * 100;
 
     const overallStatus =
-      isSupabaseError || isDatabaseOverThreshold ? "degraded" : "healthy";
+      isSupabaseError || isStoriesFallback || isDatabaseOverThreshold
+        ? "degraded"
+        : "healthy";
 
     const body: HealthResponse = {
       status: overallStatus,
@@ -105,6 +143,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
       uptime: process.uptime(),
       services: {
         supabase: supabaseStatus,
+        stories: storiesStatus,
         database: databaseStatus,
       },
     };
@@ -128,6 +167,10 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
         supabase: {
           status: "error",
           latency_ms: 0,
+          error: err instanceof Error ? err.message : "Unknown error",
+        },
+        stories: {
+          status: "fallback",
           error: err instanceof Error ? err.message : "Unknown error",
         },
         database: {
