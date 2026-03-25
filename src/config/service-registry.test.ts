@@ -45,7 +45,7 @@ describe("SERVICE_REGISTRY config", () => {
     const el = SERVICE_REGISTRY.find((s) => s.serviceId === "elevenlabs");
     expect(el).toBeDefined();
     expect(el!.currentPlan).toBe("Creator");
-    expect(el!.monthlyCostUsd).toBe(18.33);
+    expect(el!.monthlyCostUsd).toBe(22.18);
   });
 
   it("should include Supabase with Pro plan", () => {
@@ -65,8 +65,8 @@ describe("SERVICE_REGISTRY config", () => {
   it("should include Vercel", () => {
     const v = SERVICE_REGISTRY.find((s) => s.serviceId === "vercel");
     expect(v).toBeDefined();
-    expect(v!.currentPlan).toBe("Hobby");
-    expect(v!.monthlyCostUsd).toBe(0);
+    expect(v!.currentPlan).toBe("Pro");
+    expect(v!.monthlyCostUsd).toBe(20);
   });
 
   it("should include Anthropic", () => {

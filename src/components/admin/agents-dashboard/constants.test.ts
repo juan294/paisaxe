@@ -12,17 +12,19 @@ import {
 
 describe("agents-dashboard/constants", () => {
   describe("AGENT_FLAG_KEYS", () => {
-    it("includes automated_agents master key", () => {
-      expect(AGENT_FLAG_KEYS).toContain("automated_agents");
+    it("does not include master toggle (handled separately)", () => {
+      expect(AGENT_FLAG_KEYS).not.toContain("automated_agents");
     });
 
-    it("contains all expected agent flags", () => {
+    it("contains all expected individual agent flags", () => {
       expect(AGENT_FLAG_KEYS).toContain("coverage_agent_enabled");
       expect(AGENT_FLAG_KEYS).toContain("security_agent_enabled");
       expect(AGENT_FLAG_KEYS).toContain("documentation_agent_enabled");
       expect(AGENT_FLAG_KEYS).toContain("performance_agent_enabled");
       expect(AGENT_FLAG_KEYS).toContain("qa_agent_enabled");
       expect(AGENT_FLAG_KEYS).toContain("localization_agent_enabled");
+      expect(AGENT_FLAG_KEYS).toContain("cost_analyst_agent_enabled");
+      expect(AGENT_FLAG_KEYS).toContain("subscription_optimizer_enabled");
     });
   });
 

@@ -239,9 +239,9 @@ export function FeatureTogglesPanel() {
       <header className="flex items-end justify-between border-b border-[#e5e3de] pb-6 dark:border-[#3d3a36]">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">Admin / Settings</p>
-          <h1 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
+          <h2 className="mt-2 text-4xl font-extralight tracking-tight text-[#2d2a26] dark:text-[#f5f3ee]">
             Features
-          </h1>
+          </h2>
         </div>
         <div className="flex items-center gap-6">
           <p className="font-mono text-xs uppercase tracking-widest text-[#6b6560] dark:text-[#a39e98]">
@@ -274,7 +274,7 @@ export function FeatureTogglesPanel() {
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-11 w-48 rounded-xl border-none bg-white pl-10 pr-4 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus:outline-none focus:ring-1 focus:ring-[#c9a55c] dark:bg-[#252320] dark:text-[#f5f3ee]"
+            className="h-11 w-48 rounded-xl border-none bg-white pl-10 pr-4 text-sm text-[#2d2a26] placeholder:text-[#a39e98] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#c9a55c] dark:bg-[#252320] dark:text-[#f5f3ee]"
           />
         </div>
 

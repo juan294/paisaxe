@@ -3,7 +3,7 @@
 # Performs automated LLM testing and provides actionable analysis of failures
 set -euo pipefail
 
-PROJECT_DIR="/Users/juan/Documents/GenAI_Projects/paisaxe"
+PROJECT_DIR="/Users/juan/code/paisaxe"
 CLAUDE_BIN="/Users/juan/.local/bin/claude"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/qa-agent-$(date +%Y-%m-%d).log"
@@ -49,7 +49,7 @@ log_success "Feature flags enabled — proceeding with QA Agent" | tee -a "$LOG_
 
 cd "$PROJECT_DIR"
 
-# Get configuration from feature flag
+# Get configuration from local agent config
 TESTS_PER_CATEGORY=$(get_agent_config "qa_agent_enabled" "testsPerCategory" || echo "3")
 ENABLE_JOURNEY_TESTS=$(get_agent_config "qa_agent_enabled" "enableJourneyTests" || echo "true")
 ENABLE_GITHUB_ISSUES=$(get_agent_config "qa_agent_enabled" "enableGithubIssues" || echo "true")
@@ -96,7 +96,7 @@ HEALTH_CHECK_DETAILS=""
 # Check 1: App Health Endpoint
 log_info "Checking app health..." | tee -a "$LOG_FILE"
 HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3000/api/health" 2>&1)
-if echo "$HEALTH_RESPONSE" | grep -q '"status":"ok"'; then
+if echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
   log_success "App health: OK" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
 else
@@ -121,24 +121,21 @@ else
   HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Database check failed: $DB_RESPONSE"
 fi
 
-# Check 3: Stripe Connectivity (production endpoint)
-log_info "Checking Stripe connectivity..." | tee -a "$LOG_FILE"
-STRIPE_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/stripe-test" 2>&1)
-if echo "$STRIPE_RESPONSE" | grep -q '"success":true'; then
-  STRIPE_PRICE=$(echo "$STRIPE_RESPONSE" | grep -oE '"unitAmount":[0-9]+' | cut -d':' -f2 || echo "unknown")
-  log_success "Stripe connectivity: OK (Day Pass: ${STRIPE_PRICE} cents)" | tee -a "$LOG_FILE"
+# Check 3: Stripe Connectivity (checkout health endpoint — requires admin auth)
+# The /api/checkout/health endpoint requires admin authentication (Supabase session cookies).
+# From an unauthenticated context we can only verify the route is reachable and auth is enforced.
+log_info "Checking Stripe endpoint reachability..." | tee -a "$LOG_FILE"
+STRIPE_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://paisaxe.es/api/checkout/health" 2>&1)
+if [[ "$STRIPE_HTTP_CODE" == "401" ]]; then
+  log_success "Stripe endpoint: reachable, auth enforced (HTTP 401 — expected without admin session)" | tee -a "$LOG_FILE"
+  HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
+elif [[ "$STRIPE_HTTP_CODE" == "200" ]]; then
+  log_success "Stripe endpoint: OK (HTTP 200)" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
 else
-  log_error "Stripe connectivity: FAILED" | tee -a "$LOG_FILE"
-  # Check for common issues
-  if echo "$STRIPE_RESPONSE" | grep -q "hasInvisibleChars.*true"; then
-    log_warn "  -> Possible cause: Environment variable has invisible characters (see CLAUDE.md troubleshooting)" | tee -a "$LOG_FILE"
-  fi
-  if echo "$STRIPE_RESPONSE" | grep -q "StripeConnectionError"; then
-    log_warn "  -> Possible cause: Network issue or invalid API key" | tee -a "$LOG_FILE"
-  fi
+  log_error "Stripe endpoint: unexpected response (HTTP $STRIPE_HTTP_CODE)" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
-  HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Stripe check failed: $STRIPE_RESPONSE"
+  HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Stripe endpoint returned HTTP $STRIPE_HTTP_CODE (expected 401 or 200)"
 fi
 
 log_info "Health checks complete: $HEALTH_CHECKS_PASSED passed, $HEALTH_CHECKS_FAILED failed" | tee -a "$LOG_FILE"
@@ -149,14 +146,14 @@ if [[ $HEALTH_CHECKS_FAILED -gt 0 ]]; then
 
   # Build list of failed checks
   FAILED_CHECK_NAMES=""
-  if ! echo "$HEALTH_RESPONSE" | grep -q '"status":"ok"' 2>/dev/null; then
+  if ! echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"' 2>/dev/null; then
     FAILED_CHECK_NAMES="App Health"
   fi
   if ! echo "$DB_RESPONSE" | grep -q '"success":true' 2>/dev/null; then
     [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
     FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Database"
   fi
-  if ! echo "$STRIPE_RESPONSE" | grep -q '"success":true' 2>/dev/null; then
+  if [[ "$STRIPE_HTTP_CODE" != "401" && "$STRIPE_HTTP_CODE" != "200" ]]; then
     [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
     FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Stripe"
   fi
@@ -172,12 +169,48 @@ HEALTH_METRICS_FILE="$PROJECT_DIR/.qa-health-metrics.tmp"
   echo "INTEGRATION HEALTH CHECKS:"
   echo "- Passed: $HEALTH_CHECKS_PASSED"
   echo "- Failed: $HEALTH_CHECKS_FAILED"
+  echo "- CI E2E Status: $CI_E2E_STATUS"
   if [[ -n "$HEALTH_CHECK_DETAILS" ]]; then
     echo ""
     echo "FAILURE DETAILS:"
     echo -e "$HEALTH_CHECK_DETAILS"
   fi
+  if [[ "$CI_E2E_STATUS" == "FAIL" ]]; then
+    echo ""
+    echo "CI E2E REGRESSION: E2E tests are failing on develop (run $CI_E2E_RUN_ID)."
+    echo "This blocks production releases. Investigate immediately:"
+    echo "  gh run view $CI_E2E_RUN_ID --log-failed"
+  fi
 } > "$HEALTH_METRICS_FILE"
+
+# =============================================================================
+# PHASE 0.5: CI E2E Status Check
+# =============================================================================
+log_info "=== Phase 0.5: CI E2E Status Check ===" | tee -a "$LOG_FILE"
+
+CI_E2E_STATUS="unknown"
+CI_E2E_CONCLUSION=""
+if command -v gh &>/dev/null; then
+  # Get the latest E2E workflow run on develop
+  CI_E2E_JSON=$(gh run list --workflow=e2e.yml --branch=develop --limit=1 --json conclusion,status,databaseId 2>/dev/null || echo "[]")
+  CI_E2E_CONCLUSION=$(echo "$CI_E2E_JSON" | jq -r '.[0].conclusion // "unknown"' 2>/dev/null || echo "unknown")
+  CI_E2E_RUN_ID=$(echo "$CI_E2E_JSON" | jq -r '.[0].databaseId // ""' 2>/dev/null || echo "")
+
+  if [[ "$CI_E2E_CONCLUSION" == "success" ]]; then
+    CI_E2E_STATUS="PASS"
+    log_success "CI E2E: PASS (run $CI_E2E_RUN_ID)" | tee -a "$LOG_FILE"
+  elif [[ "$CI_E2E_CONCLUSION" == "failure" ]]; then
+    CI_E2E_STATUS="FAIL"
+    log_error "CI E2E: FAIL (run $CI_E2E_RUN_ID) — E2E tests are failing on develop!" | tee -a "$LOG_FILE"
+    log_error "  -> This means production-blocking regressions may exist." | tee -a "$LOG_FILE"
+    log_error "  -> Investigate: gh run view $CI_E2E_RUN_ID --log-failed" | tee -a "$LOG_FILE"
+  else
+    CI_E2E_STATUS="$CI_E2E_CONCLUSION"
+    log_warn "CI E2E: $CI_E2E_CONCLUSION (run $CI_E2E_RUN_ID)" | tee -a "$LOG_FILE"
+  fi
+else
+  log_warn "CI E2E: gh CLI not available — skipping check" | tee -a "$LOG_FILE"
+fi
 
 # =============================================================================
 # PHASE 1: LLM Quality Tests
@@ -334,7 +367,7 @@ $(cat "$HEALTH_METRICS_FILE" 2>/dev/null || echo "No details available")
 **Troubleshooting:**
 - For Stripe issues, check CLAUDE.md troubleshooting section
 - Verify environment variables on Vercel don't have trailing whitespace
-- Test manually: \`curl https://paisaxe.es/api/stripe-test\`"
+- Test manually: \`curl -I https://paisaxe.es/api/checkout/health\` (expects 401 without admin session)"
 
     create_journey_failure_issue "Integration Health Check Failures" "$HEALTH_ISSUE_BODY" "" 2>&1 | tee -a "$LOG_FILE" || {
       log_warn "Failed to create health check failure issue" | tee -a "$LOG_FILE"
@@ -486,13 +519,10 @@ fi
 log_info "=== Phase 5: Claude Analysis & Report ===" | tee -a "$LOG_FILE"
 log_info "Metrics collected, invoking Claude for analysis..." | tee -a "$LOG_FILE"
 
-# Fetch the prompt from the feature flag config, fall back to shared default
-AGENT_PROMPT=$(get_agent_prompt "qa_agent_enabled" 2>/dev/null) || {
-  log_warn "Could not fetch prompt from config, trying shared default" | tee -a "$LOG_FILE"
-  AGENT_PROMPT=$(get_default_prompt "qa_agent_enabled" 2>/dev/null) || {
-    log_error "No prompt available for qa_agent_enabled" | tee -a "$LOG_FILE"
-    exit 1
-  }
+# Load the agent prompt from shared TypeScript config
+AGENT_PROMPT=$(get_default_prompt "qa_agent_enabled" 2>/dev/null) || {
+  log_error "No prompt available for qa_agent_enabled" | tee -a "$LOG_FILE"
+  exit 1
 }
 
 # Read shared context from other agents

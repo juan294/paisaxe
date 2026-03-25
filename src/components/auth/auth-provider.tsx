@@ -29,6 +29,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Get initial session using getUser() to validate with server
     // This ensures client and server auth state stay in sync
     const initializeAuth = async () => {
+      // Skip auth with dummy credentials (CI/E2E) — real Supabase anon keys
+      // are JWTs starting with 'eyJ'. Calling getUser() with dummy credentials
+      // hangs on NXDOMAIN DNS resolution.
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!anonKey || !anonKey.startsWith("eyJ")) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
         // First get the session (needed for the session object)
         const { data: { session: currentSession } } = await supabase.auth.getSession();

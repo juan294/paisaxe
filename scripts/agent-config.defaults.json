@@ -1,0 +1,22 @@
+{
+  "master_enabled": true,
+  "agents": {
+    "coverage_agent_enabled": { "enabled": true, "config": {} },
+    "security_agent_enabled": { "enabled": true, "config": {} },
+    "qa_agent_enabled": {
+      "enabled": true,
+      "config": {
+        "testsPerCategory": 3,
+        "enableJourneyTests": true,
+        "enableGithubIssues": true,
+        "enableGapAnalysis": true
+      }
+    },
+    "documentation_agent_enabled": { "enabled": true, "config": {} },
+    "performance_agent_enabled": { "enabled": true, "config": {} },
+    "localization_agent_enabled": { "enabled": true, "config": {} },
+    "cost_analyst_agent_enabled": { "enabled": true, "config": {} },
+    "subscription_optimizer_enabled": { "enabled": true, "config": {} },
+    "content_discovery_agent_enabled": { "enabled": false, "config": {} }
+  }
+}

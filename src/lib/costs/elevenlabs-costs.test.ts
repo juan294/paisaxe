@@ -90,6 +90,125 @@ describe("elevenlabs-costs", () => {
       expect(result).toBeNull();
     });
 
+    it("handles zero character_count and character_limit", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-key";
+
+      const mockResponse = {
+        character_count: 0,
+        character_limit: 0,
+        can_extend_character_limit: false,
+        allowed_to_extend_character_limit: false,
+        next_character_count_reset_unix: 0,
+        voice_limit: 0,
+        max_voice_add_edits: 0,
+        voice_add_edit_counter: 0,
+        professional_voice_limit: 0,
+        can_extend_voice_limit: false,
+        can_use_instant_voice_cloning: false,
+        can_use_professional_voice_cloning: false,
+        currency: "usd",
+        status: "active",
+        billing_period: {
+          start_unix: 1704067200,
+          end_unix: 1706745600,
+        },
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await fetchElevenLabsCosts("2024-01-01", "2024-01-31");
+
+      expect(result).not.toBeNull();
+      // 0 chars / 1000 * 0.30 = $0.00
+      expect(result?.costUsd).toBe(0);
+      // usagePercent should be 0 when limit is 0
+      expect(result?.notes).toContain("0% used");
+    });
+
+    it("falls back to current month when billing_period timestamps are zero", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-key";
+
+      const mockResponse = {
+        character_count: 1000,
+        character_limit: 50000,
+        can_extend_character_limit: false,
+        allowed_to_extend_character_limit: false,
+        next_character_count_reset_unix: 0,
+        voice_limit: 10,
+        max_voice_add_edits: 5,
+        voice_add_edit_counter: 0,
+        professional_voice_limit: 0,
+        can_extend_voice_limit: false,
+        can_use_instant_voice_cloning: false,
+        can_use_professional_voice_cloning: false,
+        currency: "usd",
+        status: "active",
+        billing_period: {
+          start_unix: 0,
+          end_unix: 0,
+        },
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await fetchElevenLabsCosts("2024-01-01", "2024-01-31");
+
+      expect(result).not.toBeNull();
+      // Should fall back to current month dates
+      const now = new Date();
+      const expectedStart = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split("T")[0];
+      expect(result?.billingPeriodStart).toBe(expectedStart);
+    });
+
+    it("falls back to current month when billing_period is missing", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-key";
+
+      const mockResponse = {
+        character_count: 500,
+        character_limit: 10000,
+        can_extend_character_limit: false,
+        allowed_to_extend_character_limit: false,
+        next_character_count_reset_unix: 0,
+        voice_limit: 5,
+        max_voice_add_edits: 3,
+        voice_add_edit_counter: 0,
+        professional_voice_limit: 0,
+        can_extend_voice_limit: false,
+        can_use_instant_voice_cloning: false,
+        can_use_professional_voice_cloning: false,
+        currency: "usd",
+        status: "active",
+        // billing_period intentionally omitted
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await fetchElevenLabsCosts("2024-01-01", "2024-01-31");
+
+      expect(result).not.toBeNull();
+      // Should fall back to current month dates
+      const now = new Date();
+      const expectedStart = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split("T")[0];
+      const expectedEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        .toISOString()
+        .split("T")[0];
+      expect(result?.billingPeriodStart).toBe(expectedStart);
+      expect(result?.billingPeriodEnd).toBe(expectedEnd);
+    });
+
     it("uses billing period from API response", async () => {
       process.env.ELEVENLABS_API_KEY = "test-key";
 

@@ -120,6 +120,16 @@ describe("SiteInfoMenu", () => {
     });
   });
 
+  it("ignores non-Escape keydown when panel is open", () => {
+    render(<SiteInfoMenu />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(screen.getByText(mockT("footer.content_attribution"))).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Enter" });
+    // Panel should still be open
+    expect(screen.getByText(mockT("footer.content_attribution"))).toBeInTheDocument();
+  });
+
   describe("signed in state", () => {
     const mockUser = {
       id: "user-123",
@@ -165,6 +175,99 @@ describe("SiteInfoMenu", () => {
       fireEvent.click(screen.getByRole("button", { name: mockT("auth.sign_out") }));
 
       expect(mockSignOut).toHaveBeenCalled();
+    });
+
+    it("uses 'Avatar' as alt text when user has avatarUrl but no name (lines 48, 88)", () => {
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, name: null },
+        session: { access_token: "token" } as never,
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+
+      render(<SiteInfoMenu />);
+      // Trigger button: img alt should fall back to "Avatar"
+      const triggerImg = screen.getByAltText("Avatar");
+      expect(triggerImg).toHaveAttribute("src", "https://example.com/avatar.jpg");
+
+      // Open panel to verify dropdown avatar also has "Avatar" fallback
+      fireEvent.click(screen.getByRole("button"));
+      const avatarImages = screen.getAllByAltText("Avatar");
+      // Both trigger and dropdown images should use "Avatar" fallback
+      expect(avatarImages.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("shows initial letter when user has no avatarUrl", () => {
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, avatarUrl: null },
+        session: { access_token: "token" } as never,
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+
+      render(<SiteInfoMenu />);
+      // Trigger button should show "T" (first letter of "Test User")
+      expect(screen.getByText("T")).toBeInTheDocument();
+
+      // Open panel — should also show initial in dropdown
+      fireEvent.click(screen.getByRole("button"));
+      // Both trigger and panel show the initial
+      const initials = screen.getAllByText("T");
+      expect(initials.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("falls back to email initial when user has no name and no avatarUrl", () => {
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, name: null, avatarUrl: null },
+        session: { access_token: "token" } as never,
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+
+      render(<SiteInfoMenu />);
+      // Should show "T" (first letter of "test@example.com")
+      expect(screen.getByRole("button")).toHaveAttribute("aria-label", mockT("auth.user"));
+
+      fireEvent.click(screen.getByRole("button"));
+      // Panel shows email
+      expect(screen.getByText("test@example.com")).toBeInTheDocument();
+    });
+
+    it("shows fallback initial when user has no name, no email, and no avatarUrl", () => {
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, name: null, email: null, avatarUrl: null },
+        session: { access_token: "token" } as never,
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+
+      render(<SiteInfoMenu />);
+      // Trigger shows "U" fallback
+      expect(screen.getByText("U")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button"));
+      // Panel shows "?" fallback
+      expect(screen.getByText("?")).toBeInTheDocument();
+    });
+
+    it("does not show email line when user has no email", () => {
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser, email: null },
+        session: { access_token: "token" } as never,
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+
+      expect(screen.getByText("Test User")).toBeInTheDocument();
+      expect(screen.queryByText("test@example.com")).not.toBeInTheDocument();
     });
 
     it("shows loading skeleton when auth is loading", () => {

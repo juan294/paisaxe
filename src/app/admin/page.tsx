@@ -506,6 +506,7 @@ function AdminPageContent() {
                 variant="warning"
                 isActive={filter === "needs_curation"}
                 onClick={() => setFilter("needs_curation")}
+                ariaLabel="Filter: show pending stories"
               />
               <StatCard
                 icon={<CheckCircle2 className="h-5 w-5" />}
@@ -514,6 +515,7 @@ function AdminPageContent() {
                 variant="success"
                 isActive={filter === "approved"}
                 onClick={() => setFilter("approved")}
+                ariaLabel="Filter: show approved stories"
               />
               <StatCard
                 icon={<Languages className="h-5 w-5" />}
@@ -522,6 +524,7 @@ function AdminPageContent() {
                 variant="purple"
                 isActive={filter === "missing_translations"}
                 onClick={() => setFilter("missing_translations")}
+                ariaLabel="Filter: show missing translations"
               />
               <StatCard
                 icon={<Layers className="h-5 w-5" />}
@@ -530,6 +533,7 @@ function AdminPageContent() {
                 variant="default"
                 isActive={filter === "all"}
                 onClick={() => setFilter("all")}
+                ariaLabel="Filter: show all stories"
               />
             </div>
 
@@ -657,13 +661,17 @@ function AdminPageContent() {
       {/* Approve All Confirmation Dialog */}
       {isApproveAllConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-[#252320]">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-[#252320]"
+          >
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#5a7a5a]/10">
               <CheckCircle2 className="h-6 w-6 text-[#5a7a5a]" />
             </div>
-            <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
+            <h2 className="text-lg font-semibold text-[#2d2a26] dark:text-[#f5f3ee]">
               Approve All Stories
-            </h3>
+            </h2>
             <p className="mt-2 text-sm text-[#6b6560] dark:text-[#a39e98]">
               This will approve {needsCurationCount} pending{" "}
               {needsCurationCount === 1 ? "story" : "stories"}. This action
@@ -723,9 +731,10 @@ interface StatCardProps {
   variant: "default" | "warning" | "success" | "purple";
   isActive?: boolean;
   onClick?: () => void;
+  ariaLabel?: string;
 }
 
-function StatCard({ icon, value, label, variant, isActive, onClick }: StatCardProps) {
+function StatCard({ icon, value, label, variant, isActive, onClick, ariaLabel }: StatCardProps) {
   const isClickable = !!onClick;
 
   const variants = {
@@ -797,6 +806,7 @@ function StatCard({ icon, value, label, variant, isActive, onClick }: StatCardPr
     return (
       <button
         onClick={onClick}
+        aria-label={ariaLabel}
         className={cn(
           "rounded-2xl p-5 text-left transition-all",
           isActive ? v.activeBg : v.bg,

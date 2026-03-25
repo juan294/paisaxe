@@ -1,4 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+
+// Mock unsplash-placeholders so we can make getPlaceholderForStory throw in specific tests
+const mockGetPlaceholder = vi.fn().mockReturnValue({
+  image: "https://images.unsplash.com/placeholder",
+  imageSource: "unsplash-placeholder:test",
+});
+vi.mock("@/lib/unsplash-placeholders", () => ({
+  getPlaceholderForStory: (...args: unknown[]) => mockGetPlaceholder(...args),
+}));
+
 import {
   generateSlug,
   normalizeName,
@@ -233,6 +243,30 @@ describe("searchPlaces", () => {
     });
 
     await expect(searchPlaces("test", "bad-key")).rejects.toThrow("Places API error");
+  });
+
+  it("handles missing fields in place results (fallback branches)", async () => {
+    // Tests the || "Unknown", || "", || [], ?? null fallback branches
+    // when place data has missing optional fields
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        places: [
+          {
+            id: "place_minimal",
+            // No displayName, formattedAddress, types, or rating
+          },
+        ],
+      }),
+    });
+
+    const results = await searchPlaces("test", "test-api-key");
+    expect(results).toHaveLength(1);
+    expect(results[0].name).toBe("Unknown");
+    expect(results[0].address).toBe("");
+    expect(results[0].types).toEqual([]);
+    expect(results[0].rating).toBeNull();
+    expect(results[0].placeId).toBe("place_minimal");
   });
 });
 
@@ -492,5 +526,379 @@ describe("runDiscovery", () => {
     expect(result.discovered).toBe(0);
     expect(result.created).toBe(0);
     expect(result.stories).toHaveLength(0);
+  });
+
+
+  it("records error when processing a place throws", async () => {
+    // Make getPlaceholderForStory throw to trigger the catch at line 404-408
+    mockGetPlaceholder.mockImplementationOnce(() => {
+      throw new Error("Placeholder service unavailable");
+    });
+
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (typeof url === "string" && url.includes("places.googleapis.com")) {
+        return {
+          ok: true,
+          json: async () => ({
+            places: [
+              {
+                id: "place_err",
+                displayName: { text: "Error Place" },
+                formattedAddress: "Asturias",
+                types: ["park"],
+                rating: 4.0,
+              },
+            ],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          content: [{ type: "text", text: "A description" }],
+        }),
+      };
+    });
+
+    const mockSupabase = createMockSupabase([]);
+    const result = await runDiscovery({
+      supabase: mockSupabase,
+      googleApiKey: "test-google-key",
+      anthropicApiKey: "test-anthropic-key",
+    });
+
+    expect(result.discovered).toBe(1);
+    expect(result.errors.length).toBeGreaterThanOrEqual(1);
+    expect(result.errors[0]).toContain("Error Place");
+    expect(result.errors[0]).toContain("Placeholder service unavailable");
+    // Since drafts is empty, result.created should be 0
+    expect(result.created).toBe(0);
+  });
+
+  it("returns early when all drafts fail to build (drafts.length === 0)", async () => {
+    // Make getPlaceholderForStory throw for ALL places
+    mockGetPlaceholder.mockImplementation(() => {
+      throw new Error("Service down");
+    });
+
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (typeof url === "string" && url.includes("places.googleapis.com")) {
+        return {
+          ok: true,
+          json: async () => ({
+            places: [
+              {
+                id: "place_1",
+                displayName: { text: "Place A" },
+                formattedAddress: "Asturias",
+                types: ["park"],
+                rating: 4.0,
+              },
+              {
+                id: "place_2",
+                displayName: { text: "Place B" },
+                formattedAddress: "Asturias",
+                types: ["restaurant"],
+                rating: 4.5,
+              },
+            ],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          content: [{ type: "text", text: "Description" }],
+        }),
+      };
+    });
+
+    const mockSupabase = createMockSupabase([]);
+    const result = await runDiscovery({
+      supabase: mockSupabase,
+      googleApiKey: "test-google-key",
+      anthropicApiKey: "test-anthropic-key",
+    });
+
+    expect(result.discovered).toBe(2);
+    expect(result.created).toBe(0);
+    expect(result.errors).toHaveLength(2);
+    expect(result.stories).toHaveLength(0);
+
+    // Restore default mock behavior
+    mockGetPlaceholder.mockReturnValue({
+      image: "https://images.unsplash.com/placeholder",
+      imageSource: "unsplash-placeholder:test",
+    });
+  });
+
+  it("handles Supabase insert error gracefully", async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (typeof url === "string" && url.includes("places.googleapis.com")) {
+        return {
+          ok: true,
+          json: async () => ({
+            places: [
+              {
+                id: "place_1",
+                displayName: { text: "New Place" },
+                formattedAddress: "Asturias",
+                types: ["park"],
+                rating: 4.2,
+              },
+            ],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          content: [{ type: "text", text: "A lovely place in Asturias." }],
+        }),
+      };
+    });
+
+    // Create a mock supabase where insert fails
+    const mockSupabase: DiscoverySupabaseClient = {
+      from: (table: string) => ({
+        select: (_columns: string) => {
+          if (table === "stories") {
+            return Promise.resolve({ data: [], error: null });
+          }
+          return Promise.resolve({ data: [], error: null });
+        },
+        insert: (_rows: unknown[]) => ({
+          select: (_columns: string) =>
+            Promise.resolve({
+              data: null,
+              error: "Database insert failed: constraint violation",
+            }),
+        }),
+      }),
+    } as unknown as DiscoverySupabaseClient;
+
+    const result = await runDiscovery({
+      supabase: mockSupabase,
+      googleApiKey: "test-google-key",
+      anthropicApiKey: "test-anthropic-key",
+    });
+
+    expect(result.discovered).toBe(1);
+    expect(result.created).toBe(0);
+    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.errors[0]).toContain("Failed to insert stories");
+  });
+
+  it("handles null insert data gracefully (lines 426-427)", async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (typeof url === "string" && url.includes("places.googleapis.com")) {
+        return {
+          ok: true,
+          json: async () => ({
+            places: [
+              {
+                id: "place_1",
+                displayName: { text: "Playa de Torimbia", languageCode: "es" },
+                formattedAddress: "Llanes, Asturias",
+                types: ["natural_feature"],
+                rating: 4.6,
+                location: { latitude: 43.4, longitude: -4.8 },
+              },
+            ],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          content: [{ type: "text", text: "A description of the place." }],
+        }),
+      };
+    });
+
+    // Insert succeeds (no error) but returns null data
+    const mockSupabase: DiscoverySupabaseClient = {
+      from: (table: string) => ({
+        select: (_columns: string) => {
+          if (table === "stories") {
+            return Promise.resolve({ data: [], error: null });
+          }
+          return Promise.resolve({ data: [], error: null });
+        },
+        insert: (_rows: unknown[]) => ({
+          select: (_columns: string) =>
+            Promise.resolve({
+              data: null,
+              error: null,
+            }),
+        }),
+      }),
+    } as unknown as DiscoverySupabaseClient;
+
+    const result = await runDiscovery({
+      supabase: mockSupabase,
+      googleApiKey: "test-google-key",
+      anthropicApiKey: "test-anthropic-key",
+    });
+
+    // Should handle null data by defaulting to 0/empty
+    expect(result.created).toBe(0);
+    expect(result.stories).toEqual([]);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("handles null existingStories from Supabase (line 352 fallback)", async () => {
+    // Line 352: const existing = existingStories || [];
+    // When Supabase returns data: null without an error, existing defaults to []
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (typeof url === "string" && url.includes("places.googleapis.com")) {
+        return {
+          ok: true,
+          json: async () => ({
+            places: [
+              {
+                id: "place_1",
+                displayName: { text: "New Place" },
+                formattedAddress: "Asturias",
+                types: ["park"],
+                rating: 4.0,
+              },
+            ],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          content: [{ type: "text", text: "A description" }],
+        }),
+      };
+    });
+
+    // Supabase returns null data without error
+    const mockSupabase: DiscoverySupabaseClient = {
+      from: (table: string) => ({
+        select: (_columns: string) => {
+          if (table === "stories") {
+            return Promise.resolve({ data: null, error: null });
+          }
+          return Promise.resolve({ data: [], error: null });
+        },
+        insert: (rows: unknown[]) => ({
+          select: (_columns: string) =>
+            Promise.resolve({
+              data: (rows as Array<Record<string, unknown>>).map((r, i) => ({
+                id: `uuid-${i}`,
+                title: r.title,
+                slug: r.slug,
+                category: r.category,
+              })),
+              error: null,
+            }),
+        }),
+      }),
+    } as unknown as DiscoverySupabaseClient;
+
+    const result = await runDiscovery({
+      supabase: mockSupabase,
+      googleApiKey: "test-google-key",
+      anthropicApiKey: "test-anthropic-key",
+    });
+
+    // Should succeed — null existing stories treated as empty array
+    expect(result.discovered).toBeGreaterThan(0);
+    expect(result.created).toBeGreaterThan(0);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("handles non-Error throw when processing a place (line 406 String(error) branch)", async () => {
+    // Line 406: error instanceof Error ? error.message : String(error)
+    // When buildStoryDraft or generateDescription throws a non-Error value
+    mockGetPlaceholder.mockImplementationOnce(() => {
+      throw "string error, not an Error instance";  
+    });
+
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (typeof url === "string" && url.includes("places.googleapis.com")) {
+        return {
+          ok: true,
+          json: async () => ({
+            places: [
+              {
+                id: "place_str_err",
+                displayName: { text: "String Error Place" },
+                formattedAddress: "Asturias",
+                types: ["park"],
+                rating: 4.0,
+              },
+            ],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          content: [{ type: "text", text: "A description" }],
+        }),
+      };
+    });
+
+    const mockSupabase = createMockSupabase([]);
+    const result = await runDiscovery({
+      supabase: mockSupabase,
+      googleApiKey: "test-google-key",
+      anthropicApiKey: "test-anthropic-key",
+    });
+
+    expect(result.errors.length).toBeGreaterThanOrEqual(1);
+    expect(result.errors[0]).toContain("String Error Place");
+    expect(result.errors[0]).toContain("string error, not an Error instance");
+
+    // Restore default mock behavior
+    mockGetPlaceholder.mockReturnValue({
+      image: "https://images.unsplash.com/placeholder",
+      imageSource: "unsplash-placeholder:test",
+    });
+  });
+
+  it("handles non-Error throw from Google Places search (line 362 String(error) branch)", async () => {
+    // Line 362: error instanceof Error ? error.message : String(error)
+    // When searchPlaces throws a non-Error value
+    global.fetch = vi.fn().mockImplementation(async () => {
+      throw "raw string network error";  
+    });
+
+    const mockSupabase = createMockSupabase([]);
+    const result = await runDiscovery({
+      supabase: mockSupabase,
+      googleApiKey: "test-google-key",
+      anthropicApiKey: "test-anthropic-key",
+    });
+
+    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.errors[0]).toContain("Google Places search failed");
+  });
+
+  it("handles Supabase fetch error gracefully", async () => {
+    const mockSupabase: DiscoverySupabaseClient = {
+      from: (_table: string) => ({
+        select: (_columns: string) =>
+          Promise.resolve({ data: null, error: "Connection refused" }),
+        insert: (_rows: unknown[]) => ({
+          select: (_columns: string) => Promise.resolve({ data: [], error: null }),
+        }),
+      }),
+    } as unknown as DiscoverySupabaseClient;
+
+    const result = await runDiscovery({
+      supabase: mockSupabase,
+      googleApiKey: "test-google-key",
+      anthropicApiKey: "test-anthropic-key",
+    });
+
+    expect(result.discovered).toBe(0);
+    expect(result.created).toBe(0);
+    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.errors[0]).toContain("Failed to fetch existing stories");
   });
 });

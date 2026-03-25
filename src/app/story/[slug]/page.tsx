@@ -2,9 +2,6 @@ import { redirect } from "next/navigation";
 import { getStoryBySlugFromDB, getStoriesFromDB } from "@/lib/stories-data";
 import type { Metadata } from "next";
 
-/** ISR: revalidate story pages every hour */
-export const revalidate = 3600;
-
 interface StoryPageProps {
   params: Promise<{ slug: string }>;
 }

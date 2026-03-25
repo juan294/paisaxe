@@ -219,5 +219,73 @@ describe("immersive types", () => {
       expect(story.duration).toBeUndefined();
       expect(story.relatedStories).toBeUndefined();
     });
+
+    it("should convert populated optional fields correctly", () => {
+      const row: StoryRow = {
+        id: "abc-123",
+        slug: "full-story",
+        title: "Full Story",
+        subtitle: "Has subtitle",
+        description: "Has description",
+        image_path: "/img.jpg",
+        image_source: "Unsplash",
+        blur_data_url: "data:image/png;base64,abc",
+        category: "culture",
+        source_pdf: "story.pdf",
+        location: "western",
+        duration: "weekend",
+        display_order: 3,
+        is_active: true,
+        related_stories: ["s1"],
+        metadata: { key: "value" },
+        best_months: [6, 7, 8],
+        created_at: "2024-06-01T00:00:00Z",
+        updated_at: "2024-06-15T00:00:00Z",
+        source_type: "user_submitted",
+        suggestion_id: "sug-1",
+      };
+
+      const story = rowToStory(row);
+
+      expect(story.metadata).toEqual({ key: "value" });
+      expect(story.bestMonths).toEqual([6, 7, 8]);
+      expect(story.sourceType).toBe("user_submitted");
+      expect(story.suggestionId).toBe("sug-1");
+      expect(story.blurDataUrl).toBe("data:image/png;base64,abc");
+      expect(story.imageSource).toBe("Unsplash");
+    });
+
+    it("should return undefined for falsy metadata and null bestMonths", () => {
+      const row: StoryRow = {
+        id: "abc-456",
+        slug: "no-meta",
+        title: "No Meta",
+        subtitle: null,
+        description: null,
+        image_path: null,
+        image_source: null,
+        blur_data_url: null,
+        category: "nature",
+        source_pdf: null,
+        location: null,
+        duration: null,
+        display_order: 0,
+        is_active: true,
+        related_stories: null,
+        metadata: null as unknown as Record<string, unknown>,
+        best_months: null,
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+        source_type: null,
+        suggestion_id: null,
+      };
+
+      const story = rowToStory(row);
+
+      expect(story.metadata).toBeUndefined();
+      expect(story.bestMonths).toBeUndefined();
+      expect(story.sourceType).toBeUndefined();
+      expect(story.suggestionId).toBeUndefined();
+    });
   });
 });

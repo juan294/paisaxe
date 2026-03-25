@@ -8,6 +8,7 @@
     ],
     "allowJs": true,
     "skipLibCheck": true,
+    "preserveSymlinks": true,
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
@@ -40,6 +41,7 @@
   ],
   "exclude": [
     "node_modules",
+    "node_modules.nosync",
     "scripts",
     "e2e",
     "supabase/functions"

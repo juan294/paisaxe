@@ -133,6 +133,31 @@ describe("BookmarkButton", () => {
     });
   });
 
+  it("clears previous toast timer when toggling rapidly", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<BookmarkButton isFavorite={false} onToggle={onToggle} />);
+
+    const button = screen.getByRole("button");
+
+    // Click once to show toast (sets a timer)
+    await user.click(button);
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveClass("opacity-100");
+    });
+
+    // Click again before the 1500ms timeout expires (should clear previous timer)
+    await user.click(button);
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveClass("opacity-100");
+    });
+
+    // Verify onToggle was called twice
+    expect(onToggle).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
   it("stops event propagation", async () => {
     const parentHandler = vi.fn();
     const user = userEvent.setup();

@@ -294,6 +294,23 @@ describe("handleSave", () => {
       });
     });
 
+    it("passes undefined for imageSource when empty on upload (line 124 falsy branch)", async () => {
+      const mockFile = new File(["data"], "photo.jpg", { type: "image/jpeg" });
+      (uploadStoryImage as Mock).mockResolvedValue({
+        data: { id: "story-1", image: "/images/uploaded.jpg", imageSource: null },
+      });
+
+      const params = makeParams({
+        hasImageChanges: true,
+        imageSourceTab: "upload",
+        selectedFile: mockFile,
+        imageSource: "", // falsy — triggers `imageSource || undefined` → undefined
+      });
+      await handleSave(params);
+
+      expect(uploadStoryImage).toHaveBeenCalledWith("story-1", mockFile, undefined);
+    });
+
     it("saves image from content when imageSourceTab is 'content'", async () => {
       const contentImage: ContentImage = {
         filename: "img.jpg",
@@ -325,6 +342,37 @@ describe("handleSave", () => {
       );
     });
 
+    it("passes undefined for imageSource when empty on content image (line 126 falsy branch)", async () => {
+      const contentImage: ContentImage = {
+        filename: "img.jpg",
+        sourcePdf: "guide.pdf",
+        pageNumber: 1,
+        width: 800,
+        height: 600,
+        aspectRatio: 1.33,
+        type: "jpeg",
+        url: "/content/images/img.jpg",
+        score: 0.95,
+      };
+      (updateStoryImageUrl as Mock).mockResolvedValue({
+        data: { id: "story-1", image: "/content/images/img.jpg", imageSource: null },
+      });
+
+      const params = makeParams({
+        hasImageChanges: true,
+        imageSourceTab: "content",
+        currentContentImage: contentImage,
+        imageSource: "", // falsy — triggers `imageSource || undefined` → undefined
+      });
+      await handleSave(params);
+
+      expect(updateStoryImageUrl).toHaveBeenCalledWith(
+        "story-1",
+        "/content/images/img.jpg",
+        undefined
+      );
+    });
+
     it("updates only image source when only imageSource changed", async () => {
       const storyWithSource = {
         ...mockStory,
@@ -351,6 +399,28 @@ describe("handleSave", () => {
       expect(params.resetAndClose).toHaveBeenCalled();
     });
 
+    it("uses empty string fallback when story.imageSource is undefined (line 127 falsy branch)", async () => {
+      // story.imageSource is undefined → `story.imageSource || ""` evaluates the falsy branch
+      const storyNoSource = { ...mockStory, imageSource: undefined } as AdminStory;
+      (updateStoryImageSource as Mock).mockResolvedValue({
+        data: { id: "story-1", imageSource: "Added Source" },
+      });
+
+      const params = makeParams({
+        story: storyNoSource,
+        hasImageChanges: true,
+        imageSourceTab: "url",
+        imageUrl: "", // no URL — skip url branch
+        imageSource: "Added Source", // differs from fallback "" → enters source-only branch
+      });
+      await handleSave(params);
+
+      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", "Added Source");
+      expect(params.onUpdate).toHaveBeenCalledWith("story-1", {
+        imageSource: "Added Source",
+      });
+    });
+
     it("shows error when image update fails", async () => {
       (updateStoryImageUrl as Mock).mockResolvedValue({
         error: "Image too large",
@@ -366,6 +436,138 @@ describe("handleSave", () => {
       expect(params.setError).toHaveBeenCalledWith("Image too large");
       expect(params.setIsLoading).toHaveBeenCalledWith(false);
       expect(params.resetAndClose).not.toHaveBeenCalled();
+    });
+
+    it("does not call onUpdate when imageResult.data is null (line 146 false branch)", async () => {
+      // updateStoryImageUrl returns success but no data
+      (updateStoryImageUrl as Mock).mockResolvedValue({});
+
+      const params = makeParams({
+        hasImageChanges: true,
+        imageSourceTab: "url",
+        imageUrl: "https://example.com/photo.jpg",
+        imageSource: "Photo credit",
+      });
+      await handleSave(params);
+
+      expect(updateStoryImageUrl).toHaveBeenCalled();
+      // onUpdate should NOT have been called (no data returned)
+      expect(params.onUpdate).not.toHaveBeenCalled();
+      // Should still call resetAndClose (no error)
+      expect(params.resetAndClose).toHaveBeenCalled();
+    });
+
+    it("does not call onUpdate when sourceResult.data is null (line 135 false branch)", async () => {
+      const storyWithSource = {
+        ...mockStory,
+        imageSource: "Old Source",
+      } as AdminStory;
+
+      // updateStoryImageSource returns success but no data
+      (updateStoryImageSource as Mock).mockResolvedValue({});
+
+      const params = makeParams({
+        story: storyWithSource,
+        hasImageChanges: true,
+        imageSourceTab: "url",
+        imageUrl: "",
+        imageSource: "New Source",
+      });
+      await handleSave(params);
+
+      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", "New Source");
+      // onUpdate should NOT have been called (no data returned)
+      expect(params.onUpdate).not.toHaveBeenCalled();
+      // Should still call resetAndClose (no error)
+      expect(params.resetAndClose).toHaveBeenCalled();
+    });
+
+    it("does not call onUpdate when detailsResult.data is missing (line 102 false branch)", async () => {
+      // updateStory returns success but no data field
+      (updateStory as Mock).mockResolvedValue({});
+
+      const params = makeParams({ hasDetailsChanges: true });
+      await handleSave(params);
+
+      // onUpdate should NOT have been called for details
+      expect(params.onUpdate).not.toHaveBeenCalled();
+      // Should still proceed to resetAndClose
+      expect(params.resetAndClose).toHaveBeenCalled();
+    });
+
+    it("does nothing when imageSourceTab is 'upload' but selectedFile is null (line 123 false branch)", async () => {
+      // This exercises the false branch of `else if (imageSourceTab === "upload" && selectedFile)`
+      // When selectedFile is null, no image API is called and imageSource doesn't differ
+      const params = makeParams({
+        hasImageChanges: true,
+        imageSourceTab: "upload",
+        selectedFile: null,
+        imageSource: "Photo by Test", // same as story.imageSource
+      });
+      await handleSave(params);
+
+      expect(uploadStoryImage).not.toHaveBeenCalled();
+      expect(updateStoryImageUrl).not.toHaveBeenCalled();
+      expect(updateStoryImageSource).not.toHaveBeenCalled();
+      expect(params.resetAndClose).toHaveBeenCalled();
+    });
+
+    it("does nothing when imageSourceTab is 'content' but currentContentImage is null (line 125 false branch)", async () => {
+      // This exercises the false branch of `else if (imageSourceTab === "content" && currentContentImage)`
+      // When currentContentImage is null, no image API is called and imageSource doesn't differ
+      const params = makeParams({
+        hasImageChanges: true,
+        imageSourceTab: "content",
+        currentContentImage: null,
+        imageSource: "Photo by Test", // same as story.imageSource
+      });
+      await handleSave(params);
+
+      expect(uploadStoryImage).not.toHaveBeenCalled();
+      expect(updateStoryImageUrl).not.toHaveBeenCalled();
+      expect(updateStoryImageSource).not.toHaveBeenCalled();
+      expect(params.resetAndClose).toHaveBeenCalled();
+    });
+
+    it("falls through to imageSource check when upload tab has no file and source differs (line 127)", async () => {
+      // imageSourceTab is "upload" but selectedFile is null, AND imageSource differs
+      // This should fall through to the `else if (imageSource !== ...)` branch
+      const storyWithSource = { ...mockStory, imageSource: "Old Source" } as AdminStory;
+      (updateStoryImageSource as Mock).mockResolvedValue({
+        data: { id: "story-1", imageSource: "New Source" },
+      });
+
+      const params = makeParams({
+        story: storyWithSource,
+        hasImageChanges: true,
+        imageSourceTab: "upload",
+        selectedFile: null,
+        imageSource: "New Source",
+      });
+      await handleSave(params);
+
+      expect(uploadStoryImage).not.toHaveBeenCalled();
+      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", "New Source");
+    });
+
+    it("falls through to imageSource check when content tab has no image and source differs (line 127)", async () => {
+      // imageSourceTab is "content" but currentContentImage is null, AND imageSource differs
+      const storyWithSource = { ...mockStory, imageSource: "Old Source" } as AdminStory;
+      (updateStoryImageSource as Mock).mockResolvedValue({
+        data: { id: "story-1", imageSource: "New Source" },
+      });
+
+      const params = makeParams({
+        story: storyWithSource,
+        hasImageChanges: true,
+        imageSourceTab: "content",
+        currentContentImage: null,
+        imageSource: "New Source",
+      });
+      await handleSave(params);
+
+      expect(updateStoryImageUrl).not.toHaveBeenCalled();
+      expect(updateStoryImageSource).toHaveBeenCalledWith("story-1", "New Source");
     });
 
     it("shows error when updateStoryImageSource fails", async () => {

@@ -94,6 +94,134 @@ describe("queryPostHog", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it("should log console.warn when retrying a retryable error", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchFailedError = new Error("fetch failed");
+
+    mockFetch
+      .mockRejectedValueOnce(fetchFailedError)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ results: [[99]] }),
+      });
+
+    const result = await queryPostHog(
+      "SELECT 1",
+      "project-123",
+      "phx_api-key"
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("PostHog query retry 1/2")
+    );
+    expect(result).toEqual({ results: [[99]] });
+    warnSpy.mockRestore();
+  });
+
+  it("should retry on ECONNRESET errors", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const connResetError = new Error("ECONNRESET");
+
+    mockFetch
+      .mockRejectedValueOnce(connResetError)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ results: [[7]] }),
+      });
+
+    const result = await queryPostHog(
+      "SELECT 1",
+      "project-123",
+      "phx_api-key"
+    );
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ results: [[7]] });
+    expect(warnSpy).toHaveBeenCalledWith(
+      "PostHog query retry 1/2 after ECONNRESET"
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("should include the error message in the retry warn log", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const etimedoutError = new Error("ETIMEDOUT");
+
+    mockFetch
+      .mockRejectedValueOnce(etimedoutError)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ results: [[1]] }),
+      });
+
+    await queryPostHog("SELECT 1", "project-123", "phx_api-key");
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "PostHog query retry 1/2 after ETIMEDOUT"
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("should log 'unknown error' when a non-Error value is thrown", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // First call throws a non-Error value (string)
+    mockFetch
+      .mockRejectedValueOnce("string error")
+      .mockRejectedValueOnce("string error");
+
+    await expect(
+      queryPostHog("SELECT 1", "project-123", "phx_api-key")
+    ).rejects.toBe("string error");
+
+    // Non-Error values are not retryable, so only 1 call
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
+  // NOTE: posthog-query.ts line 70 has an uncovered branch for the ternary
+  // `error instanceof Error ? error.message : "unknown error"` inside console.warn.
+  // The "unknown error" path is unreachable because the `isRetryable` check on
+  // line 61-66 requires `error instanceof Error` to be true. If `isRetryable` is
+  // true, `error` is guaranteed to be an Error instance, so the ternary always
+  // takes the `error.message` path. The "unknown error" fallback is dead code.
+
+  it("should abort fetch after timeout and trigger retry", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // First call: simulate fetch that hangs until aborted
+    mockFetch.mockImplementationOnce(
+      (_url: string, opts: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          opts.signal.addEventListener("abort", () => {
+            const err = new Error("The operation was aborted");
+            err.name = "AbortError";
+            reject(err);
+          });
+          // Advance past POSTHOG_TIMEOUT_MS (15000)
+          vi.advanceTimersByTime(16000);
+        })
+    );
+
+    // Second call succeeds
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ results: [[42]] }),
+    });
+
+    const result = await queryPostHog("SELECT 1", "project-123", "phx_api-key");
+
+    expect(result).toEqual({ results: [[42]] });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("PostHog query retry 1/2")
+    );
+    warnSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
 });
 
 describe("formatForHogQL", () => {

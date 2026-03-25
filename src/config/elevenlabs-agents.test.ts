@@ -68,5 +68,12 @@ describe("ElevenLabs Agent Configuration", () => {
       expect(() => getElevenLabsAgentId("iris")).not.toThrow();
       expect(() => getElevenLabsAgentId("penny")).not.toThrow();
     });
+
+    // Branch coverage note: line 44 `id.length > 0 ? id : undefined`
+    // The falsy branch (empty-string agent ID) is unreachable because all
+    // ELEVENLABS_AGENT_IDS values are non-empty string literals (`as const`).
+    // This is a defensive guard for deploys where agents haven't been set up yet.
+    // The branch can only be exercised by modifying the source constants, and
+    // mocking the module would only test the mock itself, not the real code path.
   });
 });

@@ -276,6 +276,34 @@ describe("ShareButton", () => {
     expect(screen.getByRole("status")).toHaveClass("opacity-0");
   });
 
+  it("clears existing timeout on rapid consecutive clicks", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ShareButton story={mockStory} />);
+
+    const button = screen.getByTitle("Compartir");
+
+    // Click once to start the first timeout
+    await user.click(button);
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveClass("opacity-100");
+    });
+
+    // Click again quickly — this should hit line 19 (clearTimeout on existing timer)
+    await user.click(button);
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveClass("opacity-100");
+    });
+
+    // After 1500ms the toast should disappear (only the second timer fires)
+    vi.advanceTimersByTime(1500);
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveClass("opacity-0");
+    });
+
+    vi.useRealTimers();
+  });
+
   it("renders and works when slug is not available", async () => {
     const storyWithoutSlug: Story = {
       ...mockStory,

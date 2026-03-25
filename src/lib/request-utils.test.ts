@@ -51,4 +51,14 @@ describe("getClientIp", () => {
     });
     expect(getClientIp(request)).toBe("unknown");
   });
+
+  it("falls back to x-real-ip when x-forwarded-for first entry is whitespace-only", () => {
+    const request = new Request("http://localhost", {
+      headers: {
+        "x-forwarded-for": " , 70.41.3.18",
+        "x-real-ip": "198.51.100.23",
+      },
+    });
+    expect(getClientIp(request)).toBe("198.51.100.23");
+  });
 });

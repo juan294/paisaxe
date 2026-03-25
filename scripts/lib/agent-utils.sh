@@ -36,51 +36,25 @@ log_error() {
   echo -e "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') $*" >&2
 }
 
-# Configuration
-# Auto-detect local dev server for development testing
-# Falls back to production if localhost is not running
-if [[ -z "${FEATURE_FLAGS_URL:-}" ]]; then
-  if curl -s --max-time 2 "http://localhost:3000/api/health" >/dev/null 2>&1; then
-    FEATURE_FLAGS_URL="http://localhost:3000/api/feature-flags"
-    log_info "Using local dev server for feature flags"
-  else
-    FEATURE_FLAGS_URL="https://paisaxe.es/api/feature-flags"
-  fi
-fi
+# Configuration — local agent config (no HTTP dependency)
+# Reads from scripts/agent-config.json, auto-creates from defaults if missing.
 
-# Check if a feature flag is enabled
-# Usage: check_feature_flag "flag_key"
-# Returns: 0 if enabled, 1 if disabled or error
-check_feature_flag() {
-  local flag_key="$1"
-  local response
-  local enabled
+# Resolve the agent config file path
+# Sets AGENT_CONFIG_FILE to the path of the local JSON config
+resolve_agent_config() {
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  AGENT_CONFIG_FILE="$script_dir/agent-config.json"
+  local defaults_file="$script_dir/agent-config.defaults.json"
 
-  # Fetch feature flags from API
-  response=$(curl -s --max-time 10 "$FEATURE_FLAGS_URL" 2>/dev/null) || {
-    log_error "Failed to fetch feature flags from $FEATURE_FLAGS_URL"
-    return 1
-  }
-
-  # Check if jq is available
-  if ! command -v jq &>/dev/null; then
-    log_error "jq is required but not installed. Install with: brew install jq"
-    return 1
-  fi
-
-  # Parse the response and check if flag is enabled (API returns camelCase flagKey)
-  enabled=$(echo "$response" | jq -r --arg key "$flag_key" '.data[] | select(.flagKey == $key) | .enabled' 2>/dev/null | head -1) || {
-    log_error "Failed to parse feature flags response"
-    return 1
-  }
-
-  if [[ "$enabled" == "true" ]]; then
-    return 0
-  elif [[ "$enabled" == "false" ]]; then
-    return 1
-  else
-    log_warn "Flag '$flag_key' not found in feature flags"
-    return 1
+  if [[ ! -f "$AGENT_CONFIG_FILE" ]]; then
+    if [[ -f "$defaults_file" ]]; then
+      cp "$defaults_file" "$AGENT_CONFIG_FILE"
+      log_info "Auto-created agent config from defaults"
+    else
+      log_error "No agent config or defaults file found at $script_dir"
+      return 1
+    fi
   fi
 }
 
@@ -90,19 +64,54 @@ check_feature_flag() {
 check_agent_enabled() {
   local agent_flag="$1"
 
+  if ! command -v jq &>/dev/null; then
+    log_error "jq is required but not installed. Install with: brew install jq"
+    return 1
+  fi
+
+  resolve_agent_config || return 1
+
   # Check master toggle first
-  if ! check_feature_flag "automated_agents"; then
-    log_info "Master toggle 'automated_agents' is disabled — all agents are off"
+  local master
+  master=$(jq -r '.master_enabled' "$AGENT_CONFIG_FILE" 2>/dev/null)
+  if [[ "$master" != "true" ]]; then
+    log_info "Master toggle is disabled — all agents are off"
     return 1
   fi
 
   # Check individual agent flag
-  if ! check_feature_flag "$agent_flag"; then
+  local enabled
+  enabled=$(jq -r --arg k "$agent_flag" '.agents[$k].enabled // empty' "$AGENT_CONFIG_FILE" 2>/dev/null)
+  if [[ "$enabled" != "true" ]]; then
     log_info "Agent flag '$agent_flag' is disabled"
     return 1
   fi
 
   return 0
+}
+
+# Get a config value for an agent from local config
+# Usage: get_agent_config "agent_flag_key" "config_key"
+# Outputs: The config value, or empty if not found
+get_agent_config() {
+  local agent_flag="$1"
+  local config_key="$2"
+
+  if ! command -v jq &>/dev/null; then
+    return 1
+  fi
+
+  resolve_agent_config || return 1
+
+  local value
+  value=$(jq -r --arg k "$agent_flag" --arg ck "$config_key" '.agents[$k].config[$ck] // empty' "$AGENT_CONFIG_FILE" 2>/dev/null)
+
+  if [[ -n "$value" ]]; then
+    echo "$value"
+    return 0
+  else
+    return 1
+  fi
 }
 
 # Standard agent startup sequence
@@ -161,55 +170,6 @@ write_report_header() {
 EOF
 }
 
-# Get the prompt for an agent from its feature flag config
-# Usage: get_agent_prompt "agent_flag_key"
-# Outputs: The prompt string, or empty if not found
-get_agent_prompt() {
-  local agent_flag="$1"
-  local response
-  local prompt
-
-  # Fetch feature flags from API
-  response=$(curl -s --max-time 10 "$FEATURE_FLAGS_URL" 2>/dev/null)
-  if [[ -z "$response" ]]; then
-    log_error "Failed to fetch feature flags from $FEATURE_FLAGS_URL" >&2
-    return 1
-  fi
-
-  # Parse the response using Python (more reliable with multiline strings)
-  # Falls back to jq if Python is not available
-  if command -v python3 &>/dev/null; then
-    prompt=$(AGENT_FLAG="$agent_flag" python3 -c "
-import sys, json, os
-flag_key = os.environ.get('AGENT_FLAG', '')
-try:
-    data = json.load(sys.stdin)
-    for flag in data.get('data', []):
-        if flag.get('flagKey') == flag_key:
-            config = flag.get('config', {})
-            prompt = config.get('prompt', '')
-            if prompt:
-                print(prompt)
-                break
-except Exception as e:
-    pass
-" <<< "$response" 2>/dev/null)
-  elif command -v jq &>/dev/null; then
-    prompt=$(echo "$response" | jq -r --arg key "$agent_flag" '.data[] | select(.flagKey == $key) | .config.prompt // empty' 2>/dev/null | head -1)
-  else
-    log_error "Either python3 or jq is required but neither is installed" >&2
-    return 1
-  fi
-
-  if [[ -n "$prompt" ]]; then
-    echo "$prompt"
-    return 0
-  else
-    log_warn "No prompt found in config for '$agent_flag'" >&2
-    return 1
-  fi
-}
-
 # Get the default prompt for an agent from the shared TypeScript config
 # Usage: get_default_prompt "agent_flag_key"
 # Outputs: The default prompt string
@@ -228,35 +188,6 @@ get_default_prompt() {
     return 0
   else
     log_error "Empty default prompt for '$agent_flag'" >&2
-    return 1
-  fi
-}
-
-# Get a config value for an agent from its feature flag config
-# Usage: get_agent_config "agent_flag_key" "config_key"
-# Outputs: The config value, or empty if not found
-get_agent_config() {
-  local agent_flag="$1"
-  local config_key="$2"
-  local response
-  local value
-
-  # Fetch feature flags from API
-  response=$(curl -s --max-time 10 "$FEATURE_FLAGS_URL" 2>/dev/null) || {
-    log_error "Failed to fetch feature flags from $FEATURE_FLAGS_URL"
-    return 1
-  }
-
-  # Parse the response and extract the config value
-  value=$(echo "$response" | jq -r --arg key "$agent_flag" --arg ckey "$config_key" '.data[] | select(.flagKey == $key) | .config[$ckey] // empty' 2>/dev/null | head -1) || {
-    log_error "Failed to parse feature flags response"
-    return 1
-  }
-
-  if [[ -n "$value" ]]; then
-    echo "$value"
-    return 0
-  else
     return 1
   fi
 }

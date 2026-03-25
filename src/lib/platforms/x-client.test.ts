@@ -333,6 +333,105 @@ describe("XClient", () => {
       expect(result.error).toContain("Insufficient permissions");
       expect(result.errorCode).toBe("FORBIDDEN");
     });
+
+    it("handles API error with data.detail field", async () => {
+      const apiError = new Error("API error") as any;
+      apiError.data = { detail: "Detailed error description", title: "SomeTitle" };
+      mockTweet.mockRejectedValue(apiError);
+
+      const client = new XClient(validCredentials);
+      const result = await client.postTweet("Hello");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Detailed error description");
+      expect(result.errorCode).toBe("SomeTitle");
+    });
+
+    it("handles non-Error thrown value", async () => {
+      mockTweet.mockRejectedValue("string error");
+
+      const client = new XClient(validCredentials);
+      const result = await client.postTweet("Hello");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Failed to post tweet");
+    });
+
+    it("handles API error with data.title but no data.detail (line 294 fallback)", async () => {
+      // Line 294: data.detail || data.title || defaultMessage
+      // When data.detail is undefined but data.title exists
+      const apiError = new Error("API error") as any;
+      apiError.data = { title: "SomeErrorTitle" }; // no detail field
+      mockTweet.mockRejectedValue(apiError);
+
+      const client = new XClient(validCredentials);
+      const result = await client.postTweet("Hello");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("SomeErrorTitle");
+      expect(result.errorCode).toBe("SomeErrorTitle");
+    });
+
+    it("falls back to defaultMessage when data has no detail or title (line 294)", async () => {
+      // Line 294: data.detail || data.title || defaultMessage
+      // When both data.detail and data.title are undefined
+      const apiError = new Error("API error") as any;
+      apiError.data = {}; // no detail, no title, no specific error code
+      // apiError.code is undefined so it won't match 429 or 403
+      mockTweet.mockRejectedValue(apiError);
+
+      const client = new XClient(validCredentials);
+      const result = await client.postTweet("Hello");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Failed to post tweet");
+    });
+  });
+
+  describe("getEngagement edge cases", () => {
+    it("handles metrics with null/undefined counts (lines 216-219 ?? 0 branches)", async () => {
+      // Lines 216-219: metrics.like_count ?? 0, etc.
+      // When metric counts are null or undefined
+      mockSingleTweet.mockResolvedValue({
+        data: {
+          public_metrics: {
+            like_count: null,
+            retweet_count: undefined,
+            reply_count: null,
+            quote_count: undefined,
+            // impression_count and bookmark_count intentionally omitted
+          },
+        },
+      });
+
+      const client = new XClient(validCredentials);
+      const result = await client.getEngagement("tweet-123");
+
+      expect(result).toEqual({
+        likes: 0,
+        retweets: 0,
+        replies: 0,
+        quotes: 0,
+        impressions: undefined,
+        bookmarks: undefined,
+      });
+    });
+  });
+
+  describe("verifyCredentials edge cases", () => {
+    it("returns null when error has data.title Forbidden (line 87-88)", async () => {
+      // Line 87-88: apiError.code === 403 || apiError.data?.title === "Forbidden"
+      // When the error doesn't have code=403 but has data.title="Forbidden"
+      const apiError = new Error("Forbidden") as any;
+      apiError.data = { title: "Forbidden" };
+      // No .code set
+      mockMe.mockRejectedValue(apiError);
+
+      const client = new XClient(validCredentials);
+      const result = await client.verifyCredentials();
+
+      expect(result).toBeNull();
+    });
   });
 });
 
@@ -375,5 +474,19 @@ describe("checkXPostingAvailable", () => {
 
     expect(result.available).toBe(false);
     expect(result.reason).toBe("Unknown error");
+  });
+
+  it("returns unavailable with error.message when verifyCredentials throws a real Error", async () => {
+    // Directly make verifyCredentials throw an Error instance (bypassing handleError
+    // which returns a plain object). This covers the `error instanceof Error` branch
+    // on line 324-325 of checkXPostingAvailable.
+    vi.spyOn(XClient.prototype, "verifyCredentials").mockRejectedValue(
+      new Error("Connection refused")
+    );
+
+    const result = await checkXPostingAvailable(validCredentials);
+
+    expect(result.available).toBe(false);
+    expect(result.reason).toBe("Connection refused");
   });
 });

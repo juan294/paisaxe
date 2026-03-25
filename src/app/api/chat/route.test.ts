@@ -219,6 +219,33 @@ describe("POST /api/chat", () => {
     expect(data.error).toBe("Internal server error");
   });
 
+  it("should return debug info in development mode on error", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+
+    vi.mocked(validateChatRequest).mockReturnValue({
+      valid: true,
+      sanitizedMessage: "Test",
+      sanitizedContext: undefined,
+    });
+    vi.mocked(generateEmbedding).mockRejectedValue(new Error("Detailed API failure"));
+
+    const request = new NextRequest("http://localhost:3000/api/chat", {
+      method: "POST",
+      body: JSON.stringify({ message: "Test" }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
+    expect(data.debug).toBeDefined();
+    expect(data.debug.message).toBe("Detailed API failure");
+    expect(data.debug.stack).toBeDefined();
+
+    vi.unstubAllEnvs();
+  });
+
   it("should return 400 for empty message (after trim)", async () => {
     vi.mocked(validateChatRequest).mockReturnValue({
       valid: false,
@@ -464,6 +491,28 @@ describe("POST /api/chat", () => {
 
       expect(response.status).toBe(200);
       expect(data.topicRelevance).toBeDefined();
+    });
+
+    it("should return flagged response when message exceeds MAX_INPUT_LENGTH", async () => {
+      vi.mocked(validateChatRequest).mockReturnValue({
+        valid: true,
+        sanitizedMessage: "a".repeat(2001), // exceeds MAX_INPUT_LENGTH of 2000
+        sanitizedContext: undefined,
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "a".repeat(2001) }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.flagged).toBe(true);
+      expect(data.flagReason).toBe("length_exceeded");
+      expect(data.message).toContain("quite long");
+      expect(generateChatResponse).not.toHaveBeenCalled();
     });
 
     it("should log security events when injection detected", async () => {

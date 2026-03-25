@@ -175,4 +175,66 @@ describe("ComingSoonPage", () => {
     // Should fall back to default config
     expect(screen.getByText("Próximamente")).toBeInTheDocument();
   });
+
+  it("should use default values for undefined config fields (lines 39-41)", async () => {
+    // When config exists but individual fields are undefined,
+    // the ?? operator falls back to DEFAULT_CONFIG values
+    vi.mocked(supabase.from).mockReturnValue({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            single: vi.fn(() =>
+              Promise.resolve({
+                data: {
+                  config: {
+                    // All fields explicitly undefined to trigger ?? fallbacks
+                    title: undefined,
+                    message: undefined,
+                    show_tagline: undefined,
+                  },
+                },
+                error: null,
+              })
+            ),
+          })),
+        })),
+      })),
+    } as never);
+
+    const page = await ComingSoonPage();
+    render(page);
+
+    // Should use DEFAULT_CONFIG values
+    expect(screen.getByText("Próximamente")).toBeInTheDocument(); // default title
+    expect(screen.getByText("Look. Ask. Discover.")).toBeInTheDocument(); // default show_tagline = true
+  });
+
+  it("should use default values when config is a partial object with only some fields", async () => {
+    vi.mocked(supabase.from).mockReturnValue({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            single: vi.fn(() =>
+              Promise.resolve({
+                data: {
+                  config: {
+                    // Only title provided, message and show_tagline missing
+                    title: "En mantenimiento",
+                  },
+                },
+                error: null,
+              })
+            ),
+          })),
+        })),
+      })),
+    } as never);
+
+    const page = await ComingSoonPage();
+    render(page);
+
+    expect(screen.getByText("En mantenimiento")).toBeInTheDocument();
+    // show_tagline defaults to true
+    expect(screen.getByText("Look. Ask. Discover.")).toBeInTheDocument();
+  });
 });

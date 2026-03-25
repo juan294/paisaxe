@@ -1,4 +1,5 @@
-import { test, expect, APIRequestContext } from "@playwright/test";
+import { test, expect } from "./fixtures/base-test";
+import type { APIRequestContext } from "@playwright/test";
 
 /**
  * Helper to get CSRF headers by visiting a page first.

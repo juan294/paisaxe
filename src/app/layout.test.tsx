@@ -12,11 +12,6 @@ vi.mock("next/font/google", () => ({
   }),
 }));
 
-// Mock next/headers for async server component
-vi.mock("next/headers", () => ({
-  headers: () => Promise.resolve(new Map([["x-csp-nonce", "test-nonce"]])),
-}));
-
 // Mock language detection to return Spanish (jsdom defaults to English)
 vi.mock("@/lib/i18n/detect-language", () => ({
   resolveLocale: () => "es",
@@ -149,24 +144,24 @@ describe("RootLayout", () => {
   });
 
   describe("rendering", () => {
-    it("should render children", async () => {
-      const Component = await RootLayout({ children: <div data-testid="child">Test Child</div> });
+    it("should render children", () => {
+      const Component = RootLayout({ children: <div data-testid="child">Test Child</div> });
       render(Component);
 
       expect(screen.getByTestId("child")).toBeInTheDocument();
       expect(screen.getByText("Test Child")).toBeInTheDocument();
     });
 
-    it("should set html lang to es", async () => {
-      const Component = await RootLayout({ children: <div>Content</div> });
+    it("should set html lang to es", () => {
+      const Component = RootLayout({ children: <div>Content</div> });
       render(Component);
 
       const html = document.documentElement;
       expect(html.getAttribute("lang")).toBe("es");
     });
 
-    it("should apply font classes to body", async () => {
-      const Component = await RootLayout({ children: <div>Content</div> });
+    it("should apply font classes to body", () => {
+      const Component = RootLayout({ children: <div>Content</div> });
       render(Component);
 
       const body = document.body;
@@ -174,8 +169,8 @@ describe("RootLayout", () => {
       expect(body.className).toContain("antialiased");
     });
 
-    it("should render JsonLd WebSite component", async () => {
-      const Component = await RootLayout({ children: <div>Content</div> });
+    it("should render JsonLd WebSite component", () => {
+      const Component = RootLayout({ children: <div>Content</div> });
       const { container } = render(Component);
       const script = container.querySelector(
         'script[type="application/ld+json"]'

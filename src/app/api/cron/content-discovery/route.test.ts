@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 
+// vi.hoisted runs before vi.mock hoisting, so mockAuthError is available in the factory
+const { mockAuthError } = vi.hoisted(() => {
+  // Cannot use NextResponse here (not imported yet), so use a plain sentinel object
+  const mockAuthError = new Response(JSON.stringify({ error: "Unauthorized" }), {
+    status: 401,
+    headers: { "content-type": "application/json" },
+  }) as unknown as import("next/server").NextResponse;
+  return { mockAuthError };
+});
+
 // Mock dependencies before importing route
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn().mockResolvedValue({
     valid: false,
-    error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }),
+    error: mockAuthError,
   }),
 }));
 
@@ -18,6 +28,7 @@ vi.mock("@supabase/supabase-js", () => ({
 
 import { GET, POST } from "./route";
 import { runDiscovery } from "@/lib/content-discovery";
+import { validateAdminAuth } from "@/lib/admin-auth";
 
 function makeRequest(headers: Record<string, string> = {}, method = "POST") {
   return new Request("http://localhost:3000/api/cron/content-discovery", {
@@ -49,6 +60,13 @@ describe("POST /api/cron/content-discovery", () => {
   it("rejects requests without auth", async () => {
     const res = await POST(makeRequest());
     expect(res.status).toBe(401);
+  });
+
+  it("returns auth.error from validateAdminAuth (not a manual response)", async () => {
+    const res = await POST(makeRequest());
+    // The route should return the exact auth.error object from validateAdminAuth,
+    // not construct a new NextResponse.json({ error: "Unauthorized" }, { status: 401 }).
+    expect(res).toBe(mockAuthError);
   });
 
   it("rejects requests with wrong secret", async () => {
@@ -108,6 +126,49 @@ describe("POST /api/cron/content-discovery", () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.created).toBe(0);
+  });
+
+  it("runs discovery when admin auth succeeds (no webhook secret)", async () => {
+    (validateAdminAuth as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      valid: true,
+    });
+    (runDiscovery as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      discovered: 1,
+      created: 1,
+      skippedDuplicates: 0,
+      errors: [],
+      stories: [{ id: "uuid-1", title: "Place 1", slug: "place-1", category: "nature" }],
+    });
+
+    // No webhook secret — falls through to admin auth which is valid
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+  });
+
+  it("returns 500 with error details when runDiscovery throws an Error", async () => {
+    (runDiscovery as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("Google Places API rate limit exceeded")
+    );
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Discovery failed");
+    expect(body.details).toBe("Google Places API rate limit exceeded");
+  });
+
+  it("returns 500 with 'Unknown error' when runDiscovery throws a non-Error", async () => {
+    (runDiscovery as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      "unexpected string error"
+    );
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Discovery failed");
+    expect(body.details).toBe("Unknown error");
   });
 });
 

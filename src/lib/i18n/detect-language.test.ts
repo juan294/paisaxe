@@ -219,6 +219,72 @@ describe('detect-language', () => {
     });
   });
 
+  describe('detectBrowserLanguage — navigator.language fallback edge cases', () => {
+    it('returns default "es" when navigator.languages is empty and navigator.language is empty string', () => {
+      Object.defineProperty(navigator, 'languages', {
+        value: [],
+        configurable: true,
+      });
+      Object.defineProperty(navigator, 'language', {
+        value: '',
+        configurable: true,
+      });
+      // Empty string is falsy, so the navigator.language branch is skipped
+      expect(detectBrowserLanguage()).toBe('es');
+    });
+  });
+
+  describe('getStoredLocale server-side (line 53)', () => {
+    it('returns null when window is undefined (server-side)', () => {
+      const originalWindow = globalThis.window;
+      // @ts-expect-error - deliberately setting window to undefined for test
+      globalThis.window = undefined;
+      try {
+        expect(getStoredLocale()).toBeNull();
+      } finally {
+        globalThis.window = originalWindow;
+      }
+    });
+  });
+
+  describe('storeLocale server-side (line 71)', () => {
+    it('does nothing when window is undefined (server-side)', () => {
+      const originalWindow = globalThis.window;
+      // @ts-expect-error - deliberately setting window to undefined for test
+      globalThis.window = undefined;
+      try {
+        // Should not throw
+        storeLocale('en');
+      } finally {
+        globalThis.window = originalWindow;
+      }
+    });
+  });
+
+  describe('storeLocale error handling', () => {
+    it('silently ignores localStorage setItem errors', () => {
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('quota exceeded');
+      });
+      // Should not throw
+      expect(() => storeLocale('fr')).not.toThrow();
+    });
+  });
+
+  describe('detectBrowserLanguage server-side (line 27)', () => {
+    it('returns default locale "es" when navigator is undefined (server-side)', () => {
+      const originalNavigator = globalThis.navigator;
+      // Temporarily remove navigator to simulate server-side environment
+      // @ts-expect-error - deliberately setting navigator to undefined for test
+      globalThis.navigator = undefined;
+      try {
+        expect(detectBrowserLanguage()).toBe('es');
+      } finally {
+        globalThis.navigator = originalNavigator;
+      }
+    });
+  });
+
   describe('resolveLocale', () => {
     it('returns stored locale if available', () => {
       storeLocale('en');

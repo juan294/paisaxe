@@ -84,6 +84,44 @@ describe('getLocalizedStory', () => {
     expect(result.subtitle).toBe('Subtítulo'); // Fallback to Spanish
     expect(result.description).toBe('Deutsche Beschreibung.');
   });
+
+  it('should fallback title to Spanish when translation title is empty', () => {
+    const storyWithEmptyTitle: Story = {
+      ...mockStory,
+      metadata: {
+        translations: {
+          de: {
+            title: '', // Empty title
+            subtitle: 'Deutscher Untertitel',
+            description: 'Deutsche Beschreibung.',
+          },
+        },
+      },
+    };
+    const result = getLocalizedStory(storyWithEmptyTitle, 'de');
+    expect(result.title).toBe('Título en Español'); // Fallback to Spanish
+    expect(result.subtitle).toBe('Deutscher Untertitel');
+    expect(result.description).toBe('Deutsche Beschreibung.');
+  });
+
+  it('should fallback description to Spanish when translation description is empty', () => {
+    const storyWithEmptyDescription: Story = {
+      ...mockStory,
+      metadata: {
+        translations: {
+          de: {
+            title: 'Deutscher Titel',
+            subtitle: 'Deutscher Untertitel',
+            description: '', // Empty description
+          },
+        },
+      },
+    };
+    const result = getLocalizedStory(storyWithEmptyDescription, 'de');
+    expect(result.title).toBe('Deutscher Titel');
+    expect(result.subtitle).toBe('Deutscher Untertitel');
+    expect(result.description).toBe('Descripción del lugar.'); // Fallback to Spanish
+  });
 });
 
 describe('hasTranslation', () => {

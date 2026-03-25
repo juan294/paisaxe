@@ -17,9 +17,9 @@ export function Providers({ children }: ProvidersProps) {
         <AuthProvider>
           <SkipLink />
           <LangSync />
-          <div id="main-content">
+          <main id="main-content">
             {children}
-          </div>
+          </main>
         </AuthProvider>
       </LanguageProvider>
     </PostHogProviderWrapper>

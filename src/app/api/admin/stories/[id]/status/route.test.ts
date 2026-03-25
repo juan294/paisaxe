@@ -40,6 +40,21 @@ describe("PUT /api/admin/stories/[id]/status", () => {
     expect(response.status).toBe(401);
   });
 
+  it("should return 400 when story ID is empty", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories//status", {
+      method: "PUT",
+      body: JSON.stringify({ status: "approved" }),
+    });
+
+    const response = await PUT(request, { params: Promise.resolve({ id: "" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Story ID is required");
+  });
+
   it("should update status to approved", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 

@@ -166,7 +166,7 @@ export function OptimizerConfigPanel({ flag, onUpdate }: OptimizerConfigPanelPro
                 onChange={(e) => handleMetricChange(key, e.target.value)}
                 step={key === "supabaseStorageGb" ? "0.1" : "1"}
                 min={0}
-                className="mt-1 w-full border border-[#e5e3de] bg-transparent px-3 py-1.5 font-mono text-xs text-[#2d2a26] focus:border-[#c9a55c] focus:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
+                className="mt-1 w-full border border-[#e5e3de] bg-transparent px-3 py-1.5 font-mono text-xs text-[#2d2a26] focus-visible:border-[#c9a55c] focus-visible:outline-none dark:border-[#3d3a36] dark:text-[#f5f3ee]"
               />
             </div>
           ))}

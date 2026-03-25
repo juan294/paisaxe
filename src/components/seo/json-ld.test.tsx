@@ -4,6 +4,11 @@ import { JsonLd, StoryJsonLd, BreadcrumbJsonLd, FAQJsonLd } from "./json-ld";
 import type { Story } from "@/types/immersive";
 
 describe("JsonLd", () => {
+  // Ensure env var is cleared for default tests
+  beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+  });
+
   it("renders website structured data", () => {
     const { container } = render(<JsonLd type="website" />);
     const script = container.querySelector(
@@ -122,6 +127,10 @@ describe("JsonLd", () => {
 });
 
 describe("StoryJsonLd", () => {
+  beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+  });
+
   const mockNatureStory: Story = {
     id: "test-123",
     slug: "lagos-covadonga",
@@ -282,6 +291,21 @@ describe("StoryJsonLd", () => {
     expect(data.geo.longitude).toBe(-5.85);
   });
 
+  it("returns default touristType for unmapped category", () => {
+    const unknownCategoryStory: Story = {
+      ...mockNatureStory,
+      category: "unknown-category" as Story["category"],
+      title: "Unknown Category Story",
+    };
+    const { container } = render(<StoryJsonLd story={unknownCategoryStory} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+    expect(data["@type"]).toBe("TouristAttraction");
+    expect(data.touristType).toEqual(["Tourists"]);
+  });
+
   it("defaults to central coordinates when no location specified", () => {
     const storyNoLocation: Story = {
       ...mockNatureStory,
@@ -296,9 +320,62 @@ describe("StoryJsonLd", () => {
     expect(data.geo.latitude).toBe(43.36);
     expect(data.geo.longitude).toBe(-5.85);
   });
+
+  it("uses absolute image URL as-is when it starts with http", () => {
+    const storyWithAbsoluteImage: Story = {
+      ...mockNatureStory,
+      image: "https://cdn.example.com/photos/lagos.webp",
+    };
+    const { container } = render(<StoryJsonLd story={storyWithAbsoluteImage} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.image).toBe("https://cdn.example.com/photos/lagos.webp");
+  });
+
+  it("falls back to story.id in URL when slug is undefined", () => {
+    const storyNoSlug: Story = {
+      ...mockNatureStory,
+      slug: undefined,
+    };
+    const { container } = render(<StoryJsonLd story={storyNoSlug} />);
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.url).toContain(`story=${storyNoSlug.id}`);
+  });
+
+  describe("uses NEXT_PUBLIC_SITE_URL env var", () => {
+    const CUSTOM_URL = "https://custom.example.com";
+
+    beforeEach(() => {
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", CUSTOM_URL);
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("uses env var URL for story URL", () => {
+      const { container } = render(<StoryJsonLd story={mockNatureStory} />);
+      const script = container.querySelector(
+        'script[type="application/ld+json"]'
+      );
+      const data = JSON.parse(script!.textContent!);
+      expect(data.url).toContain(CUSTOM_URL);
+    });
+  });
 });
 
 describe("BreadcrumbJsonLd", () => {
+  beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+  });
+
   it("renders BreadcrumbList schema", () => {
     const { container } = render(
       <BreadcrumbJsonLd
@@ -382,6 +459,49 @@ describe("BreadcrumbJsonLd", () => {
     expect(data.itemListElement[0].item["@id"]).toBe(
       "https://paisaxe.es/immersive"
     );
+  });
+
+  it("uses absolute URL as-is when it starts with http", () => {
+    const { container } = render(
+      <BreadcrumbJsonLd
+        items={[
+          { name: "External", url: "https://external.example.com/page" },
+        ]}
+      />
+    );
+    const script = container.querySelector(
+      'script[type="application/ld+json"]'
+    );
+    const data = JSON.parse(script!.textContent!);
+
+    expect(data.itemListElement[0].item["@id"]).toBe(
+      "https://external.example.com/page"
+    );
+  });
+
+  describe("uses NEXT_PUBLIC_SITE_URL env var", () => {
+    const CUSTOM_URL = "https://custom.example.com";
+
+    beforeEach(() => {
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", CUSTOM_URL);
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("uses env var URL for breadcrumb paths", () => {
+      const { container } = render(
+        <BreadcrumbJsonLd items={[{ name: "Explorar", url: "/immersive" }]} />
+      );
+      const script = container.querySelector(
+        'script[type="application/ld+json"]'
+      );
+      const data = JSON.parse(script!.textContent!);
+      expect(data.itemListElement[0].item["@id"]).toBe(
+        `${CUSTOM_URL}/immersive`
+      );
+    });
   });
 });
 

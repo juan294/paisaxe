@@ -158,7 +158,7 @@ npm install  # Required — worktrees don't share node_modules
 # ... write tests first, then implement, then commit
 
 # 3. MERGE — After tests pass, merge back into develop
-cd /Users/juan/Documents/GenAI_Projects/paisaxe
+cd /Users/juan/Documents/code/paisaxe
 git merge feature/short-name
 
 # 4. CLEAN UP — Always remove the worktree and branch after merge
@@ -240,10 +240,20 @@ npm run test:e2e:ui    # Playwright UI mode
 # Data pipeline
 npm run seed-db        # Generate embeddings and populate DB
 
+# Agent management (local flags)
+scripts/agent-ctl.sh status           # Show all agent flags
+scripts/agent-ctl.sh enable <key>     # Enable an agent
+scripts/agent-ctl.sh disable <key>    # Disable an agent
+scripts/agent-ctl.sh master on|off    # Master toggle
+
 # Headless mode (non-interactive CI/batch runs)
 claude -p "Fix all TypeScript lint errors and run tests" --allowedTools "Edit,Read,Bash,Write" --output-format json
 claude -p "Read issue #240 and implement the fix with TDD" --allowedTools "Edit,Read,Bash,Write,Grep"
 ```
+
+### CRITICAL: Run verification commands sequentially, NEVER in parallel
+Never run typecheck, lint, or test as parallel sibling Bash tool calls.
+Chain with `&&` or `;`: `npm run typecheck 2>&1; npm run lint 2>&1`
 
 ## Environment Variables
 
@@ -253,6 +263,8 @@ ANTHROPIC_API_KEY=       # Claude API
 VOYAGE_API_KEY=          # Voyage AI embeddings
 ELEVENLABS_API_KEY=      # Voice agents (optional)
 ELEVENLABS_WEBHOOK_SECRET=   # ElevenLabs webhook signature verification
+ELEVENLABS_PHONE_NUMBER_ID=             # ElevenLabs phone number for outbound booking calls
+ELEVENLABS_BOOKING_AGENT_ID=            # ElevenLabs booking agent ID (dedicated booking agent)
 GITHUB_TOKEN=            # GitHub PAT with `repo` scope (traffic analytics)
 
 NEXT_PUBLIC_SUPABASE_URL=
@@ -280,6 +292,9 @@ QA_ALERT_PHONE=                         # Phone for critical alerts (E.164: +346
 # Credentials encryption
 CREDENTIALS_ENCRYPTION_KEY=             # AES-256 encryption key for stored credentials
 
+# MCP tool authentication
+MCP_API_SECRET=                         # Shared secret for authenticating MCP tool requests
+
 # Voice Agent MCP tools (optional)
 OPENWEATHERMAP_API_KEY=                 # Weather data for voice agent
 GOOGLE_PLACES_API_KEY=                  # Places data for voice agent
@@ -296,8 +311,13 @@ UPSTASH_REDIS_REST_TOKEN=              # Upstash Redis REST token
 CRON_SECRET=                           # Vercel Cron authentication secret
 
 # PostHog analytics (optional)
-NEXT_PUBLIC_POSTHOG_KEY=                # PostHog project API key
-NEXT_PUBLIC_POSTHOG_HOST=               # PostHog ingestion host
+NEXT_PUBLIC_POSTHOG_KEY=                # PostHog project API key (client-side)
+NEXT_PUBLIC_POSTHOG_HOST=               # PostHog ingestion host (client-side)
+POSTHOG_PROJECT_ID=                     # PostHog project ID for server-side analytics API
+POSTHOG_PERSONAL_API_KEY=               # PostHog personal API key for server-side analytics API
+
+# Agent execution (optional)
+# ALLOW_AGENT_RUN=                      # Gates agent execution outside dev mode
 
 # Maintenance mode (optional)
 MAINTENANCE_MODE=                       # "true" forces maintenance on, "false" forces off, unset checks DB flag
@@ -335,6 +355,9 @@ MAINTENANCE_MODE=                       # "true" forces maintenance on, "false" 
 - **HTTP Cache-Control**: `private, max-age=120, stale-while-revalidate=300` on all 4 admin analytics API routes
 - No external dependencies — pure React Context + `useRef<Map>`
 
+### Local Agent Flags
+Automated agent enabled/disabled flags live in `scripts/agent-config.json` (local-only, gitignored). Defaults tracked in `scripts/agent-config.defaults.json`. Agents read flags via `jq` in `scripts/lib/agent-utils.sh` — no HTTP dependency. The admin dashboard reads/writes this file via `GET/PUT /api/admin/agent-config` (dev-only route). CLI: `scripts/agent-ctl.sh`.
+
 ### Proxy (NOT Middleware)
 **IMPORTANT: This project uses `src/proxy.ts`, NOT `middleware.ts`.**
 
@@ -346,6 +369,16 @@ All request interception logic goes in `proxy.ts`:
 - Auth session refresh (via Supabase `getUser()`)
 
 **Never create a `middleware.ts` file in this project.**
+
+### CSP and PPR Compatibility (IMPORTANT)
+
+**PPR (`cacheComponents`) prerenders HTML at build time WITHOUT CSP nonces.** This means:
+
+1. **Never use `'strict-dynamic'` in CSP** — it overrides `'self'` per CSP Level 3, blocking ALL scripts when nonces aren't in the HTML
+2. **Never use nonce-only CSP** — prerendered pages don't have nonces, so nonce-gated scripts won't execute
+3. **Current policy**: `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com` — `'self'` covers same-origin external scripts, `'unsafe-inline'` covers Next.js hydration inline scripts
+4. **If re-enabling nonces**: Must restore `headers()` call in root layout to read `x-csp-nonce`, which makes the layout dynamic (incompatible with PPR static shell)
+5. **E2E canary**: `e2e/smoke.spec.ts` has a "CSP canary" test that verifies JavaScript executes. If CSP ever blocks scripts again, this test fails immediately.
 
 ## Database Schema
 
@@ -360,7 +393,7 @@ Core tables (see `supabase/migrations/` for full DDL):
 ## Development Guardrails
 
 1. **No secrets in code** — Use env vars. Gitleaks scans git history.
-2. **No copyleft dependencies** — MIT, Apache-2.0, BSD, ISC only.
+2. **No copyleft dependencies** — MIT, Apache-2.0, BSD, ISC only. See `docs/project/license-exceptions.md` for approved exceptions.
 3. **Performance budgets** — Lighthouse: Perf >= 70%, A11y >= 80%, LCP < 4s.
 4. **No dead code** — Knip reports unused exports on PRs.
 5. **Health endpoint is sacred** — `/api/health` monitored 24/7. Don't break it.
@@ -473,6 +506,147 @@ Only ask for manual intervention when genuinely required (OAuth consent, billing
 - External service configuration changes (ElevenLabs, Stripe, Vercel env vars, DNS)
 
 Agent autonomy applies to **development work on `develop`**. Production is user-controlled.
+
+## RPI Workflow
+
+This project follows the Research-Plan-Implement (RPI) pattern.
+All significant changes go through four phases:
+1. /research — Understand the codebase as-is
+2. /plan — Create a phased implementation spec
+3. /implement — Execute one phase at a time with review gates
+4. /validate — Verify implementation against the plan
+
+### Context Management
+
+- Each RPI phase should be its own conversation. Don't run research + plan + implement in one session.
+- Use `/clear` between unrelated tasks. Use `/compact` when context is heavy but the task continues.
+- Subagents are context control mechanisms — they search/read in their window and return only distilled results.
+- Research and planning happen on the default branch. Implementation happens in worktrees or feature branches.
+- If research comes back wrong, throw it out and restart with more specific steering.
+
+### Rules for All Phases
+
+- Read all mentioned files COMPLETELY before doing anything else.
+- Never suggest improvements during research — only document what exists.
+- Every code reference must include file:line.
+- Spawn parallel subagents for independent research tasks.
+- Wait for ALL subagents before synthesizing.
+- Never write documents with placeholder values.
+
+### Rules for Implementation
+
+- Follow the atomic loop: implement → review (plan compliance) → fix → approve → `/simplify` (code quality) → verify.
+- Run `/simplify` after reviewer approval — it handles code reuse, quality, and efficiency in one native pass.
+- Check for `[batch-eligible]` phases in the plan — use `/batch` to execute independent phases in parallel.
+- Run ALL automated verification after each phase.
+- STOP after each phase and wait for human confirmation.
+- Never auto-proceed to the next phase.
+- If the plan doesn't match reality, STOP and explain the mismatch.
+
+### Pre-Release Workflow
+
+```
+/pre-launch -> /remediate -> /update-docs -> /release
+```
+
+- `/remediate` -- resolve all pre-launch findings with parallel TDD agents, CI verification
+- `/update-docs` -- refreshes all documentation, diagrams, version references, and inline code docs
+- `/release` -- version bump, CHANGELOG, tag, GitHub release, registry publish advisory
+
+### Testing Philosophy
+
+- Prefer automated verification over manual testing.
+- Manual testing is ONLY for: sudo, hardware, new installs, truly visual-only validation.
+- If you can verify it with a command or tool, do so automatically.
+- Don't use Claude for linting/formatting — use automated tools and hooks instead.
+
+## Conditional Blocks for Context-Specific Rules
+
+As this file grows, wrap domain-specific sections in `<important if="condition">` tags.
+The agent activates these only when the condition matches the current task, reducing noise.
+Keep universal content (stack, structure, git workflow) unwrapped.
+
+```markdown
+<important if="you are writing or modifying tests">
+- Use `createTestApp()` helper for integration tests
+- Mock database with `dbMock` from `packages/db/test`
+- Test fixtures live in `__fixtures__/` directories
+</important>
+```
+
+- **Be specific.** `"you are writing tests"` is good. `"you are writing code"` matches everything and defeats the purpose.
+- **Group by domain.** One block per domain (testing, deployment, database) — don't wrap individual lines.
+
+## Agent Operational Rules
+
+### Shell & Tools
+- Chain verification commands sequentially, never as parallel Bash calls
+- In worktrees: prefix every command with `cd /absolute/path && `
+- Never use `~` in file tool paths — use full absolute paths starting with `/`
+- Always pass `{ encoding: 'utf-8' }` to `execSync`/`spawnSync`
+
+### Git Recipes (use these exact sequences — hooks enforce critical steps)
+```bash
+# Push sequence — ALWAYS commit before pulling (Error #33, hook enforced)
+git add <files> && git commit -m "msg" && git pull --rebase && git push
+
+# First push — set upstream tracking
+git add <files> && git commit -m "msg" && git push -u origin <branch>
+
+# Push with tag — NEVER use --tags (Error #44, hook enforced)
+git push origin main && git push origin v1.0.0
+# Or: git push origin main --follow-tags
+
+# Worktree cleanup
+git worktree remove --force <path>; git branch -D <branch>
+```
+
+### Git Operations
+- Run typecheck/lint BEFORE committing (pre-commit hooks run the same checks)
+- Remove worktrees BEFORE merging PRs with `--delete-branch`
+- Never fabricate filesystem paths — use the working directory or discover with `ls`
+
+### GitHub CLI
+- Don't guess `gh --json` field names — query available fields first
+- Check CI per-PR with `--json`, not chained human-readable output
+- `review: fail` means "needs approval", NOT a CI failure
+
+### Sub-agents & Agent Teams
+- Verify tool permissions before spawning sub-agents for write operations
+- If a sub-agent fails due to permissions, take over manually immediately
+- Monitor context size when running many parallel agents
+- Agent Teams are enabled via `.claude/settings.json` — use them for complex parallel work
+- When creating a team: break work so each teammate owns different files (avoid conflicts)
+- Teammates don't inherit conversation history — include full context in spawn prompts
+- Use subagents for focused tasks (result is all that matters); use teams for collaborative work requiring discussion
+- **Only the main agent handles git commit/push.** Sub-agents and teammates write changes to their working directories. The main agent reviews the changes, runs tests, and commits centrally. This prevents wrong-branch pushes and merge conflicts from parallel agents.
+
+## Memory Management
+
+When you discover an operational lesson during any session — CI failure pattern, permission issue, workaround, tooling quirk, environment-specific behavior — save it to auto memory immediately. Don't wait to be asked.
+
+What to save proactively:
+- CI/CD pipeline behaviors and failure patterns specific to this project
+- Environment quirks (build flags, platform issues, dependency conflicts)
+- Project-specific conventions confirmed by the user
+- Workarounds for tools, APIs, or libraries used in this project
+- Permission configurations that required adjustment
+
+After completing `/bootstrap`, `/adopt`, or any significant configuration change, save the key decisions and project context to auto memory so future sessions start with full awareness.
+
+## Project File Locations
+
+Go directly to these paths — never search the codebase for them.
+
+| Topic | Path | Notes |
+|-------|------|-------|
+| Agent reports | `docs/agents/*-report.md` | Flag YELLOW/RED items. Cross-agent context in `shared-context.md` |
+| Agent logs | `logs/<name>.log`, `<name>.error.log` | Read alongside reports to diagnose failures |
+| Agent scripts | `scripts/agents/` | Standalone bash files invoking Claude CLI headless |
+| ADRs | `docs/decisions/` | Architecture decision records |
+| PR descriptions | `docs/prs/{number}_description.md` | |
+| Research docs | `docs/research/YYYY-MM-DD-description.md` | |
+| Plans | `docs/plans/YYYY-MM-DD-description.md` | Phase files in `-phases/phase-N.md` |
 
 ## Issue Tracking (GitHub Issues)
 

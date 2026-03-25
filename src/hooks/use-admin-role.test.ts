@@ -161,4 +161,97 @@ describe("useAdminRole", () => {
     expect(result.current.isAdmin).toBe(true);
     expect(mockFrom).toHaveBeenCalledTimes(1);
   });
+
+  it("re-checks role when user changes after initial check", async () => {
+    // First user is admin
+    const user1 = { id: "user-aaa", email: "admin@example.com" };
+    mockUseAuth.mockReturnValue({ user: user1, isLoading: false });
+    setupSupabaseMock({ role: "admin" });
+
+    const { result, rerender } = renderHook(() => useAdminRole());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.isAdmin).toBe(true);
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+
+    // Switch to a different user who is NOT admin
+    const user2 = { id: "user-bbb", email: "regular@example.com" };
+    mockUseAuth.mockReturnValue({ user: user2, isLoading: false });
+    setupSupabaseMock({ role: "user" });
+
+    rerender();
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Should have queried again for the new user
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+    expect(result.current.isAdmin).toBe(false);
+  });
+
+  it("skips re-checking when effect re-runs with same user ID but new object reference", async () => {
+    const user1 = { id: "user-same", email: "admin@example.com" };
+    mockUseAuth.mockReturnValue({ user: user1, isLoading: false });
+    setupSupabaseMock({ role: "admin" });
+
+    const { result, rerender } = renderHook(() => useAdminRole());
+
+    // Wait for first check to complete
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.isAdmin).toBe(true);
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+
+    // Create a NEW object with the SAME id — triggers useEffect (new ref) but
+    // checkedUserIdRef.current === user.id is true, so it returns early (line 33)
+    const user2 = { id: "user-same", email: "admin@example.com" };
+    mockUseAuth.mockReturnValue({ user: user2, isLoading: false });
+
+    rerender();
+
+    // Should still be admin, and no additional query was made (line 33 early return)
+    expect(result.current.isAdmin).toBe(true);
+    expect(mockFrom).toHaveBeenCalledTimes(1);
+  });
+
+  it("resets checked user ref when user logs out", async () => {
+    // Start with an admin user
+    const user = { id: "user-ccc", email: "admin@example.com" };
+    mockUseAuth.mockReturnValue({ user, isLoading: false });
+    setupSupabaseMock({ role: "admin" });
+
+    const { result, rerender } = renderHook(() => useAdminRole());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.isAdmin).toBe(true);
+
+    // User logs out
+    mockUseAuth.mockReturnValue({ user: null, isLoading: false });
+    rerender();
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.isAdmin).toBe(false);
+
+    // Same user logs back in — should re-check (ref was cleared on logout)
+    mockUseAuth.mockReturnValue({ user, isLoading: false });
+    setupSupabaseMock({ role: "admin" });
+    vi.clearAllMocks();
+    setupSupabaseMock({ role: "admin" });
+
+    rerender();
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.isAdmin).toBe(true);
+    expect(mockFrom).toHaveBeenCalledTimes(1); // re-checked after logout cycle
+  });
 });

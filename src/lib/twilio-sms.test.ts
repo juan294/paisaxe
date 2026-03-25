@@ -105,6 +105,32 @@ describe("twilio-sms", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe("Network error");
     });
+
+    it("should fall back to status code when API error has no message field (line 75)", async () => {
+      // Line 75: data.message || `Twilio error: ${response.status}`
+      // When the API returns an error without a message field
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({}), // no `message` field
+      });
+
+      const result = await sendSMS("+34612345678", "Test message");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Twilio error: 500");
+    });
+
+    it("should return 'Unknown error' when catch receives a non-Error value (line 87)", async () => {
+      // Line 87: error instanceof Error ? error.message : "Unknown error"
+      // When fetch throws a non-Error value
+      mockFetch.mockRejectedValueOnce("string error");
+
+      const result = await sendSMS("+34612345678", "Test message");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Unknown error");
+    });
   });
 
   describe("buildConfirmationSMS", () => {
@@ -117,6 +143,16 @@ describe("twilio-sms", () => {
       expect(message).toContain("4 personas");
       expect(message).toContain("+34 985 88 77 97");
       expect(message).toContain("Pelayo (paisaxe.es)");
+    });
+
+    it("should handle natural language time format (non HH:MM)", () => {
+      const bookingWithNaturalTime = {
+        ...mockBooking,
+        booking_time: "a las nueve de la noche",
+      };
+      const message = buildConfirmationSMS(bookingWithNaturalTime);
+
+      expect(message).toContain("a las nueve de la noche");
     });
 
     it("should use singular 'persona' for party of 1", () => {

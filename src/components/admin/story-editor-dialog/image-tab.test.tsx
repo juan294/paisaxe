@@ -504,6 +504,25 @@ describe("ImageTab", () => {
         "image/jpeg,image/png,image/webp,image/gif"
       );
     });
+
+    it("triggers file input click when drag-drop zone is clicked", async () => {
+      const user = userEvent.setup();
+
+      renderImageTab(mockStory, { imageSourceTab: "upload" });
+
+      // The component renders a hidden <input type="file"> and the onClick
+      // on the drop zone calls fileInputRef.current?.click()
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      expect(fileInput).not.toBeNull();
+      const clickSpy = vi.spyOn(fileInput, "click");
+
+      // Click on the drop zone
+      const dropZone = screen.getByText("Click or drag").closest("div[class*='cursor-pointer']");
+      expect(dropZone).not.toBeNull();
+      await user.click(dropZone!);
+
+      expect(clickSpy).toHaveBeenCalled();
+    });
   });
 
   // ---------------------------------------------------------------------------

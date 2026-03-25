@@ -240,6 +240,89 @@ describe("StoryCard", () => {
       fireEvent.keyDown(checkbox, { key: "Enter" });
       expect(onToggleSelect).toHaveBeenCalledWith("story-1");
     });
+
+    it("should toggle select on Space in no-image checkbox", () => {
+      const storyWithoutImage = { ...mockStory, image: "" };
+      const onToggleSelect = vi.fn();
+      render(
+        <StoryCard
+          story={storyWithoutImage}
+          onEdit={mockOnEdit}
+          onToggleSelect={onToggleSelect}
+        />
+      );
+
+      const checkbox = screen.getByRole("checkbox");
+      fireEvent.keyDown(checkbox, { key: " " });
+      expect(onToggleSelect).toHaveBeenCalledWith("story-1");
+    });
+
+    it("should not toggle select on unrelated key in no-image checkbox", () => {
+      const storyWithoutImage = { ...mockStory, image: "" };
+      const onToggleSelect = vi.fn();
+      render(
+        <StoryCard
+          story={storyWithoutImage}
+          onEdit={mockOnEdit}
+          onToggleSelect={onToggleSelect}
+        />
+      );
+
+      const checkbox = screen.getByRole("checkbox");
+      fireEvent.keyDown(checkbox, { key: "Tab" });
+      expect(onToggleSelect).not.toHaveBeenCalled();
+    });
+
+    it("should show check icon when selected in no-image state", () => {
+      const storyWithoutImage = { ...mockStory, image: "" };
+      render(
+        <StoryCard
+          story={storyWithoutImage}
+          onEdit={mockOnEdit}
+          isSelected={true}
+          onToggleSelect={vi.fn()}
+        />
+      );
+
+      const checkbox = screen.getByRole("checkbox");
+      expect(checkbox).toHaveAttribute("aria-checked", "true");
+      // Check icon should be rendered inside the checkbox
+      const checkIcon = checkbox.querySelector("svg");
+      expect(checkIcon).toBeInTheDocument();
+    });
+
+    it("should not show check icon when not selected in no-image state", () => {
+      const storyWithoutImage = { ...mockStory, image: "" };
+      render(
+        <StoryCard
+          story={storyWithoutImage}
+          onEdit={mockOnEdit}
+          isSelected={false}
+          onToggleSelect={vi.fn()}
+        />
+      );
+
+      const checkbox = screen.getByRole("checkbox");
+      expect(checkbox).toHaveAttribute("aria-checked", "false");
+      // No check icon when not selected
+      const checkIcon = checkbox.querySelector("svg");
+      expect(checkIcon).not.toBeInTheDocument();
+    });
+
+    it("should not toggle on unrelated key in image checkbox", () => {
+      const onToggleSelect = vi.fn();
+      render(
+        <StoryCard
+          story={mockStory}
+          onEdit={mockOnEdit}
+          onToggleSelect={onToggleSelect}
+        />
+      );
+
+      const checkbox = screen.getByRole("checkbox");
+      fireEvent.keyDown(checkbox, { key: "Escape" });
+      expect(onToggleSelect).not.toHaveBeenCalled();
+    });
   });
 
   describe("translation badges", () => {
@@ -280,6 +363,55 @@ describe("StoryCard", () => {
       };
       render(<StoryCard story={storyComplete} onEdit={mockOnEdit} />);
       expect(screen.queryByText("i18n")).not.toBeInTheDocument();
+    });
+
+    it("should show i18n badge when metadata exists but translations are missing", () => {
+      // metadata exists with no translations or translation_status keys
+      // triggers the || {} fallbacks at lines 20-21
+      const storyEmptyMetadata: AdminStory = {
+        ...mockStory,
+        metadata: {},
+      };
+      render(<StoryCard story={storyEmptyMetadata} onEdit={mockOnEdit} />);
+      expect(screen.getByText("i18n")).toBeInTheDocument();
+    });
+
+    it("should show i18n badge when translations exist but some have no content", () => {
+      // Tests the hasContent false branch (line 28-32) where translation object
+      // exists but all fields are empty strings
+      const storyEmptyTranslations: AdminStory = {
+        ...mockStory,
+        metadata: {
+          translations: {
+            en: { title: "", subtitle: "", description: "", questionPrompts: [], status: "draft" as const },
+          },
+          translation_status: {
+            en: { status: "complete", lastUpdated: "2026-01-01" },
+          },
+        },
+      };
+      render(<StoryCard story={storyEmptyTranslations} onEdit={mockOnEdit} />);
+      expect(screen.getByText("i18n")).toBeInTheDocument();
+    });
+
+    it("should show i18n badge when translation has content but status is not complete", () => {
+      // Tests the `localeStatus?.status !== "complete"` branch at line 34
+      const completeTranslation = { title: "T", subtitle: "S", description: "D", questionPrompts: [], status: "complete" as const };
+      const allLocales = ["en", "fr", "de", "pt", "ast"];
+      const translations: Record<string, typeof completeTranslation> = {};
+      const translationStatus: Record<string, { status: string; lastUpdated: string }> = {};
+      for (const locale of allLocales) {
+        translations[locale] = completeTranslation;
+        translationStatus[locale] = { status: "complete", lastUpdated: "2026-01-01" };
+      }
+      // Set one locale to "pending" status
+      translationStatus["en"] = { status: "pending", lastUpdated: "2026-01-01" };
+      const storyPending: AdminStory = {
+        ...mockStory,
+        metadata: { translations, translation_status: translationStatus },
+      };
+      render(<StoryCard story={storyPending} onEdit={mockOnEdit} />);
+      expect(screen.getByText("i18n")).toBeInTheDocument();
     });
 
     it("should show i18n badge in no-image state too", () => {

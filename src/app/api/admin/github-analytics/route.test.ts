@@ -190,6 +190,127 @@ describe("GET /api/admin/github-analytics", () => {
     expect(summary.dataPointCount).toBe(2);
   });
 
+  it("logs error when daily query fails but continues", async () => {
+    mockValidateAdminAuth.mockResolvedValue({
+      valid: true,
+      userId: "test-user-id",
+    });
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Override the daily query to return an error
+    const originalFrom = mockFrom.getMockImplementation();
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "github_traffic_daily") {
+        return {
+          select: (cols: string) => {
+            if (cols === "fetched_at") {
+              return {
+                order: () => ({
+                  limit: vi.fn().mockResolvedValue({ data: mockLastSync, error: null }),
+                }),
+              };
+            }
+            // daily query returns error
+            return {
+              gte: () => ({
+                lte: () => ({
+                  order: vi.fn().mockResolvedValue({
+                    data: null,
+                    error: { message: "Table not found" },
+                  }),
+                }),
+              }),
+            };
+          },
+        };
+      }
+      if (table === "github_traffic_referrers") {
+        return {
+          select: () => ({
+            order: () => ({
+              order: () => ({
+                limit: vi.fn().mockResolvedValue({ data: mockReferrerData, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "github_traffic_paths") {
+        return {
+          select: () => ({
+            order: () => ({
+              order: () => ({
+                limit: vi.fn().mockResolvedValue({ data: mockPathData, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      return buildChain([]);
+    });
+
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/admin/github-analytics?from=2026-02-01&to=2026-02-07"
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await GET(request as never) as any;
+    expect(response.status).toBe(200);
+    // Daily data should be empty since query failed
+    expect(response.body.data.daily).toEqual([]);
+    expect(response.body.data.summary.totalViews).toBe(0);
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Failed to fetch daily traffic:",
+      expect.any(Object)
+    );
+
+    consoleSpy.mockRestore();
+    if (originalFrom) {
+      mockFrom.mockImplementation(originalFrom);
+    }
+  });
+
+  it("returns empty data on unexpected exception", async () => {
+    mockValidateAdminAuth.mockResolvedValue({
+      valid: true,
+      userId: "test-user-id",
+    });
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Save original implementation and make the from function throw
+    const originalImpl = mockFrom.getMockImplementation();
+    mockFrom.mockImplementation(() => {
+      throw new Error("Connection lost");
+    });
+
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/admin/github-analytics?from=2026-02-01&to=2026-02-07"
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await GET(request as never) as any;
+    expect(response.status).toBe(200);
+    expect(response.body.data.summary.totalViews).toBe(0);
+    expect(response.body.data.daily).toEqual([]);
+    expect(response.body.data.referrers).toEqual([]);
+    expect(response.body.data.popularPaths).toEqual([]);
+    expect(response.body.data.lastSyncedAt).toBeNull();
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "GitHub analytics API error:",
+      expect.any(Error)
+    );
+
+    consoleSpy.mockRestore();
+    // Restore original mock implementation
+    if (originalImpl) mockFrom.mockImplementation(originalImpl);
+  });
+
   it("includes cache-control headers", async () => {
     mockValidateAdminAuth.mockResolvedValue({
       valid: true,

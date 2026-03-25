@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// Mock rate-limit module
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 19, retryAfter: 0 }),
+}));
+
 import { GET, POST } from "./route";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Mock the fetch API
 const mockFetch = vi.fn();
@@ -50,6 +57,8 @@ describe("/api/mcp/places", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    // Re-establish default rate-limit mock after resetAllMocks clears it
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, remaining: 19, limit: 20, resetAt: Date.now() + 60000 });
     process.env = {
       ...originalEnv,
       GOOGLE_PLACES_API_KEY: "test-api-key",
@@ -145,6 +154,37 @@ describe("/api/mcp/places", () => {
       });
       // Second place has no phone number
       expect(data.places[1].phone_number).toBeNull();
+    });
+
+    it("should return null price_level when place has no priceLevel", async () => {
+      const mockPlacesResponse = createPlacesApiResponse([
+        {
+          name: "Free Beach",
+          address: "Playa del Silencio, Asturias",
+          rating: 4.8,
+          reviewsCount: 200,
+          lat: 43.5600,
+          lng: -6.2100,
+          id: "ChIJfree",
+          // priceLevel intentionally omitted
+        },
+      ]);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockPlacesResponse),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=playa",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.places).toHaveLength(1);
+      expect(data.places[0].price_level).toBeNull();
     });
 
     it("should return 400 if query parameter is missing", async () => {
@@ -302,6 +342,408 @@ describe("/api/mcp/places", () => {
 
       const response = await POST(request);
       expect(response.status).toBe(400);
+    });
+
+    it("should support flat format from ElevenLabs", async () => {
+      const mockPlacesResponse = createPlacesApiResponse([
+        {
+          name: "Sidrería Tierra Astur",
+          address: "Oviedo, Asturias",
+          rating: 4.2,
+          reviewsCount: 500,
+          priceLevel: "PRICE_LEVEL_MODERATE",
+          lat: 43.3619,
+          lng: -5.8494,
+          id: "ChIJ789ghi",
+        },
+      ]);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockPlacesResponse),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          query: "sidra",
+          type: "restaurant",
+          city: "Oviedo",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.places).toHaveLength(1);
+      expect(data.places[0].name).toBe("Sidrería Tierra Astur");
+    });
+
+    it("should return 500 if API key is not configured", async () => {
+      delete process.env.GOOGLE_PLACES_API_KEY;
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Places API not configured");
+    });
+
+    it("should handle fetch throwing", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toContain("Network error");
+    });
+  });
+
+  describe("GET - rate limiting", () => {
+    it("should return 429 when rate limited on GET", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 30,
+        limit: 10,
+        resetAt: Date.now() + 30000,
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(429);
+      const data = await response.json();
+      expect(data.error).toBe("Too many requests");
+      expect(response.headers.get("Retry-After")).toBe("30");
+    });
+  });
+
+  describe("POST - rate limiting", () => {
+    it("should return 429 when rate limited on POST", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 45,
+        limit: 10,
+        resetAt: Date.now() + 45000,
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(429);
+      const data = await response.json();
+      expect(data.error).toBe("Too many requests");
+      expect(response.headers.get("Retry-After")).toBe("45");
+    });
+  });
+
+  describe("GET - Places API HTTP errors", () => {
+    it("should return 500 when Places API returns non-ok HTTP response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        text: () => Promise.resolve("Forbidden: API key invalid"),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toContain("Places API error: 403");
+      expect(data.error).toContain("Forbidden");
+    });
+  });
+
+  describe("searchPlaces - API key trim check", () => {
+    it("should return 500 when GOOGLE_PLACES_API_KEY is whitespace-only (POST)", async () => {
+      // Set to whitespace so the route-level `if (!process.env.GOOGLE_PLACES_API_KEY)` passes,
+      // but inside searchPlaces() the `.trim()` produces an empty string, hitting line 166.
+      process.env.GOOGLE_PLACES_API_KEY = "   ";
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Places API not configured");
+    });
+
+    it("should return 500 when GOOGLE_PLACES_API_KEY is whitespace-only (GET)", async () => {
+      process.env.GOOGLE_PLACES_API_KEY = "   ";
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Places API not configured");
+    });
+  });
+
+  describe("GET - additional coverage", () => {
+    it("should handle API returning error in response body", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            error: {
+              message: "API quota exceeded",
+              status: "RESOURCE_EXHAUSTED",
+            },
+          }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toContain("API quota exceeded");
+    });
+
+    it("should handle no results", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ places: [] }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=nonexistent+place+xyz",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.places).toEqual([]);
+    });
+
+    it("should handle fetch throwing", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toContain("Network error");
+    });
+  });
+
+  describe("GET - non-Error throw coverage", () => {
+    it("should return 'Unknown error' when GET catch receives a non-Error object", async () => {
+      // Simulate a non-Error throw (e.g., a string or number)
+      mockFetch.mockRejectedValueOnce("string error");
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Unknown error");
+    });
+  });
+
+  describe("POST - non-Error throw coverage", () => {
+    it("should return 'Unknown error' when POST catch receives a non-Error object", async () => {
+      mockFetch.mockRejectedValueOnce(42);
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "restaurants" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Unknown error");
+    });
+  });
+
+  describe("searchPlaces - API error without message", () => {
+    it("should fall back to 'API request denied' when error.message is empty", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            error: {
+              message: "",
+              status: "PERMISSION_DENIED",
+            },
+          }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("API request denied");
+    });
+  });
+
+  describe("transformPlace - missing optional fields", () => {
+    it("should handle place with no displayName, no formattedAddress, no location", async () => {
+      // A place with minimal fields to cover the fallback branches in transformPlace
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            places: [
+              {
+                id: "ChIJminimal",
+                // displayName omitted → name should be "Unknown"
+                // formattedAddress omitted → address should be ""
+                // location omitted → lat/lng should be 0
+                // rating omitted → should be null
+                // types omitted → should be empty array
+                // regularOpeningHours omitted → is_open/opening_hours should be null
+              },
+            ],
+          }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=test",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.places).toHaveLength(1);
+      expect(data.places[0]).toMatchObject({
+        name: "Unknown",
+        address: "",
+        rating: null,
+        reviews_count: 0,
+        price_level: null,
+        types: [],
+        location: { lat: 0, lng: 0 },
+        is_open: null,
+        opening_hours: null,
+        phone_number: null,
+        international_phone: null,
+        website: null,
+        place_id: "ChIJminimal",
+      });
+    });
+
+    it("should return null for unrecognized priceLevel string", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            places: [
+              {
+                id: "ChIJunknownprice",
+                displayName: { text: "Test Place", languageCode: "es" },
+                formattedAddress: "Test address",
+                priceLevel: "PRICE_LEVEL_UNKNOWN",
+              },
+            ],
+          }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=test",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.places[0].price_level).toBeNull();
+    });
+  });
+
+  describe("searchPlaces - city not in coordinates list", () => {
+    it("should fall back to Asturias center for unknown city", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ places: [] }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=restaurants&city=UnknownVillage",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      await GET(request);
+
+      // Unknown city should use Asturias center (default) with 50km radius
+      const call = mockFetch.mock.calls[0];
+      const body = JSON.parse(call[1].body);
+      expect(body.locationBias.circle.center.latitude).toBeCloseTo(43.3619, 2);
+      expect(body.locationBias.circle.radius).toBe(50000);
+    });
+  });
+
+  describe("GET - invalid type ignored", () => {
+    it("should not include includedType for invalid type values", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ places: [] }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=test&type=invalid_type",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      await GET(request);
+
+      const call = mockFetch.mock.calls[0];
+      const body = JSON.parse(call[1].body);
+      expect(body.includedType).toBeUndefined();
     });
   });
 });

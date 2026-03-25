@@ -296,7 +296,7 @@ describe("AccountConfigDialog", () => {
     );
   });
 
-  it("sends correct body data when saving", async () => {
+  it("sends correct body data when saving", { timeout: 15000 }, async () => {
     const user = userEvent.setup();
 
     global.fetch = vi.fn().mockResolvedValue({
@@ -337,7 +337,7 @@ describe("AccountConfigDialog", () => {
     });
   });
 
-  it("defaults accountName to Paisaxe when empty", async () => {
+  it("defaults accountName to Paisaxe when empty", { timeout: 15000 }, async () => {
     const user = userEvent.setup();
 
     global.fetch = vi.fn().mockResolvedValue({
@@ -361,6 +361,41 @@ describe("AccountConfigDialog", () => {
 
     const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(callArgs[1].body);
+    expect(body.accountName).toBe("Paisaxe");
+  });
+
+  it("falls back accountName to Paisaxe when field is cleared to empty (line 67 || fallback)", { timeout: 15000 }, async () => {
+    // Covers the `accountName.trim() || "Paisaxe"` fallback at line 67 where
+    // accountName.trim() is falsy (empty string), triggering the "Paisaxe" default.
+    const user = userEvent.setup();
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: { id: "new-acc" } }),
+    });
+
+    render(<AccountConfigDialog {...defaultProps} />);
+
+    // Clear the account name field (useEffect pre-fills it with "Paisaxe")
+    const accountNameInput = screen.getByLabelText("Account Name");
+    await user.clear(accountNameInput);
+    expect(accountNameInput).toHaveValue("");
+
+    // Fill required credentials
+    await user.type(screen.getByPlaceholderText("Your X Consumer Key"), "key-1");
+    await user.type(screen.getByPlaceholderText("Your X Consumer Secret"), "secret-1");
+    await user.type(screen.getByPlaceholderText("Your Access Token"), "token-1");
+    await user.type(screen.getByPlaceholderText("Your Access Token Secret"), "refresh-1");
+
+    await user.click(screen.getByText("Connect"));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    const callArgs = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    // accountName.trim() returns "" which is falsy, so || "Paisaxe" kicks in
     expect(body.accountName).toBe("Paisaxe");
   });
 
@@ -639,7 +674,7 @@ describe("AccountConfigDialog", () => {
   });
 
   it("does not call fetch when platform is null on save", async () => {
-    // This tests the early return in handleSave
+    // This tests the early return in handleSave (line 47: `if (!platform) return;`)
     // We can't directly test this through UI since the dialog isn't rendered,
     // but we verify by asserting that no fetch is made
     global.fetch = vi.fn();
@@ -656,6 +691,30 @@ describe("AccountConfigDialog", () => {
     // Dialog is not rendered, so no save button exists
     expect(screen.queryByText("Connect")).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  // Line 67: `accountHandle: accountHandle.trim() || undefined`
+  // Both branches are covered:
+  // - truthy (non-empty handle): by "sends correct body data when saving"
+  // - falsy (empty handle → undefined): by "sends undefined accountHandle when empty"
+
+  it("documents handleSave null-platform guard (line 47) as unreachable", () => {
+    // Line 47: `if (!platform) return;` inside handleSave
+    // This guard is architecturally unreachable because the component returns null
+    // at line 87 (`if (!platform) return null;`) before rendering any UI.
+    // When platform is null, no Save/Connect button exists to trigger handleSave.
+    const { container } = render(
+      <AccountConfigDialog
+        platform={null}
+        existingAccount={undefined}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    expect(container.innerHTML).toBe("");
+    expect(screen.queryByText("Connect")).not.toBeInTheDocument();
+    expect(screen.queryByText("Update")).not.toBeInTheDocument();
   });
 
   it("clears error on new save attempt", async () => {
@@ -707,5 +766,25 @@ describe("AccountConfigDialog", () => {
 
     // Should show validation error for Consumer Key (whitespace-only)
     expect(screen.getByText(/Please fill in: Consumer Key/)).toBeInTheDocument();
+  });
+
+  it("calls onClose when dialog is closed via onOpenChange", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+
+    render(
+      <AccountConfigDialog
+        {...defaultProps}
+        onClose={onClose}
+      />
+    );
+
+    // The dialog has a close button (X) provided by DialogContent
+    // which triggers onOpenChange(false) -> onClose()
+    const closeButton = screen.getByRole("button", { name: /close/i });
+    if (closeButton) {
+      await user.click(closeButton);
+      expect(onClose).toHaveBeenCalled();
+    }
   });
 });

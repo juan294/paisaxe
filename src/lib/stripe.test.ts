@@ -68,6 +68,12 @@ describe("stripe", () => {
       expect(expiry.getTime()).toBeGreaterThanOrEqual(before + expectedMs);
       expect(expiry.getTime()).toBeLessThanOrEqual(after + expectedMs);
     });
+
+    it("should throw error for unknown purchase type", () => {
+      expect(() =>
+        calculateExpiryDate("weekly_pass" as "day_pass")
+      ).toThrow("Unknown purchase type: weekly_pass");
+    });
   });
 
   describe("formatPrice", () => {

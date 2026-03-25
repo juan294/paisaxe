@@ -505,6 +505,66 @@ describe("StoryTranslationsTab", () => {
     });
   });
 
+  describe("success message auto-clears", () => {
+    it("clears success message after 3s for generate all", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { act } = await import("@testing-library/react");
+
+      render(<StoryTranslationsTab story={mockStory} />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /generate all translations/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /generate all translations/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Generated 4/5 translations")).toBeInTheDocument();
+      });
+
+      // Advance timers by 3 seconds to trigger the auto-clear
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Generated 4/5 translations")).not.toBeInTheDocument();
+      });
+
+      vi.useRealTimers();
+    });
+
+    it("clears success message after 3s for regenerate single locale", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { act } = await import("@testing-library/react");
+
+      render(<StoryTranslationsTab story={mockStory} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Regenerate")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("Regenerate"));
+
+      await waitFor(() => {
+        expect(screen.getByText(`${LOCALE_NAMES["en"]} regenerated`)).toBeInTheDocument();
+      });
+
+      // Advance timers by 3 seconds to trigger the auto-clear
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText(`${LOCALE_NAMES["en"]} regenerated`)).not.toBeInTheDocument();
+      });
+
+      vi.useRealTimers();
+    });
+  });
+
   describe("error state", () => {
     it("shows error message when initial fetch fails", async () => {
       vi.mocked(fetchStoryTranslations).mockResolvedValue({
@@ -615,6 +675,111 @@ describe("StoryTranslationsTab", () => {
 
       // The status text should show "pending"
       expect(screen.getByText("pending")).toBeInTheDocument();
+    });
+  });
+
+  describe("edge case branches", () => {
+    it("handles fetchStoryTranslations returning data with missing locale translations (line 97/103 fallback)", async () => {
+      // translations object doesn't include 'en' but status does
+      vi.mocked(fetchStoryTranslations).mockResolvedValue({
+        data: {
+          storyId: "story-1",
+          original: {
+            title: "Titulo",
+            subtitle: "Sub",
+            description: "Desc",
+          },
+          translations: {}, // no translations for any locale
+          status: {
+            en: { status: "pending" },
+          },
+        },
+      });
+
+      render(<StoryTranslationsTab story={mockStory} />);
+
+      await waitFor(() => {
+        // EN tab should be selected by default
+        // Translation fields should be empty (fallback { title: "", subtitle: "", description: "" })
+        const titleInput = screen.getByLabelText("Title", { selector: "input" });
+        expect(titleInput).toHaveValue("");
+      });
+
+      // Status should still show pending
+      expect(screen.getByText("pending")).toBeInTheDocument();
+    });
+
+    it("handles fetchStoryTranslations returning data with missing locale status (line 108 fallback)", async () => {
+      // status object doesn't include 'en' but translations does
+      vi.mocked(fetchStoryTranslations).mockResolvedValue({
+        data: {
+          storyId: "story-1",
+          original: {
+            title: "Titulo",
+            subtitle: "",
+            description: "",
+          },
+          translations: {
+            en: { title: "English Title", subtitle: "", description: "" },
+          },
+          status: {}, // no status for any locale
+        },
+      });
+
+      render(<StoryTranslationsTab story={mockStory} />);
+
+      await waitFor(() => {
+        const titleInput = screen.getByLabelText("Title", { selector: "input" });
+        expect(titleInput).toHaveValue("English Title");
+      });
+
+      // No status badge should be shown (status is null)
+      // Count should be 0 complete
+      expect(screen.getByText(`0/${TRANSLATION_LOCALES.length} complete`)).toBeInTheDocument();
+    });
+  });
+
+  describe("edge case: no error and no data responses", () => {
+    it("handles loadTranslations when fetch returns neither error nor data (line 97 false branch)", async () => {
+      // When fetchStoryTranslations returns { error: undefined, data: undefined },
+      // neither the error nor the data branch executes. The component should
+      // still finish loading without crashing.
+      vi.mocked(fetchStoryTranslations).mockResolvedValue({});
+
+      render(<StoryTranslationsTab story={mockStory} />);
+
+      // Should complete loading (spinner disappears) even without data
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /generate all translations/i })).toBeInTheDocument();
+      });
+
+      // Fields should remain at their initial empty values
+      const titleInput = screen.getByLabelText("Title", { selector: "input" });
+      expect(titleInput).toHaveValue("");
+    });
+
+    it("handles generateAll when response returns neither error nor data (line 172 false branch)", async () => {
+      const user = userEvent.setup();
+
+      // generateStoryTranslations returns neither error nor data
+      vi.mocked(generateStoryTranslations).mockResolvedValue({});
+
+      render(<StoryTranslationsTab story={mockStory} />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /generate all translations/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /generate all translations/i }));
+
+      // Should not show error or success message — the button should re-enable
+      await waitFor(() => {
+        const button = screen.getByRole("button", { name: /generate all translations/i });
+        expect(button).not.toBeDisabled();
+      });
+
+      // No success or error messages
+      expect(screen.queryByText(/generated/i)).not.toBeInTheDocument();
     });
   });
 

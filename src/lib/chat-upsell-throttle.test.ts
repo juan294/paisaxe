@@ -185,5 +185,24 @@ describe("chat-upsell-throttle", () => {
         resetUpsellThrottle();
       }).not.toThrow();
     });
+
+    it("returns default state when window is undefined (SSR)", () => {
+      // Temporarily make typeof window === "undefined" to cover getState SSR branch
+      const originalWindow = globalThis.window;
+      // @ts-expect-error - intentionally setting window to undefined for SSR test
+      delete globalThis.window;
+
+      try {
+        // canShowUpsell internally calls getState(), which returns defaults when no window
+        expect(canShowUpsell(0)).toBe(true);
+        // recordUpsellShown calls getState() + saveState() — both bail out on SSR
+        recordUpsellShown();
+        // resetUpsellThrottle bails out when no window
+        resetUpsellThrottle();
+      } finally {
+        // Restore window
+        globalThis.window = originalWindow;
+      }
+    });
   });
 });

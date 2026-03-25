@@ -84,6 +84,36 @@ describe("manual-costs", () => {
       expect(result).toEqual([]);
     });
 
+    it("maps notes to undefined when notes is null", async () => {
+      const dbRow = {
+        serviceId: "vercel",
+        serviceName: "Vercel",
+        category: "infrastructure",
+        costUsd: 20,
+        billingPeriodStart: "2024-01-01",
+        billingPeriodEnd: "2024-01-31",
+        notes: null,
+        createdBy: "user-1",
+        createdAt: "2024-01-01T00:00:00Z",
+        updatedAt: "2024-01-01T00:00:00Z",
+      };
+
+      mockSupabase({
+        select: vi.fn().mockReturnValue({
+          gte: vi.fn().mockReturnValue({
+            lte: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [dbRow], error: null }),
+            }),
+          }),
+        }),
+      });
+
+      const result = await fetchManualCosts("2024-01-01", "2024-01-31");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].notes).toBeUndefined();
+    });
+
     it("returns empty array when data is null without error", async () => {
       mockSupabase({
         select: vi.fn().mockReturnValue({
@@ -209,6 +239,14 @@ describe("manual-costs", () => {
       const result = await updateManualCost("cost-1", { costUsd: 25 });
       expect(result).toBeNull();
     });
+
+    it("returns null when createAdminClient throws", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+      });
+      const result = await updateManualCost("cost-1", { costUsd: 25 });
+      expect(result).toBeNull();
+    });
   });
 
   describe("deleteManualCost", () => {
@@ -285,6 +323,14 @@ describe("manual-costs", () => {
       });
 
       const result = await getManualCost("non-existent");
+      expect(result).toBeNull();
+    });
+
+    it("returns null when createAdminClient throws", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+      });
+      const result = await getManualCost("cost-1");
       expect(result).toBeNull();
     });
   });

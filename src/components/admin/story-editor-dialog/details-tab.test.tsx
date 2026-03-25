@@ -1,8 +1,56 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DetailsTab } from "./details-tab";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
+
+// Mock Select components to make onValueChange testable in jsdom.
+// Each Select renders as a native <select> element with data-select-id matching its trigger id.
+vi.mock("@/components/ui/select", async () => {
+  const React = await import("react");
+  // Context to pass onValueChange from Select root to child SelectTrigger
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const SelectContext = React.createContext<any>({});
+
+  return {
+    Select: ({ children, value, onValueChange }: { children: React.ReactNode; value: string; onValueChange: (v: string) => void }) => (
+      <SelectContext.Provider value={{ onValueChange, value }}>
+        {children}
+      </SelectContext.Provider>
+    ),
+    SelectTrigger: ({ children, id }: { children: React.ReactNode; id?: string }) => {
+      const ctx = React.useContext(SelectContext);
+      return (
+        <>
+          <button data-testid={`select-trigger-${id}`}>{children}</button>
+          <select
+            data-testid={`select-native-${id}`}
+            value={ctx.value ?? ""}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => ctx.onValueChange?.(e.target.value)}
+          >
+            <option value="" />
+            <option value="nature">Nature</option>
+            <option value="cities">Cities</option>
+            <option value="culture">Culture</option>
+            <option value="food">Food</option>
+            <option value="activities">Activities</option>
+            <option value="eastern">Eastern Asturias</option>
+            <option value="central">Central Asturias</option>
+            <option value="western">Western Asturias</option>
+            <option value="day-trip">Day Trip</option>
+            <option value="weekend">Weekend</option>
+            <option value="week">Week</option>
+          </select>
+        </>
+      );
+    },
+    SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
+    SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    SelectItem: ({ children }: { children: React.ReactNode; value: string }) => (
+      <div>{children}</div>
+    ),
+  };
+});
 
 // Default props factory
 function makeProps(overrides?: Partial<React.ComponentProps<typeof DetailsTab>>) {
@@ -384,6 +432,46 @@ describe("DetailsTab", () => {
       expect(screen.getByLabelText("URL Slug")).toHaveValue("");
       expect(screen.getByLabelText("Subtitle")).toHaveValue("");
       expect(screen.getByLabelText("Description")).toHaveValue("");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Edge cases
+  // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // Select onChange handlers (lines 103, 163, 182)
+  // ---------------------------------------------------------------------------
+
+  describe("select onChange handlers", () => {
+    it("calls onCategoryChange when category select changes", () => {
+      const props = makeProps();
+      render(<DetailsTab {...props} />);
+
+      const categorySelect = screen.getByTestId("select-native-category") as HTMLSelectElement;
+      fireEvent.change(categorySelect, { target: { value: "cities" } });
+
+      expect(props.onCategoryChange).toHaveBeenCalledWith("cities");
+    });
+
+    it("calls onLocationChange when location select changes", () => {
+      const props = makeProps({ showOptionalFields: true });
+      render(<DetailsTab {...props} />);
+
+      const locationSelect = screen.getByTestId("select-native-location") as HTMLSelectElement;
+      fireEvent.change(locationSelect, { target: { value: "western" } });
+
+      expect(props.onLocationChange).toHaveBeenCalledWith("western");
+    });
+
+    it("calls onDurationChange when duration select changes", () => {
+      const props = makeProps({ showOptionalFields: true });
+      render(<DetailsTab {...props} />);
+
+      const durationSelect = screen.getByTestId("select-native-duration") as HTMLSelectElement;
+      fireEvent.change(durationSelect, { target: { value: "weekend" } });
+
+      expect(props.onDurationChange).toHaveBeenCalledWith("weekend");
     });
   });
 
