@@ -68,3 +68,6 @@ supabase/.temp/
 .agent-context.json
 .agent-alerts.json
 scripts/agent-config.json
+
+# ElevenLabs CLI (test configs are local-only; agent/tool configs are tracked)
+test_configs/

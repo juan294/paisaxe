@@ -1,0 +1,98 @@
+{
+    "type": "webhook",
+    "name": "make_booking",
+    "description": "Make an outbound call to a restaurant or business to book a reservation for the visitor. Use this AFTER you have collected ALL required info: venue name, phone (from search_places), party size, date, time, visitor's full name, and visitor's phone number.",
+    "response_timeout_secs": 20,
+    "disable_interruptions": true,
+    "force_pre_tool_speech": false,
+    "assignments": [],
+    "tool_call_sound_behavior": "auto",
+    "tool_error_handling_mode": "auto",
+    "dynamic_variables": {
+        "dynamicVariablePlaceholders": {}
+    },
+    "execution_mode": "immediate",
+    "api_schema": {
+        "request_headers": {
+            "Content-Type": "application/json",
+            "x-mcp-secret": {
+                "secret_id": "RjXEp57KRMAgOoZiAUdU"
+            }
+        },
+        "url": "https://paisaxe.es/api/mcp/make-booking",
+        "method": "POST",
+        "path_params_schema": {},
+        "request_body_schema": {
+            "type": "object",
+            "required": [
+                "venue_name",
+                "phone_number",
+                "party_size",
+                "date",
+                "time",
+                "customer_name",
+                "customer_phone"
+            ],
+            "description": "Booking request details. Before calling, you MUST have collected: venue_name and phone_number (from search_places), party_size, date, time, customer_name (full name), and customer_phone (visitor's callback number).",
+            "properties": {
+                "venue_name": {
+                    "type": "string",
+                    "description": "Name of the venue (restaurant, hotel, activity provider) to call",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                },
+                "phone_number": {
+                    "type": "string",
+                    "description": "Phone number of the business (from search_places result)",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                },
+                "party_size": {
+                    "type": "number",
+                    "description": "Number of people for the reservation",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Date for the reservation (e.g., 'hoy', 'mañana', 'el viernes', '15 de febrero')",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                },
+                "time": {
+                    "type": "string",
+                    "description": "Time for the reservation (e.g., '21:00', 'a las nueve de la noche')",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                },
+                "customer_name": {
+                    "type": "string",
+                    "description": "Visitor's FULL NAME for the reservation (e.g., 'Juan García López')",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                },
+                "customer_phone": {
+                    "type": "string",
+                    "description": "Visitor's phone number for the restaurant to call back if needed (e.g., '612345678', '+34612345678')",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                },
+                "special_requests": {
+                    "type": "string",
+                    "description": "Any special requests (e.g., 'trona para bebé', 'mesa en terraza', 'alergia al gluten')",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                }
+            }
+        },
+        "content_type": "application/json"
+    }
+}

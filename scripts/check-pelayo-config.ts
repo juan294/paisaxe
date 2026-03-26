@@ -1,5 +1,9 @@
 #!/usr/bin/env npx tsx
 /**
+ * @deprecated Use `elevenlabs agents pull --all` instead.
+ * Agent configs are now tracked as code in agent_configs/ and tool_configs/.
+ * See: agents.json, tools.json
+ *
  * Check current Pelayo agent configuration from ElevenLabs
  */
 

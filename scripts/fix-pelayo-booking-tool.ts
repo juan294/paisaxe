@@ -1,5 +1,9 @@
 #!/usr/bin/env npx tsx
 /**
+ * @deprecated Use `elevenlabs tools push` instead.
+ * Tool configs are now tracked as code in tool_configs/.
+ * See: tools.json
+ *
  * Restore Pelayo's tools configuration
  *
  * This script recreates all webhook tools for the Pelayo agent after
