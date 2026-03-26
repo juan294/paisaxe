@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-03-24
+> Auto-generated on 2026-03-25
 
-## Health Status: GREEN
+## Health Status: YELLOW
 
-**Executive Summary:** 0 advisories detected, **0 exploitable**. Clean `npm audit` for 2nd consecutive day. All CI/CD security automation active. CSP description corrected this cycle — previous reports inaccurately stated `nonce + strict-dynamic`; actual implementation is `'self' 'unsafe-inline'` (PPR-compatible). 27 outdated packages (+2: `typescript@6.0.2` and `lucide-react@1.0.1` — both major versions), none with known exploitable vulnerabilities.
+**Executive Summary:** 1 moderate advisory detected (next@16.1.6 — 5 sub-advisories), **1 exploitable** (PPR buffering DoS). This is a **regression** from the Mar 23 fix — the `npm audit fix` that upgraded next to 16.2.1 was reverted by the `chore: sync with cc-rpi blueprint v1.12.0` commit (d3a4dd6), which reset `package.json` to `^16.1.6`. Fix: re-run `npm audit fix`. All other security controls remain intact. 28 outdated packages (+1: `stripe@20.4.1`), none with known exploitable vulnerabilities beyond next.
 
 ---
 
@@ -12,15 +12,59 @@
 
 | Severity | Package | Advisory | CVE | Attack Vector | Fixable | In Production | Risk Assessment |
 |----------|---------|----------|-----|---------------|---------|---------------|-----------------|
-| — | — | — | — | — | — | — | **No active advisories** |
+| Moderate | next@16.1.6 | GHSA-ggv3-7p47-pfv8 | — | HTTP request smuggling via rewrites | Yes | Yes (PostHog rewrites) | **Low** — Static rewrites to trusted PostHog CDN only |
+| Moderate | next@16.1.6 | GHSA-3x4c-7xq6-9pq8 | — | Unbounded next/image disk cache growth | Yes | Yes | **Low** — `remotePatterns` allowlists only Supabase + Unsplash |
+| Moderate | next@16.1.6 | GHSA-h27x-g6w4-24gq | — | Unbounded postponed resume buffering (DoS) | Yes | Yes (`cacheComponents: true`) | **Medium** — PPR enabled, attacker can trigger memory exhaustion |
+| Moderate | next@16.1.6 | GHSA-mq59-m269-xvcx | — | null origin bypasses Server Actions CSRF | Yes | No Server Actions used | **None** — No `'use server'` directives + explicit null-origin rejection in proxy.ts |
+| Moderate | next@16.1.6 | GHSA-jcc7-9wpm-mj36 | — | null origin bypasses dev HMR websocket CSRF | Yes | No (dev-only) | **None** — Development environment only |
 
-### Previously Resolved
+### Exploitability Analysis
+
+**GHSA-h27x-g6w4-24gq (PPR Buffering DoS) — EXPLOITABLE:**
+- `next.config.ts:14` has `cacheComponents: true` (PPR enabled)
+- React suspense boundaries with `use()` can buffer data without limits
+- An attacker crafting many simultaneous requests that trigger deep suspense chains can exhaust server memory
+- **Mitigating factor**: Vercel's infrastructure provides some inherent protection against memory exhaustion (serverless function limits, automatic restarts)
+- **Fix**: `npm audit fix` upgrades to next@16.2.1 which adds resume buffer limits
+
+**GHSA-ggv3-7p47-pfv8 (HTTP Smuggling) — LOW RISK:**
+- `next.config.ts:40-48` configures 2 rewrites, both to PostHog CDN (`eu-assets.i.posthog.com`, `eu.i.posthog.com`)
+- No dynamic URLs or user-controlled rewrite destinations
+- HTTP smuggling requires precise header injection — theoretical but constrained
+
+**GHSA-3x4c-7xq6-9pq8 (Image Cache DoS) — LOW RISK:**
+- `next.config.ts:74-93` restricts `remotePatterns` to `*.supabase.co` and `images.unsplash.com`
+- All image sources are database-backed or hardcoded, not user-controllable
+- `minimumCacheTTL: 2592000` (30 days) — long but bounded by allowlist
+
+**GHSA-mq59-m269-xvcx (CSRF Bypass) — NOT EXPLOITABLE:**
+- Zero `'use server'` directives in codebase (no Server Actions)
+- `src/proxy.ts:38-41`: `if (!origin) return false` explicitly rejects null-origin requests
+- `src/lib/csrf.ts:21`: `sameSite: 'strict'` prevents cross-site cookie inclusion
+
+**GHSA-jcc7-9wpm-mj36 (Dev HMR CSRF) — NOT EXPLOITABLE:**
+- Dev-only; production at paisaxe.es/paisaxe.com is unaffected
+
+### Regression Details
+
+The Mar 23 triage resolved this by running `npm audit fix` (next 16.1.6 → 16.2.1). However, commit `d3a4dd6` (`chore: sync with cc-rpi blueprint v1.12.0`) appears to have reset the dependency, reinstating next@16.1.6. The installed version confirms this:
+- `node_modules/next/package.json` → `"version": "16.1.6"`
+- `package.json` → `"next": "^16.1.6"`
+- `npm audit` reports 1 moderate vulnerability
+
+**Recommended fix:**
+```bash
+npm audit fix
+# Verify: npm list next (should show 16.2.1+)
+# Test: npm run test && npm run typecheck && npm run lint
+```
+
+### Previously Resolved (still resolved)
 
 | Advisory | Resolution | When |
 |----------|-----------|------|
 | flatted <=3.4.1 — Unbounded recursion DoS + Prototype Pollution (GHSA-25h7-pfq9-p65f, GHSA-rf6f-7fwh-wjgh) | Resolved via `npm audit fix` (upgraded to >=3.4.2) | Mar 23 |
 | undici 7.0.0–7.23.0 — WebSocket overflow, HTTP smuggling, CRLF injection, memory DoS (GHSA-f269-vfmq-vjvj + 5 others) | Resolved via `npm audit fix` (upgraded to >=7.24.0) | Mar 23 |
-| next 16.0.0-beta.0–16.1.6 — CSRF bypass, HTTP smuggling, image cache DoS, buffering DoS (GHSA-mq59-m269-xvcx + 4 others) | Resolved via `npm audit fix` (upgraded to 16.2.1) | Mar 23 |
 | minimatch 10.2.2 ReDoS (GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74) | Override updated to `>=10.2.3` in `package.json` | Mar 7–8 |
 | dompurify 3.3.1 XSS (GHSA-v2wj-7wpq-c8vv) | Resolved via dependency update | Mar 7–8 |
 | qs arrayLimit bypass (GHSA-w7fw-mjwx-p883) | Override `qs >= 6.14.2` | Earlier |
@@ -30,20 +74,19 @@
 
 ---
 
-## Changes Since Last Report (2026-03-23)
+## Changes Since Last Report (2026-03-24)
 
-| Area | Mar 23 | Mar 24 | Change |
+| Area | Mar 24 | Mar 25 | Change |
 |------|--------|--------|--------|
-| Vulnerability count | 0 | 0 | Unchanged |
-| Exploitable vulns | 0 | 0 | Unchanged |
-| CSP (actual code) | `'self' 'unsafe-inline'` | `'self' 'unsafe-inline'` | **Report corrected** — was incorrectly stated as `nonce + strict-dynamic` |
+| Vulnerability count | 0 | **1 moderate** | **Regression** — cc-rpi sync reverted next@16.2.1 to 16.1.6 |
+| Exploitable vulns | 0 | **1** (PPR DoS) | PPR buffering DoS re-exposed |
+| CSP | `'self' 'unsafe-inline'` | `'self' 'unsafe-inline'` | Unchanged |
 | dangerouslySetInnerHTML | 7 instances | 7 instances | Unchanged — all safe |
-| Outdated packages | 25 | 27 | +2 (`typescript@6.0.2`, `lucide-react@1.0.1` — both major) |
+| Outdated packages | 27 | 28 | +1 (`stripe@20.4.1`) |
+| Health status | GREEN | **YELLOW** | Due to regression |
 
-**Key changes:**
-- **CSP report corrected**: Previous reports stated `nonce-based + strict-dynamic` which was inaccurate. The actual `buildCspHeader()` in `src/proxy.ts:232-248` uses `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com` — the nonce parameter is explicitly unused (`_nonce`). `strict-dynamic` is intentionally omitted for PPR compatibility. This is the correct design per CLAUDE.md, but the report was misdescribing it.
-- **New major versions available**: `typescript@6.0.2` (from 5.9.3) and `lucide-react@1.0.1` (from 0.575.0) appeared in outdated list. Neither has known vulnerabilities.
-- **Minor version bumps**: `@supabase/supabase-js` 2.99.3→2.100.0, `@typescript-eslint/eslint-plugin` 8.57.1→8.57.2, `posthog-js` 1.363.1→1.363.3, `@vitest/coverage-v8` 4.1.0→4.1.1, `knip` 6.0.2→6.0.4.
+**Key change:**
+- **Next.js version regression**: The `chore: sync with cc-rpi blueprint v1.12.0` commit (d3a4dd6) reset `package.json` to `"next": "^16.1.6"`, undoing the Mar 23 upgrade to 16.2.1. This reintroduced 5 sub-advisories, 1 exploitable (PPR buffering DoS). Fix: `npm audit fix`.
 
 ---
 
@@ -153,6 +196,7 @@ form-action 'self'
 | Hardcoded secrets | None — all via env vars with `.trim()` |
 | Command injection | None — all command execution uses whitelist + hardcoded literals + admin auth + dev-only gates |
 | `dangerouslySetInnerHTML` | 7 instances — all safe (see below) |
+| Server Actions (`'use server'`) | None found — uses API routes exclusively |
 
 **`dangerouslySetInnerHTML` audit:**
 
@@ -166,9 +210,9 @@ form-action 'self'
 
 | File | Usage | Safe? | Why |
 |------|-------|-------|-----|
-| `src/app/api/admin/agents/run/route.ts` | `spawn("bash", [scriptPath])` | Yes | Script path from whitelisted `AGENT_SCRIPTS` object, admin auth required |
+| `src/app/api/admin/agents/run/route.ts` | `spawn("bash", [scriptPath])` | Yes | Script path from whitelisted `AGENT_SCRIPTS` object (7 entries), admin auth required |
 | `src/lib/claude.ts` | `spawn("curl", [...])` | Yes | Dev-only (`NODE_ENV !== "production"`), env var source trusted |
-| `src/app/api/admin/tunnel/route.ts` | `spawn("cloudflared", [...])` | Yes | Hardcoded values, dev-only restriction |
+| `src/app/api/admin/tunnel/route.ts` | `spawn("cloudflared", [...])` / `execAsync(...)` | Yes | Hardcoded values, dev-only restriction |
 
 **Note:** `regex.exec()` calls in `agents-summary/route.ts` and `chat-action-detection.ts` are RegExp methods, not shell execution — no injection risk.
 
@@ -202,7 +246,7 @@ form-action 'self'
 |---------|---------|-------|------|
 | @img/sharp-libvips-darwin-arm64@1.2.4 | LGPL-3.0-or-later | Native binary dep of `sharp` (production) | **Low** — Dynamic linking, SaaS deployment, no source distribution. Approved in `docs/project/license-exceptions.md` |
 | @vercel/analytics@1.6.1 | MPL-2.0 | Direct production dependency | **Low** — Used as-is, no modifications to MPL files. Note: v2.0.1 available — verify license unchanged before upgrading |
-| dompurify@3.3.2 | (MPL-2.0 OR Apache-2.0) | Transitive via `posthog-js` (production) | **None** — Dual-licensed, Apache-2.0 applies |
+| dompurify@3.3.3 | (MPL-2.0 OR Apache-2.0) | Transitive via `posthog-js` (production) | **None** — Dual-licensed, Apache-2.0 applies |
 | expand-template@2.0.3 | (MIT OR WTFPL) | Transitive via `canvas` → `prebuild-install` | **None** — MIT applies |
 | paisaxe@1.0.0 | UNLICENSED | This project's package.json (`"private": true`) | **None** — Private/internal project |
 
@@ -214,39 +258,41 @@ form-action 'self'
 
 | Package | Current | Latest | Dep Type | Security Impact | Priority |
 |---------|---------|--------|----------|-----------------|----------|
+| **next** | **16.1.6** | **16.2.1** | **prod** | **5 sub-advisories (1 exploitable)** | **HIGH — fix now** |
 | @anthropic-ai/sdk | 0.78.0 | 0.80.0 | prod | None known (minor) | Low |
-| @elevenlabs/react | 0.14.1 | 0.14.3 | prod | None known (patch) | Low |
+| @elevenlabs/react | 0.14.1 | 0.15.0 | prod | Minor version — review changelog | Low |
 | @next/bundle-analyzer | 16.1.6 | 16.2.1 | dev | None (build tooling) | Low |
 | @next/eslint-plugin-next | 16.1.6 | 16.2.1 | dev | None (lint tooling) | Low |
-| @stripe/stripe-js | 8.9.0 | 8.11.0 | prod | Payment library — review changelog | Medium |
+| @stripe/react-stripe-js | 5.6.0 | 5.6.1 | prod | Payment library — patch | Low |
+| @stripe/stripe-js | 8.8.0 | 8.11.0 | prod | Payment library — review changelog | Medium |
 | @supabase/ssr | 0.8.0 | 0.9.0 | prod | Auth library — minor version | Medium |
-| @supabase/supabase-js | 2.98.0 | 2.100.0 | prod | Core client — minor version | Medium |
+| @supabase/supabase-js | 2.97.0 | 2.100.0 | prod | Core client — minor version | Medium |
 | @tailwindcss/postcss | 4.2.1 | 4.2.2 | dev | None (styling tooling) | Low |
-| @types/node | 25.3.5 | 25.5.0 | dev | None (type definitions) | Low |
 | @typescript-eslint/eslint-plugin | 8.56.1 | 8.57.2 | dev | None (lint tooling) | Low |
-| @upstash/redis | 1.36.3 | 1.37.0 | prod | Rate limiting backend — minor | Low |
+| @upstash/redis | 1.36.2 | 1.37.0 | prod | Rate limiting backend — minor | Low |
 | @vercel/analytics | 1.6.1 | 2.0.1 | prod | **Major version** — review changelog + license | Medium |
 | @vercel/speed-insights | 1.3.1 | 2.0.0 | prod | **Major version** — review changelog | Medium |
 | @vitejs/plugin-react | 5.1.4 | 6.0.1 | dev | **Major version** — dev tooling only | Low |
-| @vitest/coverage-v8 | 4.0.18 | 4.1.1 | dev | None (dev tooling) | Low |
 | canvas | 3.2.1 | 3.2.2 | dev | PDF test rendering — patch | Low |
 | jsdom | 28.1.0 | 27.0.1 | dev | Version mismatch (current is ahead) | None |
-| knip | 5.85.0 | 6.0.4 | dev | **Major version** — dead code detection tooling | Low |
-| lucide-react | 0.575.0 | 1.0.1 | prod | **Major version (0.x → 1.0)** — icon library, review breaking changes | Medium |
+| knip | 5.85.0 | 6.0.5 | dev | **Major version** — dead code detection tooling | Low |
+| lucide-react | 0.575.0 | 1.6.0 | prod | **Major version (0.x → 1.x)** — icon library, review breaking changes | Medium |
 | pdfjs-dist | 5.4.624 | 5.5.207 | prod | PDF parsing — monitor | Medium |
-| posthog-js | 1.359.1 | 1.363.3 | prod | None known | Low |
-| resend | 6.9.3 | 6.9.4 | prod | Email service — patch | Low |
+| postcss | 8.5.6 | 8.5.8 | dev | None (CSS tooling) | Low |
+| posthog-js | 1.353.0 | 1.363.5 | prod | None known | Low |
+| resend | 6.9.2 | 6.9.4 | prod | Email service — patch | Low |
+| stripe | 20.3.1 | 20.4.1 | prod | Payment server SDK — patch | Low |
 | tailwindcss | 4.2.1 | 4.2.2 | dev | None (styling tooling) | Low |
 | typescript | 5.9.3 | 6.0.2 | dev | **Major version** — TypeScript 6.0 | Medium |
-| vitest | 4.0.18 | 3.2.4 | dev | Version mismatch (current is ahead) | None |
+| vitest | 4.1.1 | 3.2.4 | dev | Version mismatch (current is ahead) | None |
 | voyageai | 0.1.0 | 0.2.1 | prod | None known | Low |
 
-**Note:** `jsdom` and `vitest` show version format mismatches in `npm outdated` output — these are at or ahead of the latest published version. No security implications. `@upstash/ratelimit` shows `v2.0.8 -> 2.0.8` — display artifact, same version.
+**Note:** `jsdom` and `vitest` show version format mismatches in `npm outdated` output — these are at or ahead of the latest published version. No security implications.
 
-**New major versions this cycle:**
-- **`typescript@6.0.2`** — TypeScript 6.0. Dev-only. Review breaking changes before upgrading. No security impact.
-- **`lucide-react@1.0.1`** — First stable release (0.x → 1.0). Production dependency. Review migration guide for renamed/removed icons.
-- `@vercel/analytics` (v2.0.1), `@vercel/speed-insights` (v2.0.0), `@vitejs/plugin-react` (v6.0.1), `knip` (v6.0.4) — unchanged from last report.
+**New this cycle:**
+- **next@16.1.6 regression** — was 16.2.1 on Mar 23–24, reverted by cc-rpi blueprint sync. The only package with active advisories. `npm audit fix` resolves it.
+- **stripe@20.4.1** — new patch available (from 20.3.1). No known vulnerabilities.
+- **lucide-react@1.6.0** — jumped from 1.0.1 to 1.6.0 since last check. Major version gap from installed 0.575.0.
 
 ---
 
@@ -265,6 +311,8 @@ form-action 'self'
 | Pre-commit hooks | Active | Typecheck + lint + test via Husky |
 | npm overrides | Active | `qs >= 6.14.2`, `minimatch >= 10.2.3` |
 
+**CI note on current advisory:** `npm audit --omit=dev --audit-level=high` in CI will NOT flag the next@16.1.6 advisory (it is classified as "moderate", below the "high" threshold). CI continues passing despite the regression. This is by design — moderate advisories are informational in CI, tracked by this report.
+
 **All CI/CD security automation gaps are closed.** No outstanding gaps.
 
 ---
@@ -273,45 +321,47 @@ form-action 'self'
 
 | Metric | Value |
 |--------|-------|
-| Total Advisories | **0** |
+| Total Advisories | **1** (moderate) |
 | Critical | 0 |
 | High | 0 |
-| Moderate | 0 |
+| Moderate | **1** (next@16.1.6 — 5 sub-advisories) |
 | Low | 0 |
-| **Exploitable** | **0** |
-| Fixable via npm audit | 0 (none outstanding) |
+| **Exploitable** | **1** (PPR buffering DoS — GHSA-h27x-g6w4-24gq) |
+| Fixable via npm audit | **1** |
 | License Compliant | Yes |
 | Webhook Security | All timing-safe (4/4 endpoints) |
 | CSRF Protection | Yes (double-submit cookie + null-origin rejection) |
 | CSP | PPR-compatible (`'self' 'unsafe-inline'`, no `strict-dynamic`) |
 | Rate Limiting | Yes (distributed via Upstash Redis) |
 | CI Secret Scanning | Yes (Gitleaks in workflow) |
-| **Health Status** | **GREEN** |
+| **Health Status** | **YELLOW** |
 
 ### Architecture Mitigations
 
-1. **Clean npm audit** — Zero advisories across all severity levels, 2nd consecutive clean day
-2. **PPR-compatible CSP** — `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com` + E2E canary test
-3. **CSRF protection** — Double-submit cookie with timing-safe validation on all mutating requests
-4. **Timing-safe everywhere** — All 7 security-critical comparison points use `timingSafeEqual`
-5. **Input sanitization** — `sanitizeInput()` + `escapeHtml()` cover all user-facing input paths
-6. **HTML escaping** — All `dangerouslySetInnerHTML` instances pre-escape content via `escapeHtml()` or `JSON.stringify()`
-7. **No command injection** — All exec/spawn calls use whitelisted literals with admin auth + dev-only gates
-8. **Full CI/CD security** — Dependabot + Gitleaks + npm audit + license check + Knip + branch protection
+1. **PPR-compatible CSP** — `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com` + E2E canary test
+2. **CSRF protection** — Double-submit cookie with timing-safe validation on all mutating requests + null-origin rejection
+3. **Timing-safe everywhere** — All 7 security-critical comparison points use `timingSafeEqual`
+4. **Input sanitization** — `sanitizeInput()` + `escapeHtml()` cover all user-facing input paths
+5. **HTML escaping** — All `dangerouslySetInnerHTML` instances pre-escape content via `escapeHtml()` or `JSON.stringify()`
+6. **No command injection** — All exec/spawn calls use whitelisted literals with admin auth + dev-only gates
+7. **No SQL injection** — All database queries parameterized via Supabase client
+8. **No Server Actions** — Zero `'use server'` directives, eliminating Server Action attack surface
+9. **Full CI/CD security** — Dependabot + Gitleaks + npm audit + license check + Knip + branch protection
 
 ### Improvement Backlog
 
 | Item | Priority | Effort | Impact | Status |
 |------|----------|--------|--------|--------|
-| Evaluate lucide-react v1.0.1 (major) | Medium | Medium | Icon library, check migration guide | New |
-| Evaluate typescript v6.0.2 (major) | Medium | Medium | Dev tooling, check breaking changes | New |
+| **Re-run `npm audit fix`** (next 16.1.6 → 16.2.1) | **High** | Low | Closes 5 sub-advisories, 1 exploitable | **Regression — fix now** |
+| Evaluate lucide-react v1.6.0 (major) | Medium | Medium | Icon library, check migration guide | Open |
+| Evaluate typescript v6.0.2 (major) | Medium | Medium | Dev tooling, check breaking changes | Open |
 | Update @stripe/stripe-js to 8.11.0 | Low | Low | Payment library patch | Open |
 | Update @supabase/ssr to 0.9.0 | Low | Low | Auth library update | Open |
 | Update @supabase/supabase-js to 2.100.0 | Low | Low | Core client update | Open |
 | Update pdfjs-dist to 5.5.207 | Low | Medium | PDF parsing update, may have fixes | Open |
 | Evaluate @vercel/analytics v2.0.1 | Low | Medium | Major version — check changelog + license | Open |
 | Evaluate @vercel/speed-insights v2.0.0 | Low | Medium | Major version — check changelog | Open |
-| Evaluate knip v6.0.4 | Low | Medium | Major version — check breaking changes | Open |
+| Evaluate knip v6.0.5 | Low | Medium | Major version — check breaking changes | Open |
 
 ---
 

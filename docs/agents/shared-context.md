@@ -2,6 +2,24 @@
 > Cross-agent intelligence — agents read this before running and write findings after finishing.
 > Pruned automatically to keep the last 3 entries per agent.
 
+<!-- ENTRY:START agent=documentation_agent timestamp=2026-03-26T06:00:00Z -->
+## Documentation Agent — 2026-03-26
+- **Status: GREEN** — No documentation gaps found. All 16 flagged feature flags already documented in `docs/project/features.md`. All 50 flagged API routes are either internal or already documented.
+- **CLAUDE.md**: Current (last modified 2026-03-25)
+- **features.md**: Complete — 25 feature flags documented across 6 categories, all user-facing features described
+- **Gap detection improvement**: The gap script checks flags against CLAUDE.md but they live in `features.md` — consider updating the script to check both files.
+- **Modified files**: 6 test files only — no feature changes requiring documentation updates.
+- **No new migrations** since last documentation update.
+
+**Cross-agent recommendations:**
+- Coverage Agent: No documentation-related coverage gaps. All feature descriptions align with test coverage targets.
+- Security Agent: No documentation changes needed this cycle.
+- QA Agent: No new features or flags to add to mock sets. Current 29 flags in QA mock set should remain stable.
+- Code Quality Agent: Gap detection script (`scripts/agents/documentation-agent.sh` or similar) should be updated to check `docs/project/features.md` in addition to CLAUDE.md for feature flag documentation.
+- Performance Agent: No documentation-impacting changes.
+- Cost Analyst Agent: No cost-related documentation concerns.
+- Localization Agent: No locale-related documentation concerns.
+
 <!-- ENTRY:START agent=triage timestamp=2026-03-25T07:30:00Z -->
 ## Triage — 2026-03-25
 - **Reports processed**: 5 (cc-rpi-update, cost-analyst, coverage, documentation, localization)
@@ -14,6 +32,24 @@
 - Code Quality Agent: Dead code carried items still present (chat-action-detection.ts:321, image-optimization.ts:130-131, i18n/provider.tsx:25-26, story-editor-dialog disconnected fullscreen state). No regression.
 - QA Agent: No new issues. All journeys stable. MCP E2E at 0% — 10th consecutive report.
 <!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-26T02:35:00Z -->
+## Coverage Agent — 2026-03-26
+- **Test suite**: ✅ 100% passing (5660 tests, 0 failures) — +12 new tests
+- **TypeScript**: ✅ No errors
+- **Overall coverage**: 98.68% statements (unchanged), **96.12% branch (+0.04%)**, 98.71% function (unchanged), 99.08% line (unchanged)
+- **3 API routes reached 100% branch**: `health/route.ts` (93.54→100%), `chat/stream/route.ts` (93.75→100%), `marketing/agent/route.ts` (95.83→100%)
+- **Fullscreen button**: iPad Pro detection branch covered (91.3→95.65% branch)
+- **Admin panels**: Skeleton loading test for ElevenLabs panel, OS/Screen data rendering test for visitors panel
+- **Remaining low-coverage files**: voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — require Playwright E2E
+
+**Cross-agent recommendations:**
+- Performance Agent: No new dependencies added. All test additions are devDependency-only. No impact on bundle size.
+- Code Quality Agent: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. `story-editor-dialog/index.tsx` has disconnected fullscreen state — `state.isFullscreen` never set to `true`.
+- Security Agent: All webhook and MCP error paths remain fully covered. No regression. Health endpoint now at 100% branch — all error paths fully exercised. Chat/stream route at 100% branch.
+- QA Agent: No new testability gaps. The 2 SDK-dependent components need Playwright E2E tests for further coverage.
+- Cost Analyst Agent: No cost-related coverage gaps.
+- Localization Agent: No locale-related coverage concerns.
 
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-03-25T02:20:00Z -->
 ## Coverage Agent — 2026-03-25
@@ -90,24 +126,25 @@
 - Localization Agent: No sensitive data in translation files.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent timestamp=2026-03-22T09:00:00Z -->
-## Security Agent — 2026-03-22
-- **Status: GREEN** — **3 advisories (2 high, 1 moderate), 0 exploitable.** No changes to vulnerability landscape. flatted + undici at day 9 (dev-only). next@16.1.6 at day 5 (5 sub-advisories, all non-exploitable). All 3 fixable via `npm audit fix`.
-- **CSP**: Nonce-based + strict-dynamic, unchanged
+<!-- ENTRY:START agent=security_agent timestamp=2026-03-25T09:00:00Z -->
+## Security Agent — 2026-03-25
+- **Status: YELLOW** — **1 moderate advisory (next@16.1.6 — 5 sub-advisories), 1 exploitable** (PPR buffering DoS). **Regression** from Mar 23 fix — cc-rpi blueprint sync (d3a4dd6) reverted next@16.2.1 to 16.1.6. Fix: `npm audit fix`.
+- **Exploitable**: GHSA-h27x-g6w4-24gq — unbounded postponed resume buffering DoS. `cacheComponents: true` in next.config.ts enables PPR, making this attackable. Serverless function limits partially mitigate.
+- **Not exploitable**: CSRF bypass (no Server Actions + null-origin rejected), HTTP smuggling (static rewrites only), image cache DoS (allowlisted domains), dev HMR (dev-only).
+- **CSP**: `'self' 'unsafe-inline'` — correct, unchanged
 - **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
-- **License compliant**: No copyleft violations; same weak copyleft packages (sharp-libvips LGPL, vercel/analytics MPL). LGPL exception documented in `docs/project/license-exceptions.md`.
-- **Gap persists**: Gitleaks NOT in CI — **19th consecutive report** flagging this
-- **dangerouslySetInnerHTML audit**: 7 instances all safe (JSON.stringify or escapeHtml pre-processing) — unchanged
-- **Command injection audit**: All exec/spawn calls (3 files) use whitelisted literals + admin auth + dev-only gates. No user input in command strings.
-- **Outdated deps**: 27 packages outdated (+1: `canvas@3.2.2`), none with known exploitable vulnerabilities. `next@16.2.1` available — fixes moderate advisory. `knip@6.0.1` patch for major.
-- **CI note**: `npm audit --omit=dev --audit-level=high` in CI will NOT flag any of the 3 advisories (2 dev-only, 1 moderate below high threshold). CI continues passing.
+- **License compliant**: No copyleft violations. Same packages: sharp-libvips LGPL, vercel/analytics MPL, dompurify dual-licensed.
+- **dangerouslySetInnerHTML audit**: 7 instances all safe — unchanged
+- **Command injection audit**: All exec/spawn calls safe — unchanged. Zero `'use server'` directives (no Server Actions).
+- **Outdated deps**: 28 packages (+1: `stripe@20.4.1`). Only next has known exploitable vulnerability.
+- **CI/CD security**: All automation active. `npm audit --omit=dev --audit-level=high` does NOT catch this advisory (moderate < high threshold). CI passes despite regression.
 
 **Cross-agent recommendations:**
-- Coverage Agent: Webhook and CSRF error paths remain fully covered. Branch coverage at 94.36%. MCP routes still at 0% E2E — highest risk gap.
-- Performance Agent: `next@16.2.1` available — may include performance improvements alongside security fixes. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
-- Code Quality Agent: Run `npm audit fix` to resolve all 3 advisories. The next update (16.1.6→16.2.1) is a minor bump — review changelog for breaking changes. `knip` v6.0.1 available — major version, check breaking changes before upgrading. No new code quality issues from security perspective.
+- Coverage Agent: All webhook and CSRF error paths remain fully covered. Branch coverage at 96.08% (excellent). MCP routes improved but E2E gaps remain.
+- Performance Agent: next@16.2.1 upgrade recommended — includes both security fixes and potential performance improvements. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
+- Code Quality Agent: **Re-run `npm audit fix`** to upgrade next 16.1.6 → 16.2.1. Regression caused by cc-rpi blueprint sync. `lucide-react@1.6.0` now available (jumped from 1.0.1). `knip@6.0.5` patch available.
 - Documentation Agent: No documentation changes needed this cycle.
-- QA Agent: CSRF protection working correctly. Null-origin rejection confirmed in proxy.ts. `llm-quality.test.ts` CSRF blocker is a test bug — not a security bug. **Escalation critically overdue** (reported since Feb 15, now 10th week).
+- QA Agent: CSRF protection working correctly. No action needed. All CI gaps remain closed.
 - Cost Analyst Agent: No cost-related security concerns.
 - Localization Agent: No sensitive data in translation files.
 <!-- ENTRY:END -->
@@ -324,44 +361,26 @@
 - Cost Analyst Agent: Stripe auth failure in QA adds urgency to 38-day revenue drought investigation. Manual Day Pass purchase test on production is the #1 priority.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-25T03:00:00Z -->
-## Cost Analyst — 2026-03-25
-- **Status: WATCH** — Platform dormant for 36 days (voice) / 40 days (revenue). Fixed costs stable at $84.41/mo operational.
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-26T03:00:00Z -->
+## Cost Analyst — 2026-03-26
+- **Status: WATCH** — Platform dormant for 37 days (voice) / 41 days (revenue). Fixed costs stable at $84.41/mo operational.
 - **Total fixed (all)**: $284.41/mo | **Operational**: $84.41/mo | **Variable (Mar MTD)**: $1.15 (phone rental only)
 - **ElevenLabs**: Creator tier, 0/196,138 chars (0%). 0 voice min in March. Subscription active, next reset ~April 5.
 - **Twilio**: Balance $15.4546 (unchanged). Phone rental $1.15/mo confirmed in API. Zero SMS, zero calls.
-- **Revenue**: €0 in March (40-day drought — exceeds full calendar month by 12 days). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
+- **Revenue**: $0 in March (41-day drought — exceeds full calendar month by 13 days). Feb final: ~$9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
 - **Config files accurate**: All service tier and recurring cost values correct.
 - **Break-even**: ~52 Day Pass sales/mo needed (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
-- **March 81% complete**: ~$68.07 operational costs accrued against $0 revenue. Only 6 days remain — first complete calendar month with zero income is virtually certain.
+- **March 84% complete**: ~$70.78 operational costs accrued against $0 revenue. Only 5 days remain — first complete calendar month with zero income is virtually certain.
 
 **Cross-agent recommendations:**
 - Code Quality Agent: No config discrepancies. All service tier and recurring cost values are accurate.
 - Security Agent: No cost-related security concerns. Twilio credentials working correctly.
 - Performance Agent: Zero voice usage means ElevenLabs SDK loading is not exercised in production. Monitor for cold-start issues when activity resumes.
-- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 40-day revenue drought and 36-day voice silence need explanation.
+- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 41-day revenue drought and 37-day voice silence need explanation.
 - Coverage Agent: No cost-related coverage gaps.
 - Localization Agent: No cost-related localization concerns.
 
-<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-23T09:00:00Z -->
-## Cost Analyst — 2026-03-23
-- **Status: WATCH** — Platform dormant for 34 days (voice) / 38 days (revenue). Fixed costs stable at $84.41/mo operational.
-- **Total fixed (all)**: $284.41/mo | **Operational**: $84.41/mo | **Variable (Mar MTD)**: $1.15 (phone rental only)
-- **ElevenLabs**: Creator tier, 0/196,138 chars (0%). 0 voice min in March. Subscription active, next reset ~April 5.
-- **Twilio**: Balance $15.4546 (unchanged). Phone rental $1.15/mo confirmed in API. Zero SMS, zero calls.
-- **Revenue**: €0 in March (38-day drought — exceeds full calendar month by 10 days). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
-- **Config files accurate**: All service tier and recurring cost values correct.
-- **Break-even**: ~52 Day Pass sales/mo needed (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
-- **March 74% complete**: ~$62.63 operational costs accrued against $0 revenue. Only 8 days remain — first complete calendar month with zero income is virtually certain.
-- **QA journeys stable at 100%**: Chat panel E2E tests pass for 3rd consecutive week (per QA Mar 22). Manual production verification of voice widget and Day Pass flow remains the top priority.
-
-**Cross-agent recommendations:**
-- Code Quality Agent: No config discrepancies. All service tier and recurring cost values are accurate.
-- Security Agent: No cost-related security concerns. Twilio credentials working correctly.
-- Performance Agent: Zero voice usage means ElevenLabs SDK loading is not exercised in production. Monitor for cold-start issues when activity resumes.
-- QA Agent: Journey tests confirm chat panel loads correctly in E2E for 3rd straight week. Manual production verification of Pelayo voice widget and Day Pass purchase flow is now urgent — 38-day revenue drought and 34-day voice silence need explanation.
-- Coverage Agent: No cost-related coverage gaps.
-- Localization Agent: No cost-related localization concerns.
+<!-- (pruned: cost_analyst 2026-03-23 entry removed, keeping last 3) -->
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=cost_analyst timestamp=2026-03-24T09:00:00Z -->
@@ -407,26 +426,7 @@
 - Localization Agent: No locale-related coverage concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-23T09:00:00Z -->
-## Coverage Agent — 2026-03-23
-- **Test suite**: ✅ 100% passing (5562 tests, 0 failures) — +64 new tests
-- **TypeScript**: ✅ No errors
-- **Overall coverage**: 98.53% statements (unchanged), **95.31% branch (+0.95%)**, 98.60% function (unchanged), 98.94% line (unchanged)
-- **Branch coverage crossed 95%** — largest single-cycle improvement (+0.95%), targeting MCP routes, admin components, hooks, and app pages across 18 files
-- **17 files reached 100% branch coverage**: analytics-dashboard (72→100%), admin-tabs (83→100%), story-card (86→100%), markdown (87→100%), agent-card (97→100%), optimizer-config-panel (92→100%), tunnel-control-panel (96→100%), maintenance-config-panel (97→100%), story-translations-tab (95→100%), use-feature-flags (95→100%), use-stream-chat (97→100%), coming-soon/page (81→100%), mcp/weather (90→100%), webhooks/elevenlabs (98→100%), plus near-100% for mcp/places (84→98.8%) and mcp/make-booking (88→96.9%)
-- **MCP route coverage significantly improved**: weather 100%, places 98.8%, make-booking 96.9% — up from 84-90% range
-- **26 untestable branches documented** in coverage report (SSR guards, dead code, architectural guards, V8 async coverage limitations)
-- **Statement coverage plateau unchanged at 98.53%** — all uncovered statements remain in documented untestable categories
-- **Remaining low-coverage files**: posthog-provider (61.8%), voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — unchanged, all require Playwright E2E
-
-**Cross-agent recommendations:**
-- Performance Agent: No new dependencies added. All test additions are devDependency-only. No impact on bundle size.
-- Code Quality Agent: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. `subscription-optimizer.ts:160` `?? []` is dead (undefined routes to "review" first).
-- Security Agent: All webhook and MCP error paths remain fully covered. No regression. MCP weather at 100%, elevenlabs webhook at 100%. API route branch coverage significantly improved.
-- QA Agent: No new testability gaps. The 3 SDK-dependent components need Playwright E2E tests for further coverage. Journey tests at 100% — consider adding chat interaction coverage.
-- Cost Analyst Agent: No cost-related coverage gaps.
-- Localization Agent: No locale-related coverage concerns.
-<!-- ENTRY:END -->
+<!-- (pruned: coverage_agent 2026-03-23 entry removed, keeping last 3) -->
 
 
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-02-06T16:30:00Z -->
