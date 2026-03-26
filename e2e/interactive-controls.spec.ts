@@ -233,7 +233,12 @@ test.describe("Navigation behavior", () => {
     await expect(page.locator("h1").first()).toBeVisible();
   });
 
-  test("right arrow key advances to next story", async ({ page }) => {
+  test("right arrow key advances to next story", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "Keyboard navigation is desktop-only");
+
     const initialTitle = await page.locator("h1").first().textContent();
 
     await page.keyboard.press("ArrowRight");
@@ -245,7 +250,12 @@ test.describe("Navigation behavior", () => {
     await expect(page.locator("h1").first()).not.toHaveText(initialTitle!);
   });
 
-  test("left arrow key goes to previous story", async ({ page }) => {
+  test("left arrow key goes to previous story", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "Keyboard navigation is desktop-only");
+
     // First go to second story
     await page.keyboard.press("ArrowRight");
     await page.waitForTimeout(500);
