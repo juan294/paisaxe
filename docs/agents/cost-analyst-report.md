@@ -1,29 +1,29 @@
 # Cost Analyst Report
 
-> **Generated**: 2026-03-25 | **Period**: March 2026 (MTD, 25 days) + February 2026 (final) | **Status**: WATCH
+> **Generated**: 2026-03-26 | **Period**: March 2026 (MTD, 26 days) + February 2026 (final) | **Status**: WATCH
 
 ---
 
 ## Executive Summary
 
-**Platform dormancy extends — 36 days without a voice conversation and 40 days without revenue.** No voice conversations since February 17, no Day Pass sales since February 13. All usage metrics remain at zero for March. The revenue drought has now reached the **40-day mark** — exceeding one full calendar month by 12 days.
+**Platform dormancy extends — 37 days without a voice conversation and 41 days without revenue.** No voice conversations since February 17, no Day Pass sales since February 13. All usage metrics remain at zero for March. The revenue drought has now reached the **41-day mark** — exceeding one full calendar month by 13 days.
 
 **All systems nominal.** ElevenLabs subscription is active with 196,138 character allowance (0% utilized), Twilio balance stable at $15.45. No anomalies detected in any billing system.
 
-**Fixed costs accrue regardless.** Twenty-five days into March, ~$68.07 in operational fixed costs have accrued against $0 revenue. March is now 81% complete. The platform continues operating at 100% loss.
+**Fixed costs accrue regardless.** Twenty-six days into March, ~$70.78 in operational fixed costs have accrued against $0 revenue. March is now 84% complete. The platform continues operating at 100% loss.
 
-**March will close with $0 revenue.** Only 6 days remain. This will be the first complete calendar month with zero income since launch.
+**March will close with $0 revenue.** Only 5 days remain. This will be the first complete calendar month with zero income since launch.
 
-**Financial health: WATCH** — Extended inactivity continues. Costs are stable and predictable. No variable cost anomalies. Revenue drought now at 40 days — exceeding one full calendar month by 12 days.
+**Financial health: WATCH** — Extended inactivity continues. Costs are stable and predictable. No variable cost anomalies. Revenue drought now at 41 days — exceeding one full calendar month by 13 days.
 
-| Metric | Value | vs. Mar 24 |
+| Metric | Value | vs. Mar 25 |
 |--------|-------|-----------|
 | Total Fixed Costs (all) | $284.41/mo | -- |
 | Total Fixed Costs (operational) | **$84.41/mo** | -- |
 | Variable Costs (Mar MTD) | $1.15 | -- |
 | Total Burn (Mar projected, operational) | ~$85.56 | -- |
-| Revenue (Mar MTD) | €0.00 | -- |
-| Revenue (Feb final) | €13.93 gross / €9.98 net (~$10.78) | -- |
+| Revenue (Mar MTD) | $0.00 | -- |
+| Revenue (Feb final) | $13.93 gross / $9.98 net (~$10.78) | -- |
 | Twilio Balance | **$15.45** | -- ($15.4546) |
 | ElevenLabs Characters | **0 / 196,138 (0%)** | -- |
 | ElevenLabs Voice Min (Feb final) | 60.0 / 100 | -- |
@@ -35,7 +35,7 @@
 
 ### Fixed / Recurring Costs
 
-| Service | Tier | Monthly Cost | Category | Since | Change vs Mar 24 |
+| Service | Tier | Monthly Cost | Category | Since | Change vs Mar 25 |
 |---------|------|-------------|----------|-------|-----------------|
 | Claude Code Max | Max (20x Pro) | $200.00 | Development | 2026-01-27 | -- |
 | Supabase | Pro | $25.00 | Infrastructure | 2025-01 | -- |
@@ -64,12 +64,12 @@
 | Twilio (Phone rental) | 1 number | $1.15 | API (confirmed) |
 | Twilio (SMS) | 0 messages | $0.00 | API |
 | Twilio (Calls) | 0 minutes | $0.00 | API |
-| Stripe (Processing Fees) | 0 charges | €0.00 | -- |
+| Stripe (Processing Fees) | 0 charges | $0.00 | -- |
 | Anthropic (Claude API) | Unknown | Unknown | -- |
 | Voyage AI (Embeddings) | Unknown | Unknown | -- |
 | **Total Variable** | | **$1.15** | |
 
-*All Twilio categories at $0.00 except phone rental ($1.15). API data as of 2026-03-25T02:01 UTC. Balance remains $15.4546.*
+*All Twilio categories at $0.00 except phone rental ($1.15). API data as of 2026-03-26T02:00 UTC. Balance remains $15.4546.*
 
 ### February 2026 Final Costs (confirmed)
 
@@ -79,7 +79,7 @@
 | Twilio (Media stream) | 23 minutes | $0.09 | API |
 | Twilio (Amazon Polly TTS) | 3 units | $0.002 | API |
 | Twilio (Phone number) | 1 number | $1.15 | API |
-| Stripe (Processing Fees) | 7 charges, 1 refund | €1.96 (~$2.12) | -- |
+| Stripe (Processing Fees) | 7 charges, 1 refund | ~$2.12 | -- |
 | **Total Variable (Feb)** | | **~$2.75** | |
 
 ---
@@ -90,11 +90,11 @@
 
 | Period | Conversations | Successful | Failed/Init | Duration | Avg Duration |
 |--------|--------------|-----------|-------------|----------|-------------|
-| Mar 2026 (MTD, 25 days) | **0** | 0 | 0 | 0.0 min | -- |
+| Mar 2026 (MTD, 26 days) | **0** | 0 | 0 | 0.0 min | -- |
 | Feb 2026 (final, 28 days) | 51 | 47 | 4 | 60.0 min | 76.6 sec |
 | **Change** | **-51** | **-47** | **-4** | **-60.0 min** | **--** |
 
-**Zero voice activity since February 17** (36 consecutive days). The last Paisaxe conversation was a 16-second Visitor Guide session at 08:59 UTC on Feb 17, confirmed via ConvAI API (conv_3101khnd78cze9m9j76e8qk2rs3x).
+**Zero voice activity since February 17** (37 consecutive days). The last Paisaxe conversation was a 16-second Visitor Guide session at 08:59 UTC on Feb 17, confirmed via ConvAI API (conv_3101khnd78cze9m9j76e8qk2rs3x).
 
 **February final by agent type:**
 
@@ -127,7 +127,7 @@
 
 ### Twilio Communications
 
-| Metric | March (25 days) | February (final) | Change |
+| Metric | March (26 days) | February (final) | Change |
 |--------|----------------|-----------------|--------|
 | SMS Sent | 0 | 6 (17 segments) | -6 |
 | Usage Cost | $0.00 | $1.49 | -$1.49 |
@@ -140,19 +140,19 @@ Balance unchanged at $15.4546 since March 8. Phone rental charge visible in usag
 
 ### Stripe Revenue
 
-| Metric | March (25 days) | February (final) | Change |
+| Metric | March (26 days) | February (final) | Change |
 |--------|----------------|-----------------|--------|
 | Net Sales | 0 | 6 | -6 |
-| Gross Revenue | €0.00 | €13.93 | -€13.93 |
-| Net Revenue | €0.00 | €9.98 | -€9.98 |
+| Gross Revenue | $0.00 | $13.93 | -$13.93 |
+| Net Revenue | $0.00 | $9.98 | -$9.98 |
 
-**40-day revenue drought** — No Day Pass sales since February 13. Well past one full calendar month without income (exceeds by 12 days). Longest dry spell since launch.
+**41-day revenue drought** — No Day Pass sales since February 13. Well past one full calendar month without income (exceeds by 13 days). Longest dry spell since launch.
 
 ---
 
 ## Cost Efficiency
 
-| Metric | Current (Mar 25) | Previous (Mar 24) | Change | Trend |
+| Metric | Current (Mar 26) | Previous (Mar 25) | Change | Trend |
 |--------|-----------------|-------------------|--------|-------|
 | Fixed operational cost/mo | $84.41 | $84.41 | -- | FLAT |
 | Total monthly burn (operational) | ~$85.56 | ~$85.56 | -- | FLAT |
@@ -165,7 +165,7 @@ Balance unchanged at $15.4546 since March 8. Phone rental charge visible in usag
 | Infra cost per Day Pass sold (Feb) | $14.07 | $14.07 | -- | FLAT |
 | Revenue coverage (operational) | ~13.4% | ~13.4% | -- | FLAT |
 
-**All efficiency metrics unchanged.** No new activity to move any needle. Break-even still requires ~52 Day Pass sales/month at €1.64 net per pass.
+**All efficiency metrics unchanged.** No new activity to move any needle. Break-even still requires ~52 Day Pass sales/month at ~$1.64 net per pass.
 
 ---
 
@@ -214,11 +214,11 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 
 | Scenario | Monthly Cost (op.) | Day Passes Needed to Break Even* | Revenue at 5% Conversion |
 |----------|-------------------|----------------------------------|--------------------------|
-| Current (~50 visitors) | ~$84 | 52 passes | ~€4.10 (2.5 passes) |
-| 500 visitors | ~$170 | 104 passes | ~€42.75 (25 passes) |
-| 5,000 visitors | ~$370 | 226 passes | ~€427.50 (250 passes) |
+| Current (~50 visitors) | ~$84 | 52 passes | ~$4.10 (2.5 passes) |
+| 500 visitors | ~$170 | 104 passes | ~$42.75 (25 passes) |
+| 5,000 visitors | ~$370 | 226 passes | ~$427.50 (250 passes) |
 
-*\*At €1.64 net per Day Pass after Stripe fees.*
+*\*At ~$1.64 net per Day Pass after Stripe fees.*
 
 **Break-even point**: ~3,150 monthly visitors assuming 5% Day Pass conversion rate.
 
@@ -228,8 +228,8 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 
 | Finding | Severity | Details |
 |---------|----------|---------|
-| 40-day revenue drought | **WARNING** | No Day Pass sales since Feb 13. Exceeds one full calendar month by 12 days. Longest dry spell since launch. |
-| 36-day voice silence | **WARNING** | No Paisaxe voice conversations since Feb 17. Platform appears dormant. Exceeds one full calendar month by 8 days. |
+| 41-day revenue drought | **WARNING** | No Day Pass sales since Feb 13. Exceeds one full calendar month by 13 days. Longest dry spell since launch. |
+| 37-day voice silence | **WARNING** | No Paisaxe voice conversations since Feb 17. Platform appears dormant. Exceeds one full calendar month by 9 days. |
 | No Anthropic cost visibility | **WATCH** | Personal account has no billing API. Manual checks required. |
 
 **No new anomalies detected since Mar 9.** All systems are stable — the dormancy itself remains the primary concern. Both drought streaks now well past one full calendar month.
@@ -238,9 +238,9 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 
 ## Trend Analysis
 
-### Comparison: Mar 24 → Mar 25
+### Comparison: Mar 25 → Mar 26
 
-| Metric | Mar 24 | Mar 25 | Change | Direction |
+| Metric | Mar 25 | Mar 26 | Change | Direction |
 |--------|--------|--------|--------|-----------|
 | Fixed costs/mo (operational) | $84.41 | $84.41 | -- | FLAT |
 | Variable costs (Mar MTD) | $1.15 | $1.15 | -- | FLAT |
@@ -251,18 +251,18 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 | SMS sent (Mar MTD) | 0 | 0 | -- | FLAT |
 | Day Pass net sales (Mar MTD) | 0 | 0 | -- | FLAT |
 | Twilio balance | $15.4546 | $15.4546 | -- | FLAT |
-| Voice dormancy streak | 35 days | **36 days** | +1 day | WORSENING |
-| Revenue drought streak | 39 days | **40 days** | +1 day | WORSENING |
+| Voice dormancy streak | 36 days | **37 days** | +1 day | WORSENING |
+| Revenue drought streak | 40 days | **41 days** | +1 day | WORSENING |
 
 **Key observations:**
 
-1. **Day 36 of voice dormancy, day 40 of revenue drought.** Both streaks well past one full calendar month. Voice silence: Feb 17 → Mar 25 (36 days). Revenue drought: Feb 13 → Mar 25 (40 days, exceeding one full month by 12 days).
+1. **Day 37 of voice dormancy, day 41 of revenue drought.** Both streaks well past one full calendar month. Voice silence: Feb 17 -> Mar 26 (37 days). Revenue drought: Feb 13 -> Mar 26 (41 days, exceeding one full month by 13 days).
 
-2. **March will close with $0 revenue.** Only 6 days remain in March, and with no activity trend reversal, March is now virtually certain to be the first complete calendar month with zero revenue.
+2. **March will close with $0 revenue.** Only 5 days remain in March, and with no activity trend reversal, March is now virtually certain to be the first complete calendar month with zero revenue.
 
 3. **All metrics frozen.** Twilio balance identical to the cent ($15.4546), ElevenLabs characters at 0, zero SMS. Consistent with a completely idle platform.
 
-4. **Costs accrue steadily.** 25 days into March: ~$68.07 in operational fixed costs accrued ($84.41 / 31 × 25), with $0 revenue to offset. March is now 81% complete.
+4. **Costs accrue steadily.** 26 days into March: ~$70.78 in operational fixed costs accrued ($84.41 / 31 x 26), with $0 revenue to offset. March is now 84% complete.
 
 5. **ElevenLabs subscription healthy.** Creator tier active, 196,138 character allowance, 30 voice slots available, next annual invoice $266.20 in Feb 2027. No billing concerns.
 
@@ -273,7 +273,7 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 | Month | Operational Fixed | Variable (known) | Total Operational | Revenue (net) | Coverage |
 |-------|------------------|------------------|-------------------|---------------|----------|
 | Feb 2026 | $84.41 | ~$2.75 | ~$87.16 | ~$11.34 | ~13.0% |
-| Mar 2026 (MTD, 25 days) | $84.41* | $1.15 | ~$85.56* | $0.00 | 0% |
+| Mar 2026 (MTD, 26 days) | $84.41* | $1.15 | ~$85.56* | $0.00 | 0% |
 
 *\*Projected full month. Variable costs may increase if activity resumes.*
 
@@ -285,7 +285,7 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 
 1. **Check Anthropic billing manually** — Visit [console.anthropic.com/settings/billing](https://console.anthropic.com/settings/billing) and record March MTD spend. With the platform dormant, Anthropic usage should be minimal (only automated agents/cron).
 
-2. **Verify the platform is functioning** — 36 days without a voice conversation and 40 days without a sale warrants investigation:
+2. **Verify the platform is functioning** — 37 days without a voice conversation and 41 days without a sale warrants investigation:
    - Is the Pelayo voice widget rendering correctly?
    - Is the Day Pass purchase flow working?
    - Are there any deployment errors on Vercel?
@@ -295,11 +295,11 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 
 3. **Consider Vercel Pro necessity** — With ~50 visitors/month, the Hobby tier (50K visitors included) would suffice. Pro saves $20/mo (24% of operational costs). Evaluate whether team features or other Pro benefits justify the cost at current scale.
 
-4. **Evaluate Twilio phone number** — At $1.15/mo with zero booking calls in 36 days, consider whether to release the number. If outbound booking is not actively used, this saves $13.80/yr.
+4. **Evaluate Twilio phone number** — At $1.15/mo with zero booking calls in 37 days, consider whether to release the number. If outbound booking is not actively used, this saves $13.80/yr.
 
 ### Long-Term Planning
 
-5. **Revenue strategy is urgent** — Zero revenue for 40 days at $84.41/mo operational cost means the platform is losing ~$2.72/day. March is on track for ~$85.56 cost with $0 revenue. The break-even target of ~3,150 monthly visitors at 5% conversion is ~63x current traffic.
+5. **Revenue strategy is urgent** — Zero revenue for 41 days at $84.41/mo operational cost means the platform is losing ~$2.72/day. March is on track for ~$85.56 cost with $0 revenue. The break-even target of ~3,150 monthly visitors at 5% conversion is ~63x current traffic.
 
 6. **ElevenLabs remains well within limits** — February used 60/100 voice minutes (60%) and the character limit has increased to 196,138. The Creator tier is appropriately sized. No change needed.
 
@@ -309,16 +309,16 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 
 | Source | Method | Last Queried |
 |--------|--------|-------------|
-| ElevenLabs Subscription API | `/v1/user/subscription` | 2026-03-25 |
-| ElevenLabs ConvAI API | `/v1/convai/conversations` (page_size=5) | 2026-03-25 |
-| ElevenLabs Character Stats API | `/v1/usage/character-stats` | 2026-03-25 |
-| Twilio Usage API (This Month) | `/Usage/Records/ThisMonth` (targeted: phonenumbers-local, sms-outbound, calls-outbound) | 2026-03-25 |
-| Twilio Balance API | `/Balance.json` | 2026-03-25 |
-| Config: `service-tiers.ts` | File read | 2026-03-25 |
-| Config: `recurring-costs.ts` | File read | 2026-03-25 |
-| Config: `forecast.ts` | File read | 2026-03-25 |
+| ElevenLabs Subscription API | `/v1/user/subscription` | 2026-03-26 |
+| ElevenLabs ConvAI API | `/v1/convai/conversations` (page_size=5) | 2026-03-26 |
+| ElevenLabs Character Stats API | `/v1/usage/character-stats` | 2026-03-26 |
+| Twilio Usage API (This Month) | `/Usage/Records/ThisMonth` (targeted: phonenumbers-local, sms-outbound, calls-outbound) | 2026-03-26 |
+| Twilio Balance API | `/Balance.json` | 2026-03-26 |
+| Config: `service-tiers.ts` | File read | 2026-03-26 |
+| Config: `recurring-costs.ts` | File read | 2026-03-26 |
+| Config: `forecast.ts` | File read | 2026-03-26 |
 | Anthropic Billing | **NOT AVAILABLE** (personal account) | -- |
 
 ---
 
-*Report generated by the Paisaxe Cost Analyst Agent. Next scheduled run: 2026-03-26.*
+*Report generated by the Paisaxe Cost Analyst Agent. Next scheduled run: 2026-03-27.*

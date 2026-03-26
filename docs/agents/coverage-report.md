@@ -4,23 +4,47 @@
 > See `docs/health-report-[DATE].md` for the latest coverage data.
 > This file is kept for historical reference only and is no longer updated.
 
-> Last updated: 2026-03-25
+> Last updated: 2026-03-26
 
 ## Summary
 
-- **Total tests:** 5648 passed (+43 from 5605)
+- **Total tests:** 5660 passed (+12 from 5648)
 - **Test files:** 304 passed (100%)
-- **Statement coverage:** 98.68% (+0.16%)
-- **Branch coverage:** 96.08% (+0.67% from 95.41%)
-- **Function coverage:** 98.71% (+0.26%)
-- **Line coverage:** ~99.08% (+0.16%)
+- **Statement coverage:** 98.68% (unchanged)
+- **Branch coverage:** 96.12% (+0.04% from 96.08%)
+- **Function coverage:** 98.71% (unchanged)
+- **Line coverage:** ~99.08% (unchanged)
 - **TypeScript:** ✅ No errors
 
-**Branch coverage crossed 96%.** This cycle added 43 new tests targeting the PostHog provider production initialization path, a new pricing/loading.tsx skeleton, visitors-analytics-panel percentage thresholds, and branch gaps across 7 API routes (github-analytics, subscription-optimizer, chat, checkout/day-pass, checkout/embedded, checkout/health, marketing/dashboard, agents-summary, elevenlabs-analytics). PostHog provider coverage jumped from 61.76% to ~90%+ with production hostname mocking. Statement coverage rose to 98.68%.
+This cycle added 12 new tests targeting branch gaps across 5 files. Two API routes reached 100% branch coverage: `/api/health` (93.54% → 100%) and `/api/chat/stream` (93.75% → 100%). Fullscreen button iPad Pro detection now covered (91.3% → 95.65% branch). Marketing agent route voice-less agent branch covered (95.83% → 100%). Skeleton loading and OS/Screen data rendering tests added for admin panels.
 
 *Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
 
-## Changes This Cycle (2026-03-25)
+## Changes This Cycle (2026-03-26)
+
+### New Tests Written (+12 tests across 6 files)
+
+#### API Routes Reaching 100% Branch
+
+| File | Branch Change | What Was Covered |
+|------|---------------|------------------|
+| `health/route.ts` | 93.54% → **100%** | Null stories data `?? 0` fallback (line 75), non-Error exception in checkStories catch (line 85 both branches) |
+| `chat/stream/route.ts` | 93.75% → **100%** | Asturianu feature flag `enabled: true` path (line 106), null flagData `?? false` fallback |
+| `marketing/agent/route.ts` | 95.83% → **100%** | Agent without voice config returning `undefined` (line 224 false branch) |
+
+#### Component Branch Improvements
+
+| File | Branch Change | What Was Covered |
+|------|---------------|------------------|
+| `fullscreen-button.tsx` | 91.3% → **95.65%** | iPad Pro detection via `navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1` (line 26) |
+| `visitors-analytics-panel.tsx` | — | OS data (section 08) and Screen Size data (section 09) rendering with multiple items |
+| `elevenlabs-analytics-panel.tsx` | — | Skeleton recent conversations table rendering during loading state (line 544) — verifies 5 skeleton rows with pulse animations |
+
+### Files Reaching 100% Branch Coverage This Cycle (3 files)
+
+`health/route.ts`, `chat/stream/route.ts`, `marketing/agent/route.ts`
+
+## Changes Previous Cycle (2026-03-25)
 
 ### New Tests Written (+43 tests across 12 files)
 
@@ -162,7 +186,7 @@ These 2 files account for the bulk of the remaining coverage gap and require Pla
 
 - **Performance Agent**: No new dependencies added. All test additions are devDependency-only. No impact on bundle size.
 - **Code Quality Agent**: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321 — regex never captures `.`), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. `subscription-optimizer.ts:160` `?? []` is dead (undefined routes to "review" first). `story-editor-dialog/index.tsx` has disconnected fullscreen state — `state.isFullscreen` never set to `true`.
-- **Security Agent**: All webhook and MCP error paths remain fully covered. No regression. API route branch coverage stable at high levels.
-- **QA Agent**: No new testability gaps. The 3 SDK-dependent components need Playwright E2E tests for further coverage. Journey tests at 100% — consider adding chat interaction coverage.
+- **Security Agent**: All webhook and MCP error paths remain fully covered. No regression. Health endpoint now at 100% branch coverage — all error paths fully exercised. Chat/stream route at 100% branch.
+- **QA Agent**: No new testability gaps. The 2 SDK-dependent components need Playwright E2E tests for further coverage.
 - **Cost Analyst Agent**: No cost-related coverage gaps.
 - **Localization Agent**: No locale-related coverage concerns.
