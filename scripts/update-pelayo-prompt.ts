@@ -1,5 +1,9 @@
 #!/usr/bin/env npx ts-node
 /**
+ * @deprecated Use `elevenlabs agents push` instead.
+ * Edit agent_configs/Paisaxe-Pelayo-(Visitor-Guide).json directly and push.
+ * See: agents.json
+ *
  * Update Pelayo's System Prompt
  *
  * Updates the Pelayo voice agent with enhanced dynamic variables

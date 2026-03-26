@@ -1,0 +1,19 @@
+{
+    "tools": [
+        {
+            "type": "webhook",
+            "config": "tool_configs/search_places.json",
+            "id": "tool_2101kgqhsetcf7f8ew71176van7m"
+        },
+        {
+            "type": "webhook",
+            "config": "tool_configs/make_booking.json",
+            "id": "tool_4801kgqhsetdf3vr045n8r1h55js"
+        },
+        {
+            "type": "webhook",
+            "config": "tool_configs/get_weather.json",
+            "id": "tool_7901kgqhsetben3bbbg4p360d987"
+        }
+    ]
+}

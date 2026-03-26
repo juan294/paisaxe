@@ -1,0 +1,50 @@
+{
+    "type": "webhook",
+    "name": "search_places",
+    "description": "Search for restaurants, hotels, attractions, or activities in Asturias. Returns name, address, phone number, rating, and other details. Use this when the visitor wants recommendations or is planning to visit somewhere.",
+    "response_timeout_secs": 20,
+    "disable_interruptions": false,
+    "force_pre_tool_speech": false,
+    "assignments": [],
+    "tool_call_sound_behavior": "auto",
+    "tool_error_handling_mode": "auto",
+    "dynamic_variables": {
+        "dynamicVariablePlaceholders": {}
+    },
+    "execution_mode": "immediate",
+    "api_schema": {
+        "request_headers": {
+            "Content-Type": "application/json",
+            "x-mcp-secret": {
+                "secret_id": "RjXEp57KRMAgOoZiAUdU"
+            }
+        },
+        "url": "https://paisaxe.es/api/mcp/places",
+        "method": "POST",
+        "path_params_schema": {},
+        "request_body_schema": {
+            "type": "object",
+            "required": [
+                "query"
+            ],
+            "description": "The type of place or restaurant the user is searching for in Asturias. Include the location if mentioned. Extract from the conversation.",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query (e.g., 'sidrerías en Gijón', 'hotel cerca de Covadonga', 'restaurante Casa Marcial')",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                },
+                "location": {
+                    "type": "string",
+                    "description": "Optional: specific city or area to search in",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                }
+            }
+        },
+        "content_type": "application/json"
+    }
+}

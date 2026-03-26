@@ -38,6 +38,13 @@
     "seed-all": "npm run seed-images && npm run seed-db",
     "seed-all:clear": "npm run seed-images:clear && npm run seed-db:clear",
     "setup-elevenlabs": "tsx scripts/setup-elevenlabs-agents.ts",
+    "agents:pull": "elevenlabs agents pull --all",
+    "agents:push": "elevenlabs agents push",
+    "agents:push:dry": "elevenlabs agents push --dry-run",
+    "agents:status": "elevenlabs agents status",
+    "tools:pull": "elevenlabs tools pull --all",
+    "tools:push": "elevenlabs tools push",
+    "tools:push:dry": "elevenlabs tools push --dry-run",
     "prepare": "husky"
   },
   "dependencies": {
