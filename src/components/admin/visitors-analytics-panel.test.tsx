@@ -128,6 +128,36 @@ describe("VisitorsAnalyticsPanel", () => {
     expect(screen.getByText("02 — Top Referrers")).toBeInTheDocument();
     expect(screen.getByText("04 — Countries")).toBeInTheDocument();
     expect(screen.getByText("06 — Devices")).toBeInTheDocument();
+    expect(screen.getByText("08 — Operating Systems")).toBeInTheDocument();
+    expect(screen.getByText("09 — Screen Sizes")).toBeInTheDocument();
+  });
+
+  it("renders operating system and screen size data", async () => {
+    vi.mocked(adminApi.fetchAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        operatingSystems: [
+          { os: "Windows", count: 200 },
+          { os: "macOS", count: 150 },
+        ],
+        screenSizes: [
+          { width: 1920, height: 1080, count: 100 },
+          { width: 1440, height: 900, count: 50 },
+        ],
+      },
+    });
+
+    render(<VisitorsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("08 — Operating Systems")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Windows")).toBeInTheDocument();
+    expect(screen.getByText("macOS")).toBeInTheDocument();
+    expect(screen.getByText("09 — Screen Sizes")).toBeInTheDocument();
+    expect(screen.getByText("1920 × 1080")).toBeInTheDocument();
+    expect(screen.getByText("1440 × 900")).toBeInTheDocument();
   });
 
   it("shows empty state when no data", async () => {

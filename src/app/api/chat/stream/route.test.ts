@@ -24,12 +24,13 @@ vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn(),
 }));
 
+const mockSingle = vi.fn().mockResolvedValue({ data: { enabled: false }, error: null });
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: vi.fn().mockResolvedValue({ data: { enabled: false }, error: null }),
+          single: mockSingle,
         }),
       }),
     }),
@@ -385,5 +386,63 @@ describe("POST /api/chat/stream", () => {
     await POST(request);
 
     expect(search).toHaveBeenCalledWith(mockEmbedding, 3, "Best hiking routes");
+  });
+
+  it("should handle null flagData for asturianu feature flag (line 106 ?? fallback)", async () => {
+    // Override to return null data — triggers the ?? false fallback
+    mockSingle.mockResolvedValueOnce({ data: null, error: null });
+
+    const mockEmbedding = new Array(512).fill(0.1);
+
+    vi.mocked(validateChatRequest).mockReturnValue({
+      valid: true,
+      sanitizedMessage: "Hola",
+      sanitizedContext: undefined,
+    });
+    vi.mocked(generateEmbedding).mockResolvedValue(mockEmbedding);
+    vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+    vi.mocked(streamChatResponse).mockImplementation(async function* () {
+      yield "Response";
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Hola" }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+  });
+
+  it("should pass asturianu enabled flag when feature flag is true (line 106)", async () => {
+    // Override the supabase mock to return enabled: true for asturianu_touches flag
+    mockSingle.mockResolvedValueOnce({ data: { enabled: true }, error: null });
+
+    const mockEmbedding = new Array(512).fill(0.1);
+
+    vi.mocked(validateChatRequest).mockReturnValue({
+      valid: true,
+      sanitizedMessage: "Tell me about Asturias",
+      sanitizedContext: undefined,
+    });
+    vi.mocked(generateEmbedding).mockResolvedValue(mockEmbedding);
+    vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+    vi.mocked(streamChatResponse).mockImplementation(async function* () {
+      yield "Response about Asturias";
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Tell me about Asturias" }),
+    });
+
+    const response = await POST(request);
+
+    // Should succeed — the asturianu flag is read and used in the system prompt
+    expect(response.status).toBe(200);
+    // Verify streamChatResponse was called (meaning the flow completed with the flag)
+    expect(streamChatResponse).toHaveBeenCalled();
   });
 });

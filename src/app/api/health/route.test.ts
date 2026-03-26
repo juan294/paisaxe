@@ -384,6 +384,68 @@ describe("GET /api/health", () => {
     expect(data.services.stories.count).toBe(0);
   });
 
+  it("should handle stories query returning null data without error (line 75 ?? fallback)", async () => {
+    // When stories query returns data: null but no error, the ?? 0 fallback triggers
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        const lastEq = vi.fn().mockResolvedValue({ data: null, error: null });
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
+      }
+      return createChainMock({ error: null }) as never;
+    });
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.status).toBe("degraded");
+    expect(data.services.stories.status).toBe("fallback");
+    expect(data.services.stories.count).toBe(0);
+  });
+
+  it("should handle checkStories throwing a non-Error exception (line 85)", async () => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        // Make the chain throw a non-Error value
+        const lastEq = vi.fn().mockRejectedValue("stories query crashed");
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
+      }
+      return createChainMock({ error: null }) as never;
+    });
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.status).toBe("degraded");
+    expect(data.services.stories.status).toBe("fallback");
+    expect(data.services.stories.error).toBe("Unknown error");
+  });
+
+  it("should handle checkStories throwing an Error exception (line 85 true branch)", async () => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        const lastEq = vi.fn().mockRejectedValue(new Error("stories table missing"));
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
+      }
+      return createChainMock({ error: null }) as never;
+    });
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.status).toBe("degraded");
+    expect(data.services.stories.status).toBe("fallback");
+    expect(data.services.stories.error).toBe("stories table missing");
+  });
+
   // --- Coverage for checkSupabase() non-Error exception (line 51) ---
 
   it("should handle non-Error exception from supabase check", async () => {

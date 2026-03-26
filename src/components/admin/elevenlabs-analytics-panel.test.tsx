@@ -617,6 +617,27 @@ describe("ElevenLabsAnalyticsPanel", () => {
     });
   });
 
+  it("renders skeleton recent conversations table during loading (line 544)", () => {
+    vi.mocked(adminApi.fetchElevenLabsAnalytics).mockImplementation(
+      () => new Promise(() => {})
+    );
+
+    const { container } = render(<ElevenLabsAnalyticsPanel />, { wrapper });
+
+    // The SkeletonRecentConversations component renders a table with 5 skeleton rows
+    const skeletonRows = container.querySelectorAll("tbody tr");
+    expect(skeletonRows.length).toBeGreaterThanOrEqual(5);
+
+    // Verify skeleton pulse animations are present
+    const pulseElements = container.querySelectorAll(".animate-pulse");
+    expect(pulseElements.length).toBeGreaterThan(0);
+
+    // Verify table headers for the recent conversations skeleton
+    expect(screen.getByText("Time")).toBeInTheDocument();
+    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getByText("Duration")).toBeInTheDocument();
+  });
+
   // Line 270: `statColorClasses[color] || statColorClasses.stone` — the `||` fallback is unreachable.
   // The StatCard `color` prop is typed as a union of valid keys ("blue" | "emerald" | ... | "stone")
   // with a default of "stone". The parent component only passes valid color strings.
