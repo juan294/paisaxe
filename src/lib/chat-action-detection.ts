@@ -313,13 +313,8 @@ export function detectAddresses(text: string): AddressMatch[] {
   for (const pattern of streetPatterns) {
     let match;
     while ((match = pattern.exec(text)) !== null) {
-      // Clean up the match - trim and remove trailing punctuation
-      let addressText = match[0].trim();
-
-      // Remove trailing period if present
-      if (addressText.endsWith(".")) {
-        addressText = addressText.slice(0, -1);
-      }
+      // Clean up the match - trim
+      const addressText = match[0].trim();
 
       // Normalize for deduplication (lowercase, remove extra spaces)
       const normalized = addressText.toLowerCase().replace(/\s+/g, " ");
