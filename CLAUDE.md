@@ -187,41 +187,24 @@ git branch -d feature/short-name
 8. **Background agents use `.worktrees/`**: Agents spawned with `run_in_background: true` or as team members are sandboxed to the project directory. They CANNOT access `../paisaxe-*` paths. Always use `.worktrees/short-name` inside the project.
 9. **If merge conflicts arise**: Resolve them in the main repo during merge, never in the worktree.
 
-## Push Accountability (MANDATORY — Background)
+<important if="you are pushing code to a remote">
+### Push Accountability
 
-**Every push to `develop` requires CI verification. No exceptions. No matter how small the change.**
+After pushing to the development branch, spawn a background agent to monitor CI.
+If CI fails, the background agent investigates, fixes, and re-pushes.
+Main terminal continues working -- push verification is non-blocking.
+If a background fix requires changes that conflict with current work, notify the user before applying fixes.
+**Pushing to `main` is PROHIBITED** -- see Production Safety above.
+</important>
 
-**Pushing to `main` is PROHIBITED** — see Production Safety above. This section applies to `develop` only.
+## TDD Protocol
 
-**This runs as a background agent so the terminal stays unblocked.** After ANY `git push origin develop`, immediately spawn a background task (using `run_in_background: true`) that:
+All code changes follow Red-Green-Refactor:
+1. **Red** -- Write a failing test FIRST
+2. **Green** -- Minimum code to pass
+3. **Refactor** -- Clean up with green tests
 
-1. **Polls CI status** — `gh run list --limit 5` until the run completes
-2. **If CI passes** — Log success, no interruption needed
-3. **If CI fails** — Investigate with `gh run view <run-id> --log-failed`, fix the issue, and re-push — all in the background
-4. **NEVER push to `main`** — Even if a background fix seems urgent, it stays on `develop`
-
-The main terminal continues working on the next task immediately after pushing. The background agent owns the push outcome until CI is green on `develop`.
-
-**If a background fix requires changes that conflict with current work**, notify the user before applying fixes.
-
-**This is non-negotiable.** You own the outcome of your push until CI is green. If you break the build on `develop`, you fix the build — automatically in the background. But `main` is never touched without user authorization.
-
-## Test-Driven Development (MANDATORY)
-
-**NO code is written without a failing test first. No exceptions. Not even "small" changes.**
-
-This is non-negotiable. Every feature, bug fix, and refactor follows this exact sequence:
-
-1. **Red**: Write a failing test FIRST — before touching any implementation code
-2. **Green**: Write the minimum code to make the test pass
-3. **Refactor**: Clean up while tests stay green
-
-#### Rules
-
-- **Tests before code, always.** If you catch yourself writing implementation code without a test, stop and write the test first.
-- **Bug fixes need a regression test.** Before fixing a bug, write a test that reproduces it. Then fix the code so the test passes.
-- **Refactors need existing tests.** Before refactoring, ensure tests exist that cover the current behavior. If they don't, write them first.
-- **No "I'll add tests later."** There is no later. Tests are written in the same worktree, in the same commit sequence, before the implementation.
+No exceptions. Bug fixes need a regression test. Refactors need existing coverage. No "tests later."
 
 ## Key Commands
 
@@ -251,9 +234,6 @@ claude -p "Fix all TypeScript lint errors and run tests" --allowedTools "Edit,Re
 claude -p "Read issue #240 and implement the fix with TDD" --allowedTools "Edit,Read,Bash,Write,Grep"
 ```
 
-### CRITICAL: Run verification commands sequentially, NEVER in parallel
-Never run typecheck, lint, or test as parallel sibling Bash tool calls.
-Chain with `&&` or `;`: `npm run typecheck 2>&1; npm run lint 2>&1`
 
 ## Environment Variables
 
@@ -535,26 +515,15 @@ echo $MY_VAR | vercel env add MY_VAR production
 
 ## Agent Autonomy
 
-**Before asking the user to perform any manual step, exhaust all available tools first.**
+Exhaust CLI tools, shell commands, and file tools before asking the user. Only escalate when genuinely impossible. Production-affecting actions need explicit human authorization.
 
-Use these before telling the user "go to the dashboard and...":
-
-1. **Supabase CLI** — `supabase db push`, `supabase functions deploy`, etc.
-2. **GitHub CLI** — `gh pr create`, `gh run list`, `gh issue view`
-3. **Vercel CLI** — `vercel` for deployments and logs (develop/preview only)
-4. **MCP servers** — Check available tools in the session
-5. **Bash** — npm scripts, git, curl
-6. **SQL** — `supabase db execute` for queries
-
-Only ask for manual intervention when genuinely required (OAuth consent, billing, UI-only features).
+**Tools to exhaust before suggesting manual steps:**
+Supabase CLI, GitHub CLI (`gh`), Vercel CLI (develop/preview only), MCP servers, Bash (npm scripts, git, curl), SQL (`supabase db execute`).
 
 **EXCEPTION — Production-affecting actions require user authorization (see Production Safety):**
 - Anything touching `main` branch (push, PR, merge)
-- Production deployments
-- Production database migrations
+- Production deployments, database migrations
 - External service configuration changes (ElevenLabs, Stripe, Vercel env vars, DNS)
-
-Agent autonomy applies to **development work on `develop`**. Production is user-controlled.
 
 ## RPI Workflow
 
@@ -626,49 +595,48 @@ Keep universal content (stack, structure, git workflow) unwrapped.
 - **Be specific.** `"you are writing tests"` is good. `"you are writing code"` matches everything and defeats the purpose.
 - **Group by domain.** One block per domain (testing, deployment, database) — don't wrap individual lines.
 
-## Agent Operational Rules
+## Working Patterns
 
-### Shell & Tools
-- Chain verification commands sequentially, never as parallel Bash calls
-- In worktrees: prefix every command with `cd /absolute/path && `
-- Never use `~` in file tool paths — use full absolute paths starting with `/`
-- Always pass `{ encoding: 'utf-8' }` to `execSync`/`spawnSync`
+<examples>
+<example name="push-sequence">
+Commit before pulling -- hook blocks dirty pulls.
 
-### Git Recipes (use these exact sequences — hooks enforce critical steps)
 ```bash
-# Push sequence — ALWAYS commit before pulling (Error #33, hook enforced)
-git add <files> && git commit -m "msg" && git pull --rebase && git push
-
-# First push — set upstream tracking
-git add <files> && git commit -m "msg" && git push -u origin <branch>
-
-# Push with tag — NEVER use --tags (Error #44, hook enforced)
-git push origin main && git push origin v1.0.0
-# Or: git push origin main --follow-tags
-
-# Worktree cleanup
-git worktree remove --force <path>; git branch -D <branch>
+git add src/feature.ts && git commit -m "feat: add feature"
+git pull --rebase && git push
 ```
 
-### Git Operations
-- Run typecheck/lint BEFORE committing (pre-commit hooks run the same checks)
-- Remove worktrees BEFORE merging PRs with `--delete-branch`
-- Never fabricate filesystem paths — use the working directory or discover with `ls`
+</example>
 
-### GitHub CLI
-- Don't guess `gh --json` field names — query available fields first
-- Check CI per-PR with `--json`, not chained human-readable output
-- `review: fail` means "needs approval", NOT a CI failure
+<example name="verification">
+Run checks sequentially, never as parallel tool calls.
 
-### Sub-agents & Agent Teams
-- Verify tool permissions before spawning sub-agents for write operations
-- If a sub-agent fails due to permissions, take over manually immediately
-- Monitor context size when running many parallel agents
-- Agent Teams are enabled via `.claude/settings.json` — use them for complex parallel work
-- When creating a team: break work so each teammate owns different files (avoid conflicts)
-- Teammates don't inherit conversation history — include full context in spawn prompts
-- Use subagents for focused tasks (result is all that matters); use teams for collaborative work requiring discussion
-- **Only the main agent handles git commit/push.** Sub-agents and teammates write changes to their working directories. The main agent reviews the changes, runs tests, and commits centrally. This prevents wrong-branch pushes and merge conflicts from parallel agents.
+```bash
+npm run typecheck 2>&1; npm run lint 2>&1; npm run test 2>&1
+```
+
+</example>
+
+<example name="worktree-cleanup">
+Remove worktrees before merging PRs. Use -D (uppercase) for branches.
+
+```bash
+git worktree remove --force ../feature-branch; git branch -D feature-branch
+```
+
+</example>
+
+<example name="file-paths">
+Use absolute paths in all file tools and worktree commands. Never use ~.
+
+```bash
+cd /Users/juan/code/paisaxe && npm run test
+```
+
+</example>
+</examples>
+
+Domain-specific rules (git, CI, deployment, Python, macOS, Supabase, GitHub CLI, multi-agent) are in `.claude/skills/` -- loaded automatically when relevant.
 
 ## Memory Management
 
@@ -689,9 +657,9 @@ Go directly to these paths — never search the codebase for them.
 
 | Topic | Path | Notes |
 |-------|------|-------|
-| Agent reports | `docs/agents/*-report.md` | Flag YELLOW/RED items. Cross-agent context in `shared-context.md` |
-| Agent logs | `logs/<name>.log`, `<name>.error.log` | Read alongside reports to diagnose failures |
-| Agent scripts | `scripts/agents/` | Standalone bash files invoking Claude CLI headless |
+| Agent reports | `docs/agents/*-report.md` | Gitignored. Local-only operational history. Never committed (Rule #70) |
+| Agent logs | `logs/<name>.log`, `<name>.error.log` | Gitignored. Read alongside reports to diagnose failures |
+| Agent scripts | `scripts/agents/` | Gitignored. Standalone bash files invoking Claude CLI headless |
 | ADRs | `docs/decisions/` | Architecture decision records |
 | PR descriptions | `docs/prs/{number}_description.md` | |
 | Research docs | `docs/research/YYYY-MM-DD-description.md` | |
