@@ -24,7 +24,6 @@ export function useStoryEditorState(story: AdminStory | null) {
   // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasDetailsChanges, setHasDetailsChanges] = useState(false);
   const [hasTranslationChanges, setHasTranslationChanges] = useState(false);
   const [pendingTranslations, setPendingTranslations] = useState<PendingTranslationChange[]>([]);
@@ -158,8 +157,6 @@ export function useStoryEditorState(story: AdminStory | null) {
     setIsLoading,
     error,
     setError,
-    isFullscreen,
-    setIsFullscreen,
     hasDetailsChanges,
     hasImageChanges,
     hasTranslationChanges,

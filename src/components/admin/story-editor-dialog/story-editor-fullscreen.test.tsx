@@ -44,8 +44,8 @@ vi.mock("./use-story-editor-state", () => ({
       isSearchingContent: false,
       contentSearched: false,
       currentContentImage: null,
-      isFullscreen: false,
-      setIsFullscreen: vi.fn(),
+      isFullscreen: true,
+      setIsFullscreen: mockSetIsFullscreen,
       currentPreview: null,
       handleUrlChange: vi.fn(),
       handleFileChange: vi.fn(),
@@ -62,8 +62,6 @@ vi.mock("./use-story-editor-state", () => ({
     setIsLoading: vi.fn(),
     error: "",
     setError: vi.fn(),
-    isFullscreen: true,
-    setIsFullscreen: mockSetIsFullscreen,
     hasDetailsChanges: false,
     hasImageChanges: false,
     hasTranslationChanges: false,
@@ -169,7 +167,7 @@ describe("StoryEditorDialog fullscreen preview", () => {
       <StoryEditorDialog story={mockStory} onClose={onClose} onUpdate={onUpdate} />
     );
 
-    // The fullscreen overlay should be visible (state.isFullscreen=true, state.currentPreview set)
+    // The fullscreen overlay should be visible (imageEditor.isFullscreen=true, state.currentPreview set)
     expect(screen.getByLabelText("Close fullscreen preview")).toBeInTheDocument();
     // Story title shown in fullscreen overlay
     expect(screen.getAllByText("Covadonga Lakes").length).toBeGreaterThanOrEqual(1);
