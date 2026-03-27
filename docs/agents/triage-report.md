@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-03-25 | 5 reports processed | 2 action items
+> Generated on 2026-03-27 | 5 reports processed | 2 action items
 
 ## Agent Failures
 None — all agents ran successfully.
@@ -8,51 +8,57 @@ None — all agents ran successfully.
 
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi-update | GREEN | 0 — already synced to v1.11.0 |
-| 2 | cost-analyst-report.md | cost-analyst | WATCH | 0 code items — business recommendations only |
-| 3 | coverage-report.md | coverage | GREEN (ARCHIVED) | 0 — 43 tests produced, committed with fixes |
-| 4 | documentation-report.md | documentation | GREEN | 0 — all docs complete |
-| 5 | localization-report.md | localization | GREEN | 0 — 100% coverage, stable 19 days |
+| 1 | cc-rpi-update-report.md | cc-rpi-update | GREEN | 0 — synced at v1.13.0 |
+| 2 | cost-analyst-report.md | cost-analyst | WATCH | 0 code items — business concern (42-day revenue drought) |
+| 3 | coverage-report.md | coverage | GREEN (ARCHIVED) | 1 — 18 new tests committed |
+| 4 | security-report.md | security | **YELLOW** (known) | 1 — brace-expansion override added |
+| 5 | localization-report.md | localization | GREEN | 0 — 100% coverage maintained |
 
-## Overall Status: GREEN
+## Overall Status: GREEN (security YELLOW is a known, deliberate trade-off)
 
-All agents operational. No code-level issues. Cost analyst at WATCH for extended platform dormancy (business concern, not technical).
+Security YELLOW is caused by next@16.1.6, which was **deliberately** downgraded in `934fe4a` due to a Vercel runtime bug in 16.2.1 (console-file.js missing file-logger.js in NFT trace — took production down 2026-03-24). Cannot upgrade until Next.js publishes 16.2.2+. PPR DoS partially mitigated by Vercel serverless function limits.
+
+New brace-expansion vulnerability (GHSA-f886-m6hf-6m8v) fixed via npm override `>=5.0.5`.
 
 ## Action Items Completed
 
-| # | Item | Source Report | Tests Added | Status |
-|---|------|--------------|-------------|--------|
-| 1 | Fix TS error: `window as Record<string, unknown>` cast in posthog-provider.test.tsx | coverage | 0 (fix only) | Done |
-| 2 | Fix lint error: unused `screen` import in pricing/loading.test.tsx | coverage | 0 (fix only) | Done |
+| # | Item | Source Report | Tests Updated | Status |
+|---|------|--------------|---------------|--------|
+| 1 | Commit 18 new coverage agent tests | Coverage | 10 test files | Done |
+| 2 | Fix brace-expansion vulnerability (override >=5.0.5) | npm audit (new) | N/A | Done |
 
 ### Details
 
-**1. PostHog provider test TS error**
-- 3 occurrences of `(window as Record<string, unknown>)` changed to `(window as unknown as Record<string, unknown>)` to satisfy TS2352 (double-cast through `unknown`).
+**1. Coverage agent tests committed**
+- 18 new tests across 10 files (+548 lines). Five files reached 100% branch coverage: `stories-data.ts`, `alerts.tsx`, `forecast.tsx`, `analytics/route.ts`, `stripe-analytics/route.ts`. API routes improved: `costs-analytics/route.ts` (92.42->98.48%), `mcp/places/route.ts` (98.81->100%), `mcp/make-booking/route.ts` (96.87->97.91%).
 
-**2. Pricing loading test lint error**
-- Removed unused `screen` import from `@testing-library/react` — test uses `document.querySelectorAll` instead.
+**2. brace-expansion security fix**
+- Added `"brace-expansion": ">=5.0.5"` to npm overrides in `package.json`. Fixes GHSA-f886-m6hf-6m8v (process hang + memory exhaustion via zero-step sequence). Transitive dep via `eslint-plugin-react` -> `minimatch` -> `brace-expansion`.
+
+### Items Not Actionable
+
+| # | Item | Reason |
+|---|------|--------|
+| 3 | next@16.1.6 security advisory (5 sub-advisories) | Deliberate downgrade per `934fe4a` — Vercel runtime bug in 16.2.1. Wait for 16.2.2+. |
 
 ## Verification
-- [x] All tests passing (5648/5648)
+- [x] All tests passing (5678/5678, 304 files)
 - [x] Typecheck clean
 - [x] Lint clean
-- [x] CI green (monitoring in background)
+- [x] CI monitoring in progress
 
 ## Carried Items
 
 | Item | Duration | Trend |
 |------|----------|-------|
-| Dead code: `chat-action-detection.ts:321`, `image-optimization.ts:130-131`, `i18n/provider.tsx:25-26` | 3+ cycles | Code quality — no runtime impact |
-| Disconnected fullscreen state in `story-editor-dialog/index.tsx` | 2 cycles | `state.isFullscreen` never set to `true` |
-| MCP routes 0% E2E coverage | 10+ weeks | QA/Coverage/Security all flag this |
-| Low coverage: voice-agent-chat (45.6%), agents-dashboard (48.5%) | 3+ cycles | Requires Playwright E2E |
-| Platform dormancy (0 revenue, 0 voice) | 40 days | Business concern — manual production verification needed |
-| Gap detection script should check features.md | 2 cycles | Causes false positives in documentation report |
-| JS bundle 2,726 KB (9% over 2,500 KB budget) | Since Mar 8 | Performance recommends browserslist optimization |
+| next@16.1.6 security advisory (deliberate) | 1 cycle | Blocked on Next.js 16.2.2+ release |
+| Dead code (structural): JPEG branch, i18n loaders | 5+ cycles | Kept for type safety — no runtime impact |
+| MCP routes 0% E2E coverage | 11+ weeks | QA/Coverage/Security all flag this |
+| Low coverage: voice-agent-chat (45.6%), agents-dashboard (48.5%) | 5+ cycles | Requires Playwright E2E |
+| Platform dormancy (0 revenue, 0 voice) | 42 days | Business concern — manual verification needed |
+| Gap detection script should check features.md | 4 cycles | Causes false positives in documentation report |
 
 ## Commits
-1. `4146715` — `chore: commit overnight agent reports [2026-03-25]` (reports + TS/lint fixes)
-2. `052a920` — `test: commit coverage agent branch tests + triage entry [2026-03-25]` (10 test files + shared-context)
+1. `0653686` — `fix: add coverage agent tests + brace-expansion security override [triage]`
 
 *Report generated by triage agent.*

@@ -1,22 +1,22 @@
 # Cost Analyst Report
 
-> **Generated**: 2026-03-26 | **Period**: March 2026 (MTD, 26 days) + February 2026 (final) | **Status**: WATCH
+> **Generated**: 2026-03-27 | **Period**: March 2026 (MTD, 27 days) + February 2026 (final) | **Status**: WATCH
 
 ---
 
 ## Executive Summary
 
-**Platform dormancy extends — 37 days without a voice conversation and 41 days without revenue.** No voice conversations since February 17, no Day Pass sales since February 13. All usage metrics remain at zero for March. The revenue drought has now reached the **41-day mark** — exceeding one full calendar month by 13 days.
+**Platform dormancy extends — 38 days without a Paisaxe voice conversation and 42 days without revenue.** No Pelayo conversations since February 17, no Day Pass sales since February 13. All Paisaxe usage metrics remain at zero for March. The revenue drought has now reached the **42-day mark** — exceeding one full calendar month by 14 days.
 
-**All systems nominal.** ElevenLabs subscription is active with 196,138 character allowance (0% utilized), Twilio balance stable at $15.45. No anomalies detected in any billing system.
+**New: Account-wide ElevenLabs character usage detected.** The ElevenLabs subscription API now shows 3,948 / 196,138 characters used (2.01%), up from 0 yesterday. This usage is from the "Archy" agent (a separate project on the same account), NOT from Paisaxe agents. Paisaxe-specific voice activity remains zero.
 
-**Fixed costs accrue regardless.** Twenty-six days into March, ~$70.78 in operational fixed costs have accrued against $0 revenue. March is now 84% complete. The platform continues operating at 100% loss.
+**Fixed costs accrue regardless.** Twenty-seven days into March, ~$73.52 in operational fixed costs have accrued against $0 revenue. March is now 87% complete with only 4 days remaining. The platform continues operating at 100% loss.
 
-**March will close with $0 revenue.** Only 5 days remain. This will be the first complete calendar month with zero income since launch.
+**March will close with $0 revenue.** Only 4 days remain. This will be the first complete calendar month with zero income since launch.
 
-**Financial health: WATCH** — Extended inactivity continues. Costs are stable and predictable. No variable cost anomalies. Revenue drought now at 41 days — exceeding one full calendar month by 13 days.
+**Financial health: WATCH** — Extended inactivity continues. Costs are stable and predictable. No variable cost anomalies. Revenue drought now at 42 days — exceeding one full calendar month by 14 days.
 
-| Metric | Value | vs. Mar 25 |
+| Metric | Value | vs. Mar 26 |
 |--------|-------|-----------|
 | Total Fixed Costs (all) | $284.41/mo | -- |
 | Total Fixed Costs (operational) | **$84.41/mo** | -- |
@@ -25,7 +25,7 @@
 | Revenue (Mar MTD) | $0.00 | -- |
 | Revenue (Feb final) | $13.93 gross / $9.98 net (~$10.78) | -- |
 | Twilio Balance | **$15.45** | -- ($15.4546) |
-| ElevenLabs Characters | **0 / 196,138 (0%)** | -- |
+| ElevenLabs Characters | **3,948 / 196,138 (2.01%)** | +3,948 (non-Paisaxe) |
 | ElevenLabs Voice Min (Feb final) | 60.0 / 100 | -- |
 | ElevenLabs Voice Min (Mar) | **0.0 / 100** | -- |
 
@@ -35,7 +35,7 @@
 
 ### Fixed / Recurring Costs
 
-| Service | Tier | Monthly Cost | Category | Since | Change vs Mar 25 |
+| Service | Tier | Monthly Cost | Category | Since | Change vs Mar 26 |
 |---------|------|-------------|----------|-------|-----------------|
 | Claude Code Max | Max (20x Pro) | $200.00 | Development | 2026-01-27 | -- |
 | Supabase | Pro | $25.00 | Infrastructure | 2025-01 | -- |
@@ -69,7 +69,7 @@
 | Voyage AI (Embeddings) | Unknown | Unknown | -- |
 | **Total Variable** | | **$1.15** | |
 
-*All Twilio categories at $0.00 except phone rental ($1.15). API data as of 2026-03-26T02:00 UTC. Balance remains $15.4546.*
+*All Twilio categories at $0.00 except phone rental ($1.15). API data as of 2026-03-27T02:01 UTC. Balance remains $15.4546.*
 
 ### February 2026 Final Costs (confirmed)
 
@@ -90,11 +90,13 @@
 
 | Period | Conversations | Successful | Failed/Init | Duration | Avg Duration |
 |--------|--------------|-----------|-------------|----------|-------------|
-| Mar 2026 (MTD, 26 days) | **0** | 0 | 0 | 0.0 min | -- |
+| Mar 2026 (MTD, 27 days) | **0** | 0 | 0 | 0.0 min | -- |
 | Feb 2026 (final, 28 days) | 51 | 47 | 4 | 60.0 min | 76.6 sec |
 | **Change** | **-51** | **-47** | **-4** | **-60.0 min** | **--** |
 
-**Zero voice activity since February 17** (37 consecutive days). The last Paisaxe conversation was a 16-second Visitor Guide session at 08:59 UTC on Feb 17, confirmed via ConvAI API (conv_3101khnd78cze9m9j76e8qk2rs3x).
+**Zero Paisaxe voice activity since February 17** (38 consecutive days). The last Paisaxe conversation was a 16-second Visitor Guide session at 08:59 UTC on Feb 17, confirmed via ConvAI API (conv_3101khnd78cze9m9j76e8qk2rs3x).
+
+**Account-wide activity detected**: 5 recent conversations from the "Archy" agent (a separate project) on March 23-24, consuming 3,948 characters. These do NOT represent Paisaxe usage but do consume from the shared ElevenLabs character quota.
 
 **February final by agent type:**
 
@@ -107,11 +109,11 @@
 
 | Metric | Value | Note |
 |--------|-------|------|
-| Characters used (current cycle) | **0 / 196,138 (0%)** | Post-reset, new cycle |
+| Characters used (current cycle) | **3,948 / 196,138 (2.01%)** | Up from 0 — non-Paisaxe usage (Archy agent) |
 | Character limit | 196,138 | Unchanged |
 | Character reset (previous) | March 7, 2026 at 14:07 UTC | Completed |
 | Next character reset | **~April 5, 2026 at 14:35 UTC** | unix 1775571305 |
-| Characters used (March, post-reset) | 0 | No voice activity |
+| Characters used (March, Paisaxe-only) | 0 | No Paisaxe voice activity |
 
 ### ElevenLabs Subscription Details (from API)
 
@@ -127,7 +129,7 @@
 
 ### Twilio Communications
 
-| Metric | March (26 days) | February (final) | Change |
+| Metric | March (27 days) | February (final) | Change |
 |--------|----------------|-----------------|--------|
 | SMS Sent | 0 | 6 (17 segments) | -6 |
 | Usage Cost | $0.00 | $1.49 | -$1.49 |
@@ -140,32 +142,32 @@ Balance unchanged at $15.4546 since March 8. Phone rental charge visible in usag
 
 ### Stripe Revenue
 
-| Metric | March (26 days) | February (final) | Change |
+| Metric | March (27 days) | February (final) | Change |
 |--------|----------------|-----------------|--------|
 | Net Sales | 0 | 6 | -6 |
 | Gross Revenue | $0.00 | $13.93 | -$13.93 |
 | Net Revenue | $0.00 | $9.98 | -$9.98 |
 
-**41-day revenue drought** — No Day Pass sales since February 13. Well past one full calendar month without income (exceeds by 13 days). Longest dry spell since launch.
+**42-day revenue drought** — No Day Pass sales since February 13. Well past one full calendar month without income (exceeds by 14 days). Longest dry spell since launch.
 
 ---
 
 ## Cost Efficiency
 
-| Metric | Current (Mar 26) | Previous (Mar 25) | Change | Trend |
+| Metric | Current (Mar 27) | Previous (Mar 26) | Change | Trend |
 |--------|-----------------|-------------------|--------|-------|
 | Fixed operational cost/mo | $84.41 | $84.41 | -- | FLAT |
 | Total monthly burn (operational) | ~$85.56 | ~$85.56 | -- | FLAT |
 | Cost per voice conversation (Feb) | ~$0.43 | ~$0.43 | -- | FLAT |
 | Cost per voice minute (Feb) | ~$0.37 | ~$0.37 | -- | FLAT |
-| ElevenLabs char utilization (current cycle) | **0%** | 0% | -- | FLAT |
-| ElevenLabs char headroom | **196,138** | 196,138 | -- | FLAT |
+| ElevenLabs char utilization (current cycle) | **2.01%** | 0% | +2.01% | UP (non-Paisaxe) |
+| ElevenLabs char headroom | **192,190** | 196,138 | -3,948 | DOWN (non-Paisaxe) |
 | ElevenLabs voice min utilization (Feb final) | 60.0% | 60.0% | -- | FLAT |
 | Stripe net margin per Day Pass | 85.9% | 85.9% | -- | FLAT |
 | Infra cost per Day Pass sold (Feb) | $14.07 | $14.07 | -- | FLAT |
 | Revenue coverage (operational) | ~13.4% | ~13.4% | -- | FLAT |
 
-**All efficiency metrics unchanged.** No new activity to move any needle. Break-even still requires ~52 Day Pass sales/month at ~$1.64 net per pass.
+**Character headroom slightly reduced** by non-Paisaxe usage (Archy agent: 3,948 chars). Remaining 192,190 characters still provides ample margin. All other efficiency metrics unchanged.
 
 ---
 
@@ -173,13 +175,13 @@ Balance unchanged at $15.4546 since March 8. Phone rental charge visible in usag
 
 | Service | Metric | Used | Limit | Utilization | Projected Month-End | Alert Level |
 |---------|--------|------|-------|-------------|---------------------|-------------|
-| ElevenLabs | Characters (Mar) | 0 | 196,138 | **0%** | ~0% | SAFE |
+| ElevenLabs | Characters (cycle) | 3,948 | 196,138 | **2.01%** | ~2% | SAFE |
 | ElevenLabs | Voice Minutes (Mar) | 0.0 | 100 | **0%** | ~0% | SAFE |
 | Vercel | Monthly Visitors | ~low | 500,000 (Pro) | **<1%** | <1% | SAFE |
 | PostHog | Monthly Events | ~low | 1,000,000 | **<1%** | <1% | SAFE |
 | Supabase | Database Storage | <8 GB | 8 GB | **<100%** | <100% | SAFE |
 
-**All tier alerts cleared.** With zero usage in March, there is no risk of approaching any limits.
+**All tier alerts cleared.** The 3,948 characters consumed by non-Paisaxe agents represent only 2% of the monthly allowance. No risk of approaching any limits.
 
 ### Upgrade Trigger Points
 
@@ -228,43 +230,44 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 
 | Finding | Severity | Details |
 |---------|----------|---------|
-| 41-day revenue drought | **WARNING** | No Day Pass sales since Feb 13. Exceeds one full calendar month by 13 days. Longest dry spell since launch. |
-| 37-day voice silence | **WARNING** | No Paisaxe voice conversations since Feb 17. Platform appears dormant. Exceeds one full calendar month by 9 days. |
+| 42-day revenue drought | **WARNING** | No Day Pass sales since Feb 13. Exceeds one full calendar month by 14 days. Longest dry spell since launch. |
+| 38-day Paisaxe voice silence | **WARNING** | No Paisaxe voice conversations since Feb 17. Platform appears dormant. Exceeds one full calendar month by 10 days. |
+| Non-Paisaxe ElevenLabs usage | **INFO** | 3,948 characters consumed by Archy agent (separate project) on same account. First cross-project quota usage detected. Not a concern at current levels (2% of limit). |
 | No Anthropic cost visibility | **WATCH** | Personal account has no billing API. Manual checks required. |
 
-**No new anomalies detected since Mar 9.** All systems are stable — the dormancy itself remains the primary concern. Both drought streaks now well past one full calendar month.
+**New anomaly**: Cross-project ElevenLabs character consumption. The "Archy" agent on the same account consumed 3,948 characters in March. While negligible at current levels, this establishes a shared-resource pattern that could become relevant if both projects scale. Monitor for quota contention.
 
 ---
 
 ## Trend Analysis
 
-### Comparison: Mar 25 → Mar 26
+### Comparison: Mar 26 → Mar 27
 
-| Metric | Mar 25 | Mar 26 | Change | Direction |
+| Metric | Mar 26 | Mar 27 | Change | Direction |
 |--------|--------|--------|--------|-----------|
 | Fixed costs/mo (operational) | $84.41 | $84.41 | -- | FLAT |
 | Variable costs (Mar MTD) | $1.15 | $1.15 | -- | FLAT |
 | Voice conversations (Mar MTD) | 0 | 0 | -- | FLAT |
 | Voice minutes (Mar MTD) | 0.0 | 0.0 | -- | FLAT |
-| Characters used (cycle) | 0 (0%) | 0 (0%) | -- | FLAT |
+| Characters used (cycle) | 0 (0%) | 3,948 (2.01%) | +3,948 | UP (non-Paisaxe) |
 | Characters limit | 196,138 | 196,138 | -- | FLAT |
 | SMS sent (Mar MTD) | 0 | 0 | -- | FLAT |
 | Day Pass net sales (Mar MTD) | 0 | 0 | -- | FLAT |
 | Twilio balance | $15.4546 | $15.4546 | -- | FLAT |
-| Voice dormancy streak | 36 days | **37 days** | +1 day | WORSENING |
-| Revenue drought streak | 40 days | **41 days** | +1 day | WORSENING |
+| Paisaxe voice dormancy streak | 37 days | **38 days** | +1 day | WORSENING |
+| Revenue drought streak | 41 days | **42 days** | +1 day | WORSENING |
 
 **Key observations:**
 
-1. **Day 37 of voice dormancy, day 41 of revenue drought.** Both streaks well past one full calendar month. Voice silence: Feb 17 -> Mar 26 (37 days). Revenue drought: Feb 13 -> Mar 26 (41 days, exceeding one full month by 13 days).
+1. **Day 38 of Paisaxe voice dormancy, day 42 of revenue drought.** Both streaks well past one full calendar month. Voice silence: Feb 17 -> Mar 27 (38 days). Revenue drought: Feb 13 -> Mar 27 (42 days, exceeding one full month by 14 days).
 
-2. **March will close with $0 revenue.** Only 5 days remain in March, and with no activity trend reversal, March is now virtually certain to be the first complete calendar month with zero revenue.
+2. **March will close with $0 revenue.** Only 4 days remain in March, and with no activity trend reversal, March is now virtually certain to be the first complete calendar month with zero revenue.
 
-3. **All metrics frozen.** Twilio balance identical to the cent ($15.4546), ElevenLabs characters at 0, zero SMS. Consistent with a completely idle platform.
+3. **ElevenLabs character usage appeared** — but from a different project (Archy agent, 3,948 chars). This is the first non-zero character reading since the cycle reset on March 7. Paisaxe-specific usage remains zero.
 
-4. **Costs accrue steadily.** 26 days into March: ~$70.78 in operational fixed costs accrued ($84.41 / 31 x 26), with $0 revenue to offset. March is now 84% complete.
+4. **Costs accrue steadily.** 27 days into March: ~$73.52 in operational fixed costs accrued ($84.41 / 31 x 27), with $0 revenue to offset. March is now 87% complete.
 
-5. **ElevenLabs subscription healthy.** Creator tier active, 196,138 character allowance, 30 voice slots available, next annual invoice $266.20 in Feb 2027. No billing concerns.
+5. **ElevenLabs subscription healthy.** Creator tier active, 192,190 characters remaining (after Archy usage), 30 voice slots available, next annual invoice $266.20 in Feb 2027. No billing concerns.
 
 6. **Twilio balance sufficient.** $15.45 at $1.15/mo phone rental = ~13.4 months of runway. No top-up needed.
 
@@ -273,7 +276,7 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 | Month | Operational Fixed | Variable (known) | Total Operational | Revenue (net) | Coverage |
 |-------|------------------|------------------|-------------------|---------------|----------|
 | Feb 2026 | $84.41 | ~$2.75 | ~$87.16 | ~$11.34 | ~13.0% |
-| Mar 2026 (MTD, 26 days) | $84.41* | $1.15 | ~$85.56* | $0.00 | 0% |
+| Mar 2026 (MTD, 27 days) | $84.41* | $1.15 | ~$85.56* | $0.00 | 0% |
 
 *\*Projected full month. Variable costs may increase if activity resumes.*
 
@@ -285,7 +288,7 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 
 1. **Check Anthropic billing manually** — Visit [console.anthropic.com/settings/billing](https://console.anthropic.com/settings/billing) and record March MTD spend. With the platform dormant, Anthropic usage should be minimal (only automated agents/cron).
 
-2. **Verify the platform is functioning** — 37 days without a voice conversation and 41 days without a sale warrants investigation:
+2. **Verify the platform is functioning** — 38 days without a Paisaxe voice conversation and 42 days without a sale warrants investigation:
    - Is the Pelayo voice widget rendering correctly?
    - Is the Day Pass purchase flow working?
    - Are there any deployment errors on Vercel?
@@ -293,15 +296,17 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 
 ### Near-Term Actions
 
-3. **Consider Vercel Pro necessity** — With ~50 visitors/month, the Hobby tier (50K visitors included) would suffice. Pro saves $20/mo (24% of operational costs). Evaluate whether team features or other Pro benefits justify the cost at current scale.
+3. **Monitor shared ElevenLabs quota** — The Archy agent is now consuming characters from the same Creator plan. At 2% utilization this is negligible, but if both projects become active simultaneously, track combined usage against the 196,138 character limit and 100 voice-minute cap.
 
-4. **Evaluate Twilio phone number** — At $1.15/mo with zero booking calls in 37 days, consider whether to release the number. If outbound booking is not actively used, this saves $13.80/yr.
+4. **Consider Vercel Pro necessity** — With ~50 visitors/month, the Hobby tier (50K visitors included) would suffice. Pro saves $20/mo (24% of operational costs). Evaluate whether team features or other Pro benefits justify the cost at current scale.
+
+5. **Evaluate Twilio phone number** — At $1.15/mo with zero booking calls in 38 days, consider whether to release the number. If outbound booking is not actively used, this saves $13.80/yr.
 
 ### Long-Term Planning
 
-5. **Revenue strategy is urgent** — Zero revenue for 41 days at $84.41/mo operational cost means the platform is losing ~$2.72/day. March is on track for ~$85.56 cost with $0 revenue. The break-even target of ~3,150 monthly visitors at 5% conversion is ~63x current traffic.
+6. **Revenue strategy is urgent** — Zero revenue for 42 days at $84.41/mo operational cost means the platform is losing ~$2.72/day. March is on track for ~$85.56 cost with $0 revenue. The break-even target of ~3,150 monthly visitors at 5% conversion is ~63x current traffic.
 
-6. **ElevenLabs remains well within limits** — February used 60/100 voice minutes (60%) and the character limit has increased to 196,138. The Creator tier is appropriately sized. No change needed.
+7. **ElevenLabs remains well within limits** — February used 60/100 voice minutes (60%) and the character limit is 196,138 with only 2% consumed (non-Paisaxe). The Creator tier is appropriately sized. No change needed.
 
 ---
 
@@ -309,16 +314,16 @@ Based on the forecast model in `src/lib/costs/forecast.ts`, with corrected opera
 
 | Source | Method | Last Queried |
 |--------|--------|-------------|
-| ElevenLabs Subscription API | `/v1/user/subscription` | 2026-03-26 |
-| ElevenLabs ConvAI API | `/v1/convai/conversations` (page_size=5) | 2026-03-26 |
-| ElevenLabs Character Stats API | `/v1/usage/character-stats` | 2026-03-26 |
-| Twilio Usage API (This Month) | `/Usage/Records/ThisMonth` (targeted: phonenumbers-local, sms-outbound, calls-outbound) | 2026-03-26 |
-| Twilio Balance API | `/Balance.json` | 2026-03-26 |
-| Config: `service-tiers.ts` | File read | 2026-03-26 |
-| Config: `recurring-costs.ts` | File read | 2026-03-26 |
-| Config: `forecast.ts` | File read | 2026-03-26 |
+| ElevenLabs Subscription API | `/v1/user/subscription` | 2026-03-27 |
+| ElevenLabs ConvAI API | `/v1/convai/conversations` (Pelayo agent_id, page_size=5) | 2026-03-27 |
+| ElevenLabs Character Stats API | `/v1/usage/character-stats` | 2026-03-27 |
+| Twilio Usage API (This Month) | `/Usage/Records/ThisMonth` (targeted: phonenumbers-local, sms-outbound, calls-outbound) | 2026-03-27 |
+| Twilio Balance API | `/Balance.json` | 2026-03-27 |
+| Config: `service-tiers.ts` | File read | 2026-03-27 |
+| Config: `recurring-costs.ts` | File read | 2026-03-27 |
+| Config: `forecast.ts` | File read | 2026-03-27 |
 | Anthropic Billing | **NOT AVAILABLE** (personal account) | -- |
 
 ---
 
-*Report generated by the Paisaxe Cost Analyst Agent. Next scheduled run: 2026-03-27.*
+*Report generated by the Paisaxe Cost Analyst Agent. Next scheduled run: 2026-03-28.*

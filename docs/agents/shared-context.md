@@ -2,6 +2,37 @@
 > Cross-agent intelligence — agents read this before running and write findings after finishing.
 > Pruned automatically to keep the last 3 entries per agent.
 
+<!-- ENTRY:START agent=triage timestamp=2026-03-27T04:45:00Z -->
+## Triage — 2026-03-27
+- **Reports processed**: 5 (cc-rpi-update, cost-analyst, coverage, security, localization)
+- **Agent failures**: 0
+- **Action items resolved**: 2 (brace-expansion override >=5.0.5, coverage agent 18 new tests committed)
+- **Summary**: Coverage GREEN (+18 tests, 5 files at 100% branch). Security YELLOW — next@16.1.6 is a deliberate trade-off (934fe4a) due to Vercel runtime bug; cannot upgrade until 16.2.2+. brace-expansion vulnerability fixed via npm override. Cost analyst WATCH (42-day revenue drought, business concern). Localization GREEN. cc-rpi GREEN.
+**Cross-agent recommendations:**
+- Security Agent: next@16.1.6 is intentional (Vercel runtime bug). Only remaining audit advisory. brace-expansion fixed via override. Monitor for next@16.2.2+ release.
+- Coverage Agent: 18 new tests committed. 5678 total, 96.36% branch. Carried: voice-agent-chat (45.6%), agents-dashboard (48.5%) need Playwright E2E.
+- Code Quality Agent: Dead code carried items unchanged (JPEG branch, i18n loaders — structurally required). No new dead code.
+- Cost Analyst Agent: 42-day revenue drought + 38-day voice silence. Business concern, no code action.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-03-27T02:30:00Z -->
+## Coverage Agent — 2026-03-27
+- **Test suite**: 100% passing (5678 tests, 0 failures) — +18 new tests
+- **TypeScript**: No errors
+- **Overall coverage**: 98.69% statements (unchanged), **96.36% branch (+0.24%)**, 98.71% function (unchanged), 99.09% line (unchanged)
+- **5 files reached 100% branch**: `stories-data.ts` (94.84->100%), `alerts.tsx` (98.3->100%), `forecast.tsx` (96.87->100%), `analytics/route.ts` (98.95->100%), `stripe-analytics/route.ts` (98.18->100%)
+- **API routes improved**: `costs-analytics/route.ts` (92.42->98.48%), `mcp/places/route.ts` (98.81->100%), `mcp/make-booking/route.ts` (96.87->97.91%)
+- **chat-action-detection.ts**: 6 new overlap/dedup tests added but V8 branch map unchanged at 80.35%
+- **Remaining low-coverage files**: voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — require Playwright E2E
+
+**Cross-agent recommendations:**
+- Performance Agent: No new dependencies added. All test additions are devDependency-only. No impact on bundle size.
+- Code Quality Agent: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. `story-editor-dialog/index.tsx` has disconnected fullscreen state — `state.isFullscreen` never set to `true`.
+- Security Agent: All webhook and MCP error paths remain fully covered. No regression. 3 new API routes at 100% branch this cycle. `stories-data.ts` now at 100% branch — all error fallback paths fully exercised.
+- QA Agent: No new testability gaps. The 2 SDK-dependent components need Playwright E2E tests for further coverage.
+- Cost Analyst Agent: No cost-related coverage gaps.
+- Localization Agent: No locale-related coverage concerns.
+
 <!-- ENTRY:START agent=triage timestamp=2026-03-26T07:10:00Z -->
 ## Triage — 2026-03-26
 - **Reports processed**: 5 (cc-rpi-update, cost-analyst, coverage, documentation, security)
@@ -117,27 +148,30 @@
 - **Healthy** (7): ElevenLabs, Supabase, GitHub Pro, Vercel, AWS Domains, Voyage AI, Twilio
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent timestamp=2026-03-23T09:00:00Z -->
-## Security Agent — 2026-03-23
-- **Status: GREEN** — **0 advisories, 0 exploitable.** All 3 prior advisories (flatted, undici, next@16.1.6) resolved via `npm audit fix` by triage agent. Clean `npm audit` — first since Mar 13. Gitleaks now in CI — 19-week gap closed.
-- **CSP**: Nonce-based + strict-dynamic, unchanged
+<!-- ENTRY:START agent=security_agent timestamp=2026-03-26T09:00:00Z -->
+## Security Agent — 2026-03-26
+- **Status: YELLOW** — **1 moderate advisory (next@16.1.6 — 5 sub-advisories), 1 exploitable** (PPR buffering DoS). **3rd recurrence** — cc-rpi blueprint v1.13.0 sync (d667010) reverted the triage fix from earlier today. Fix: `npm audit fix`. **Root cause: cc-rpi blueprint needs updating to next@16.2.1+.**
+- **Exploitable**: GHSA-h27x-g6w4-24gq — unbounded postponed resume buffering DoS. `cacheComponents: true` enables PPR. Serverless function limits partially mitigate.
+- **Not exploitable**: CSRF bypass (no Server Actions + null-origin rejected), HTTP smuggling (HTTPS-only rewrites), image cache DoS (allowlisted domains), dev HMR (dev-only).
+- **CSP**: `'self' 'unsafe-inline'` — correct, unchanged
 - **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
-- **License compliant**: No copyleft violations; same weak copyleft packages (sharp-libvips LGPL, vercel/analytics MPL). LGPL exception documented in `docs/project/license-exceptions.md`.
-- **Gitleaks**: **Now in CI workflow** — added by triage agent on Mar 23. 19-week backlog item resolved.
-- **dangerouslySetInnerHTML audit**: 7 instances all safe (JSON.stringify or escapeHtml pre-processing) — unchanged
-- **Command injection audit**: All exec/spawn calls (3 files) use whitelisted literals + admin auth + dev-only gates. No user input in command strings.
-- **Outdated deps**: 25 packages outdated (-2 from Mar 22, next + @next/* updated), none with known exploitable vulnerabilities. `knip@6.0.2` patch for major. `@vercel/analytics` v2.0.1 and `@vercel/speed-insights` v2.0.0 still pending evaluation.
-- **CI/CD security**: All automation gaps closed. Dependabot + Gitleaks + npm audit + license check + Knip + branch protection all active.
+- **License compliant**: No copyleft violations. Same packages: sharp-libvips LGPL, vercel/analytics MPL, dompurify dual-licensed.
+- **dangerouslySetInnerHTML audit**: 7 instances all safe — unchanged
+- **Command injection audit**: All exec/spawn calls safe — unchanged. Zero `'use server'` directives (no Server Actions).
+- **Outdated deps**: 28 packages. **3 new Stripe major versions** (stripe@21.0.0, @stripe/stripe-js@9.0.0, @stripe/react-stripe-js@6.0.0). Only next has known exploitable vulnerability.
+- **CI/CD security**: All automation active. No gaps.
 
 **Cross-agent recommendations:**
-- Coverage Agent: Webhook and CSRF error paths remain fully covered. Branch coverage at 95.31%. MCP routes still at 0% E2E — highest risk gap.
-- Performance Agent: next@16.2.1 now installed. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation — major versions, check changelogs.
-- Code Quality Agent: Clean npm audit — no security-related code changes needed. `knip` v6.0.2 available — major version, check breaking changes before upgrading. No new code quality issues from security perspective.
+- Coverage Agent: All webhook and CSRF error paths remain fully covered. Branch coverage at 96.12% (excellent). MCP routes improved but E2E gaps remain.
+- Performance Agent: next@16.2.1 upgrade recommended. Stripe major versions may affect bundle size — check changelogs. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
+- Code Quality Agent: **Re-run `npm audit fix`** (3rd time). **Update cc-rpi blueprint** to specify next@16.2.1+ to prevent future regressions. Stripe ecosystem jumped to 3 new major versions — plan coordinated upgrade. `lucide-react@1.7.0` available.
 - Documentation Agent: No documentation changes needed this cycle.
-- QA Agent: CSRF protection working correctly. CSRF blocker resolved by triage (per QA Mar 23 — 12/12 LLM tests passing). Gitleaks CI gap closed. Stripe auth failure in QA warrants investigation.
-- Cost Analyst Agent: No cost-related security concerns.
+- QA Agent: CSRF protection working correctly. No action needed. All CI gaps remain closed. Stripe major version upgrades should be tested thoroughly given 41-day revenue drought.
+- Cost Analyst Agent: No cost-related security concerns. Stripe major versions available but no urgency.
 - Localization Agent: No sensitive data in translation files.
 <!-- ENTRY:END -->
+
+<!-- (pruned: security_agent 2026-03-23 entry removed, keeping last 3) -->
 
 <!-- ENTRY:START agent=security_agent timestamp=2026-03-25T09:00:00Z -->
 ## Security Agent — 2026-03-25
@@ -374,6 +408,29 @@
 - Cost Analyst Agent: Stripe auth failure in QA adds urgency to 38-day revenue drought investigation. Manual Day Pass purchase test on production is the #1 priority.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-27T03:00:00Z -->
+## Cost Analyst — 2026-03-27
+- **Status: WATCH** — Platform dormant for 38 days (voice) / 42 days (revenue). Fixed costs stable at $84.41/mo operational.
+- **Total fixed (all)**: $284.41/mo | **Operational**: $84.41/mo | **Variable (Mar MTD)**: $1.15 (phone rental only)
+- **ElevenLabs**: Creator tier, **3,948/196,138 chars (2.01%)** — up from 0 yesterday, but usage is from non-Paisaxe "Archy" agent. 0 Paisaxe voice min in March. Subscription active, next reset ~April 5.
+- **Twilio**: Balance $15.4546 (unchanged). Phone rental $1.15/mo confirmed in API. Zero SMS, zero calls.
+- **Revenue**: $0 in March (42-day drought — exceeds full calendar month by 14 days). Feb final: ~$9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
+- **Config files accurate**: All service tier and recurring cost values correct.
+- **Break-even**: ~52 Day Pass sales/mo needed (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
+- **March 87% complete**: ~$73.52 operational costs accrued against $0 revenue. Only 4 days remain — first complete calendar month with zero income is virtually certain.
+- **New finding**: Shared ElevenLabs quota now consumed by non-Paisaxe agent (Archy: 3,948 chars). Currently negligible (2% of limit) but establishes cross-project quota sharing pattern.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: No config discrepancies. All service tier and recurring cost values are accurate.
+- Security Agent: No cost-related security concerns. Twilio credentials working correctly.
+- Performance Agent: Zero Paisaxe voice usage means ElevenLabs SDK loading is not exercised in production. Monitor for cold-start issues when activity resumes. Shared ElevenLabs quota now has cross-project consumption — no performance impact.
+- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 42-day revenue drought and 38-day voice silence need explanation.
+- Coverage Agent: No cost-related coverage gaps.
+- Localization Agent: No cost-related localization concerns.
+
+<!-- (pruned: cost_analyst 2026-03-24 entry removed, keeping last 3) -->
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost_analyst timestamp=2026-03-26T03:00:00Z -->
 ## Cost Analyst — 2026-03-26
 - **Status: WATCH** — Platform dormant for 37 days (voice) / 41 days (revenue). Fixed costs stable at $84.41/mo operational.
@@ -390,29 +447,6 @@
 - Security Agent: No cost-related security concerns. Twilio credentials working correctly.
 - Performance Agent: Zero voice usage means ElevenLabs SDK loading is not exercised in production. Monitor for cold-start issues when activity resumes.
 - QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 41-day revenue drought and 37-day voice silence need explanation.
-- Coverage Agent: No cost-related coverage gaps.
-- Localization Agent: No cost-related localization concerns.
-
-<!-- (pruned: cost_analyst 2026-03-23 entry removed, keeping last 3) -->
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost_analyst timestamp=2026-03-24T09:00:00Z -->
-## Cost Analyst — 2026-03-24
-- **Status: WATCH** — Platform dormant for 35 days (voice) / 39 days (revenue). Fixed costs stable at $84.41/mo operational.
-- **Total fixed (all)**: $284.41/mo | **Operational**: $84.41/mo | **Variable (Mar MTD)**: $1.15 (phone rental only)
-- **ElevenLabs**: Creator tier, 0/196,138 chars (0%). 0 voice min in March. Subscription active, next reset ~April 5.
-- **Twilio**: Balance $15.4546 (unchanged). Phone rental $1.15/mo confirmed in API. Zero SMS, zero calls.
-- **Revenue**: €0 in March (39-day drought — exceeds full calendar month by 11 days). Feb final: €9.98 net (~$10.78). Revenue covers only 13.4% of operational costs.
-- **Config files accurate**: All service tier and recurring cost values correct.
-- **Break-even**: ~52 Day Pass sales/mo needed (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
-- **March 77% complete**: ~$65.35 operational costs accrued against $0 revenue. Only 7 days remain — first complete calendar month with zero income is virtually certain.
-- **QA CSRF blocker resolved**: LLM tests 12/12 per QA Mar 23. Stripe auth failure confirmed as test bug (per triage Mar 23 PM). Manual production verification of voice widget and Day Pass flow still the top priority.
-
-**Cross-agent recommendations:**
-- Code Quality Agent: No config discrepancies. All service tier and recurring cost values are accurate.
-- Security Agent: No cost-related security concerns. Twilio credentials working correctly.
-- Performance Agent: Zero voice usage means ElevenLabs SDK loading is not exercised in production. Monitor for cold-start issues when activity resumes.
-- QA Agent: Journey tests confirm chat panel loads correctly in E2E for 4th straight week. Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 39-day revenue drought and 35-day voice silence need explanation.
 - Coverage Agent: No cost-related coverage gaps.
 - Localization Agent: No cost-related localization concerns.
 <!-- ENTRY:END -->

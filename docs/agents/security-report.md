@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-03-25
+> Auto-generated on 2026-03-26
 
 ## Health Status: YELLOW
 
-**Executive Summary:** 1 moderate advisory detected (next@16.1.6 — 5 sub-advisories), **1 exploitable** (PPR buffering DoS). This is a **regression** from the Mar 23 fix — the `npm audit fix` that upgraded next to 16.2.1 was reverted by the `chore: sync with cc-rpi blueprint v1.12.0` commit (d3a4dd6), which reset `package.json` to `^16.1.6`. Fix: re-run `npm audit fix`. All other security controls remain intact. 28 outdated packages (+1: `stripe@20.4.1`), none with known exploitable vulnerabilities beyond next.
+**Executive Summary:** 1 moderate advisory detected (next@16.1.6 — 5 sub-advisories), **1 exploitable** (PPR buffering DoS). This is the **3rd recurrence** of the same regression — the cc-rpi blueprint sync keeps resetting `package.json` to `^16.1.6`. Previous fixes on Mar 23 and Mar 26 (triage) were each undone by subsequent blueprint syncs. The latest sync (`d667010`, `chore: sync with cc-rpi blueprint v1.13.0`) reintroduced the vulnerability. Fix: `npm audit fix` — but a **permanent fix requires updating the cc-rpi blueprint itself** to use next@16.2.1+. All other security controls remain intact. 28 outdated packages, 3 new major versions (Stripe ecosystem: stripe@21.0.0, @stripe/stripe-js@9.0.0, @stripe/react-stripe-js@6.0.0), none with known exploitable vulnerabilities beyond next.
 
 ---
 
@@ -29,8 +29,8 @@
 
 **GHSA-ggv3-7p47-pfv8 (HTTP Smuggling) — LOW RISK:**
 - `next.config.ts:40-48` configures 2 rewrites, both to PostHog CDN (`eu-assets.i.posthog.com`, `eu.i.posthog.com`)
+- All HTTPS destinations — no HTTP-based smuggling vector
 - No dynamic URLs or user-controlled rewrite destinations
-- HTTP smuggling requires precise header injection — theoretical but constrained
 
 **GHSA-3x4c-7xq6-9pq8 (Image Cache DoS) — LOW RISK:**
 - `next.config.ts:74-93` restricts `remotePatterns` to `*.supabase.co` and `images.unsplash.com`
@@ -45,14 +45,22 @@
 **GHSA-jcc7-9wpm-mj36 (Dev HMR CSRF) — NOT EXPLOITABLE:**
 - Dev-only; production at paisaxe.es/paisaxe.com is unaffected
 
-### Regression Details
+### Recurring Regression Pattern
 
-The Mar 23 triage resolved this by running `npm audit fix` (next 16.1.6 → 16.2.1). However, commit `d3a4dd6` (`chore: sync with cc-rpi blueprint v1.12.0`) appears to have reset the dependency, reinstating next@16.1.6. The installed version confirms this:
-- `node_modules/next/package.json` → `"version": "16.1.6"`
-- `package.json` → `"next": "^16.1.6"`
-- `npm audit` reports 1 moderate vulnerability
+This next@16.1.6 vulnerability has now regressed **3 times**:
 
-**Recommended fix:**
+| Date | Event | Cause |
+|------|-------|-------|
+| Mar 23 | Fixed | Triage ran `npm audit fix` (16.1.6 → 16.2.1) |
+| Mar 25 | **Regressed** | `d3a4dd6` — cc-rpi blueprint v1.12.0 sync reset package.json |
+| Mar 26 (AM) | Fixed | Triage ran `npm audit fix` again |
+| Mar 26 (PM) | **Regressed** | `d667010` — cc-rpi blueprint v1.13.0 sync reset package.json |
+
+**Root cause:** The cc-rpi blueprint's `package.json` template specifies `"next": "^16.1.6"`, and each sync overwrites the local version. Running `npm audit fix` after each sync is a band-aid.
+
+**Permanent fix:** Update the cc-rpi blueprint itself to specify `"next": "^16.2.1"` or higher, so future syncs don't reintroduce this regression. Until then, every blueprint sync must be followed by `npm audit fix`.
+
+**Recommended immediate fix:**
 ```bash
 npm audit fix
 # Verify: npm list next (should show 16.2.1+)
@@ -74,19 +82,22 @@ npm audit fix
 
 ---
 
-## Changes Since Last Report (2026-03-24)
+## Changes Since Last Report (2026-03-25)
 
-| Area | Mar 24 | Mar 25 | Change |
+| Area | Mar 25 | Mar 26 | Change |
 |------|--------|--------|--------|
-| Vulnerability count | 0 | **1 moderate** | **Regression** — cc-rpi sync reverted next@16.2.1 to 16.1.6 |
-| Exploitable vulns | 0 | **1** (PPR DoS) | PPR buffering DoS re-exposed |
+| Vulnerability count | 1 moderate | **1 moderate** | Same (re-regressed after triage fix) |
+| Exploitable vulns | 1 (PPR DoS) | **1** (PPR DoS) | Same |
+| Regression count | 1st recurrence | **3rd recurrence** | Recurring pattern identified |
 | CSP | `'self' 'unsafe-inline'` | `'self' 'unsafe-inline'` | Unchanged |
 | dangerouslySetInnerHTML | 7 instances | 7 instances | Unchanged — all safe |
-| Outdated packages | 27 | 28 | +1 (`stripe@20.4.1`) |
-| Health status | GREEN | **YELLOW** | Due to regression |
+| Outdated packages | 28 | 28 | Same count, 3 new major versions (Stripe ecosystem) |
+| Health status | YELLOW | **YELLOW** | Same — recurring regression |
 
-**Key change:**
-- **Next.js version regression**: The `chore: sync with cc-rpi blueprint v1.12.0` commit (d3a4dd6) reset `package.json` to `"next": "^16.1.6"`, undoing the Mar 23 upgrade to 16.2.1. This reintroduced 5 sub-advisories, 1 exploitable (PPR buffering DoS). Fix: `npm audit fix`.
+**Key changes:**
+- **Next.js regression recurrence**: The triage agent fixed this on Mar 26 morning, but `d667010` (cc-rpi blueprint v1.13.0 sync) re-introduced it. Third time in 4 days.
+- **Stripe ecosystem major versions**: stripe@21.0.0, @stripe/stripe-js@9.0.0, @stripe/react-stripe-js@6.0.0 — all jumped to new major versions since last report. Review changelogs before upgrading.
+- **lucide-react@1.7.0**: Continued major version advancement (was 1.6.0 on Mar 25).
 
 ---
 
@@ -263,8 +274,8 @@ form-action 'self'
 | @elevenlabs/react | 0.14.1 | 0.15.0 | prod | Minor version — review changelog | Low |
 | @next/bundle-analyzer | 16.1.6 | 16.2.1 | dev | None (build tooling) | Low |
 | @next/eslint-plugin-next | 16.1.6 | 16.2.1 | dev | None (lint tooling) | Low |
-| @stripe/react-stripe-js | 5.6.0 | 5.6.1 | prod | Payment library — patch | Low |
-| @stripe/stripe-js | 8.8.0 | 8.11.0 | prod | Payment library — review changelog | Medium |
+| **@stripe/react-stripe-js** | **5.6.0** | **6.0.0** | **prod** | **Major version** — payment UI library, review breaking changes | **Medium** |
+| **@stripe/stripe-js** | **8.8.0** | **9.0.0** | **prod** | **Major version** — payment library, review breaking changes | **Medium** |
 | @supabase/ssr | 0.8.0 | 0.9.0 | prod | Auth library — minor version | Medium |
 | @supabase/supabase-js | 2.97.0 | 2.100.0 | prod | Core client — minor version | Medium |
 | @tailwindcss/postcss | 4.2.1 | 4.2.2 | dev | None (styling tooling) | Low |
@@ -276,12 +287,12 @@ form-action 'self'
 | canvas | 3.2.1 | 3.2.2 | dev | PDF test rendering — patch | Low |
 | jsdom | 28.1.0 | 27.0.1 | dev | Version mismatch (current is ahead) | None |
 | knip | 5.85.0 | 6.0.5 | dev | **Major version** — dead code detection tooling | Low |
-| lucide-react | 0.575.0 | 1.6.0 | prod | **Major version (0.x → 1.x)** — icon library, review breaking changes | Medium |
+| lucide-react | 0.575.0 | 1.7.0 | prod | **Major version (0.x → 1.x)** — icon library, review breaking changes | Medium |
 | pdfjs-dist | 5.4.624 | 5.5.207 | prod | PDF parsing — monitor | Medium |
 | postcss | 8.5.6 | 8.5.8 | dev | None (CSS tooling) | Low |
 | posthog-js | 1.353.0 | 1.363.5 | prod | None known | Low |
 | resend | 6.9.2 | 6.9.4 | prod | Email service — patch | Low |
-| stripe | 20.3.1 | 20.4.1 | prod | Payment server SDK — patch | Low |
+| **stripe** | **20.3.1** | **21.0.0** | **prod** | **Major version** — payment server SDK, review breaking changes | **Medium** |
 | tailwindcss | 4.2.1 | 4.2.2 | dev | None (styling tooling) | Low |
 | typescript | 5.9.3 | 6.0.2 | dev | **Major version** — TypeScript 6.0 | Medium |
 | vitest | 4.1.1 | 3.2.4 | dev | Version mismatch (current is ahead) | None |
@@ -290,9 +301,9 @@ form-action 'self'
 **Note:** `jsdom` and `vitest` show version format mismatches in `npm outdated` output — these are at or ahead of the latest published version. No security implications.
 
 **New this cycle:**
-- **next@16.1.6 regression** — was 16.2.1 on Mar 23–24, reverted by cc-rpi blueprint sync. The only package with active advisories. `npm audit fix` resolves it.
-- **stripe@20.4.1** — new patch available (from 20.3.1). No known vulnerabilities.
-- **lucide-react@1.6.0** — jumped from 1.0.1 to 1.6.0 since last check. Major version gap from installed 0.575.0.
+- **Stripe ecosystem major versions**: stripe@21.0.0, @stripe/stripe-js@9.0.0, @stripe/react-stripe-js@6.0.0 — all 3 jumped to new major versions. These should be upgraded together after reviewing migration guides. Given the 41-day revenue drought, verify payment flows work before and after upgrade.
+- **lucide-react@1.7.0** — continued advancement (was 1.6.0 on Mar 25). Major version gap from installed 0.575.0 remains.
+- **next@16.1.6 regression** — 3rd recurrence. cc-rpi blueprint sync is the root cause.
 
 ---
 
@@ -307,7 +318,7 @@ form-action 'self'
 | License check | In CI | Blocks GPL, AGPL, SSPL, and other strong copyleft |
 | Knip (dead code) | In CI | Blocks unused exports on PRs |
 | Branch protection | Enabled on `main` | 4 required status checks, force push blocked |
-| Claude Code Review | In CI | Runs on PRs, uses `claude-sonnet-4-5-20250929` |
+| Claude Code Review | In CI | Runs on PRs |
 | Pre-commit hooks | Active | Typecheck + lint + test via Husky |
 | npm overrides | Active | `qs >= 6.14.2`, `minimatch >= 10.2.3` |
 
@@ -352,10 +363,11 @@ form-action 'self'
 
 | Item | Priority | Effort | Impact | Status |
 |------|----------|--------|--------|--------|
-| **Re-run `npm audit fix`** (next 16.1.6 → 16.2.1) | **High** | Low | Closes 5 sub-advisories, 1 exploitable | **Regression — fix now** |
-| Evaluate lucide-react v1.6.0 (major) | Medium | Medium | Icon library, check migration guide | Open |
+| **Re-run `npm audit fix`** (next 16.1.6 → 16.2.1) | **High** | Low | Closes 5 sub-advisories, 1 exploitable | **3rd regression — fix now** |
+| **Fix cc-rpi blueprint** to use next@16.2.1+ | **High** | Low | Prevents future regressions | **NEW — root cause fix** |
+| Evaluate Stripe ecosystem v21/v9/v6 (3 major versions) | Medium | High | Payment libraries — review migration guides together | **NEW** |
+| Evaluate lucide-react v1.7.0 (major) | Medium | Medium | Icon library, check migration guide | Open |
 | Evaluate typescript v6.0.2 (major) | Medium | Medium | Dev tooling, check breaking changes | Open |
-| Update @stripe/stripe-js to 8.11.0 | Low | Low | Payment library patch | Open |
 | Update @supabase/ssr to 0.9.0 | Low | Low | Auth library update | Open |
 | Update @supabase/supabase-js to 2.100.0 | Low | Low | Core client update | Open |
 | Update pdfjs-dist to 5.5.207 | Low | Medium | PDF parsing update, may have fixes | Open |
