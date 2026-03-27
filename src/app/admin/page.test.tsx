@@ -1531,4 +1531,17 @@ describe("AdminPage", () => {
       });
     });
   });
+
+  // Line 821: StatCard non-clickable variant (`<div>` instead of `<button>`)
+  // This branch is unreachable through the component's public API because all 4
+  // StatCard usages in AdminPage pass an `onClick` prop, making `isClickable` always
+  // true. StatCard is a non-exported internal function, so it cannot be called
+  // externally without an onClick. This is a defensive fallback for future usages
+  // that may omit onClick.
+  //
+  // Lines 45, 55, 60, 65: `dynamic()` import `.then(m => ...)` callbacks
+  // These are Next.js `dynamic()` factory functions whose `.then()` callbacks
+  // never execute in tests because the modules are fully mocked. The callbacks
+  // are trivial property accessors (e.g., `m => ({ default: m.FeatureTogglesPanel })`)
+  // and cannot be exercised without un-mocking the dynamic imports.
 });

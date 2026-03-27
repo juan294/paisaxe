@@ -1255,6 +1255,40 @@ describe("/api/mcp/make-booking", () => {
       expect(body.conversation_initiation_client_data.dynamic_variables.time).toBe("una menos cuarto de la noche");
     });
 
+    it("should handle :45 time at non-12 hour (13:45 → dos menos cuarto)", async () => {
+      // This tests lines 157-158: hour12 !== 12 branch → nextHour = hour12 + 1
+      // 13:45 → hour=13, hour12=1, nextHour=2 → "dos menos cuarto de la tarde"
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_1345" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34985887797",
+          party_size: 2,
+          date: "hoy",
+          time: "13:45",
+          customer_name: "Test User",
+          customer_phone: "612345678",
+        }),
+      });
+
+      await POST(request);
+
+      const [, options] = mockFetch.mock.calls[0];
+      const body = JSON.parse(options.body);
+      // hour=13 → hour12=1 → nextHour=2 → "dos menos cuarto de la tarde"
+      expect(body.conversation_initiation_client_data.dynamic_variables.time).toBe("dos menos cuarto de la tarde");
+    });
+
     it("should handle non-Error throw inside initiateCall catch", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";

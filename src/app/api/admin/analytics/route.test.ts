@@ -277,6 +277,24 @@ describe("GET /api/admin/analytics (PostHog)", () => {
     expect(data.data.newVsReturning).toEqual({ newVisitors: 0, returningVisitors: 0 });
   });
 
+  it("should handle non-Error thrown values in catch block (line 404 else branch)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    // Throw a non-Error value (string) to trigger the "Unknown error" fallback
+    mockFetch.mockImplementation(() => {
+      throw "unexpected string error";
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    // Should return 200 with empty data (graceful fallback)
+    expect(response.status).toBe(200);
+    expect(data.data.summary.totalPageviews).toBe(0);
+    expect(data.data.summary.uniqueVisitors).toBe(0);
+  });
+
   it("should handle null UTM values gracefully", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
