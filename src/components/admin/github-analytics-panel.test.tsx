@@ -342,15 +342,13 @@ describe("GitHubAnalyticsPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Daily Traffic")).toBeInTheDocument();
+      // Single data point: xStep = w (not division by zero)
+      const chartSvg = container.querySelector('svg[preserveAspectRatio="none"]');
+      expect(chartSvg).not.toBeNull();
+      // Should have 2 path elements (views + clones) inside the chart SVG
+      const paths = chartSvg!.querySelectorAll("path");
+      expect(paths.length).toBe(2);
     });
-
-    // Single data point: xStep = w (not division by zero)
-    const chartSvg = container.querySelector('svg[preserveAspectRatio="none"]');
-    expect(chartSvg).not.toBeNull();
-
-    // Should have 2 path elements (views + clones) inside the chart SVG
-    const paths = chartSvg!.querySelectorAll("path");
-    expect(paths.length).toBe(2);
   });
 
   it("renders traffic chart with many data points and label skipping", async () => {
