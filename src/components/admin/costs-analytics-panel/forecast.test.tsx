@@ -260,8 +260,10 @@ describe("ScalingForecastSection", () => {
 
   it("does not re-fetch in useEffect when data already loaded (line 35 !usageMetrics false branch)", async () => {
     // The useEffect guard on line 35 is `if (!usageMetrics && !isLoadingUsage)`.
-    // When usageMetrics is already loaded (non-null), the condition is false
-    // and loadUsageData is NOT called again on rerender.
+    // The useEffect depends on [loadUsageData], and loadUsageData depends on
+    // [dateRange.from, dateRange.to, services]. Changing the dateRange prop creates
+    // a new loadUsageData reference, which triggers the useEffect. But since
+    // usageMetrics is already non-null, the guard evaluates to false.
     mockFetchCostsAnalytics.mockResolvedValue({
       data: { usageMetrics: mockUsageMetrics },
     });
@@ -280,10 +282,11 @@ describe("ScalingForecastSection", () => {
     // Only 1 fetch call so far.
     expect(mockFetchCostsAnalytics).toHaveBeenCalledTimes(1);
 
-    // Rerender with same props — useEffect fires but !usageMetrics is false,
-    // so loadUsageData is NOT called again
+    // Rerender with a DIFFERENT dateRange — this creates a new loadUsageData callback,
+    // which triggers the useEffect to re-run. But usageMetrics is non-null,
+    // so the guard `!usageMetrics && !isLoadingUsage` is false.
     rerender(
-      <ScalingForecastSection services={mockServices} dateRange={dateRange} />
+      <ScalingForecastSection services={mockServices} dateRange={{ from: "2026-03-01", to: "2026-03-31" }} />
     );
 
     // Still only 1 call — the guard prevented a refetch

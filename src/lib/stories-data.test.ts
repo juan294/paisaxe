@@ -743,6 +743,84 @@ describe("stories-data", () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
+    it("should NOT log warnings during build phase for getStoriesFromDB on DB error (not exception)", async () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } });
+      const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const result = await getStoriesFromDB();
+
+      expect(result).toEqual(FALLBACK_STORIES);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should NOT log warnings during build phase for getStoriesByCategoryFromDB on DB error (not exception)", async () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } });
+      const mockEqCategory = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqCategory });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const result = await getStoriesByCategoryFromDB("nature");
+
+      expect(result.length).toBeGreaterThan(0);
+      result.forEach((story) => expect(story.category).toBe("nature"));
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should NOT log warnings during build phase for getStoriesByLocationFromDB on DB error (not exception)", async () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } });
+      const mockEqLocation = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqLocation });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const result = await getStoriesByLocationFromDB("eastern");
+
+      expect(result.length).toBeGreaterThan(0);
+      result.forEach((story) => expect(story.location).toBe("eastern"));
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should NOT log warnings during build phase for getStoriesByDurationFromDB on DB error (not exception)", async () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } });
+      const mockEqDuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqCuration = vi.fn().mockReturnValue({ eq: mockEqDuration });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const result = await getStoriesByDurationFromDB("weekend");
+
+      expect(result.length).toBeGreaterThan(0);
+      result.forEach((story) => expect(story.duration).toBe("weekend"));
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should NOT log warnings during build phase for getStoryBySlugFromDB on DB error (not exception)", async () => {
+      process.env = { ...originalEnv, NEXT_PHASE: "phase-production-build" };
+      const mockSingle = vi.fn().mockResolvedValue({ data: null, error: { message: "Not found" } });
+      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const result = await getStoryBySlugFromDB("lagos-covadonga");
+
+      expect(result).not.toBeNull();
+      expect(result?.slug).toBe("lagos-covadonga");
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
     it("should log warnings at runtime (non-build phase) for getStoryBySlugFromDB", async () => {
       process.env = { ...originalEnv };
       delete process.env.NEXT_PHASE;

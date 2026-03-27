@@ -57,6 +57,42 @@ describe("Stripe Analytics API Route", () => {
     expect(data.data.summary.totalOrders).toBe(0);
   });
 
+  it("falls back to EUR when payment intent has empty currency (line 15 fallback)", async () => {
+    vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+    const now = Math.floor(Date.now() / 1000);
+
+    mockPaymentIntentsList.mockResolvedValue({
+      data: [
+        {
+          id: "pi_no_currency",
+          amount: 199,
+          currency: "", // empty currency triggers the || "EUR" fallback
+          status: "succeeded",
+          created: now - 86400,
+          receipt_email: "user@example.com",
+          metadata: {},
+          latest_charge: null,
+        },
+      ],
+    });
+
+    mockBalanceTransactionsList
+      .mockResolvedValueOnce({
+        data: [{ id: "txn_1", amount: 199, status: "available", created: now - 86400 }],
+      })
+      .mockResolvedValueOnce({ data: [] });
+
+    const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // The formatted amount should use EUR as fallback
+    const order = data.data.recentOrders[0];
+    expect(order.totalFormatted).toContain("€");
+  });
+
   it("returns empty data structure on API error", async () => {
     vi.mocked(isStripeConfigured).mockReturnValue(true);
     mockPaymentIntentsList.mockRejectedValue(new Error("Stripe API error"));
