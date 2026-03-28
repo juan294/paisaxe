@@ -187,16 +187,6 @@ git branch -d feature/short-name
 8. **Background agents use `.worktrees/`**: Agents spawned with `run_in_background: true` or as team members are sandboxed to the project directory. They CANNOT access `../paisaxe-*` paths. Always use `.worktrees/short-name` inside the project.
 9. **If merge conflicts arise**: Resolve them in the main repo during merge, never in the worktree.
 
-<important if="you are pushing code to a remote">
-### Push Accountability
-
-After pushing to the development branch, spawn a background agent to monitor CI.
-If CI fails, the background agent investigates, fixes, and re-pushes.
-Main terminal continues working -- push verification is non-blocking.
-If a background fix requires changes that conflict with current work, notify the user before applying fixes.
-**Pushing to `main` is PROHIBITED** -- see Production Safety above.
-</important>
-
 ## TDD Protocol
 
 All code changes follow Red-Green-Refactor:
@@ -233,7 +223,6 @@ scripts/agent-ctl.sh master on|off    # Master toggle
 claude -p "Fix all TypeScript lint errors and run tests" --allowedTools "Edit,Read,Bash,Write" --output-format json
 claude -p "Read issue #240 and implement the fix with TDD" --allowedTools "Edit,Read,Bash,Write,Grep"
 ```
-
 
 ## Environment Variables
 
@@ -312,55 +301,6 @@ Core tables (see `supabase/migrations/` for full DDL):
 - Production deploys from `main` only. Changes pushed to `develop` must be merged to `main` via PR before they go live.
 - Always confirm the target branch before pushing — if the goal is production deployment, ensure the PR targets `main`.
 
-<important if="you are merging PRs, merging branches to main, deploying, or handling dependency updates">
-### Deployment Safety
-
-- **Merging to `main` IS deploying to production.** Every merge triggers a production deployment. No exceptions.
-- **Dependabot PRs target `main` by default.** Never merge them directly. Cherry-pick to `develop`, close the PR, release normally.
-- **Every CI run and deployment costs money.** Before starting: estimate how many runs/deploys this will trigger. If more than 2-3, batch the work.
-- **Framework upgrades (Next.js, React, etc.) require preview deployment verification.** CI passing is NOT sufficient. Deploy to a preview URL and verify before merging to production.
-- **When production is down:** Roll back immediately. Investigate on non-production. Fix forward on `develop`. Never deploy to diagnose. Never promote broken deployments "briefly."
-- **Batch dependency updates** into a single branch and PR. Never merge N PRs one-by-one (causes O(n^2) CI waste from rebase cascades).
-- **Justify every external action** — before any CI run, deployment, or API call: Is this needed? Is this justified? Is this verifiable? If any answer is "no," stop.
-</important>
-
-<important if="you are writing Supabase migrations or creating tables in Supabase">
-### Supabase Migration Rules
-
-- **Every migration that creates a public-facing table must include explicit grants:**
-  ```sql
-  GRANT SELECT ON table_name TO anon, authenticated;
-  ```
-- **Add `ALTER DEFAULT PRIVILEGES` in the initial setup migration** so all future tables automatically get anon SELECT. Never rely on Supabase dashboard-granted defaults for migration-created tables.
-- **Fallback data paths must log at ERROR level.** If a query fails and the code falls back to default/placeholder data, log `[TABLE_FALLBACK]` at ERROR — not INFO. Silent fallbacks hide permission bugs for days.
-- **Health endpoints must check actual data access**, not just connectivity. Return `"degraded"` if primary tables are inaccessible.
-</important>
-
-<important if="you are creating or modifying Supabase database migrations">
-### Supabase Migration Safety
-
-Always test migrations locally before pushing to the remote project.
-
-```bash
-# 1. Ensure local Supabase is running (requires Docker Desktop)
-supabase start
-
-# 2. Apply all migrations to the local Postgres instance
-supabase db reset
-
-# 3. Verify the migration worked (query the local database)
-docker exec supabase_db_<project> psql -U postgres -c "<verification query>"
-
-# 4. Only after local verification succeeds, push to remote
-supabase db push
-```
-
-- The local instance is a full Postgres with RLS, extensions, and auth — treat it as your UAT environment.
-- If `supabase start` fails, check that Docker Desktop is running.
-- The container name follows the pattern `supabase_db_<project>` where `<project>` is the Supabase project name from `supabase/config.toml`.
-- Never push a migration to remote without testing it locally first.
-</important>
-
 ## Language & Tone
 
 - All user-facing content for the Asturias project must be in Spanish unless explicitly stated otherwise.
@@ -383,17 +323,9 @@ supabase db push
 - You CANNOT handle credentials (npm tokens, API keys) directly — ask the user to provide/set them.
 - Upstash Redis API differs from standard Redis: use `zrange` with options instead of `zrangebyscore`/`zrevrangebyscore`.
 
-## Agent Autonomy
+## Agent Behavior
 
-Exhaust CLI tools, shell commands, and file tools before asking the user. Only escalate when genuinely impossible. Production-affecting actions need explicit human authorization.
-
-**Tools to exhaust before suggesting manual steps:**
-Supabase CLI, GitHub CLI (`gh`), Vercel CLI (develop/preview only), MCP servers, Bash (npm scripts, git, curl), SQL (`supabase db execute`).
-
-**EXCEPTION — Production-affecting actions require user authorization (see Production Safety):**
-- Anything touching `main` branch (push, PR, merge)
-- Production deployments, database migrations
-- External service configuration changes (ElevenLabs, Stripe, Vercel env vars, DNS)
+Exhaust tools before asking the user. Production actions need human authorization. Save operational lessons to auto memory immediately. Don't wait to be asked.
 
 ## RPI Workflow
 
@@ -490,12 +422,6 @@ cd /Users/juan/code/paisaxe && npm run test
 </examples>
 
 Domain-specific rules (git, CI, deployment, Python, macOS, Supabase, GitHub CLI, multi-agent) are in `.claude/skills/` -- loaded automatically when relevant.
-
-## Memory Management
-
-When you discover an operational lesson during any session — CI failure pattern, permission issue, workaround, tooling quirk, environment-specific behavior — save it to auto memory immediately. Don't wait to be asked.
-
-After completing `/bootstrap`, `/adopt`, or any significant configuration change, save the key decisions and project context to auto memory so future sessions start with full awareness.
 
 ## Project File Locations
 
