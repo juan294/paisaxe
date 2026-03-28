@@ -44,7 +44,7 @@ DEV_SERVER_PID=""
 RESTART_DEV_SERVER=false
 
 # Detect if the dev server is running on port 3000
-DEV_SERVER_PID=$(lsof -ti :3000 2>/dev/null | head -1)
+DEV_SERVER_PID=$(timeout 5 lsof -ti :3000 2>/dev/null | head -1 || true)
 if [[ -n "$DEV_SERVER_PID" ]]; then
   log_info "Dev server detected (PID $DEV_SERVER_PID) — stopping for production build..." | tee -a "$LOG_FILE"
   kill "$DEV_SERVER_PID" 2>/dev/null
@@ -64,8 +64,8 @@ if [[ -n "$DEV_SERVER_PID" ]]; then
   log_success "Dev server stopped" | tee -a "$LOG_FILE"
 fi
 
-log_info "Building application..." | tee -a "$LOG_FILE"
-if BUILD_OUTPUT=$(npm run build 2>&1); then
+log_info "Building application (timeout: 300s)..." | tee -a "$LOG_FILE"
+if BUILD_OUTPUT=$(timeout 300 npm run build 2>&1); then
   log_success "Build completed" | tee -a "$LOG_FILE"
 else
   FRESH_BUILD=false

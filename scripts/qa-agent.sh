@@ -56,8 +56,8 @@ ENABLE_GITHUB_ISSUES=$(get_agent_config "qa_agent_enabled" "enableGithubIssues" 
 ENABLE_GAP_ANALYSIS=$(get_agent_config "qa_agent_enabled" "enableGapAnalysis" || echo "true")
 log_info "Configuration: $TESTS_PER_CATEGORY tests/category, journeyTests=$ENABLE_JOURNEY_TESTS, githubIssues=$ENABLE_GITHUB_ISSUES, gapAnalysis=$ENABLE_GAP_ANALYSIS" | tee -a "$LOG_FILE"
 
-# Check if server is already running
-if curl -s --max-time 2 "http://localhost:3000/api/health" > /dev/null 2>&1; then
+# Check if server is already running and healthy (HTTP 200)
+if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3000/api/health 2>/dev/null)" == "200" ]]; then
   log_info "Dev server already running on port 3000" | tee -a "$LOG_FILE"
 else
   log_info "Starting Next.js dev server..." | tee -a "$LOG_FILE"
@@ -66,10 +66,13 @@ else
   npm run dev > "$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
 
-  # Wait for server to be ready (max 120 seconds)
+  # Wait for server to be healthy (max 120 seconds)
+  # Check for HTTP 200 specifically — a 503 ("degraded") means Supabase isn't ready yet
   MAX_WAIT=120
   WAITED=0
-  while ! curl -s --max-time 2 "http://localhost:3000/api/health" > /dev/null 2>&1; do
+  while true; do
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3000/api/health" 2>/dev/null || echo "000")
+    [[ "$HTTP_CODE" == "200" ]] && break
     if [[ $WAITED -ge $MAX_WAIT ]]; then
       log_error "Server failed to start within ${MAX_WAIT}s" | tee -a "$LOG_FILE"
       exit 1
@@ -92,6 +95,8 @@ log_info "=== Phase 0: Integration Health Checks ===" | tee -a "$LOG_FILE"
 HEALTH_CHECKS_PASSED=0
 HEALTH_CHECKS_FAILED=0
 HEALTH_CHECK_DETAILS=""
+CI_E2E_STATUS="unknown"
+CI_E2E_RUN_ID=""
 
 # Check 1: App Health Endpoint
 log_info "Checking app health..." | tee -a "$LOG_FILE"
