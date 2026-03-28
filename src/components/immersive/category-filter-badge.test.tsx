@@ -303,6 +303,38 @@ describe("CategoryFilterBadge", () => {
     expect(screen.getByText("3")).toBeInTheDocument();
   });
 
+  it("click inside dropdown does NOT close it", () => {
+    const { container } = renderBadge();
+
+    // Open dropdown
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
+
+    // Verify dropdown is open
+    const visibleDropdown = container.querySelector('[class*="opacity-100"][class*="pointer-events-auto"]');
+    expect(visibleDropdown).not.toBeNull();
+
+    // Click inside the dropdown panel
+    fireEvent.mouseDown(visibleDropdown!);
+
+    // Dropdown should still be open (contains returns true, so it does NOT close)
+    const stillVisible = container.querySelector('[class*="opacity-100"][class*="pointer-events-auto"]');
+    expect(stillVisible).not.toBeNull();
+  });
+
+  it("non-Escape key does NOT close dropdown", () => {
+    const { container } = renderBadge();
+
+    // Open dropdown
+    fireEvent.click(getToggleButton(CATEGORY_LABELS.nature));
+
+    // Press a key that is NOT Escape
+    fireEvent.keyDown(document, { key: "Enter" });
+
+    // Dropdown should still be open
+    const visibleDropdown = container.querySelector('[class*="opacity-100"][class*="pointer-events-auto"]');
+    expect(visibleDropdown).not.toBeNull();
+  });
+
   it("clicking toggle again closes the dropdown", () => {
     const { container } = renderBadge();
 

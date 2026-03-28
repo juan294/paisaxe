@@ -154,6 +154,15 @@ describe("getStoriesServer", () => {
     expect(result).toEqual(MOCK_FALLBACK_STORIES);
   });
 
+  it("returns FALLBACK_STORIES when a non-Error value is thrown", async () => {
+    mockFetch.mockRejectedValue("non-error string");
+
+    const { getStoriesServer } = await import("./stories-server");
+    const result = await getStoriesServer();
+
+    expect(result).toEqual(MOCK_FALLBACK_STORIES);
+  });
+
   it("uses next: { revalidate: 60 } in production", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
