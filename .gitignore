@@ -62,6 +62,7 @@ logs/
 
 # Supabase local
 supabase/.temp/
+supabase/.branches/
 .claude/
 !.claude/commands/
 .performance-history.json
