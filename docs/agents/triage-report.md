@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-03-27 | 5 reports processed | 2 action items
+> Generated on 2026-03-28 | 6 reports processed | 1 action item
 
 ## Agent Failures
 None — all agents ran successfully.
@@ -9,40 +9,40 @@ None — all agents ran successfully.
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
 | 1 | cc-rpi-update-report.md | cc-rpi-update | GREEN | 0 — synced at v1.13.0 |
-| 2 | cost-analyst-report.md | cost-analyst | WATCH | 0 code items — business concern (42-day revenue drought) |
-| 3 | coverage-report.md | coverage | GREEN (ARCHIVED) | 1 — 18 new tests committed |
-| 4 | security-report.md | security | **YELLOW** (known) | 1 — brace-expansion override added |
-| 5 | localization-report.md | localization | GREEN | 0 — 100% coverage maintained |
+| 2 | cost-analyst-report.md | cost-analyst | WATCH | 0 code items — business concern (43-day revenue drought) |
+| 3 | coverage-report.md | coverage | GREEN (ARCHIVED) | 1 — 5 new tests + use-stories refactor committed |
+| 4 | documentation-report.md | documentation | GREEN | 0 — second consecutive clean run |
+| 5 | localization-report.md | localization | GREEN | 0 — 100% coverage, 21 days stable |
+| 6 | security-report.md | security | **YELLOW** (known) | 0 — next@16.1.6 blocked until 16.2.2+ |
 
 ## Overall Status: GREEN (security YELLOW is a known, deliberate trade-off)
 
-Security YELLOW is caused by next@16.1.6, which was **deliberately** downgraded in `934fe4a` due to a Vercel runtime bug in 16.2.1 (console-file.js missing file-logger.js in NFT trace — took production down 2026-03-24). Cannot upgrade until Next.js publishes 16.2.2+. PPR DoS partially mitigated by Vercel serverless function limits.
-
-New brace-expansion vulnerability (GHSA-f886-m6hf-6m8v) fixed via npm override `>=5.0.5`.
+Security YELLOW is caused by next@16.1.6, which was **deliberately** downgraded in `934fe4a` due to a Vercel runtime bug in 16.2.1. Cannot upgrade until Next.js publishes 16.2.2+. PPR DoS partially mitigated by Vercel serverless function limits.
 
 ## Action Items Completed
 
 | # | Item | Source Report | Tests Updated | Status |
 |---|------|--------------|---------------|--------|
-| 1 | Commit 18 new coverage agent tests | Coverage | 10 test files | Done |
-| 2 | Fix brace-expansion vulnerability (override >=5.0.5) | npm audit (new) | N/A | Done |
+| 1 | Commit 5 new coverage agent tests + use-stories refactor | Coverage | 7 files (6 modified + 1 new) | Done |
 
 ### Details
 
 **1. Coverage agent tests committed**
-- 18 new tests across 10 files (+548 lines). Five files reached 100% branch coverage: `stories-data.ts`, `alerts.tsx`, `forecast.tsx`, `analytics/route.ts`, `stripe-analytics/route.ts`. API routes improved: `costs-analytics/route.ts` (92.42->98.48%), `mcp/places/route.ts` (98.81->100%), `mcp/make-booking/route.ts` (96.87->97.91%).
+- 5 new tests across 6 files + 1 new test file (`use-stories.cache-hit.test.ts`). Branch coverage improved to 96.44% (+0.08%). Covered: stories-server.ts non-Error branch, sitemap.ts slug fallback, category-filter-badge click-outside/escape handlers, suggest-place-dialog loading-state close prevention. use-stories.test.ts refactored from `vi.resetModules()` to static imports with `clearStoriesCache()`.
 
-**2. brace-expansion security fix**
-- Added `"brace-expansion": ">=5.0.5"` to npm overrides in `package.json`. Fixes GHSA-f886-m6hf-6m8v (process hang + memory exhaustion via zero-step sequence). Transitive dep via `eslint-plugin-react` -> `minimatch` -> `brace-expansion`.
+### Stale Report Data Corrected
+
+- Coverage report cross-agent recommendation still lists `chat-action-detection.ts:321` (trailing-period removal) as dead code. Verified this was **already removed** in Mar 26 triage. Report template needs updating by coverage agent.
 
 ### Items Not Actionable
 
 | # | Item | Reason |
 |---|------|--------|
-| 3 | next@16.1.6 security advisory (5 sub-advisories) | Deliberate downgrade per `934fe4a` — Vercel runtime bug in 16.2.1. Wait for 16.2.2+. |
+| 2 | next@16.1.6 security advisory (5 sub-advisories) | Deliberate downgrade per `934fe4a` — Vercel runtime bug in 16.2.1. Wait for 16.2.2+. |
+| 3 | 43-day revenue drought | Business concern — manual platform verification recommended |
 
 ## Verification
-- [x] All tests passing (5678/5678, 304 files)
+- [x] All tests passing (5683/5683, 305 files)
 - [x] Typecheck clean
 - [x] Lint clean
 - [x] CI monitoring in progress
@@ -51,14 +51,15 @@ New brace-expansion vulnerability (GHSA-f886-m6hf-6m8v) fixed via npm override `
 
 | Item | Duration | Trend |
 |------|----------|-------|
-| next@16.1.6 security advisory (deliberate) | 1 cycle | Blocked on Next.js 16.2.2+ release |
+| next@16.1.6 security advisory (deliberate) | 2 cycles | Blocked on Next.js 16.2.2+ release |
 | Dead code (structural): JPEG branch, i18n loaders | 5+ cycles | Kept for type safety — no runtime impact |
 | MCP routes 0% E2E coverage | 11+ weeks | QA/Coverage/Security all flag this |
 | Low coverage: voice-agent-chat (45.6%), agents-dashboard (48.5%) | 5+ cycles | Requires Playwright E2E |
-| Platform dormancy (0 revenue, 0 voice) | 42 days | Business concern — manual verification needed |
-| Gap detection script should check features.md | 4 cycles | Causes false positives in documentation report |
+| Platform dormancy (0 revenue, 0 voice) | 43 days | Business concern — manual verification needed |
+| Gap detection script should check features.md | 5 cycles | Causes false positives in documentation report |
+| Coverage report stale dead code reference | NEW | chat-action-detection.ts:321 listed but already removed |
 
 ## Commits
-1. `0653686` — `fix: add coverage agent tests + brace-expansion security override [triage]`
+1. `0361a60` — `fix: add coverage agent tests + refactor use-stories test imports [triage]`
 
 *Report generated by triage agent.*

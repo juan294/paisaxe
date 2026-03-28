@@ -4,24 +4,53 @@
 > See `docs/health-report-[DATE].md` for the latest coverage data.
 > This file is kept for historical reference only and is no longer updated.
 
-> Last updated: 2026-03-27
+> Last updated: 2026-03-28
 
 ## Summary
 
-- **Total tests:** 5678 passed (+18 from 5660)
-- **Test files:** 304 passed (100%)
+- **Total tests:** 5683 passed (+5 from 5678)
+- **Test files:** 305 passed (100%) (+1 new file)
 - **Statement coverage:** 98.69% (unchanged)
-- **Branch coverage:** 96.36% (+0.24% from 96.12%)
+- **Branch coverage:** 96.44% (+0.08% from 96.36%)
 - **Function coverage:** 98.71% (unchanged)
 - **Line coverage:** ~99.09% (unchanged)
 - **TypeScript:** No errors
 - **Lint:** No errors
 
-This cycle added 18 new tests targeting branch gaps across 7 files. Two lib modules reached 100% branch coverage: `stories-data.ts` (94.84% -> 100%) and costs-analytics-panel alerts/forecast subcomponents. Three API routes reached 100% branch: `analytics`, `stripe-analytics`, `places`. The `costs-analytics` route improved from 92.42% to 98.48% branch. The `make-booking` route improved from 96.87% to 97.91% branch.
+This cycle added 5 new tests across 6 files targeting branch and statement gaps. One new test file was created for the `use-stories` cache-hit path. Branch coverage improved through `stories-server.ts` non-Error error handling, `sitemap.ts` slug fallback, `category-filter-badge.tsx` click-outside/escape behaviors, and `suggest-place-dialog.tsx` loading-state close prevention. The `use-stories.test.ts` was refactored from `vi.resetModules()` to static imports with `clearStoriesCache()` for better V8 coverage tracking.
 
 *Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
 
-## Changes This Cycle (2026-03-27)
+## Changes This Cycle (2026-03-28)
+
+### New Tests Written (+5 tests across 6 files)
+
+#### New Test Files
+
+| File | What Was Covered |
+|------|------------------|
+| `use-stories.cache-hit.test.ts` | Dedicated test for `fetchStories` cache-hit path (line 142) — uses `Date.now()` mocking to make focus handler think cache is stale while `fetchStories` sees it as fresh |
+
+#### Branch Improvements
+
+| File | What Was Covered |
+|------|------------------|
+| `stories-server.ts` | Non-Error thrown value in catch block — `String(error)` branch at line 66 |
+| `sitemap.ts` | Story slug fallback to `story.id` when `slug` is falsy (line 15) |
+| `category-filter-badge.tsx` | Click-outside handler (line 50) and Escape key handler (line 64) |
+| `suggest-place-dialog.tsx` | Loading-state close prevention in `handleOpenChange` (line 89) |
+
+#### Test Infrastructure Improvements
+
+| File | What Changed |
+|------|--------------|
+| `use-stories.test.ts` | Refactored from `vi.resetModules()` + dynamic imports to static imports with `clearStoriesCache()` — improves V8 coverage tracking reliability |
+
+### Files with Documented Untestable Branches (Unchanged)
+
+All previously documented untestable branches remain unchanged. See "Untestable Branches Documented" section below.
+
+## Changes Previous Cycle (2026-03-27)
 
 ### New Tests Written (+18 tests across 7 files)
 
