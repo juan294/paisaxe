@@ -36,6 +36,28 @@
 - Cost Analyst Agent: No cost-related coverage gaps.
 - Localization Agent: No locale-related coverage concerns.
 
+<!-- ENTRY:START agent=security_agent timestamp=2026-03-28T09:00:00Z -->
+## Security Agent — 2026-03-28
+- **Status: YELLOW** — **1 moderate advisory (next@16.1.6 — 5 sub-advisories), 1 exploitable** (PPR buffering DoS). Accepted trade-off unchanged — next@16.2.1 has Vercel runtime bug. Waiting for next@16.2.2+. Day 2 of conscious trade-off.
+- **Exploitable**: GHSA-h27x-g6w4-24gq — unbounded postponed resume buffering DoS. `cacheComponents: true` enables PPR. Serverless function limits partially mitigate.
+- **Not exploitable**: CSRF bypass (no Server Actions + null-origin rejected), HTTP smuggling (HTTPS-only rewrites), image cache DoS (allowlisted domains), dev HMR (dev-only).
+- **CSP**: `'self' 'unsafe-inline'` — correct, unchanged
+- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
+- **License compliant**: No copyleft violations. Same packages: sharp-libvips LGPL, vercel/analytics MPL, dompurify dual-licensed.
+- **dangerouslySetInnerHTML audit**: 7 instances all safe — unchanged
+- **Command injection audit**: All exec/spawn calls safe — unchanged. Zero `'use server'` directives (no Server Actions).
+- **Outdated deps**: 29 packages (unchanged count). **@elevenlabs/react 1.0.0 released** (major version). Only next has known exploitable vulnerability.
+- **CI/CD security**: All automation active. No gaps.
+
+**Cross-agent recommendations:**
+- Coverage Agent: All webhook and CSRF error paths remain fully covered. Branch coverage at 96.44% (excellent). MCP routes improved but E2E gaps remain.
+- Performance Agent: next@16.2.2+ upgrade needed when available. @elevenlabs/react 1.0.0 may change bundle size — review before upgrading. Stripe major versions (v21/v9/v6) still pending. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
+- Code Quality Agent: **Monitor for next@16.2.2+ release** — the only remaining security advisory fix. @elevenlabs/react 1.0.0 released — plan voice SDK upgrade. Stripe ecosystem still at 3 new major versions. `lucide-react@1.7.0` available.
+- Documentation Agent: No documentation changes needed this cycle.
+- QA Agent: CSRF protection working correctly. No action needed. All CI gaps remain closed. @elevenlabs/react 1.0.0 upgrade should be tested thoroughly with voice agent flows.
+- Cost Analyst Agent: No cost-related security concerns.
+- Localization Agent: No sensitive data in translation files.
+
 <!-- ENTRY:START agent=security_agent timestamp=2026-03-27T09:00:00Z -->
 ## Security Agent — 2026-03-27
 - **Status: YELLOW** — **1 moderate advisory (next@16.1.6 — 5 sub-advisories), 1 exploitable** (PPR buffering DoS). **Fix now BLOCKED** — next@16.2.1 has a Vercel runtime bug (commit `934fe4a` deliberately reverted). Must wait for next@16.2.2+. This is no longer a regression — it is an accepted trade-off.
@@ -230,28 +252,7 @@
 
 <!-- (pruned: security_agent 2026-03-24 entry removed, keeping last 3) -->
 
-<!-- ENTRY:START agent=security_agent timestamp=2026-03-25T09:00:00Z -->
-## Security Agent — 2026-03-25
-- **Status: YELLOW** — **1 moderate advisory (next@16.1.6 — 5 sub-advisories), 1 exploitable** (PPR buffering DoS). **Regression** from Mar 23 fix — cc-rpi blueprint sync (d3a4dd6) reverted next@16.2.1 to 16.1.6. Fix: `npm audit fix`.
-- **Exploitable**: GHSA-h27x-g6w4-24gq — unbounded postponed resume buffering DoS. `cacheComponents: true` in next.config.ts enables PPR, making this attackable. Serverless function limits partially mitigate.
-- **Not exploitable**: CSRF bypass (no Server Actions + null-origin rejected), HTTP smuggling (static rewrites only), image cache DoS (allowlisted domains), dev HMR (dev-only).
-- **CSP**: `'self' 'unsafe-inline'` — correct, unchanged
-- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
-- **License compliant**: No copyleft violations. Same packages: sharp-libvips LGPL, vercel/analytics MPL, dompurify dual-licensed.
-- **dangerouslySetInnerHTML audit**: 7 instances all safe — unchanged
-- **Command injection audit**: All exec/spawn calls safe — unchanged. Zero `'use server'` directives (no Server Actions).
-- **Outdated deps**: 28 packages (+1: `stripe@20.4.1`). Only next has known exploitable vulnerability.
-- **CI/CD security**: All automation active. `npm audit --omit=dev --audit-level=high` does NOT catch this advisory (moderate < high threshold). CI passes despite regression.
-
-**Cross-agent recommendations:**
-- Coverage Agent: All webhook and CSRF error paths remain fully covered. Branch coverage at 96.08% (excellent). MCP routes improved but E2E gaps remain.
-- Performance Agent: next@16.2.1 upgrade recommended — includes both security fixes and potential performance improvements. @vercel/analytics v2.0.1 and @vercel/speed-insights v2.0.0 still pending evaluation.
-- Code Quality Agent: **Re-run `npm audit fix`** to upgrade next 16.1.6 → 16.2.1. Regression caused by cc-rpi blueprint sync. `lucide-react@1.6.0` now available (jumped from 1.0.1). `knip@6.0.5` patch available.
-- Documentation Agent: No documentation changes needed this cycle.
-- QA Agent: CSRF protection working correctly. No action needed. All CI gaps remain closed.
-- Cost Analyst Agent: No cost-related security concerns.
-- Localization Agent: No sensitive data in translation files.
-<!-- ENTRY:END -->
+<!-- (pruned: security_agent 2026-03-25 entry removed, keeping last 3) -->
 
 <!-- ENTRY:START agent=code_quality_audit timestamp=2026-02-09T18:00:00Z -->
 ## Code Quality Audit — 2026-02-09
@@ -401,6 +402,24 @@
 <!-- ENTRY:END -->
 
 <!-- (pruned: localization_agent 2026-03-24 entry removed, keeping last 3) -->
+
+<!-- ENTRY:START agent=localization_agent timestamp=2026-03-28T07:00:00Z -->
+## Localization Agent — 2026-03-28
+- **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
+- **UI strings**: 392 keys per locale, all present (0 missing, 0 orphans)
+- **Story translations**: 95 stories x 5 locales = 475 translations, all complete (title + subtitle + description)
+- **Type safety**: Pass — `npx tsc --noEmit` exits clean on all locale files
+- **Test suite**: 348 i18n/translation/locale tests passing (0 failures)
+- **Changes**: None — all translations stable for 22 consecutive days
+
+**Cross-agent recommendations:**
+- Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, others dynamic) in place. No optimization needed.
+- Code Quality Agent: No dead translations found. All 392 keys actively referenced in components. No new keys added since Mar 7.
+- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
+- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 348 i18n tests all passing.
+- QA Agent: No locale-related issues this cycle. All translations stable.
+- Cost Analyst Agent: No cost-related localization concerns.
+<!-- ENTRY:END -->
 
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-03-21T09:00:00Z -->

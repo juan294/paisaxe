@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-03-27
+> Auto-generated on 2026-03-28
 
 ## Health Status: YELLOW
 
-**Executive Summary:** 1 moderate advisory detected (next@16.1.6 — 5 sub-advisories), **1 exploitable** (PPR buffering DoS). Unlike previous reports where this was a cc-rpi blueprint regression, next@16.1.6 is now a **deliberate trade-off** (commit `934fe4a`) — next@16.2.1 has a Vercel runtime bug that breaks the production site. `npm audit fix` would "fix" the advisory but **break the deployment**. The fix is blocked until next@16.2.2+ resolves both the security advisories and the Vercel runtime bug. All other security controls remain intact. 29 outdated packages (+1 from last report), 3 Stripe major versions still pending review, none with known exploitable vulnerabilities beyond next. brace-expansion override (>=5.0.5) added since last report.
+**Executive Summary:** 1 moderate advisory detected (next@16.1.6 — 5 sub-advisories), **1 exploitable** (PPR buffering DoS). next@16.1.6 remains a **deliberate trade-off** (commit `934fe4a`) — next@16.2.1 has a Vercel runtime bug that breaks the production site. `npm audit fix` would "fix" the advisory but **break the deployment**. The fix is blocked until next@16.2.2+ resolves both the security advisories and the Vercel runtime bug. All other security controls remain intact. 29 outdated packages (unchanged count from last report). @elevenlabs/react jumped to v1.0.0 (major). No new known exploitable vulnerabilities beyond next.
 
 ---
 
@@ -57,9 +57,10 @@ The next@16.1.6 advisory has a complex history:
 | Mar 25 | Regressed | `d3a4dd6` — cc-rpi blueprint v1.12.0 sync reset package.json |
 | Mar 26 (AM) | Fixed | Triage ran `npm audit fix` again |
 | Mar 26 (PM) | Regressed | `d667010` — cc-rpi blueprint v1.13.0 sync reset package.json |
-| **Mar 27** | **Intentional** | `934fe4a` — **deliberate revert** to 16.1.6 because next@16.2.1 has a Vercel runtime bug |
+| Mar 27 | **Intentional** | `934fe4a` — **deliberate revert** to 16.1.6 because next@16.2.1 has a Vercel runtime bug |
+| **Mar 28** | **Unchanged** | Still on 16.1.6 — next@16.2.2 not yet released |
 
-**Current state:** This is no longer a regression — it is a conscious trade-off. The Vercel runtime bug in 16.2.1 breaks the production site, which is worse than the moderate advisory. The accepted risk is the PPR buffering DoS, which is partially mitigated by serverless function limits.
+**Current state:** This is a conscious trade-off, now in its second day. The Vercel runtime bug in 16.2.1 breaks the production site, which is worse than the moderate advisory. The accepted risk is the PPR buffering DoS, which is partially mitigated by serverless function limits.
 
 **Resolution path:** Monitor for next@16.2.2+ which should fix both the security advisories AND the Vercel runtime bug. When available, upgrade immediately.
 
@@ -79,23 +80,24 @@ The next@16.1.6 advisory has a complex history:
 
 ---
 
-## Changes Since Last Report (2026-03-26)
+## Changes Since Last Report (2026-03-27)
 
-| Area | Mar 26 | Mar 27 | Change |
+| Area | Mar 27 | Mar 28 | Change |
 |------|--------|--------|--------|
 | Vulnerability count | 1 moderate | **1 moderate** | Same |
 | Exploitable vulns | 1 (PPR DoS) | **1** (PPR DoS) | Same |
-| Fix status | `npm audit fix` available | **Blocked** (Vercel runtime bug) | Downgraded — cannot fix until 16.2.2+ |
-| brace-expansion override | Not present | **>=5.0.5** | NEW — added to package.json overrides |
+| Fix status | Blocked (Vercel runtime bug) | **Blocked** | Same — next@16.2.2 still not released |
 | CSP | `'self' 'unsafe-inline'` | `'self' 'unsafe-inline'` | Unchanged |
 | dangerouslySetInnerHTML | 7 instances | 7 instances | Unchanged — all safe |
-| Outdated packages | 28 | **29** | +1 (@vitest/coverage-v8) |
+| Outdated packages | 29 | **29** | Same count |
 | Health status | YELLOW | **YELLOW** | Same — accepted risk |
 
 **Key changes:**
-- **next@16.1.6 is now intentional**: Commit `934fe4a` explicitly reverted to 16.1.6 due to Vercel runtime bug in 16.2.1. This changes the advisory from "fixable regression" to "accepted risk pending upstream fix."
-- **brace-expansion override**: `>=5.0.5` added to npm overrides, closing the ReDoS vulnerability in this transitive dependency.
-- **Outdated count increased to 29**: @vitest/coverage-v8 4.1.1 → 4.1.2 added, posthog-js latest moved to 1.364.0, @supabase/supabase-js latest moved to 2.100.1.
+- **@elevenlabs/react 1.0.0 released**: Major version jump from 0.14.1 → 1.0.0. Production dependency — review migration guide before upgrading.
+- **stripe@21.0.1**: Patch bump from 21.0.0 — still a major version upgrade from current 20.3.1.
+- **knip@6.1.0**: Minor bump from 6.0.6 — dev-only tooling.
+- **posthog-js@1.364.1**: Patch bump from 1.364.0. No known security issues.
+- **No new advisories or CVEs** affecting any dependency.
 
 ---
 
@@ -253,10 +255,10 @@ form-action 'self'
 
 | Package | License | Usage | Risk |
 |---------|---------|-------|------|
-| @img/sharp-libvips-darwin-arm64@1.2.4 | LGPL-3.0-or-later | Native binary dep of `sharp` (production) | **Low** — Dynamic linking, SaaS deployment, no source distribution. Approved in `docs/project/license-exceptions.md` |
+| @img/sharp-libvips-darwin-arm64@1.2.4 | LGPL-3.0-or-later | Native binary dep of `sharp` (production, transitive) | **Low** — Dynamic linking, SaaS deployment, no source distribution. Approved in `docs/project/license-exceptions.md` |
 | @vercel/analytics@1.6.1 | MPL-2.0 | Direct production dependency | **Low** — Used as-is, no modifications to MPL files. Note: v2.0.1 available — verify license unchanged before upgrading |
 | dompurify@3.3.3 | (MPL-2.0 OR Apache-2.0) | Transitive via `posthog-js` (production) | **None** — Dual-licensed, Apache-2.0 applies |
-| expand-template@2.0.3 | (MIT OR WTFPL) | Transitive via `canvas` → `prebuild-install` | **None** — MIT applies |
+| expand-template@2.0.3 | (MIT OR WTFPL) | Transitive via `canvas` → `prebuild-install` (optional dep) | **None** — MIT applies, and canvas is optional |
 | paisaxe@1.0.0 | UNLICENSED | This project's package.json (`"private": true`) | **None** — Private/internal project |
 
 **Copyleft in production:** No blocking issues. LGPL and MPL are weak copyleft — compliant under current usage (no modification, no source distribution, SaaS deployment). CI license-check workflow blocks strong copyleft (GPL, AGPL, SSPL) on all PRs. LGPL exception formally documented in `docs/project/license-exceptions.md`.
@@ -269,7 +271,7 @@ form-action 'self'
 |---------|---------|--------|----------|-----------------|----------|
 | **next** | **16.1.6** | **16.2.1** | **prod** | **5 sub-advisories (1 exploitable) — BLOCKED by Vercel runtime bug** | **HIGH — waiting for 16.2.2+** |
 | @anthropic-ai/sdk | 0.78.0 | 0.80.0 | prod | None known (minor) | Low |
-| @elevenlabs/react | 0.14.1 | 0.15.0 | prod | Minor version — review changelog | Low |
+| **@elevenlabs/react** | **0.14.1** | **1.0.0** | **prod** | **Major version (0.x → 1.0)** — voice UI library, review migration guide | **Medium** |
 | @next/bundle-analyzer | 16.1.6 | 16.2.1 | dev | None (build tooling) | Low |
 | @next/eslint-plugin-next | 16.1.6 | 16.2.1 | dev | None (lint tooling) | Low |
 | **@stripe/react-stripe-js** | **5.6.0** | **6.0.0** | **prod** | **Major version** — payment UI library, review breaking changes | **Medium** |
@@ -285,13 +287,13 @@ form-action 'self'
 | @vitest/coverage-v8 | 4.1.1 | 4.1.2 | dev | Patch — coverage tooling | Low |
 | canvas | 3.2.1 | 3.2.2 | dev | PDF test rendering — patch | Low |
 | jsdom | 28.1.0 | 27.0.1 | dev | Version mismatch (current is ahead) | None |
-| knip | 5.85.0 | 6.0.6 | dev | **Major version** — dead code detection tooling | Low |
+| knip | 5.85.0 | 6.1.0 | dev | **Major version** — dead code detection tooling | Low |
 | lucide-react | 0.575.0 | 1.7.0 | prod | **Major version (0.x → 1.x)** — icon library, review breaking changes | Medium |
 | pdfjs-dist | 5.4.624 | 5.5.207 | prod | PDF parsing — monitor | Medium |
 | postcss | 8.5.6 | 8.5.8 | dev | None (CSS tooling) | Low |
-| posthog-js | 1.353.0 | 1.364.0 | prod | None known | Low |
+| posthog-js | 1.353.0 | 1.364.1 | prod | None known | Low |
 | resend | 6.9.2 | 6.9.4 | prod | Email service — patch | Low |
-| **stripe** | **20.3.1** | **21.0.0** | **prod** | **Major version** — payment server SDK, review breaking changes | **Medium** |
+| **stripe** | **20.3.1** | **21.0.1** | **prod** | **Major version** — payment server SDK, review breaking changes | **Medium** |
 | tailwindcss | 4.2.1 | 4.2.2 | dev | None (styling tooling) | Low |
 | typescript | 5.9.3 | 6.0.2 | dev | **Major version** — TypeScript 6.0 | Medium |
 | vitest | 4.1.1 | 3.2.4 | dev | Version mismatch (current is ahead) | None |
@@ -300,11 +302,10 @@ form-action 'self'
 **Note:** `jsdom` and `vitest` show version format mismatches in `npm outdated` output — these are at or ahead of the latest published version. No security implications.
 
 **New this cycle:**
-- **next@16.1.6 fix blocked**: Vercel runtime bug prevents upgrading to 16.2.1. Must wait for 16.2.2+. Previous `npm audit fix` approach is no longer viable.
-- **brace-expansion override added**: `>=5.0.5` in package.json overrides — closes ReDoS vulnerability.
-- **@vitest/coverage-v8**: New in outdated list (4.1.1 → 4.1.2, patch).
-- **posthog-js latest**: Moved from 1.363.5 to 1.364.0. No known security issues.
-- **@supabase/supabase-js latest**: Moved from 2.100.0 to 2.100.1. Patch update.
+- **@elevenlabs/react 1.0.0 released**: Major version jump from 0.x to 1.0. Voice UI library used in production. Review migration guide before upgrading — breaking API changes likely.
+- **stripe@21.0.1**: Patch bump from 21.0.0. Still a major version upgrade from current 20.3.1.
+- **knip@6.1.0**: Minor bump from 6.0.6 — dev-only, no urgency.
+- **posthog-js@1.364.1**: Patch bump. No known security issues.
 
 ---
 
@@ -365,6 +366,7 @@ form-action 'self'
 | Item | Priority | Effort | Impact | Status |
 |------|----------|--------|--------|--------|
 | **Upgrade next to 16.2.2+** (when released) | **High** | Low | Closes 5 sub-advisories, 1 exploitable | **Blocked — waiting for upstream fix** |
+| Evaluate @elevenlabs/react v1.0.0 (major, NEW) | Medium | Medium | Voice UI — review migration guide for breaking changes | Open |
 | Evaluate Stripe ecosystem v21/v9/v6 (3 major versions) | Medium | High | Payment libraries — review migration guides together | Open |
 | Evaluate lucide-react v1.7.0 (major) | Medium | Medium | Icon library, check migration guide | Open |
 | Evaluate typescript v6.0.2 (major) | Medium | Medium | Dev tooling, check breaking changes | Open |
@@ -373,7 +375,7 @@ form-action 'self'
 | Update pdfjs-dist to 5.5.207 | Low | Medium | PDF parsing update, may have fixes | Open |
 | Evaluate @vercel/analytics v2.0.1 | Low | Medium | Major version — check changelog + license | Open |
 | Evaluate @vercel/speed-insights v2.0.0 | Low | Medium | Major version — check changelog | Open |
-| Evaluate knip v6.0.6 | Low | Medium | Major version — check breaking changes | Open |
+| Evaluate knip v6.1.0 | Low | Medium | Major version — check breaking changes | Open |
 
 ---
 
