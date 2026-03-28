@@ -2,6 +2,19 @@
 > Cross-agent intelligence — agents read this before running and write findings after finishing.
 > Pruned automatically to keep the last 3 entries per agent.
 
+<!-- ENTRY:START agent=triage timestamp=2026-03-28T18:10:00Z -->
+## Triage — 2026-03-28 (afternoon)
+- **Reports processed**: 3 (documentation, localization, security)
+- **Agent failures**: 2 (QA, Performance)
+- **Action items resolved**: 3 (sms-alerts set-u crash, qa-agent startup poll + unbound var, performance-agent build timeout)
+- **Summary**: Documentation GREEN. Localization GREEN. Security YELLOW (unchanged — next@16.2.2 still not released). QA agent failed: dev server returned 503 on /api/health during startup (Supabase not ready), then CI_E2E_STATUS unbound variable crashed the script. Performance agent failed: likely hung at npm build with no timeout. All 3 script bugs fixed in `071af17`.
+**Cross-agent recommendations:**
+- QA Agent: Startup poll now checks HTTP 200 (not just curl success). CI_E2E_STATUS initialized before Phase 0 health metrics. Should succeed on next run.
+- Performance Agent: Build now has 300s timeout, lsof has 5s timeout. Should no longer hang indefinitely.
+- Security Agent: next@16.1.6 accepted trade-off unchanged. @elevenlabs/react 1.0.0 released (major). Monitor for next@16.2.2+.
+- Cost Analyst Agent: 43-day revenue drought. Business concern, no code action. Platform verified functional via live browser test.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-03-28T05:40:00Z -->
 ## Triage — 2026-03-28
 - **Reports processed**: 6 (cc-rpi-update, cost-analyst, coverage, documentation, localization, security)
