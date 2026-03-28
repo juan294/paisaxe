@@ -91,6 +91,22 @@ describe("sitemap", () => {
     });
   });
 
+  describe("story slug fallback", () => {
+    it("falls back to story.id when slug is falsy", async () => {
+      const { getStoriesFromDB } = await import("@/lib/stories-data");
+      vi.mocked(getStoriesFromDB).mockResolvedValueOnce([
+        { id: "story-no-slug", slug: "", title: "No Slug Story" },
+      ] as Awaited<ReturnType<typeof getStoriesFromDB>>);
+
+      const entries = await sitemap();
+      expect(entries).toContainEqual(
+        expect.objectContaining({
+          url: `${SITE_URL}/immersive?story=story-no-slug`,
+        })
+      );
+    });
+  });
+
   describe("trims NEXT_PUBLIC_SITE_URL to prevent newlines in URLs", () => {
     afterEach(() => {
       vi.unstubAllEnvs();

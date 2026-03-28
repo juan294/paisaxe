@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { SuggestPlaceDialog } from "./suggest-place-dialog";
@@ -37,6 +38,22 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
+// Capture onOpenChange from the Dialog component for direct invocation in tests
+let capturedOnOpenChange: ((open: boolean) => void) | null = null;
+
+vi.mock("@/components/ui/dialog", async () => {
+  const actual = await vi.importActual<typeof import("@/components/ui/dialog")>(
+    "@/components/ui/dialog"
+  );
+  return {
+    ...actual,
+    Dialog: ({ onOpenChange, ...props }: React.ComponentProps<typeof actual.Dialog>) => {
+      capturedOnOpenChange = onOpenChange ?? null;
+      return <actual.Dialog onOpenChange={onOpenChange} {...props} />;
+    },
+  };
+});
+
 // Mock fetch
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -47,6 +64,7 @@ describe("SuggestPlaceDialog", () => {
   beforeEach(() => {
     mockOnClose.mockClear();
     mockFetch.mockClear();
+    capturedOnOpenChange = null;
   });
 
   it("renders dialog when isOpen is true", () => {
@@ -344,6 +362,23 @@ describe("SuggestPlaceDialog", () => {
     expect(mockOnClose).not.toHaveBeenCalled();
   });
 
+  it("handleOpenChange(true) is a no-op — does not call onClose", () => {
+    // Covers the else branch of `if (!open)` at line 89 in handleOpenChange.
+    // When Radix Dialog calls onOpenChange(true), the handler intentionally
+    // does nothing since the dialog is controlled via the `isOpen` prop.
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    expect(capturedOnOpenChange).not.toBeNull();
+    act(() => {
+      capturedOnOpenChange!(true);
+    });
+
+    // onClose should NOT be called — the handler only acts when open=false
+    expect(mockOnClose).not.toHaveBeenCalled();
+    // Dialog should still be visible
+    expect(screen.getByText("Suggest a Place")).toBeInTheDocument();
+  });
+
   it("resets state when dialog closes while idle", async () => {
     // First, trigger an error to set errorMessage and submitState to "error"
     render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
@@ -384,13 +419,6 @@ describe("SuggestPlaceDialog", () => {
       expect(screen.getByText("Something went wrong")).toBeInTheDocument();
     });
   });
-
-  // Line 89: `if (!open)` false branch — handleOpenChange is called with open=true.
-  // This is a no-op path: when Radix Dialog calls onOpenChange(true), the handler
-  // intentionally does nothing. This branch is architecturally unreachable in tests
-  // because the dialog is controlled via the `isOpen` prop, and Radix only calls
-  // onOpenChange(false) when the user dismisses the dialog. The no-op is defensive
-  // and protects against unexpected open-state changes.
 
   it("renders error message with role=alert for screen readers", async () => {
     mockFetch.mockResolvedValueOnce({
