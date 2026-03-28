@@ -1,9 +1,9 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-03-26 06:00:00
+> Auto-generated on 2026-03-27 06:00:05
 
 ## CLAUDE.md Status
 
-Last modified: **2026-03-25**
+Last modified: **2026-03-26**
 
 ## Files Modified Since Documentation Update
 
@@ -12,12 +12,17 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
-src/app/api/admin/marketing/agent/route.test.ts
-src/app/api/chat/stream/route.test.ts
-src/app/api/health/route.test.ts
-src/components/admin/elevenlabs-analytics-panel.test.tsx
-src/components/admin/visitors-analytics-panel.test.tsx
-src/components/immersive/fullscreen-button.test.tsx
+src/app/admin/page.test.tsx
+src/app/api/admin/analytics/route.test.ts
+src/app/api/admin/costs-analytics/route.test.ts
+src/app/api/admin/stripe-analytics/route.test.ts
+src/app/api/mcp/make-booking/route.test.ts
+src/app/api/mcp/places/route.test.ts
+src/components/admin/costs-analytics-panel/alerts.test.tsx
+src/components/admin/costs-analytics-panel/forecast.test.tsx
+src/components/admin/github-analytics-panel.test.tsx
+src/lib/chat-action-detection.test.ts
+src/lib/stories-data.test.ts
 ```
 
 No new migrations since documentation update.
@@ -58,6 +63,7 @@ admin/stripe-analytics
 admin/suggestions
 admin/suggestions/[id]
 admin/tunnel
+chat
 chat/stream
 checkout/day-pass
 checkout/embedded
@@ -105,39 +111,25 @@ user_story_suggestions
 
 ```
 
-## Changes Made This Run (2026-03-26)
-
-### Feature Flags: No Changes Needed
-
-All 16 flags listed as "undocumented" (`ambient_discovery`, `asturianu_touches`, `autoplay_button`, `booking_system`, `contextual_prompts`, `fullscreen_button`, `maintenance_mode`, `mood_discovery`, `randomized_order`, `related_stories`, `seasonal_surfacing`, `sms_booking_confirmation`, `story_freshness`, `story_sharing`, `surprise_me`, `user_story_suggestions`) are already fully documented in `docs/project/features.md` (Feature Flags Reference, lines 660-717). The gap detection script was checking against CLAUDE.md rather than `features.md` — **false positive**.
-
-### API Routes: No Changes Needed
-
-All 50 routes listed as "undocumented" fall into categories that do not require individual API documentation:
-
-| Category | Count | Reason |
-|----------|-------|--------|
-| Admin dashboard routes (`admin/*`) | 30 | Internal — serve the admin UI, documented as features |
-| Webhook routes (`webhooks/*`) | 4 | Already documented in features.md Infrastructure section |
-| MCP tool routes (`mcp/*`) | 4 | Already documented in features.md Premium Voice Agent section |
-| Cron job routes (`cron/*`) | 3 | Internal scheduled jobs |
-| Health/monitoring (`health/db`, `checkout/health`) | 2 | Internal diagnostics |
-| User-facing implementation details | 7 | `chat/stream`, `checkout/*`, `favorites`, `feature-flags`, `suggestions`, `voice-access` — implementation details of documented features |
-
-### Health Status: GREEN
-
-- **CLAUDE.md**: Current (last modified 2026-03-25)
-- **features.md**: Complete — all 25 feature flags documented, all user-facing features described
-- **Modified source files**: 6 test files only (no feature changes requiring doc updates)
-- **No new migrations** since last documentation update
-
 ## Documentation File Ages
 
 | File | Last Modified |
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
-| CLAUDE.md | 2026-03-25 |
+| CLAUDE.md | 2026-03-26 |
 | README.md | 2026-02-16 |
+
+## Changes Made This Run (2026-03-27)
+
+**Status: GREEN** — No documentation gaps found. Second consecutive clean run.
+
+- **Feature flags**: All 16 flagged flags are already documented in `docs/project/features.md` (Feature Flags Reference, lines 660-718). The gap script checks CLAUDE.md only — these flags live in features.md. **This is a false positive in the gap detection script**, not a documentation gap.
+- **API routes**: All 50 flagged routes are internal admin API endpoints, cron jobs, or webhooks. They are covered by the feature descriptions in features.md (e.g., Analytics Dashboard, Story Management, MCP tools, Webhooks). None are meant for external consumption and do not require standalone API documentation.
+- **Source changes since last update**: 11 modified files — all test files (`*.test.ts`, `*.test.tsx`). No feature code changes requiring documentation updates.
+- **Migrations**: 1 new migration (`grant missing table-level permissions`) — infrastructure fix, no schema changes requiring documentation.
+- **Files modified**: Only this report file (`documentation-report.md`).
+
+**Recurring recommendation**: Update the gap detection script (`scripts/agents/documentation-agent.sh`) to check `docs/project/features.md` in addition to CLAUDE.md when scanning for feature flag documentation. This would eliminate the 16 false positives that appear every run.
 
 ---
 
