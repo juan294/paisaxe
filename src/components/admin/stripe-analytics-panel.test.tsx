@@ -131,10 +131,9 @@ describe("StripeAnalyticsPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("01 — Revenue by Product")).toBeInTheDocument();
+      expect(screen.getAllByText("Day Pass").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("€45.00").length).toBeGreaterThanOrEqual(1);
     });
-
-    expect(screen.getAllByText("Day Pass").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("€45.00").length).toBeGreaterThanOrEqual(1);
   });
 
   it("displays recent orders table", async () => {
@@ -259,7 +258,7 @@ describe("StripeAnalyticsPanel", () => {
       data: mockData,
     });
 
-    render(<StripeAnalyticsPanel />, { wrapper });
+    const { container } = render(<StripeAnalyticsPanel />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Revenue Over Time")).toBeInTheDocument();
@@ -267,6 +266,12 @@ describe("StripeAnalyticsPanel", () => {
 
     // Chart legend
     expect(screen.getByText("Daily Revenue")).toBeInTheDocument();
+
+    // Verify SVG chart renders with bars (RevenueChart lines 243-254)
+    const svg = container.querySelector("svg");
+    expect(svg).toBeTruthy();
+    const bars = container.querySelectorAll("rect");
+    expect(bars.length).toBe(mockData.revenueByDay.length);
   });
 
   it("displays refunded order with strikethrough amount", async () => {

@@ -1,68 +1,58 @@
 # Triage Report
-> Generated on 2026-03-28 (afternoon) | 3 reports processed | 3 action items | 2 agent failures
+> Generated on 2026-03-29 | 7 reports processed | 3 action items | 1 agent failure
 
 ## Agent Failures
 
 | Agent | Status | Error | Log File |
 |-------|--------|-------|----------|
-| QA | FAILED — no report | Dev server /api/health returned 503 (Supabase not ready at startup); `CI_E2E_STATUS` unbound variable crashed script at line 172 | `logs/qa-agent-2026-03-28.log` |
-| Performance | FAILED — no report | Stalled at "Collecting performance metrics..." — likely hung at `npm run build` with no timeout (266 bytes log, 7+ hours) | `logs/performance-agent-2026-03-28.log` |
+| QA | FAILED — no report | Dev server startup timed out after 120s — never reached HTTP 200 | `logs/qa-agent-2026-03-29.log` |
 
 ## Reports Reviewed
 
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | documentation-report.md | documentation | GREEN | 0 — third consecutive clean run |
-| 2 | localization-report.md | localization | GREEN | 0 — 22 days stable, 100% coverage |
-| 3 | security-report.md | security | **YELLOW** (known) | 0 — next@16.1.6 blocked until 16.2.2+; @elevenlabs/react 1.0.0 released |
+| 1 | cost-analyst-report.md | Cost Analyst | WATCH | 0 (business concern — 44-day revenue drought) |
+| 2 | coverage-report.md | Coverage | GREEN | 0 (archived to health check, 5685 tests, 96.47% branch) |
+| 3 | localization-report.md | Localization | GREEN | 0 (23 days stable, 100% coverage) |
+| 4 | documentation-report.md | Documentation | GREEN | 0 (third consecutive clean run) |
+| 5 | security-report.md | Security | YELLOW | 0 (next@16.1.6 blocked until 16.2.2+, day 3) |
+| 6 | cc-rpi-update-report.md | cc-rpi Update | GREEN | 0 (synced at v1.14.0) |
+| 7 | performance-report.md | Performance | YELLOW | 2 (P1 browserslist + P2 idle prefetch) |
 
-## Overall Status: GREEN (security YELLOW is a known, deliberate trade-off; agent failures fixed)
+## Overall Status: YELLOW
 
-Security YELLOW is caused by next@16.1.6, which was **deliberately** downgraded in `934fe4a` due to a Vercel runtime bug in 16.2.1. Cannot upgrade until Next.js publishes 16.2.2+. Confirmed today: 16.2.2 still not released (only canaries exist). PPR DoS partially mitigated by Vercel serverless function limits.
+Security YELLOW (next@16.1.6 accepted trade-off, blocked until 16.2.2+). Performance YELLOW (JS budget exceeded by 304 KB — P1 browserslist now implemented, expect ~80-112 KB savings on next measurement). Cost analyst WATCH (44-day revenue drought, business concern).
 
 ## Action Items Completed
 
 | # | Item | Source | Tests Updated | Status |
 |---|------|--------|---------------|--------|
-| 1 | Fix sms-alerts.sh `set -u` crash on unbound Twilio vars | QA agent failure | N/A (bash script) | Done |
-| 2 | Fix QA agent startup poll (check HTTP 200, not just curl success) + initialize `CI_E2E_STATUS` before use | QA agent failure | N/A (bash script) | Done |
-| 3 | Add 300s timeout to performance agent build + 5s timeout to lsof | Performance agent failure | N/A (bash script) | Done |
-
-### Details
-
-**1. sms-alerts.sh — Twilio env var defaults**
-- Root cause: `qa-agent.sh` uses `set -euo pipefail`. When it sources `sms-alerts.sh`, line 17 accesses `$TWILIO_ACCOUNT_SID` which is unbound under `set -u`, crashing before the `-z` check can evaluate.
-- Fix: Added `${VAR:-}` defaults for all 4 Twilio env vars at top of `sms-alerts.sh`.
-
-**2. qa-agent.sh — Startup poll + unbound variable**
-- Root cause (poll): Startup loop used `curl -s ... > /dev/null` which passes on ANY HTTP response including 503. The dev server returns 503/"degraded" when Supabase hasn't initialized yet. The agent declared "server ready" at 503, then Phase 0 health check correctly flagged the 503 as a failure.
-- Root cause (unbound): `CI_E2E_STATUS` referenced at line 172 (Phase 0 health metrics) but not defined until line 191 (Phase 0.5). Under `set -u`, this crashes the script.
-- Fix: Changed startup poll to check `HTTP_CODE == "200"`. Also fixed the "already running" check at line 60. Added `CI_E2E_STATUS="unknown"` and `CI_E2E_RUN_ID=""` initialization before Phase 0.
-
-**3. performance-agent.sh — Build timeout**
-- Root cause: `npm run build` has no timeout. A Next.js production build can hang indefinitely on resource contention or compilation issues. The `lsof` port check also had no timeout.
-- Fix: Wrapped build in `timeout 300` (5 minutes). Added `timeout 5` to `lsof` call.
+| 1 | Add `browserslist` to `package.json` — drops polyfills for modern browsers (~80-112 KB savings) | Performance P1 | N/A (config) | Done |
+| 2 | Add ElevenLabs idle prefetch via `requestIdleCallback` in `immersive-page-content.tsx` | Performance P2 | N/A (UX optimization) | Done |
+| 3 | Increase QA agent dev server startup timeout from 120s to 240s | QA Agent Failure | N/A (bash script) | Done |
 
 ## Verification
 - [x] All tests passing (5683/5683, 305 files)
 - [x] Typecheck clean
 - [x] Lint clean
-- [ ] CI monitoring in progress
+- [x] CI monitoring (background agent)
 
 ## Carried Items
 
 | Item | Duration | Trend |
 |------|----------|-------|
-| next@16.1.6 security advisory (deliberate) | 3 cycles | Blocked on Next.js 16.2.2+ release — still canaries only |
-| Dead code (structural): JPEG branch, i18n loaders | 5+ cycles | Kept for type safety — no runtime impact |
-| MCP routes 0% E2E coverage | 11+ weeks | QA/Coverage/Security all flag this |
+| next@16.1.6 security advisory (deliberate) | 4 cycles | Blocked on Next.js 16.2.2+ release — only canaries exist |
+| Performance P3 (Supabase tree-shake, ~20-30 KB) | 3 weeks | Medium effort |
+| Performance P4 (i18n bundle investigation) | NEW | Needs production build to verify lazy-loading effectiveness |
+| Performance P5 (split JS budget) | 3 weeks | Process improvement |
+| Performance P6 (update posthog-js) | NEW | 1.353.0 → latest |
 | Low coverage: voice-agent-chat (45.6%), agents-dashboard (48.5%) | 5+ cycles | Requires Playwright E2E |
-| Platform dormancy (0 revenue, 0 voice) | 43 days | Business concern — platform verified functional via live test |
-| Gap detection script should check features.md | 5 cycles | Causes false positives in documentation report |
-| Coverage report stale dead code reference | 2 cycles | chat-action-detection.ts:321 listed but already removed |
-| @elevenlabs/react 1.0.0 (major) | NEW | Voice SDK major version — review migration guide |
+| Platform dormancy (0 revenue, 0 voice) | 44 days | Business concern — platform verified functional |
+| Gap detection script should check features.md | 6 cycles | Causes false positives in documentation report |
+| @elevenlabs/react 1.0.0 (major) | 2 cycles | Voice SDK major version — review migration guide |
+| Stripe ecosystem v21/v9/v6 (3 major versions) | Pending | Payment libraries — review migration guides together |
 
 ## Commits
-1. `071af17` — `fix: harden agent scripts against startup failures`
+1. `42ed615` — `fix: resolve agent report findings [triage]`
 
 *Report generated by triage agent.*

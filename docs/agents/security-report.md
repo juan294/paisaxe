@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-03-28
+> Auto-generated on 2026-03-29
 
 ## Health Status: YELLOW
 
-**Executive Summary:** 1 moderate advisory detected (next@16.1.6 — 5 sub-advisories), **1 exploitable** (PPR buffering DoS). next@16.1.6 remains a **deliberate trade-off** (commit `934fe4a`) — next@16.2.1 has a Vercel runtime bug that breaks the production site. `npm audit fix` would "fix" the advisory but **break the deployment**. The fix is blocked until next@16.2.2+ resolves both the security advisories and the Vercel runtime bug. All other security controls remain intact. 29 outdated packages (unchanged count from last report). @elevenlabs/react jumped to v1.0.0 (major). No new known exploitable vulnerabilities beyond next.
+**Executive Summary:** 1 moderate advisory detected (next@16.1.6 — 5 sub-advisories), **1 exploitable** (PPR buffering DoS). next@16.1.6 remains a **deliberate trade-off** (commit `934fe4a`) — next@16.2.1 has a Vercel runtime bug that breaks the production site. `npm audit fix` would "fix" the advisory but **break the deployment**. The fix is blocked until next@16.2.2+ resolves both the security advisories and the Vercel runtime bug. Day 3 of conscious trade-off — next@16.2.2 has not been released yet (only canaries). All other security controls remain intact. 29 outdated packages (unchanged). No new advisories or CVEs affecting any dependency.
 
 ---
 
@@ -35,12 +35,12 @@
 - No dynamic URLs or user-controlled rewrite destinations
 
 **GHSA-3x4c-7xq6-9pq8 (Image Cache DoS) — LOW RISK:**
-- `next.config.ts:74-93` restricts `remotePatterns` to `*.supabase.co` and `images.unsplash.com`
+- `next.config.ts:81-90` restricts `remotePatterns` to `*.supabase.co` and `images.unsplash.com`
 - All image sources are database-backed or hardcoded, not user-controllable
 - `minimumCacheTTL: 2592000` (30 days) — long but bounded by allowlist
 
 **GHSA-mq59-m269-xvcx (CSRF Bypass) — NOT EXPLOITABLE:**
-- Zero `'use server'` directives in codebase (no Server Actions)
+- Zero `'use server'` directives in codebase (confirmed — no Server Actions)
 - `src/proxy.ts:38-41`: `if (!origin) return false` explicitly rejects null-origin requests
 - `src/lib/csrf.ts:21`: `sameSite: 'strict'` prevents cross-site cookie inclusion
 
@@ -58,11 +58,11 @@ The next@16.1.6 advisory has a complex history:
 | Mar 26 (AM) | Fixed | Triage ran `npm audit fix` again |
 | Mar 26 (PM) | Regressed | `d667010` — cc-rpi blueprint v1.13.0 sync reset package.json |
 | Mar 27 | **Intentional** | `934fe4a` — **deliberate revert** to 16.1.6 because next@16.2.1 has a Vercel runtime bug |
-| **Mar 28** | **Unchanged** | Still on 16.1.6 — next@16.2.2 not yet released |
+| **Mar 29** | **Unchanged** | Still on 16.1.6 — next@16.2.2 not yet released (only 16.2.1-canary.0–12 exist) |
 
-**Current state:** This is a conscious trade-off, now in its second day. The Vercel runtime bug in 16.2.1 breaks the production site, which is worse than the moderate advisory. The accepted risk is the PPR buffering DoS, which is partially mitigated by serverless function limits.
+**Current state:** This is a conscious trade-off, now in its third day. The Vercel runtime bug in 16.2.1 breaks the production site, which is worse than the moderate advisory. The accepted risk is the PPR buffering DoS, which is partially mitigated by serverless function limits.
 
-**Resolution path:** Monitor for next@16.2.2+ which should fix both the security advisories AND the Vercel runtime bug. When available, upgrade immediately.
+**Resolution path:** Monitor for next@16.2.2+ stable which should fix both the security advisories AND the Vercel runtime bug. When available, upgrade immediately. Canary releases (16.2.1-canary.0–12) are in progress but not suitable for production.
 
 ### Previously Resolved (still resolved)
 
@@ -80,24 +80,24 @@ The next@16.1.6 advisory has a complex history:
 
 ---
 
-## Changes Since Last Report (2026-03-27)
+## Changes Since Last Report (2026-03-28)
 
-| Area | Mar 27 | Mar 28 | Change |
+| Area | Mar 28 | Mar 29 | Change |
 |------|--------|--------|--------|
 | Vulnerability count | 1 moderate | **1 moderate** | Same |
 | Exploitable vulns | 1 (PPR DoS) | **1** (PPR DoS) | Same |
 | Fix status | Blocked (Vercel runtime bug) | **Blocked** | Same — next@16.2.2 still not released |
 | CSP | `'self' 'unsafe-inline'` | `'self' 'unsafe-inline'` | Unchanged |
 | dangerouslySetInnerHTML | 7 instances | 7 instances | Unchanged — all safe |
-| Outdated packages | 29 | **29** | Same count |
+| Code changes to `src/` | — | **0** | No source code changes since Mar 28 |
+| Outdated packages | 29 | **29** | Same count, same versions |
 | Health status | YELLOW | **YELLOW** | Same — accepted risk |
 
-**Key changes:**
-- **@elevenlabs/react 1.0.0 released**: Major version jump from 0.14.1 → 1.0.0. Production dependency — review migration guide before upgrading.
-- **stripe@21.0.1**: Patch bump from 21.0.0 — still a major version upgrade from current 20.3.1.
-- **knip@6.1.0**: Minor bump from 6.0.6 — dev-only tooling.
-- **posthog-js@1.364.1**: Patch bump from 1.364.0. No known security issues.
+**Key observations:**
+- **No code changes** since the last report — security posture is identical.
+- **next@16.2.1-canary.0–12** published on npm — canary track active, stable 16.2.2 not yet released.
 - **No new advisories or CVEs** affecting any dependency.
+- **All version numbers in outdated list are unchanged** from Mar 28.
 
 ---
 
@@ -301,11 +301,7 @@ form-action 'self'
 
 **Note:** `jsdom` and `vitest` show version format mismatches in `npm outdated` output — these are at or ahead of the latest published version. No security implications.
 
-**New this cycle:**
-- **@elevenlabs/react 1.0.0 released**: Major version jump from 0.x to 1.0. Voice UI library used in production. Review migration guide before upgrading — breaking API changes likely.
-- **stripe@21.0.1**: Patch bump from 21.0.0. Still a major version upgrade from current 20.3.1.
-- **knip@6.1.0**: Minor bump from 6.0.6 — dev-only, no urgency.
-- **posthog-js@1.364.1**: Patch bump. No known security issues.
+**No changes from Mar 28** — all package versions and counts are identical.
 
 ---
 
@@ -366,7 +362,7 @@ form-action 'self'
 | Item | Priority | Effort | Impact | Status |
 |------|----------|--------|--------|--------|
 | **Upgrade next to 16.2.2+** (when released) | **High** | Low | Closes 5 sub-advisories, 1 exploitable | **Blocked — waiting for upstream fix** |
-| Evaluate @elevenlabs/react v1.0.0 (major, NEW) | Medium | Medium | Voice UI — review migration guide for breaking changes | Open |
+| Evaluate @elevenlabs/react v1.0.0 (major) | Medium | Medium | Voice UI — review migration guide for breaking changes | Open |
 | Evaluate Stripe ecosystem v21/v9/v6 (3 major versions) | Medium | High | Payment libraries — review migration guides together | Open |
 | Evaluate lucide-react v1.7.0 (major) | Medium | Medium | Icon library, check migration guide | Open |
 | Evaluate typescript v6.0.2 (major) | Medium | Medium | Dev tooling, check breaking changes | Open |

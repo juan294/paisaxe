@@ -268,6 +268,31 @@ describe("useStories", () => {
     expect(result.current.error).toBeInstanceOf(Error);
   });
 
+  it("should wrap non-Error thrown values in refresh catch block", async () => {
+    // Start with a fetch that fails immediately (no cache)
+    mockGetStoriesFromDB.mockRejectedValue("string error");
+
+    const { result } = renderHook(() => useStories());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Refresh also rejects with a non-Error value
+    mockGetStoriesFromDB.mockRejectedValue("refresh string error");
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.error?.message).toBe("Failed to refresh stories");
+  });
+
   it("should revalidate stale data on window focus", async () => {
     const { result } = renderHook(() => useStories());
 

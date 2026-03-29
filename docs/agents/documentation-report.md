@@ -1,18 +1,18 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-03-28 06:00:01
+> Auto-generated on 2026-03-29 06:00:04
 
-## Changes Made This Run (2026-03-28)
+## Changes Made This Run (2026-03-29)
 
-**No changes needed.** Third consecutive clean run.
+**No documentation changes needed.** Third consecutive clean run.
 
-- **Feature flags**: All 16 flagged flags (`ambient_discovery`, `asturianu_touches`, `autoplay_button`, `booking_system`, `contextual_prompts`, `fullscreen_button`, `maintenance_mode`, `mood_discovery`, `randomized_order`, `related_stories`, `seasonal_surfacing`, `sms_booking_confirmation`, `story_freshness`, `story_sharing`, `surprise_me`, `user_story_suggestions`) are already documented in `docs/project/features.md` Feature Flags Reference (lines 660-718).
-- **API routes**: All 50 flagged routes are internal (admin, cron, webhook) or already documented in `features.md`. None require separate external documentation.
-- **Gap script false positive**: The detection script checks CLAUDE.md but feature flags are documented in `features.md`. Consider updating the script to check both files.
-- **Modified files**: 19 test files only — no feature changes requiring documentation updates.
+- **Feature flags**: All 16 flagged flags are already documented in `docs/project/features.md` Feature Flags Reference (lines 660-718). The gap detection script checks CLAUDE.md instead of `features.md`, producing false positives.
+- **API routes**: All 50 flagged routes are internal (admin, cron, webhook) and already covered contextually in features.md sections (Voice & Text Chat, Premium Voice Agent, Infrastructure, etc.). None require standalone documentation.
+- **Modified files**: 3 test files only (`stripe-analytics-panel.test.tsx`, `visitors-analytics-panel.test.tsx`, `use-stories.test.ts`) — no feature changes requiring documentation updates.
+- **Recommendation (carried)**: Update the gap detection script to also check `docs/project/features.md` for feature flag documentation.
 
 ## CLAUDE.md Status
 
-Last modified: **2026-03-26**
+Last modified: **2026-03-28**
 
 ## Files Modified Since Documentation Update
 
@@ -21,27 +21,20 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
-src/app/admin/page.test.tsx
-src/app/admin/page.tsx
-src/app/api/admin/analytics/route.test.ts
-src/app/api/admin/costs-analytics/route.test.ts
-src/app/api/admin/stripe-analytics/route.test.ts
-src/app/api/mcp/make-booking/route.test.ts
-src/app/api/mcp/places/route.test.ts
-src/app/sitemap.test.ts
-src/components/admin/costs-analytics-panel/alerts.test.tsx
-src/components/admin/costs-analytics-panel/forecast.test.tsx
-src/components/admin/github-analytics-panel.test.tsx
-src/components/immersive/category-filter-badge.test.tsx
-src/components/immersive/suggest-place-dialog.test.tsx
-src/hooks/use-stories.cache-hit.test.ts
+src/components/admin/stripe-analytics-panel.test.tsx
+src/components/admin/visitors-analytics-panel.test.tsx
 src/hooks/use-stories.test.ts
-src/lib/chat-action-detection.test.ts
-src/lib/stories-data.test.ts
-src/lib/stories-server.test.ts
 ```
 
 No new migrations since documentation update.
+
+### Scripts
+
+```
+scripts/lib/sms-alerts.sh
+scripts/performance-agent.sh
+scripts/qa-agent.sh
+```
 
 ## Documentation Gaps
 
@@ -132,7 +125,7 @@ user_story_suggestions
 | File | Last Modified |
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
-| CLAUDE.md | 2026-03-26 |
+| CLAUDE.md | 2026-03-28 |
 | README.md | 2026-02-16 |
 
 ---

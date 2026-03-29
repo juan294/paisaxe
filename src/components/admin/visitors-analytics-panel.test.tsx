@@ -132,6 +132,28 @@ describe("VisitorsAnalyticsPanel", () => {
     expect(screen.getByText("09 — Screen Sizes")).toBeInTheDocument();
   });
 
+  it("renders device and browser data content in DataTable callbacks", async () => {
+    vi.mocked(adminApi.fetchAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    render(<VisitorsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("06 — Devices")).toBeInTheDocument();
+    });
+
+    // Verify device data renders (DataTable renderItem callback)
+    expect(screen.getByText("Desktop")).toBeInTheDocument();
+    expect(screen.getByText("Mobile")).toBeInTheDocument();
+    // Verify browser data renders
+    expect(screen.getByText("07 — Browsers")).toBeInTheDocument();
+    expect(screen.getByText("Chrome")).toBeInTheDocument();
+    // Verify count values render (DataTable getCount callback)
+    expect(screen.getByText("300")).toBeInTheDocument();
+    expect(screen.getByText("250")).toBeInTheDocument();
+  });
+
   it("renders operating system and screen size data", async () => {
     vi.mocked(adminApi.fetchAnalytics).mockResolvedValue({
       data: {
