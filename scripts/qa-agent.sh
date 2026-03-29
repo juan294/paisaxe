@@ -66,9 +66,10 @@ else
   npm run dev > "$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
 
-  # Wait for server to be healthy (max 120 seconds)
+  # Wait for server to be healthy (max 240 seconds)
   # Check for HTTP 200 specifically — a 503 ("degraded") means Supabase isn't ready yet
-  MAX_WAIT=120
+  # Increased from 120s: Next.js dev server + Turbopack compilation can take >120s on cold start
+  MAX_WAIT=240
   WAITED=0
   while true; do
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3000/api/health" 2>/dev/null || echo "000")
