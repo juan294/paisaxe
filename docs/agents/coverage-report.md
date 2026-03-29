@@ -4,24 +4,46 @@
 > See `docs/health-report-[DATE].md` for the latest coverage data.
 > This file is kept for historical reference only and is no longer updated.
 
-> Last updated: 2026-03-28
+> Last updated: 2026-03-29
 
 ## Summary
 
-- **Total tests:** 5683 passed (+5 from 5678)
-- **Test files:** 305 passed (100%) (+1 new file)
-- **Statement coverage:** 98.69% (unchanged)
-- **Branch coverage:** 96.44% (+0.08% from 96.36%)
+- **Total tests:** 5685 passed (+2 from 5683)
+- **Test files:** 305 passed (100%)
+- **Statement coverage:** 98.70% (+0.01%)
+- **Branch coverage:** 96.47% (+0.03% from 96.44%)
 - **Function coverage:** 98.71% (unchanged)
-- **Line coverage:** ~99.09% (unchanged)
+- **Line coverage:** ~99.10% (+0.01%)
 - **TypeScript:** No errors
 - **Lint:** No errors
 
-This cycle added 5 new tests across 6 files targeting branch and statement gaps. One new test file was created for the `use-stories` cache-hit path. Branch coverage improved through `stories-server.ts` non-Error error handling, `sitemap.ts` slug fallback, `category-filter-badge.tsx` click-outside/escape behaviors, and `suggest-place-dialog.tsx` loading-state close prevention. The `use-stories.test.ts` was refactored from `vi.resetModules()` to static imports with `clearStoriesCache()` for better V8 coverage tracking.
+This cycle focused on coverage hardening and flaky test elimination. Fixed a flaky `stripe-analytics-panel` test (assertions outside `waitFor` causing intermittent full-suite failures). Added SVG chart verification for the RevenueChart component, explicit device/browser DataTable content assertions for visitors analytics, and a non-Error refresh catch branch test for `use-stories`. Branch coverage improved marginally as most remaining gaps are documented untestable defensive guards, SSR checks, or V8 instrumentation artifacts.
 
 *Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
 
-## Changes This Cycle (2026-03-28)
+## Changes This Cycle (2026-03-29)
+
+### Flaky Test Fix
+
+| File | What Was Fixed |
+|------|----------------|
+| `stripe-analytics-panel.test.tsx` | "displays product breakdown table" test had assertions (`Day Pass`, `€45.00`) outside `waitFor` block — caused intermittent failures during full-suite runs due to async timing. Moved assertions inside `waitFor`. |
+
+### New Tests Written (+2 tests across 2 files)
+
+#### Branch/Statement Improvements
+
+| File | What Was Covered |
+|------|------------------|
+| `stripe-analytics-panel.test.tsx` | RevenueChart SVG rendering — verifies `<svg>` element and correct number of `<rect>` bars match `revenueByDay` data length (covers lines 243-254) |
+| `visitors-analytics-panel.test.tsx` | DataTable renderItem/getCount callbacks for Devices and Browsers sections — verifies "Desktop", "Mobile", "Chrome" content and count values render (covers lines 225-244 DataTable JSX) |
+| `use-stories.test.ts` | Non-Error thrown value in refresh catch block — `mockRejectedValue("string error")` triggers `new Error("Failed to refresh stories")` branch at line 238 |
+
+### Files with Documented Untestable Branches (Unchanged)
+
+All previously documented untestable branches remain unchanged. See "Untestable Branches Documented" section below.
+
+## Changes Previous Cycle (2026-03-28)
 
 ### New Tests Written (+5 tests across 6 files)
 
@@ -251,8 +273,8 @@ These 2 files account for the bulk of the remaining coverage gap and require Pla
 ## Cross-Agent Recommendations
 
 - **Performance Agent**: No new dependencies added. All test additions are devDependency-only. No impact on bundle size.
-- **Code Quality Agent**: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321 -- regex never captures `.`), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. `subscription-optimizer.ts:160` `?? []` is dead (undefined routes to "review" first). `story-editor-dialog/index.tsx` has disconnected fullscreen state -- `state.isFullscreen` never set to `true`.
-- **Security Agent**: All webhook and MCP error paths remain fully covered. No regression. Health endpoint at 100% branch. Chat/stream route at 100% branch. 3 new API routes at 100% branch this cycle.
-- **QA Agent**: No new testability gaps. The 2 SDK-dependent components need Playwright E2E tests for further coverage.
+- **Code Quality Agent**: Dead code still present: `chat-action-detection.ts` trailing-period removal (line 321 -- regex never captures `.`), JPEG branch in `image-optimization.ts` (lines 130-131), `i18n/provider.tsx` es/en lazy loaders (lines 25-26). Consider removing. `subscription-optimizer.ts:160` `?? []` is dead (undefined routes to "review" first). `story-editor-dialog/index.tsx` has disconnected fullscreen state -- `state.isFullscreen` never set to `true`. `admin/page.tsx:821` StatCard non-clickable div branch is dead code -- all usages pass `onClick`.
+- **Security Agent**: All webhook and MCP error paths remain fully covered. No regression. Health endpoint at 100% branch. Chat/stream route at 100% branch.
+- **QA Agent**: No new testability gaps. The 2 SDK-dependent components need Playwright E2E tests for further coverage. Flaky stripe-analytics-panel test fixed — assertions moved inside `waitFor`.
 - **Cost Analyst Agent**: No cost-related coverage gaps.
 - **Localization Agent**: No locale-related coverage concerns.
