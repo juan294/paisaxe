@@ -4,24 +4,58 @@
 > See `docs/health-report-[DATE].md` for the latest coverage data.
 > This file is kept for historical reference only and is no longer updated.
 
-> Last updated: 2026-03-29
+> Last updated: 2026-03-31
 
 ## Summary
 
-- **Total tests:** 5685 passed (+2 from 5683)
+- **Total tests:** 5692 passed (+3 from 5689)
 - **Test files:** 305 passed (100%)
-- **Statement coverage:** 98.70% (+0.01%)
-- **Branch coverage:** 96.47% (+0.03% from 96.44%)
-- **Function coverage:** 98.71% (unchanged)
-- **Line coverage:** ~99.10% (+0.01%)
+- **Statement coverage:** 98.70% (unchanged)
+- **Branch coverage:** 96.50% (+0.12%)
+- **Function coverage:** 98.72% (unchanged)
+- **Line coverage:** ~99.10% (unchanged)
 - **TypeScript:** No errors
 - **Lint:** No errors
 
-This cycle focused on coverage hardening and flaky test elimination. Fixed a flaky `stripe-analytics-panel` test (assertions outside `waitFor` causing intermittent full-suite failures). Added SVG chart verification for the RevenueChart component, explicit device/browser DataTable content assertions for visitors analytics, and a non-Error refresh catch branch test for `use-stories`. Branch coverage improved marginally as most remaining gaps are documented untestable defensive guards, SSR checks, or V8 instrumentation artifacts.
+This cycle focused on covering React hook unmount-during-async-operation paths in `use-stories.ts`. Three new tests exercise the `mounted = false` guard branches for stale revalidation, initial fetch, and error handling — all triggered by unmounting the component before the async operation resolves. This brought `use-stories.ts` branch coverage from 89.39% to 92.42%.
 
-*Note: Coverage percentages fluctuate slightly as coverage scope expands to include more files.*
+All remaining gaps are well-documented: unreachable defensive guards, SSR-only paths, V8 branch map artifacts, and SDK-dependent components requiring Playwright E2E.
 
-## Changes This Cycle (2026-03-29)
+*Note: Coverage percentages fluctuate slightly (±0.1%) between runs due to V8 coverage instrumentation variance.*
+
+## Changes This Cycle (2026-03-31)
+
+### New Tests Written (+3 tests in 1 file)
+
+#### Branch Improvements
+
+| File | Coverage Change | What Was Covered |
+|------|----------------|------------------|
+| `use-stories.ts` | 89.39% → **92.42% branch** | Unmount during stale revalidation (line 190 `mounted = false`), unmount during initial fetch (line 197 `mounted = false`), unmount during fetch error (line 203 `mounted = false`) — exercises cleanup function setting `mounted = false` before async resolves |
+
+## Changes Previous Cycle (2026-03-30)
+
+### New Tests Written (+4 tests across 4 files)
+
+#### Statement/Function Improvements
+
+| File | Coverage Change | What Was Covered |
+|------|----------------|------------------|
+| `immersive-page-content.tsx` | 97.46% → **100% stmts**, 94.73% → **100% funcs**, 95.45% → **97.72% branch** | `requestIdleCallback` voice-chat prefetch body (lines 82-83) — mocks `requestIdleCallback` to fire synchronously, exercising the dynamic import |
+
+#### Content Verification Tests
+
+| File | What Was Covered |
+|------|------------------|
+| `visitors-analytics-panel.test.tsx` | Entry Pages (section 10) and Exit Pages (section 11) DataTable `renderItem`/`getCount` callbacks — verifies page paths and count values render |
+| `github-analytics-panel.test.tsx` | Skeleton loading state renders "Daily Traffic" header, "01 — Top Referrers" and "02 — Popular Paths" skeleton table headers |
+| `suggest-place-dialog.test.tsx` | Empty attribution and comment fields submit as `undefined` — exercises `attribution.trim() \|\| undefined` and `comment.trim() \|\| undefined` branches at lines 55-56 |
+
+### Files with Documented Untestable Branches (Unchanged)
+
+All previously documented untestable branches remain unchanged. See "Untestable Branches Documented" section below.
+
+## Changes Previous Cycle (2026-03-29)
 
 ### Flaky Test Fix
 

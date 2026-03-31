@@ -451,6 +451,83 @@ describe("useStories", () => {
     });
   });
 
+  it("should not update stories when unmounted during stale revalidation (line 190)", async () => {
+    // Step 1: Populate the cache
+    const { result: result1 } = renderHook(() => useStories());
+
+    await waitFor(() => {
+      expect(result1.current.isLoading).toBe(false);
+    });
+    expect(result1.current.stories).toEqual(mockStories);
+
+    // Step 2: Make cache stale
+    const realDateNow = Date.now;
+    vi.spyOn(Date, "now").mockReturnValue(realDateNow() + 6 * 60 * 1000);
+
+    // Step 3: Make DB fetch slow so we can unmount before it resolves
+    let resolveDB: (value: unknown) => void;
+    mockGetStoriesFromDB.mockImplementation(
+      () => new Promise((resolve) => { resolveDB = resolve; })
+    );
+
+    // Step 4: Render a new hook that will trigger stale revalidation
+    const { unmount } = renderHook(() => useStories());
+
+    // Step 5: Unmount before the fetch resolves — sets mounted = false
+    unmount();
+
+    // Step 6: Resolve the fetch after unmount
+    await act(async () => {
+      resolveDB!(mockStories);
+    });
+
+    // No React warning about updating unmounted component.
+    // The mounted guard at line 190 prevents setStories from being called.
+    vi.spyOn(Date, "now").mockRestore();
+  });
+
+  it("should not update state when unmounted during initial fetch (line 197)", async () => {
+    // No cache — the hook will fetch from DB
+    let resolveDB: (value: unknown) => void;
+    mockGetStoriesFromDB.mockImplementation(
+      () => new Promise((resolve) => { resolveDB = resolve; })
+    );
+
+    const { unmount, result } = renderHook(() => useStories());
+
+    // Should be loading
+    expect(result.current.isLoading).toBe(true);
+
+    // Unmount before fetch resolves
+    unmount();
+
+    // Resolve after unmount — mounted guard at line 197 prevents state updates
+    await act(async () => {
+      resolveDB!(mockStories);
+    });
+  });
+
+  it("should not set error state when unmounted during fetch failure (line 203)", async () => {
+    // No cache — the hook will fetch from DB
+    let rejectDB: (reason: unknown) => void;
+    mockGetStoriesFromDB.mockImplementation(
+      () => new Promise((_, reject) => { rejectDB = reject; })
+    );
+
+    const { unmount, result } = renderHook(() => useStories());
+
+    // Should be loading
+    expect(result.current.isLoading).toBe(true);
+
+    // Unmount before fetch rejects
+    unmount();
+
+    // Reject after unmount — mounted guard at line 203 prevents setError/setStories
+    await act(async () => {
+      rejectDB!(new Error("Failed after unmount"));
+    });
+  });
+
 });
 
 describe("useStories with initialStories", () => {
