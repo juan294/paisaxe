@@ -839,4 +839,37 @@ describe("VisitorsAnalyticsPanel", () => {
   // React DOM requires window to render. The functions are not exported, so they
   // can only be invoked through the component. Deleting globalThis.window would
   // break React rendering before these functions execute.
+
+  it("renders entry pages and exit pages DataTable content", async () => {
+    vi.mocked(adminApi.fetchAnalytics).mockResolvedValue({
+      data: {
+        ...mockData,
+        entryPages: [
+          { page: "/immersive", count: 120 },
+          { page: "/pricing", count: 45 },
+        ],
+        exitPages: [
+          { page: "/chat", count: 80 },
+          { page: "/about", count: 30 },
+        ],
+      },
+    });
+
+    render(<VisitorsAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("10 — Entry Pages")).toBeInTheDocument();
+    });
+
+    // Entry Pages DataTable renderItem and getCount callbacks
+    expect(screen.getByText("/immersive")).toBeInTheDocument();
+    expect(screen.getByText("/pricing")).toBeInTheDocument();
+    expect(screen.getByText("45")).toBeInTheDocument();
+
+    // Exit Pages DataTable renderItem and getCount callbacks
+    expect(screen.getByText("11 — Exit Pages")).toBeInTheDocument();
+    expect(screen.getByText("/chat")).toBeInTheDocument();
+    expect(screen.getByText("/about")).toBeInTheDocument();
+    expect(screen.getByText("30")).toBeInTheDocument();
+  });
 });

@@ -174,6 +174,35 @@ describe("SuggestPlaceDialog", () => {
     });
   });
 
+  it("submits with undefined attribution and comment when fields are empty", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: "suggestion-2" }),
+    });
+
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    fireEvent.change(placeNameInput, { target: { value: "Cueva del Sidrón" } });
+    // Leave comment and attribution empty
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith("/api/suggestions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          placeName: "Cueva del Sidrón",
+          comment: undefined,
+          attribution: undefined,
+        }),
+      });
+    });
+  });
+
   it("shows success message after successful submission", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
