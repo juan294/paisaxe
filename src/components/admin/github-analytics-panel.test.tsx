@@ -498,4 +498,17 @@ describe("GitHubAnalyticsPanel", () => {
     // The "days" suffix should render for the Days Tracked card (line 247)
     expect(screen.getByText("days")).toBeInTheDocument();
   });
+
+  it("renders skeleton loading tables with expected headers", () => {
+    vi.mocked(adminApi.fetchGithubAnalytics).mockImplementation(
+      () => new Promise(() => {})
+    );
+
+    render(<GitHubAnalyticsPanel />, { wrapper });
+
+    // SkeletonGitHubDashboard renders "Daily Traffic" header and two SkeletonTable components
+    expect(screen.getByText("Daily Traffic")).toBeInTheDocument();
+    expect(screen.getByText("01 — Top Referrers")).toBeInTheDocument();
+    expect(screen.getByText("02 — Popular Paths")).toBeInTheDocument();
+  });
 });

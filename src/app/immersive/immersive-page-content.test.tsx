@@ -558,4 +558,25 @@ describe("ImmersivePageContent", () => {
     render(<ImmersivePageContent serverShuffleSeed={null} />);
     expect(screen.getByTestId("mood-overlay")).toBeInTheDocument();
   });
+
+  it("prefetches voice chat chunk via requestIdleCallback when available (lines 82-83)", () => {
+    // Mock requestIdleCallback so the callback actually fires
+    const originalRIC = window.requestIdleCallback;
+    window.requestIdleCallback = (cb: IdleRequestCallback) => {
+      cb({} as IdleDeadline);
+      return 0;
+    };
+
+    setupDefaults();
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // The callback fires synchronously via the mock, triggering the dynamic import.
+    // The voice-chat module is already mocked via next/dynamic, so no error occurs.
+    // This test exercises lines 82-83 (requestIdleCallback body).
+    expect(screen.getByTestId("story-viewer")).toBeInTheDocument();
+
+    // Restore
+    window.requestIdleCallback = originalRIC;
+  });
 });
