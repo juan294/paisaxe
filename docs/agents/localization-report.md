@@ -1,5 +1,5 @@
 # Localization Coverage Report
-> **Last Updated:** 2026-03-29
+> **Last Updated:** 2026-03-30
 > **Agent:** Paisaxe Localization Agent
 > **Status:** Complete - 100% Translation Coverage Verified
 
@@ -11,42 +11,44 @@
 
 All 6 supported locales have complete translation coverage across both UI strings and story content.
 
-- **UI Translations**: 6/6 locales complete (es, en, fr, de, pt, ast) — 392 keys each
+- **UI Translations**: 6/6 locales complete (es, en, fr, de, pt, ast) — 391 leaf keys each
 - **Story Translations**: 95 stories x 5 non-default locales = 475 translations, all complete
 - **Type Safety**: Pass — `npx tsc --noEmit` exits clean on all locale files
-- **Test Suite**: 197 i18n/translation/locale tests passing (0 failures)
+- **Test Suite**: 352 i18n/translation/locale tests passing (0 failures)
 - **Changes Made**: None — all translations were already complete
-- **Consecutive stable days**: 23
+- **Consecutive stable days**: 24
 
 ---
 
-## Current Status (2026-03-29 Verification)
+## Current Status (2026-03-30 Verification)
 
 ### Summary Table
 
 | Locale | Code | UI Keys | UI Coverage | Stories | Story Coverage |
 |--------|------|---------|-------------|---------|----------------|
-| Spanish | `es` | 392 | 100% (source) | 95 (source) | 100% (source) |
-| English | `en` | 392 | 100% | 95 | 100% |
-| French | `fr` | 392 | 100% | 95 | 100% |
-| German | `de` | 392 | 100% | 95 | 100% |
-| Portuguese | `pt` | 392 | 100% | 95 | 100% |
-| Asturian | `ast` | 392 | 100% | 95 | 100% |
+| Spanish | `es` | 391 | 100% (source) | 95 (source) | 100% (source) |
+| English | `en` | 391 | 100% | 95 | 100% |
+| French | `fr` | 391 | 100% | 95 | 100% |
+| German | `de` | 391 | 100% | 95 | 100% |
+| Portuguese | `pt` | 391 | 100% | 95 | 100% |
+| Asturian | `ast` | 391 | 100% | 95 | 100% |
 
 ### Stability Trend
 
-| Metric | 2026-03-27 | 2026-03-28 | 2026-03-29 | Change |
+| Metric | 2026-03-28 | 2026-03-29 | 2026-03-30 | Change |
 |--------|-----------|-----------|-----------|--------|
-| UI keys per locale | 392 | 392 | 392 | 0 (stable 23 days) |
-| Story translations | 95 | 95 | 95 | 0 (stable 23 days) |
+| UI keys per locale | 391 | 391 | 391 | 0 (stable 24 days) |
+| Story translations | 95 | 95 | 95 | 0 (stable 24 days) |
 
 No new UI keys or stories were added since the last report. All translations remain in sync.
+
+**Note on key count**: Previous reports listed 392 keys. Re-counting with a precise leaf-key extraction script yields 391 across 22 top-level sections. All 6 locales have identical key sets — the alignment is the important metric.
 
 ---
 
 ## UI Translations Analysis
 
-### Key Distribution by Section
+### Key Distribution by Section (22 sections)
 
 | Section | Keys | Description |
 |---------|------|-------------|
@@ -72,15 +74,28 @@ No new UI keys or stories were added since the last report. All translations rem
 | `privacy` | 44 | Privacy policy (9 sections) |
 | `terms` | 45 | Terms of service (10 sections) |
 | `admin` | 38 | Admin panel (login, stories, toggles, analytics) |
-| **Total** | **392** | |
+| **Total** | **391** | |
 
 ### Missing Keys
 
-None. All 5 target locales have the exact same 392 keys as the Spanish source.
+None. All 5 target locales have the exact same 391 keys as the Spanish source.
 
 ### Orphaned Keys
 
 None. No locale contains keys absent from Spanish.
+
+### Cosmetic Discrepancy: Inline Comments
+
+| File | Lines | Comment Lines | Code Lines |
+|------|-------|---------------|------------|
+| es.ts | 501 | 8 | 469 |
+| en.ts | 501 | 8 | 469 |
+| fr.ts | 493 | 0 | 469 |
+| de.ts | 493 | 0 | 469 |
+| pt.ts | 493 | 0 | 469 |
+| ast.ts | 500 | 7 | 469 |
+
+The 8-line difference in fr/de/pt is because those files lack inline `// LOCATION-SPECIFIC:` comments that exist in es/en. AST is missing 1 of the 8 comments. This is purely cosmetic — all code lines and keys are identical across locales.
 
 ---
 
@@ -129,7 +144,7 @@ All locale files properly translate location-specific references:
 
 ---
 
-## Changes Made (2026-03-29)
+## Changes Made (2026-03-30)
 
 **0 translations added** — all locales were already complete. No files modified.
 
@@ -155,8 +170,8 @@ All locale files properly translate location-specific references:
 
 **Cross-agent recommendations:**
 - Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, others dynamic) in place. No optimization needed.
-- Code Quality Agent: No dead translations found. All 392 keys actively referenced in components. No new keys added since Mar 7.
+- Code Quality Agent: No dead translations found. All 391 keys actively referenced in components. No new keys added since Mar 7.
 - Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
-- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 197 i18n tests passing.
+- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 352 i18n tests passing.
 - QA Agent: No locale-related issues this cycle. All translations stable.
 - Cost Analyst Agent: No cost-related localization concerns.

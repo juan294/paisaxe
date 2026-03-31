@@ -1,14 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-03-29 06:00:04
-
-## Changes Made This Run (2026-03-29)
-
-**No documentation changes needed.** Third consecutive clean run.
-
-- **Feature flags**: All 16 flagged flags are already documented in `docs/project/features.md` Feature Flags Reference (lines 660-718). The gap detection script checks CLAUDE.md instead of `features.md`, producing false positives.
-- **API routes**: All 50 flagged routes are internal (admin, cron, webhook) and already covered contextually in features.md sections (Voice & Text Chat, Premium Voice Agent, Infrastructure, etc.). None require standalone documentation.
-- **Modified files**: 3 test files only (`stripe-analytics-panel.test.tsx`, `visitors-analytics-panel.test.tsx`, `use-stories.test.ts`) — no feature changes requiring documentation updates.
-- **Recommendation (carried)**: Update the gap detection script to also check `docs/project/features.md` for feature flag documentation.
+> Auto-generated on 2026-03-31 06:00:04
 
 ## CLAUDE.md Status
 
@@ -21,8 +12,12 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
+src/app/immersive/immersive-page-content.test.tsx
+src/app/immersive/immersive-page-content.tsx
+src/components/admin/github-analytics-panel.test.tsx
 src/components/admin/stripe-analytics-panel.test.tsx
 src/components/admin/visitors-analytics-panel.test.tsx
+src/components/immersive/suggest-place-dialog.test.tsx
 src/hooks/use-stories.test.ts
 ```
 
@@ -127,6 +122,15 @@ user_story_suggestions
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-03-28 |
 | README.md | 2026-02-16 |
+
+## Changes Made This Run (2026-03-31)
+
+- **Status: GREEN** — No documentation gaps found. Fifth consecutive clean run.
+- **Feature flags**: All 16 flagged items already documented in `docs/project/features.md` (lines 660-718). Gap script false positive — checks CLAUDE.md only, flags live in features.md.
+- **API routes**: All 51 flagged routes are internal admin/backend or already documented (chat flow in CLAUDE.md, MCP tools, webhooks).
+- **Modified files**: 7 files (5 test files, 1 already-documented source file, 3 agent scripts) — no feature changes requiring documentation updates.
+- **No new migrations** since last documentation update.
+- **Recommendation**: Update gap detection script to check `docs/project/features.md` for feature flag documentation (5th consecutive report flagging this).
 
 ---
 
