@@ -8,8 +8,19 @@
 
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import dynamic from "next/dynamic";
+
+const Analytics = dynamic(
+  () => import("@vercel/analytics/next").then((m) => ({ default: m.Analytics })),
+  { ssr: false }
+);
+const SpeedInsights = dynamic(
+  () =>
+    import("@vercel/speed-insights/next").then((m) => ({
+      default: m.SpeedInsights,
+    })),
+  { ssr: false }
+);
 import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
 import { Providers } from "./providers";

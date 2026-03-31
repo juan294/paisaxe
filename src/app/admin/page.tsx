@@ -730,13 +730,11 @@ interface StatCardProps {
   label: string;
   variant: "default" | "warning" | "success" | "purple";
   isActive?: boolean;
-  onClick?: () => void;
+  onClick: () => void;
   ariaLabel?: string;
 }
 
 function StatCard({ icon, value, label, variant, isActive, onClick, ariaLabel }: StatCardProps) {
-  const isClickable = !!onClick;
-
   const variants = {
     default: {
       bg: "bg-white dark:bg-[#252320]",
@@ -802,25 +800,17 @@ function StatCard({ icon, value, label, variant, isActive, onClick, ariaLabel }:
     </>
   );
 
-  if (isClickable) {
-    return (
-      <button
-        onClick={onClick}
-        aria-label={ariaLabel}
-        className={cn(
-          "rounded-2xl p-5 text-left transition-all",
-          isActive ? v.activeBg : v.bg,
-          !isActive && "hover:scale-[1.02] hover:shadow-md"
-        )}
-      >
-        {content}
-      </button>
-    );
-  }
-
   return (
-    <div className={cn("rounded-2xl p-5", v.bg)}>
+    <button
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className={cn(
+        "rounded-2xl p-5 text-left transition-all",
+        isActive ? v.activeBg : v.bg,
+        !isActive && "hover:scale-[1.02] hover:shadow-md"
+      )}
+    >
       {content}
-    </div>
+    </button>
   );
 }
