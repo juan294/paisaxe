@@ -538,6 +538,25 @@ describe("useImageEditor", () => {
       expect(result.current.contentSearched).toBe(false);
     });
 
+    it("handles response with neither error nor data (line 179 false branch)", async () => {
+      // When searchContentImages returns {} (no error, no data), the else-if branch is skipped
+      (searchContentImages as Mock).mockResolvedValue({});
+
+      const { result } = renderHook(() => useImageEditor(mockStory, mockSetError));
+
+      await act(async () => {
+        await result.current.handleSearchContent();
+      });
+
+      // setError("") is always called at the start of handleSearchContent to clear prior errors
+      // but the error string from result.error is NOT set (no result.error)
+      // and contentImages is NOT populated (no result.data)
+      expect(mockSetError).toHaveBeenCalledWith(""); // clears prior error only
+      expect(mockSetError).not.toHaveBeenCalledWith(expect.stringContaining("not found"));
+      expect(result.current.contentImages).toEqual([]);
+      expect(result.current.contentSearched).toBe(false);
+    });
+
     it("handles exception during search", async () => {
       (searchContentImages as Mock).mockRejectedValue(new Error("Network error"));
 
