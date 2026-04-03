@@ -471,6 +471,8 @@ Eight toggle switches for controlling automated agents:
 | `qa_agent_enabled` | QA agent (weekly Sunday 8:00 AM) |
 | `localization_agent_enabled` | Localization agent (weekly Sunday 7:00 AM) |
 | `cost_analyst_agent_enabled` | Cost Analyst agent (daily at 3:00 AM) |
+| `subscription_optimizer_enabled` | Subscription Optimizer agent (weekly Monday 4:00 AM) — reviews service costs and spending |
+| `content_discovery_agent_enabled` | Content Discovery agent (weekly Monday 3:00 AM, disabled by default) — discovers new Asturias places via Google Places API and creates pending stories |
 
 Individual agent toggles have an expandable configuration panel (gear icon) for adjusting agent-specific settings like schedule and prompt parameters.
 
@@ -659,7 +661,7 @@ Scheduled via pg_cron + pg_net and deployed with `supabase functions deploy keep
 
 ## Feature Flags Reference
 
-All flags are managed from the admin panel and take effect within approximately 1 minute of toggling. Feature flags are split across two tabs: the Features tab (17 flags in 5 categories) and the Agents tab (8 agent flags).
+All flags are managed from the admin panel and take effect within approximately 1 minute of toggling. Feature flags are split across two tabs: the Features tab (17 flags in 5 categories) and the Agents tab (10 agent flags).
 
 ### Discovery Flags (Features tab)
 
