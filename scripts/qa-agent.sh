@@ -56,9 +56,10 @@ ENABLE_GITHUB_ISSUES=$(get_agent_config "qa_agent_enabled" "enableGithubIssues" 
 ENABLE_GAP_ANALYSIS=$(get_agent_config "qa_agent_enabled" "enableGapAnalysis" || echo "true")
 log_info "Configuration: $TESTS_PER_CATEGORY tests/category, journeyTests=$ENABLE_JOURNEY_TESTS, githubIssues=$ENABLE_GITHUB_ISSUES, gapAnalysis=$ENABLE_GAP_ANALYSIS" | tee -a "$LOG_FILE"
 
-# Check if server is already running and healthy (HTTP 200)
-if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3000/api/health 2>/dev/null)" == "200" ]]; then
-  log_info "Dev server already running on port 3000" | tee -a "$LOG_FILE"
+# Check if server is already running (any HTTP response = server is up)
+PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3000/api/health 2>/dev/null || echo "000")
+if [[ "$PRECHECK_CODE" != "000" ]]; then
+  log_info "Dev server already running on port 3000 (HTTP $PRECHECK_CODE)" | tee -a "$LOG_FILE"
 else
   log_info "Starting Next.js dev server..." | tee -a "$LOG_FILE"
 
@@ -66,14 +67,15 @@ else
   npm run dev > "$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
 
-  # Wait for server to be healthy (max 240 seconds)
-  # Check for HTTP 200 specifically — a 503 ("degraded") means Supabase isn't ready yet
-  # Increased from 120s: Next.js dev server + Turbopack compilation can take >120s on cold start
+  # Wait for server to respond (max 240 seconds)
+  # Accept any HTTP response (200 or 503) — both mean the server is up.
+  # A 503 from /api/health means Supabase is degraded, not that the server failed to start.
+  # Phase 0 health checks below will properly report Supabase degradation.
   MAX_WAIT=240
   WAITED=0
   while true; do
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3000/api/health" 2>/dev/null || echo "000")
-    [[ "$HTTP_CODE" == "200" ]] && break
+    [[ "$HTTP_CODE" != "000" ]] && break
     if [[ $WAITED -ge $MAX_WAIT ]]; then
       log_error "Server failed to start within ${MAX_WAIT}s" | tee -a "$LOG_FILE"
       exit 1
@@ -85,7 +87,7 @@ else
     fi
   done
 
-  log_success "Dev server ready (took ${WAITED}s)" | tee -a "$LOG_FILE"
+  log_success "Dev server ready (HTTP $HTTP_CODE, took ${WAITED}s)" | tee -a "$LOG_FILE"
 fi
 
 # =============================================================================
