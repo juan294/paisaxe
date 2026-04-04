@@ -537,15 +537,20 @@ describe("ElevenLabsAnalyticsPanel", () => {
       expect(screen.getByText("04 — Recent Conversations")).toBeInTheDocument();
     });
 
-    // Find the "Failed" badge specifically in the recent conversations table
+    // Find the "Failed" badge — wrap in waitFor since the conversations list
+    // renders asynchronously after the section header appears.
     const recentSection = screen.getByText("04 — Recent Conversations").closest("section")!;
-    const failedBadge = recentSection.querySelector("span[class*='bg-rose-100']")!;
-    expect(failedBadge).toBeInTheDocument();
+    let failedBadge!: Element;
+    await waitFor(() => {
+      const el = recentSection.querySelector("span[class*='bg-rose-100']");
+      expect(el).toBeInTheDocument();
+      failedBadge = el!;
+    });
     expect(failedBadge.textContent).toBe("Failed");
     expect(failedBadge.className).toContain("text-rose-700");
 
     // Duration should be rendered
-    expect(screen.getByText("45s")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("45s")).toBeInTheDocument());
   });
 
   it("handles unknown language code in breakdown", async () => {

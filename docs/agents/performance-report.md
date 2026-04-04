@@ -211,11 +211,11 @@ layout.tsx
 
 | Package | Installed | Latest | Gap | Priority |
 |---------|-----------|--------|-----|----------|
-| stripe | 20.3.1 | 22.0.0 | +2 major | **High — coordinate with @stripe/\*** |
-| @stripe/stripe-js | 8.8.0 | 9.0.1 | +1 major | **High — part of Stripe ecosystem upgrade** |
-| @stripe/react-stripe-js | 5.6.0 | 6.1.0 | +1 major | **High — part of Stripe ecosystem upgrade** |
-| @elevenlabs/react | 0.14.0 | 1.0.2 | +1 major | Medium — voice agent, review breaking changes |
 | @anthropic-ai/sdk | 0.78.0 | latest ~0.82+ | +4 minor | Low — API compatible |
+| ~~stripe~~ | ~~20.3.1~~ | ~~22.0.0~~ | ~~+2 major~~ | ✅ **RESOLVED Apr 4 — ui_mode "embedded"→"form" fixed** |
+| ~~@stripe/stripe-js~~ | ~~8.8.0~~ | ~~9.0.1~~ | ~~+1 major~~ | ✅ **RESOLVED Apr 4** |
+| ~~@stripe/react-stripe-js~~ | ~~5.6.0~~ | ~~6.1.0~~ | ~~+1 major~~ | ✅ **RESOLVED Apr 4** |
+| ~~@elevenlabs/react~~ | ~~0.14.1~~ | ~~1.0.2~~ | ~~+1 major~~ | ✅ **RESOLVED Apr 4 — backward compatible** |
 | ~~next~~ | ~~16.1.6~~ | ~~16.2.2~~ | ~~patch~~ | ✅ **RESOLVED — 16.2.2 installed** |
 | ~~posthog-js~~ | ~~1.353.0~~ | ~~1.364.6~~ | ~~+12 minor~~ | ✅ **RESOLVED — 1.364.6 installed** |
 
@@ -303,14 +303,11 @@ The old 2,500 KB total budget is **retired** — it was set when code-splitting 
 | ~~#1~~ | ~~Run production build~~ | Measurement | Low | ✅ **DONE (Apr 4)** |
 | ~~P5~~ | ~~Fix i18n bundling~~ | ~~40-80 KB~~ | ~~Low~~ | ✅ **CLOSED — Turbopack limitation, not fixable** |
 | ~~P6~~ | ~~Split JS budget~~ | Process clarity | Trivial | ✅ **DONE (Apr 4) — new GREEN status** |
-| **#2** | **Stripe ecosystem upgrade (20→22, stripe-js 8→9, react-stripe-js 5→6)** | Supply-chain risk | Medium | **Pending — 2 major versions behind** |
-| **#3** | **@elevenlabs/react upgrade (0.14.0 → 1.0.2)** | Stability, API access | Medium | **Pending — major version gap** |
+| ~~#2~~ | ~~Stripe ecosystem upgrade (20→22, stripe-js 8→9, react-stripe-js 5→6)~~ | Supply-chain risk | Medium | ✅ **DONE (Apr 4) — 1 breaking change fixed: ui_mode "embedded"→"form"** |
+| ~~#3~~ | ~~@elevenlabs/react upgrade (0.14.1 → 1.0.2)~~ | Stability, API access | Medium | ✅ **DONE (Apr 4) — backward compatible, no source changes** |
 | P4 | Tree-shake Supabase realtime | ~20-30 KB | Medium | Downgraded — low ROI |
-| P1 | ~~Browserslist~~ investigation | **0 KB** — Turbopack ignores it | Trivial | **CLOSED — no effect, wasted** |
 
-**Next actions:**
-1. **Plan Stripe ecosystem upgrade** — stripe 20→22, @stripe/stripe-js 8→9, @stripe/react-stripe-js 5→6. Review changelogs for breaking changes.
-2. **Plan @elevenlabs/react upgrade** — 0.14.0 → 1.0.2. Check ElevenLabs v1 migration guide.
+**No remaining action items.** All budget and dependency goals met.
 
 ---
 
@@ -330,9 +327,9 @@ The old 2,500 KB total budget is **retired** — it was set when code-splitting 
 
 ---
 
-*Report updated 2026-04-04 — production build verified, split budget adopted, status now GREEN*
-*Initial load JS: ~1,958 KB / 2,000 KB | Total JS: 2,851 KB / 3,000 KB*
-*RESOLVED this cycle: next@16.2.2 + posthog-js@1.364.6 + production build + P5 investigation (closed) + P6 budget split (done)*
-*P1 browserslist: zero effect in Turbopack — investigation complete, approach abandoned*
-*P5 i18n: Turbopack limitation, not code fixable — investigation complete, closed*
-*PENDING: Stripe ecosystem upgrade (20→22), @elevenlabs/react upgrade (0.14→1.0)*
+*Report updated 2026-04-04 — all action items complete*
+*Initial load JS: ~1,958 KB / 2,000 KB | Total JS: 2,851 KB / 3,000 KB — GREEN*
+*RESOLVED this cycle: next@16.2.2 + posthog-js@1.364.6 + production build + P5/P6 + stripe ecosystem + @elevenlabs/react*
+*Stripe breaking change: ui_mode "embedded" → "form" in Stripe API 2026-03-25.dahlia (v21+)*
+*@elevenlabs/react 1.0.2: backward compatible — useConversation hook unchanged*
+*PENDING: None — all dep upgrades done, all budgets met*

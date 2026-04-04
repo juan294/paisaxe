@@ -220,23 +220,21 @@
 
 <!-- (pruned: documentation_agent 2026-03-31 entry removed, keeping last 3) -->
 
-<!-- ENTRY:START agent=performance_agent timestamp=2026-04-04T16:00:00Z -->
-## Performance Agent — 2026-04-04 (budget split adopted, status GREEN)
-- **Status: GREEN** — Split budget adopted. Initial load JS: **~1,958 KB / 2,000 KB ✅**. Total JS: **2,851 KB / 3,000 KB ✅**. Old 2,500 KB single budget retired.
-- **P1 browserslist: zero effect** — Turbopack ignores browserslist for polyfill compilation. `core-js` chunk stays at 110 KB regardless of targets. Approach abandoned.
-- **P5 i18n: Turbopack limitation** — All 6 locales bundle together (208 KB across 2 chunks) regardless of dynamic import pattern. `loadLocale` function approach tested: WORSE (+565 KB overhead from changed module graph). Code change reverted. Limitation accepted.
-- **P6 split budget: DONE** — Initial (~1,958 KB) vs total (2,851 KB) budgets replace the old 2,500 KB single budget.
-- **Stripe ecosystem still pending:** stripe 20.3.1→22.0.0 (+2 major), @stripe/stripe-js 8.8.0→9.0.1, @stripe/react-stripe-js 5.6.0→6.1.0.
-- **@elevenlabs/react major gap:** 0.14.0 vs 1.0.2.
+<!-- ENTRY:START agent=performance_agent timestamp=2026-04-04T18:00:00Z -->
+## Performance Agent — 2026-04-04 (all action items complete)
+- **Status: GREEN** — Initial load JS: **~1,958 KB / 2,000 KB ✅**. Total JS: **2,851 KB / 3,000 KB ✅**. Split budget in effect.
+- **Stripe ecosystem upgraded:** stripe 20.3.1→22.0.0, @stripe/stripe-js 8.8.0→9.0.1, @stripe/react-stripe-js 5.6.0→6.1.0. One breaking change fixed: `ui_mode: "embedded"` → `"form"` in `createEmbeddedCheckoutSession()` (Stripe API 2026-03-25.dahlia). All 5703 tests pass.
+- **@elevenlabs/react upgraded:** 0.14.1→1.0.2 (+ @elevenlabs/client 0.15.0→1.1.1). Backward compatible — `useConversation` hook, `startSession`, `endSession`, `sendUserMessage`, `status`, `isSpeaking` all unchanged. No source changes.
+- **No remaining dep upgrade action items.** @anthropic-ai/sdk is +4 minor versions behind (low priority, API compatible).
 - **Deferred chunks (892 KB):** ElevenLabs 471 KB, PostHog 173 KB, react-markdown 142 KB, admin tabs 106 KB — all verified in production.
 
 **Cross-agent recommendations:**
-- Security Agent: Production build clean, 0 advisories. Stripe 2 major behind and @elevenlabs/react major gap remain the only dep risks.
-- Code Quality Agent: P1/P5 investigations complete — both closed. Stripe ecosystem upgrade (#2) and @elevenlabs/react upgrade (#3) are the remaining action items.
-- QA Agent: No bundle-related test concerns. Stripe and ElevenLabs upgrades will need E2E verification when applied.
-- Coverage Agent: No bundle-related coverage changes.
-- Cost Analyst Agent: Status now GREEN. No cost impact from bundle optimization work.
-- Localization Agent: i18n 208 KB in initial bundle is permanent (Turbopack limitation). Locale lazy-loading does not work with current Turbopack — no action needed on localization side.
+- Security Agent: Stripe ecosystem fully upgraded — supply chain risk resolved. @elevenlabs/react at stable v1. npm audit should show 0 critical advisories. Note: GitHub shows 9 Dependabot alerts on develop — review to see if any remain after this cycle's upgrades.
+- Code Quality Agent: All major dep upgrades complete this cycle. No outstanding version discrepancies. @anthropic-ai/sdk +4 minor is low priority.
+- QA Agent: Stripe major version upgrade done — recommend verifying embedded checkout flow on staging. ElevenLabs backward compatible, no Pelayo testing needed.
+- Coverage Agent: Stripe test for `ui_mode` updated. No other coverage impact.
+- Cost Analyst Agent: All dep upgrades done. No cost impact.
+- Localization Agent: No changes this cycle.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance_agent timestamp=2026-04-04T10:00:00Z -->
