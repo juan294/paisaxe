@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-03-31 06:00:04
+> Auto-generated on 2026-04-04 06:00:05
 
 ## CLAUDE.md Status
 
@@ -12,11 +12,18 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
+src/app/admin/page.test.tsx
+src/app/admin/page.tsx
 src/app/immersive/immersive-page-content.test.tsx
 src/app/immersive/immersive-page-content.tsx
+src/app/layout.tsx
 src/components/admin/github-analytics-panel.test.tsx
+src/components/admin/story-editor-dialog/use-image-editor.test.ts
 src/components/admin/stripe-analytics-panel.test.tsx
 src/components/admin/visitors-analytics-panel.test.tsx
+src/components/analytics.test.tsx
+src/components/analytics.tsx
+src/components/immersive/language-switcher.test.tsx
 src/components/immersive/suggest-place-dialog.test.tsx
 src/hooks/use-stories.test.ts
 ```
@@ -26,6 +33,7 @@ No new migrations since documentation update.
 ### Scripts
 
 ```
+scripts/documentation-agent.sh
 scripts/lib/sms-alerts.sh
 scripts/performance-agent.sh
 scripts/qa-agent.sh
@@ -91,30 +99,6 @@ webhooks/translate
 
 ```
 
-### Potentially Undocumented Feature Flags
-
-These feature flags may not be documented in CLAUDE.md:
-
-```
-ambient_discovery
-asturianu_touches
-autoplay_button
-booking_system
-contextual_prompts
-fullscreen_button
-maintenance_mode
-mood_discovery
-randomized_order
-related_stories
-seasonal_surfacing
-sms_booking_confirmation
-story_freshness
-story_sharing
-surprise_me
-user_story_suggestions
-
-```
-
 ## Documentation File Ages
 
 | File | Last Modified |
@@ -123,14 +107,14 @@ user_story_suggestions
 | CLAUDE.md | 2026-03-28 |
 | README.md | 2026-02-16 |
 
-## Changes Made This Run (2026-03-31)
+## Changes Made This Run
 
-- **Status: GREEN** — No documentation gaps found. Fifth consecutive clean run.
-- **Feature flags**: All 16 flagged items already documented in `docs/project/features.md` (lines 660-718). Gap script false positive — checks CLAUDE.md only, flags live in features.md.
-- **API routes**: All 51 flagged routes are internal admin/backend or already documented (chat flow in CLAUDE.md, MCP tools, webhooks).
-- **Modified files**: 7 files (5 test files, 1 already-documented source file, 3 agent scripts) — no feature changes requiring documentation updates.
-- **No new migrations** since last documentation update.
-- **Recommendation**: Update gap detection script to check `docs/project/features.md` for feature flag documentation (5th consecutive report flagging this).
+**Status: GREEN** — No documentation changes required. Eighth consecutive clean run.
+
+- **Feature flags**: Verified all 17 flags in `src/types/feature-flags.ts` match `docs/project/features.md`. Zero undocumented flags.
+- **API routes**: All 51 flagged routes are internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require documentation.
+- **Modified source files**: 14 files (test additions + analytics deferral) — no new features or flags requiring documentation.
+- **No new migrations** since last documentation update (2026-03-28).
 
 ---
 
