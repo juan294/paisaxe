@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ElevenLabsAnalyticsPanel } from "./elevenlabs-analytics-panel";
 import { AnalyticsCacheProvider } from "./analytics-cache-context";
@@ -537,20 +537,13 @@ describe("ElevenLabsAnalyticsPanel", () => {
       expect(screen.getByText("04 — Recent Conversations")).toBeInTheDocument();
     });
 
-    // Find the "Failed" badge — wrap in waitFor since the conversations list
-    // renders asynchronously after the section header appears.
+    // Conversations list renders asynchronously after the section header.
     const recentSection = screen.getByText("04 — Recent Conversations").closest("section")!;
-    let failedBadge!: Element;
     await waitFor(() => {
-      const el = recentSection.querySelector("span[class*='bg-rose-100']");
-      expect(el).toBeInTheDocument();
-      failedBadge = el!;
+      const badge = within(recentSection).getByText("Failed");
+      expect(badge).toHaveClass("bg-rose-100", "text-rose-700");
+      expect(within(recentSection).getByText("45s")).toBeInTheDocument();
     });
-    expect(failedBadge.textContent).toBe("Failed");
-    expect(failedBadge.className).toContain("text-rose-700");
-
-    // Duration should be rendered
-    await waitFor(() => expect(screen.getByText("45s")).toBeInTheDocument());
   });
 
   it("handles unknown language code in breakdown", async () => {
