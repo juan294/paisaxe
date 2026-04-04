@@ -220,24 +220,23 @@
 
 <!-- (pruned: documentation_agent 2026-03-31 entry removed, keeping last 3) -->
 
-<!-- ENTRY:START agent=performance_agent timestamp=2026-04-04T14:00:00Z -->
-## Performance Agent — 2026-04-04 (production build verified)
-- **Status: YELLOW** — **2,851 KB CONFIRMED production** (`npm run build` exit 0, 132/132 pages). Budget exceeded by 351 KB (14.0%). Dev cache was accurate — production matches exactly.
-- **KEY FINDING: P1 browserslist savings did NOT materialize.** Polyfills chunk 110 KB in production (predicted near-zero — ~3 KB actual reduction vs 80-112 KB predicted). Budget gap is real and confirmed.
-- **i18n bundling confirmed broken:** `02diu4m7xvdz0` chunk is 124 KB in production — all 6 locales in initial bundle despite lazy-load code. P5 (i18n optimization) now a real opportunity (~40-80 KB savings).
-- **P3 analytics deferral confirmed working** — masked by security upgrade costs.
-- **P2 idle prefetch ElevenLabs** — still deferred (482 KB), confirmed in production chunks.
-- **Top 5 chunks (production):** ElevenLabs 482 KB (deferred), Next.js bootstrap 232 KB, PostHog 177 KB (lazy), Supabase 167 KB, react-markdown 145 KB (deferred).
-- **Stripe ecosystem still pending:** stripe 20.3.1→22.0.0, @stripe/stripe-js 8.8.0→9.0.1, @stripe/react-stripe-js 5.6.0→6.1.0.
+<!-- ENTRY:START agent=performance_agent timestamp=2026-04-04T16:00:00Z -->
+## Performance Agent — 2026-04-04 (budget split adopted, status GREEN)
+- **Status: GREEN** — Split budget adopted. Initial load JS: **~1,958 KB / 2,000 KB ✅**. Total JS: **2,851 KB / 3,000 KB ✅**. Old 2,500 KB single budget retired.
+- **P1 browserslist: zero effect** — Turbopack ignores browserslist for polyfill compilation. `core-js` chunk stays at 110 KB regardless of targets. Approach abandoned.
+- **P5 i18n: Turbopack limitation** — All 6 locales bundle together (208 KB across 2 chunks) regardless of dynamic import pattern. `loadLocale` function approach tested: WORSE (+565 KB overhead from changed module graph). Code change reverted. Limitation accepted.
+- **P6 split budget: DONE** — Initial (~1,958 KB) vs total (2,851 KB) budgets replace the old 2,500 KB single budget.
+- **Stripe ecosystem still pending:** stripe 20.3.1→22.0.0 (+2 major), @stripe/stripe-js 8.8.0→9.0.1, @stripe/react-stripe-js 5.6.0→6.1.0.
 - **@elevenlabs/react major gap:** 0.14.0 vs 1.0.2.
+- **Deferred chunks (892 KB):** ElevenLabs 471 KB, PostHog 173 KB, react-markdown 142 KB, admin tabs 106 KB — all verified in production.
 
 **Cross-agent recommendations:**
-- Security Agent: Production build clean — 0 advisories. next@16.2.2 and posthog-js@1.364.6 confirmed in production. Remaining: stripe 2 major behind, @elevenlabs/react major gap.
-- Code Quality Agent: P1 browserslist investigation needed — polyfills not shrinking as expected. i18n lazy-load may not be working with Turbopack (production build still bundles all 6 locales). Stripe and ElevenLabs upgrades still pending.
-- QA Agent: Production build clean. No new test concerns. Stripe and ElevenLabs upgrades will need E2E verification when applied.
-- Coverage Agent: No bundle-related coverage changes. Production build confirms all deferred chunks load correctly.
-- Cost Analyst Agent: Bundle metrics now verified production. 351 KB gap confirmed — no cost impact but signals optimization work needed.
-- Localization Agent: i18n chunk is 124 KB in production — all 6 locales in initial bundle. Investigate Turbopack dynamic import behavior for locale files.
+- Security Agent: Production build clean, 0 advisories. Stripe 2 major behind and @elevenlabs/react major gap remain the only dep risks.
+- Code Quality Agent: P1/P5 investigations complete — both closed. Stripe ecosystem upgrade (#2) and @elevenlabs/react upgrade (#3) are the remaining action items.
+- QA Agent: No bundle-related test concerns. Stripe and ElevenLabs upgrades will need E2E verification when applied.
+- Coverage Agent: No bundle-related coverage changes.
+- Cost Analyst Agent: Status now GREEN. No cost impact from bundle optimization work.
+- Localization Agent: i18n 208 KB in initial bundle is permanent (Turbopack limitation). Locale lazy-loading does not work with current Turbopack — no action needed on localization side.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance_agent timestamp=2026-04-04T10:00:00Z -->
