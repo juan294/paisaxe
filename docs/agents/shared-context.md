@@ -220,6 +220,47 @@
 
 <!-- (pruned: documentation_agent 2026-03-31 entry removed, keeping last 3) -->
 
+<!-- ENTRY:START agent=performance_agent timestamp=2026-04-04T14:00:00Z -->
+## Performance Agent — 2026-04-04 (production build verified)
+- **Status: YELLOW** — **2,851 KB CONFIRMED production** (`npm run build` exit 0, 132/132 pages). Budget exceeded by 351 KB (14.0%). Dev cache was accurate — production matches exactly.
+- **KEY FINDING: P1 browserslist savings did NOT materialize.** Polyfills chunk 110 KB in production (predicted near-zero — ~3 KB actual reduction vs 80-112 KB predicted). Budget gap is real and confirmed.
+- **i18n bundling confirmed broken:** `02diu4m7xvdz0` chunk is 124 KB in production — all 6 locales in initial bundle despite lazy-load code. P5 (i18n optimization) now a real opportunity (~40-80 KB savings).
+- **P3 analytics deferral confirmed working** — masked by security upgrade costs.
+- **P2 idle prefetch ElevenLabs** — still deferred (482 KB), confirmed in production chunks.
+- **Top 5 chunks (production):** ElevenLabs 482 KB (deferred), Next.js bootstrap 232 KB, PostHog 177 KB (lazy), Supabase 167 KB, react-markdown 145 KB (deferred).
+- **Stripe ecosystem still pending:** stripe 20.3.1→22.0.0, @stripe/stripe-js 8.8.0→9.0.1, @stripe/react-stripe-js 5.6.0→6.1.0.
+- **@elevenlabs/react major gap:** 0.14.0 vs 1.0.2.
+
+**Cross-agent recommendations:**
+- Security Agent: Production build clean — 0 advisories. next@16.2.2 and posthog-js@1.364.6 confirmed in production. Remaining: stripe 2 major behind, @elevenlabs/react major gap.
+- Code Quality Agent: P1 browserslist investigation needed — polyfills not shrinking as expected. i18n lazy-load may not be working with Turbopack (production build still bundles all 6 locales). Stripe and ElevenLabs upgrades still pending.
+- QA Agent: Production build clean. No new test concerns. Stripe and ElevenLabs upgrades will need E2E verification when applied.
+- Coverage Agent: No bundle-related coverage changes. Production build confirms all deferred chunks load correctly.
+- Cost Analyst Agent: Bundle metrics now verified production. 351 KB gap confirmed — no cost impact but signals optimization work needed.
+- Localization Agent: i18n chunk is 124 KB in production — all 6 locales in initial bundle. Investigate Turbopack dynamic import behavior for locale files.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent timestamp=2026-04-04T10:00:00Z -->
+## Performance Agent — 2026-04-04
+- **Status: YELLOW** — Total JS **2,851 KB** exceeds 2,500 KB budget by 351 KB (14.0% over). **Dev server cache data — not production build.** +47 KB from previous run (2,804 KB) — **expected cost of security upgrades resolved this cycle**.
+- ✅ **next@16.2.2 INSTALLED** (was 16.1.6 — day 3 overdue). GHSA-h27x-g6w4-24gq (exploitable PPR DoS) now closed. 5 sub-advisories resolved. Security agent will go GREEN.
+- ✅ **posthog-js@1.364.6 INSTALLED** (was 1.353.0 — 12 minor versions stale). dompurify vuln fixed. package.json now `^1.364.6`.
+- **+47 KB explained**: next@16.2.2 adds minor framework code (~30-40 KB) + posthog-js 1.364.6 adds 12 minor versions of features (~5-10 KB). Accepted trade-off for security.
+- **stripe ecosystem still pending**: stripe 20.3.1 (vs 22.0.0), @stripe/stripe-js 8.8.0 (vs 9.0.1), @stripe/react-stripe-js 5.6.0 (vs 6.1.0) — coordinate as single upgrade.
+- **@elevenlabs/react major gap**: 0.14.0 installed vs 1.0.2 latest — major version, breaking changes possible.
+- **P1 + P2 + P3 still unverified**: browserslist (~80-112 KB) + analytics deferral (~10-20 KB) implemented since Mar 29/30 — production build still needed to measure actual savings.
+- **Code-splitting**: ~921 KB (32.3%) deferred. 12 `dynamic()` imports, all verified correct.
+- **Estimated prod JS**: ~2,609-2,761 KB after P1+P3 savings. Production deps: 31. CSS: 123 KB. node_modules: 896 MB (+34 MB). .next: 1,223 MB (+275 MB, dev server rebuilt after upgrades).
+
+**Cross-agent recommendations:**
+- Security Agent: next@16.2.2 ✅ installed — GHSA-h27x-g6w4-24gq closed, 0 advisories. posthog-js@1.364.6 ✅ installed — dompurify fixed. Remaining: stripe 20.3.1→22.0.0, @stripe/stripe-js 8.8.0→9.0.1, @stripe/react-stripe-js 5.6.0→6.1.0, @elevenlabs/react 0.14.0→1.0.2.
+- Code Quality Agent: next@16.2.2 and posthog-js@1.364.6 resolved — no version discrepancies. Stripe ecosystem still pending (stripe 20→22 + @stripe/stripe-js 8→9 + @stripe/react-stripe-js 5→6, coordinate together). @elevenlabs/react 0.14.0→1.0.2 — separate upgrade, review breaking changes.
+- QA Agent: No user-facing changes this cycle (dep upgrades only). After Stripe ecosystem upgrade, verify full payment flow E2E. After @elevenlabs/react upgrade, test Pelayo voice widget.
+- Coverage Agent: No new production dependencies affecting coverage. next@16.2.2 and posthog-js@1.364.6 — framework/analytics only, no coverage impact. Stripe/ElevenLabs upgrades may surface new code paths when applied.
+- Cost Analyst Agent: +47 KB bundle increase from security upgrades — no cost impact. Zero production voice usage unchanged. Stripe 2-major gap has no cost impact today.
+- Localization Agent: i18n lazy loading code correct (es+en static, fr/de/pt/ast dynamic). Production build still needed. 391 keys stable (confirmed Apr 4).
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=performance_agent timestamp=2026-04-03T10:00:00Z -->
 ## Performance Agent — 2026-04-03
 - **Status: YELLOW** — Total JS **2,804 KB** exceeds 2,500 KB budget by 304 KB (12.2% over). **Dev server cache data — not production build.** Zero change from Apr 2 (same dev cache).
@@ -259,26 +300,7 @@
 - Cost Analyst Agent: posthog-js stale version has no cost impact. Zero production voice usage — ElevenLabs SDK still never exercised. Bandwidth unchanged until production build verified.
 - Localization Agent: i18n lazy loading code correct. Production build still needed to confirm dev-mode artifact.
 
-<!-- ENTRY:START agent=performance_agent timestamp=2026-04-01T10:00:00Z -->
-## Performance Agent — 2026-04-01
-- **Status: YELLOW** — Total JS **2,804 KB** exceeds 2,500 KB budget by 304 KB (12.2% over). **Dev server cache data — not production build.** Same dev cache numbers as Mar 30.
-- **P3 DONE (Mar 30)**: `src/components/analytics.tsx` wraps `@vercel/analytics` + `@vercel/speed-insights` via `dynamic({ ssr: false })`. ~10-20 KB deferred from initial load.
-- **P7 DONE (Mar 30)**: posthog-js updated **1.353.0 → 1.364.2** in lockfile. dompurify vuln fix applied. Bundle size unchanged.
-- **P1 + P2 done but unverified**: browserslist (~80-112 KB savings) + idle prefetch (UX improvement) both implemented Mar 29. Production build still needed.
-- **next@16.2.2 NOW RELEASED** — security advisory unblocked. Upgrade path clear. `npm audit fix` should resolve all 5 sub-advisories (GHSA-h27x-g6w4-24gq exploitable DoS).
-- **Code-splitting**: ~921 KB (32.8%) deferred. 12 `dynamic()` imports, all verified correct. Analytics component adds 1 more deferred.
-- **Estimated prod JS**: ~2,562-2,714 KB after P1+P3 savings — potentially at or near 2,500 KB budget.
-- **Production deps: 31** (unchanged). CSS: 124 KB. node_modules: 862 MB. .next: 945 MB.
-
-**Cross-agent recommendations:**
-- Security Agent: **Upgrade next@16.2.2 now** — all 5 advisories resolvable via `npm audit fix`. posthog-js 1.364.4 is latest (we're at 1.364.2, trivial gap). Analytics deferral confirmed — no new security surface.
-- Code Quality Agent: P3 complete — `analytics.tsx` uses `dynamic({ ssr: false })`. posthog-js at 1.364.2. All 12 `dynamic()` imports verified correct. next@16.2.2 upgrade is the only remaining bundle-affecting action.
-- QA Agent: Analytics deferral is client-only — no user-facing behavior change. After next upgrade, run full test + E2E suite.
-- Coverage Agent: posthog-js update is lockfile-only (no API change). `analytics.tsx` wrapper is trivial — may show low coverage, not worth testing.
-- Cost Analyst Agent: posthog-js update has no cost impact. ElevenLabs SDK still never loaded in production (0 voice usage). Bandwidth unchanged until production build verified.
-- Localization Agent: i18n lazy loading verified correct. Production build still needed to confirm es+en only in initial bundle.
-
-<!-- (pruned: performance_agent 2026-03-30 entry removed, keeping last 3) -->
+<!-- (pruned: performance_agent 2026-04-01 entry removed, keeping last 3) -->
 
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-04-02T02:20:00Z -->
 ## Coverage Agent — 2026-04-02
