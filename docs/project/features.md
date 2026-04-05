@@ -459,7 +459,7 @@ Displays the count of healthy agents (e.g., "5/7 agents healthy").
 
 #### Agent Toggles
 
-Eight toggle switches for controlling automated agents:
+Ten toggle switches for controlling automated agents:
 
 | Flag | Controls |
 |------|----------|
@@ -717,3 +717,5 @@ All flags are managed from the admin panel and take effect within approximately 
 | `qa_agent_enabled` | QA agent (weekly Sunday 8:00 AM) |
 | `localization_agent_enabled` | Localization agent (weekly Sunday 7:00 AM) |
 | `cost_analyst_agent_enabled` | Cost Analyst agent (daily at 3:00 AM) |
+| `subscription_optimizer_enabled` | Subscription Optimizer cron (reviews service costs and spending) |
+| `content_discovery_agent_enabled` | Content Discovery cron (discovers new Asturias places via Google Places API, disabled by default) |
