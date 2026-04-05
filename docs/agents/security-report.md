@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-04-03
+> Auto-generated on 2026-04-05
 
-## Health Status: YELLOW
+## Health Status: GREEN
 
-**Executive Summary:** 1 moderate advisory detected (next@16.1.6 — 5 sub-advisories), **1 exploitable** (PPR buffering DoS). next@16.2.2 remains available (released Apr 1) but has not yet been applied — **now day 3 of unblocked upgrade window**. All other security controls intact. 31 outdated packages (unchanged count; stripe jumped to 22.0.0 — now 2 major versions behind).
+**Executive Summary:** 0 advisories detected, 0 exploitable. **Best security posture in project history.** All previously flagged vulnerabilities resolved — next@16.2.2 installed (closes GHSA-h27x-g6w4-24gq PPR DoS + 4 sub-advisories), Stripe ecosystem upgraded to v22/v9/v6, ElevenLabs upgraded to v1.0.2, posthog-js at 1.364.6. 25 outdated packages remain (down from 31), none with known security advisories. All CI/CD security automation active. License compliant.
 
 ---
 
@@ -12,42 +12,32 @@
 
 | Severity | Package | Advisory | CVE | Attack Vector | Fixable | In Production | Risk Assessment |
 |----------|---------|----------|-----|---------------|---------|---------------|-----------------|
-| Moderate | next@16.1.6 | GHSA-ggv3-7p47-pfv8 | — | HTTP request smuggling via rewrites | **Yes (via 16.2.2)** | Yes (PostHog rewrites) | **Low** — Static rewrites to trusted PostHog CDN only |
-| Moderate | next@16.1.6 | GHSA-3x4c-7xq6-9pq8 | — | Unbounded next/image disk cache growth | **Yes (via 16.2.2)** | Yes | **Low** — `remotePatterns` allowlists only Supabase + Unsplash |
-| Moderate | next@16.1.6 | GHSA-h27x-g6w4-24gq | — | Unbounded postponed resume buffering (DoS) | **Yes (via 16.2.2)** | Yes (`cacheComponents: true`) | **Medium** — PPR enabled, attacker can trigger memory exhaustion |
-| Moderate | next@16.1.6 | GHSA-mq59-m269-xvcx | — | null origin bypasses Server Actions CSRF | **Yes (via 16.2.2)** | No Server Actions used | **None** — No `'use server'` directives + explicit null-origin rejection in proxy.ts |
-| Moderate | next@16.1.6 | GHSA-jcc7-9wpm-mj36 | — | null origin bypasses dev HMR websocket CSRF | **Yes (via 16.2.2)** | No (dev-only) | **None** — Development environment only |
+| — | — | — | — | — | — | — | **No active advisories** |
 
-### Exploitability Analysis
+**npm audit: 0 vulnerabilities found.**
 
-**GHSA-h27x-g6w4-24gq (PPR Buffering DoS) — EXPLOITABLE:**
-- `next.config.ts:14` has `cacheComponents: true` (PPR enabled)
-- React suspense boundaries with `use()` can buffer data without limits
-- An attacker crafting many simultaneous requests that trigger deep suspense chains can exhaust server memory
-- **Mitigating factor**: Vercel's infrastructure provides inherent protection (serverless function limits, automatic restarts, request timeout)
-- **Fix**: **AVAILABLE** — next@16.2.2 released Apr 1. Day 3 of upgrade window. Run `npm audit fix` after Vercel runtime verification.
+### Previously Resolved (full history)
 
-**GHSA-ggv3-7p47-pfv8 (HTTP Smuggling) — LOW RISK:**
-- `next.config.ts:40-48` configures 2 rewrites, both to PostHog CDN (`eu-assets.i.posthog.com`, `eu.i.posthog.com`)
-- All HTTPS destinations — no HTTP-based smuggling vector
-- No dynamic URLs or user-controlled rewrite destinations
+| Advisory | Resolution | When |
+|----------|-----------|------|
+| next@16.1.6 — PPR buffering DoS (GHSA-h27x-g6w4-24gq) | Upgraded to next@16.2.2 | Apr 4 (via Stripe ecosystem upgrade batch) |
+| next@16.1.6 — HTTP request smuggling (GHSA-ggv3-7p47-pfv8) | Upgraded to next@16.2.2 | Apr 4 |
+| next@16.1.6 — Image cache DoS (GHSA-3x4c-7xq6-9pq8) | Upgraded to next@16.2.2 | Apr 4 |
+| next@16.1.6 — Server Actions CSRF bypass (GHSA-mq59-m269-xvcx) | Upgraded to next@16.2.2 | Apr 4 |
+| next@16.1.6 — Dev HMR CSRF (GHSA-jcc7-9wpm-mj36) | Upgraded to next@16.2.2 | Apr 4 |
+| flatted <=3.4.1 — Unbounded recursion DoS + Prototype Pollution (GHSA-25h7-pfq9-p65f, GHSA-rf6f-7fwh-wjgh) | `npm audit fix` (>=3.4.2) | Mar 23 |
+| undici 7.0.0–7.23.0 — WebSocket overflow, HTTP smuggling, CRLF injection, memory DoS (GHSA-f269-vfmq-vjvj + 5 others) | `npm audit fix` (>=7.24.0) | Mar 23 |
+| brace-expansion — ReDoS | Override `brace-expansion >= 5.0.5` | Mar 27 |
+| minimatch 10.2.2 ReDoS (GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74) | Override `minimatch >= 10.2.1` | Mar 7–8 |
+| dompurify 3.3.1 XSS (GHSA-v2wj-7wpq-c8vv) | Dependency update | Mar 7–8 |
+| qs arrayLimit bypass (GHSA-w7fw-mjwx-p883) | Override `qs >= 6.14.2` | Earlier |
+| Next.js Image Optimizer DoS (GHSA-9g9p-9gw9-jx7f) | Fixed in next@16.1.6 | Earlier |
+| Next.js PPR Memory DoS (GHSA-5f7q-jpqc-wp7h) | Fixed in next@16.1.6 | Earlier |
+| Next.js RSC Deserialization DoS (GHSA-h25m-26qc-wcjf) | Fixed in next@16.1.6 | Earlier |
 
-**GHSA-3x4c-7xq6-9pq8 (Image Cache DoS) — LOW RISK:**
-- `next.config.ts:81-90` restricts `remotePatterns` to `*.supabase.co` and `images.unsplash.com`
-- All image sources are database-backed or hardcoded, not user-controllable
-- `minimumCacheTTL: 2592000` (30 days) — long but bounded by allowlist
+### Regression History (closed)
 
-**GHSA-mq59-m269-xvcx (CSRF Bypass) — NOT EXPLOITABLE:**
-- Zero `'use server'` directives in codebase (confirmed — no Server Actions)
-- `src/proxy.ts:38-41`: `if (!origin) return false` explicitly rejects null-origin requests
-- `src/lib/csrf.ts:21`: `sameSite: 'strict'` prevents cross-site cookie inclusion
-
-**GHSA-jcc7-9wpm-mj36 (Dev HMR CSRF) — NOT EXPLOITABLE:**
-- Dev-only; production at paisaxe.es/paisaxe.com is unaffected
-
-### Regression History & Current State
-
-The next@16.1.6 advisory has a complex history:
+The next@16.1.6 advisory had a complex lifecycle spanning 12 days:
 
 | Date | Event | Cause |
 |------|-------|-------|
@@ -55,58 +45,35 @@ The next@16.1.6 advisory has a complex history:
 | Mar 25 | Regressed | `d3a4dd6` — cc-rpi blueprint v1.12.0 sync reset package.json |
 | Mar 26 (AM) | Fixed | Triage ran `npm audit fix` again |
 | Mar 26 (PM) | Regressed | `d667010` — cc-rpi blueprint v1.13.0 sync reset package.json |
-| Mar 27 | **Intentional** | `934fe4a` — **deliberate revert** to 16.1.6 because next@16.2.1 has a Vercel runtime bug |
-| Mar 28–31 | Unchanged | Still on 16.1.6 — next@16.2.2 not yet released (canaries up to 16.2.1-canary.14) |
-| Apr 1 | **UNBLOCKED** | **next@16.2.2 released** — stable, upgrade path clear |
-| Apr 2 | Pending | Upgrade not applied (day 2) |
-| **Apr 3** | **Pending** | **Upgrade not applied — day 3 of available window** |
+| Mar 27 | Intentional | `934fe4a` — deliberate revert to 16.1.6 (next@16.2.1 Vercel runtime bug) |
+| Apr 1 | Unblocked | next@16.2.2 released — Vercel runtime bug fixed |
+| **Apr 4** | **RESOLVED** | **Upgraded to next@16.2.2 in coordinated dep upgrade** |
 
-**Current state:** next@16.2.2 has been available for 2 days. Upgrade path is unblocked. Action required: confirm 16.2.2 does not carry the Vercel runtime bug that 16.2.1 had, then run `npm audit fix`.
-
-**Resolution path:**
-1. Check next@16.2.2 release notes / Vercel changelog for runtime compatibility
-2. Run `npm audit fix` in a worktree
-3. Run full test suite + `npm run build`
-4. If clean, merge to develop
-
-### Previously Resolved (still resolved)
-
-| Advisory | Resolution | When |
-|----------|-----------|------|
-| flatted <=3.4.1 — Unbounded recursion DoS + Prototype Pollution (GHSA-25h7-pfq9-p65f, GHSA-rf6f-7fwh-wjgh) | Resolved via `npm audit fix` (upgraded to >=3.4.2) | Mar 23 |
-| undici 7.0.0–7.23.0 — WebSocket overflow, HTTP smuggling, CRLF injection, memory DoS (GHSA-f269-vfmq-vjvj + 5 others) | Resolved via `npm audit fix` (upgraded to >=7.24.0) | Mar 23 |
-| brace-expansion — ReDoS | Override `brace-expansion >= 5.0.5` in package.json | Mar 27 |
-| minimatch 10.2.2 ReDoS (GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74) | Override `minimatch >= 10.2.1` in package.json | Mar 7–8 |
-| dompurify 3.3.1 XSS (GHSA-v2wj-7wpq-c8vv) | Resolved via dependency update | Mar 7–8 |
-| qs arrayLimit bypass (GHSA-w7fw-mjwx-p883) | Override `qs >= 6.14.2` | Earlier |
-| Next.js Image Optimizer DoS (GHSA-9g9p-9gw9-jx7f) | Fixed in next@16.1.6 | Earlier |
-| Next.js PPR Memory DoS (GHSA-5f7q-jpqc-wp7h) | Fixed in next@16.1.6 | Earlier |
-| Next.js RSC Deserialization DoS (GHSA-h25m-26qc-wcjf) | Fixed in next@16.1.6 | Earlier |
+**This issue is now fully closed.** No further monitoring needed.
 
 ---
 
-## Changes Since Last Report (2026-04-02)
+## Changes Since Last Report (2026-04-03)
 
-| Area | Apr 2 | Apr 3 | Change |
+| Area | Apr 3 | Apr 5 | Change |
 |------|--------|-------|--------|
-| Vulnerability count | 1 moderate | **1 moderate** | Same |
-| Exploitable vulns | 1 (PPR DoS) | **1** (PPR DoS) | Same |
-| Fix status | Upgrade pending (day 2) | **Upgrade still pending (day 3)** | No change |
+| Vulnerability count | 1 moderate (5 sub) | **0** | **RESOLVED** |
+| Exploitable vulns | 1 (PPR DoS) | **0** | **RESOLVED** |
+| Health status | YELLOW | **GREEN** | **Upgraded** |
+| next | 16.1.6 | **16.2.2** | **Upgraded** |
+| stripe | 20.3.1 | **22.0.0** | **Upgraded (+2 majors)** |
+| @stripe/stripe-js | 8.8.0 | **9.0.1** | **Upgraded (+1 major)** |
+| @stripe/react-stripe-js | 5.6.0 | **6.1.0** | **Upgraded (+1 major)** |
+| @elevenlabs/react | 0.14.1 | **1.0.2** | **Upgraded (+1 major)** |
+| posthog-js | 1.353.0 | **1.364.6** | **Upgraded** |
+| Outdated packages | 31 | **25** | -6 (upgrades applied) |
 | CSP | `'self' 'unsafe-inline'` | `'self' 'unsafe-inline'` | Unchanged |
 | dangerouslySetInnerHTML | 7 instances | 7 instances | Unchanged — all safe |
-| Outdated packages | 31 | **31** | Unchanged |
-| stripe latest | 21.0.1 | **22.0.0** | **+1 major — now 2 major versions behind** |
-| posthog-js latest | 1.364.5 | **1.364.6** | Latest bumped |
-| @elevenlabs/react latest | 1.0.1 | **1.0.2** | Latest bumped — still major gap (0.14.1 installed) |
-| knip latest | 6.2.0 | **6.3.0** | Latest bumped — dev-only |
-| Health status | YELLOW | **YELLOW** | Same — exploit still present, fix pending |
 
 **Key observations:**
-- **next@16.2.2 still not applied** — Day 3 of available upgrade window. No new advisories, but the exploitable DoS (GHSA-h27x-g6w4-24gq) remains open. Upgrade is the only action needed to restore GREEN.
-- **stripe jumped to v22.0.0** — Now 2 major versions behind (20.3.1 installed, 22.0.0 available). This is the fastest-moving major in the backlog. No known CVEs but security fixes are commonly bundled in Stripe SDK major releases.
-- **No new source changes** — No new files added to `src/` since Apr 2. Security posture unchanged.
+- **All HIGH-priority items from Apr 3 report are resolved.** next@16.2.2 closes the exploitable PPR DoS. Stripe ecosystem fully upgraded. ElevenLabs at v1.0.2 stable. posthog-js version discrepancy resolved.
 - **No new advisories or CVEs** affecting any dependency.
-- **posthog-js discrepancy persists** — npm outdated still shows 1.353.0 as installed despite triage Mar 30 "lockfile update". Merging the open Dependabot PR resolves this cleanly.
+- **25 outdated packages remain** — all minor/patch versions with no known security implications. No urgent upgrades needed.
 
 ---
 
@@ -242,10 +209,10 @@ form-action 'self'
 
 | License | Count | Status |
 |---------|-------|--------|
-| MIT | 268 | Permissive |
+| MIT | 263 | Permissive |
 | Apache-2.0 | 30 | Permissive |
 | BSD-3-Clause | 16 | Permissive |
-| ISC | 11 | Permissive |
+| ISC | 9 | Permissive |
 | MIT* | 2 | Permissive |
 | BSD-2-Clause | 1 | Permissive |
 | MIT-0 | 1 | Permissive |
@@ -280,44 +247,37 @@ form-action 'self'
 
 | Package | Current | Latest | Dep Type | Security Impact | Priority |
 |---------|---------|--------|----------|-----------------|----------|
-| **next** | **16.1.6** | **16.2.2** | **prod** | **5 sub-advisories (1 exploitable) — upgrade unblocked (day 3)** | **HIGH — upgrade now** |
-| @anthropic-ai/sdk | 0.78.0 | 0.82.0 | prod | None known (minor) | Low |
-| **@elevenlabs/react** | **0.14.1** | **1.0.2** | **prod** | **Major version (0.x → 1.0)** — voice UI library, review migration guide | **Medium** |
-| @next/bundle-analyzer | 16.1.6 | 16.2.2 | dev | None (build tooling) | Low |
-| @next/eslint-plugin-next | 16.1.6 | 16.2.2 | dev | None (lint tooling) | Low |
-| @playwright/test | 1.58.2 | 1.59.1 | dev | None (test tooling — minor) | Low |
-| **@stripe/react-stripe-js** | **5.6.0** | **6.1.0** | **prod** | **Major version** — payment UI library, review breaking changes | **Medium** |
-| **@stripe/stripe-js** | **8.8.0** | **9.0.1** | **prod** | **Major version** — payment library, review breaking changes | **Medium** |
-| @supabase/ssr | 0.8.0 | 0.10.0 | prod | Auth library — minor version | Medium |
-| @supabase/supabase-js | 2.97.0 | 2.101.1 | prod | Core client — minor version | Medium |
-| @tailwindcss/postcss | 4.2.1 | 4.2.2 | dev | None (styling tooling) | Low |
-| @typescript-eslint/eslint-plugin | 8.56.1 | 8.58.0 | dev | None (lint tooling) | Low |
-| @upstash/redis | 1.36.2 | 1.37.0 | prod | Rate limiting backend — minor | Low |
-| @vercel/analytics | 1.6.1 | 2.0.1 | prod | **Major version** — review changelog + license | Medium |
+| @anthropic-ai/sdk | 0.78.0 | 0.82.0 | prod | None known (4 minors behind, pinned at ^0.78.0) | Low |
+| @supabase/ssr | 0.8.0 | 0.10.0 | prod | Auth library — 2 minor versions behind | Low–Medium |
+| @supabase/supabase-js | 2.97.0 | 2.101.1 | prod | Core client — 4 minor versions behind | Low–Medium |
+| @vercel/analytics | 1.6.1 | 2.0.1 | prod | **Major version** — review changelog + verify MPL license unchanged | Medium |
 | @vercel/speed-insights | 1.3.1 | 2.0.0 | prod | **Major version** — review changelog | Medium |
+| lucide-react | 0.575.0 | 1.7.0 | prod | **Major version (0.x → 1.x)** — icon library, review breaking changes | Medium |
+| pdfjs-dist | 5.4.624 | 5.6.205 | prod | PDF parsing — minor version bump | Low |
+| resend | 6.9.2 | 6.10.0 | prod | Email service — minor | Low |
+| voyageai | 0.1.0 | 0.2.1 | prod | Embedding SDK — minor | Low |
+| @upstash/redis | 1.36.2 | 1.37.0 | prod | Rate limiting backend — minor | Low |
+| @playwright/test | 1.58.2 | 1.59.1 | dev | None (test tooling — minor) | Low |
+| @tailwindcss/postcss | 4.2.1 | 4.2.2 | dev | None (styling tooling) | Low |
+| @types/node | 25.5.0 | 25.5.2 | dev | None (type defs) | Low |
+| @typescript-eslint/eslint-plugin | 8.56.1 | 8.58.0 | dev | None (lint tooling) | Low |
 | @vitejs/plugin-react | 5.1.4 | 6.0.1 | dev | **Major version** — dev tooling only | Low |
 | @vitest/coverage-v8 | 4.1.1 | 4.1.2 | dev | Patch — coverage tooling | Low |
 | canvas | 3.2.1 | 3.2.3 | dev | PDF test rendering — patch | Low |
 | dotenv | 17.3.1 | 17.4.0 | dev | None (env loading — minor) | Low |
-| jsdom | 28.1.0 | 27.0.1 | dev | Version mismatch (current is ahead of stable) | None |
+| jsdom | 28.1.0 | 27.0.1 | dev | Version mismatch (current ahead of stable) | None |
 | knip | 5.85.0 | 6.3.0 | dev | **Major version** — dead code detection tooling | Low |
-| lucide-react | 0.575.0 | 1.7.0 | prod | **Major version (0.x → 1.x)** — icon library, review breaking changes | Medium |
-| pdfjs-dist | 5.4.624 | 5.6.205 | prod | PDF parsing — minor version bump | Medium |
 | postcss | 8.5.6 | 8.5.8 | dev | None (CSS tooling) | Low |
-| posthog-js | 1.353.0 | 1.364.6 | prod | None known — see discrepancy note | Low |
-| resend | 6.9.2 | 6.10.0 | prod | Email service — minor | Low |
-| **stripe** | **20.3.1** | **22.0.0** | **prod** | **2 major versions behind** — payment server SDK, security fixes common in major releases | **Medium** |
+| posthog-js | 1.364.6 | 1.364.7 | prod | Patch — 1 patch behind | Low |
 | tailwindcss | 4.2.1 | 4.2.2 | dev | None (styling tooling) | Low |
 | typescript | 5.9.3 | 6.0.2 | dev | **Major version** — TypeScript 6.0 | Medium |
-| vitest | 4.1.1 | 3.2.4 | dev | Version mismatch (current is ahead of stable) | None |
-| voyageai | 0.1.0 | 0.2.1 | prod | None known | Low |
+| vitest | 4.1.1 | 3.2.4 | dev | Version mismatch (current ahead of stable) | None |
 
 **Notes:**
+- **No HIGH-priority items.** All previously urgent upgrades (next, stripe ecosystem, elevenlabs, posthog-js) have been applied.
 - `jsdom` and `vitest` show version format mismatches in `npm outdated` output — these are at or ahead of the latest published stable release. No security implications.
-- `posthog-js` shows 1.353.0 as current in `npm outdated` despite triage Mar 30 reporting "P7 DONE: updated to 1.364.2 in lockfile". The lockfile was updated but package.json constraint was not changed. Merging the open Dependabot PR will resolve this cleanly.
-- `stripe` jumped from 21.0.1 to **22.0.0** since yesterday — now 2 major versions behind (20.3.1 installed). While no known CVEs, Stripe SDK major releases frequently bundle security hardening. Plan to evaluate alongside the full Stripe ecosystem (stripe, @stripe/stripe-js, @stripe/react-stripe-js) in one coordinated upgrade.
-
-**Changes from Apr 2:** stripe latest: 21.0.1 → **22.0.0**. posthog-js latest: 1.364.5 → **1.364.6**. @elevenlabs/react latest: 1.0.1 → **1.0.2**. knip latest: 6.2.0 → **6.3.0**. No new security advisories for any package.
+- Remaining major version updates (@vercel/analytics v2, @vercel/speed-insights v2, lucide-react v1, typescript v6, knip v6) are non-urgent — no known CVEs, can be batched in a future dependency upgrade cycle.
+- @anthropic-ai/sdk is pinned at ^0.78.0 (current: 0.78.0, latest: 0.82.0). API-compatible minor versions — upgrade when convenient.
 
 ---
 
@@ -336,8 +296,6 @@ form-action 'self'
 | Pre-commit hooks | Active | Typecheck + lint + test via Husky |
 | npm overrides | Active | `qs >= 6.14.2`, `minimatch >= 10.2.1`, `brace-expansion >= 5.0.5` |
 
-**CI note on current advisory:** `npm audit --omit=dev --audit-level=high` in CI will NOT flag the next@16.1.6 advisory (it is classified as "moderate", below the "high" threshold). CI continues passing despite the advisory. This is by design — moderate advisories are informational in CI, tracked by this report.
-
 **All CI/CD security automation gaps are closed.** No outstanding gaps.
 
 ---
@@ -346,20 +304,20 @@ form-action 'self'
 
 | Metric | Value |
 |--------|-------|
-| Total Advisories | **1** (moderate) |
+| Total Advisories | **0** |
 | Critical | 0 |
 | High | 0 |
-| Moderate | **1** (next@16.1.6 — 5 sub-advisories) |
+| Moderate | 0 |
 | Low | 0 |
-| **Exploitable** | **1** (PPR buffering DoS — GHSA-h27x-g6w4-24gq) |
-| Fixable via npm audit | **1** (next@16.2.2 available — verify Vercel runtime, then `npm audit fix`) |
+| **Exploitable** | **0** |
+| Fixable via npm audit | 0 |
 | License Compliant | Yes |
 | Webhook Security | All timing-safe (4/4 endpoints) |
 | CSRF Protection | Yes (double-submit cookie + null-origin rejection) |
 | CSP | PPR-compatible (`'self' 'unsafe-inline'`, no `strict-dynamic`) |
 | Rate Limiting | Yes (distributed via Upstash Redis) |
 | CI Secret Scanning | Yes (Gitleaks in workflow) |
-| **Health Status** | **YELLOW** |
+| **Health Status** | **GREEN** |
 
 ### Architecture Mitigations
 
@@ -377,18 +335,16 @@ form-action 'self'
 
 | Item | Priority | Effort | Impact | Status |
 |------|----------|--------|--------|--------|
-| **Upgrade next to 16.2.2** (day 3 of available window) | **High** | Low | Closes 5 sub-advisories, 1 exploitable | **READY — verify Vercel runtime, then `npm audit fix`** |
-| Merge Dependabot production PR | Medium | Low | 27 minor/patch updates including posthog-js 1.364.6 | Open |
-| Evaluate @elevenlabs/react v1.0.2 (major) | Medium | Medium | Voice UI — review migration guide for breaking changes | Open |
-| **Evaluate Stripe ecosystem v22/v9/v6 (3 major versions)** | Medium | High | stripe 20.3.1→22.0.0 (+2 majors), @stripe/stripe-js 8.8.0→9.0.1, @stripe/react-stripe-js 5.6.0→6.1.0 — coordinate together | Open |
+| Evaluate @vercel/analytics v2.0.1 (major) | Medium | Medium | Review changelog + verify MPL license unchanged | Open |
+| Evaluate @vercel/speed-insights v2.0.0 (major) | Medium | Medium | Review changelog | Open |
 | Evaluate lucide-react v1.7.0 (major) | Medium | Medium | Icon library, check migration guide | Open |
 | Evaluate typescript v6.0.2 (major) | Medium | Medium | Dev tooling, check breaking changes | Open |
 | Update @supabase/ssr to 0.10.0 | Low | Low | Auth library update | Open |
 | Update @supabase/supabase-js to 2.101.1 | Low | Low | Core client update | Open |
-| Update pdfjs-dist to 5.6.205 | Low | Medium | PDF parsing update, may have fixes | Open |
-| Evaluate @vercel/analytics v2.0.1 | Low | Medium | Major version — check changelog + license | Open |
-| Evaluate @vercel/speed-insights v2.0.0 | Low | Medium | Major version — check changelog | Open |
-| Evaluate knip v6.3.0 | Low | Medium | Major version — check breaking changes | Open |
+| Update @anthropic-ai/sdk to 0.82.0 | Low | Low | AI SDK — API compatible | Open |
+| Evaluate knip v6.3.0 (major) | Low | Medium | Dev tooling, check breaking changes | Open |
+
+**No HIGH-priority items.** All backlog items are non-urgent improvements with no known security implications.
 
 ---
 

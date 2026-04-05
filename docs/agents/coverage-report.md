@@ -4,7 +4,7 @@
 > See `docs/health-report-[DATE].md` for the latest coverage data.
 > This file is kept for historical reference only and is no longer updated.
 
-> Last updated: 2026-04-04
+> Last updated: 2026-04-05
 
 ## Summary
 
@@ -17,15 +17,15 @@
 - **TypeScript:** No errors
 - **Lint:** No errors
 
-This cycle produced no new tests — all remaining coverage gaps were confirmed as carry-overs from previous runs. Every uncovered line falls into a documented category: SSR guards, defensive dead code, V8 artifacts, or SDK-dependent components requiring Playwright E2E. Coverage plateau at 98.72% statements is confirmed stable for the fourth consecutive run.
+This cycle produced no new tests — all remaining coverage gaps were confirmed as carry-overs from previous runs. Every uncovered line falls into a documented category: SSR guards, defensive dead code, V8 artifacts, or SDK-dependent components requiring Playwright E2E. Coverage plateau at 98.72% statements is confirmed stable for the fifth consecutive run.
 
 *Note: Coverage percentages fluctuate slightly (±0.1%) between runs due to V8 coverage instrumentation variance.*
 
-## Changes This Cycle (2026-04-04)
+## Changes This Cycle (2026-04-05)
 
 ### New Tests Written (+0 tests)
 
-No new tests this cycle. All remaining coverage gaps were audited and confirmed as previously documented. The full list of documented untestable branches is maintained in the section below.
+No new tests this cycle. All remaining coverage gaps were audited and confirmed as previously documented. Only one source file changed since last run: `stripe.ts` (`ui_mode: "embedded"` → `"form"` for Stripe v22 upgrade) — already at 100% coverage. The full list of documented untestable branches is maintained in the section below.
 
 **Files re-audited and confirmed as carry-overs (no new tests possible):**
 
@@ -44,9 +44,21 @@ No new tests this cycle. All remaining coverage gaps were audited and confirmed 
 
 ### Findings
 
-- **Coverage plateau confirmed stable**: All four metrics unchanged from Apr 3 run (5703 tests, 98.72%/96.61%/98.72%/99.12%). No regression, no improvement — all remaining gaps are structural.
-- **All documented gaps re-verified**: Spot-checked each file in the documented list. No gaps have disappeared or appeared. The plateau is genuine.
+- **Coverage plateau confirmed stable**: All four metrics unchanged for 5th consecutive run (5703 tests, 98.72%/96.61%/98.72%/99.12%). No regression, no improvement — all remaining gaps are structural.
+- **Stripe v22 upgrade fully covered**: The only source change (stripe.ts `ui_mode` string) is already at 100% coverage.
+- **Two flaky tests noted (not real failures)**: `elevenlabs-analytics-panel.test.tsx:300` and `visitors-analytics-panel.test.tsx:865` fail during full-suite load contention but pass in isolation. Load-contention timing artifact — not actionable.
 - **voice-agent-chat (45.6%), agents-dashboard/index (48.5%)**: Still require Playwright E2E. No Playwright additions this cycle.
+
+## Changes Previous Cycle (2026-04-04)
+
+### New Tests Written (+0 tests)
+
+No new tests that cycle. All remaining coverage gaps were audited and confirmed as previously documented.
+
+### Findings
+
+- **Coverage plateau confirmed stable**: Fourth consecutive run with identical metrics.
+- **All documented gaps re-verified**: Spot-checked each file in the documented list. No gaps have disappeared or appeared.
 
 ## Changes Previous Cycle (2026-04-03)
 

@@ -1,5 +1,13 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-04-04 06:00:05
+> Auto-generated on 2026-04-05 06:00:03
+
+## Changes Made This Run (2026-04-05)
+
+- **Added 2 missing agent flags** to Feature Flags Reference in `docs/project/features.md`:
+  - `subscription_optimizer_enabled` — Subscription Optimizer cron (reviews service costs and spending)
+  - `content_discovery_agent_enabled` — Content Discovery cron (discovers new Asturias places via Google Places API, disabled by default)
+- **Fixed agent toggle count** in Admin Dashboard section: "Eight toggle switches" → "Ten toggle switches"
+- **API routes**: All 51 flagged routes confirmed internal (admin, cron, webhook, MCP). No external-consumption routes requiring documentation.
 
 ## CLAUDE.md Status
 
@@ -17,6 +25,7 @@ src/app/admin/page.tsx
 src/app/immersive/immersive-page-content.test.tsx
 src/app/immersive/immersive-page-content.tsx
 src/app/layout.tsx
+src/components/admin/elevenlabs-analytics-panel.test.tsx
 src/components/admin/github-analytics-panel.test.tsx
 src/components/admin/story-editor-dialog/use-image-editor.test.ts
 src/components/admin/stripe-analytics-panel.test.tsx
@@ -26,6 +35,8 @@ src/components/analytics.tsx
 src/components/immersive/language-switcher.test.tsx
 src/components/immersive/suggest-place-dialog.test.tsx
 src/hooks/use-stories.test.ts
+src/lib/stripe.test.ts
+src/lib/stripe.ts
 ```
 
 No new migrations since documentation update.
@@ -106,15 +117,6 @@ webhooks/translate
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-03-28 |
 | README.md | 2026-02-16 |
-
-## Changes Made This Run
-
-**Status: GREEN** — No documentation changes required. Eighth consecutive clean run.
-
-- **Feature flags**: Verified all 17 flags in `src/types/feature-flags.ts` match `docs/project/features.md`. Zero undocumented flags.
-- **API routes**: All 51 flagged routes are internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require documentation.
-- **Modified source files**: 14 files (test additions + analytics deferral) — no new features or flags requiring documentation.
-- **No new migrations** since last documentation update (2026-03-28).
 
 ---
 
