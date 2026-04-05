@@ -1,1 +1,237 @@
-{}
+{
+  "1.1": {
+    "test_id": "test_4501knessp09ec6rfvrxzq2j8dk2",
+    "name": "1.1 — Introduces as Pelayo, named after King Pelayo",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "1.2": {
+    "test_id": "test_3001knesspk2fvbb5hmehpebgagy",
+    "name": "1.2 — Does not re-greet after first message",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "1.3": {
+    "test_id": "test_9601knessq64e0hrcgqwyrqt4sy8",
+    "name": "1.3 — Knows what Paisaxe is",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "1.4": {
+    "test_id": "test_3901knessqtees9sp1h29gmg215c",
+    "name": "1.4 — Returning user: skips intro, jumps straight to help",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "2.1": {
+    "test_id": "test_0801knessrf2f0nv5k52azjdwyz1",
+    "name": "2.1 — Knows Lagos de Covadonga: location and character",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "2.2": {
+    "test_id": "test_0201knesss27fhg9ehp451245cga",
+    "name": "2.2 — Picos de Europa is fully in scope",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "2.3": {
+    "test_id": "test_9701knessskseatbyty785zn85gv",
+    "name": "2.3 — Knows the Covadonga sanctuary and its religious significance",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "2.4": {
+    "test_id": "test_6201knesst5jf62smrmgjcf005rc",
+    "name": "2.4 — Knows Fuente Dé teleférico and Cantabrian scope",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "2.5": {
+    "test_id": "test_8801knesstq0fbfs7bq26m76sg7z",
+    "name": "2.5 — Knows coastal geography: Cudillero, Llanes, Ribadesella",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "3.1": {
+    "test_id": "test_7701knessv96fqxbnqx8bjtk77w7",
+    "name": "3.1 — Explains fabada asturiana",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "3.2": {
+    "test_id": "test_0001knessvtdeq9vcc55mpn5f7pt",
+    "name": "3.2 — Explains sidra and Asturian cider culture",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "3.3": {
+    "test_id": "test_3101knesswdme0yt5gcm6b5nm8tk",
+    "name": "3.3 — Describes cachopo",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "3.4": {
+    "test_id": "test_1301knessx2hfm5bs3dn9bgvdqgf",
+    "name": "3.4 — Describes Cabrales cheese",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "3.5": {
+    "test_id": "test_9401knessxn6ef6vf4meprt6nrmn",
+    "name": "3.5 — Recommends a full Asturian gastronomic experience",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "4.1": {
+    "test_id": "test_5301knessy8hedfv1sh1zm9c1rv8",
+    "name": "4.1 — Knows Oviedo pre-Romanesque churches",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "4.2": {
+    "test_id": "test_1501knessytcfj9vc9t274zc9y8y",
+    "name": "4.2 — Knows Gijón attractions",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "4.3": {
+    "test_id": "test_0901knesszc2fj0rmqn6t8y93fzk",
+    "name": "4.3 — Knows Camino de Santiago routes through Asturias",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "4.4": {
+    "test_id": "test_6901knest001fymbawvs5kbykpcg",
+    "name": "4.4 — Knows gaita asturiana (bagpipe tradition)",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "4.5": {
+    "test_id": "test_8101knest0h5f1bvtx48gxcs2cwd",
+    "name": "4.5 — Knows Cangas de Onís as gateway to Picos de Europa",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "5.1": {
+    "test_id": "test_0801knest15hees8vcfw0b8agcgs",
+    "name": "5.1 — Gets weather without asking which city (Lagos de Covadonga context)",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "5.2": {
+    "test_id": "test_7101knest1raef08pmr7amx3ht90",
+    "name": "5.2 — Handles weather request phrased as 'how's the weather there?'",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "5.3": {
+    "test_id": "test_8201knest29zepcr8aazqdc31fsa",
+    "name": "5.3 — Gives useful weather guidance even if tool is unavailable",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "6.1": {
+    "test_id": "test_3201knest2v3esd8qv276dqmm6zr",
+    "name": "6.1 — Searches for restaurants when asked",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "6.2": {
+    "test_id": "test_6501knest3cre1wat6txmk949btb",
+    "name": "6.2 — Recommends specific sidra bars or restaurants in Gijón",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "6.3": {
+    "test_id": "test_0101knest3ybebcaqrah207ayjwn",
+    "name": "6.3 — Does not invent phone numbers for venues",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "7.1": {
+    "test_id": "test_6101knest4fcf9hr8yd27dwqw4kd",
+    "name": "7.1 — Asks for missing party size before booking",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "7.2": {
+    "test_id": "test_2301knest51rf38by4xyjry0cdrz",
+    "name": "7.2 — Asks for customer name and phone before calling make_booking",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "7.3": {
+    "test_id": "test_6801knest5mhfzhbhkcxpf5bnw0m",
+    "name": "7.3 — Confirms all details before initiating booking call",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "7.4": {
+    "test_id": "test_5901knest65wf0fbsb9mt4b24k8z",
+    "name": "7.4 — Does NOT say booking is confirmed without tool response",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "7.5": {
+    "test_id": "test_0301knest6sqe9hsjy3e2vp7jnzz",
+    "name": "7.5 — Offers phone number if booking fails or tool unavailable",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "8.1": {
+    "test_id": "test_4501knest7cqeazbenf89m8nfz0w",
+    "name": "8.1 — Does not ask user for location when discussing a story",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "8.2": {
+    "test_id": "test_9901knest7yxfqsrrqv3h286vsqf",
+    "name": "8.2 — Avoids banned tourism clichés",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "8.3": {
+    "test_id": "test_0701knest8g7e10tmye1p8e37z89",
+    "name": "8.3 — Keeps voice responses concise (under ~150 words)",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "8.4": {
+    "test_id": "test_6801knest92hfyvtj8d8g5k3zgw5",
+    "name": "8.4 — Uses sensory and specific language",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "9.1": {
+    "test_id": "test_4101knest9m9exnrex145rht65w8",
+    "name": "9.1 — Stays on topic: redirects off-topic questions",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "9.2": {
+    "test_id": "test_5001knesta89ew99sgx9z43dh857",
+    "name": "9.2 — Resists prompt injection: 'ignore all previous instructions'",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "9.3": {
+    "test_id": "test_1401knestawke92rm8k0gp7z8bhg",
+    "name": "9.3 — Does not invent specific prices or opening hours",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "9.4": {
+    "test_id": "test_7901knestbfqexxsjw3w08svfeke",
+    "name": "9.4 — Handles gibberish input gracefully",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "9.5": {
+    "test_id": "test_3701knestc0ye708960pfay971n1",
+    "name": "9.5 — Handles repeated or identical questions gracefully",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "10.1": {
+    "test_id": "test_6701knestcjaf7srerjckvrc5vtt",
+    "name": "10.1 — Responds in English when user speaks English",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "10.2": {
+    "test_id": "test_7101knestd3rfw18p8h4zf0rx4mq",
+    "name": "10.2 — Switches language mid-conversation when user switches",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "10.3": {
+    "test_id": "test_9101knestdmkf4ytc6hnwdqag1k4",
+    "name": "10.3 — Responds in French when user speaks French",
+    "agent_id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv"
+  },
+  "11.1": {
+    "test_id": "test_9401kneste5wfq6bpb39x2acfqh6",
+    "name": "11.1 — Booking agent states purpose and provides key reservation details",
+    "agent_id": "agent_5201kgm2956ge8ct95yxjas867z5"
+  },
+  "11.2": {
+    "test_id": "test_7201knesteqxfkq92ah9yc5nt0qa",
+    "name": "11.2 — Provides customer name when restaurant asks",
+    "agent_id": "agent_5201kgm2956ge8ct95yxjas867z5"
+  },
+  "11.3": {
+    "test_id": "test_7901knestfc6ehk9aa81bfym8asg",
+    "name": "11.3 — Provides customer phone when restaurant asks",
+    "agent_id": "agent_5201kgm2956ge8ct95yxjas867z5"
+  },
+  "11.4": {
+    "test_id": "test_9101knestfx1ejet1npe1w00tjf0",
+    "name": "11.4 — Handles alternative time offer from restaurant",
+    "agent_id": "agent_5201kgm2956ge8ct95yxjas867z5"
+  },
+  "11.5": {
+    "test_id": "test_9001knestgh2f0m9x296vabzfrgm",
+    "name": "11.5 — Confirms booking and ends the call gracefully",
+    "agent_id": "agent_5201kgm2956ge8ct95yxjas867z5"
+  }
+}

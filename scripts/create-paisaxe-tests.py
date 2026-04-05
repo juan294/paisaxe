@@ -88,7 +88,7 @@ def create_test(name: str, agent_id: str, chat_history: list, success_condition:
         "success_condition": success_condition,
         "parent_folder_id": folder_id,
     }
-    return api_request("POST", BASE_URL + "/create", body)
+    return api_request("POST", "/v1/convai/agent-testing/create", body)
 
 
 # ---------------------------------------------------------------------------
