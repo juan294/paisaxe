@@ -143,7 +143,7 @@ def poll_invocation(invocation_id: str, expected_count: int) -> dict:
             time.sleep(POLL_INTERVAL_SECS)
             continue
         runs = data.get("test_runs", [])
-        done = [r for r in runs if r.get("status") not in ("pending", "running", None)]
+        done = [r for r in runs if r.get("status") not in ("pending", "running", "queued", None)]
         print(f"  {len(done)}/{len(runs)} complete...", end="\r", flush=True)
         if len(done) >= expected_count and len(runs) > 0:
             print()
@@ -157,10 +157,27 @@ def poll_invocation(invocation_id: str, expected_count: int) -> dict:
 # Results display
 # ---------------------------------------------------------------------------
 
-def _verdict_icon(verdict) -> str:
-    if verdict in ("pass", "passed", True):
+def _parse_run(run: dict) -> tuple[str, str]:
+    """Return (verdict_str, reason_str) from a completed test run."""
+    cr = run.get("condition_result") or {}
+    result = cr.get("result", "")          # "pass" | "fail" | "unknown"
+    rationale = cr.get("rationale") or {}
+    summary = rationale.get("summary", "")
+    messages = rationale.get("messages", [])
+    reason = summary or (messages[0] if messages else "")
+
+    # Fallback: use top-level status when condition_result is absent
+    if not result:
+        status = run.get("status", "unknown")
+        result = "pass" if status in ("passed", "pass") else "fail" if status in ("failed", "fail") else "unknown"
+
+    return result, reason
+
+
+def _verdict_icon(verdict: str) -> str:
+    if verdict in ("pass", "passed", "success"):
         return "PASS"
-    if verdict in ("fail", "failed", False):
+    if verdict in ("fail", "failed", "failure"):
         return "FAIL"
     return "ERR "
 
@@ -184,8 +201,7 @@ def print_results(all_data: list[tuple[dict, list[dict]]]) -> tuple[int, int, in
     print("=" * 80)
 
     for run, meta in flat:
-        verdict = run.get("result", {}).get("verdict", run.get("status", "unknown"))
-        reason = run.get("result", {}).get("reason", "")
+        verdict, reason = _parse_run(run)
         icon = _verdict_icon(verdict)
 
         if icon == "PASS":
@@ -246,8 +262,7 @@ def write_results_to_plan(
     flags: list[tuple[str, str, str]] = []
 
     for run, meta in flat:
-        verdict = run.get("result", {}).get("verdict", run.get("status", "unknown"))
-        reason = run.get("result", {}).get("reason", "")
+        verdict, reason = _parse_run(run)
         icon = _verdict_icon(verdict)
         key = meta.get("key", "?")
         name = meta.get("name", run.get("test_id", ""))
