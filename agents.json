@@ -3,13 +3,13 @@
         {
             "config": "agent_configs/Paisaxe-Pelayo-(Visitor-Guide).json",
             "id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv",
-            "version_id": "agtvrsn_2901khbp5z2pfqk9gpyfstqvd3dr",
+            "version_id": "agtvrsn_2801knexj1zrfr9a2d3ax4drndmz",
             "branch_id": "agtbrch_2801kgqjhbhaf9097aka9qeek8qj"
         },
         {
             "config": "agent_configs/Paisaxe-Pelayo-(Booking).json",
             "id": "agent_5201kgm2956ge8ct95yxjas867z5",
-            "version_id": "agtvrsn_6301kgmwwa2me81ahre816tktwyf",
+            "version_id": "agtvrsn_0601knexj36sew7aykcp4tdy8mst",
             "branch_id": "agtbrch_2301kgm295x1e0m87n5ayxgb6tnh"
         },
         {
