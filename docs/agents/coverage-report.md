@@ -4,28 +4,63 @@
 > See `docs/health-report-[DATE].md` for the latest coverage data.
 > This file is kept for historical reference only and is no longer updated.
 
-> Last updated: 2026-04-05
+> Last updated: 2026-04-06
 
 ## Summary
 
-- **Total tests:** 5703 passed (unchanged)
+- **Total tests:** 5704 passed (+1)
 - **Test files:** 306 passed (100%)
 - **Statement coverage:** 98.72% (unchanged)
-- **Branch coverage:** 96.61% (unchanged)
+- **Branch coverage:** 96.62% (+0.01%)
 - **Function coverage:** 98.72% (unchanged)
 - **Line coverage:** 99.12% (unchanged)
 - **TypeScript:** No errors
 - **Lint:** No errors
 
-This cycle produced no new tests — all remaining coverage gaps were confirmed as carry-overs from previous runs. Every uncovered line falls into a documented category: SSR guards, defensive dead code, V8 artifacts, or SDK-dependent components requiring Playwright E2E. Coverage plateau at 98.72% statements is confirmed stable for the fifth consecutive run.
+One new test added this cycle covering the previously missing `handleBulkMarkApproved` "neither error nor data" branch (admin/page.tsx line 249). Branch coverage improved +0.01% globally (+0.64% in admin/page.tsx, 91.71% → 92.35%).
 
 *Note: Coverage percentages fluctuate slightly (±0.1%) between runs due to V8 coverage instrumentation variance.*
 
-## Changes This Cycle (2026-04-05)
+## Changes This Cycle (2026-04-06)
+
+### New Tests Written (+1 test)
+
+#### Branch Improvement — `src/app/admin/page.test.tsx` (+1 test)
+
+| Test | Lines Covered | What Was Covered |
+|------|---------------|-----------------|
+| "handles bulk approve returning neither error nor data (line 249 else-if false branch)" | 249 | `else if (result.data)` false branch in `handleBulkMarkApproved` — when `bulkUpdateStoryStatus` returns `{}` (neither error nor data), stories are not updated and no error is shown |
+
+**Gap pattern**: The equivalent test for `handleBulkMarkPending` (line 272) and `handleBulkDelete` (line 330) both existed, but the `handleBulkMarkApproved` case (line 249) was missing. Parity now restored.
+
+### Findings
+
+- **Branch coverage improved**: 96.61% → 96.62% globally (+0.01%). admin/page.tsx branch coverage: 91.71% → 92.35% (+0.64%).
+- **No source code changes since last run**: All recent commits are docs-only (agent configs, test plan updates). No new source files to cover.
+- **Remaining admin/page.tsx gaps are documented dead code**: Lines 242, 265, 316 are `selectedIds.size === 0` guards in handleBulkMarkApproved/handleBulkMarkPending/handleBulkDelete — Bulk buttons only appear when `selectedIds.size > 0`, making these checks UI-unreachable.
+- **All other gaps confirmed carry-overs**: Same documented set as previous cycle. No new coverage opportunities identified.
+- **voice-agent-chat (45.6%), agents-dashboard/index (48.5%)**: Still require Playwright E2E.
+
+**Files re-audited and confirmed as carry-overs:**
+
+| File | Uncovered Lines | Category |
+|------|----------------|----------|
+| `story-editor-dialog/index.tsx:40-84` | 88.88% stmts | Dead guards (story=null, unreachable when UI renders) |
+| `use-stories.ts:39,76,124,131,277` | 98.24% stmts | SSR guards + V8 artifacts across two test environments |
+| `use-voice-session.ts:75-111` | 96.96% stmts | SSR guard in saveState() + V8 merge artifact (node vs jsdom envs) |
+| `language-switcher.tsx:72-75` | 96.82% stmts | Dead guards (listbox/options always present) |
+| `posthog-provider.tsx:17` | 97.05% stmts | SSR guard (`typeof window === "undefined"`) |
+| `account-config-dialog.tsx:47` | 97.82% stmts | Dead guard (component returns null before handleSave can fire without platform) |
+| `post-row.tsx:18` | 85.71% stmts | Dead guard (formatDate always called with truthy string by JSX `&&`) |
+| `claude.ts:323` | 99.39% stmts | Exhaustiveness throw — TypeScript requirement, loop always returns/throws |
+| `github-analytics-panel.tsx:225-244,531` | 98.55% stmts | Color constant fallbacks (unreachable), skeleton table V8 artifact |
+| `elevenlabs-analytics-panel.tsx:238-246,254` | 98.38% stmts | Color constant fallbacks (unreachable) |
+
+## Changes Previous Cycle (2026-04-05)
 
 ### New Tests Written (+0 tests)
 
-No new tests this cycle. All remaining coverage gaps were audited and confirmed as previously documented. Only one source file changed since last run: `stripe.ts` (`ui_mode: "embedded"` → `"form"` for Stripe v22 upgrade) — already at 100% coverage. The full list of documented untestable branches is maintained in the section below.
+No new tests that cycle. All remaining coverage gaps were audited and confirmed as previously documented. Only one source file changed since last run: `stripe.ts` (`ui_mode: "embedded"` → `"form"` for Stripe v22 upgrade) — already at 100% coverage. The full list of documented untestable branches is maintained in the section below.
 
 **Files re-audited and confirmed as carry-overs (no new tests possible):**
 

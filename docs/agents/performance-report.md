@@ -1,27 +1,27 @@
 # Performance Report
 
-> Updated on 2026-04-05 (dev server cache — production build verified Apr 4)
+> Updated on 2026-04-06 (dev server cache — production build verified Apr 4)
 
-## Health Status: GREEN (split budget — both targets met, 2nd consecutive day)
+## Health Status: GREEN (split budget — both targets met, 3rd consecutive day)
 
 **Initial load JS: ~1,958 KB (budget: 2,000 KB) ✅ | Total JS: 2,851 KB (budget: 3,000 KB) ✅**
 
 **Note on metrics input:** The agent script reported a 2,500 KB budget violation. That single budget was **retired on 2026-04-04** after investigation confirmed it was structurally unachievable (Turbopack i18n limitation, polyfill floor). The split budget adopted Apr 4 is the authoritative definition. Both targets are GREEN.
 
-**Zero change this cycle.** Bundle: 2,851 KB (same as Apr 4). No new dependencies. No source changes impacting bundle size. All major dep upgrades from Apr 4 remain in place and verified.
+**Zero change this cycle.** Bundle: 2,851 KB (same as Apr 4 and Apr 5). No new dependencies. No source changes impacting bundle size. All major dep upgrades from Apr 4 remain in place and verified.
 
 ## Key Metrics
 
-| Metric | Current (2026-04-05) | Previous (2026-04-04) | Mar 8 (prod build) | Budget | Status |
+| Metric | Current (2026-04-06) | Previous (2026-04-05) | Mar 8 (prod build) | Budget | Status |
 |--------|----------------------|-----------------------|---------------------|--------|--------|
 | Total JS | **2,851 KB** | 2,851 KB | 2,726 KB | 3,000 KB (split) | ✅ Under budget |
 | Initial load JS | **~1,958 KB** | ~1,958 KB | — | 2,000 KB (split) | ✅ Under budget |
 | Total CSS | **123 KB** | 123 KB | 122 KB | — | Stable |
 | Production deps | 31 | 31 | 31 | 40 | Good |
-| node_modules | 908 MB | 896 MB | 865 MB | — | +12 MB (noise/cache) |
-| .next | 48 MB | — (1,223 MB full) | — | — | Dev cache partial view |
+| node_modules | 908 MB | 908 MB | 865 MB | — | Stable |
+| .next | 48 MB | 48 MB | — | — | Dev cache partial view |
 
-*Current (2026-04-05): Dev server was running — cached .next data. Production build was verified on 2026-04-04 (exit 0, 132/132 pages, 2,851 KB confirmed).*
+*Current (2026-04-06): Dev server was running — cached .next data. Production build was verified on 2026-04-04 (exit 0, 132/132 pages, 2,851 KB confirmed).*
 
 ## Budget Status
 
@@ -60,16 +60,16 @@
 | **App code (static)** | ~207 KB | 7.3% | i18n strings (both chunks) |
 | **Other smaller chunks** | ~1,076 KB | 37.7% | Page routes, shared modules |
 
-## Changes This Cycle (Apr 5 vs Apr 4)
+## Changes This Cycle (Apr 6 vs Apr 5)
 
-**No changes.** Zero KB delta. All metrics identical to Apr 4 production build.
+**No changes.** Zero KB delta. All metrics identical to Apr 5.
 
 | Item | Status |
 |------|--------|
 | Total JS | Unchanged (2,851 KB) |
 | CSS | Unchanged (123 KB) |
 | Production deps | Unchanged (31) |
-| node_modules | +12 MB (cache/ephemeral noise) |
+| node_modules | Unchanged (908 MB) |
 | Security posture | GREEN (confirmed by security agent — 0 advisories) |
 
 ## Action Items (Prioritized)
@@ -170,21 +170,21 @@ layout.tsx
 | ~~next~~ | ~~16.1.6~~ | — | — | ✅ **16.2.2 — DONE Apr 3** |
 | ~~posthog-js~~ | ~~1.353.0~~ | — | — | ✅ **1.364.6 — DONE Apr 3** |
 
-## Comparison: 12-Run Trend
+## Comparison: 13-Run Trend
 
-| Metric | Feb 7 | Mar 8 | Mar 29* | Mar 30* | Apr 1* | Apr 2* | Apr 3* | Apr 4 | **Apr 5*** | Trend |
-|--------|-------|-------|---------|---------|--------|--------|--------|-------|------------|-------|
-| Total JS | 2,455 KB | 2,726 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,851 KB | **2,851 KB** | Stable |
-| CSS | 130 KB | 122 KB | 124 KB | 124 KB | 124 KB | 124 KB | 124 KB | 123 KB | **123 KB** | Stable |
-| Prod deps | 27 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | **31** | Stable |
-| node_modules | 856 MB | 865 MB | 862 MB | 862 MB | 862 MB | 862 MB | 862 MB | 896 MB | **908 MB** | +12 MB noise |
-| EL deferred | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| EL idle prefetch | No | No | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| Browserslist P1 | No | No | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| Analytics deferred P3 | No | No | No | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| posthog-js | 1.237.x | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.364.6 ✅ | **1.364.6** | Stable |
-| next | 16.x | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.2.2 ✅ | **16.2.2** | Stable |
-| stripe | — | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 22.0.0 ✅ | **22.0.0** | Stable |
+| Metric | Feb 7 | Mar 8 | Mar 29* | Mar 30* | Apr 1* | Apr 2* | Apr 3* | Apr 4 | Apr 5* | **Apr 6*** | Trend |
+|--------|-------|-------|---------|---------|--------|--------|--------|-------|--------|------------|-------|
+| Total JS | 2,455 KB | 2,726 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,851 KB | 2,851 KB | **2,851 KB** | Stable |
+| CSS | 130 KB | 122 KB | 124 KB | 124 KB | 124 KB | 124 KB | 124 KB | 123 KB | 123 KB | **123 KB** | Stable |
+| Prod deps | 27 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | **31** | Stable |
+| node_modules | 856 MB | 865 MB | 862 MB | 862 MB | 862 MB | 862 MB | 862 MB | 896 MB | 908 MB | **908 MB** | Stable |
+| EL deferred | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| EL idle prefetch | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| Browserslist P1 | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| Analytics deferred P3 | No | No | No | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| posthog-js | 1.237.x | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.364.6 ✅ | 1.364.6 | **1.364.6** | Stable |
+| next | 16.x | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.2.2 ✅ | 16.2.2 | **16.2.2** | Stable |
+| stripe | — | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 22.0.0 ✅ | 22.0.0 | **22.0.0** | Stable |
 
 *\*Dev server cache — may differ slightly from production build. Apr 4 = production build verified.*
 
@@ -229,7 +229,7 @@ All 6 locales bundled in initial JS (~208 KB combined). Root cause: Turbopack 16
 
 ## Cross-Agent Context
 
-**For Security Agent:** All dep upgrades complete. next@16.2.2 ✅, posthog-js@1.364.6 ✅, stripe 22.0.0 ✅, @stripe/stripe-js 9.0.1 ✅, @stripe/react-stripe-js 6.1.0 ✅, @elevenlabs/react 1.0.2 ✅. Security agent confirmed GREEN (0 advisories) on Apr 5. Remaining gap: @anthropic-ai/sdk +4 minor (no CVEs).
+**For Security Agent:** All dep upgrades complete. next@16.2.2 ✅, posthog-js@1.364.6 ✅, stripe 22.0.0 ✅, @stripe/stripe-js 9.0.1 ✅, @stripe/react-stripe-js 6.1.0 ✅, @elevenlabs/react 1.0.2 ✅. Security agent confirmed GREEN (0 advisories) on Apr 6. Remaining gap: @anthropic-ai/sdk +4 minor (no CVEs). No security-driven upgrade requests.
 
 **For Code Quality Agent:** No version discrepancies remain. All major upgrades resolved. @anthropic-ai/sdk 0.78.0 vs ~0.82.0 — +4 minor, low priority, API compatible. No performance-driven code changes needed.
 
@@ -237,13 +237,13 @@ All 6 locales bundled in initial JS (~208 KB combined). Root cause: Turbopack 16
 
 **For Coverage Agent:** No new production dependencies. No bundle changes. Zero impact on coverage this cycle.
 
-**For Cost Analyst Agent:** Bundle stable at 2,851 KB (zero change). No cost impact. Zero production voice usage — ElevenLabs SDK not exercised in production. @anthropic-ai/sdk minor version gap has no cost impact.
+**For Cost Analyst Agent:** Bundle stable at 2,851 KB (zero change for 3rd consecutive day). No cost impact. Zero production voice usage — ElevenLabs SDK not exercised in production. ElevenLabs character reset tomorrow (April 7, 14:15 UTC) — new cycle will start clean.
 
-**For Localization Agent:** i18n lazy loading code correct (es+en static, fr/de/pt/ast dynamic). 392 keys stable (confirmed Apr 5). P5 closed — Turbopack limitation. No further optimization possible.
+**For Localization Agent:** i18n lazy loading code correct (es+en static, fr/de/pt/ast dynamic). 392 keys stable. P5 closed — Turbopack limitation. No further optimization possible.
 
 ---
 
-*Report updated 2026-04-05 — no changes, GREEN status maintained*
+*Report updated 2026-04-06 — no changes, GREEN status maintained (3rd consecutive day)*
 *Initial load JS: ~1,958 KB / 2,000 KB | Total JS: 2,851 KB / 3,000 KB — GREEN*
 *Split budget adopted Apr 4 — old 2,500 KB single budget retired*
 *All dep upgrades complete. No active action items.*

@@ -1,13 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-04-05 06:00:03
-
-## Changes Made This Run (2026-04-05)
-
-- **Added 2 missing agent flags** to Feature Flags Reference in `docs/project/features.md`:
-  - `subscription_optimizer_enabled` — Subscription Optimizer cron (reviews service costs and spending)
-  - `content_discovery_agent_enabled` — Content Discovery cron (discovers new Asturias places via Google Places API, disabled by default)
-- **Fixed agent toggle count** in Admin Dashboard section: "Eight toggle switches" → "Ten toggle switches"
-- **API routes**: All 51 flagged routes confirmed internal (admin, cron, webhook, MCP). No external-consumption routes requiring documentation.
+> Auto-generated on 2026-04-06 06:00:05
 
 ## CLAUDE.md Status
 
@@ -117,6 +109,14 @@ webhooks/translate
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-03-28 |
 | README.md | 2026-02-16 |
+
+## Changes Made This Run
+
+**Status: GREEN — No documentation gaps found. Tenth consecutive clean run.**
+
+- **Feature flags**: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
+- **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, frontend-facing API routes). No external-consumption routes require new documentation.
+- **No source changes** since last documentation update that introduce new user-facing features or flags.
 
 ---
 
