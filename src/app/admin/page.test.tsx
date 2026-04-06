@@ -1305,6 +1305,34 @@ describe("AdminPage", () => {
         });
       });
 
+      it("handles bulk approve returning neither error nor data (line 249 else-if false branch)", async () => {
+        // When bulkUpdateStoryStatus returns {} (no error, no data), the `else if (result.data)`
+        // branch at line 249 is false — stories are not updated and no error shown.
+        mockBulkUpdateStoryStatus.mockResolvedValue({});
+
+        await navigateToStories();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId("select-story-1"));
+        });
+
+        await act(async () => {
+          fireEvent.click(screen.getByText("Bulk Approve"));
+        });
+
+        await waitFor(() => {
+          expect(mockBulkUpdateStoryStatus).toHaveBeenCalledWith(["story-1"], "approved");
+        });
+
+        // No error shown, stories unchanged in state
+        expect(screen.queryByText(/error/i)).not.toBeInTheDocument();
+        expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
+      });
+
       it("handles bulk pending returning neither error nor data (line 272 else-if false branch)", async () => {
         // When bulkUpdateStoryStatus returns {} (no error, no data), the `else if (result.data)`
         // branch at line 272 is false — stories are not updated and no error shown.
