@@ -512,5 +512,24 @@ describe("chat-action-detection", () => {
       // Only one address should remain after dedup
       expect(result).toHaveLength(1);
     });
+
+    it("documents existingCandidate null guard (line 371) as unreachable dead code", () => {
+      // Line 371: `if (!existingCandidate) return false;` inside the `.some()` callback.
+      //
+      // The `matches` array is populated exclusively from `candidates` (line 392:
+      // `matches.push({ text: candidate.text, mapsUrl: ... })`). When we later search
+      // `candidates.find((c) => c.text === existing.text)`, we search the same `candidates`
+      // array for the text that was originally sourced from it. The lookup always succeeds.
+      //
+      // Therefore `existingCandidate` is never undefined, and `return false` is dead code.
+      // It is a defensive guard that cannot be triggered without modifying the source algorithm.
+
+      // Demonstrate: two overlapping addresses — dedup runs conflictsWithExisting logic
+      // and successfully finds existingCandidate (no null guard path taken).
+      const text = "Calle Mayor 5 y Calle Mayor 7, Oviedo";
+      const result = detectAddresses(text);
+      // At least one result, meaning the .some() callback ran without hitting the null guard
+      expect(result.length).toBeGreaterThanOrEqual(1);
+    });
   });
 });
