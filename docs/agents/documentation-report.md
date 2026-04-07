@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-04-06 06:00:05
+> Auto-generated on 2026-04-07 06:00:02
 
 ## CLAUDE.md Status
 
@@ -14,6 +14,7 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ```
 src/app/admin/page.test.tsx
 src/app/admin/page.tsx
+src/app/favorites/page.test.tsx
 src/app/immersive/immersive-page-content.test.tsx
 src/app/immersive/immersive-page-content.tsx
 src/app/layout.tsx
@@ -27,8 +28,10 @@ src/components/analytics.tsx
 src/components/immersive/language-switcher.test.tsx
 src/components/immersive/suggest-place-dialog.test.tsx
 src/hooks/use-stories.test.ts
+src/lib/chat-action-detection.test.ts
 src/lib/stripe.test.ts
 src/lib/stripe.ts
+src/proxy.test.ts
 ```
 
 No new migrations since documentation update.
@@ -112,11 +115,10 @@ webhooks/translate
 
 ## Changes Made This Run
 
-**Status: GREEN — No documentation gaps found. Tenth consecutive clean run.**
+**No changes made.** Eleventh consecutive clean run.
 
 - **Feature flags**: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
-- **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, frontend-facing API routes). No external-consumption routes require new documentation.
-- **No source changes** since last documentation update that introduce new user-facing features or flags.
+- **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require new documentation.
 
 ---
 
