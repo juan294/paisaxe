@@ -43,6 +43,26 @@
 - Cost Analyst Agent: No cost-related security concerns.
 - Localization Agent: No sensitive data in translation files.
 
+<!-- ENTRY:START agent=documentation_agent timestamp=2026-04-07T06:00:00Z -->
+## Documentation Agent — 2026-04-07
+- **Status: GREEN** — No documentation gaps found. Eleventh consecutive clean run.
+- **Feature flags**: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
+- **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require new documentation.
+- **CLAUDE.md**: Current (last modified 2026-03-28)
+- **features.md**: Complete — no additions needed.
+- **No source changes** since last run that introduce new user-facing features or flags.
+- **No new migrations** since last documentation update.
+
+**Cross-agent recommendations:**
+- Coverage Agent: No documentation-related coverage gaps. All feature descriptions align with test coverage targets.
+- Security Agent: No documentation changes needed this cycle.
+- QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 in `FeatureFlagKey` + 10 agent flags.
+- Code Quality Agent: No documentation-impacting code quality concerns.
+- Performance Agent: No documentation-impacting changes.
+- Cost Analyst Agent: No cost-related documentation concerns.
+- Localization Agent: No locale-related documentation concerns.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-04-06T06:00:00Z -->
 ## Documentation Agent — 2026-04-06
 - **Status: GREEN** — No documentation gaps found. Tenth consecutive clean run.
@@ -98,6 +118,26 @@
 - Localization Agent: No changes this cycle.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-04-07T02:00:00Z -->
+## Coverage Agent — 2026-04-07
+- **Test suite**: 100% passing (5709 tests, +5) — 0 failures
+- **TypeScript**: No errors
+- **Overall coverage**: **98.73% statements** (+0.01%), **96.64% branch** (+0.02%), **98.72% function** (unchanged), **99.13% line** (+0.01%)
+- **New tests**: 5 — (1) proxy.ts development-mode init covering line 29; (2–4) SSR guard docs for use-stories.ts lines 39/76; (5) dead-code doc for chat-action-detection.ts line 371; (bonus) loadMore dead-code doc for favorites/page.tsx line 36.
+- **proxy.ts**: 99.4% → **100%** ✅ — line 29 (`ALLOWED_ORIGINS.push("http://localhost:3000")` in development mode) covered via `vi.resetModules()` + `vi.stubEnv("NODE_ENV", "development")` + dynamic import.
+- **Coverage plateau broken**: First improvement in 7 consecutive runs (98.72% → 98.73% statements).
+- **Remaining low-coverage files**: voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — require Playwright E2E (unchanged)
+- **Newly documented unreachable guards**: favorites/page.tsx:36 (IO pre-guards loadMore), use-stories.ts:39,76 (SSR guards), chat-action-detection.ts:371 (existingCandidate always found)
+
+**Cross-agent recommendations:**
+- Performance Agent: No new dependencies added. 5 test-only additions. No bundle impact.
+- Code Quality Agent: Dead code unchanged. proxy.ts now fully covered. Carry-overs documented.
+- Security Agent: All webhook and MCP error paths remain fully covered. No regression.
+- QA Agent: No new testability gaps. voice-agent-chat and agents-dashboard still need Playwright E2E.
+- Cost Analyst Agent: No cost-related coverage gaps.
+- Localization Agent: No locale-related coverage concerns.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-04-06T02:00:00Z -->
 ## Coverage Agent — 2026-04-06
 - **Test suite**: 100% passing (5704 tests, +1) — 0 failures
@@ -116,6 +156,7 @@
 - QA Agent: No new testability gaps. voice-agent-chat and agents-dashboard still need Playwright E2E for coverage improvement.
 - Cost Analyst Agent: No cost-related coverage gaps.
 - Localization Agent: No locale-related coverage concerns.
+<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-04-05T02:00:00Z -->
 ## Coverage Agent — 2026-04-05
@@ -136,26 +177,25 @@
 - Cost Analyst Agent: No cost-related coverage gaps.
 - Localization Agent: No locale-related coverage concerns.
 
-<!-- ENTRY:START agent=coverage_agent timestamp=2026-04-04T02:00:00Z -->
-## Coverage Agent — 2026-04-04
-- **Test suite**: 100% passing (5703 tests, 0 failures) — unchanged
-- **TypeScript**: No errors
-- **Overall coverage**: **98.72% statements** (unchanged), **96.61% branch** (unchanged), **98.72% function** (unchanged), **99.12% line** (unchanged)
-- **New tests**: None — all remaining gaps confirmed as documented carry-overs
-- **Coverage plateau confirmed stable**: Fourth consecutive run with identical metrics. All uncovered lines re-audited and verified as SSR guards, defensive dead code, V8 artifacts, or SDK-dependent components.
-- **Remaining low-coverage files**: voice-agent-chat (45.6%), agents-dashboard/index (48.5%) — require Playwright E2E (unchanged)
-- **Key carry-over gaps confirmed**: story-editor-dialog (dead null guards), use-voice-session (SSR guard + V8 node/jsdom merge), language-switcher (dead listbox guards), posthog-provider (SSR guard), post-row (dead formatDate null guard), claude.ts:323 (exhaustiveness throw), analytics panels (color constant fallbacks)
+<!-- (pruned: coverage_agent 2026-04-04 entry removed, keeping last 3) -->
+
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-04-07T03:00:00Z -->
+## Cost Analyst — 2026-04-07
+- **Status: WATCH** — Day 7 of April. Revenue drought: **53 days** (since Feb 13). Voice silence: **49 days** (since Feb 17).
+- **Twilio phone rental charged**: Balance dropped $15.2146 → **$14.0646** (-$1.15). April variable spend confirmed at **$1.15**. April total MTD: $85.56 (= Mar final).
+- **ElevenLabs**: Creator tier, **23,591/196,138 chars (12.03%)** — unchanged from yesterday. No new conversations since Apr 5 17:55 UTC. **Character cycle resets TODAY at 14:15 UTC** — closing at 12.03% utilization, all non-Paisaxe.
+- **New cycle begins today** (Apr 7 14:15 UTC): counter resets to 0/196,138. First data point tomorrow.
+- **Daily burn rate**: $2.81/day (fixed operational: $84.41/mo). ~12.2 months of Twilio runway remaining.
+- **Break-even**: ~52 Day Pass sales/mo (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
+- **Revenue trajectory**: Feb $9.98 net → Mar $0.00 → Apr $0.00 (day 7). Day 53 of drought — no sign of reversal.
 
 **Cross-agent recommendations:**
-- Performance Agent: No new dependencies added. No bundle impact this cycle.
-- Code Quality Agent: Same dead code items persist: chat-action-detection.ts trailing-period removal, JPEG branch in image-optimization.ts, i18n/provider.tsx es/en lazy loaders, admin/page.tsx:265,316 size-0 guards.
-- Security Agent: All webhook and MCP error paths remain fully covered. No regression.
-- QA Agent: No new testability gaps. voice-agent-chat and agents-dashboard still need Playwright E2E for coverage improvement.
-- Cost Analyst Agent: No cost-related coverage gaps.
-- Localization Agent: No locale-related coverage concerns.
-<!-- ENTRY:END -->
-
-<!-- (pruned: coverage_agent 2026-04-03 entry removed, keeping last 3) -->
+- Code Quality Agent: No config discrepancies. All service tier and recurring cost values accurate. Note: Twilio phone rental timing — $1.15 shows in balance delta (not Usage Records API).
+- Security Agent: No cost-related security concerns. All dep upgrades complete. 0 vulns.
+- Performance Agent: Zero Paisaxe voice usage — ElevenLabs SDK not exercised in production. New cycle starts today — monitor Archy activity rate in new cycle.
+- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 53-day revenue drought and 49-day voice silence still unexplained.
+- Coverage Agent: No cost-related coverage gaps.
+- Localization Agent: No cost-related localization concerns.
 
 <!-- ENTRY:START agent=cost_analyst timestamp=2026-04-06T03:00:00Z -->
 ## Cost Analyst — 2026-04-06
@@ -194,25 +234,23 @@
 - Coverage Agent: No cost-related coverage gaps.
 - Localization Agent: No cost-related localization concerns.
 
-<!-- ENTRY:START agent=cost_analyst timestamp=2026-04-04T03:00:00Z -->
-## Cost Analyst — 2026-04-04
-- **Status: WATCH** — Day 4 of April. Revenue drought: **50 days** (since Feb 13). Voice silence: **46 days** (since Feb 17).
-- **NEW: "Coach" agent (agent_8201kmhr2vbef328b4dcey3wddhk)** appeared in ElevenLabs account with 5 failed conversations on Apr 3 (11:07–14:16 UTC). Not a Paisaxe project agent. All failed at initialization (0–7 sec), no characters consumed. Likely a separate project Juan is building/testing. Monitor for cost impact in future cycles.
-- **ElevenLabs**: Creator tier, **6,318/196,138 chars (3.22%)** — up +1,138 from yesterday (Apr 3 Archy: 2 done convos, 163 sec total). **Character reset in 3 days (April 7, 14:15 UTC)**.
-- **Twilio**: Balance **$15.2146** (was $15.4546, **-$0.24 unexplained**). Usage Records API shows $0.00 across all 50 categories. Possible phone number billing, regulatory fee, or API lag. ~13.2 months of runway remaining.
-- **Daily burn rate**: $2.81/day (April, 30 days). Fixed operational: $84.41/mo. Variable: $0.00 April MTD (confirmed).
-- **Break-even**: ~52 Day Pass sales/mo (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
-- **Revenue trajectory**: Feb $9.98 net → Mar $0.00 → Apr $0.00 (day 4). Day 50 of drought — no sign of reversal.
+<!-- (pruned: cost_analyst 2026-04-04 and earlier entries removed, keeping last 3) -->
+
+<!-- ENTRY:START agent=localization_agent timestamp=2026-04-07T07:00:00Z -->
+## Localization Agent — 2026-04-07
+- **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
+- **UI strings**: **392 leaf keys** per locale, all present (0 missing, 0 orphans)
+- **Story translations**: 95 stories × 5 locales = 475 translations, all complete (title + subtitle + description)
+- **Type safety**: Pass — `npx tsc --noEmit` exits clean (0 errors)
+- **Changes**: None — all translations stable for **32 consecutive days**.
 
 **Cross-agent recommendations:**
-- Code Quality Agent: No config discrepancies. All service tier and recurring cost values accurate.
-- Security Agent: No cost-related security concerns. next@16.2.2 confirmed installed (commit 70765d7). 0 vulns.
-- Performance Agent: Zero Paisaxe voice usage — ElevenLabs SDK not exercised in production. Coach agent activity is non-Paisaxe. Twilio $0.24 drop not explained by usage records.
-- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 50-day revenue drought and 46-day voice silence still unexplained.
-- Coverage Agent: No cost-related coverage gaps.
-- Localization Agent: No cost-related localization concerns.
-
-<!-- (pruned: cost_analyst 2026-04-03 and earlier entries removed, keeping last 3) -->
+- Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, fr/de/pt/ast dynamic) in place. No optimization needed.
+- Code Quality Agent: No dead translations found. All 392 keys actively referenced. No new keys since Mar 7. Cosmetic: fr/de/pt missing 8 inline `// LOCATION-SPECIFIC` comments — no functional impact.
+- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
+- Coverage Agent: No locale-related coverage concerns.
+- QA Agent: No locale-related issues. All translations stable for 32 days.
+- Cost Analyst Agent: No cost-related localization concerns.
 
 <!-- ENTRY:START agent=localization_agent timestamp=2026-04-06T07:00:00Z -->
 ## Localization Agent — 2026-04-06
@@ -246,23 +284,7 @@
 - QA Agent: No locale-related issues. All translations stable.
 - Cost Analyst Agent: No cost-related localization concerns.
 
-<!-- ENTRY:START agent=localization_agent timestamp=2026-04-04T07:00:00Z -->
-## Localization Agent — 2026-04-04
-- **Coverage**: 100% complete across 6 locales (es, en, fr, de, pt, ast)
-- **UI strings**: **391 leaf keys** per locale, all present (0 missing, 0 orphans)
-- **Story translations**: 95 stories × 5 locales = 475 translations, all complete (title + subtitle + description)
-- **Type safety**: Pass — `npx tsc --noEmit` exits clean (full project, 0 errors)
-- **Changes**: None — all translations stable for **29 consecutive days**
-
-**Cross-agent recommendations:**
-- Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, fr/de/pt/ast dynamic) in place. No optimization needed.
-- Code Quality Agent: No dead translations found. All 391 keys actively referenced. No new keys since Mar 7. Cosmetic: fr/de/pt missing 8 inline `// LOCATION-SPECIFIC` comments — no functional impact.
-- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
-- Coverage Agent: No locale-related coverage concerns.
-- QA Agent: No locale-related issues. All translations stable.
-- Cost Analyst Agent: No cost-related localization concerns.
-
-<!-- (pruned: localization_agent 2026-04-03 entry removed, keeping last 3) -->
+<!-- (pruned: localization_agent 2026-04-04 and earlier entries removed, keeping last 3) -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-03-30T06:12:00Z -->
 ## Triage — 2026-03-30
@@ -279,47 +301,7 @@
 - QA Agent: No QA-impacting changes this cycle.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=documentation_agent timestamp=2026-04-04T06:00:00Z -->
-## Documentation Agent — 2026-04-04
-- **Status: GREEN** — No documentation gaps found. Eighth consecutive clean run.
-- **Feature flags**: No undocumented flags. All 17 flags in `src/types/feature-flags.ts` verified against `docs/project/features.md`. Zero gaps.
-- **API routes**: All 51 flagged routes are internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require new documentation.
-- **CLAUDE.md**: Current (last modified 2026-03-28)
-- **features.md**: Complete — no additions needed.
-- **Modified files**: 14 files (test files + source files from git status) — test additions only; no new features requiring documentation.
-- **No new migrations** since last documentation update.
-
-**Cross-agent recommendations:**
-- Coverage Agent: No documentation-related coverage gaps. All feature descriptions align with test coverage targets.
-- Security Agent: No documentation changes needed this cycle.
-- QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 in `FeatureFlagKey`.
-- Code Quality Agent: Gap detection script should be updated to check `docs/project/features.md` in addition to CLAUDE.md for feature flag documentation (8th consecutive report flagging this).
-- Performance Agent: No documentation-impacting changes.
-- Cost Analyst Agent: No cost-related documentation concerns.
-- Localization Agent: No locale-related documentation concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=documentation_agent timestamp=2026-04-03T06:00:00Z -->
-## Documentation Agent — 2026-04-03
-- **Status: GREEN** — No documentation gaps found. Seventh consecutive clean run.
-- **Feature flags**: No undocumented flags. All 25 flags documented in `docs/project/features.md` Feature Flags Reference (lines 662–720) across 6 categories. Gap script confirmed 0 undocumented flags.
-- **API routes**: All 51 flagged routes are internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require new documentation.
-- **CLAUDE.md**: Current (last modified 2026-03-28)
-- **features.md**: Complete — no additions needed.
-- **Modified files**: 14 files (test files + source files from git status) — changes are test additions; no new features requiring documentation.
-- **No new migrations** since last documentation update.
-
-**Cross-agent recommendations:**
-- Coverage Agent: No documentation-related coverage gaps. All feature descriptions align with test coverage targets.
-- Security Agent: No documentation changes needed this cycle.
-- QA Agent: No new features or flags to add to mock sets. Current flag count in QA mock set should remain stable.
-- Code Quality Agent: Gap detection script should be updated to check `docs/project/features.md` in addition to CLAUDE.md for feature flag documentation (7th consecutive report flagging this).
-- Performance Agent: No documentation-impacting changes.
-- Cost Analyst Agent: No cost-related documentation concerns.
-- Localization Agent: No locale-related documentation concerns.
-<!-- ENTRY:END -->
-
-<!-- (pruned: documentation_agent 2026-04-02 and earlier entries removed, keeping last 3) -->
+<!-- (pruned: documentation_agent 2026-04-04 and earlier entries removed, keeping last 3) -->
 
 <!-- ENTRY:START agent=performance_agent timestamp=2026-04-06T18:00:00Z -->
 ## Performance Agent — 2026-04-06
