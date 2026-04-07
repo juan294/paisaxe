@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-04-06
+> Auto-generated on 2026-04-07
 
 ## Health Status: GREEN
 
-**Executive Summary:** 0 advisories detected, 0 exploitable. Second consecutive GREEN. All previously flagged vulnerabilities remain resolved — next@16.2.2, Stripe v22/v9/v6, ElevenLabs v1.0.2, posthog-js@1.364.6 all confirmed in place. 25 outdated packages, none with known CVEs. Two packages (vitest@4.1.1, jsdom@28.1.0) show as "outdated" because they are ahead of the npm `latest` tag — installed versions are pre-release/beta channel and are actually newer. All security headers configured correctly in source. All CI/CD automation active.
+**Executive Summary:** 0 advisories detected, 0 exploitable. Third consecutive GREEN. All previously flagged vulnerabilities remain resolved — next@16.2.2, Stripe v22/v9/v6, ElevenLabs v1.0.2, posthog-js@1.364.6, @anthropic-ai/sdk@0.82.0 all confirmed in place. 26 outdated packages (+1 from yesterday), none with known CVEs. Two packages (vitest@4.1.1, jsdom@28.1.0) show as "outdated" because they are ahead of the npm `latest` tag — installed versions are pre-release/beta channel and are actually newer. All security headers configured correctly in source. All CI/CD automation active.
 
 ---
 
@@ -65,14 +65,15 @@ No active advisories — no exploitability analysis required this cycle.
 
 ## Outdated Packages
 
-25 packages outdated. None have known CVEs.
+26 packages outdated (+1 from yesterday). None have known CVEs.
 
 | Package | Installed | Available | Type | Security Relevance |
 |---------|-----------|-----------|------|-------------------|
-| @anthropic-ai/sdk | 0.78.0 | 0.82.0 | prod | Low — 4 minors, API compatible, no CVEs |
+| @elevenlabs/react | 1.0.2 | 1.0.3 | prod | None — patch bump |
 | @playwright/test | 1.58.2 | 1.59.1 | dev | None |
-| @supabase/ssr | 0.8.0 | 0.10.0 | prod | Low — patch/minor, auth library |
-| @supabase/supabase-js | 2.97.0 | 2.101.1 | prod | Low — minor bumps, no advisories |
+| @stripe/stripe-js | 9.0.1 | 9.1.0 | prod | None — minor bump, no advisories |
+| @supabase/ssr | 0.8.0 | 0.10.0 | prod | Low — 2 minor bumps, auth library |
+| @supabase/supabase-js | 2.97.0 | 2.101.1 | prod | Low — 4 minor bumps, no advisories |
 | @tailwindcss/postcss | 4.2.1 | 4.2.2 | dev | None |
 | @types/node | 25.5.0 | 25.5.2 | dev | None |
 | @typescript-eslint/eslint-plugin | 8.56.1 | 8.58.0 | dev | None |
@@ -93,9 +94,14 @@ No active advisories — no exploitability analysis required this cycle.
 | tailwindcss | 4.2.1 | 4.2.2 | dev | None |
 | typescript | 5.9.3 | 6.0.2 | dev | None — major version, dev tooling only |
 | vitest | 4.1.1 | 3.2.4 | dev | **Note**: installed > latest — pre-release/beta channel in use, not a downgrade |
-| voyageai | 0.1.0 | 0.2.1 | prod | Low — minor, AI SDK |
+| voyageai | 0.1.0 | 0.2.1 | prod | Low — minor bump, AI SDK |
 
-**Channel note (vitest + jsdom):** `npm outdated` compares the installed version against the `latest` dist-tag. vitest@4.1.1 and jsdom@28.1.0 are on a pre-release channel (installed versions exceed the stable `latest`). These are not regressions — the codebase is intentionally tracking pre-release builds.
+**Changes from yesterday:**
+- `@anthropic-ai/sdk` **removed** — upgraded 0.78.0 → 0.82.0 by triage on Apr 6 ✅
+- `@stripe/stripe-js 9.0.1 → 9.1.0` **added** — new minor available
+- `@elevenlabs/react 1.0.2 → 1.0.3` **added** — new patch available
+
+**Channel note (vitest + jsdom):** `npm outdated` compares installed versions against the `latest` dist-tag. vitest@4.1.1 and jsdom@28.1.0 are on a pre-release channel (installed versions exceed stable `latest`). These are not regressions — the codebase is intentionally tracking pre-release builds.
 
 **Pending major version migrations (non-urgent, no CVEs):**
 - `@vercel/analytics` v1 → v2
@@ -163,22 +169,23 @@ No remediation required this cycle. 0 active advisories.
 
 **Ongoing maintenance (low priority, no CVEs):**
 
-1. **`@anthropic-ai/sdk` +4 minors** (`0.78.0 → 0.82.0`) — API compatible, no breaking changes. Upgrade when convenient.
-2. **`@supabase/ssr` + `@supabase/supabase-js`** — minor bumps, auth library, upgrade in a single batch.
-3. **Major version migrations** (non-urgent, no security implications):
+1. **`@stripe/stripe-js` 1 minor** (`9.0.1 → 9.1.0`) — minor bump, no breaking changes expected. Can be batched with next Supabase upgrade.
+2. **`@elevenlabs/react` patch** (`1.0.2 → 1.0.3`) — patch bump. Low risk, upgrade when convenient.
+3. **`@supabase/ssr` + `@supabase/supabase-js`** — minor bumps, auth library, upgrade in a single batch.
+4. **Major version migrations** (non-urgent, no security implications):
    - `@vercel/analytics` v1 → v2
    - `@vercel/speed-insights` v1 → v2
    - `lucide-react` v0 → v1
-4. **`voyageai` minor** (`0.1.0 → 0.2.1`) — AI SDK, check changelog before upgrading.
+5. **`voyageai` minor** (`0.1.0 → 0.2.1`) — AI SDK, check changelog before upgrading.
 
 ---
 
 ## Cross-Agent Recommendations
 
 - **Coverage Agent**: All webhook and CSRF error paths remain fully covered. No regression risk. No security-driven test changes needed.
-- **Performance Agent**: No security-driven upgrade requests this cycle. All major dep upgrades remain complete. @anthropic-ai/sdk +4 minors is the only actionable gap (low priority).
-- **Code Quality Agent**: No version discrepancies that need urgent attention. @anthropic-ai/sdk 0.78.0 vs 0.82.0 — low priority. Supabase minor batch upgrade recommended when convenient.
-- **Documentation Agent**: No documentation changes needed this cycle. Security posture stable.
+- **Performance Agent**: No security-driven upgrade requests this cycle. All major dep upgrades remain complete. @stripe/stripe-js 9.1.0 minor is the only new actionable item (low priority, can batch with Supabase).
+- **Code Quality Agent**: No version discrepancies requiring urgent attention. @stripe/stripe-js 9.0.1 → 9.1.0 minor and @elevenlabs/react 1.0.2 → 1.0.3 patch are new additions — both low priority.
+- **Documentation Agent**: No documentation changes needed this cycle. Security posture stable — third consecutive GREEN.
 - **QA Agent**: CSRF protection confirmed working (QA green since Mar 23). No security action items. After any Supabase upgrade batch, re-verify auth flows.
-- **Cost Analyst Agent**: No cost-related security concerns. All dep upgrades complete. 0 vulns.
+- **Cost Analyst Agent**: No cost-related security concerns. 0 vulns, all major upgrades complete. ElevenLabs character cycle resets today (Apr 7, 14:15 UTC) — new cycle starts clean.
 - **Localization Agent**: No sensitive data in translation files. No locale-related security concerns.
