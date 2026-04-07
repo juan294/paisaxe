@@ -1,18 +1,18 @@
 # Performance Report
 
-> Updated on 2026-04-06 (dev server cache — production build verified Apr 4)
+> Updated on 2026-04-07 (dev server cache — production build verified Apr 4)
 
-## Health Status: GREEN (split budget — both targets met, 3rd consecutive day)
+## Health Status: GREEN (split budget — both targets met, 4th consecutive day)
 
 **Initial load JS: ~1,958 KB (budget: 2,000 KB) ✅ | Total JS: 2,851 KB (budget: 3,000 KB) ✅**
 
 **Note on metrics input:** The agent script reported a 2,500 KB budget violation. That single budget was **retired on 2026-04-04** after investigation confirmed it was structurally unachievable (Turbopack i18n limitation, polyfill floor). The split budget adopted Apr 4 is the authoritative definition. Both targets are GREEN.
 
-**Zero change this cycle.** Bundle: 2,851 KB (same as Apr 4 and Apr 5). No new dependencies. No source changes impacting bundle size. All major dep upgrades from Apr 4 remain in place and verified.
+**Zero change this cycle.** Bundle: 2,851 KB (same as Apr 4, Apr 5, and Apr 6). No new dependencies. No source changes impacting bundle size. All major dep upgrades remain in place. `@anthropic-ai/sdk` was upgraded to 0.82.0 on Apr 6 (triage) — that gap is now closed.
 
 ## Key Metrics
 
-| Metric | Current (2026-04-06) | Previous (2026-04-05) | Mar 8 (prod build) | Budget | Status |
+| Metric | Current (2026-04-07) | Previous (2026-04-06) | Mar 8 (prod build) | Budget | Status |
 |--------|----------------------|-----------------------|---------------------|--------|--------|
 | Total JS | **2,851 KB** | 2,851 KB | 2,726 KB | 3,000 KB (split) | ✅ Under budget |
 | Initial load JS | **~1,958 KB** | ~1,958 KB | — | 2,000 KB (split) | ✅ Under budget |
@@ -21,7 +21,7 @@
 | node_modules | 908 MB | 908 MB | 865 MB | — | Stable |
 | .next | 48 MB | 48 MB | — | — | Dev cache partial view |
 
-*Current (2026-04-06): Dev server was running — cached .next data. Production build was verified on 2026-04-04 (exit 0, 132/132 pages, 2,851 KB confirmed).*
+*Current (2026-04-07): Dev server was running — cached .next data. Production build was verified on 2026-04-04 (exit 0, 132/132 pages, 2,851 KB confirmed).*
 
 ## Budget Status
 
@@ -60,9 +60,9 @@
 | **App code (static)** | ~207 KB | 7.3% | i18n strings (both chunks) |
 | **Other smaller chunks** | ~1,076 KB | 37.7% | Page routes, shared modules |
 
-## Changes This Cycle (Apr 6 vs Apr 5)
+## Changes This Cycle (Apr 7 vs Apr 6)
 
-**No changes.** Zero KB delta. All metrics identical to Apr 5.
+**No bundle changes.** Zero KB delta. All size metrics identical to Apr 6.
 
 | Item | Status |
 |------|--------|
@@ -70,7 +70,8 @@
 | CSS | Unchanged (123 KB) |
 | Production deps | Unchanged (31) |
 | node_modules | Unchanged (908 MB) |
-| Security posture | GREEN (confirmed by security agent — 0 advisories) |
+| @anthropic-ai/sdk | ✅ Upgraded 0.78.0 → 0.82.0 (triage Apr 6) — gap closed |
+| Security posture | GREEN (security agent Apr 7 — 0 advisories, 0 exploitable) |
 
 ## Action Items (Prioritized)
 
@@ -78,9 +79,10 @@
 
 | Item | Status |
 |------|--------|
-| @anthropic-ai/sdk 0.78.0 (vs ~0.82.0) | LOW — +4 minor, API compatible, no security impact |
+| @stripe/stripe-js 9.0.1 → 9.1.0 | LOW — minor release, no CVEs (security agent Apr 7) |
+| @elevenlabs/react 1.0.2 → 1.0.3 | LOW — patch release, no CVEs (security agent Apr 7) |
 
-The only outstanding dep gap is `@anthropic-ai/sdk` at +4 minor versions. No CVEs, no API breakage. Can be updated opportunistically.
+Both new gaps are low priority. Batch with next scheduled Supabase minor upgrade.
 
 ## Previously Implemented
 
@@ -162,7 +164,9 @@ layout.tsx
 
 | Package | Installed | Latest | Gap | Priority |
 |---------|-----------|--------|-----|----------|
-| @anthropic-ai/sdk | 0.78.0 | ~0.82.0 | +4 minor | Low — API compatible, no CVEs |
+| @stripe/stripe-js | 9.0.1 | 9.1.0 | +1 minor | Low — no CVEs |
+| @elevenlabs/react | 1.0.2 | 1.0.3 | +1 patch | Low — no CVEs |
+| ~~@anthropic-ai/sdk~~ | ~~0.78.0~~ | — | — | ✅ **0.82.0 — DONE Apr 6** |
 | ~~stripe~~ | ~~20.3.1~~ | — | — | ✅ **22.0.0 — DONE Apr 4** |
 | ~~@stripe/stripe-js~~ | ~~8.8.0~~ | — | — | ✅ **9.0.1 — DONE Apr 4** |
 | ~~@stripe/react-stripe-js~~ | ~~5.6.0~~ | — | — | ✅ **6.1.0 — DONE Apr 4** |
@@ -172,19 +176,20 @@ layout.tsx
 
 ## Comparison: 13-Run Trend
 
-| Metric | Feb 7 | Mar 8 | Mar 29* | Mar 30* | Apr 1* | Apr 2* | Apr 3* | Apr 4 | Apr 5* | **Apr 6*** | Trend |
-|--------|-------|-------|---------|---------|--------|--------|--------|-------|--------|------------|-------|
-| Total JS | 2,455 KB | 2,726 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,851 KB | 2,851 KB | **2,851 KB** | Stable |
-| CSS | 130 KB | 122 KB | 124 KB | 124 KB | 124 KB | 124 KB | 124 KB | 123 KB | 123 KB | **123 KB** | Stable |
-| Prod deps | 27 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | **31** | Stable |
-| node_modules | 856 MB | 865 MB | 862 MB | 862 MB | 862 MB | 862 MB | 862 MB | 896 MB | 908 MB | **908 MB** | Stable |
-| EL deferred | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| EL idle prefetch | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| Browserslist P1 | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| Analytics deferred P3 | No | No | No | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| posthog-js | 1.237.x | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.364.6 ✅ | 1.364.6 | **1.364.6** | Stable |
-| next | 16.x | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.2.2 ✅ | 16.2.2 | **16.2.2** | Stable |
-| stripe | — | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 22.0.0 ✅ | 22.0.0 | **22.0.0** | Stable |
+| Metric | Feb 7 | Mar 8 | Mar 29* | Mar 30* | Apr 1* | Apr 2* | Apr 3* | Apr 4 | Apr 5* | Apr 6* | **Apr 7*** | Trend |
+|--------|-------|-------|---------|---------|--------|--------|--------|-------|--------|--------|------------|-------|
+| Total JS | 2,455 KB | 2,726 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,851 KB | 2,851 KB | 2,851 KB | **2,851 KB** | Stable |
+| CSS | 130 KB | 122 KB | 124 KB | 124 KB | 124 KB | 124 KB | 124 KB | 123 KB | 123 KB | 123 KB | **123 KB** | Stable |
+| Prod deps | 27 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | **31** | Stable |
+| node_modules | 856 MB | 865 MB | 862 MB | 862 MB | 862 MB | 862 MB | 862 MB | 896 MB | 908 MB | 908 MB | **908 MB** | Stable |
+| EL deferred | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| EL idle prefetch | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| Browserslist P1 | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| Analytics deferred P3 | No | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| posthog-js | 1.237.x | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.364.6 ✅ | 1.364.6 | 1.364.6 | **1.364.6** | Stable |
+| next | 16.x | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.2.2 ✅ | 16.2.2 | 16.2.2 | **16.2.2** | Stable |
+| stripe | — | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 22.0.0 ✅ | 22.0.0 | 22.0.0 | **22.0.0** | Stable |
+| @anthropic-ai/sdk | — | — | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.82.0 ✅ | **0.82.0** | Stable |
 
 *\*Dev server cache — may differ slightly from production build. Apr 4 = production build verified.*
 
@@ -221,29 +226,30 @@ All 6 locales bundled in initial JS (~208 KB combined). Root cause: Turbopack 16
 | ~~#2~~ | ~~Fix posthog-js~~ | Security | Trivial | ✅ **DONE (Apr 3)** |
 | ~~#2~~ | ~~Stripe ecosystem upgrade~~ | Supply-chain risk | Medium | ✅ **DONE (Apr 4)** |
 | ~~#3~~ | ~~@elevenlabs/react upgrade~~ | Stability | Medium | ✅ **DONE (Apr 4)** |
+| ~~#4~~ | ~~@anthropic-ai/sdk 0.78.0→0.82.0~~ | +4 minor | Trivial | ✅ **DONE (Apr 6 triage)** |
 | P4 | Tree-shake Supabase realtime | ~20-30 KB | Medium | Downgraded — low ROI |
 
-**No active action items.** All budget and dependency goals met.
+**No active action items.** All budget and dependency goals met. Two new low-priority dep gaps: `@stripe/stripe-js` 9.1.0 and `@elevenlabs/react` 1.0.3 — batch opportunistically.
 
 ---
 
 ## Cross-Agent Context
 
-**For Security Agent:** All dep upgrades complete. next@16.2.2 ✅, posthog-js@1.364.6 ✅, stripe 22.0.0 ✅, @stripe/stripe-js 9.0.1 ✅, @stripe/react-stripe-js 6.1.0 ✅, @elevenlabs/react 1.0.2 ✅. Security agent confirmed GREEN (0 advisories) on Apr 6. Remaining gap: @anthropic-ai/sdk +4 minor (no CVEs). No security-driven upgrade requests.
+**For Security Agent:** All dep upgrades complete. next@16.2.2 ✅, posthog-js@1.364.6 ✅, stripe 22.0.0 ✅, @stripe/stripe-js 9.0.1 ✅, @stripe/react-stripe-js 6.1.0 ✅, @elevenlabs/react 1.0.2 ✅, @anthropic-ai/sdk 0.82.0 ✅. Security agent confirmed GREEN (0 advisories, 0 exploitable) on Apr 7. New minor gaps: @stripe/stripe-js 9.1.0 + @elevenlabs/react 1.0.3 — both LOW, no CVEs. Batch with Supabase minor when convenient.
 
-**For Code Quality Agent:** No version discrepancies remain. All major upgrades resolved. @anthropic-ai/sdk 0.78.0 vs ~0.82.0 — +4 minor, low priority, API compatible. No performance-driven code changes needed.
+**For Code Quality Agent:** @anthropic-ai/sdk 0.82.0 installed — gap closed. Two new low-priority patches: @stripe/stripe-js 9.0.1→9.1.0, @elevenlabs/react 1.0.2→1.0.3. No performance-driven code changes needed.
 
 **For QA Agent:** No user-facing changes this cycle. Payment flow verified (Stripe v22 upgrade done Apr 4). Voice widget verified via backward compatibility (@elevenlabs/react 1.0.2 upgrade done Apr 4). No new regressions.
 
 **For Coverage Agent:** No new production dependencies. No bundle changes. Zero impact on coverage this cycle.
 
-**For Cost Analyst Agent:** Bundle stable at 2,851 KB (zero change for 3rd consecutive day). No cost impact. Zero production voice usage — ElevenLabs SDK not exercised in production. ElevenLabs character reset tomorrow (April 7, 14:15 UTC) — new cycle will start clean.
+**For Cost Analyst Agent:** Bundle stable at 2,851 KB (zero change for 4th consecutive day). No cost impact. Zero production voice usage — ElevenLabs SDK not exercised in production. ElevenLabs character cycle reset today (April 7, 14:15 UTC) — new cycle just started.
 
 **For Localization Agent:** i18n lazy loading code correct (es+en static, fr/de/pt/ast dynamic). 392 keys stable. P5 closed — Turbopack limitation. No further optimization possible.
 
 ---
 
-*Report updated 2026-04-06 — no changes, GREEN status maintained (3rd consecutive day)*
+*Report updated 2026-04-07 — no changes, GREEN status maintained (4th consecutive day)*
 *Initial load JS: ~1,958 KB / 2,000 KB | Total JS: 2,851 KB / 3,000 KB — GREEN*
 *Split budget adopted Apr 4 — old 2,500 KB single budget retired*
-*All dep upgrades complete. No active action items.*
+*All dep upgrades complete. New minor gaps: @stripe/stripe-js 9.1.0 + @elevenlabs/react 1.0.3 (LOW, batch with Supabase).*
