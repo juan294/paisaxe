@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-04-07 06:00:02
+> Auto-generated on 2026-04-08 06:00:03
 
 ## CLAUDE.md Status
 
@@ -39,6 +39,7 @@ No new migrations since documentation update.
 ### Scripts
 
 ```
+scripts/commit-reports.sh
 scripts/documentation-agent.sh
 scripts/lib/sms-alerts.sh
 scripts/performance-agent.sh
@@ -115,10 +116,11 @@ webhooks/translate
 
 ## Changes Made This Run
 
-**No changes made.** Eleventh consecutive clean run.
+**Status: GREEN — No documentation gaps found. Twelfth consecutive clean run.**
 
-- **Feature flags**: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
+- **Feature flags**: Gaps file reports zero undocumented flags. All 17 feature flags and 10 agent flags remain fully documented in `docs/project/features.md`. No additions needed.
 - **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require new documentation.
+- **No changes made** to `features.md` or `CLAUDE.md` this run.
 
 ---
 
