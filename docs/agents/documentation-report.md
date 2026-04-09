@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-04-08 06:00:03
+> Auto-generated on 2026-04-09 06:00:02 | Agent run: 2026-04-09
 
 ## CLAUDE.md Status
 
@@ -18,6 +18,8 @@ src/app/favorites/page.test.tsx
 src/app/immersive/immersive-page-content.test.tsx
 src/app/immersive/immersive-page-content.tsx
 src/app/layout.tsx
+src/components/admin/agents-dashboard/use-agent-runner.test.ts
+src/components/admin/agents-dashboard/use-agent-terminal.test.ts
 src/components/admin/elevenlabs-analytics-panel.test.tsx
 src/components/admin/github-analytics-panel.test.tsx
 src/components/admin/story-editor-dialog/use-image-editor.test.ts
@@ -114,13 +116,27 @@ webhooks/translate
 | CLAUDE.md | 2026-03-28 |
 | README.md | 2026-02-16 |
 
-## Changes Made This Run
+---
 
-**Status: GREEN — No documentation gaps found. Twelfth consecutive clean run.**
+## Changes Made This Run (2026-04-09)
 
-- **Feature flags**: Gaps file reports zero undocumented flags. All 17 feature flags and 10 agent flags remain fully documented in `docs/project/features.md`. No additions needed.
-- **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require new documentation.
-- **No changes made** to `features.md` or `CLAUDE.md` this run.
+**Status: GREEN** — No documentation gaps found. Thirteenth consecutive clean run.
+
+**Feature flags**: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Gaps file reports zero undocumented flags.
+
+**API routes**: All 51 flagged routes confirmed internal — no external-consumption routes require new documentation:
+- `admin/*` — Admin panel APIs (require admin auth, internal only)
+- `chat`, `chat/stream` — Frontend-called chat APIs (internal)
+- `checkout/*` — Payment flow handlers (internal)
+- `cron/*` — Vercel cron job handlers (internal)
+- `favorites`, `feature-flags`, `suggestions`, `voice-access` — Frontend-called APIs (internal)
+- `health/db` — Internal health sub-check
+- `mcp/*` — Voice agent tools called by ElevenLabs; already documented in features.md under "Custom MCP tools"
+- `webhooks/*` — Already documented in features.md under "Webhooks"
+
+**No source changes** since last run that introduce new user-facing features or flags.
+
+**No changes made to any documentation files.**
 
 ---
 
