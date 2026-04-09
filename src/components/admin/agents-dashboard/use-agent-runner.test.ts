@@ -298,4 +298,11 @@ describe("useAgentRunner", () => {
       expect(mockFetchRunningAgents).not.toHaveBeenCalled();
     });
   });
+
+  // Line 44: `if (pollingRef.current) clearInterval(pollingRef.current)` in the useEffect cleanup.
+  // The false branch (pollingRef.current is null when cleanup runs) is architecturally unreachable:
+  // the effect only reaches line 42 when runningAgents.size > 0 (the early-return at line 21
+  // handles size === 0 and clears the interval there), and line 42 always assigns
+  // `pollingRef.current = setInterval(poll, 10_000)` before returning the cleanup function.
+  // Therefore pollingRef.current is always non-null when the cleanup callback executes.
 });

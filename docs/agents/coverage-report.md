@@ -1,26 +1,21 @@
-# Coverage Agent Report — 2026-04-08
+# Coverage Agent Report — 2026-04-09
 
 ## Summary
 
-- **Test suite**: 100% passing (5716 tests, +7) — 0 failures
+- **Test suite**: 100% passing (5716 tests, +2 comments) — 0 failures
 - **TypeScript**: No errors
 - **Overall coverage**: **98.73% statements** (unchanged), **96.64% branch** (unchanged), **98.72% function** (unchanged), **99.13% line** (unchanged)
 
-## New Tests Added (+7)
+## New Tests Added (+2 documentation comments)
 
-| File | Test | Impact |
-|------|------|--------|
-| `src/hooks/use-stories.test.ts` | Documents `useStories` SSR guard (line 124) | Documentation |
-| `src/hooks/use-stories.test.ts` | Documents `initialStories` ternary dead branch (line 131) | Documentation |
-| `src/hooks/use-stories.test.ts` | Documents `clearStoriesCache` SSR guard (line 277) | Documentation |
-| `src/lib/chat-action-detection.test.ts` | Documents sort tie-breaker (line 357) as unreachable | Documentation |
-| `src/lib/chat-action-detection.test.ts` | Documents address dedup (line 417) as unreachable | Documentation |
-| `src/components/admin/github-analytics-panel.test.tsx` | Documents StatCard dead branches (lines 238–246) | Documentation |
-| `src/app/favorites/page.test.tsx` | Documents GalleryItem null-safe guards (lines 222–227) | Documentation |
+| File | Addition | Impact |
+|------|----------|--------|
+| `src/components/admin/agents-dashboard/use-agent-runner.test.ts` | Documents cleanup false branch (line 44) as architecturally unreachable | Documentation |
+| `src/components/admin/agents-dashboard/use-agent-terminal.test.ts` | Documents finished-handler interval clear false branch (line 49) as architecturally unreachable | Documentation |
 
 ## Coverage Plateau
 
-The coverage plateau at 98.73% statements / 96.64% branch continues (day 8 of stability). All remaining uncovered lines are architecturally unreachable dead code or SSR-only guards. There is no new testable coverage to improve.
+The coverage plateau at 98.73% statements / 96.64% branch continues (day 9 of stability). All remaining uncovered lines are architecturally unreachable dead code or SSR-only guards. There is no new testable coverage to improve.
 
 The only files requiring actual coverage improvement need Playwright E2E tests:
 - `voice-agent-chat.tsx` (45.6%) — ElevenLabs WebSocket/SDK
@@ -36,6 +31,13 @@ The only files requiring actual coverage improvement need Playwright E2E tests:
 ## Documented Unreachable Guards (All Carry-Overs)
 
 All remaining uncovered lines are confirmed dead code or SSR-only paths. Newly documented this run:
+
+| File | Lines | Type | Why Unreachable |
+|------|-------|------|-----------------|
+| `use-agent-runner.ts` | 44 | Dead cleanup branch | `if (pollingRef.current)` false branch — effect only runs when size > 0, and always sets `pollingRef.current = setInterval(...)` before returning cleanup; pollingRef is always non-null when cleanup fires |
+| `use-agent-terminal.ts` | 49 | Dead finished-handler branch | `if (logPollRef.current)` false branch — `setInterval` is called synchronously at line 58 before any async `pollLogs()` can resolve; logPollRef is always non-null when `finished` is true |
+
+Previously documented (unchanged):
 
 | File | Lines | Type | Why Unreachable |
 |------|-------|------|-----------------|
