@@ -461,13 +461,42 @@ describe("GitHubAnalyticsPanel", () => {
     expect(screen.queryByText("Daily Traffic")).not.toBeInTheDocument();
   });
 
-  // Line 238: `const colors = statColorClasses[color] || statColorClasses.stone;`
-  // The fallback `|| statColorClasses.stone` is architecturally unreachable because:
-  // 1. The color prop type is `"blue" | "emerald" | "amber" | "violet" | "stone"`
-  // 2. The default parameter value is `color = "stone"`
-  // 3. All 5 StatCard call sites in GitHubAnalyticsPanel pass explicit valid color values
-  // Therefore no runtime path can produce a color value outside statColorClasses keys.
-  // This is a defensive fallback that cannot be exercised through the component's public API.
+  // Lines 238-246: StatCard dead branches — two architecturally unreachable paths:
+  //
+  // 1. Line 238: `const colors = statColorClasses[color] || statColorClasses.stone;`
+  //    The fallback `|| statColorClasses.stone` never runs because:
+  //    - The color prop type is `"blue" | "emerald" | "amber" | "violet" | "stone"`
+  //    - The default parameter is `color = "stone"` (a valid key)
+  //    - All 5 StatCard call sites pass explicit valid color values
+  //    TypeScript enforces this — no runtime path can produce an invalid color key.
+  //
+  // 2. Line 246: `{typeof value === "number" ? value.toLocaleString() : value}`
+  //    The string branch (`: value`) never runs because all 5 StatCard call sites in
+  //    GitHubAnalyticsPanel pass number values from the API summary object.
+  //    StatCard is a non-exported internal function so it cannot be called externally.
+
+  it("documents StatCard || fallback and string-value branch (lines 238, 246) as unreachable dead code", async () => {
+    // Confirm: all StatCard call sites pass valid colors and number values.
+    // When the component renders with data, V8 records both branches as partially uncovered
+    // because (a) `|| statColorClasses.stone` RHS is never evaluated and (b) `: value` string
+    // branch is never taken. These are defensive guards for hypothetical future call sites.
+    vi.mocked(adminApi.fetchGithubAnalytics).mockResolvedValue({
+      data: mockData,
+    });
+
+    render(<GitHubAnalyticsPanel />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Total Views")).toBeInTheDocument();
+    });
+
+    // All 5 StatCards render with number values — string branch never taken
+    expect(screen.getByText("250")).toBeInTheDocument();
+    expect(screen.getByText("80")).toBeInTheDocument();
+    expect(screen.getByText("15")).toBeInTheDocument();
+    expect(screen.getByText("10")).toBeInTheDocument();
+    expect(screen.getByText("14")).toBeInTheDocument();
+  });
 
   it("renders StatCard with large number values using toLocaleString formatting", async () => {
     // Covers line 246: typeof value === "number" ? value.toLocaleString() : value

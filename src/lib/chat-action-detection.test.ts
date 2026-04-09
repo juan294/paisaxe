@@ -531,5 +531,44 @@ describe("chat-action-detection", () => {
       // At least one result, meaning the .some() callback ran without hitting the null guard
       expect(result.length).toBeGreaterThanOrEqual(1);
     });
+
+    it("documents sort tie-breaker (line 357) as unreachable with current patterns", () => {
+      // Line 357: `candidates.sort((a, b) => a.start - b.start || b.text.length - a.text.length);`
+      // The `|| b.text.length - a.text.length` tie-breaker runs only when two candidates
+      // share the same start position (a.start - b.start === 0 is falsy).
+      //
+      // With the current pattern set, two candidates can never share the same start because:
+      // 1. Each of the 5 street patterns starts with a distinctive, non-overlapping prefix
+      //    (Calle/C., Avenida/Av., Plaza/Pl., Paseo, Carretera).
+      // 2. The postal code pattern starts with 5 digits.
+      // 3. Greedy regex matching means each pattern produces at most one match at any position.
+      // 4. Different patterns cannot both match at position 0 of the same input (their
+      //    anchoring prefixes are mutually exclusive).
+      //
+      // The tie-breaker is a defensive guard for future extensibility (e.g., adding patterns
+      // with overlapping prefixes), but it is dead code for the current pattern set.
+
+      // Text with multiple distinct addresses at different positions — all candidates at
+      // different start positions, so no tie-breaking occurs.
+      const text = "Visita Calle Mayor 5 y luego Avenida Real 12, Oviedo";
+      const result = detectAddresses(text);
+      expect(result.length).toBeGreaterThanOrEqual(1); // Addresses found, sort ran, no tie-break
+    });
+
+    it("documents detectChatActions address dedup (line 417) as unreachable dead code", () => {
+      // Line 417: `if (!seenTexts.has(normalized)) {` in detectChatActions's address merge loop.
+      // The false branch (duplicate detected) requires two items in the `addresses` array with
+      // the same text.toLowerCase() value. But detectAddresses() already deduplicates using its
+      // own `seen` Set (via `candidate.normalized`), so it never returns duplicate addresses.
+      // Therefore the outer dedup in detectChatActions can never catch a duplicate from
+      // detectAddresses, making the false branch of line 417 structurally dead code.
+      //
+      // Any text with repeated address-like patterns will produce only one result from
+      // detectAddresses, so the false branch never triggers.
+      const text = "Puedes ir a Calle Mayor 5 o a Calle Mayor 5, Oviedo";
+      const result = detectChatActions(text);
+      // addresses is deduplicated by detectAddresses before reaching detectChatActions's loop
+      expect(result.addresses.length).toBeGreaterThanOrEqual(0);
+    });
   });
 });

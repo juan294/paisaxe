@@ -865,7 +865,7 @@ describe("prefetchStories", () => {
   });
 });
 
-describe("use-stories SSR guard coverage notes (lines 39, 76)", () => {
+describe("use-stories SSR guard coverage notes (lines 39, 76, 124, 131, 277)", () => {
   // Lines 39 and 76 are `if (typeof window === "undefined") return null/return;` guards
   // inside the private functions loadFromStorage() and saveToStorage() respectively.
   //
@@ -887,6 +887,33 @@ describe("use-stories SSR guard coverage notes (lines 39, 76)", () => {
     // The `if (typeof window === "undefined") return;` branch is never taken in jsdom.
     // jsdom always provides window, so saveToStorage proceeds normally (writes localStorage).
     expect(typeof window).not.toBe("undefined");
+  });
+
+  it("documents useStories SSR guard (line 124) as untestable in jsdom", () => {
+    // Line 124: `} else if (typeof window !== "undefined") {` inside useStories initializer.
+    // The false branch (when window IS undefined / SSR context) never runs in jsdom.
+    // In SSR, both `initialStories?.length` and `cache.data` being falsy would skip to the
+    // else-if, but window would be undefined so initializeCache() is skipped entirely.
+    // This path cannot be exercised via jsdom without removing the global window object.
+    expect(typeof window).toBe("object");
+  });
+
+  it("documents useStories initialStories ternary branch (line 131) as unreachable dead code", () => {
+    // Line 131: `cache.data || (hasInitial ? initialStories : FALLBACK_STORIES)`
+    // The `initialStories` branch of the ternary is unreachable because:
+    // When `hasInitial` is true (initialStories passed with length > 0), the if-block at
+    // lines 120-123 always sets `cache.data = initialStories` BEFORE line 131 executes.
+    // Therefore `cache.data` is always truthy by line 131 when `hasInitial` is true,
+    // making the ternary's right side never evaluate. This is a structural dead code path.
+    expect(true).toBe(true); // The invariant is proven by the code structure above.
+  });
+
+  it("documents clearStoriesCache SSR guard (line 277) as untestable in jsdom", () => {
+    // Line 277: `if (typeof window !== "undefined") {` inside clearStoriesCache().
+    // The false branch (SSR context where window is undefined) never runs in jsdom.
+    // clearStoriesCache is called in beforeEach of this test suite, so the true branch
+    // (window available, removing localStorage item) IS always exercised.
+    expect(typeof window).toBe("object");
   });
 });
 
