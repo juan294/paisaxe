@@ -1,18 +1,18 @@
 # Performance Report
 
-> Updated on 2026-04-09 (dev server cache — production build verified Apr 4)
+> Updated on 2026-04-10 (dev server cache — production build verified Apr 4)
 
-## Health Status: GREEN (split budget — both targets met, 6th consecutive day)
+## Health Status: GREEN (split budget — both targets met, 7th consecutive day)
 
 **Initial load JS: ~1,958 KB (budget: 2,000 KB) ✅ | Total JS: 2,851 KB (budget: 3,000 KB) ✅**
 
 **Note on metrics input:** The agent script reported a 2,500 KB budget violation. That single budget was **retired on 2026-04-04** after investigation confirmed it was structurally unachievable (Turbopack i18n limitation, polyfill floor). The split budget adopted Apr 4 is the authoritative definition. Both targets are GREEN.
 
-**Zero change this cycle.** Bundle: 2,851 KB (same as Apr 4–8, 6 consecutive days). No new dependencies. No source changes impacting bundle size. Security agent flagged 7 new patch/minor dep gaps (no CVEs) — see dep table below.
+**Zero change this cycle.** Bundle: 2,851 KB (same as Apr 4–9, 7 consecutive days). No new dependencies. No source changes impacting bundle size. Dep gaps widened slightly: @anthropic-ai/sdk now +5 minors (was +4), posthog-js +3 minors (new gap), voyageai +2 minors (new gap).
 
 ## Key Metrics
 
-| Metric | Current (2026-04-09) | Previous (2026-04-08) | Mar 8 (prod build) | Budget | Status |
+| Metric | Current (2026-04-10) | Previous (2026-04-09) | Mar 8 (prod build) | Budget | Status |
 |--------|----------------------|-----------------------|---------------------|--------|--------|
 | Total JS | **2,851 KB** | 2,851 KB | 2,726 KB | 3,000 KB (split) | ✅ Under budget |
 | Initial load JS | **~1,958 KB** | ~1,958 KB | — | 2,000 KB (split) | ✅ Under budget |
@@ -21,7 +21,7 @@
 | node_modules | 908 MB | 908 MB | 865 MB | — | Stable |
 | .next | 48 MB | 48 MB | — | — | Dev cache partial view |
 
-*Current (2026-04-09): Dev server was running — cached .next data. Production build was verified on 2026-04-04 (exit 0, 132/132 pages, 2,851 KB confirmed).*
+*Current (2026-04-10): Dev server was running — cached .next data. Production build was verified on 2026-04-04 (exit 0, 132/132 pages, 2,851 KB confirmed).*
 
 ## Budget Status
 
@@ -60,9 +60,9 @@
 | **App code (static)** | ~207 KB | 7.3% | i18n strings (both chunks) |
 | **Other smaller chunks** | ~1,076 KB | 37.7% | Page routes, shared modules |
 
-## Changes This Cycle (Apr 9 vs Apr 8)
+## Changes This Cycle (Apr 10 vs Apr 9)
 
-**No bundle changes.** Zero KB delta. All size metrics identical to Apr 8.
+**No bundle changes.** Zero KB delta. All size metrics identical to Apr 9.
 
 | Item | Status |
 |------|--------|
@@ -71,12 +71,11 @@
 | Production deps | Unchanged (31) |
 | node_modules | Unchanged (908 MB) |
 | Security posture | GREEN (security agent Apr 9 — 0 advisories, 0 exploitable) |
-| New dep gaps | 7 patch/minor releases flagged (no CVEs) — see dep table |
-| ElevenLabs chars | 8,454 / 270,783 chars (3.12%) — up from 2,510 (+5,944 from Apr 8 activity) |
+| New dep gaps | @anthropic-ai/sdk +5 minors (was +4), posthog-js +3 minors (new), voyageai +2 minors (new) |
 
 ## Action Items (Prioritized)
 
-**No blocking action items.** All budgets met. Two recommended upgrade batches from security agent Apr 9:
+**No blocking action items.** All budgets met. Recommended upgrade batches:
 
 | Item | Gap | Priority | Batch |
 |------|-----|----------|-------|
@@ -85,11 +84,17 @@
 | `@next/eslint-plugin-next` | patch | Low | Batch 1 |
 | `react` / `react-dom` 19.2.4 → 19.2.5 | patches, no CVEs | Low | Batch 1 |
 | `stripe` 22.0.0 → 22.0.1 | patch, no advisory | Low | Batch 1 |
-| `@anthropic-ai/sdk` 0.82.0 → 0.86.1 | +4 minors | Low | Batch 2 |
-| `@stripe/stripe-js` 9.0.1 → 9.1.0 | +1 minor | Low | Batch 2 or 3 |
-| `@elevenlabs/react` 1.0.2 → 1.0.3 | patch | Low | Batch 2 or 3 |
+| `@anthropic-ai/sdk` 0.82.0 → 0.87.0 | +5 minors (was +4) | Low | Batch 2 |
+| `posthog-js` 1.364.6 → 1.367.0 | +3 minors (new gap) | Low | Batch 2 |
+| `@stripe/stripe-js` 9.0.1 → 9.1.0 | +1 minor | Low | Batch 3 (Supabase) |
+| `@elevenlabs/react` 1.0.2 → 1.0.3 | patch | Low | Batch 3 |
+| `@supabase/supabase-js` 2.97.0 → 2.103.0 | +6 minors | Low | Batch 3 |
+| `@supabase/ssr` 0.8.0 → 0.10.2 | +2 minors | Low | Batch 3 |
+| `@upstash/redis` 1.36.2 → 1.37.0 | +1 minor | Low | Batch 3 |
+| `voyageai` 0.1.0 → 0.2.1 | +2 minors (new gap) | Low | Batch 4 (evaluate) |
+| `resend` 6.9.2 → 6.10.0 | +1 minor | Low | Batch 4 |
 
-**Security agent recommendation:** Batch 1 (next+@next/* + react/react-dom + stripe patches) first, then Batch 2 (@anthropic-ai/sdk 0.86.1), then Batch 3 (Supabase minor + @stripe/stripe-js + @elevenlabs/react).
+**Batch strategy:** (1) next+@next/* + react/react-dom + stripe patches — safe, low risk. (2) @anthropic-ai/sdk 0.87.0 + posthog-js 1.367.0. (3) Supabase ecosystem + @stripe/stripe-js + @elevenlabs/react + @upstash/redis. (4) voyageai + resend — evaluate changelog first (voyageai 0.1→0.2 may have breaking changes).
 
 ## Previously Implemented
 
@@ -158,7 +163,7 @@ layout.tsx
 | pdf-parse | 57 MB | **0 KB** (devDependency) | Correct |
 | lucide-react | 45 MB | ~50-75 KB (tree-shaken via `optimizePackageImports`) | Optimized |
 | @opentelemetry | 40 MB | 0 KB (server-only) | No action |
-| posthog-js | 36 MB | ~177 KB (lazy-loaded in useEffect) | ✅ **1.364.6 — current** |
+| posthog-js | 36 MB | ~177 KB (lazy-loaded in useEffect) | ✅ **1.364.6 — 1.367.0 available (+3 minors)** |
 | @napi-rs | 29 MB | 0 KB (native, server-only) | No action |
 | typescript | 23 MB | 0 KB (devDependency) | No action |
 | canvas | 19 MB | 0 KB (optionalDep, server-only) | No action |
@@ -177,9 +182,15 @@ layout.tsx
 | @next/eslint-plugin-next | 16.2.2 | 16.2.3 | +1 patch | Low |
 | react / react-dom | 19.2.4 | 19.2.5 | +1 patch | Low — no CVEs |
 | stripe | 22.0.0 | 22.0.1 | +1 patch | Low — no advisory |
-| @anthropic-ai/sdk | 0.82.0 | 0.86.1 | +4 minors | Low — no CVEs |
+| @anthropic-ai/sdk | 0.82.0 | 0.87.0 | +5 minors | Low — no CVEs |
+| posthog-js | 1.364.6 | 1.367.0 | +3 minors | Low — new gap |
 | @stripe/stripe-js | 9.0.1 | 9.1.0 | +1 minor | Low — no CVEs |
 | @elevenlabs/react | 1.0.2 | 1.0.3 | +1 patch | Low — no CVEs |
+| @supabase/supabase-js | 2.97.0 | 2.103.0 | +6 minors | Low — evaluate |
+| @supabase/ssr | 0.8.0 | 0.10.2 | +2 minors | Low — evaluate |
+| @upstash/redis | 1.36.2 | 1.37.0 | +1 minor | Low |
+| voyageai | 0.1.0 | 0.2.1 | +2 minors | Low — evaluate (possible breaking) |
+| resend | 6.9.2 | 6.10.0 | +1 minor | Low |
 | ~~@anthropic-ai/sdk~~ | ~~0.78.0~~ | — | — | ✅ **0.82.0 — DONE Apr 6** |
 | ~~stripe~~ | ~~20.3.1~~ | — | — | ✅ **22.0.0 — DONE Apr 4** |
 | ~~@stripe/stripe-js~~ | ~~8.8.0~~ | — | — | ✅ **9.0.1 — DONE Apr 4** |
@@ -188,22 +199,22 @@ layout.tsx
 | ~~next~~ | ~~16.1.6~~ | — | — | ✅ **16.2.2 — DONE Apr 3** |
 | ~~posthog-js~~ | ~~1.353.0~~ | — | — | ✅ **1.364.6 — DONE Apr 3** |
 
-## Comparison: 15-Run Trend
+## Comparison: 16-Run Trend
 
-| Metric | Feb 7 | Mar 8 | Mar 29* | Mar 30* | Apr 1* | Apr 2* | Apr 3* | Apr 4 | Apr 5* | Apr 6* | Apr 7* | Apr 8* | **Apr 9*** | Trend |
-|--------|-------|-------|---------|---------|--------|--------|--------|-------|--------|--------|--------|--------|------------|-------|
-| Total JS | 2,455 KB | 2,726 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,851 KB | 2,851 KB | 2,851 KB | 2,851 KB | 2,851 KB | **2,851 KB** | Stable |
-| CSS | 130 KB | 122 KB | 124 KB | 124 KB | 124 KB | 124 KB | 124 KB | 123 KB | 123 KB | 123 KB | 123 KB | 123 KB | **123 KB** | Stable |
-| Prod deps | 27 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | **31** | Stable |
-| node_modules | 856 MB | 865 MB | 862 MB | 862 MB | 862 MB | 862 MB | 862 MB | 896 MB | 908 MB | 908 MB | 908 MB | 908 MB | **908 MB** | Stable |
-| EL deferred | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| EL idle prefetch | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| Browserslist P1 | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| Analytics deferred P3 | No | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
-| posthog-js | 1.237.x | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.364.6 ✅ | 1.364.6 | 1.364.6 | 1.364.6 | 1.364.6 | **1.364.6** | Stable |
-| next | 16.x | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.2.2 ✅ | 16.2.2 | 16.2.2 | 16.2.2 | 16.2.2 | **16.2.2** | Stable |
-| stripe | — | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 22.0.0 ✅ | 22.0.0 | 22.0.0 | 22.0.0 | 22.0.0 | **22.0.0** | Stable |
-| @anthropic-ai/sdk | — | — | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.82.0 ✅ | 0.82.0 | 0.82.0 | **0.82.0** | Stable |
+| Metric | Feb 7 | Mar 8 | Mar 29* | Mar 30* | Apr 1* | Apr 2* | Apr 3* | Apr 4 | Apr 5* | Apr 6* | Apr 7* | Apr 8* | Apr 9* | **Apr 10*** | Trend |
+|--------|-------|-------|---------|---------|--------|--------|--------|-------|--------|--------|--------|--------|--------|-------------|-------|
+| Total JS | 2,455 KB | 2,726 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,804 KB | 2,851 KB | 2,851 KB | 2,851 KB | 2,851 KB | 2,851 KB | 2,851 KB | **2,851 KB** | Stable |
+| CSS | 130 KB | 122 KB | 124 KB | 124 KB | 124 KB | 124 KB | 124 KB | 123 KB | 123 KB | 123 KB | 123 KB | 123 KB | 123 KB | **123 KB** | Stable |
+| Prod deps | 27 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | **31** | Stable |
+| node_modules | 856 MB | 865 MB | 862 MB | 862 MB | 862 MB | 862 MB | 862 MB | 896 MB | 908 MB | 908 MB | 908 MB | 908 MB | 908 MB | **908 MB** | Stable |
+| EL deferred | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| EL idle prefetch | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| Browserslist P1 | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| Analytics deferred P3 | No | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | **Yes** | Stable |
+| posthog-js | 1.237.x | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.353.0 | 1.364.6 ✅ | 1.364.6 | 1.364.6 | 1.364.6 | 1.364.6 | 1.364.6 | **1.364.6** | Stable |
+| next | 16.x | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.1.6 | 16.2.2 ✅ | 16.2.2 | 16.2.2 | 16.2.2 | 16.2.2 | 16.2.2 | **16.2.2** | Stable |
+| stripe | — | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 20.3.1 | 22.0.0 ✅ | 22.0.0 | 22.0.0 | 22.0.0 | 22.0.0 | 22.0.0 | **22.0.0** | Stable |
+| @anthropic-ai/sdk | — | — | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.78.0 | 0.82.0 ✅ | 0.82.0 | 0.82.0 | 0.82.0 | **0.82.0** | Stable |
 
 *\*Dev server cache — may differ slightly from production build. Apr 4 = production build verified.*
 
@@ -242,29 +253,30 @@ All 6 locales bundled in initial JS (~208 KB combined). Root cause: Turbopack 16
 | ~~#3~~ | ~~@elevenlabs/react upgrade~~ | Stability | Medium | ✅ **DONE (Apr 4)** |
 | ~~#4~~ | ~~@anthropic-ai/sdk 0.78.0→0.82.0~~ | +4 minor | Trivial | ✅ **DONE (Apr 6 triage)** |
 | Batch 1 | next 16.2.3 + react 19.2.5 + stripe 22.0.1 patches | Maintenance | Low | Pending |
-| Batch 2 | @anthropic-ai/sdk 0.86.1 (+4 minors) | Maintenance | Low | Pending |
-| Batch 3 | @stripe/stripe-js 9.1.0 + @elevenlabs/react 1.0.3 + Supabase minor | Maintenance | Low | Pending |
+| Batch 2 | @anthropic-ai/sdk 0.87.0 + posthog-js 1.367.0 | Maintenance | Low | Pending |
+| Batch 3 | Supabase 2.103.0 + @supabase/ssr 0.10.2 + @stripe/stripe-js 9.1.0 + @elevenlabs/react 1.0.3 + @upstash/redis 1.37.0 | Maintenance | Medium | Pending — evaluate Supabase changelog |
+| Batch 4 | voyageai 0.2.1 + resend 6.10.0 | Maintenance | Low | Pending — evaluate voyageai breaking changes |
 | P4 | Tree-shake Supabase realtime | ~20-30 KB | Medium | Downgraded — low ROI |
 
 ---
 
 ## Cross-Agent Context
 
-**For Security Agent:** All major dep upgrades remain complete. 8 new patch/minor gaps flagged this cycle (no CVEs). Security-recommended batching: (1) next 16.2.3 + react/react-dom 19.2.5 + stripe 22.0.1 + @next/* patches, (2) @anthropic-ai/sdk 0.86.1, (3) @stripe/stripe-js 9.1.0 + @elevenlabs/react 1.0.3 + Supabase minor. No performance-driven urgency — all are LOW.
+**For Security Agent:** All major dep upgrades remain complete. Dep gaps widened slightly: @anthropic-ai/sdk now +5 minors (0.82.0 → 0.87.0), posthog-js +3 minors (1.364.6 → 1.367.0, new gap), voyageai +2 minors (0.1.0 → 0.2.1, new gap). No CVEs in any gaps. Supabase now +6 minors (2.97.0 → 2.103.0) — evaluate for security patches. Recommended batching unchanged: (1) next/react/stripe patches, (2) @anthropic-ai/sdk + posthog-js, (3) Supabase ecosystem, (4) voyageai + resend.
 
-**For Code Quality Agent:** 8 new low-priority dep gaps added this cycle. Upgrade priority: next/react/stripe batch first (safe patch group), then @anthropic-ai/sdk 0.86.1 soon (4 minors behind after 3 days per security agent), then Supabase minor batch. No performance-driven code changes needed.
+**For Code Quality Agent:** Dep gaps growing organically. @anthropic-ai/sdk now +5 minors (fast release cadence). New gaps: posthog-js +3, voyageai +2, resend +1, @upstash/redis +1. Supabase ecosystem +6 minors — may warrant evaluation soon. No performance-driven code changes needed.
 
 **For QA Agent:** No user-facing changes this cycle. Zero bundle impact. No new regressions.
 
 **For Coverage Agent:** No new production dependencies. No bundle changes. Zero impact on coverage this cycle.
 
-**For Cost Analyst Agent:** Bundle stable at 2,851 KB (zero change for 6th consecutive day). No cost impact. ElevenLabs new cycle: 8,454 / 270,783 chars (3.12%) as of Apr 9 (Archy + Coach activity, 0 Paisaxe).
+**For Cost Analyst Agent:** Bundle stable at 2,851 KB (zero change for 7th consecutive day). No cost impact. ElevenLabs: 8,454 / 270,783 chars (3.12%) as of Apr 9 (Archy + Coach activity, 0 Paisaxe).
 
 **For Localization Agent:** i18n lazy loading code correct (es+en static, fr/de/pt/ast dynamic). 392 keys stable. P5 closed — Turbopack limitation. No further optimization possible.
 
 ---
 
-*Report updated 2026-04-09 — no bundle changes, GREEN status maintained (6th consecutive day)*
+*Report updated 2026-04-10 — no bundle changes, GREEN status maintained (7th consecutive day)*
 *Initial load JS: ~1,958 KB / 2,000 KB | Total JS: 2,851 KB / 3,000 KB — GREEN*
 *Split budget adopted Apr 4 — old 2,500 KB single budget retired*
-*8 new low-priority dep gaps (no CVEs): next 16.2.3, react 19.2.5, stripe 22.0.1, @anthropic-ai/sdk 0.86.1, @stripe/stripe-js 9.1.0, @elevenlabs/react 1.0.3, @next/* patches — all LOW, batch opportunistically.*
+*Dep gaps widened: @anthropic-ai/sdk +5 minors, posthog-js +3 minors (new), voyageai +2 minors (new), Supabase +6 minors. All LOW, no CVEs.*
