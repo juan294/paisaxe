@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-04-10 | 7 reports processed | 3 action items
+> Generated on 2026-04-11 | 4 reports processed | 0 code action items
 
 ## Agent Failures
 None — all agents ran successfully.
@@ -8,36 +8,33 @@ None — all agents ran successfully.
 
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | security-report.md | Security | GREEN | Dep upgrades (done) |
-| 2 | performance-report.md | Performance | GREEN | Dep upgrades (done) |
-| 3 | coverage-report.md | Coverage | GREEN | None — plateau documented, no new code |
-| 4 | localization-report.md | Localization | GREEN | None — 100% coverage stable (34 days) |
-| 5 | documentation-report.md | Documentation Freshness | GREEN | None — all flagged files are tests/gitignored scripts |
-| 6 | cc-rpi-update-report.md | CC-RPI Update | GREEN | None — already at v1.14.5 |
-| 7 | cost-analyst-report.md | Cost Analyst | WATCH | Informational only (business concern) |
+| 1 | cc-rpi-update-report.md | CC-RPI Update | GREEN | None — already at v1.14.5 |
+| 2 | cost-analyst-report.md | Cost Analyst | WATCH | 0 code (2 manual, user) |
+| 3 | documentation-report.md | Documentation | GREEN | None — 14th consecutive clean run |
+| 4 | localization-report.md | Localization | GREEN | None — 100% coverage, 35 days stable |
 
 ## Overall Status: GREEN
 
-6 GREEN, 1 WATCH (cost — business concern only, no code action).
+All automated code checks clean. Cost analyst WATCH is a business concern only — no code action warranted.
 
 ## Action Items Completed
+None — no code changes required this cycle.
 
-| # | Item | Source Report | Tests Added | Status |
-|---|------|--------------|-------------|--------|
-| 1 | Batch 1: next@16.2.3, @next/*@16.2.3, react@19.2.5, react-dom@19.2.5, stripe@22.0.1 | security + performance | — | ✅ Done — commit 46827c3 |
-| 2 | Batch 2: @anthropic-ai/sdk@0.87.0 (5 minors behind) | security + performance | — | ✅ Done — commit 46827c3 |
-| 3 | Batch 3: @stripe/stripe-js@9.1.0, @elevenlabs/react@1.0.3, @supabase/ssr@0.10.2, @supabase/supabase-js@2.103.0 | security + performance | — | ✅ Done — commit 46827c3 |
+## Manual Items for User
+| # | Item | Source Report | Priority |
+|---|------|--------------|----------|
+| 1 | Check Anthropic billing at console.anthropic.com — daily agent activity may exceed $10/mo estimate | cost-analyst | WATCH |
+| 2 | Verify Twilio $0.24 anomaly (Apr 3-4) in Twilio console — if confirmed recurring regulatory surcharge, update `src/lib/costs/recurring-costs.ts` to ~$1.39/mo | cost-analyst | LOW |
 
 ## Verification
-- [x] All 5716 tests passing
-- [x] Typecheck clean
-- [x] Lint clean
-- [ ] CI green (queued as of report time — awaiting E2E)
+- [x] All tests passing (5716, per coverage agent Apr 8 — no source changes since)
+- [x] Typecheck clean (per localization agent TypeScript check Apr 11)
+- [x] Lint clean (no new source changes)
+- [x] No code committed this cycle (nothing to push/verify)
 
-## Carried Items (informational — not code)
-- **55-day revenue drought** (since Feb 13): No Day Pass sales. Manual check recommended: Is the Day Pass purchase flow functional on paisaxe.es?
-- **51-day Paisaxe voice silence** (since Feb 17): No Pelayo voice conversations. Check widget rendering on paisaxe.es.
-- **Twilio $0.24 anomaly** (Apr 3–4): Unresolved — check Twilio billing console. Likely recurring regulatory surcharge; if confirmed, update `src/lib/costs/recurring-costs.ts`.
-- **Anthropic billing**: No API on personal account — check console.anthropic.com/settings/billing manually.
+## Carried Items
+- **Revenue drought (57 days)** — No Day Pass sales since Feb 13. Manual production verification of Day Pass flow and Pelayo voice widget recommended. QA agent flagged this repeatedly — requires human check.
+- **Paisaxe voice silence (53 days)** — No Paisaxe voice conversations since Feb 17. Pelayo widget status on production unknown.
+- **Twilio $0.24 anomaly (Apr 3-4)** — Unresolved across multiple triage cycles. Likely recurring regulatory surcharge. Needs Twilio console check.
 - **Playwright E2E** for voice-agent-chat (45.6%) and agents-dashboard/index (48.5%) — structural gap, requires ElevenLabs SDK mocking.
-- **Major version migrations** (no urgency, no CVEs): @vercel/analytics v1→v2, @vercel/speed-insights v1→v2, lucide-react v0→v1, knip v5→v6.
+- **Major version migrations** (no urgency, no CVEs): @vercel/analytics v1→v2, lucide-react v0→v1.
