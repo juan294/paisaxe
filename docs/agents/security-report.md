@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-04-10
+> Auto-generated on 2026-04-11
 
 ## Health Status: GREEN
 
-**Executive Summary:** 0 advisories detected, 0 exploitable. Fifth consecutive GREEN. All previously resolved vulnerabilities remain clean. 33 outdated packages (count unchanged, 5 packages bumped their available version since Apr 9): `@anthropic-ai/sdk` 0.86.1 → 0.87.0 (+1 minor, 5 total minors behind since Apr 6 upgrade), `posthog-js` 1.365.5 → 1.367.0 (+2 patches), `@types/node` 25.5.2 → 25.6.0 (minor), `@vitest/coverage-v8` 4.1.3 → 4.1.4 (patch), `dotenv` 17.4.0 → 17.4.1 (patch). No new CVEs. All security headers configured correctly in source. CI/CD automation fully active.
+**Executive Summary:** 0 advisories detected, 0 exploitable. **Sixth consecutive GREEN.** All previously resolved vulnerabilities remain clean. 33 outdated packages (count unchanged). Notable version bumps since Apr 10: `@anthropic-ai/sdk` 0.87.0 → 0.88.0 (+1 more minor, now 6 total behind the Apr 6 upgrade to 0.82.0), `@elevenlabs/react` 1.0.3 → 1.1.0 (minor release, more significant than yesterday's patch expectation), `knip` 6.3.1 → 6.4.0 (minor, dev only). **Node_modules discrepancy detected:** Triage (Apr 10, commit 46827c3) reports upgrading next@16.2.3, react@19.2.5, react-dom@19.2.5, stripe@22.0.1, @anthropic-ai/sdk@0.87.0, and Supabase batch — but current `npm outdated` shows these packages still at pre-upgrade installed versions, indicating `npm install` was not run after the commit. Recommend `npm install` to sync node_modules. No new CVEs. All security headers verified in source. CI/CD automation fully active.
 
 ---
 
@@ -65,50 +65,48 @@ No active advisories — no exploitability analysis required this cycle.
 
 ## Outdated Packages
 
-33 packages outdated (count unchanged from Apr 9; 5 packages bumped available version). None have known CVEs.
+33 packages outdated (count unchanged from Apr 10). **Node_modules discrepancy**: Triage commit 46827c3 (Apr 10) records upgrades to next, react, react-dom, stripe, @anthropic-ai/sdk, @stripe/stripe-js, @elevenlabs/react, @supabase/ssr, @supabase/supabase-js — but `npm outdated` shows these packages still at pre-upgrade installed versions. Run `npm install` to sync node_modules with the committed package.json changes. None of the 33 gaps have known CVEs.
 
 | Package | Installed | Available | Type | Security Relevance |
 |---------|-----------|-----------|------|-------------------|
-| @anthropic-ai/sdk | 0.82.0 | 0.87.0 | prod | Low — 5 minors since Apr 6 upgrade, no CVEs; fast release cadence (0.86.1 → 0.87.0 overnight) |
-| @elevenlabs/react | 1.0.2 | 1.0.3 | prod | None — patch bump |
+| @anthropic-ai/sdk | 0.82.0 | 0.88.0 | prod | Low — 6 minor releases behind since Apr 6 upgrade to 0.82.0; fast release cadence (0.87.0 → 0.88.0 overnight). No CVEs. Triage (Apr 10) targeted 0.87.0; latest now 0.88.0. |
+| @elevenlabs/react | 1.0.2 | 1.1.0 | prod | Low — minor release (was expected as 1.0.3 patch, shipped as 1.1.0 minor). No advisories. |
 | @next/bundle-analyzer | 16.2.2 | 16.2.3 | dev | None — patch |
 | @next/eslint-plugin-next | 16.2.2 | 16.2.3 | dev | None — patch |
 | @playwright/test | 1.58.2 | 1.59.1 | dev | None |
 | @stripe/stripe-js | 9.0.1 | 9.1.0 | prod | None — minor bump, no advisories |
-| @supabase/ssr | 0.8.0 | 0.10.2 | prod | Low — 2 minor bumps, auth library, no advisories |
-| @supabase/supabase-js | 2.97.0 | 2.103.0 | prod | Low — 6 minor bumps, no advisories |
+| @supabase/ssr | 0.8.0 | 0.10.2 | prod | Low — 2 minor bumps, auth library, no advisories. Triage (Apr 10) committed 0.10.2 upgrade; node_modules still at 0.8.0 pending `npm install`. |
+| @supabase/supabase-js | 2.97.0 | 2.103.0 | prod | Low — 6 minor bumps, no advisories. Same node_modules sync issue as @supabase/ssr. |
 | @tailwindcss/postcss | 4.2.1 | 4.2.2 | dev | None |
-| @types/node | 25.5.0 | 25.6.0 | dev | None — minor bump (was 25.5.2 yesterday) |
+| @types/node | 25.5.0 | 25.6.0 | dev | None — minor bump |
 | @typescript-eslint/eslint-plugin | 8.56.1 | 8.58.1 | dev | None |
 | @upstash/redis | 1.36.2 | 1.37.0 | prod | None |
 | @vercel/analytics | 1.6.1 | 2.0.1 | prod | None — MPL-2.0, major version pending migration |
 | @vercel/speed-insights | 1.3.1 | 2.0.0 | prod | None — major version pending migration |
 | @vitejs/plugin-react | 5.1.4 | 6.0.1 | dev | None |
-| @vitest/coverage-v8 | 4.1.1 | 4.1.4 | dev | None — patch bump (was 4.1.3 yesterday) |
+| @vitest/coverage-v8 | 4.1.1 | 4.1.4 | dev | None — patch bump |
 | canvas | 3.2.1 | 3.2.3 | prod | None |
-| dotenv | 17.3.1 | 17.4.1 | dev | None — patch bump (was 17.4.0 yesterday) |
+| dotenv | 17.3.1 | 17.4.1 | dev | None — patch bump |
 | jsdom | 28.1.0 | 27.0.1 | dev | **Note**: installed > latest — pre-release/beta channel in use, not a downgrade |
-| knip | 5.85.0 | 6.3.1 | dev | None |
+| knip | 5.85.0 | 6.4.0 | dev | None — major version bump (was 6.3.1 yesterday), dev tooling only |
 | lucide-react | 0.575.0 | 1.8.0 | prod | None — major version pending migration |
-| next | 16.2.2 | 16.2.3 | prod | Low — patch release, no advisory for 16.2.2, upgrade when convenient |
+| next | 16.2.2 | 16.2.3 | prod | Low — patch release, no advisory for 16.2.2. Triage (Apr 10) committed 16.2.3; node_modules still at 16.2.2 pending `npm install`. |
 | pdfjs-dist | 5.4.624 | 5.6.205 | prod | Low — minor bump |
 | postcss | 8.5.6 | 8.5.9 | dev | None |
-| posthog-js | 1.364.6 | 1.367.0 | prod | None — 3 patches (was 1.365.5 yesterday) |
-| react | 19.2.4 | 19.2.5 | prod | None — patch bump |
-| react-dom | 19.2.4 | 19.2.5 | prod | None — patch bump |
+| posthog-js | 1.364.6 | 1.367.0 | prod | None — 3 patches |
+| react | 19.2.4 | 19.2.5 | prod | None — patch bump. Triage (Apr 10) committed 19.2.5; node_modules still at 19.2.4 pending `npm install`. |
+| react-dom | 19.2.4 | 19.2.5 | prod | None — same as react above |
 | resend | 6.9.2 | 6.10.0 | prod | None |
-| stripe | 22.0.0 | 22.0.1 | prod | None — patch bump |
+| stripe | 22.0.0 | 22.0.1 | prod | None — patch bump. Triage (Apr 10) committed 22.0.1; node_modules still at 22.0.0 pending `npm install`. |
 | tailwindcss | 4.2.1 | 4.2.2 | dev | None |
 | typescript | 5.9.3 | 6.0.2 | dev | None — major version, dev tooling only |
 | vitest | 4.1.1 | 3.2.4 | dev | **Note**: installed > latest — pre-release/beta channel in use, not a downgrade |
 | voyageai | 0.1.0 | 0.2.1 | prod | Low — minor bump, AI SDK |
 
-**New available version bumps since Apr 9 (+5 packages, count unchanged at 33):**
-- `@anthropic-ai/sdk 0.86.1 → 0.87.0` — another minor release overnight; now 5 minors behind since the Apr 6 upgrade to 0.82.0
-- `posthog-js 1.365.5 → 1.367.0` — +2 more patches (was 9 patches behind yesterday, now more)
-- `@types/node 25.5.2 → 25.6.0` — minor version bump (dev only)
-- `@vitest/coverage-v8 4.1.3 → 4.1.4` — patch (dev only)
-- `dotenv 17.4.0 → 17.4.1` — patch (dev only)
+**New available version bumps since Apr 10 (+3 packages, count unchanged at 33):**
+- `@anthropic-ai/sdk 0.87.0 → 0.88.0` — another minor release overnight; fast release cadence continues
+- `@elevenlabs/react 1.0.3 → 1.1.0` — shipped as a minor (not patch as previously expected)
+- `knip 6.3.1 → 6.4.0` — minor dev tooling release
 
 **Channel note (vitest + jsdom):** `npm outdated` compares against the `latest` dist-tag. vitest@4.1.1 and jsdom@28.1.0 are on a pre-release channel (installed versions exceed stable `latest`). These are not regressions.
 
@@ -177,17 +175,22 @@ Flagged packages requiring review:
 
 No remediation required this cycle. 0 active advisories.
 
+**Immediate action (node_modules sync):**
+
+```bash
+# Sync node_modules with package.json after Apr 10 triage upgrades (commit 46827c3)
+npm install
+```
+
+This resolves the discrepancy between committed package.json versions (next@16.2.3, react@19.2.5, react-dom@19.2.5, stripe@22.0.1, @anthropic-ai/sdk@0.87.0, @supabase/ssr@0.10.2, @supabase/supabase-js@2.103.0, @stripe/stripe-js@9.1.0, @elevenlabs/react@1.0.3) and currently installed node_modules versions.
+
 **Ongoing maintenance (low priority, no CVEs):**
 
-1. **`@anthropic-ai/sdk` minors** (`0.82.0 → 0.87.0`) — 5 minor bumps in 4 days; fast release cadence. Upgrade when convenient: `npm install @anthropic-ai/sdk@latest`. No breaking changes reported.
-2. **`next` patch batch** (`16.2.2 → 16.2.3`) — bundle `next`, `@next/bundle-analyzer`, `@next/eslint-plugin-next` in one patch: `npm install next@latest @next/bundle-analyzer@latest @next/eslint-plugin-next@latest`. Low risk.
-3. **`react`/`react-dom` patch** (`19.2.4 → 19.2.5`) — `npm install react@latest react-dom@latest`. Patch, low risk.
-4. **`stripe` patch** (`22.0.0 → 22.0.1`) — `npm install stripe@latest`. Patch only.
-5. **Supabase batch** (`@supabase/ssr` 0.8.0 → 0.10.2, `@supabase/supabase-js` 2.97.0 → 2.103.0) — auth library minors, upgrade together. Re-verify auth flows after.
-6. **`@stripe/stripe-js`** (`9.0.1 → 9.1.0`) + **`@elevenlabs/react`** (`1.0.2 → 1.0.3`) — minor/patch, batch with Supabase.
-7. **`pdfjs-dist`/`voyageai` minors** — check changelogs before upgrading.
-8. **Major version migrations** (non-urgent, no security implications):
-   - `@vercel/analytics` v1 → v2
+1. **`@anthropic-ai/sdk`** (`0.82.0 → 0.88.0` — now 6 minor versions) — Triage targeted 0.87.0; latest jumped to 0.88.0. After `npm install` brings installed to 0.87.0, re-upgrade: `npm install @anthropic-ai/sdk@latest`.
+2. **`@elevenlabs/react`** (`1.0.2 → 1.1.0`) — Triage targeted 1.0.3; shipped as 1.1.0 minor. After `npm install`, upgrade: `npm install @elevenlabs/react@latest`. Review changelog for breaking changes.
+3. **`pdfjs-dist`/`voyageai` minors** — Check changelogs before upgrading.
+4. **Major version migrations** (non-urgent, no security implications):
+   - `@vercel/analytics` v1 → v2 (MPL-2.0 — review changelog for API changes)
    - `@vercel/speed-insights` v1 → v2
    - `lucide-react` v0 → v1
 
@@ -196,9 +199,9 @@ No remediation required this cycle. 0 active advisories.
 ## Cross-Agent Recommendations
 
 - **Coverage Agent**: All webhook and CSRF error paths remain fully covered. No regression risk. No security-driven test changes needed.
-- **Performance Agent**: Same patch batch from Apr 9 still pending: `next` 16.2.3, `react`/`react-dom` 19.2.5, `stripe` 22.0.1. All negligible bundle impact. `@anthropic-ai/sdk` now 5 minors behind (0.82.0 → 0.87.0 in 4 days); upgrade with `@supabase` batch.
-- **Code Quality Agent**: `@anthropic-ai/sdk` is now the highest-priority upgrade — 5 minor bumps in 4 days indicates active development. Recommended batch order: (1) next/react/stripe patches together, (2) @anthropic-ai/sdk minor, (3) Supabase minor batch with @stripe/stripe-js + @elevenlabs/react.
-- **Documentation Agent**: No documentation changes needed this cycle. Fifth consecutive GREEN.
-- **QA Agent**: CSRF confirmed working (green since Mar 23). After any Supabase upgrade batch, re-verify auth flows. No other security action items.
-- **Cost Analyst Agent**: No cost-related security concerns. 0 vulns, all major upgrades complete.
+- **Performance Agent**: Node_modules discrepancy: `npm install` needed to sync after Apr 10 triage commit 46827c3. After sync, bundle impact should be negligible (all patch/minor upgrades). `@elevenlabs/react` 1.1.0 is a minor — monitor for any bundle size change.
+- **Code Quality Agent**: `@anthropic-ai/sdk` remains the highest-priority upgrade — now 6 minors behind. After `npm install` syncs node_modules, upgrade to 0.88.0. `@elevenlabs/react` shipped 1.1.0 (minor, not patch) — review changelog before treating as a drop-in. `knip` is now at 6.4.0 (major + minor); dev-only, upgrade when convenient.
+- **Documentation Agent**: No documentation changes needed this cycle. Sixth consecutive GREEN.
+- **QA Agent**: CSRF confirmed working (green since Mar 23). Run `npm install` to apply Apr 10 upgrades. After Supabase sync (0.8.0 → 0.10.2), re-verify auth flows. No other security action items.
+- **Cost Analyst Agent**: No cost-related security concerns. 0 vulns. Revenue drought and voice silence continue — no security contribution to those issues.
 - **Localization Agent**: No sensitive data in translation files. No locale-related security concerns.
