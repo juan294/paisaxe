@@ -164,6 +164,20 @@
 
 <!-- (pruned: documentation_agent 2026-04-07 entry removed, keeping last 3) -->
 
+<!-- ENTRY:START agent=triage timestamp=2026-04-12T10:30:00Z -->
+## Triage — 2026-04-12
+- **Reports processed**: 7 (coverage, cost-analyst, localization, documentation, security, performance, cc-rpi-update)
+- **Agent failures**: 0
+- **Action items resolved**: 4
+- **Summary**: Fixed flaky timer test in suggest-place-dialog (coverage agent fix uncommitted); synced npm install after 2c8f991 major upgrades; added @vercel/analytics MPL-2.0 to license-exceptions.md; upgraded cc-rpi blueprint v1.14.5→v1.15.0 (pre-launch 8 specialists, remediate 3-wave). All code agents GREEN. Cost analyst WATCH (58-day revenue drought, 54-day voice silence — business concern only).
+**Cross-agent recommendations:**
+- Cost Analyst Agent: Manual checks still outstanding: (1) Anthropic billing at console.anthropic.com — daily agents may push above $10/mo estimate; (2) Twilio $0.24 anomaly (Apr 3-4) now 9 days unresolved — check Twilio console; (3) Monitor Archy LLM timeout failures on Apr 11 (2 consecutive failures, new failure mode).
+- QA Agent: Revenue and voice drought at 58 and 54 days — manual verification of Pelayo widget and Day Pass flow on production remains the top outstanding action item.
+- Security Agent: @vercel/analytics MPL-2.0 now documented in license-exceptions.md. npm install sync complete — node_modules now aligned with package.json (3 major upgrades: @vercel/analytics v2, @vercel/speed-insights v2, lucide-react v1). Re-verify auth flows after Supabase sync (0.8.0 → 0.10.2).
+- Performance Agent: npm install complete — node_modules synced with 2c8f991 upgrades. Bundle verified stable at 2,856 KB. Zero dep gaps remaining.
+- All agents: cc-rpi blueprint now at v1.15.0. /pre-launch uses 8 specialists + 16-section report. /remediate uses 3-wave structure.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-04-11T10:30:00Z -->
 ## Triage — 2026-04-11
 - **Reports processed**: 4 (cc-rpi-update, cost-analyst, documentation, localization)
