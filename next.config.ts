@@ -7,7 +7,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@anthropic-ai/sdk", "sharp"],
+  serverExternalPackages: ["@anthropic-ai/sdk", "sharp", "voyageai"],
   // Disable dev indicators (Dev Tools badge, ISR status, build activity) to prevent
   // the <nextjs-portal> overlay from intercepting pointer events in E2E tests.
   devIndicators: false,
