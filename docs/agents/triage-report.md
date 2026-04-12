@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-04-11 | 4 reports processed | 0 code action items
+> Generated on 2026-04-12 | 7 reports processed | 5 action items
 
 ## Agent Failures
 None — all agents ran successfully.
@@ -8,33 +8,37 @@ None — all agents ran successfully.
 
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | CC-RPI Update | GREEN | None — already at v1.14.5 |
-| 2 | cost-analyst-report.md | Cost Analyst | WATCH | 0 code (2 manual, user) |
-| 3 | documentation-report.md | Documentation | GREEN | None — 14th consecutive clean run |
-| 4 | localization-report.md | Localization | GREEN | None — 100% coverage, 35 days stable |
+| 1 | coverage-report.md | Coverage Agent | GREEN | 1 — commit flaky test fix |
+| 2 | cost-analyst-report.md | Cost Analyst | WATCH | 0 — business concern only |
+| 3 | localization-report.md | Localization Agent | GREEN | 0 |
+| 4 | documentation-report.md | Documentation Agent | GREEN | 0 |
+| 5 | security-report.md | Security Agent | GREEN | 2 — npm install sync, license doc |
+| 6 | performance-report.md | Performance Agent | GREEN | 1 — npm install sync (shared w/ security) |
+| 7 | cc-rpi-update-report.md | cc-rpi Update Agent | ACTION | 1 — blueprint v1.15.0 sync |
 
 ## Overall Status: GREEN
 
-All automated code checks clean. Cost analyst WATCH is a business concern only — no code action warranted.
+All code agents are GREEN. Cost analyst WATCH is a business concern only (58-day revenue drought, 54-day voice silence) — no code action available.
 
 ## Action Items Completed
-None — no code changes required this cycle.
 
-## Manual Items for User
-| # | Item | Source Report | Priority |
-|---|------|--------------|----------|
-| 1 | Check Anthropic billing at console.anthropic.com — daily agent activity may exceed $10/mo estimate | cost-analyst | WATCH |
-| 2 | Verify Twilio $0.24 anomaly (Apr 3-4) in Twilio console — if confirmed recurring regulatory surcharge, update `src/lib/costs/recurring-costs.ts` to ~$1.39/mo | cost-analyst | LOW |
+| # | Item | Source Report | Tests Added | Status |
+|---|------|--------------|-------------|--------|
+| 1 | Fix flaky timer test in `suggest-place-dialog.test.tsx` | coverage-report | 0 (fix to existing test) | ✅ Done — committed in faa9485 |
+| 2 | Run `npm install` to sync node_modules with 2c8f991 upgrades | security + performance | — | ✅ Done — synced (@vercel/analytics v2, @vercel/speed-insights v2, lucide-react v1) |
+| 3 | Add `@vercel/analytics` MPL-2.0 to `docs/project/license-exceptions.md` | security-report | — | ✅ Done — committed in faa9485 |
+| 4 | Sync cc-rpi blueprint v1.14.5 → v1.15.0 | cc-rpi-update-report | — | ✅ Done — pre-launch.md (8 specialists, 16 sections), remediate.md (3-wave), cc-rpi-sync.json updated |
+| 5 | Fix CI build failure: voyageai@0.2.1 ESM resolution | CI failure (post-push) | — | ✅ Done — added voyageai to serverExternalPackages in next.config.ts (cd99d7a) |
 
 ## Verification
-- [x] All tests passing (5716, per coverage agent Apr 8 — no source changes since)
-- [x] Typecheck clean (per localization agent TypeScript check Apr 11)
-- [x] Lint clean (no new source changes)
-- [x] No code committed this cycle (nothing to push/verify)
+- [x] All tests passing (5716/5716)
+- [x] Typecheck clean
+- [x] Lint clean
+- [x] Production build clean (132 pages)
+- [ ] CI green (monitoring — cd99d7a pushed)
 
 ## Carried Items
-- **Revenue drought (57 days)** — No Day Pass sales since Feb 13. Manual production verification of Day Pass flow and Pelayo voice widget recommended. QA agent flagged this repeatedly — requires human check.
-- **Paisaxe voice silence (53 days)** — No Paisaxe voice conversations since Feb 17. Pelayo widget status on production unknown.
-- **Twilio $0.24 anomaly (Apr 3-4)** — Unresolved across multiple triage cycles. Likely recurring regulatory surcharge. Needs Twilio console check.
-- **Playwright E2E** for voice-agent-chat (45.6%) and agents-dashboard/index (48.5%) — structural gap, requires ElevenLabs SDK mocking.
-- **Major version migrations** (no urgency, no CVEs): @vercel/analytics v1→v2, lucide-react v0→v1.
+- **Revenue/voice drought (day 58/54)** — Persists across all cycles. Requires manual production verification of Pelayo widget and Day Pass flow. Not an automated action item.
+- **Anthropic billing check** — Personal account has no billing API. Manual check at console.anthropic.com/settings/billing required. Ongoing.
+- **Twilio $0.24 anomaly (day 9)** — Balance stable at $14.0646 but anomaly unresolved. Check Twilio console for Apr 3-4 regulatory surcharge.
+- **Archy LLM timeout failures** — New failure mode on Apr 11 (2 consecutive failures). Monitor whether pattern continues Apr 12.
