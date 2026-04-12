@@ -1,23 +1,26 @@
-# Coverage Agent Report — 2026-04-09
+# Coverage Agent Report — 2026-04-12
 
 ## Summary
 
-- **Test suite**: 100% passing (5716 tests, +2 comments) — 0 failures
+- **Test suite**: 100% passing (5716 tests, 0 failures) — fixed 1 flaky test
 - **TypeScript**: No errors
 - **Overall coverage**: **98.73% statements** (unchanged), **96.64% branch** (unchanged), **98.72% function** (unchanged), **99.13% line** (unchanged)
 
-## New Tests Added (+2 documentation comments)
+## Changes This Run
 
-| File | Addition | Impact |
-|------|----------|--------|
-| `src/components/admin/agents-dashboard/use-agent-runner.test.ts` | Documents cleanup false branch (line 44) as architecturally unreachable | Documentation |
-| `src/components/admin/agents-dashboard/use-agent-terminal.test.ts` | Documents finished-handler interval clear false branch (line 49) as architecturally unreachable | Documentation |
+### Bug Fix: Flaky test in `suggest-place-dialog.test.tsx`
+
+**Test**: `resets form and calls onClose after success timer`
+**Root cause**: `vi.useFakeTimers({ shouldAdvanceTime: true })` advances the fake clock in sync with real time. On slower machines, the `waitFor()` polling takes >2000ms of real time, causing the component's `setTimeout(() => onClose(), 2000)` to fire _before_ the test asserts that `onClose` has NOT been called yet.
+
+**Fix**: Removed `shouldAdvanceTime: true`. Replaced `waitFor()` with `await act(async () => { fireEvent.click(...); await Promise.resolve(); await Promise.resolve(); })` to flush microtasks (fetch mock resolves via microtask queue, not setTimeout, so fake timers don't interfere). The 2000ms fake timeout is now only triggered by the explicit `vi.advanceTimersByTime(2000)` call.
+
+**Result**: All 27 tests in the file pass reliably.
 
 ## Coverage Plateau
 
-The coverage plateau at 98.73% statements / 96.64% branch continues (day 9 of stability). All remaining uncovered lines are architecturally unreachable dead code or SSR-only guards. There is no new testable coverage to improve.
+The plateau at 98.73% statements / 96.64% branch continues (day 12 of stability). All remaining uncovered lines are architecturally unreachable dead code or SSR-only guards. The only files requiring actual coverage improvement need Playwright E2E tests:
 
-The only files requiring actual coverage improvement need Playwright E2E tests:
 - `voice-agent-chat.tsx` (45.6%) — ElevenLabs WebSocket/SDK
 - `agents-dashboard/index.tsx` (48.5%) — ElevenLabs terminal UI
 
@@ -30,17 +33,12 @@ The only files requiring actual coverage improvement need Playwright E2E tests:
 
 ## Documented Unreachable Guards (All Carry-Overs)
 
-All remaining uncovered lines are confirmed dead code or SSR-only paths. Newly documented this run:
+All remaining uncovered lines are confirmed dead code or SSR-only paths.
 
 | File | Lines | Type | Why Unreachable |
 |------|-------|------|-----------------|
 | `use-agent-runner.ts` | 44 | Dead cleanup branch | `if (pollingRef.current)` false branch — effect only runs when size > 0, and always sets `pollingRef.current = setInterval(...)` before returning cleanup; pollingRef is always non-null when cleanup fires |
 | `use-agent-terminal.ts` | 49 | Dead finished-handler branch | `if (logPollRef.current)` false branch — `setInterval` is called synchronously at line 58 before any async `pollLogs()` can resolve; logPollRef is always non-null when `finished` is true |
-
-Previously documented (unchanged):
-
-| File | Lines | Type | Why Unreachable |
-|------|-------|------|-----------------|
 | `use-stories.ts` | 124 | SSR guard | `else if (typeof window !== "undefined")` false branch — SSR context not reachable in jsdom |
 | `use-stories.ts` | 131 | Dead ternary branch | `hasInitial ? initialStories : FALLBACK_STORIES` — cache.data always truthy when hasInitial is true (set at lines 121-123) |
 | `use-stories.ts` | 277 | SSR guard | `clearStoriesCache` window check — SSR path not reachable in jsdom |
@@ -49,11 +47,6 @@ Previously documented (unchanged):
 | `github-analytics-panel.tsx` | 238 | Dead OR fallback | `statColorClasses[color] || statColorClasses.stone` — all call sites pass valid TypeScript-enforced color keys |
 | `github-analytics-panel.tsx` | 246 | Dead ternary branch | `: value` string branch — all 5 StatCard call sites pass `number` values from API |
 | `favorites/page.tsx` | 222,227 | Dead null guards | `if (currentRef)` false branch — React sets ref synchronously during commit; ref never null when effect fires |
-
-Previously documented carry-overs (unchanged):
-
-| File | Lines | Type | Why Unreachable |
-|------|-------|------|-----------------|
 | `author-typewriter.tsx` | 17–57,65,82–103 | V8 instrumentation limit | Fake-timer async paths; ref guard always true in jsdom |
 | `story-editor-dialog/index.tsx` | 40–84 | Dead null guards | Component returns null on line 88 before callbacks can be triggered with null story |
 | `use-voice-session.ts` | 75–111 | SSR guard + V8 merge | SSR guard; V8 maps node/jsdom to same branch |
@@ -75,9 +68,9 @@ Previously documented carry-overs (unchanged):
 
 ## Cross-Agent Recommendations
 
-- **Performance Agent**: No new dependencies added. 7 test-only additions. No bundle impact.
-- **Code Quality Agent**: Dead code catalogue now fully documented across all carry-over files. No new dead code introduced.
+- **Performance Agent**: No new dependencies. 1 test fix (no additions). No bundle impact.
+- **Code Quality Agent**: Flaky test fixed — `vi.useFakeTimers({ shouldAdvanceTime: true })` pattern is brittle; avoid in future tests that also manually advance timers.
 - **Security Agent**: All webhook and MCP error paths remain fully covered. No regression.
-- **QA Agent**: No new testability gaps. `voice-agent-chat` and `agents-dashboard` still require Playwright E2E for coverage improvement.
+- **QA Agent**: Suite is 100% passing again. `voice-agent-chat` and `agents-dashboard` still require Playwright E2E for coverage improvement.
 - **Cost Analyst Agent**: No cost-related coverage gaps.
 - **Localization Agent**: No locale-related coverage concerns.
