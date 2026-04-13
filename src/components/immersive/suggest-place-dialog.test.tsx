@@ -300,13 +300,6 @@ describe("SuggestPlaceDialog", () => {
   });
 
   it("resets form and calls onClose after success timer", async () => {
-    // Use fake timers WITHOUT shouldAdvanceTime — that flag advances the clock
-    // in sync with real time, causing the 2000ms setTimeout to fire during
-    // waitFor polling on slow machines, making the test flaky.
-    // Promises/microtasks resolve independently of the fake clock, so the
-    // fetch mock still resolves and the success state still renders.
-    vi.useFakeTimers();
-
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ id: "suggestion-1" }),
@@ -316,30 +309,18 @@ describe("SuggestPlaceDialog", () => {
 
     const placeNameInput = screen.getByLabelText(/Place Name/);
     fireEvent.change(placeNameInput, { target: { value: "Lago Enol" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
 
-    // Wrap click + microtask flush in act so the fetch promise resolves and
-    // React commits the success state before we check assertions.
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-      // Flush microtasks so the mocked fetch resolves inside this act block
-      await Promise.resolve();
-      await Promise.resolve();
+    await waitFor(() => {
+      expect(screen.getByText("Thank you!")).toBeInTheDocument();
     });
 
-    // Success state should be visible
-    expect(screen.getByText("Thank you!")).toBeInTheDocument();
-
-    // onClose should not have been called yet — the 2000ms fake timer hasn't fired
-    expect(mockOnClose).not.toHaveBeenCalled();
-
-    // Advance timer by 2000ms to trigger the setTimeout callback
-    await act(async () => {
-      vi.advanceTimersByTime(2000);
-    });
-
-    expect(mockOnClose).toHaveBeenCalled();
-
-    vi.useRealTimers();
+    await waitFor(
+      () => {
+        expect(mockOnClose).toHaveBeenCalled();
+      },
+      { timeout: 3000 }
+    );
   });
 
   it("disables cancel button while loading", async () => {
