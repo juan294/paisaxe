@@ -29,7 +29,9 @@
     "BSL-1.1",
     "CPAL-1.0",
     "OSL-3.0",
-    "CPOL-1.02"
+    "CPOL-1.02",
+    "du",
+    "elevenlabs"
   ],
   "paths": {
     "@/*": ["./src/*"]

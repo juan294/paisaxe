@@ -542,6 +542,7 @@ describe("FavoritesPage", () => {
         class ControlledObserver implements IntersectionObserver {
           readonly root: Element | null = null;
           readonly rootMargin: string = "";
+          readonly scrollMargin: string = "";
           readonly thresholds: ReadonlyArray<number> = [];
 
           constructor(
@@ -678,6 +679,7 @@ describe("FavoritesPage", () => {
         class LazyObserver implements IntersectionObserver {
           readonly root: Element | null = null;
           readonly rootMargin: string = "";
+          readonly scrollMargin: string = "";
           readonly thresholds: ReadonlyArray<number> = [];
           private disconnected = false;
 
@@ -762,6 +764,7 @@ describe("FavoritesPage", () => {
         class TrackingObserver implements IntersectionObserver {
           readonly root: Element | null = null;
           readonly rootMargin: string = "";
+          readonly scrollMargin: string = "";
           readonly thresholds: ReadonlyArray<number> = [];
 
           constructor(
@@ -822,6 +825,7 @@ describe("FavoritesPage", () => {
         class NonIntersectingObserver implements IntersectionObserver {
           readonly root: Element | null = null;
           readonly rootMargin: string = "";
+          readonly scrollMargin: string = "";
           readonly thresholds: ReadonlyArray<number> = [];
 
           constructor(
