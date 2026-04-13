@@ -8,8 +8,7 @@
 
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import { VercelAnalytics } from "@/components/analytics";
 import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
 import { Providers } from "./providers";
@@ -142,8 +141,7 @@ export default function RootLayout({
           <PostHogPageView />
           {children}
         </Providers>
-        <Analytics />
-        <SpeedInsights />
+        <VercelAnalytics />
       </body>
     </html>
   );

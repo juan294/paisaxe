@@ -1027,6 +1027,39 @@ describe("AdminPage", () => {
 
         expect(screen.getByText(/This will approve 1 pending story\./)).toBeInTheDocument();
       });
+
+      it("handles approveAll returning neither error nor data (line 300 else-if false branch)", async () => {
+        // When approveAllPendingStories returns {} (no error, no data), the `else if (result.data)`
+        // branch at line 300 is false — stories are not updated in local state, no error shown.
+        mockApproveAllPendingStories.mockResolvedValue({});
+
+        await navigateToStories();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        // Open the confirm dialog
+        await act(async () => {
+          fireEvent.click(screen.getByText(/Approve All \(2\)/));
+        });
+
+        const dialogApproveBtn = screen.getAllByText("Approve All").find(btn =>
+          btn.closest(".fixed")
+        );
+
+        await act(async () => {
+          fireEvent.click(dialogApproveBtn!);
+        });
+
+        await waitFor(() => {
+          expect(mockApproveAllPendingStories).toHaveBeenCalled();
+        });
+
+        // No error shown and stories still in original state (not updated)
+        expect(screen.queryByText(/error/i)).not.toBeInTheDocument();
+        expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
+      });
     });
 
     describe("Create Story", () => {
@@ -1272,6 +1305,62 @@ describe("AdminPage", () => {
         });
       });
 
+      it("handles bulk approve returning neither error nor data (line 249 else-if false branch)", async () => {
+        // When bulkUpdateStoryStatus returns {} (no error, no data), the `else if (result.data)`
+        // branch at line 249 is false — stories are not updated and no error shown.
+        mockBulkUpdateStoryStatus.mockResolvedValue({});
+
+        await navigateToStories();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId("select-story-1"));
+        });
+
+        await act(async () => {
+          fireEvent.click(screen.getByText("Bulk Approve"));
+        });
+
+        await waitFor(() => {
+          expect(mockBulkUpdateStoryStatus).toHaveBeenCalledWith(["story-1"], "approved");
+        });
+
+        // No error shown, stories unchanged in state
+        expect(screen.queryByText(/error/i)).not.toBeInTheDocument();
+        expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
+      });
+
+      it("handles bulk pending returning neither error nor data (line 272 else-if false branch)", async () => {
+        // When bulkUpdateStoryStatus returns {} (no error, no data), the `else if (result.data)`
+        // branch at line 272 is false — stories are not updated and no error shown.
+        mockBulkUpdateStoryStatus.mockResolvedValue({});
+
+        await navigateToStories();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId("select-story-1"));
+        });
+
+        await act(async () => {
+          fireEvent.click(screen.getByText("Bulk Pending"));
+        });
+
+        await waitFor(() => {
+          expect(mockBulkUpdateStoryStatus).toHaveBeenCalledWith(["story-1"], "needs_curation");
+        });
+
+        // No error shown, stories unchanged in state
+        expect(screen.queryByText(/error/i)).not.toBeInTheDocument();
+        expect(screen.getByText("Picos de Europa")).toBeInTheDocument();
+      });
+
       it("shows error when bulk delete fails", async () => {
         mockBulkDeleteStories.mockResolvedValue({ error: "Delete failed" });
         vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -1293,6 +1382,63 @@ describe("AdminPage", () => {
         await waitFor(() => {
           expect(screen.getByText("Delete failed")).toBeInTheDocument();
         });
+      });
+
+      it("shows plural 'stories' in confirm dialog when multiple are selected (line 320)", async () => {
+        // Covers the `selectedIds.size === 1 ? "story" : "stories"` "stories" branch at line 320.
+        // Select 2 stories (story-1 and story-3 are both needs_curation).
+        mockBulkDeleteStories.mockResolvedValue({ data: { deleted: 2 } });
+        const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false); // cancel to avoid deletion
+
+        await navigateToStories();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId("select-story-1"));
+        });
+        await act(async () => {
+          fireEvent.click(screen.getByTestId("select-story-3"));
+        });
+
+        await act(async () => {
+          fireEvent.click(screen.getByText("Bulk Delete"));
+        });
+
+        expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("2 stories"));
+        expect(mockBulkDeleteStories).not.toHaveBeenCalled(); // cancelled
+      });
+
+      it("handles bulk delete returning neither error nor data (line 330 else-if false branch)", async () => {
+        // When bulkDeleteStories returns {} (no error, no data), the `else if (result.data)`
+        // branch at line 330 is false — stories are not removed from state and no error is shown.
+        mockBulkDeleteStories.mockResolvedValue({});
+        vi.spyOn(window, "confirm").mockReturnValue(true);
+
+        await navigateToStories();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+        });
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId("select-story-1"));
+        });
+
+        await act(async () => {
+          fireEvent.click(screen.getByText("Bulk Delete"));
+        });
+
+        await waitFor(() => {
+          expect(mockBulkDeleteStories).toHaveBeenCalledWith(["story-1"]);
+        });
+
+        // Stories should still be present (not removed) because result.data was falsy
+        expect(screen.getByTestId("story-story-1")).toBeInTheDocument();
+        // And no error message was set
+        expect(screen.queryByText(/error/i)).not.toBeInTheDocument();
       });
     });
 
@@ -1530,5 +1676,103 @@ describe("AdminPage", () => {
         });
       });
     });
+
+    describe("Tab panel rendering (lines 629-641)", () => {
+      // These tests cover the visitedTabs.has("marketing/suggestions/agents") true branches.
+      // The content divs for these tabs only render once the tab has been visited.
+      it("renders MarketingDashboard when Marketing tab is visited (line 629-631)", async () => {
+        render(<AdminPage />);
+
+        // Marketing has not been visited yet — content not rendered
+        expect(screen.queryByTestId("marketing-dashboard")).not.toBeInTheDocument();
+
+        // Click the Marketing tab
+        await act(async () => {
+          fireEvent.click(screen.getByText("Marketing"));
+        });
+
+        // Now visitedTabs.has("marketing") is true — content renders (display: block)
+        await waitFor(() => {
+          expect(screen.getByTestId("marketing-dashboard")).toBeInTheDocument();
+        });
+
+        // Navigate away to cover the display:none branch (activeTab !== "marketing")
+        await act(async () => {
+          fireEvent.click(screen.getByText("Stories"));
+        });
+
+        // Content still exists in DOM (lazy-mount) but is hidden
+        await waitFor(() => {
+          expect(screen.getByTestId("marketing-dashboard")).toBeInTheDocument();
+        });
+      });
+
+      it("renders SuggestionsPanel when Suggestions tab is visited (line 635-637)", async () => {
+        render(<AdminPage />);
+
+        expect(screen.queryByTestId("suggestions-panel")).not.toBeInTheDocument();
+
+        await act(async () => {
+          fireEvent.click(screen.getByText("Suggestions"));
+        });
+
+        await waitFor(() => {
+          expect(screen.getByTestId("suggestions-panel")).toBeInTheDocument();
+        });
+
+        // Navigate away to cover display:none branch
+        await act(async () => {
+          fireEvent.click(screen.getByText("Stories"));
+        });
+
+        await waitFor(() => {
+          expect(screen.getByTestId("suggestions-panel")).toBeInTheDocument();
+        });
+      });
+
+      it("renders AgentsDashboard when Agents tab is visited (line 641-643)", async () => {
+        render(<AdminPage />);
+
+        expect(screen.queryByTestId("agents-dashboard")).not.toBeInTheDocument();
+
+        await act(async () => {
+          fireEvent.click(screen.getByText("Agents"));
+        });
+
+        await waitFor(() => {
+          expect(screen.getByTestId("agents-dashboard")).toBeInTheDocument();
+        });
+
+        // Navigate away to cover display:none branch
+        await act(async () => {
+          fireEvent.click(screen.getByText("Stories"));
+        });
+
+        await waitFor(() => {
+          expect(screen.getByTestId("agents-dashboard")).toBeInTheDocument();
+        });
+      });
+    });
   });
+
+  // Line 821: StatCard non-clickable variant (`<div>` instead of `<button>`)
+  // This branch is unreachable through the component's public API because all 4
+  // StatCard usages in AdminPage pass an `onClick` prop, making `isClickable` always
+  // true. StatCard is a non-exported internal function, so it cannot be tested
+  // directly without modifying source code. This is a defensive fallback for future
+  // usages that may omit onClick.
+
+  // Lines 45, 55, 60, 65: `dynamic()` import `.then(m => ...)` callbacks
+  // These are Next.js `dynamic()` factory functions whose `.then()` callbacks
+  // never execute in tests because the modules are fully mocked. The callbacks
+  // are trivial property accessors (e.g., `m => ({ default: m.FeatureTogglesPanel })`)
+  // and cannot be exercised without un-mocking the dynamic imports.
+
+  // Lines 265 and 316: `if (selectedIds.size === 0) return;` guards in handleBulkMarkPending
+  // and handleBulkDelete respectively.
+  // Both are architecturally unreachable because:
+  // - The "Bulk Pending" and "Bulk Delete" buttons only appear in the SelectionToolbar,
+  //   which is conditionally rendered when `selectedIds.size > 0`.
+  // - Therefore selectedIds.size is always > 0 when these handlers can be invoked via the UI.
+  // These defensive guards exist to prevent a hypothetical programmatic call with no selection.
 });

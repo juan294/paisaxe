@@ -1368,3 +1368,37 @@ describe("Auth session refresh - anonymous visitor skip", () => {
     expect(mockGetUser).toHaveBeenCalled();
   });
 });
+
+describe("development mode ALLOWED_ORIGINS initialization (proxy.ts:29)", () => {
+  // Line 29: `ALLOWED_ORIGINS.push("http://localhost:3000")` runs at module load time
+  // when NODE_ENV === "development". We must vi.resetModules() + dynamic import so the
+  // initialization code re-runs with the correct env var.
+  it("adds localhost to ALLOWED_ORIGINS when NODE_ENV is development at import time", async () => {
+    vi.resetModules();
+    vi.stubEnv("NODE_ENV", "development");
+
+    // Fresh import — re-executes module-level initialization code including line 29
+    const { proxy: devProxy } = await import("./proxy");
+
+    process.env.MAINTENANCE_MODE = "false";
+    mockFetch.mockReset();
+
+    const request = new NextRequest("http://localhost:3000/api/chat", {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:3000",
+        "access-control-request-method": "POST",
+      },
+    });
+
+    const response = await devProxy(request);
+
+    // In development mode, localhost is in ALLOWED_ORIGINS → CORS header is set
+    expect(response.status).toBe(204);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3000");
+
+    delete process.env.MAINTENANCE_MODE;
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+});

@@ -187,41 +187,14 @@ git branch -d feature/short-name
 8. **Background agents use `.worktrees/`**: Agents spawned with `run_in_background: true` or as team members are sandboxed to the project directory. They CANNOT access `../paisaxe-*` paths. Always use `.worktrees/short-name` inside the project.
 9. **If merge conflicts arise**: Resolve them in the main repo during merge, never in the worktree.
 
-## Push Accountability (MANDATORY — Background)
+## TDD Protocol
 
-**Every push to `develop` requires CI verification. No exceptions. No matter how small the change.**
+All code changes follow Red-Green-Refactor:
+1. **Red** -- Write a failing test FIRST
+2. **Green** -- Minimum code to pass
+3. **Refactor** -- Clean up with green tests
 
-**Pushing to `main` is PROHIBITED** — see Production Safety above. This section applies to `develop` only.
-
-**This runs as a background agent so the terminal stays unblocked.** After ANY `git push origin develop`, immediately spawn a background task (using `run_in_background: true`) that:
-
-1. **Polls CI status** — `gh run list --limit 5` until the run completes
-2. **If CI passes** — Log success, no interruption needed
-3. **If CI fails** — Investigate with `gh run view <run-id> --log-failed`, fix the issue, and re-push — all in the background
-4. **NEVER push to `main`** — Even if a background fix seems urgent, it stays on `develop`
-
-The main terminal continues working on the next task immediately after pushing. The background agent owns the push outcome until CI is green on `develop`.
-
-**If a background fix requires changes that conflict with current work**, notify the user before applying fixes.
-
-**This is non-negotiable.** You own the outcome of your push until CI is green. If you break the build on `develop`, you fix the build — automatically in the background. But `main` is never touched without user authorization.
-
-## Test-Driven Development (MANDATORY)
-
-**NO code is written without a failing test first. No exceptions. Not even "small" changes.**
-
-This is non-negotiable. Every feature, bug fix, and refactor follows this exact sequence:
-
-1. **Red**: Write a failing test FIRST — before touching any implementation code
-2. **Green**: Write the minimum code to make the test pass
-3. **Refactor**: Clean up while tests stay green
-
-#### Rules
-
-- **Tests before code, always.** If you catch yourself writing implementation code without a test, stop and write the test first.
-- **Bug fixes need a regression test.** Before fixing a bug, write a test that reproduces it. Then fix the code so the test passes.
-- **Refactors need existing tests.** Before refactoring, ensure tests exist that cover the current behavior. If they don't, write them first.
-- **No "I'll add tests later."** There is no later. Tests are written in the same worktree, in the same commit sequence, before the implementation.
+No exceptions. Bug fixes need a regression test. Refactors need existing coverage. No "tests later."
 
 ## Key Commands
 
@@ -251,77 +224,9 @@ claude -p "Fix all TypeScript lint errors and run tests" --allowedTools "Edit,Re
 claude -p "Read issue #240 and implement the fix with TDD" --allowedTools "Edit,Read,Bash,Write,Grep"
 ```
 
-### CRITICAL: Run verification commands sequentially, NEVER in parallel
-Never run typecheck, lint, or test as parallel sibling Bash tool calls.
-Chain with `&&` or `;`: `npm run typecheck 2>&1; npm run lint 2>&1`
-
 ## Environment Variables
 
-Required in `.env.local`:
-```
-ANTHROPIC_API_KEY=       # Claude API
-VOYAGE_API_KEY=          # Voyage AI embeddings
-ELEVENLABS_API_KEY=      # Voice agents (optional)
-ELEVENLABS_WEBHOOK_SECRET=   # ElevenLabs webhook signature verification
-ELEVENLABS_PHONE_NUMBER_ID=             # ElevenLabs phone number for outbound booking calls
-ELEVENLABS_BOOKING_AGENT_ID=            # ElevenLabs booking agent ID (dedicated booking agent)
-GITHUB_TOKEN=            # GitHub PAT with `repo` scope (traffic analytics)
-
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_KEY=    # For seeding
-
-GOOGLE_CLIENT_ID=        # OAuth
-GOOGLE_CLIENT_SECRET=
-
-WEBHOOK_SECRET=          # Supabase webhooks
-NEXT_PUBLIC_SITE_URL=
-
-# Stripe (payments)
-STRIPE_SECRET_KEY=                      # Server-side API key
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=     # Client-side publishable key
-STRIPE_WEBHOOK_SECRET=                  # Webhook signature verification
-STRIPE_DAY_PASS_PRICE_ID=               # Price ID for Day Pass product
-
-# Twilio (SMS alerts, voice booking)
-TWILIO_ACCOUNT_SID=                     # Twilio account SID
-TWILIO_AUTH_TOKEN=                      # Twilio auth token
-TWILIO_PHONE_NUMBER=                    # Twilio sender phone number
-QA_ALERT_PHONE=                         # Phone for critical alerts (E.164: +34612345678)
-
-# Credentials encryption
-CREDENTIALS_ENCRYPTION_KEY=             # AES-256 encryption key for stored credentials
-
-# MCP tool authentication
-MCP_API_SECRET=                         # Shared secret for authenticating MCP tool requests
-
-# Voice Agent MCP tools (optional)
-OPENWEATHERMAP_API_KEY=                 # Weather data for voice agent
-GOOGLE_PLACES_API_KEY=                  # Places data for voice agent
-
-# Resend (transactional email)
-RESEND_API_KEY=                         # Resend API key for sending emails
-ADMIN_EMAIL=                            # Admin notification recipient (default: admin@paisaxe.es)
-
-# Upstash Redis (distributed rate limiting - optional)
-UPSTASH_REDIS_REST_URL=                # Upstash Redis REST URL
-UPSTASH_REDIS_REST_TOKEN=              # Upstash Redis REST token
-
-# Vercel Cron (required for scheduled jobs)
-CRON_SECRET=                           # Vercel Cron authentication secret
-
-# PostHog analytics (optional)
-NEXT_PUBLIC_POSTHOG_KEY=                # PostHog project API key (client-side)
-NEXT_PUBLIC_POSTHOG_HOST=               # PostHog ingestion host (client-side)
-POSTHOG_PROJECT_ID=                     # PostHog project ID for server-side analytics API
-POSTHOG_PERSONAL_API_KEY=               # PostHog personal API key for server-side analytics API
-
-# Agent execution (optional)
-# ALLOW_AGENT_RUN=                      # Gates agent execution outside dev mode
-
-# Maintenance mode (optional)
-MAINTENANCE_MODE=                       # "true" forces maintenance on, "false" forces off, unset checks DB flag
-```
+All env vars are documented in `.env.local`. Key groups: Anthropic, Voyage AI, ElevenLabs, Supabase, Google OAuth, Stripe, Twilio, Resend, Upstash Redis, PostHog, Vercel Cron. Always `.trim()` env vars before use (Vercel CLI may add invisible chars).
 
 ## Architecture Decisions
 
@@ -346,17 +251,8 @@ MAINTENANCE_MODE=                       # "true" forces maintenance on, "false" 
 - Server: `validateAdminAuth()` checks cookies
 - Client: `useAdminRole()` hook
 
-### Analytics Dashboard Caching
-- **CSS visibility**: All 4 panels (Visitors, Voice, Costs, Revenue) stay mounted via `display:none` — no remount/refetch on tab switch
-- **In-memory SWR**: `AnalyticsCacheProvider` + `useAnalyticsData` hook in `analytics-cache-context.tsx`
-- Cache key = `${tabKey}:${JSON.stringify(params)}`, stale after 2 minutes
-- Background revalidation shows thin blue pulse bar, never blocks UI
-- `refresh()` invalidates cache (used after CRUD mutations in costs panel)
-- **HTTP Cache-Control**: `private, max-age=120, stale-while-revalidate=300` on all 4 admin analytics API routes
-- No external dependencies — pure React Context + `useRef<Map>`
-
 ### Local Agent Flags
-Automated agent enabled/disabled flags live in `scripts/agent-config.json` (local-only, gitignored). Defaults tracked in `scripts/agent-config.defaults.json`. Agents read flags via `jq` in `scripts/lib/agent-utils.sh` — no HTTP dependency. The admin dashboard reads/writes this file via `GET/PUT /api/admin/agent-config` (dev-only route). CLI: `scripts/agent-ctl.sh`.
+Flags in `scripts/agent-config.json` (gitignored). Defaults in `scripts/agent-config.defaults.json`. CLI: `scripts/agent-ctl.sh`. Admin dashboard uses dev-only route `/api/admin/agent-config`.
 
 ### Proxy (NOT Middleware)
 **IMPORTANT: This project uses `src/proxy.ts`, NOT `middleware.ts`.**
@@ -412,34 +308,8 @@ Core tables (see `supabase/migrations/` for full DDL):
 
 ## Sub-Agent & Background Task Guidelines
 
-- Sub-agents (Task tool) may lack Bash or file-write permissions. If spawning agents for fixes, verify they have the required tool access first.
-- If a sub-agent fails due to permissions, take over manually immediately rather than retrying.
-- Be aware of context window limits when receiving multiple parallel task notifications.
-
-### Self-Healing Agent Pipelines
-
-When spawning multi-agent pipelines (audits, fixes, refactors), agents MUST be resilient to failures:
-
-**Failure Recovery Protocol:**
-1. Each sub-agent should attempt the fix using its primary tool.
-2. If it hits a permission or tool error, **try an alternative approach** before reporting failure:
-   - If `Write` fails → try `Edit`
-   - If `Bash` is blocked → report back with exact manual steps the parent can execute
-   - If a file is locked or inaccessible → skip and document why
-3. **Parent agent tracks all sub-agent results.** After the first pass:
-   - Retry failed agents once with modified instructions (e.g., different tool, different approach)
-   - Collect all remaining blockers into a single summary
-4. **Escalate only truly blocked items.** Do not ask the user to intervene unless all automated alternatives have been exhausted.
-5. **Consolidate output:**
-   - Create **one PR** with all successful fixes
-   - Create **one GitHub issue** listing any unresolved items with reproduction steps
-
-**Error Reporting Contract:**
-Sub-agents must report failures in a structured way:
-- What was attempted
-- What error occurred
-- What alternative was tried (if any)
-- Whether the item is recoverable or needs manual intervention
+- Sub-agents may lack Bash or file-write permissions. Verify access first; if a sub-agent fails due to permissions, take over manually.
+- Self-healing pipelines: try alternative tools on failure (`Write` fails → `Edit`), retry once, consolidate output into one PR + one issue for unresolved items. See `.claude/skills/multi-agent/` for full protocol.
 
 ## Testing & CI
 
@@ -453,59 +323,9 @@ Sub-agents must report failures in a structured way:
 - You CANNOT handle credentials (npm tokens, API keys) directly — ask the user to provide/set them.
 - Upstash Redis API differs from standard Redis: use `zrange` with options instead of `zrangebyscore`/`zrevrangebyscore`.
 
-## Troubleshooting
+## Agent Behavior
 
-### Vercel Environment Variables with Invisible Characters
-
-**Symptom**: API calls fail with connection errors or "invalid request" errors despite correct-looking credentials.
-
-**Cause**: When adding environment variables to Vercel via CLI, trailing whitespace or newlines can be accidentally included (e.g., from command output capture or copy-paste).
-
-**Diagnosis**:
-```typescript
-// Add this to debug endpoints:
-const rawLength = process.env.MY_VAR?.length ?? 0;
-const trimmedLength = process.env.MY_VAR?.trim().length ?? 0;
-const hasInvisibleChars = rawLength !== trimmedLength;
-// If hasInvisibleChars is true, the env var has trailing/leading whitespace
-```
-
-**Fix**: Always `.trim()` environment variables before use, especially API keys:
-```typescript
-const apiKey = process.env.API_KEY?.trim();
-```
-
-**Prevention**: When adding env vars to Vercel via CLI, pipe values directly:
-```bash
-# Good - pipes value directly
-grep '^MY_VAR=' .env.local | cut -d'=' -f2- | vercel env add MY_VAR production
-
-# Bad - may capture extra output
-echo $MY_VAR | vercel env add MY_VAR production
-```
-
-## Agent Autonomy
-
-**Before asking the user to perform any manual step, exhaust all available tools first.**
-
-Use these before telling the user "go to the dashboard and...":
-
-1. **Supabase CLI** — `supabase db push`, `supabase functions deploy`, etc.
-2. **GitHub CLI** — `gh pr create`, `gh run list`, `gh issue view`
-3. **Vercel CLI** — `vercel` for deployments and logs (develop/preview only)
-4. **MCP servers** — Check available tools in the session
-5. **Bash** — npm scripts, git, curl
-6. **SQL** — `supabase db execute` for queries
-
-Only ask for manual intervention when genuinely required (OAuth consent, billing, UI-only features).
-
-**EXCEPTION — Production-affecting actions require user authorization (see Production Safety):**
-- Anything touching `main` branch (push, PR, merge)
-- Production deployments
-- Production database migrations
-- External service configuration changes (ElevenLabs, Stripe, Vercel env vars, DNS)
-
-Agent autonomy applies to **development work on `develop`**. Production is user-controlled.
+Exhaust tools before asking the user. Production actions need human authorization. Save operational lessons to auto memory immediately. Don't wait to be asked.
 
 ## RPI Workflow
 
@@ -560,79 +380,48 @@ All significant changes go through four phases:
 - If you can verify it with a command or tool, do so automatically.
 - Don't use Claude for linting/formatting — use automated tools and hooks instead.
 
-## Conditional Blocks for Context-Specific Rules
+## Working Patterns
 
-As this file grows, wrap domain-specific sections in `<important if="condition">` tags.
-The agent activates these only when the condition matches the current task, reducing noise.
-Keep universal content (stack, structure, git workflow) unwrapped.
+<examples>
+<example name="push-sequence">
+Commit before pulling -- hook blocks dirty pulls.
 
-```markdown
-<important if="you are writing or modifying tests">
-- Use `createTestApp()` helper for integration tests
-- Mock database with `dbMock` from `packages/db/test`
-- Test fixtures live in `__fixtures__/` directories
-</important>
-```
-
-- **Be specific.** `"you are writing tests"` is good. `"you are writing code"` matches everything and defeats the purpose.
-- **Group by domain.** One block per domain (testing, deployment, database) — don't wrap individual lines.
-
-## Agent Operational Rules
-
-### Shell & Tools
-- Chain verification commands sequentially, never as parallel Bash calls
-- In worktrees: prefix every command with `cd /absolute/path && `
-- Never use `~` in file tool paths — use full absolute paths starting with `/`
-- Always pass `{ encoding: 'utf-8' }` to `execSync`/`spawnSync`
-
-### Git Recipes (use these exact sequences — hooks enforce critical steps)
 ```bash
-# Push sequence — ALWAYS commit before pulling (Error #33, hook enforced)
-git add <files> && git commit -m "msg" && git pull --rebase && git push
-
-# First push — set upstream tracking
-git add <files> && git commit -m "msg" && git push -u origin <branch>
-
-# Push with tag — NEVER use --tags (Error #44, hook enforced)
-git push origin main && git push origin v1.0.0
-# Or: git push origin main --follow-tags
-
-# Worktree cleanup
-git worktree remove --force <path>; git branch -D <branch>
+git add src/feature.ts && git commit -m "feat: add feature"
+git pull --rebase && git push
 ```
 
-### Git Operations
-- Run typecheck/lint BEFORE committing (pre-commit hooks run the same checks)
-- Remove worktrees BEFORE merging PRs with `--delete-branch`
-- Never fabricate filesystem paths — use the working directory or discover with `ls`
+</example>
 
-### GitHub CLI
-- Don't guess `gh --json` field names — query available fields first
-- Check CI per-PR with `--json`, not chained human-readable output
-- `review: fail` means "needs approval", NOT a CI failure
+<example name="verification">
+Run checks sequentially, never as parallel tool calls.
 
-### Sub-agents & Agent Teams
-- Verify tool permissions before spawning sub-agents for write operations
-- If a sub-agent fails due to permissions, take over manually immediately
-- Monitor context size when running many parallel agents
-- Agent Teams are enabled via `.claude/settings.json` — use them for complex parallel work
-- When creating a team: break work so each teammate owns different files (avoid conflicts)
-- Teammates don't inherit conversation history — include full context in spawn prompts
-- Use subagents for focused tasks (result is all that matters); use teams for collaborative work requiring discussion
-- **Only the main agent handles git commit/push.** Sub-agents and teammates write changes to their working directories. The main agent reviews the changes, runs tests, and commits centrally. This prevents wrong-branch pushes and merge conflicts from parallel agents.
+```bash
+npm run typecheck 2>&1; npm run lint 2>&1; npm run test 2>&1
+```
 
-## Memory Management
+</example>
 
-When you discover an operational lesson during any session — CI failure pattern, permission issue, workaround, tooling quirk, environment-specific behavior — save it to auto memory immediately. Don't wait to be asked.
+<example name="worktree-cleanup">
+Remove worktrees before merging PRs. Use -D (uppercase) for branches.
 
-What to save proactively:
-- CI/CD pipeline behaviors and failure patterns specific to this project
-- Environment quirks (build flags, platform issues, dependency conflicts)
-- Project-specific conventions confirmed by the user
-- Workarounds for tools, APIs, or libraries used in this project
-- Permission configurations that required adjustment
+```bash
+git worktree remove --force ../feature-branch; git branch -D feature-branch
+```
 
-After completing `/bootstrap`, `/adopt`, or any significant configuration change, save the key decisions and project context to auto memory so future sessions start with full awareness.
+</example>
+
+<example name="file-paths">
+Use absolute paths in all file tools and worktree commands. Never use ~.
+
+```bash
+cd /Users/juan/code/paisaxe && npm run test
+```
+
+</example>
+</examples>
+
+Domain-specific rules (git, CI, deployment, Python, macOS, Supabase, GitHub CLI, multi-agent) are in `.claude/skills/` -- loaded automatically when relevant.
 
 ## Project File Locations
 
@@ -640,9 +429,9 @@ Go directly to these paths — never search the codebase for them.
 
 | Topic | Path | Notes |
 |-------|------|-------|
-| Agent reports | `docs/agents/*-report.md` | Flag YELLOW/RED items. Cross-agent context in `shared-context.md` |
-| Agent logs | `logs/<name>.log`, `<name>.error.log` | Read alongside reports to diagnose failures |
-| Agent scripts | `scripts/agents/` | Standalone bash files invoking Claude CLI headless |
+| Agent reports | `docs/agents/*-report.md` | Gitignored. Local-only operational history. Never committed (Rule #70) |
+| Agent logs | `logs/<name>.log`, `<name>.error.log` | Gitignored. Read alongside reports to diagnose failures |
+| Agent scripts | `scripts/agents/` | Gitignored. Standalone bash files invoking Claude CLI headless |
 | ADRs | `docs/decisions/` | Architecture decision records |
 | PR descriptions | `docs/prs/{number}_description.md` | |
 | Research docs | `docs/research/YYYY-MM-DD-description.md` | |
@@ -650,230 +439,16 @@ Go directly to these paths — never search the codebase for them.
 
 ## Issue Tracking (GitHub Issues)
 
-**GitHub Issues is the single source of truth for all planned work.** See @docs/project/issue-workflow.md for the full workflow.
+**GitHub Issues is the single source of truth.** See @docs/project/issue-workflow.md for full workflow, labels, and templates.
 
-### Quick Reference
-
-Every issue gets **one type label** + **one priority label** + **area label(s)**:
-
-- **Type**: `type: bug`, `type: feature`, `type: enhancement`, `type: chore`, `type: security`, `type: docs`
-- **Priority**: `priority: critical`, `priority: high`, `priority: medium`, `priority: low`
-- **Area**: `area: chat`, `area: voice`, `area: payments`, `area: admin`, `area: content`, `area: infra`, `area: marketing`, `area: auth`, `area: ux`
-
-### Auto-Filing Issues (MANDATORY)
-
-**When the user mentions a bug, feature idea, enhancement, or task — create a GitHub issue immediately.** Do not wait to be asked. Do not ask "should I create an issue?" Just file it.
-
-The user will throw ideas, complaints, observations, and requests in conversation. The agent's job is to:
-
-1. **Parse what the user said** into a clear issue title and description.
-2. **Classify it** with the right type, priority, and area labels.
-3. **Create it via CLI** — `gh issue create --title "..." --label "..." --body "..."`.
-4. **Report back** — show the issue number and URL so the user knows it's tracked.
-
-If the description would benefit from more detail, **ask the user** before creating — but bias toward filing it now with what you have rather than blocking on perfect information. You can always edit the issue later.
-
-**Example flow:**
-```
-User: "The voice chat sometimes drops after 30 seconds on mobile"
-Agent: *immediately creates issue* →
-  gh issue create \
-    --title "Voice: connection drops after ~30s on mobile" \
-    --label "type: bug,priority: high,area: voice" \
-    --body "## Description\nVoice chat sessions drop..."
-Agent: "Filed as #19 — type: bug, priority: high, area: voice"
-```
-
-**Multiple items in one message?** Create multiple issues. One issue per concern.
-
-### General Agent Rules for Issues
-
-1. **Reference issues in commits.** Use `Fixes #N` or `Refs #N` in commit messages.
-2. **Close issues when merged to `develop` with green CI.** No need to wait for production release.
-3. **When starting work on an issue**, mention the issue number in your first commit.
-4. **Use the CLI:**
-   ```bash
-   # Create an issue
-   gh issue create --title "Chat: timeout on long queries" --label "type: bug,priority: high,area: chat" --body "..."
-
-   # List open issues by priority
-   gh issue list --label "priority: critical"
-   gh issue list --label "priority: high"
-
-   # Edit an issue to add detail later
-   gh issue edit 19 --body "updated description..."
-   ```
+**Auto-Filing (MANDATORY):** When the user mentions a bug, feature, or task — create a GitHub issue immediately via `gh issue create`. Don't ask, just file it. Every issue gets one `type:` label + one `priority:` label + `area:` label(s). Multiple items = multiple issues. Reference in commits: `Fixes #N` or `Refs #N`. Close once merged to `develop` with green CI.
 
 ## Autonomous Issue Implementation
 
 **Trigger:** User says "implement issue #N" or "work on issue #N end-to-end"
 
-This workflow takes a GitHub issue and implements it from start to finish with zero intervention, tying together TDD, worktrees, CI monitoring, and issue tracking into a single autonomous pipeline.
+Workflow: Read issue → create worktree branch → write failing tests → implement → run full suite → commit (`Fixes #N`) → push → monitor CI (retry up to 3x) → report summary. Follow all conventions (TDD, worktree, branch naming). Don't ask questions — make reasonable decisions and document assumptions.
 
-### Workflow
+## Agent Teams
 
-```
-Implement GitHub issue #[NUMBER] end-to-end with zero intervention:
-
-1. Read the issue thoroughly. Read CLAUDE.md and any referenced plan files.
-2. Create a feature branch from develop following our naming convention.
-3. Write failing tests FIRST that capture every acceptance criterion from the issue.
-4. Implement the feature iteratively — run tests after each change, fix failures before moving on.
-5. Spawn a parallel Task agent to update all relevant documentation (README, CLAUDE.md, any /docs files).
-6. Run the full test suite. If anything fails, diagnose and fix. Repeat until all tests pass.
-7. Commit with a conventional message, push to origin.
-8. Monitor CI — if it fails, pull the logs, fix the issue, push again. Repeat up to 3 times.
-9. Once CI is green, report the summary of what was implemented.
-```
-
-### Rules
-
-- **Do NOT ask questions** — make reasonable decisions based on codebase patterns and document any assumptions in the PR description.
-- **Follow all existing conventions** — TDD, worktree isolation, branch naming, push accountability.
-- **Reference the issue** in all commits: `Fixes #N` or `Refs #N`.
-- **Close the issue** once merged to `develop` with green CI.
-- **If the issue is ambiguous**, document your interpretation in the commit/PR rather than blocking on clarification.
-
-## Content Categories
-
-From 37 PDFs in `content/pdfs/`:
-- City guides: Oviedo, Gijón, Avilés
-- Activities: hiking, cycling, family activities
-- Culture: pre-Romanesque art, museums, festivals
-- Gastronomy: sidra, fabada, local dishes
-- Camino de Santiago planning
-
-## Debug Mode (Agent Team)
-
-**Trigger:** User says "enter debug mode", "debug this", or "let's debug this"
-
-When triggered, create a team of parallel investigators to diagnose the issue:
-
-1. **Assess complexity** — Simple bugs (single component, clear error): 3 investigators. Cross-cutting issues (multiple systems, intermittent): up to 5.
-
-2. **Create team** called "debug-squad" with investigators, each assigned a different hypothesis:
-   - Each investigator focuses on a different area (API / client / database / config / dependencies / etc.)
-   - Each investigator must state their hypothesis upfront, then gather evidence
-   - Investigators should actively try to disprove their own hypothesis
-   - Time-boxed: if no evidence found after thorough investigation, report "hypothesis unlikely" and stop
-
-3. **Synthesize findings** — After all investigators complete:
-   - Rank hypotheses by evidence strength
-   - Present the most likely root cause with supporting evidence
-   - Propose a specific fix with code changes
-
-4. **Do NOT auto-apply fixes** — Present the diagnosis and proposed fix to the user for approval. Only implement after the user confirms.
-
-**Example team for a "chat responses are empty" bug:**
-- Investigator 1: API route — check if the Claude API is being called correctly, verify request/response
-- Investigator 2: Client-side — check if SSE parsing is working, verify state updates
-- Investigator 3: Database/RAG — check if embeddings are being retrieved, verify search results
-
-## Large Refactoring (Agent Team)
-
-**Trigger:** Auto-detected when a refactoring operation will touch 5+ files. Claude proposes using a team; proceeds only with user agreement.
-
-When triggered, create a team called "refactor" with 4 sequential specialists:
-
-### Phase 1 (Parallel)
-1. **architect** — Plan the refactoring: define target architecture, sequence of changes, identify risks. Produces a step-by-step plan.
-2. **dependency-analyst** — Map all imports/exports of affected modules, trace all consumers, list all tests that cover the affected code. Produces a dependency map.
-
-### Phase 2 (Sequential, after Phase 1)
-3. **implementer** — Execute the refactoring changes following the architect's plan. After each file change, run `npm run typecheck` to catch errors early. Does NOT run tests (that's the test-updater's job).
-
-### Phase 3 (Sequential, after Phase 2)
-4. **test-updater** — Update all affected tests based on the dependency analyst's map. Run `npm run test` after each test file update. Fix any failures. Run the full suite at the end.
-
-### Final Verification
-After all specialists complete, the lead runs:
-```bash
-npm run test && npm run typecheck && npm run lint
-```
-
-**Do NOT commit** — present the full diff to the user for review. The user decides whether to commit.
-
-## Codebase Health Check (Agent Team)
-
-**Trigger:** User says "run a health check", "codebase health", "health monitoring", "code quality audit", or "deep dive on code quality"
-
-This is the **single unified audit** for the entire codebase. It replaces the former standalone "Code Quality Deep-Dive" and "Coverage Report" — those checks are now folded into this workflow to eliminate overlap.
-
-Create a team called "health-check" with 4 parallel agents:
-
-### Agents
-
-1. **test-health**
-   - Run full test suite, identify any flaky tests (run failing tests 3x to confirm)
-   - Report coverage percentages by module (`npm run test:coverage`)
-   - Check coverage gaps in recently changed files (`git diff develop..main`)
-   - Flag files at 0% coverage that have been modified recently
-   - Flag tests that take unusually long (> 5 seconds)
-
-2. **code-quality**
-   - Run linter and typecheck (`npm run lint && npm run typecheck`)
-   - Run `npx knip` for unused exports, files, and dependencies
-   - Find TODO/FIXME/HACK comments
-   - Check for `any` types that should be properly typed
-   - Identify complexity hotspots: functions > 50 lines, files > 300 lines, nesting > 3 levels
-   - Check for duplicated logic and inconsistent patterns across API routes and components
-   - Cross-reference: flag files that are both complex AND low-coverage (highest risk)
-
-3. **ci-deploy-health**
-   - Check last 5 CI runs for patterns in failures (`gh run list --limit 5`)
-   - Verify production health endpoint (`curl /api/health`)
-   - Check database size and latency
-   - Confirm cron jobs are configured and executing
-   - Check for any Vercel deployment errors or warnings
-
-4. **dependency-health**
-   - Check for outdated dependencies (`npm outdated`)
-   - Identify known vulnerabilities (`npm audit`)
-   - Verify lockfile integrity (`npm ci --dry-run`)
-   - Flag any dependencies with incompatible licenses (only MIT, Apache-2.0, BSD, ISC allowed)
-
-### Output
-
-Write the unified report to `docs/health-report-[TODAY].md`. This is the **single source of truth** — it replaces `docs/agents/coverage-report.md` and `docs/agents/code-quality-report.md` (those files are archived and no longer updated).
-
-Report structure:
-```
-# Codebase Health Report
-> Generated: [date] | Branch: develop | Commit: [hash]
-
-## Executive Summary
-[Overall status + score table]
-
-## Test Health
-[Pass rate, coverage by module, coverage gaps, flaky tests]
-
-## Code Quality
-[Lint/type errors, dead code, complexity hotspots, pattern violations]
-
-## CI & Deploy Health
-[CI runs, production status, database, cron jobs]
-
-## Dependency Health
-[Outdated deps, vulnerabilities, lockfile, licenses]
-
-## Recommended Actions
-[Priority 1: quick automated fixes]
-[Priority 2: manual improvements with GitHub issues]
-[Priority 3: items to monitor]
-```
-
-### Auto-Remediation
-
-- For **critical issues**, automatically create GitHub issues.
-- For **simple fixes** (unused deps, lint fixes, dead code, minor/patch dep updates), fix them in a single PR titled `chore: automated health fixes [DATE]`.
-- For **complex issues**, file issues with context and suggested approaches — do NOT auto-fix.
-
-### Relationship to Other Reports
-
-This health check is the **periodic comprehensive audit**. It does NOT replace:
-- **QA Report** — LLM safety tests, browser journeys (unique domain)
-- **Security Report** — deep CVE/CSP/CSRF/rate-limiting audit (unique domain)
-- **Performance Report** — bundle size analysis, Lighthouse deep-dive (unique domain)
-- **Pre-Launch Report** — production readiness gate (superset, run only before releases)
-- **Cost Analyst Report** — API spend tracking and forecasting (unique domain)
-- **Localization Report** — translation completeness (unique domain)
+Debug mode, large refactoring, and health check workflows are defined in `.claude/skills/` — loaded automatically when triggered.

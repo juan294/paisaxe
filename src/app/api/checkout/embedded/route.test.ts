@@ -177,4 +177,35 @@ describe("POST /api/checkout/embedded", () => {
     expect(data.error).toBe("Failed to create checkout session");
     expect(data.details).toBe("Detailed error");
   });
+
+  it("should use empty string as userEmail when user.email is undefined", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: undefined } },
+      error: null,
+    });
+    vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_test_secret_123");
+    const request = createRequest({ origin: "https://paisaxe.es" });
+    await POST(request);
+    expect(createEmbeddedCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-123",
+        userEmail: "",
+      })
+    );
+  });
+
+  it("should show 'Unknown error' in development mode when error is not an Error instance", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createEmbeddedCheckoutSession).mockRejectedValue("string error");
+    const request = createRequest({ origin: "https://paisaxe.es" });
+    const response = await POST(request);
+    const data = await response.json();
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to create checkout session");
+    expect(data.details).toBe("Unknown error");
+  });
 });

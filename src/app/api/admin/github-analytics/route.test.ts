@@ -311,6 +311,143 @@ describe("GET /api/admin/github-analytics", () => {
     if (originalImpl) mockFrom.mockImplementation(originalImpl);
   });
 
+  it("uses default date range when from/to params are missing", async () => {
+    mockValidateAdminAuth.mockResolvedValue({
+      valid: true,
+      userId: "test-user-id",
+    });
+
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/admin/github-analytics"
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await GET(request as never) as any;
+    expect(response.status).toBe(200);
+
+    const { dateRange } = response.body.data;
+    // `from` should default to ~30 days ago in YYYY-MM-DD format
+    expect(dateRange.from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // `to` should default to today in YYYY-MM-DD format
+    expect(dateRange.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // `to` should be today
+    const today = new Date().toISOString().split("T")[0];
+    expect(dateRange.to).toBe(today);
+    // `from` should be approximately 30 days before today
+    const fromDate = new Date(dateRange.from);
+    const toDate = new Date(dateRange.to);
+    const diffDays = (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24);
+    expect(diffDays).toBeGreaterThanOrEqual(29);
+    expect(diffDays).toBeLessThanOrEqual(31);
+  });
+
+  it("handles null referrer, path, and lastSync data gracefully", async () => {
+    mockValidateAdminAuth.mockResolvedValue({
+      valid: true,
+      userId: "test-user-id",
+    });
+
+    // Override all queries to return null data arrays
+    const originalImpl = mockFrom.getMockImplementation();
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "github_traffic_daily") {
+        return {
+          select: (cols: string) => {
+            if (cols === "fetched_at") {
+              // lastSync query returns null data
+              return {
+                order: () => ({
+                  limit: vi.fn().mockResolvedValue({ data: null, error: null }),
+                }),
+              };
+            }
+            // daily query returns null data
+            return {
+              gte: () => ({
+                lte: () => ({
+                  order: vi.fn().mockResolvedValue({ data: null, error: null }),
+                }),
+              }),
+            };
+          },
+        };
+      }
+      if (table === "github_traffic_referrers") {
+        return {
+          select: () => ({
+            order: () => ({
+              order: () => ({
+                limit: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "github_traffic_paths") {
+        return {
+          select: () => ({
+            order: () => ({
+              order: () => ({
+                limit: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      return buildChain([]);
+    });
+
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/admin/github-analytics?from=2026-02-01&to=2026-02-07"
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await GET(request as never) as any;
+    expect(response.status).toBe(200);
+    expect(response.body.data.daily).toEqual([]);
+    expect(response.body.data.referrers).toEqual([]);
+    expect(response.body.data.popularPaths).toEqual([]);
+    expect(response.body.data.lastSyncedAt).toBeNull();
+    expect(response.body.data.summary.totalViews).toBe(0);
+    expect(response.body.data.summary.dataPointCount).toBe(0);
+
+    if (originalImpl) mockFrom.mockImplementation(originalImpl);
+  });
+
+  it("catch block falls back to empty strings when URL has no from/to params", async () => {
+    mockValidateAdminAuth.mockResolvedValue({
+      valid: true,
+      userId: "test-user-id",
+    });
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Make supabase throw to trigger the catch block
+    const originalImpl = mockFrom.getMockImplementation();
+    mockFrom.mockImplementation(() => {
+      throw new Error("Connection lost");
+    });
+
+    const { GET } = await import("./route");
+    // No from/to params — catch block should fall back to empty strings
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/admin/github-analytics"
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await GET(request as never) as any;
+    expect(response.status).toBe(200);
+    expect(response.body.data.dateRange.from).toBe("");
+    expect(response.body.data.dateRange.to).toBe("");
+    expect(response.body.data.summary.totalViews).toBe(0);
+    expect(response.body.data.daily).toEqual([]);
+
+    consoleSpy.mockRestore();
+    if (originalImpl) mockFrom.mockImplementation(originalImpl);
+  });
+
   it("includes cache-control headers", async () => {
     mockValidateAdminAuth.mockResolvedValue({
       valid: true,

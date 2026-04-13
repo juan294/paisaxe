@@ -264,10 +264,10 @@ export function StoryEditorDialog({
       </Dialog>
 
       {/* Fullscreen Preview */}
-      {state.isFullscreen && state.currentPreview && (
+      {state.imageEditor.isFullscreen && state.currentPreview && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95"
-          onClick={() => state.setIsFullscreen(false)}
+          onClick={() => state.imageEditor.setIsFullscreen(false)}
         >
           <Image
             src={state.currentPreview}
@@ -277,7 +277,7 @@ export function StoryEditorDialog({
             sizes="100vw"
           />
           <button
-            onClick={() => state.setIsFullscreen(false)}
+            onClick={() => state.imageEditor.setIsFullscreen(false)}
             aria-label="Close fullscreen preview"
             className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
           >

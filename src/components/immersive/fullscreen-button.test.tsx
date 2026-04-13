@@ -93,6 +93,41 @@ describe("FullscreenButton", () => {
     });
   });
 
+  it("should detect iPad Pro as iOS device (MacIntel + touch, line 26)", async () => {
+    // iPad Pro reports as MacIntel but with touch support
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "platform", {
+      value: "MacIntel",
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "maxTouchPoints", {
+      value: 5,
+      configurable: true,
+    });
+
+    await act(async () => {
+      render(<FullscreenButton />);
+    });
+
+    await waitFor(() => {
+      const button = screen.getByRole("button", { name: /fullscreen.toggle/i });
+      expect(button).toBeInTheDocument();
+    });
+
+    // Clicking should show iOS instructions (not use fullscreen API)
+    const button = screen.getByRole("button", { name: /fullscreen.toggle/i });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("fullscreen.install_title")).toBeInTheDocument();
+    });
+  });
+
   it("should show iOS instructions modal when clicking on iOS device", async () => {
     // Mock iOS device
     Object.defineProperty(navigator, "userAgent", {

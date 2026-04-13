@@ -571,4 +571,14 @@ describe("LanguageSwitcher", () => {
       expect(toggleButton).toHaveAttribute("aria-expanded", "true");
     });
   });
+
+  // Lines 72 and 75 in language-switcher.tsx are defensive guards inside handleListboxKeyDown:
+  // - Line 72: `if (!listbox) return;` — guard for when listboxRef.current is null.
+  //   Unreachable because the `onKeyDown` handler is attached to the outer listbox div, which
+  //   always renders alongside the inner div that holds the ref. The ref is always set by the
+  //   time any keydown event fires.
+  // - Line 75: `if (options.length === 0) return;` — guard for when no [role="option"] elements
+  //   exist. Unreachable because the `languages` array is a module-level constant with 6 items
+  //   and all 6 buttons with role="option" always render.
+  // Both are structurally sound defensive patterns that cannot be exercised via jsdom/vitest.
 });

@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # SMS Alerts — Send critical failure notifications via Twilio
 #
-# Required environment variables:
+# Optional environment variables (gracefully degrades when absent):
 #   TWILIO_ACCOUNT_SID    - Twilio account SID
 #   TWILIO_AUTH_TOKEN     - Twilio auth token
 #   TWILIO_PHONE_NUMBER   - Twilio phone number (sender)
 #   QA_ALERT_PHONE        - Phone number to receive alerts (E.164 format, e.g., +34612345678)
+
+# Default to empty — safe under set -u from parent scripts
+TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID:-}"
+TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN:-}"
+TWILIO_PHONE_NUMBER="${TWILIO_PHONE_NUMBER:-}"
+QA_ALERT_PHONE="${QA_ALERT_PHONE:-}"
 
 # Send an SMS via Twilio
 # Usage: send_sms "message body"

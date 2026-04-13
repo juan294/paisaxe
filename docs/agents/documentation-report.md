@@ -1,9 +1,19 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-03-24 06:00:05
+> Auto-generated on 2026-04-13 06:00:03
+
+## Changes Made This Run (2026-04-13)
+
+- **Status: GREEN** — No documentation gaps found. Sixteenth consecutive clean run.
+- **Feature flags**: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
+- **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require new documentation.
+- **CLAUDE.md**: Current (last modified 2026-03-28)
+- **features.md**: Complete — no additions needed.
+- **No source changes** since last run that introduce new user-facing features or flags.
+- **No new migrations** since last documentation update.
 
 ## CLAUDE.md Status
 
-Last modified: **2026-03-23**
+Last modified: **2026-03-28**
 
 ## Files Modified Since Documentation Update
 
@@ -12,56 +22,43 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
-src/app/pricing/checkout/page.tsx
-src/app/pricing/loading.tsx
-src/app/providers.test.tsx
-src/app/providers.tsx
-src/components/admin/a11y-heading-focus.test.tsx
-src/components/admin/agent-config-panel.tsx
-src/components/admin/agents-dashboard/index.tsx
-src/components/admin/agents-dashboard/optimizer-config-panel.tsx
-src/components/admin/analytics-tabs.tsx
-src/components/admin/costs-analytics-panel/alerts.test.tsx
-src/components/admin/costs-analytics-panel/forecast.test.tsx
-src/components/admin/costs-analytics-panel/index.tsx
-src/components/admin/date-input-focus.test.tsx
-src/components/admin/elevenlabs-analytics-panel.tsx
-src/components/admin/feature-toggles-panel.tsx
-src/components/admin/github-analytics-panel.tsx
-src/components/admin/maintenance-config-panel.tsx
-src/components/admin/marketing-dashboard/account-config-dialog.test.tsx
-src/components/admin/marketing-dashboard/account-config-dialog.tsx
-src/components/admin/marketing-dashboard/create-draft-dialog.tsx
-src/components/admin/marketing-dashboard/marketing-dashboard.tsx
-src/components/admin/story-editor-dialog/story-editor-dialog.test.tsx
-src/components/admin/story-editor-dialog/story-editor-fullscreen.test.tsx
-src/components/admin/story-editor-dialog/use-story-editor-save.test.ts
-src/components/admin/stripe-analytics-panel.tsx
-src/components/admin/suggestions-panel.tsx
-src/components/admin/visitor-voice-config-panel.tsx
-src/components/admin/visitors-analytics-panel.tsx
-src/components/admin/voice-agent-chat.tsx
-src/components/immersive/author-typewriter.test.tsx
-src/components/immersive/question-prompts.test.tsx
-src/components/immersive/question-prompts.tsx
-src/components/site-footer.test.tsx
-src/components/site-footer.tsx
-src/hooks/use-reduced-motion.test.ts
+src/app/admin/page.test.tsx
+src/app/admin/page.tsx
+src/app/api/chat/route.ts
+src/app/favorites/page.test.tsx
+src/app/immersive/immersive-page-content.test.tsx
+src/app/immersive/immersive-page-content.tsx
+src/app/layout.tsx
+src/components/admin/agents-dashboard/use-agent-runner.test.ts
+src/components/admin/agents-dashboard/use-agent-terminal.test.ts
+src/components/admin/elevenlabs-analytics-panel.test.tsx
+src/components/admin/github-analytics-panel.test.tsx
+src/components/admin/story-editor-dialog/use-image-editor.test.ts
+src/components/admin/stripe-analytics-panel.test.tsx
+src/components/admin/visitors-analytics-panel.test.tsx
+src/components/analytics.test.tsx
+src/components/analytics.tsx
+src/components/immersive/language-switcher.test.tsx
+src/components/immersive/suggest-place-dialog.test.tsx
 src/hooks/use-stories.test.ts
-src/hooks/use-voice-session.ssr.test.ts
-src/hooks/use-voice-session.test.ts
 src/lib/chat-action-detection.test.ts
-src/lib/claude.test.ts
-src/lib/costs/anthropic-costs.test.ts
-src/lib/costs/anthropic-costs.ts
-src/lib/image-optimization.test.ts
-src/lib/localize-story.test.ts
-src/lib/posting-service.test.ts
-src/lib/stories-data.test.ts
-src/lib/stories-data.ts
+src/lib/stripe.test.ts
+src/lib/stripe.ts
+src/proxy.test.ts
 ```
 
 No new migrations since documentation update.
+
+### Scripts
+
+```
+scripts/commit-reports.sh
+scripts/cost-analyst-fetch.sh
+scripts/documentation-agent.sh
+scripts/lib/sms-alerts.sh
+scripts/performance-agent.sh
+scripts/qa-agent.sh
+```
 
 ## Documentation Gaps
 
@@ -99,6 +96,7 @@ admin/stripe-analytics
 admin/suggestions
 admin/suggestions/[id]
 admin/tunnel
+chat
 chat/stream
 checkout/day-pass
 checkout/embedded
@@ -122,44 +120,12 @@ webhooks/translate
 
 ```
 
-### Potentially Undocumented Feature Flags
-
-These feature flags may not be documented in CLAUDE.md:
-
-```
-ambient_discovery
-asturianu_touches
-autoplay_button
-booking_system
-contextual_prompts
-fullscreen_button
-maintenance_mode
-mood_discovery
-randomized_order
-related_stories
-seasonal_surfacing
-sms_booking_confirmation
-story_freshness
-story_sharing
-surprise_me
-user_story_suggestions
-
-```
-
-## Changes Made This Run (2026-03-24)
-
-**Feature Flags**: All 16 flagged feature flags are already documented in `docs/project/features.md` (Feature Flags Reference, lines 660-717). The gap detection script checked CLAUDE.md but the canonical location is features.md — false positive. No changes needed.
-
-**API Routes**: All 48 flagged routes reviewed. External-facing routes (webhooks, MCP tools) are already documented in features.md (lines 625-631, 128-133). Remaining routes are internal admin panel, cron, checkout, and utility APIs — not meant for external consumption. No changes needed.
-
-**Result**: No documentation gaps found. All items are either already documented or are internal implementation details.
-
 ## Documentation File Ages
 
 | File | Last Modified |
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
-| CLAUDE.md | 2026-03-23 |
+| CLAUDE.md | 2026-03-28 |
 | README.md | 2026-02-16 |
 
 ---

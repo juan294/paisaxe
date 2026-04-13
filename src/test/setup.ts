@@ -1,4 +1,9 @@
 import "@testing-library/jest-dom/vitest";
+import { afterEach, vi } from "vitest";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 // Mock environment variables for tests
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";

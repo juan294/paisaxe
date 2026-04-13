@@ -574,8 +574,8 @@ describe("StoryEditorDialog", () => {
   });
 
   describe("fullscreen preview (lines 267-290)", () => {
-    // The fullscreen overlay renders when state.isFullscreen && state.currentPreview.
-    // isFullscreen is internal state in useStoryEditorState, initialized to false.
+    // The fullscreen overlay renders when state.imageEditor.isFullscreen && state.currentPreview.
+    // isFullscreen is internal state in useImageEditor, initialized to false.
     // It can only be set to true by child component interactions (ImageTab),
     // but ImageTab is mocked. Testing fullscreen requires mocking useStoryEditorState,
     // which under V8 coverage causes branch map conflicts for lines 40-84.

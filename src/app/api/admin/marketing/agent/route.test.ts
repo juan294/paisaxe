@@ -323,5 +323,33 @@ describe("/api/admin/marketing/agent", () => {
         expect(agent.voice.tone).toBeTruthy();
       }
     });
+
+    it("should return undefined voice for agents without voice config (line 224)", async () => {
+      // Spy on getAllAgents to include an agent without voice
+      const agentsModule = await import("@/agents");
+      const originalGetAllAgents = agentsModule.getAllAgents;
+      vi.spyOn(agentsModule, "getAllAgents").mockReturnValue([
+        ...originalGetAllAgents(),
+        {
+          id: "test-no-voice",
+          name: "Test Agent",
+          platform: "x" as const,
+          description: "Test agent without voice",
+          capabilities: ["text"],
+          limitations: [],
+          personaFile: "test.md",
+        },
+      ]);
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      const noVoiceAgent = data.agents.find((a: { id: string }) => a.id === "test-no-voice");
+      expect(noVoiceAgent).toBeDefined();
+      expect(noVoiceAgent.voice).toBeUndefined();
+
+      vi.restoreAllMocks();
+    });
   });
 });

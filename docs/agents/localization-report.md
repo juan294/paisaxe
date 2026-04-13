@@ -1,161 +1,75 @@
 # Localization Coverage Report
-> **Last Updated:** 2026-03-24
+> **Last Updated:** 2026-04-13
 > **Agent:** Paisaxe Localization Agent
-> **Status:** Complete - 100% Translation Coverage Verified
+> **Status:** GREEN — 100% Translation Coverage
 
----
+## Summary
 
-## Executive Summary
+| Locale | UI Keys | Coverage | Story Translations | Coverage |
+|--------|---------|----------|--------------------|----------|
+| es (Spanish) | 392 / 392 | 100% | 95 / 95 | 100% (source) |
+| en (English) | 392 / 392 | 100% | 95 / 95 | 100% |
+| fr (French) | 392 / 392 | 100% | 95 / 95 | 100% |
+| de (German) | 392 / 392 | 100% | 95 / 95 | 100% |
+| pt (Portuguese) | 392 / 392 | 100% | 95 / 95 | 100% |
+| ast (Asturian) | 392 / 392 | 100% | 95 / 95 | 100% |
 
-**Result: 100% Translation Coverage Maintained**
+**Total leaf keys (UI):** 392 per locale  
+**Total story translations:** 95 stories × 5 locales = 475 (title + subtitle + description each)  
+**TypeScript check:** PASS — `npx tsc --noEmit` exits clean (0 errors)
 
-All 6 supported locales have complete translation coverage across both UI strings and story content.
+## Fixed This Cycle
 
-- **UI Translations**: 6/6 locales complete (es, en, fr, de, pt, ast) — 392 keys each
-- **Story Translations**: 95 stories x 5 non-default locales = 475 translations, all complete
-- **Type Safety**: Pass — `npx tsc --noEmit` exits clean on all locale files
-- **Test Suite**: 197 i18n tests passing (4 test files)
-- **Changes Made**: None — all translations were already complete
-
----
-
-## Current Status (2026-03-24 Verification)
-
-### Summary Table
-
-| Locale | Code | UI Keys | UI Coverage | Stories | Story Coverage |
-|--------|------|---------|-------------|---------|----------------|
-| Spanish | `es` | 392 | 100% (source) | 95 (source) | 100% (source) |
-| English | `en` | 392 | 100% | 95 | 100% |
-| French | `fr` | 392 | 100% | 95 | 100% |
-| German | `de` | 392 | 100% | 95 | 100% |
-| Portuguese | `pt` | 392 | 100% | 95 | 100% |
-| Asturian | `ast` | 392 | 100% | 95 | 100% |
-
-### Stability Trend
-
-| Metric | 2026-03-22 | 2026-03-23 | 2026-03-24 | Change |
-|--------|-----------|-----------|-----------|--------|
-| UI keys per locale | 392 | 392 | 392 | 0 (stable 18 days) |
-| Story translations | 95 | 95 | 95 | 0 (stable 18 days) |
-
-No new UI keys or stories were added since the last report. All translations remain in sync.
-
----
-
-## UI Translations Analysis
-
-### Key Distribution by Section
-
-| Section | Keys | Description |
-|---------|------|-------------|
-| `common` | 2 | Loading states, close buttons |
-| `chat` | 13 | Chat interface, privacy, copy/directions |
-| `stories` | 22 | Filters, categories, locations, durations |
-| `nav` | 6 | Navigation keyboard shortcuts |
-| `author_pill` | 9 | Fun author taglines |
-| `share` | 2 | Share functionality |
-| `favorites` | 21 | Bookmarks, saved stories, sync |
-| `accessibility` | 18 | Screen reader labels, ARIA descriptions |
-| `auth` | 7 | Authentication prompts, sign in/out |
-| `mood` | 7 | Mood-based story filtering |
-| `voice` | 24 | Voice chat, Pelayo persona references |
-| `suggestions` | 24 | Community place suggestions |
-| `upsell` | 9 | Voice Pass feature promotion |
-| `premium` | 26 | Premium features, Day Pass, checkout, FAQ |
-| `fullscreen` | 7 | PWA installation instructions |
-| `errors` | 11 | Error pages, retry actions |
-| `footer` | 4 | Terms, privacy, attribution |
-| `info_menu` | 2 | About, saved places |
-| `about` | 11 | About page content |
-| `privacy` | 44 | Privacy policy (9 sections) |
-| `terms` | 45 | Terms of service (10 sections) |
-| `admin` | 38 | Admin panel (login, stories, toggles, analytics) |
-| **Total** | **392** | |
-
-### Missing Keys
-
-None. All 5 target locales have the exact same 392 keys as the Spanish source.
-
-### Orphaned Keys
-
-None. No locale contains keys absent from Spanish.
-
----
-
-## Story Translations Analysis
-
-### Coverage
-
-**Total Stories**: 95 in `content/translations/story-translations.ts`
-
-Each story has translations for 5 non-default locales (en, fr, de, pt, ast), with:
-- `title`: Translated story title
-- `subtitle`: Translated subtitle/tagline
-- `description`: Translated description (1-2 sentences)
-
-| Category | Count |
-|----------|-------|
-| Core stories (nature, cities, etc.) | 20 |
-| Restaurants | 31 |
-| Gastronomy dishes | 6 |
-| Culture & monuments | 15 |
-| Nature & activities | 12 |
-| Camino de Santiago | 5 |
-| Other | 6 |
-
-**Total story translations**: 95 stories x 5 locales x 3 fields = **1,425 translation strings**, all present.
-
----
-
-## Translation Quality Notes
-
-### Asturian (ast) Specifics
-
-The Asturian translations maintain proper Bable dialect:
-- Authentic vocabulary: "Afayar" (Discover), "Histories" (Stories), "Llagos" (Lakes)
-- Regional place names: "Uviéu" (Oviedo), "Xixón" (Gijón), "Cuadonga" (Covadonga)
-- Proper conjugations: "ta falando" (is speaking), "Escúchote" (I listen to you)
-- Voice agent: "Pelayo" -> "Pelayu" (Asturianized name)
-- Cultural terms: "llagariega" (cider house), "fabes" (beans)
-
-### Location-Specific Content
-
-All locale files properly translate location-specific references:
-- Region names localized per language (e.g., "Ostasturien" in German, "Asturies orientales" in French)
-- "Paisaxe" kept untranslated as brand name across all locales
-- Cultural items ("fabada", "sidra") kept or minimally adapted per locale
-
----
-
-## Changes Made (2026-03-24)
-
-**0 translations added** — all locales were already complete. No files modified.
-
----
+None. All translations stable for **37 consecutive days** (since 2026-03-07).
 
 ## Remaining Gaps
 
-**None identified.**
+None. Coverage is complete across all locales.
 
----
+## Orphaned Keys
 
-## Recommendations
+None. All 392 keys in non-Spanish locales have corresponding Spanish source entries.
 
-1. **Stricter type safety**: The `Translations` interface uses `[key: string]: string | Translations` which doesn't enforce specific keys at compile time. Consider generating a stricter type from `es.ts` to catch missing keys at build time.
+## Key Distribution by Section
 
-2. **CI validation script**: Add a key-comparison script to CI that fails the build if any locale drifts from the Spanish source. This prevents silent regressions when new features add UI strings.
+| Section | Leaf Keys |
+|---------|-----------|
+| common | 2 |
+| chat | 15 |
+| stories (incl. filters, categories, locations, durations) | 24 |
+| nav | 6 |
+| author_pill | 9 |
+| share | 2 |
+| favorites | 23 |
+| accessibility | 21 |
+| auth | 7 |
+| mood | 7 |
+| voice | 23 |
+| suggestions | 28 |
+| upsell | 9 |
+| premium | 28 |
+| fullscreen | 8 |
+| errors | 12 |
+| footer | 4 |
+| info_menu | 2 |
+| about | 13 |
+| privacy | 50 |
+| terms | 44 |
+| admin (incl. login, tabs, stories, featureToggles, analytics) | 55 |
+| **Total** | **392** |
 
-3. **New key workflow**: When adding new UI strings, add to all 6 locale files simultaneously. The current flexible type won't catch omissions.
+## Notes
 
----
+- Spanish (`es`) is the source of truth. No Spanish strings were modified.
+- Cosmetic: `fr`, `de`, `pt` locale files are missing 8 inline `// LOCATION-SPECIFIC` comments present in `es` and `en`. No functional impact.
+- `ast` (Asturian) locale uses the Asturianu persona name "Pelayu" (not "Pelayo") consistently throughout voice prompts — correct per locale conventions.
+- Story translations verified: all 95 slugs have `en`, `fr`, `de`, `pt`, and `ast` blocks confirmed by grep (95/95 each).
 
-## Cross-Agent Intelligence
+## Cross-Agent Recommendations
 
-**Cross-agent recommendations:**
-- Performance Agent: Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, others dynamic) in place. No optimization needed.
-- Code Quality Agent: No dead translations found. All 392 keys actively referenced in components. No new keys added since Mar 7.
-- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
-- Coverage Agent: i18n type system uses flexible index signatures — runtime key comparison is the reliable coverage check. 197 i18n tests all passing.
-- QA Agent: No locale-related issues this cycle. All translations stable.
-- Cost Analyst Agent: No cost-related localization concerns.
+- **Performance Agent:** Locale bundle sizes stable (~15 KB each). Lazy-loading (es+en static, fr/de/pt/ast dynamic) in place. No optimization needed.
+- **Code Quality Agent:** No dead translations found. All 392 keys actively referenced. No new keys since Mar 7. Cosmetic: fr/de/pt missing 8 inline `// LOCATION-SPECIFIC` comments — no functional impact.
+- **Security Agent:** No sensitive data in translation files (no API keys, tokens, or PII).
+- **Coverage Agent:** No locale-related coverage concerns.
+- **QA Agent:** No locale-related issues. All translations stable for 37 days.
+- **Cost Analyst Agent:** No cost-related localization concerns.

@@ -1,73 +1,50 @@
 # Triage Report
-> Generated on 2026-03-23 | 7 reports processed | 6 action items
+> Generated on 2026-04-13 | 5 reports processed | 2 action items resolved
 
 ## Agent Failures
-None — all 7 agents ran successfully.
+
+None — all 5 agents ran successfully. Error logs clean (empty).
 
 ## Reports Reviewed
 
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi-update | GREEN | 0 — already at v1.10.0 |
-| 2 | cost-analyst-report.md | cost-analyst | WATCH | 0 — business concern (38-day revenue drought), no code fixes |
-| 3 | coverage-report.md | coverage | GREEN | 2 — commit 64 new tests, fix 15+ TS/lint errors |
-| 4 | documentation-report.md | documentation | GREEN | 0 — no gaps found |
-| 5 | localization-report.md | localization | GREEN | 0 — 100% coverage stable |
-| 6 | qa-report.md | qa | YELLOW | 2 — fix CSRF test blocker, fix health check expectations |
-| 7 | security-report.md | security | GREEN | 2 — npm audit fix, add gitleaks to CI |
+| 1 | coverage-report.md | coverage | GREEN | 2 code (test fix + global timer cleanup) |
+| 2 | cost-analyst-report.md | cost-analyst | WATCH | 0 code (operational only) |
+| 3 | localization-report.md | localization | GREEN | 0 code (cosmetic comments deferred) |
+| 4 | documentation-report.md | documentation | GREEN (16th) | 0 |
+| 5 | cc-rpi-update-report.md | cc-rpi-update | GREEN | 0 (at v1.15.0) |
 
-## Overall Status: YELLOW → GREEN
+## Overall Status: GREEN
 
-The only YELLOW (QA CSRF blocker) has been resolved. All action items implemented.
+All code findings resolved. Cost Analyst WATCH items are operational (revenue drought, Twilio anomaly, Anthropic billing) — these require user action outside the code path and do not block GREEN.
 
 ## Action Items Completed
 
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Fix LLM quality test CSRF blocker | QA | 0 (existing tests now unblocked) | DONE |
-| 2 | Fix health check script expectations | QA | 0 (script fix) | DONE |
-| 3 | Run `npm audit fix` (3 advisories → 0) | Security | 0 | DONE |
-| 4 | Add gitleaks to CI workflow | Security | 0 | DONE |
-| 5 | Fix 15+ TypeScript/lint errors in test files | Coverage | 0 (fixes to existing tests) | DONE |
-| 6 | Commit 64 new tests from coverage agent | Coverage | 64 | DONE |
+| 1 | Commit coverage agent's `suggest-place-dialog.test.tsx` fix (uncommitted from Apr 12 run) — replaces fake-timer success test with real-timer `waitFor` approach | coverage | Rewrote existing test (27/27 pass) | ✅ |
+| 2 | Add global `afterEach(() => vi.useRealTimers())` to `src/test/setup.ts` to close the recurring fake-timer-leakage hazard (has bitten twice) | coverage | Existing suite (5716) validates | ✅ |
 
-### Details
+Commit: `def9813` — "test: add global fake-timer cleanup to prevent leakage"
 
-**1. CSRF Test Blocker (QA P0 — 10 weeks blocked)**
-- Modified `src/tests/qa/llm-quality.test.ts`: `sendChatMessage()` now obtains a CSRF token via `getCsrfToken()` (fetches page, parses `__csrf` cookie) and includes `x-csrf-token` header and `Cookie` in POST requests.
-- LLM quality monitoring should resume on next QA agent run.
+## Deferred (Not Code Fixes)
 
-**2. Health Check Script (QA P1 — 11 weeks stale)**
-- Updated `scripts/qa-agent.sh`: Changed health check from `"status":"ok"` to `"status":"healthy"` (3 occurrences).
-- Replaced deleted `/api/stripe-test` endpoint with `/api/checkout/health` (2 occurrences).
-
-**3. npm audit fix (Security — 3 advisories)**
-- Resolved: flatted (dev-only DoS + prototype pollution), undici (dev-only multiple), next 16.1.6→16.2.1 (5 moderate sub-advisories).
-- `npm audit` now shows 0 vulnerabilities.
-
-**4. Gitleaks CI (Security — 19 weeks pending)**
-- Added `gitleaks` job to `.github/workflows/security.yml` using `gitleaks/gitleaks-action@v2`.
-- Runs on push/PR to develop/main and weekly schedule. References existing `.gitleaks.toml`.
-- Note: Requires `GITLEAKS_LICENSE` secret for GitHub Actions (free for public repos, paid for private).
-
-**5-6. Coverage Agent Test Fixes**
-- Fixed TypeScript errors: `AuthResult` missing `userId`, `CreateStoryResponse` missing `curationStatus`/`createdAt`, `TimeOfDay` union mismatch, `TierAlert` missing `dailyRate`, `Buffer.from` overload typing, untyped `createContext` calls, nullable `caption` type assertion.
-- Fixed lint errors: unused variables (8 instances), `require()` → `import()` (2 files), unused imports (2 files), invalid eslint-disable rule references (1 file).
-- All 5562 tests pass, 299 test files, typecheck clean, lint clean.
+- **Anthropic billing manual check** — no billing API on personal account; user must check console.
+- **59-day revenue drought** — requires manual verification of Pelayo voice widget and Day Pass flow on production.
+- **Twilio $0.24 anomaly** (10 days unresolved) — user must check Twilio billing console.
+- **Archy failure escalation** (3 failures, 2 error types, Apr 11–12) — non-Paisaxe agent, no cost impact to us.
+- **Cosmetic localization comments** — 8 missing `// LOCATION-SPECIFIC` comments in fr/de/pt; no functional impact; skipped to avoid churn.
+- **Untracked utility scripts** (`scripts/compare-i18n-keys.ts`, `scripts/cost-analyst-fetch.sh`) — leftover from agent runs, not flagged by any report.
 
 ## Verification
-- [x] All tests passing (5562/5562)
+
+- [x] All tests passing (5716/5716)
 - [x] Typecheck clean
 - [x] Lint clean
-- [ ] CI green (monitoring in background)
+- [ ] CI green — background monitor spawned for commit `def9813` (3 workflows queued: CI, Security Scan, Lighthouse CI)
 
 ## Carried Items
 
-| Item | Duration | Trend |
-|------|----------|-------|
-| Platform dormancy (0 revenue, 0 voice) | 38 days | Business concern — not a code issue |
-| Authenticated journey tests (9-12) skipped | Ongoing | QA recommends auth fixture setup |
-| MCP routes 0% E2E coverage | 9+ weeks | QA/Coverage/Security all flag this |
-| JS bundle 2,726 KB (9% over 2,500 KB budget) | Since Mar 8 | Performance recommends browserslist optimization |
-
-*Report generated by triage agent.*
+- **voice-agent-chat.tsx (45.6%)** and **agents-dashboard/index.tsx (48.5%)** — still require Playwright E2E. Unchanged from prior cycles. Not a triage-fixable item.
+- **Cost Analyst WATCH pattern** — 59-day revenue drought, 55-day voice silence. Persistent across multiple triage cycles; escalation to user attention.
