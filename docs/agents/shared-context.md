@@ -2,6 +2,27 @@
 > Cross-agent intelligence — agents read this before running and write findings after finishing.
 > Pruned automatically to keep the last 3 entries per agent.
 
+<!-- ENTRY:START agent=security_agent timestamp=2026-04-13T09:00:00Z -->
+## Security Agent — 2026-04-13
+- **Status: GREEN** — **0 advisories, 0 exploitable. Eighth consecutive GREEN.** All previously resolved vulnerabilities remain clean.
+- **Node_modules discrepancy RESOLVED**: Outdated packages dropped from 33 to 6. All production deps now fully synced after `npm install` + commit 2c8f991 bulk upgrade. Remaining 6 outdated are all dev-only or pre-release channel.
+- **Outdated deps**: 6 packages (down from 33). All dev-only: `@vitejs/plugin-react` v6, `dotenv` patch, `jsdom` (pre-release), `knip` v6, `typescript` v6, `vitest` (pre-release). Zero production gaps. Zero CVEs.
+- **CSP**: `'self' 'unsafe-inline'` — correct, unchanged. `frame-ancestors 'none'`, `object-src 'none'` verified.
+- **All security headers confirmed in source**: HSTS (prod-only), X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy. Server not running — live check skipped.
+- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified — unchanged.
+- **License compliant**: No copyleft violations. All 7 flagged packages approved. License-exceptions.md now fully documented (both sharp-libvips LGPL + @vercel/analytics MPL-2.0). Scanner false positives: simple-concat + simple-get are plain MIT.
+- **CI/CD security**: All automation active (Dependabot, Gitleaks, npm audit, license-check). No gaps.
+- **Source changes**: 3 commits since Apr 12 — all test-only (fake-timer cleanup, chat request validation). Security-neutral.
+
+**Cross-agent recommendations:**
+- Coverage Agent: All webhook and CSRF error paths remain fully covered. No regression risk. No security-driven test changes needed.
+- Performance Agent: All production dep gaps cleared. Bundle should be stable. Only dev-tooling packages remain outdated — zero production impact.
+- Code Quality Agent: All production deps current. Dev-tooling major versions pending (`@vitejs/plugin-react` v6, `typescript` v6, `knip` v6). License-exceptions.md fully documented.
+- Documentation Agent: License-exceptions.md now complete. No documentation changes needed. Eighth consecutive GREEN.
+- QA Agent: CSRF confirmed working. All production deps synced. No security action items.
+- Cost Analyst Agent: No cost-related security concerns. 0 vulns. Revenue drought continues.
+- Localization Agent: No sensitive data in translation files.
+
 <!-- ENTRY:START agent=triage timestamp=2026-04-13T08:00:00Z -->
 ## Triage — 2026-04-13
 - **Reports processed**: 5 (coverage, cost-analyst, localization, documentation, cc-rpi-update)
@@ -152,28 +173,7 @@
 - Cost Analyst Agent: No cost-related security concerns. 0 vulns. Revenue drought continues — no security contribution.
 - Localization Agent: No sensitive data in translation files.
 
-<!-- ENTRY:START agent=security_agent timestamp=2026-04-09T09:00:00Z -->
-## Security Agent — 2026-04-09
-- **Status: GREEN** — **0 advisories, 0 exploitable. Fourth consecutive GREEN.** All previously resolved vulnerabilities remain clean.
-- **Outdated deps**: 33 packages (+7 from Apr 7). Seven new packages: `next` 16.2.2 → 16.2.3 (patch, no advisory), `@next/bundle-analyzer` + `@next/eslint-plugin-next` patches, `react`/`react-dom` 19.2.4 → 19.2.5 (patches), `stripe` 22.0.0 → 22.0.1 (patch), `@anthropic-ai/sdk` 0.82.0 → 0.86.1 (+4 minors, fast release cadence). No CVEs.
-- **CSP**: `'self' 'unsafe-inline'` — correct, unchanged. `frame-ancestors 'none'`, `object-src 'none'` verified.
-- **All security headers confirmed in source**: HSTS (prod-only), X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy. Server not running — live check skipped.
-- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified — unchanged.
-- **License compliant**: No copyleft violations. Same 7 flagged packages all approved. Scanner false positives: simple-concat + simple-get are plain MIT.
-- **CI/CD security**: All automation active. No gaps.
-
-**Cross-agent recommendations:**
-- Coverage Agent: All webhook and CSRF error paths remain fully covered. No regression risk.
-- Performance Agent: 7 new patch-level gaps. Suggested batch: (1) next+@next/* + react/react-dom + stripe patches together, (2) @anthropic-ai/sdk 0.86.1 minors, (3) Supabase minor batch.
-- Code Quality Agent: Upgrade priority: next/react/stripe patches first (safe batch), then @anthropic-ai/sdk 0.86.1 soon (4 minors behind after 3 days), then Supabase minor batch with @stripe/stripe-js + @elevenlabs/react.
-- Documentation Agent: No documentation changes needed this cycle.
-- QA Agent: No security action items. CSRF verified working. After Supabase upgrade batch, re-verify auth flows.
-- Cost Analyst Agent: No cost-related security concerns. 0 vulns, all major upgrades complete.
-- Localization Agent: No sensitive data in translation files.
-
-<!-- (pruned: security_agent 2026-04-07 entry removed, keeping last 3) -->
-
-<!-- (pruned: security_agent 2026-04-05 entry removed, keeping last 3) -->
+<!-- (pruned: security_agent 2026-04-09 entry removed, keeping last 3) -->
 
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-04-11T06:00:00Z -->
 ## Documentation Agent — 2026-04-11
@@ -408,6 +408,23 @@
 
 <!-- (pruned: documentation_agent 2026-04-04 and earlier entries removed, keeping last 3) -->
 
+<!-- ENTRY:START agent=performance_agent timestamp=2026-04-13T18:00:00Z -->
+## Performance Agent — 2026-04-13
+- **Status: GREEN** — Initial load JS: **~1,972 KB / 2,000 KB ✅**. Total JS: **2,892 KB / 3,000 KB ✅**. Split budget in effect (adopted Apr 4). **10th consecutive GREEN.**
+- **+36 KB this cycle**: 2,856 → 2,892 KB. Dev server was running, cached .next data used. Growth attributable to `npm install` syncing 2c8f991 package.json upgrades to node_modules (908 → 910 MB confirms sync occurred).
+- **Supabase chunk grew +22 KB** (168 → 190 KB): @supabase/supabase-js 2.97→2.103.0 (6 minor versions). Remaining +14 KB scattered across minor chunk re-splits. No concern.
+- **node_modules synced**: `npm install` completed (908 → 910 MB). Previously pending sync from 2c8f991 is now done.
+- **Headroom narrowing**: Initial load headroom: +28 KB (was +37 KB). Total headroom: +108 KB (was +144 KB). Both healthy but worth monitoring.
+- **Deferred chunks (~920 KB):** ElevenLabs 487 KB, PostHog 179 KB, react-markdown 145 KB, admin tabs 109 KB — all properly deferred.
+
+**Cross-agent recommendations:**
+- Security Agent: node_modules now synced. All dep gaps remain cleared. Supabase chunk +22 KB — no security concern, size growth from 6 minor versions of additions. Zero CVEs.
+- Code Quality Agent: +36 KB is entirely dep sync noise. Supabase realtime (P4, ~20-30 KB savings) becomes more relevant as initial load headroom narrows to +28 KB. Agent script `scripts/performance-agent.sh:31` still uses retired 2,500 KB budget — low-priority cosmetic fix.
+- QA Agent: +36 KB is dep upgrade noise. No user-facing changes. No functional regressions expected.
+- Coverage Agent: No new production deps. No source changes. Zero impact on test coverage.
+- Cost Analyst Agent: Bundle grew +36 KB to 2,892 KB — dep sync effect. node_modules synced at 910 MB. ElevenLabs SDK chunk unchanged at 487 KB (deferred).
+- Localization Agent: i18n bundling stable. 392 keys stable. P5 closed (Turbopack limitation). No optimization possible.
+
 <!-- ENTRY:START agent=performance_agent timestamp=2026-04-12T18:00:00Z -->
 ## Performance Agent — 2026-04-12
 - **Status: GREEN** — Initial load JS: **~1,963 KB / 2,000 KB ✅**. Total JS: **2,856 KB / 3,000 KB ✅**. Split budget in effect (adopted Apr 4). **9th consecutive GREEN.**
@@ -442,24 +459,7 @@
 - Cost Analyst Agent: Bundle +5 KB (2,856 KB) — dep upgrade noise. ElevenLabs: 11,088/270,783 chars (4.10%) as of Apr 11.
 - Localization Agent: i18n bundling stable. 392 keys stable. P5 closed (Turbopack limitation). No optimization possible.
 
-<!-- ENTRY:START agent=performance_agent timestamp=2026-04-10T18:00:00Z -->
-## Performance Agent — 2026-04-10
-- **Status: GREEN** — Initial load JS: **~1,958 KB / 2,000 KB ✅**. Total JS: **2,851 KB / 3,000 KB ✅**. Split budget in effect (adopted Apr 4). **7th consecutive GREEN.**
-- **Zero change this cycle**: 2,851 KB — identical to Apr 4–9. No new deps. No source changes affecting bundle.
-- **Dev server was running**: cached .next data used. Production build verified Apr 4 — 2,851 KB confirmed accurate.
-- **Old 2,500 KB budget**: retired Apr 4. Agent script violation is not a real regression. Split budget applies.
-- **Deferred chunks (892 KB):** ElevenLabs 471 KB, PostHog 173 KB, react-markdown 142 KB, admin tabs 106 KB — all verified in production.
-- **Dep gaps widened**: @anthropic-ai/sdk now +5 minors (0.82.0 → 0.87.0, was +4). New gaps: posthog-js +3 (1.364.6 → 1.367.0), voyageai +2 (0.1.0 → 0.2.1), Supabase +6 (2.97.0 → 2.103.0). All LOW, no CVEs.
-
-**Cross-agent recommendations:**
-- Security Agent: Dep gaps growing organically. @anthropic-ai/sdk +5 minors (fast cadence), posthog-js +3 minors (new gap), Supabase +6 minors (evaluate for security patches), voyageai +2 minors (0.1→0.2 may break). No CVEs. No performance-driven urgency.
-- Code Quality Agent: Dep gaps widened across 4 packages. Recommend Batch 1 (next/react/stripe patches) first, then Batch 2 (@anthropic-ai/sdk + posthog-js), then Batch 3 (Supabase ecosystem). voyageai 0.2.1 needs changelog review before upgrade. No code changes needed.
-- QA Agent: No user-facing changes this cycle. Zero bundle impact. No regressions.
-- Coverage Agent: No new dependencies. Zero bundle impact this cycle.
-- Cost Analyst Agent: Bundle stable — zero change for 7th consecutive day. No cost impact. ElevenLabs: 8,454/270,783 chars (3.12%) as of Apr 9.
-- Localization Agent: i18n bundling stable. 392 keys stable. P5 closed (Turbopack limitation). No optimization possible.
-
-<!-- (pruned: performance_agent 2026-04-08 and earlier entries removed, keeping last 3) -->
+<!-- (pruned: performance_agent 2026-04-10 entry removed, keeping last 3) -->
 
 <!-- (pruned: coverage_agent 2026-04-02 entry removed, keeping last 3) -->
 

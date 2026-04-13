@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-04-12
+> Auto-generated on 2026-04-13
 
 ## Health Status: GREEN
 
-**Executive Summary:** 0 advisories detected, 0 exploitable. **Seventh consecutive GREEN.** All previously resolved vulnerabilities remain clean. 33 outdated packages (count unchanged). No new CVE advisories for any outdated package. **Node_modules discrepancy persists:** Triage (Apr 10, commit 46827c3) upgraded next, react, react-dom, stripe, @anthropic-ai/sdk, and Supabase batch in package.json — but `npm outdated` still shows pre-upgrade installed versions; `npm install` has not been run. No source changes since Apr 11. CI/CD automation fully active.
+**Executive Summary:** 0 advisories detected, 0 exploitable. **Eighth consecutive GREEN.** All previously resolved vulnerabilities remain clean. Outdated packages dropped from 33 to 6 — node_modules now fully synced with package.json (resolved after `npm install` + commit 2c8f991 bulk upgrade). Only 6 packages remain outdated, all dev-only or pre-release channel, with zero CVEs. 3 source changes since Apr 12 — all test-only, security-neutral. CI/CD automation fully active.
 
 ---
 
@@ -56,62 +56,34 @@ The next@16.1.6 advisory had a complex lifecycle spanning 12 days:
 No active advisories — no exploitability analysis required this cycle.
 
 **Confirmed safe (persistent audit items):**
-- **dangerouslySetInnerHTML (7 instances)**: All safe — content is either static strings, markdown rendered via react-markdown (which sanitizes), or HTML already sanitized through DOMPurify before use.
-- **Command injection**: Zero `child_process` exec/spawn calls with user-controlled input. Zero `'use server'` directives that could expose server-side execution.
-- **CSRF**: Token validation enforced on all state-changing API routes (POST/PUT/PATCH/DELETE) via `handleCsrfValidation()` in `src/proxy.ts`. Webhooks and MCP routes are appropriately exempt (`isExemptFromCsrf()`). Verified passing by QA agent (since Mar 23).
-- **Webhook signature verification**: All 4 webhook endpoints use `timingSafeEqual()`. 7 call sites verified across: `src/app/api/webhooks/elevenlabs/route.ts:141`, `src/app/api/webhooks/translate/route.ts:37`, `src/app/api/webhooks/supabase/route.ts:44`, `src/app/api/webhooks/stripe/route.ts` (Stripe SDK), `src/lib/csrf.ts:77`, `src/lib/cron-auth.ts:19,34`, `src/lib/mcp-auth.ts:30`.
+- **dangerouslySetInnerHTML (7 instances)**: All safe — 5 JSON-LD schema outputs via `JSON.stringify()` in `src/components/seo/json-ld.tsx:28,127,144,199,235`, and 2 admin markdown renders with `escapeHtml()` in `src/components/admin/agents-dashboard/cross-agent-insights.tsx:84` and `optimizer-report-dialog.tsx:57`.
+- **Command injection**: 5 exec/spawn sites — all safe. 4 in `src/app/api/admin/tunnel/route.ts` (dev-only, hardcoded commands). 1 in `src/app/api/admin/agents/run/route.ts:97` (whitelist-validated script path via `AGENT_SCRIPTS` map). Zero `'use server'` directives.
+- **CSRF**: Token validation enforced on all state-changing API routes via `handleCsrfValidation()` in `src/proxy.ts`. Webhooks and MCP routes appropriately exempt. QA-verified passing since Mar 23.
+- **Webhook signature verification**: All 4 webhook endpoints use `timingSafeEqual()`. 7 call sites verified: `webhooks/elevenlabs/route.ts:141`, `webhooks/translate/route.ts:37`, `webhooks/supabase/route.ts:44`, `webhooks/stripe/route.ts` (Stripe SDK), `csrf.ts:77`, `cron-auth.ts:19,34`, `mcp-auth.ts:30`.
 
 ---
 
 ## Outdated Packages
 
-33 packages outdated (unchanged from Apr 11). **Node_modules discrepancy persists (day 2)**: Triage commit 46827c3 (Apr 10) records upgrades to next, react, react-dom, stripe, @anthropic-ai/sdk, @stripe/stripe-js, @elevenlabs/react, @supabase/ssr, @supabase/supabase-js — but `npm outdated` still shows pre-upgrade installed versions. Run `npm install` to sync. None of the 33 gaps have known CVEs.
+**6 packages outdated** (down from 33 — node_modules fully synced). All are dev-only or pre-release channel. None have known CVEs.
 
 | Package | Installed | Available | Type | Security Relevance |
 |---------|-----------|-----------|------|-------------------|
-| @anthropic-ai/sdk | 0.82.0 | 0.88.0 | prod | Low — 6 minor releases behind since Apr 6 upgrade to 0.82.0. No CVEs. Fast cadence continues. |
-| @elevenlabs/react | 1.0.2 | 1.1.0 | prod | Low — minor release. No advisories. |
-| @next/bundle-analyzer | 16.2.2 | 16.2.3 | dev | None — patch |
-| @next/eslint-plugin-next | 16.2.2 | 16.2.3 | dev | None — patch |
-| @playwright/test | 1.58.2 | 1.59.1 | dev | None |
-| @stripe/stripe-js | 9.0.1 | 9.1.0 | prod | None — minor bump, no advisories |
-| @supabase/ssr | 0.8.0 | 0.10.2 | prod | Low — 2 minor bumps, auth library, no advisories. Committed to package.json; node_modules pending sync. |
-| @supabase/supabase-js | 2.97.0 | 2.103.0 | prod | Low — 6 minor bumps, no advisories. Same sync issue. |
-| @tailwindcss/postcss | 4.2.1 | 4.2.2 | dev | None |
-| @types/node | 25.5.0 | 25.6.0 | dev | None — minor bump |
-| @typescript-eslint/eslint-plugin | 8.56.1 | 8.58.1 | dev | None |
-| @upstash/redis | 1.36.2 | 1.37.0 | prod | None |
-| @vercel/analytics | 1.6.1 | 2.0.1 | prod | None — MPL-2.0, major version pending migration |
-| @vercel/speed-insights | 1.3.1 | 2.0.0 | prod | None — major version pending migration |
-| @vitejs/plugin-react | 5.1.4 | 6.0.1 | dev | None |
-| @vitest/coverage-v8 | 4.1.1 | 4.1.4 | dev | None — patch bump |
-| canvas | 3.2.1 | 3.2.3 | prod | None |
-| dotenv | 17.3.1 | 17.4.1 | dev | None — patch bump |
-| jsdom | 28.1.0 | 27.0.1 | dev | **Note**: installed > latest — pre-release channel, not a downgrade |
-| knip | 5.85.0 | 6.4.0 | dev | None — major version bump, dev tooling only |
-| lucide-react | 0.575.0 | 1.8.0 | prod | None — major version pending migration |
-| next | 16.2.2 | 16.2.3 | prod | Low — patch release, no advisory for 16.2.2. Committed to package.json; node_modules pending sync. |
-| pdfjs-dist | 5.4.624 | 5.6.205 | prod | Low — minor bump |
-| postcss | 8.5.6 | 8.5.9 | dev | None |
-| posthog-js | 1.364.6 | 1.367.0 | prod | None — 3 patches |
-| react | 19.2.4 | 19.2.5 | prod | None — patch bump. Committed; node_modules pending sync. |
-| react-dom | 19.2.4 | 19.2.5 | prod | None — same as react above |
-| resend | 6.9.2 | 6.10.0 | prod | None |
-| stripe | 22.0.0 | 22.0.1 | prod | None — patch bump. Committed; node_modules pending sync. |
-| tailwindcss | 4.2.1 | 4.2.2 | dev | None |
-| typescript | 5.9.3 | 6.0.2 | dev | None — major version, dev tooling only |
-| vitest | 4.1.1 | 3.2.4 | dev | **Note**: installed > latest — pre-release channel, not a downgrade |
-| voyageai | 0.1.0 | 0.2.1 | prod | Low — minor bump, AI SDK |
+| `@vitejs/plugin-react` | 5.2.0 | 6.0.1 | dev | None — major version, dev tooling only |
+| `dotenv` | 17.4.1 | 17.4.2 | dev | None — patch |
+| `jsdom` | 28.1.0 | 27.0.1 | dev | **Note**: installed > latest — pre-release channel, not a downgrade |
+| `knip` | 5.88.1 | 6.4.1 | dev | None — major version, dev tooling only |
+| `typescript` | 5.9.3 | 6.0.2 | dev | None — major version, dev tooling only |
+| `vitest` | 4.1.4 | 3.2.4 | dev | **Note**: installed > latest — pre-release channel, not a downgrade |
 
-**Channel note (vitest + jsdom):** `npm outdated` compares against the `latest` dist-tag. vitest@4.1.1 and jsdom@28.1.0 are on a pre-release channel (installed versions exceed stable `latest`). These are not regressions.
+**Channel note (vitest + jsdom):** `npm outdated` compares against the `latest` dist-tag. vitest@4.1.4 and jsdom@28.1.0 are on a pre-release channel (installed versions exceed stable `latest`). These are not regressions.
 
-**Pending major version migrations (non-urgent, no CVEs):**
-- `@vercel/analytics` v1 → v2
-- `@vercel/speed-insights` v1 → v2
-- `lucide-react` v0 → v1
-- `typescript` v5 → v6 (dev only)
-- `knip` v5 → v6 (dev only)
-- `@vitejs/plugin-react` v5 → v6 (dev only)
+**Milestone: All production dependency gaps cleared.** Commit `2c8f991` (bulk upgrade) plus `npm install` resolved every previously tracked production dep gap. No production packages are outdated.
+
+**Pending major version migrations (non-urgent, dev-only, no CVEs):**
+- `@vitejs/plugin-react` v5 → v6
+- `typescript` v5 → v6
+- `knip` v5 → v6
 
 ---
 
@@ -124,20 +96,20 @@ Flagged packages requiring review:
 | Package | License | Risk Assessment | Status |
 |---------|---------|----------------|--------|
 | `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | Dynamically-linked native binary (libvips). LGPL-3.0 permits use without source disclosure provided the library is not statically linked. SaaS-only, no binary distribution. No modification. | ✅ Approved — documented in `docs/project/license-exceptions.md` |
-| `@vercel/analytics@1.6.1` | MPL-2.0 | File-level copyleft (not project-level). We do not modify `@vercel/analytics` source. MPL-2.0 only requires disclosure of modifications to the MPL-licensed files themselves. | ✅ Approved — not documented in license-exceptions.md (recommend adding) |
+| `@vercel/analytics` | MPL-2.0 | File-level copyleft (not project-level). We do not modify `@vercel/analytics` source. MPL-2.0 only requires disclosure of modifications to the MPL-licensed files themselves. | ✅ Approved — documented in `docs/project/license-exceptions.md` |
 | `dompurify@3.3.3` | (MPL-2.0 OR Apache-2.0) | Dual-licensed. We elect Apache-2.0 (permissive). No concern. | ✅ Approved — Apache-2.0 elected |
 | `expand-template@2.0.3` | (MIT OR WTFPL) | Both permissive. MIT elected. No concern. | ✅ Approved |
 | `paisaxe@1.0.0` | UNLICENSED | The project itself. Intentionally proprietary (`"private": true`). | ✅ Expected |
 | `simple-concat@1.0.1` | MIT | Scanner false positive — plain MIT, correctly licensed. | ✅ False positive |
 | `simple-get@4.0.1` | MIT | Scanner false positive — plain MIT, correctly licensed. | ✅ False positive |
 
-**Documentation gap (minor):** Only `@img/sharp-libvips-*` is formally documented in `docs/project/license-exceptions.md`. The `@vercel/analytics` MPL-2.0 exception should be added for completeness. `dompurify` (dual-licensed, Apache elected) and `expand-template` (MIT elected) are permissive under their elected licenses and don't require exception documentation.
+**All license exceptions documented.** Both `@img/sharp-libvips-*` (LGPL) and `@vercel/analytics` (MPL-2.0) are formally documented in `docs/project/license-exceptions.md`. No documentation gaps remain.
 
 ---
 
 ## Security Headers
 
-**Source-verified** (server not running — live check skipped). Configuration confirmed in `next.config.ts` (lines 50–73) and `src/proxy.ts` (`buildCspHeader()`, lines 232–248).
+**Source-verified** (server not running — live check skipped). Configuration confirmed in `next.config.ts` (lines 50–73) and `src/proxy.ts` (`buildCspHeader()`, lines 219–247).
 
 | Header | Value | Status |
 |--------|-------|--------|
@@ -171,36 +143,24 @@ Flagged packages requiring review:
 
 ## Remediation Steps
 
-No remediation required this cycle. 0 active advisories.
+No remediation required this cycle. 0 active advisories. 0 outdated production dependencies.
 
-**Immediate action (node_modules sync — day 2 outstanding):**
+**Ongoing maintenance (all low priority, dev-only, no CVEs):**
 
-```bash
-# Sync node_modules with package.json after Apr 10 triage upgrades (commit 46827c3)
-npm install
-```
-
-This resolves the discrepancy between committed package.json versions (next@16.2.3, react@19.2.5, react-dom@19.2.5, stripe@22.0.1, @anthropic-ai/sdk@0.87.0, @supabase/ssr@0.10.2, @supabase/supabase-js@2.103.0, @stripe/stripe-js@9.1.0, @elevenlabs/react@1.1.0) and currently installed node_modules versions.
-
-**Ongoing maintenance (low priority, no CVEs):**
-
-1. **`@anthropic-ai/sdk`** (`0.82.0 → 0.88.0`) — After `npm install` brings installed to 0.87.0, re-upgrade: `npm install @anthropic-ai/sdk@latest`.
-2. **`@elevenlabs/react`** (`1.0.2 → 1.1.0`) — After `npm install` syncs to 1.1.0, verify no breaking changes in this minor.
-3. **`pdfjs-dist`/`voyageai` minors** — Check changelogs before upgrading.
-4. **License documentation** — Add `@vercel/analytics` MPL-2.0 exception to `docs/project/license-exceptions.md`.
-5. **Major version migrations** (non-urgent, no security implications):
-   - `@vercel/analytics` v1 → v2 (MPL-2.0 — review changelog for API changes)
-   - `@vercel/speed-insights` v1 → v2
-   - `lucide-react` v0 → v1
+1. **`dotenv`** (`17.4.1 → 17.4.2`) — Trivial patch: `npm install dotenv@latest`.
+2. **Major version dev migrations** (no security implications):
+   - `@vitejs/plugin-react` v5 → v6
+   - `typescript` v5 → v6
+   - `knip` v5 → v6
 
 ---
 
 ## Cross-Agent Recommendations
 
 - **Coverage Agent**: All webhook and CSRF error paths remain fully covered. No regression risk. No security-driven test changes needed.
-- **Performance Agent**: Node_modules discrepancy now day 2: `npm install` needed to sync after Apr 10 triage commit 46827c3. After sync, bundle impact should be negligible (all patch/minor upgrades). `@elevenlabs/react` 1.1.0 is a minor — monitor for any bundle size change.
-- **Code Quality Agent**: `@anthropic-ai/sdk` remains the highest-priority upgrade — now 6 minors behind. After `npm install` syncs node_modules, upgrade to 0.88.0. License-exceptions.md should document `@vercel/analytics` MPL-2.0 for completeness.
-- **Documentation Agent**: Minor gap: `@vercel/analytics` MPL-2.0 not in `docs/project/license-exceptions.md`. Otherwise no documentation changes needed. Seventh consecutive GREEN.
-- **QA Agent**: CSRF confirmed working (green since Mar 23). Run `npm install` to apply Apr 10 upgrades. After Supabase sync (0.8.0 → 0.10.2), re-verify auth flows. No other security action items.
+- **Performance Agent**: All production dep gaps cleared. Bundle should be stable. Only dev-tooling packages remain outdated — zero production impact.
+- **Code Quality Agent**: All production deps current. Only dev-tooling major versions pending (`@vitejs/plugin-react` v6, `typescript` v6, `knip` v6) — evaluate when convenient. License exceptions fully documented.
+- **Documentation Agent**: License-exceptions.md now complete — both `@img/sharp-libvips-*` and `@vercel/analytics` documented. No documentation changes needed. Eighth consecutive GREEN.
+- **QA Agent**: CSRF confirmed working (green since Mar 23). All production deps synced. Auth flows should be stable with current Supabase versions. No security action items.
 - **Cost Analyst Agent**: No cost-related security concerns. 0 vulns. Revenue drought and voice silence continue — no security contribution to those issues.
 - **Localization Agent**: No sensitive data in translation files. No locale-related security concerns.
