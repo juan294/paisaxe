@@ -14,31 +14,19 @@ interface SecureChatResponse extends ChatResponse {
 }
 
 export async function POST(request: NextRequest) {
-  // Dynamic imports — Turbopack corrupts the HTTP stack for api.anthropic.com
-  // when lib modules (embeddings, search, supabase, claude) are statically
-  // co-bundled in the same route. Each module works fine individually, but the
-  // combination breaks outbound HTTPS to Anthropic. Dynamic imports isolate
-  // each module's loading context and avoid the bundle corruption.
-  const { generateChatResponse, extractSourcesFromChunks } = await import(
-    "@/lib/claude"
-  );
-  const { generateEmbedding } = await import("@/lib/embeddings");
-  const { search } = await import("@/lib/search");
+  // --- Lightweight imports: validation, rate-limiting, security checks ---
+  // These modules have no heavy external dependencies (no Anthropic, Voyage, etc.)
+  // so they are safe to import before we know the request is valid.
   const { validateChatRequest } = await import("@/lib/validation");
   const { checkRateLimit } = await import("@/lib/rate-limit");
-  const { supabase } = await import("@/lib/supabase");
-
-  // Security modules
+  const { getClientIp } = await import("@/lib/request-utils");
   const {
     detectInjectionAttempt,
     sanitizeInput,
     assessTopicRelevance,
-    detectPromptLeakage,
     MAX_INPUT_LENGTH,
   } = await import("@/lib/chat-safety");
   const { GENERIC_REDIRECT_RESPONSE } = await import("@/lib/chat-config");
-
-  const { getClientIp } = await import("@/lib/request-utils");
 
   try {
     // Rate limiting - check before any processing
@@ -121,6 +109,20 @@ export async function POST(request: NextRequest) {
 
     // Assess topic relevance for analytics
     const topicRelevance = assessTopicRelevance(cleanMessage);
+
+    // --- Heavy imports: only loaded after validation passes ---
+    // Dynamic imports — Turbopack corrupts the HTTP stack for api.anthropic.com
+    // when lib modules (embeddings, search, supabase, claude) are statically
+    // co-bundled in the same route. Each module works fine individually, but the
+    // combination breaks outbound HTTPS to Anthropic. Dynamic imports isolate
+    // each module's loading context and avoid the bundle corruption.
+    const { generateChatResponse, extractSourcesFromChunks } = await import(
+      "@/lib/claude"
+    );
+    const { generateEmbedding } = await import("@/lib/embeddings");
+    const { search } = await import("@/lib/search");
+    const { supabase } = await import("@/lib/supabase");
+    const { detectPromptLeakage } = await import("@/lib/chat-safety");
 
     // === MAIN PROCESSING ===
 

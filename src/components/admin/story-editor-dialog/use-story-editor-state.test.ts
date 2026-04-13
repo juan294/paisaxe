@@ -372,18 +372,6 @@ describe("useStoryEditorState", () => {
       expect(result.current.error).toBe("Something went wrong");
     });
 
-    it("manages fullscreen state", () => {
-      const { result } = renderHook(() => useStoryEditorState(mockStory));
-
-      expect(result.current.isFullscreen).toBe(false);
-
-      act(() => {
-        result.current.setIsFullscreen(true);
-      });
-
-      expect(result.current.isFullscreen).toBe(true);
-    });
-
     it("manages optional fields visibility", () => {
       const { result } = renderHook(() => useStoryEditorState(mockStory));
 

@@ -62,9 +62,16 @@ logs/
 
 # Supabase local
 supabase/.temp/
+supabase/.branches/
 .claude/
 !.claude/commands/
 .performance-history.json
 .agent-context.json
 .agent-alerts.json
 scripts/agent-config.json
+
+# ElevenLabs CLI (test configs are local-only; agent/tool configs are tracked)
+test_configs/
+
+# Claude Code tool config
+.summon

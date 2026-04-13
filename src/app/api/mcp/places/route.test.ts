@@ -728,6 +728,47 @@ describe("/api/mcp/places", () => {
     });
   });
 
+  describe("GET - type filtering with underscore types", () => {
+    it("should keep types with underscore that are in VALID_TYPES (line 143 VALID_TYPES branch)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            places: [
+              {
+                id: "ChIJtypetest",
+                displayName: { text: "Test Place", languageCode: "es" },
+                formattedAddress: "Test Address",
+                types: [
+                  "restaurant",           // no underscore → kept
+                  "meal_delivery",         // underscore + in VALID_TYPES → kept
+                  "tourist_attraction",    // underscore + in VALID_TYPES → kept
+                  "point_of_interest",     // underscore + in VALID_TYPES → kept
+                  "some_random_type",      // underscore + NOT in VALID_TYPES → filtered out
+                ],
+                location: { latitude: 43.36, longitude: -5.85 },
+              },
+            ],
+          }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=test",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.places[0].types).toContain("restaurant");
+      expect(data.places[0].types).toContain("meal_delivery");
+      expect(data.places[0].types).toContain("tourist_attraction");
+      expect(data.places[0].types).toContain("point_of_interest");
+      expect(data.places[0].types).not.toContain("some_random_type");
+      expect(data.places[0].types).toHaveLength(4);
+    });
+  });
+
   describe("GET - invalid type ignored", () => {
     it("should not include includedType for invalid type values", async () => {
       mockFetch.mockResolvedValueOnce({

@@ -323,4 +323,11 @@ describe("useAgentTerminal", () => {
       expect(mockFetchAgentLogs).not.toHaveBeenCalled();
     });
   });
+
+  // Line 49: `if (logPollRef.current) { clearInterval(...); logPollRef.current = null; }` inside
+  // the `if (result.data.finished)` block in pollLogs. The false branch (logPollRef.current is
+  // null when finished is true) is architecturally unreachable: line 58 assigns
+  // `logPollRef.current = setInterval(pollLogs, 2_000)` synchronously after the initial
+  // `pollLogs()` invocation. Because pollLogs is async, it can only resolve after setInterval
+  // completes. Therefore logPollRef.current is always non-null when the finished branch executes.
 });

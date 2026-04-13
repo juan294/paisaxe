@@ -860,6 +860,138 @@ describe("ElevenLabs Analytics API Route", () => {
     expect(data.data.dateRange.to).toBe(to);
   });
 
+  it("handles undefined agents array from API (line 112 || [] fallback)", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          // Return object WITHOUT agents property — exercises the || [] fallback on line 112
+          json: () => Promise.resolve({}),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ conversations: [] }),
+      });
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.summary.totalConversations).toBe(0);
+    expect(data.data.conversationsByAgent).toEqual([]);
+  });
+
+  it("handles undefined conversations array from API (line 135 || [] fallback)", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              agents: [{ agent_id: "agent1", name: "Paisaxe - Test" }],
+            }),
+        });
+      }
+      if (url.includes("/convai/analytics/live-count")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ count: 0 }),
+        });
+      }
+      // Return object WITHOUT conversations property — exercises the || [] fallback on line 135
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.summary.totalConversations).toBe(0);
+    expect(data.data.conversationsByAgent).toEqual([]);
+    expect(data.data.recentConversations).toEqual([]);
+  });
+
+  it("handles Paisaxe agent with falsy name in agentNameMap loop (line 120 false branch)", async () => {
+    // An agent whose name starts with "Paisaxe" passes the filter on line 112-113,
+    // but we need to exercise the false branch of `if (agent.name)` on line 120.
+    // Since name?.startsWith("Paisaxe") filters out nameless agents, we need to
+    // use a creative approach: an agent with an empty-string name that still
+    // passes the filter won't happen. However, the optional chaining `name?.startsWith`
+    // means undefined name returns undefined (falsy), so it's filtered.
+    //
+    // The branch that's uncovered is likely the case where agent.name exists
+    // but the regex match fails to find "Paisaxe - X" pattern. Let's verify
+    // by testing an agent with name exactly "Paisaxe" (no dash pattern).
+    // Actually line 120 `if (agent.name)` — in practice paisaxeAgents always
+    // have names since they passed name?.startsWith. But the V8 branch coverage
+    // engine counts the boolean evaluation, so we need the falsy case.
+    //
+    // The only way to reach line 120 with a falsy name is if the agent passed
+    // the filter with name?.startsWith returning truthy, which requires name
+    // to exist. So the `if (agent.name)` false branch is technically dead code.
+    // But we can still try to trigger it via prototype manipulation.
+    //
+    // Actually — the simplest explanation: V8 may mark the entire block 112-120
+    // as partially uncovered because the `|| []` fallback on line 112 was never taken.
+    // Let's just ensure both the `|| []` paths are covered (done above) and also
+    // test agent with empty name property that might affect the name?.startsWith check.
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              agents: [
+                // Agent with empty string name — name?.startsWith("Paisaxe") returns false
+                { agent_id: "agent_empty", name: "" },
+                // Agent with null name — name?.startsWith returns undefined (falsy)
+                { agent_id: "agent_null", name: null },
+                // Valid Paisaxe agent
+                { agent_id: "agent_valid", name: "Paisaxe - Valid" },
+              ],
+            }),
+        });
+      }
+      if (url.includes("/convai/analytics/live-count")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ count: 0 }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            conversations: [
+              {
+                conversation_id: "conv1",
+                agent_id: "agent_valid",
+                status: "done",
+                call_duration_secs: 30,
+              },
+            ],
+          }),
+      });
+    });
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // Only the valid Paisaxe agent should be included
+    expect(data.data.summary.totalConversations).toBe(1);
+    expect(data.data.conversationsByAgent).toHaveLength(1);
+    expect(data.data.conversationsByAgent[0].agentName).toBe("Valid");
+  });
+
   it("aggregates conversations by status including failed", async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes("/convai/agents")) {

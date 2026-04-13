@@ -144,7 +144,7 @@ FEATURE_FLAGS=$(grep -o '"[a-z_]*"' src/types/feature-flags.ts 2>/dev/null | tr 
 UNDOCUMENTED_FLAGS=""
 
 while IFS= read -r flag; do
-  if [[ -n "$flag" ]] && ! grep -q "$flag" "$CLAUDE_MD" 2>/dev/null; then
+  if [[ -n "$flag" ]] && ! grep -q "$flag" "$CLAUDE_MD" 2>/dev/null && ! grep -q "$flag" "docs/project/features.md" 2>/dev/null; then
     UNDOCUMENTED_FLAGS="$UNDOCUMENTED_FLAGS$flag"$'\n'
   fi
 done <<< "$FEATURE_FLAGS"
@@ -153,7 +153,7 @@ if [[ -n "$UNDOCUMENTED_FLAGS" ]]; then
   {
     echo "### Potentially Undocumented Feature Flags"
     echo ""
-    echo "These feature flags may not be documented in CLAUDE.md:"
+    echo "These feature flags may not be documented in CLAUDE.md or docs/project/features.md:"
     echo ""
     echo "\`\`\`"
     echo "$UNDOCUMENTED_FLAGS"

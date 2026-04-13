@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ElevenLabsAnalyticsPanel } from "./elevenlabs-analytics-panel";
 import { AnalyticsCacheProvider } from "./analytics-cache-context";
@@ -537,15 +537,13 @@ describe("ElevenLabsAnalyticsPanel", () => {
       expect(screen.getByText("04 — Recent Conversations")).toBeInTheDocument();
     });
 
-    // Find the "Failed" badge specifically in the recent conversations table
+    // Conversations list renders asynchronously after the section header.
     const recentSection = screen.getByText("04 — Recent Conversations").closest("section")!;
-    const failedBadge = recentSection.querySelector("span[class*='bg-rose-100']")!;
-    expect(failedBadge).toBeInTheDocument();
-    expect(failedBadge.textContent).toBe("Failed");
-    expect(failedBadge.className).toContain("text-rose-700");
-
-    // Duration should be rendered
-    expect(screen.getByText("45s")).toBeInTheDocument();
+    await waitFor(() => {
+      const badge = within(recentSection).getByText("Failed");
+      expect(badge).toHaveClass("bg-rose-100", "text-rose-700");
+      expect(within(recentSection).getByText("45s")).toBeInTheDocument();
+    });
   });
 
   it("handles unknown language code in breakdown", async () => {
@@ -615,6 +613,27 @@ describe("ElevenLabsAnalyticsPanel", () => {
       // Verify that the stat card with "Failed" label exists with stone coloring
       expect(screen.getAllByText("Failed").length).toBeGreaterThanOrEqual(1);
     });
+  });
+
+  it("renders skeleton recent conversations table during loading (line 544)", () => {
+    vi.mocked(adminApi.fetchElevenLabsAnalytics).mockImplementation(
+      () => new Promise(() => {})
+    );
+
+    const { container } = render(<ElevenLabsAnalyticsPanel />, { wrapper });
+
+    // The SkeletonRecentConversations component renders a table with 5 skeleton rows
+    const skeletonRows = container.querySelectorAll("tbody tr");
+    expect(skeletonRows.length).toBeGreaterThanOrEqual(5);
+
+    // Verify skeleton pulse animations are present
+    const pulseElements = container.querySelectorAll(".animate-pulse");
+    expect(pulseElements.length).toBeGreaterThan(0);
+
+    // Verify table headers for the recent conversations skeleton
+    expect(screen.getByText("Time")).toBeInTheDocument();
+    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getByText("Duration")).toBeInTheDocument();
   });
 
   // Line 270: `statColorClasses[color] || statColorClasses.stone` — the `||` fallback is unreachable.

@@ -10,8 +10,17 @@ vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
 
+vi.mock("@/types/marketing", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/types/marketing")>();
+  return {
+    ...actual,
+    rowToMarketingPost: vi.fn(actual.rowToMarketingPost),
+  };
+});
+
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { rowToMarketingPost } from "@/types/marketing";
 
 describe("GET /api/admin/marketing/dashboard", () => {
   const mockAccounts = [
@@ -754,5 +763,485 @@ describe("GET /api/admin/marketing/dashboard", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("Internal server error");
+  });
+
+  it("should not update lastPostedAt when an older post follows a newer one", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const newerDate = "2025-01-20T14:00:00.000Z";
+    const olderDate = "2025-01-10T10:00:00.000Z";
+
+    // Posts ordered so the newer one is processed first, then the older one
+    const postsNewerFirst = [
+      {
+        id: "post-newer",
+        account_id: "acc-1",
+        platform: "x",
+        content: "Newer post",
+        media_urls: [],
+        hashtags: [],
+        link_url: null,
+        scheduled_for: null,
+        posted_at: newerDate,
+        status: "posted",
+        platform_post_id: "2",
+        post_url: null,
+        error_message: null,
+        engagement: {},
+        story_id: null,
+        content_theme: null,
+        created_at: newerDate,
+        updated_at: newerDate,
+      },
+      {
+        id: "post-older",
+        account_id: "acc-1",
+        platform: "x",
+        content: "Older post",
+        media_urls: [],
+        hashtags: [],
+        link_url: null,
+        scheduled_for: null,
+        posted_at: olderDate,
+        status: "posted",
+        platform_post_id: "1",
+        post_url: null,
+        error_message: null,
+        engagement: {},
+        story_id: null,
+        content_theme: null,
+        created_at: olderDate,
+        updated_at: olderDate,
+      },
+    ];
+
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "marketing_accounts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        };
+      }
+      if (table === "marketing_posts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: postsNewerFirst, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "marketing_schedule") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      }
+      return { select: vi.fn() };
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // lastPostedAt should remain the newer date (not be overwritten by the older post)
+    expect(data.data.stats.byPlatform.x.lastPostedAt).toBe(newerDate);
+    expect(data.data.stats.totalPosts).toBe(2);
+  });
+
+  it("should skip non-number engagement values in aggregation", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const now = new Date();
+    const recentDate = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+
+    const postsWithMixedEngagement = [
+      {
+        id: "post-mixed-engagement",
+        account_id: "acc-1",
+        platform: "instagram",
+        content: "Mixed engagement post",
+        media_urls: [],
+        hashtags: [],
+        link_url: null,
+        scheduled_for: null,
+        posted_at: recentDate.toISOString(),
+        status: "posted",
+        platform_post_id: "ig-100",
+        post_url: null,
+        error_message: null,
+        // Include a non-number value alongside numbers to test typeof check
+        engagement: { likes: 42, comments: 5, someString: "not-a-number" as unknown },
+        story_id: null,
+        content_theme: null,
+        created_at: recentDate.toISOString(),
+        updated_at: recentDate.toISOString(),
+      },
+    ];
+
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "marketing_accounts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        };
+      }
+      if (table === "marketing_posts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: postsWithMixedEngagement, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "marketing_schedule") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      }
+      return { select: vi.fn() };
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // Only numeric engagement values should be aggregated
+    expect(data.data.stats.totalEngagement.likes).toBe(42);
+    expect(data.data.stats.totalEngagement.comments).toBe(5);
+    // Non-number values should NOT be included
+    expect(data.data.stats.totalEngagement.someString).toBeUndefined();
+  });
+
+  it("should handle a mix of posted, scheduled, and failed posts across platforms", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const now = new Date();
+    const recentDate = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+    const mixedPosts = [
+      {
+        id: "post-ig-posted",
+        account_id: "acc-2",
+        platform: "instagram",
+        content: "IG posted",
+        media_urls: [],
+        hashtags: [],
+        link_url: null,
+        scheduled_for: null,
+        posted_at: recentDate.toISOString(),
+        status: "posted",
+        platform_post_id: "ig-1",
+        post_url: null,
+        error_message: null,
+        engagement: { likes: 30 },
+        story_id: null,
+        content_theme: null,
+        created_at: recentDate.toISOString(),
+        updated_at: recentDate.toISOString(),
+      },
+      {
+        id: "post-ig-scheduled",
+        account_id: "acc-2",
+        platform: "instagram",
+        content: "IG scheduled",
+        media_urls: [],
+        hashtags: [],
+        link_url: null,
+        scheduled_for: "2027-06-01T10:00:00.000Z",
+        posted_at: null,
+        status: "scheduled",
+        platform_post_id: null,
+        post_url: null,
+        error_message: null,
+        engagement: {},
+        story_id: null,
+        content_theme: null,
+        created_at: recentDate.toISOString(),
+        updated_at: recentDate.toISOString(),
+      },
+      {
+        id: "post-pinterest-failed",
+        account_id: "acc-3",
+        platform: "pinterest",
+        content: "Pinterest failed",
+        media_urls: [],
+        hashtags: [],
+        link_url: null,
+        scheduled_for: null,
+        posted_at: null,
+        status: "failed",
+        platform_post_id: null,
+        post_url: null,
+        error_message: "Rate limit exceeded",
+        engagement: {},
+        story_id: null,
+        content_theme: null,
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      },
+      {
+        id: "post-x-failed",
+        account_id: "acc-1",
+        platform: "x",
+        content: "X failed",
+        media_urls: [],
+        hashtags: [],
+        link_url: null,
+        scheduled_for: null,
+        posted_at: null,
+        status: "failed",
+        platform_post_id: null,
+        post_url: null,
+        error_message: "Auth error",
+        engagement: {},
+        story_id: null,
+        content_theme: null,
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      },
+    ];
+
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "marketing_accounts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        };
+      }
+      if (table === "marketing_posts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: mixedPosts, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "marketing_schedule") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      }
+      return { select: vi.fn() };
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // 1 posted (IG)
+    expect(data.data.stats.totalPosts).toBe(1);
+    // 2 failed (Pinterest + X)
+    expect(data.data.stats.failedPosts).toBe(2);
+    // IG has 1 scheduled
+    expect(data.data.stats.byPlatform.instagram.scheduled).toBe(1);
+    // IG has 1 posted
+    expect(data.data.stats.byPlatform.instagram.posts).toBe(1);
+    // Pinterest and X have 0 posted
+    expect(data.data.stats.byPlatform.pinterest.posts).toBe(0);
+    expect(data.data.stats.byPlatform.x.posts).toBe(0);
+    // Engagement from the IG post
+    expect(data.data.stats.totalEngagement.likes).toBe(30);
+    expect(data.data.stats.byPlatform.instagram.engagement.likes).toBe(30);
+  });
+
+  it("should skip engagement aggregation when post has falsy engagement", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const now = new Date();
+    const recentDate = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+
+    const postRow = {
+      id: "post-no-eng",
+      account_id: "acc-1",
+      platform: "x",
+      content: "No engagement",
+      media_urls: [],
+      hashtags: [],
+      link_url: null,
+      scheduled_for: null,
+      posted_at: recentDate.toISOString(),
+      status: "posted",
+      platform_post_id: "999",
+      post_url: null,
+      error_message: null,
+      engagement: null,
+      story_id: null,
+      content_theme: null,
+      created_at: recentDate.toISOString(),
+      updated_at: recentDate.toISOString(),
+    };
+
+    // Override the mock mapper to return null engagement (covers the false branch of `if (post.engagement)`)
+    vi.mocked(rowToMarketingPost).mockReturnValueOnce({
+      id: "post-no-eng",
+      accountId: "acc-1",
+      platform: "x",
+      content: "No engagement",
+      mediaUrls: [],
+      hashtags: [],
+      linkUrl: null,
+      scheduledFor: null,
+      postedAt: recentDate.toISOString(),
+      status: "posted",
+      platformPostId: "999",
+      postUrl: null,
+      errorMessage: null,
+      engagement: null as never,
+      storyId: null,
+      contentTheme: null,
+      createdAt: recentDate.toISOString(),
+      updatedAt: recentDate.toISOString(),
+    });
+
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "marketing_accounts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        };
+      }
+      if (table === "marketing_posts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [postRow], error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "marketing_schedule") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      }
+      return { select: vi.fn() };
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.stats.totalPosts).toBe(1);
+    // Engagement should be empty since the post had null engagement
+    expect(data.data.stats.totalEngagement).toEqual({});
+    expect(data.data.stats.byPlatform.x.engagement).toEqual({});
+  });
+
+  it("should ignore posts with unknown status (not posted, scheduled, or failed)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const draftPost = {
+      id: "post-draft",
+      account_id: "acc-1",
+      platform: "x",
+      content: "Draft post",
+      media_urls: [],
+      hashtags: [],
+      link_url: null,
+      scheduled_for: null,
+      posted_at: null,
+      status: "draft",
+      platform_post_id: null,
+      post_url: null,
+      error_message: null,
+      engagement: {},
+      story_id: null,
+      content_theme: null,
+      created_at: "2025-01-15T10:00:00.000Z",
+      updated_at: "2025-01-15T10:00:00.000Z",
+    };
+
+    // Override the mock mapper to return a post with "draft" status
+    vi.mocked(rowToMarketingPost).mockReturnValueOnce({
+      id: "post-draft",
+      accountId: "acc-1",
+      platform: "x",
+      content: "Draft post",
+      mediaUrls: [],
+      hashtags: [],
+      linkUrl: null,
+      scheduledFor: null,
+      postedAt: null,
+      status: "draft" as never,
+      platformPostId: null,
+      postUrl: null,
+      errorMessage: null,
+      engagement: {},
+      storyId: null,
+      contentTheme: null,
+      createdAt: "2025-01-15T10:00:00.000Z",
+      updatedAt: "2025-01-15T10:00:00.000Z",
+    });
+
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "marketing_accounts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+        };
+      }
+      if (table === "marketing_posts") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [draftPost], error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "marketing_schedule") {
+        return {
+          select: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      }
+      return { select: vi.fn() };
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // A draft post should not be counted in any category
+    expect(data.data.stats.totalPosts).toBe(0);
+    expect(data.data.stats.failedPosts).toBe(0);
+    expect(data.data.stats.byPlatform.x.posts).toBe(0);
+    expect(data.data.stats.byPlatform.x.scheduled).toBe(0);
   });
 });

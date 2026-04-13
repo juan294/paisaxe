@@ -1,0 +1,28 @@
+{
+    "agents": [
+        {
+            "config": "agent_configs/Paisaxe-Pelayo-(Visitor-Guide).json",
+            "id": "agent_1201kgqhsdzxfkk9x7m1bjaew9mv",
+            "version_id": "agtvrsn_2801knexj1zrfr9a2d3ax4drndmz",
+            "branch_id": "agtbrch_2801kgqjhbhaf9097aka9qeek8qj"
+        },
+        {
+            "config": "agent_configs/Paisaxe-Pelayo-(Booking).json",
+            "id": "agent_5201kgm2956ge8ct95yxjas867z5",
+            "version_id": "agtvrsn_0601knexj36sew7aykcp4tdy8mst",
+            "branch_id": "agtbrch_2301kgm295x1e0m87n5ayxgb6tnh"
+        },
+        {
+            "config": "agent_configs/Paisaxe-Penny-(Pinterest).json",
+            "id": "agent_1601kg4wghnzewc9aqpkf4r2fkfw"
+        },
+        {
+            "config": "agent_configs/Paisaxe-Iris-(Instagram).json",
+            "id": "agent_1301kg4wggmvfwgbx91h7sn2xsbh"
+        },
+        {
+            "config": "agent_configs/Paisaxe-Xander-(X).json",
+            "id": "agent_5901kg4wgebce0abca4ssyav3684"
+        }
+    ]
+}

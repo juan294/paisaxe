@@ -76,6 +76,15 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
     }
   }, []);
 
+  // Prefetch voice chat chunk during idle time to eliminate cold-start latency
+  useEffect(() => {
+    if ("requestIdleCallback" in window) {
+      requestIdleCallback(() => {
+        import("@/components/immersive/voice-chat");
+      });
+    }
+  }, []);
+
   // Story ordering pipeline: allStories -> mood filter -> seasonal -> shuffle -> filters
   // Key fix: If serverShuffleSeed is provided, shuffle immediately without waiting for flags
   const processedStories = useMemo(() => {

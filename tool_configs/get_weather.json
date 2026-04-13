@@ -1,0 +1,43 @@
+{
+    "type": "webhook",
+    "name": "get_weather",
+    "description": "Get current weather for a city in Asturias or Picos de Europa. Use this when the visitor asks about weather conditions. Supported cities: Oviedo, Gijón, Avilés, Llanes, Cangas de Onís, Cudillero, Luarca, Ribadesella, Covadonga, Picos de Europa, Fuente Dé.",
+    "response_timeout_secs": 20,
+    "disable_interruptions": false,
+    "force_pre_tool_speech": false,
+    "assignments": [],
+    "tool_call_sound_behavior": "auto",
+    "tool_error_handling_mode": "auto",
+    "dynamic_variables": {
+        "dynamicVariablePlaceholders": {}
+    },
+    "execution_mode": "immediate",
+    "api_schema": {
+        "request_headers": {
+            "Content-Type": "application/json",
+            "x-mcp-secret": {
+                "secret_id": "RjXEp57KRMAgOoZiAUdU"
+            }
+        },
+        "url": "https://paisaxe.es/api/mcp/weather",
+        "method": "POST",
+        "path_params_schema": {},
+        "request_body_schema": {
+            "type": "object",
+            "required": [
+                "city"
+            ],
+            "description": "The city or location name in Asturias that the user is asking about the weather for. Extract from the conversation.",
+            "properties": {
+                "city": {
+                    "type": "string",
+                    "description": "City name for weather lookup. Infer from story context if user says 'here' or 'there'.",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                }
+            }
+        },
+        "content_type": "application/json"
+    }
+}

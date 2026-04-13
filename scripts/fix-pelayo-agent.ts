@@ -1,5 +1,9 @@
 #!/usr/bin/env npx tsx
 /**
+ * @deprecated Use `elevenlabs agents push` instead.
+ * Agent configs are now tracked as code in agent_configs/ and tool_configs/.
+ * See: agents.json, tools.json
+ *
  * Fix Pelayo agent configuration
  *
  * Updates:
