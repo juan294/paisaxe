@@ -27,8 +27,10 @@ export const fr: Translations = {
     speech_hint: 'Vous pouvez utiliser le micro pour parler',
     error_processing: 'Désolé, je n\'ai pas pu traiter votre question.',
     error_generic: 'Désolé, une erreur est survenue. Veuillez réessayer.',
+    // LOCATION-SPECIFIC: Location name in alt text
     image_alt: 'Image des Asturies',
     source: 'Source',
+    // LOCATION-SPECIFIC: Location name in privacy notice
     privacy_notice: 'Vos questions sont traitées par intelligence artificielle pour vous offrir les meilleures réponses sur les Asturies. Nous ne conservons pas vos conversations.',
     understood: 'Compris',
     call: 'Appeler',
@@ -60,6 +62,7 @@ export const fr: Translations = {
       culture: 'Culture',
       activities: 'Activités',
     },
+    // LOCATION-SPECIFIC: Region names
     locations: {
       eastern: 'Asturies orientales',
       central: 'Asturies centrales',
@@ -115,6 +118,7 @@ export const fr: Translations = {
     local_only_description: 'Si vous effacez les données du navigateur ou changez d\'appareil, vous les perdrez.',
     sync_with_google: 'Synchroniser avec Google',
     empty_title: 'Aucun enregistrement pour le moment',
+    // LOCATION-SPECIFIC: Location name
     empty_description: 'Explorez les histoires des Asturies et enregistrez celles qui vous plaisent pour les consulter plus tard.',
     explore: 'Explorer les histoires',
     loading_more: 'Chargement...',
@@ -168,6 +172,7 @@ export const fr: Translations = {
     show_all: 'Tout afficher',
   },
 
+  // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
     try_voice: 'Parler',
     use_text: 'Écrire',
@@ -199,11 +204,13 @@ export const fr: Translations = {
     suggest_place: 'Suggérer un lieu',
     suggest_short: 'Suggérer',
     dialog_title: 'Suggérer un lieu',
+    // LOCATION-SPECIFIC: Location and site name
     dialog_description: 'Partagez un lieu des Asturies que vous aimeriez voir sur Paisaxe',
     place_name_label: 'Nom du lieu',
     place_name_placeholder: 'ex. Plage de Gulpiyuri',
     location_label: 'Zone (optionnel)',
     location_placeholder: 'Sélectionnez une zone',
+    // LOCATION-SPECIFIC: Region names
     location_eastern: 'Asturies orientales',
     location_central: 'Asturies centrales',
     location_western: 'Asturies occidentales',
@@ -297,6 +304,7 @@ export const fr: Translations = {
   footer: {
     terms: 'Conditions d\'Utilisation',
     privacy: 'Politique de Confidentialité',
+    // LOCATION-SPECIFIC: Content source attribution
     content_attribution: 'Contenu partiellement basé sur des documents disponibles gratuitement sur turismoasturias.es',
     ai_disclaimer: 'Les réponses sont générées par IA et doivent être vérifiées',
   },
