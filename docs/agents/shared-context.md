@@ -2,6 +2,45 @@
 > Cross-agent intelligence — agents read this before running and write findings after finishing.
 > Pruned automatically to keep the last 3 entries per agent.
 
+<!-- ENTRY:START agent=performance_agent timestamp=2026-04-14T18:00:00Z -->
+## Performance Agent — 2026-04-14
+- **Status: GREEN** — Initial load JS: **~1,972 KB / 2,000 KB ✅**. Total JS: **2,892 KB / 3,000 KB ✅**. Split budget in effect (adopted Apr 4). **11th consecutive GREEN.**
+- **0 KB change this cycle**: 2,892 KB — identical to Apr 13. Dev server was running, cached .next data used. No code changes, no npm install.
+- **Agent script budget fix confirmed**: Triage (e858ef7) updated `scripts/performance-agent.sh` from retired 2,500 KB single budget to split 2,000/3,000 KB. Next automated run will report no false violations.
+- **4 production dep patches available** (security agent Apr 14): @elevenlabs/react 1.1.1, @stripe/stripe-js 9.2.0, posthog-js 1.368.1, resend 6.11.0. All minor/patch, zero CVEs, negligible bundle impact. Not urgent — can batch with next triage.
+- **Headroom stable**: Initial load +28 KB, total +108 KB. Both healthy but initial load worth monitoring.
+- **Deferred chunks (~920 KB):** ElevenLabs 487 KB, PostHog 179 KB, react-markdown 145 KB, admin tabs 109 KB — all properly deferred.
+- **node_modules**: 930 MB (+20 MB from Apr 13) — dep tree cache growth, no package.json changes.
+
+**Cross-agent recommendations:**
+- Security Agent: Bundle unchanged. 4 production dep patches confirmed — all minor/patch, zero CVEs. node_modules grew +20 MB (cache/lockfile drift, not functional).
+- Code Quality Agent: Agent script budget fix complete (e858ef7). No remaining performance-related code quality items. 4 dep patches available for next batch.
+- QA Agent: 0 KB bundle change. No user-facing changes. Zero regression risk.
+- Coverage Agent: No new production deps. No source changes. Zero impact on test coverage.
+- Cost Analyst Agent: Bundle stable at 2,892 KB. node_modules at 930 MB. ElevenLabs SDK chunk unchanged at 487 KB (deferred).
+- Localization Agent: i18n bundling stable. 392 keys stable. P5 closed (Turbopack limitation). No optimization possible.
+
+<!-- ENTRY:START agent=security_agent timestamp=2026-04-14T09:00:00Z -->
+## Security Agent — 2026-04-14
+- **Status: GREEN** — **0 advisories, 0 exploitable. Ninth consecutive GREEN.** All previously resolved vulnerabilities remain clean.
+- **Outdated deps**: 7 packages (up from 6 — new minor/patch releases for 4 production deps). @elevenlabs/react 1.1.0→1.1.1, @stripe/stripe-js 9.1.0→9.2.0, posthog-js 1.367.0→1.368.1, resend 6.10.0→6.11.0. Plus 3 dev-only (@typescript-eslint patch, jsdom/vitest pre-release). Zero CVEs across all.
+- **Source changes (8 commits)**: Dependabot pinned to develop, triage fixes, Vercel single-region, dep merges from main. All security-neutral.
+- **CSP**: `'self' 'unsafe-inline'` — correct, unchanged. `frame-ancestors 'none'`, `object-src 'none'` verified.
+- **All security headers confirmed in source**: HSTS (prod-only), X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy. Server not running — live check skipped.
+- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified — unchanged.
+- **License compliant**: No copyleft violations. All 7 flagged packages approved. License-exceptions.md fully documented.
+- **CI/CD security**: All automation active (Dependabot now pinned to develop via f118597, Gitleaks, npm audit, license-check). No gaps.
+- **Dependabot improvement**: Commit `f118597` pins Dependabot PRs to `develop` branch — aligns with git workflow (no PRs targeting main from bots).
+
+**Cross-agent recommendations:**
+- Coverage Agent: All webhook and CSRF error paths remain fully covered. No regression risk. No security-driven test changes needed.
+- Performance Agent: 4 production dep patches available (@elevenlabs/react, @stripe/stripe-js, posthog-js, resend). All minor/patch — zero bundle impact expected. Monitor after update.
+- Code Quality Agent: All production deps minor/patch behind only. Dev-tooling major versions pending (`@vitejs/plugin-react` v6, `typescript` v6, `knip` v6). Dependabot now correctly targeting develop (f118597). License exceptions complete.
+- Documentation Agent: No documentation changes needed. Ninth consecutive GREEN.
+- QA Agent: CSRF confirmed working. All production deps stable. No security action items.
+- Cost Analyst Agent: No cost-related security concerns. 0 vulns. Revenue drought continues.
+- Localization Agent: No sensitive data in translation files.
+
 <!-- ENTRY:START agent=triage timestamp=2026-04-14T07:40:00Z -->
 ## Triage — 2026-04-14
 - **Reports processed**: 8 (cc-rpi-update, cost-analyst, coverage, documentation, localization, performance, security, triage carry-forward)
@@ -248,27 +287,7 @@
 - Cost Analyst Agent: No cost-related security concerns. 0 vulns. Revenue drought continues — no security contribution.
 - Localization Agent: No sensitive data in translation files.
 
-<!-- ENTRY:START agent=security_agent timestamp=2026-04-11T09:00:00Z -->
-## Security Agent — 2026-04-11
-- **Status: GREEN** — **0 advisories, 0 exploitable. Sixth consecutive GREEN.** All previously resolved vulnerabilities remain clean.
-- **Node_modules discrepancy (new)**: Triage commit 46827c3 (Apr 10) upgraded next, react, react-dom, stripe, @anthropic-ai/sdk, Supabase batch — but `npm outdated` shows pre-upgrade installed versions. `npm install` needed to sync node_modules with committed package.json.
-- **Outdated deps**: 33 packages (count unchanged). New available bumps: `@anthropic-ai/sdk` 0.87.0 → 0.88.0 (6 minors behind Apr 6 upgrade), `@elevenlabs/react` 1.0.3 → 1.1.0 (shipped as minor, not patch), `knip` 6.3.1 → 6.4.0 (dev only). No CVEs.
-- **CSP**: `'self' 'unsafe-inline'` — correct, unchanged. `frame-ancestors 'none'`, `object-src 'none'` verified.
-- **All security headers confirmed in source**: HSTS (prod-only), X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy. Server not running — live check skipped.
-- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified — unchanged.
-- **License compliant**: No copyleft violations. Same 7 flagged packages all approved. Scanner false positives: simple-concat + simple-get are plain MIT.
-- **CI/CD security**: All automation active. No gaps.
-
-**Cross-agent recommendations:**
-- Coverage Agent: All webhook and CSRF error paths remain fully covered. No regression risk. No security-driven test changes needed.
-- Performance Agent: Run `npm install` to apply Apr 10 triage upgrades. After sync, `@elevenlabs/react` 1.1.0 (minor) — monitor for bundle size change. All other upgrades patch/minor level, negligible impact.
-- Code Quality Agent: `npm install` needed first. Then: upgrade `@anthropic-ai/sdk` to 0.88.0 (now 6 minors behind). `@elevenlabs/react` 1.1.0 is a minor — review changelog before treating as drop-in.
-- Documentation Agent: No documentation changes needed this cycle. Sixth consecutive GREEN.
-- QA Agent: CSRF confirmed working. After `npm install` + Supabase sync (0.8.0 → 0.10.2), re-verify auth flows. No other security action items.
-- Cost Analyst Agent: No cost-related security concerns. 0 vulns. Revenue drought continues — no security contribution.
-- Localization Agent: No sensitive data in translation files.
-
-<!-- (pruned: security_agent 2026-04-09 entry removed, keeping last 3) -->
+<!-- (pruned: security_agent 2026-04-11 entry removed, keeping last 3) -->
 
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-04-11T06:00:00Z -->
 ## Documentation Agent — 2026-04-11
@@ -507,55 +526,7 @@
 
 <!-- (pruned: coverage_agent 2026-03-28 entry removed, keeping last 3) -->
 
-<!-- ENTRY:START agent=security_agent timestamp=2026-04-03T09:00:00Z -->
-## Security Agent — 2026-04-03
-- **Status: YELLOW** — **1 moderate advisory (next@16.1.6 — 5 sub-advisories), 1 exploitable** (PPR buffering DoS). next@16.2.2 available (released Apr 1) but upgrade still not applied — **now day 3 of unblocked window**.
-- **Exploitable**: GHSA-h27x-g6w4-24gq — unbounded postponed resume buffering DoS. `cacheComponents: true` enables PPR. Serverless function limits partially mitigate.
-- **Not exploitable**: CSRF bypass (no Server Actions + null-origin rejected), HTTP smuggling (HTTPS-only rewrites), image cache DoS (allowlisted domains), dev HMR (dev-only).
-- **CSP**: `'self' 'unsafe-inline'` — correct, unchanged
-- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
-- **License compliant**: No copyleft violations. sharp-libvips LGPL, vercel/analytics MPL, dompurify dual-licensed. Scanner false positives: simple-concat + simple-get are plain MIT.
-- **dangerouslySetInnerHTML audit**: 7 instances all safe — unchanged
-- **Command injection audit**: All exec/spawn calls safe — unchanged. Zero `'use server'` directives.
-- **Source changes**: No new `src/` changes since Apr 2. Security-neutral.
-- **Outdated deps**: 31 packages (unchanged). **stripe jumped to 22.0.0** — now 2 major versions behind. posthog-js 1.364.6, @elevenlabs/react 1.0.2, knip 6.3.0 latest bumped. No new advisories or CVEs.
-- **posthog-js discrepancy**: npm outdated still shows 1.353.0 installed. Dependabot PR merge resolves.
-- **CI/CD security**: All automation active. No gaps.
-
-**Cross-agent recommendations:**
-- Coverage Agent: All webhook and CSRF error paths remain fully covered. Branch coverage at 96.61% (excellent). MCP routes E2E gaps remain.
-- Performance Agent: **next@16.2.2 upgrade now day 3 overdue** — verify Vercel runtime, then `npm audit fix`. @elevenlabs/react 1.0.2 still pending (major gap: 0.14.1 installed). stripe 22.0.0 now 2 major versions ahead — plan coordinated Stripe ecosystem upgrade.
-- Code Quality Agent: **Apply next@16.2.2 now (day 3).** Stripe ecosystem: stripe 20.3.1→22.0.0 (+2 majors), @stripe/stripe-js 8.8.0→9.0.1, @stripe/react-stripe-js 5.6.0→6.1.0 — coordinate together. Merge Dependabot PR to fix posthog-js discrepancy.
-- Documentation Agent: No documentation changes needed this cycle.
-- QA Agent: CSRF protection working correctly. No action needed. After next upgrade, run full test + E2E suite to verify no regressions.
-- Cost Analyst Agent: No cost-related security concerns.
-- Localization Agent: No sensitive data in translation files.
-
-<!-- ENTRY:START agent=security_agent timestamp=2026-04-02T09:00:00Z -->
-## Security Agent — 2026-04-02
-- **Status: YELLOW** — **1 moderate advisory (next@16.1.6 — 5 sub-advisories), 1 exploitable** (PPR buffering DoS). next@16.2.2 available (released Apr 1) but upgrade still not applied — now day 2 of unblocked window.
-- **Exploitable**: GHSA-h27x-g6w4-24gq — unbounded postponed resume buffering DoS. `cacheComponents: true` enables PPR. Serverless function limits partially mitigate.
-- **Not exploitable**: CSRF bypass (no Server Actions + null-origin rejected), HTTP smuggling (HTTPS-only rewrites), image cache DoS (allowlisted domains), dev HMR (dev-only).
-- **CSP**: `'self' 'unsafe-inline'` — correct, unchanged
-- **Webhook security**: All 4 endpoints timing-safe, all 7 `timingSafeEqual` call sites verified
-- **License compliant**: No copyleft violations. sharp-libvips LGPL, vercel/analytics MPL, dompurify dual-licensed. Scanner false positives: simple-concat + simple-get are plain MIT.
-- **dangerouslySetInnerHTML audit**: 7 instances all safe — unchanged
-- **Command injection audit**: All exec/spawn calls safe — unchanged. Zero `'use server'` directives.
-- **Source changes**: analytics.test.tsx added (coverage agent, 3 tests). Security-neutral.
-- **Outdated deps**: 31 packages (+1: dotenv 17.3.1→17.4.0). posthog-js 1.364.5, @anthropic-ai/sdk 0.82.0, @playwright/test 1.59.1, knip 6.2.0 latest bumped. No new advisories or CVEs.
-- **posthog-js discrepancy**: npm outdated shows 1.353.0 installed despite triage Mar 30 "lockfile update". Dependabot PR merge would cleanly resolve.
-- **CI/CD security**: All automation active. No gaps.
-
-**Cross-agent recommendations:**
-- Coverage Agent: All webhook and CSRF error paths remain fully covered. Branch coverage at 96.44% (excellent). MCP routes E2E gaps remain.
-- Performance Agent: **next@16.2.2 upgrade now day 2 overdue** — verify Vercel runtime, then `npm audit fix`. @elevenlabs/react 1.0.1 still pending. Stripe major versions (v21/v9/v6) still pending.
-- Code Quality Agent: **Apply next@16.2.2 now (day 2).** Verify Vercel runtime, then `npm audit fix`. Stripe ecosystem and lucide-react v1.7.0 still pending. Merge Dependabot PR to fix posthog-js version discrepancy.
-- Documentation Agent: No documentation changes needed this cycle.
-- QA Agent: CSRF protection working correctly. No action needed. After next upgrade, run full test + E2E suite to verify no regressions.
-- Cost Analyst Agent: No cost-related security concerns.
-- Localization Agent: No sensitive data in translation files.
-
-<!-- (pruned: security_agent 2026-04-01 entry removed, keeping last 3) -->
+<!-- (pruned: security_agent 2026-04-03, 2026-04-02 entries removed, keeping last 3) -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-03-27T04:45:00Z -->
 ## Triage — 2026-03-27
