@@ -27,8 +27,9 @@ log_success "Feature flags enabled — proceeding with Performance Agent" | tee 
 
 cd "$PROJECT_DIR"
 
-# Performance budgets (thresholds for warnings)
-BUDGET_TOTAL_JS_KB=2500      # 2.5 MB total JS
+# Performance budgets (split budget adopted 2026-04-04 — single 2,500 KB budget retired)
+BUDGET_INITIAL_JS_KB=2000    # 2 MB initial load JS (static chunks only, excl. deferred)
+BUDGET_TOTAL_JS_KB=3000      # 3 MB total JS (including deferred dynamic chunks)
 BUDGET_LARGEST_CHUNK_KB=500  # 500 KB per chunk
 BUDGET_NODE_MODULES_MB=1000  # 1 GB node_modules
 BUDGET_PROD_DEPS=40          # Max production dependencies
@@ -153,7 +154,7 @@ fi
   echo "BUNDLE SIZES:"
   echo "- Total JS: ${TOTAL_JS_KB} KB (previous: ${PREV_TOTAL_JS_KB} KB, change: ${JS_CHANGE_KB} KB)"
   echo "- Total CSS: ${TOTAL_CSS_KB} KB"
-  echo "- Budget: ${BUDGET_TOTAL_JS_KB} KB"
+  echo "- Budget (split, since 2026-04-04): initial ${BUDGET_INITIAL_JS_KB} KB / total ${BUDGET_TOTAL_JS_KB} KB"
   echo ""
   echo "LARGEST JS CHUNKS:"
   echo "$LARGEST_CHUNKS"
