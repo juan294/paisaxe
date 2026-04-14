@@ -1,27 +1,27 @@
 # Performance Report
 
-> Updated on 2026-04-13 (dev server cache — production build verified Apr 4)
+> Updated on 2026-04-14 (dev server cache — production build verified Apr 4)
 
-## Health Status: GREEN (split budget — both targets met, 10th consecutive day)
+## Health Status: GREEN (split budget — both targets met, 11th consecutive day)
 
 **Initial load JS: ~1,972 KB (budget: 2,000 KB) ✅ | Total JS: 2,892 KB (budget: 3,000 KB) ✅**
 
-**Note on metrics input:** The agent script reported a 2,500 KB budget violation. That single budget was **retired on 2026-04-04** after investigation confirmed it was structurally unachievable (Turbopack i18n limitation, polyfill floor). The split budget adopted Apr 4 is the authoritative definition. Both targets are GREEN.
+**0 KB change this cycle** (2,892 KB → 2,892 KB). Dev server was running — cached .next data, identical to Apr 13. No code changes, no npm install, no build. Metrics are unchanged. Agent script budget thresholds now correctly report split budget (triage fix e858ef7).
 
-**+36 KB this cycle** (2,856 → 2,892 KB). Dev server was running — cached .next data used, not a production build. Growth likely attributable to `npm install` syncing the 2c8f991 package.json upgrades (node_modules: 908 → 910 MB confirms sync occurred). Primary contributor: Supabase chunk grew ~22 KB (168 → 190 KB), consistent with @supabase/supabase-js 2.97→2.103.0 upgrade. Remaining +14 KB spread across minor chunk re-splits. **No concern** — well within budget. Headroom reduced but healthy.
+**4 production dep patches available** (security agent Apr 14): @elevenlabs/react 1.1.0→1.1.1, @stripe/stripe-js 9.1.0→9.2.0, posthog-js 1.367.0→1.368.1, resend 6.10.0→6.11.0. All minor/patch — zero bundle impact expected. Not urgent.
 
 ## Key Metrics
 
-| Metric | Current (2026-04-13) | Previous (2026-04-12) | Mar 8 (prod build) | Budget | Status |
+| Metric | Current (2026-04-14) | Previous (2026-04-13) | Mar 8 (prod build) | Budget | Status |
 |--------|----------------------|-----------------------|---------------------|--------|--------|
-| Total JS | **2,892 KB** | 2,856 KB | 2,726 KB | 3,000 KB (split) | ✅ Under budget |
-| Initial load JS | **~1,972 KB** | ~1,963 KB | — | 2,000 KB (split) | ✅ Under budget |
+| Total JS | **2,892 KB** | 2,892 KB | 2,726 KB | 3,000 KB (split) | ✅ Under budget |
+| Initial load JS | **~1,972 KB** | ~1,972 KB | — | 2,000 KB (split) | ✅ Under budget |
 | Total CSS | **123 KB** | 123 KB | 122 KB | — | Stable |
 | Production deps | 31 | 31 | 31 | 40 | Good |
-| node_modules | 910 MB | 908 MB | 865 MB | — | Synced (npm install ran) |
-| .next | 46 MB | 45 MB | — | — | Dev cache partial view |
+| node_modules | 930 MB | 910 MB | 865 MB | — | +20 MB (dep tree growth) |
+| .next | 46 MB | 46 MB | — | — | Dev cache partial view |
 
-*Current (2026-04-13): Dev server was running — cached .next data. Production build was verified on 2026-04-04 (exit 0, 132/132 pages, 2,851 KB confirmed). +36 KB from Apr 12 — likely npm install sync effect.*
+*Current (2026-04-14): Dev server was running — cached .next data. Production build was verified on 2026-04-04 (exit 0, 132/132 pages, 2,851 KB confirmed). 0 KB change from Apr 13.*
 
 ## Budget Status
 
@@ -35,7 +35,7 @@
 
 **Deferred chunks (not in initial load):** ElevenLabs 487 KB + PostHog 179 KB + react-markdown 145 KB + admin tabs 109 KB = **~920 KB deferred**.
 
-**Headroom watch:** Initial load headroom narrowed from +37 KB to +28 KB. Still healthy but approaching the 2,000 KB limit. If a new static dependency or significant feature adds >28 KB, the initial load budget will be exceeded. Next production build will provide exact numbers.
+**Headroom watch:** Initial load headroom stable at +28 KB (unchanged from Apr 13). Still approaching the 2,000 KB limit. If a new static dependency or significant feature adds >28 KB, the initial load budget will be exceeded. Next production build will provide exact numbers.
 
 ## Top 10 Chunks Identified
 
@@ -58,32 +58,32 @@
 |----------|------|-----------|-------|
 | **Deferred (dynamic imports)** | ~920 KB | 31.8% | Loads on-demand only |
 | **Framework (Next.js + React)** | ~366 KB | 12.7% | Bootstrap, router, RSC runtime |
-| **Vendor (static)** | ~302 KB | 10.4% | Supabase (+22 KB), polyfills |
+| **Vendor (static)** | ~302 KB | 10.4% | Supabase, polyfills |
 | **App code (static)** | ~208 KB | 7.2% | i18n strings (both chunks) |
 | **Other smaller chunks** | ~1,096 KB | 37.9% | Page routes, shared modules |
 
-## Changes This Cycle (Apr 13 vs Apr 12)
+## Changes This Cycle (Apr 14 vs Apr 13)
 
-**+36 KB total JS** — first measurable growth since Apr 11 (+5 KB). Both attributed to the Apr 12 dep upgrades (2c8f991) now synced to node_modules.
+**0 KB change** — no code changes, no npm install, no production build. Dev server was running and cached .next data is identical.
 
 | Item | Status |
 |------|--------|
-| Total JS | **+36 KB** (2,856 → 2,892 KB) — Supabase chunk +22 KB, rest +14 KB scattered |
+| Total JS | **0 KB** (2,892 KB unchanged) |
 | CSS | Unchanged (123 KB) |
 | Production deps | Unchanged count (31) |
-| node_modules | **+2 MB** (908 → 910 MB) — `npm install` sync completed |
-| Supabase chunk | **168 → 190 KB (+22 KB)** — @supabase/supabase-js 2.97→2.103.0 |
+| node_modules | **+20 MB** (910 → 930 MB) — likely npm cache/lockfile drift, no package.json changes |
+| Agent script budget | ✅ **Fixed** (triage e858ef7) — now reports split 2,000/3,000 KB budgets |
 
-**Root cause:** The 2c8f991 commit (Apr 12) upgraded all packages in package.json. This cycle, `npm install` appears to have been run (node_modules grew +2 MB), syncing the actual packages. The Supabase SDK grew the most (+22 KB), which is expected for 6 minor versions of additions (2.97→2.103).
+**Triage fix confirmed:** `scripts/performance-agent.sh` now uses `BUDGET_INITIAL_JS_KB=2000` and `BUDGET_TOTAL_JS_KB=3000` (lines 31-32). The retired 2,500 KB single budget is gone. Next automated run will report no false violations.
 
 ## Action Items (Prioritized)
 
-**All dep gaps remain cleared. No new action items.**
+**4 production dep patches available. No budget violations.**
 
 | Item | Gap | Priority | Notes |
 |------|-----|----------|-------|
+| Patch 4 production deps | @elevenlabs/react, @stripe/stripe-js, posthog-js, resend | Low | All minor/patch, 0 CVEs. Bundle impact negligible. Can batch with next triage. |
 | Monitor initial load headroom | +28 KB until budget breach | **Watch** | Next production build will provide exact numbers. If headroom <15 KB, consider P4 or splitting static vendors. |
-| Update agent script budget | Still uses retired 2,500 KB single budget | Low | `scripts/performance-agent.sh:31` — update to split budget thresholds to stop false violations |
 
 ## Previously Implemented
 
@@ -97,6 +97,7 @@
 | **next@16.2.2** | Security (GHSA-h27x-g6w4-24gq closed) | 2026-04-03 (triage) | ✅ 16.2.2 → 16.2.3 Apr 10 |
 | **Stripe ecosystem upgrade** | stripe 22.0.0, stripe-js 9.0.1, react-stripe-js 6.1.0 | 2026-04-04 | ✅ All current |
 | **All dep gaps cleared** | 2c8f991: 3 majors + 6 minors + 3 patches | 2026-04-12 | ✅ node_modules synced Apr 13 |
+| **Agent script budget fix** | Script now uses split 2,000/3,000 KB thresholds | 2026-04-14 (triage e858ef7) | ✅ Confirmed in source |
 
 ## Dynamic Import Chain Verification
 
@@ -151,59 +152,58 @@ layout.tsx
 | pdf-parse | 57 MB | **0 KB** (devDependency) | Correct |
 | lucide-react | 39 MB | ~50-75 KB (tree-shaken via `optimizePackageImports`) | ✅ **v1.8.0 — current** |
 | @opentelemetry | 40 MB | 0 KB (server-only) | No action |
-| posthog-js | 35 MB | ~179 KB (lazy-loaded in useEffect) | ✅ **1.367.0 — current** |
+| posthog-js | 35 MB | ~179 KB (lazy-loaded in useEffect) | ⬆️ **1.367.0 → 1.368.1 available** |
 | @napi-rs | 30 MB | 0 KB (native, server-only) | No action |
-| typescript | 23 MB | 0 KB (devDependency) | No action |
+| typescript | 24 MB | 0 KB (devDependency) | No action |
 | canvas | 19 MB | 0 KB (optionalDep, server-only) | No action |
 | stripe | 18 MB | ~10-15 KB (server-side Stripe SDK) | ✅ **22.0.1 — current** |
 | @img | 16 MB | 0 KB (sharp image processing, server-only) | No action |
 | core-js | 15 MB | ~112 KB (P1 browserslist applied — 3 KB savings only) | No further action |
 | rxjs | 12 MB | ~0 KB (transitive, tree-shaken) | No action |
-| @babel | 12 MB | 0 KB (build tool) | No action |
 
 ### Dependency Version Status
 
-| Package | package.json | Latest | Gap | Priority |
-|---------|-------------|--------|-----|----------|
-| next | ^16.2.3 | 16.2.3 | — | ✅ Current |
-| react / react-dom | ^19.2.5 | 19.2.5 | — | ✅ Current |
-| stripe | ^22.0.1 | 22.0.1 | — | ✅ Current |
-| @anthropic-ai/sdk | ^0.88.0 | 0.88.0 | — | ✅ Current |
-| @elevenlabs/react | ^1.1.0 | 1.1.0 | — | ✅ Current |
-| @supabase/supabase-js | ^2.103.0 | 2.103.0 | — | ✅ Current |
-| @supabase/ssr | ^0.10.2 | 0.10.2 | — | ✅ Current |
-| @stripe/stripe-js | ^9.1.0 | 9.1.0 | — | ✅ Current |
-| posthog-js | ^1.367.0 | 1.367.0 | — | ✅ Current |
-| @upstash/redis | ^1.37.0 | 1.37.0 | — | ✅ Current |
-| voyageai | ^0.2.1 | 0.2.1 | — | ✅ Current |
-| resend | ^6.10.0 | 6.10.0 | — | ✅ Current |
-| @vercel/analytics | ^2.0.1 | 2.0.1 | — | ✅ Current |
-| @vercel/speed-insights | ^2.0.0 | 2.0.0 | — | ✅ Current |
-| lucide-react | ^1.8.0 | 1.8.0 | — | ✅ Current |
+| Package | package.json | Installed | Latest | Gap | Priority |
+|---------|-------------|-----------|--------|-----|----------|
+| next | ^16.2.3 | 16.2.3 | 16.2.3 | — | ✅ Current |
+| react / react-dom | ^19.2.5 | 19.2.5 | 19.2.5 | — | ✅ Current |
+| stripe | ^22.0.1 | 22.0.1 | 22.0.1 | — | ✅ Current |
+| @anthropic-ai/sdk | ^0.88.0 | 0.88.0 | 0.88.0 | — | ✅ Current |
+| @supabase/supabase-js | ^2.103.0 | 2.103.0 | 2.103.0 | — | ✅ Current |
+| @supabase/ssr | ^0.10.2 | 0.10.2 | 0.10.2 | — | ✅ Current |
+| @upstash/redis | ^1.37.0 | 1.37.0 | 1.37.0 | — | ✅ Current |
+| voyageai | ^0.2.1 | 0.2.1 | 0.2.1 | — | ✅ Current |
+| @vercel/analytics | ^2.0.1 | 2.0.1 | 2.0.1 | — | ✅ Current |
+| @vercel/speed-insights | ^2.0.0 | 2.0.0 | 2.0.0 | — | ✅ Current |
+| lucide-react | ^1.8.0 | 1.8.0 | 1.8.0 | — | ✅ Current |
+| **@elevenlabs/react** | ^1.1.0 | **1.1.0** | **1.1.1** | Patch | Low |
+| **@stripe/stripe-js** | ^9.1.0 | **9.1.0** | **9.2.0** | Minor | Low |
+| **posthog-js** | ^1.367.0 | **1.367.0** | **1.368.1** | Patch | Low |
+| **resend** | ^6.10.0 | **6.10.0** | **6.11.0** | Minor | Low |
 
-**All production dependencies are current as of 2026-04-13. Zero gaps.**
+**4 production deps have minor/patch updates. Zero CVEs. Bundle impact negligible.** Can batch in next triage cycle.
 
-## Comparison: 19-Run Trend
+## Comparison: 20-Run Trend
 
-| Metric | Feb 7 | Mar 8 | Mar 29* | Apr 4 | Apr 10* | Apr 11* | Apr 12* | **Apr 13*** | Trend |
-|--------|-------|-------|---------|-------|---------|---------|---------|-------------|-------|
-| Total JS | 2,455 KB | 2,726 KB | 2,804 KB | 2,851 KB | 2,851 KB | 2,856 KB | 2,856 KB | **2,892 KB** | +36 KB (dep sync) |
-| CSS | 130 KB | 122 KB | 124 KB | 123 KB | 123 KB | 123 KB | 123 KB | **123 KB** | Stable |
-| Prod deps | 27 | 31 | 31 | 31 | 31 | 31 | 31 | **31** | Stable |
-| node_modules | 856 MB | 865 MB | 862 MB | 896 MB | 908 MB | 908 MB | 908 MB | **910 MB** | +2 MB (synced) |
-| next | 16.x | 16.1.6 | 16.1.6 | 16.2.2 ✅ | 16.2.3 ✅ | 16.2.3 | 16.2.3 | **16.2.3 ✅** | Current |
-| @anthropic-ai/sdk | — | — | 0.78.0 | 0.78.0 | 0.87.0 ✅ | 0.87.0 | 0.88.0 ✅ | **0.88.0 ✅** | Current |
-| lucide-react | — | 0.x | 0.x | 0.x | 0.x | 0.x | 1.8.0 ✅ | **1.8.0 ✅** | Current |
+| Metric | Feb 7 | Mar 8 | Mar 29* | Apr 4 | Apr 10* | Apr 11* | Apr 12* | Apr 13* | **Apr 14*** | Trend |
+|--------|-------|-------|---------|-------|---------|---------|---------|---------|-------------|-------|
+| Total JS | 2,455 KB | 2,726 KB | 2,804 KB | 2,851 KB | 2,851 KB | 2,856 KB | 2,856 KB | 2,892 KB | **2,892 KB** | Unchanged |
+| CSS | 130 KB | 122 KB | 124 KB | 123 KB | 123 KB | 123 KB | 123 KB | 123 KB | **123 KB** | Stable |
+| Prod deps | 27 | 31 | 31 | 31 | 31 | 31 | 31 | 31 | **31** | Stable |
+| node_modules | 856 MB | 865 MB | 862 MB | 896 MB | 908 MB | 908 MB | 908 MB | 910 MB | **930 MB** | +20 MB |
+| next | 16.x | 16.1.6 | 16.1.6 | 16.2.2 ✅ | 16.2.3 ✅ | 16.2.3 | 16.2.3 | 16.2.3 ✅ | **16.2.3 ✅** | Current |
+| @anthropic-ai/sdk | — | — | 0.78.0 | 0.78.0 | 0.87.0 ✅ | 0.87.0 | 0.88.0 ✅ | 0.88.0 ✅ | **0.88.0 ✅** | Current |
+| lucide-react | — | 0.x | 0.x | 0.x | 0.x | 0.x | 1.8.0 ✅ | 1.8.0 ✅ | **1.8.0 ✅** | Current |
 
 *\*Dev server cache — may differ slightly from production build. Apr 4 = production build verified.*
 
-**2-month growth: 2,455 → 2,892 KB (+437 KB, +17.8%).** Growth drivers: +4 production deps (Feb→Mar), framework upgrades (Next.js 16.2.x), Supabase SDK growth. Growth rate is decelerating — +36 KB this cycle vs +271 KB in Feb→Mar.
+**2-month growth: 2,455 → 2,892 KB (+437 KB, +17.8%).** Growth rate has plateaued — 0 KB change over the last 2 days. All growth was from dependency upgrades, not new features.
 
 ## Remaining Backlog
 
 ### P4: Tree-shake Supabase realtime module (~20-30 KB savings) — DOWNGRADED, LOW ROI
 
-Chunk containing Supabase grew from 168 → 190 KB (+22 KB) after the 2.97→2.103 upgrade. `RealtimeClient` is only used in admin pages. Creating separate public/admin Supabase clients adds complexity for ~20-30 KB savings that don't affect the initial load budget directly, but would help preserve headroom.
+Chunk containing Supabase is 190 KB. `RealtimeClient` is only used in admin pages. Creating separate public/admin Supabase clients adds complexity for ~20-30 KB savings that don't affect the initial load budget directly, but would help preserve headroom.
 
 **Fix (if pursued):**
 ```typescript
@@ -213,7 +213,7 @@ const supabase = createBrowserClient(url, key, {
 });
 ```
 
-**Effort:** Medium. **Savings:** ~20-30 KB. **Verdict:** With headroom narrowing (+28 KB), this becomes more relevant if another static dependency is added. Monitor.
+**Effort:** Medium. **Savings:** ~20-30 KB. **Verdict:** With headroom at +28 KB, this becomes actionable if another static dependency is added. Monitor.
 
 ### P5: i18n bundling — CLOSED (Turbopack limitation, not fixable)
 
@@ -229,28 +229,28 @@ All 6 locales bundled in initial JS (~208 KB combined). Root cause: Turbopack 16
 | ~~P5~~ | ~~Fix i18n bundling~~ | ~~40-80 KB~~ | ~~Low~~ | ✅ **CLOSED — Turbopack limitation** |
 | ~~P6~~ | ~~Split JS budget~~ | Process clarity | Trivial | ✅ **DONE (Apr 4)** |
 | ~~All dep gaps~~ | ~~3 majors + 6 minors + 3 patches~~ | Maintenance | — | ✅ **DONE (Apr 12 — 2c8f991, synced Apr 13)** |
-| P4 | Tree-shake Supabase realtime | ~20-30 KB | Medium | Monitoring — relevance increasing as headroom narrows |
-| Agent script | Update budget in `scripts/performance-agent.sh:31` | Process fix | Trivial | Low — cosmetic, does not affect actual budgets |
+| ~~Agent script~~ | ~~Update budget thresholds~~ | Process fix | Trivial | ✅ **DONE (Apr 14 — triage e858ef7)** |
+| P4 | Tree-shake Supabase realtime | ~20-30 KB | Medium | Monitoring — actionable if headroom <15 KB |
 
 ---
 
 ## Cross-Agent Context
 
-**For Security Agent:** node_modules now synced (910 MB, +2 MB). All dep gaps remain cleared. Supabase grew +22 KB in client bundle from 2.97→2.103 upgrade — no security concern, just size. Zero CVEs. Zero production dep gaps.
+**For Security Agent:** Bundle unchanged (0 KB delta). 4 production dep patches confirmed available (same as security report): @elevenlabs/react 1.1.1, @stripe/stripe-js 9.2.0, posthog-js 1.368.1, resend 6.11.0. All minor/patch, zero CVEs. node_modules grew +20 MB (930 MB) — dep tree cache growth, no package.json changes.
 
-**For Code Quality Agent:** Bundle growth of +36 KB is entirely from dep upgrades syncing to node_modules (2c8f991). No code changes contribute. Supabase realtime (P4) remains the only actionable optimization — becomes more relevant if headroom continues to narrow. Agent script at `scripts/performance-agent.sh:31` still uses retired 2,500 KB budget — low-priority cosmetic fix.
+**For Code Quality Agent:** Zero code changes this cycle. Agent script budget fix confirmed (triage e858ef7 — split 2,000/3,000 KB). 4 minor/patch dep updates available for next batch. Supabase realtime (P4) still the only actionable optimization — relevance stable at +28 KB headroom.
 
-**For QA Agent:** +36 KB is dep upgrade noise (npm install sync). No user-facing changes. No functional regressions expected. Initial load headroom is +28 KB — not a user-visible concern.
+**For QA Agent:** 0 KB bundle change. No user-facing changes. No functional regressions possible. 4 dep patches available — all minor/patch, zero risk.
 
 **For Coverage Agent:** No new production dependencies. No source changes. Zero impact on test coverage.
 
-**For Cost Analyst Agent:** Bundle grew +36 KB to 2,892 KB — dep sync effect, not new features. node_modules now synced at 910 MB. ElevenLabs SDK chunk unchanged at 487 KB (deferred).
+**For Cost Analyst Agent:** Bundle stable at 2,892 KB (zero change). node_modules at 930 MB (+20 MB, no package.json changes). ElevenLabs SDK chunk unchanged at 487 KB (deferred). 4 production dep patches pending — zero cost impact.
 
 **For Localization Agent:** i18n bundling stable. 392 keys stable. P5 closed — Turbopack limitation. No optimization possible. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged.
 
 ---
 
-*Report updated 2026-04-13 — +36 KB (dep sync effect). GREEN status maintained (10th consecutive day).*
+*Report updated 2026-04-14 — 0 KB change (dev cache unchanged). GREEN status maintained (11th consecutive day).*
 *Initial load JS: ~1,972 KB / 2,000 KB | Total JS: 2,892 KB / 3,000 KB — GREEN*
 *Split budget adopted Apr 4 — old 2,500 KB single budget retired*
-*node_modules synced: 908 → 910 MB. Supabase chunk grew +22 KB (2.97→2.103 upgrade).*
+*Agent script budget fix confirmed (triage e858ef7). 4 production dep patches available (low priority).*

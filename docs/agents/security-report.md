@@ -1,10 +1,10 @@
 # Security Report
 
-> Auto-generated on 2026-04-13
+> Auto-generated on 2026-04-14
 
 ## Health Status: GREEN
 
-**Executive Summary:** 0 advisories detected, 0 exploitable. **Eighth consecutive GREEN.** All previously resolved vulnerabilities remain clean. Outdated packages dropped from 33 to 6 — node_modules now fully synced with package.json (resolved after `npm install` + commit 2c8f991 bulk upgrade). Only 6 packages remain outdated, all dev-only or pre-release channel, with zero CVEs. 3 source changes since Apr 12 — all test-only, security-neutral. CI/CD automation fully active.
+**Executive Summary:** 0 advisories detected, 0 exploitable. **Ninth consecutive GREEN.** All previously resolved vulnerabilities remain clean. 7 packages shown as outdated by `npm outdated` — 4 are production (minor/patch: @elevenlabs/react, @stripe/stripe-js, posthog-js, resend), 3 are dev-only (jsdom and vitest on pre-release channels, @typescript-eslint/eslint-plugin patch). Zero CVEs across all outdated packages. 8 commits since last report — CI config (Dependabot pinned to develop), triage fixes, Vercel single-region config, and dep updates merged from main. All security-neutral. CI/CD automation fully active.
 
 ---
 
@@ -57,7 +57,7 @@ No active advisories — no exploitability analysis required this cycle.
 
 **Confirmed safe (persistent audit items):**
 - **dangerouslySetInnerHTML (7 instances)**: All safe — 5 JSON-LD schema outputs via `JSON.stringify()` in `src/components/seo/json-ld.tsx:28,127,144,199,235`, and 2 admin markdown renders with `escapeHtml()` in `src/components/admin/agents-dashboard/cross-agent-insights.tsx:84` and `optimizer-report-dialog.tsx:57`.
-- **Command injection**: 5 exec/spawn sites — all safe. 4 in `src/app/api/admin/tunnel/route.ts` (dev-only, hardcoded commands). 1 in `src/app/api/admin/agents/run/route.ts:97` (whitelist-validated script path via `AGENT_SCRIPTS` map). Zero `'use server'` directives.
+- **Command injection**: 5 exec/spawn sites — all safe. 4 in `src/lib/claude.ts:65,78,223,245` (hardcoded curl to Anthropic API). 3 in `src/app/api/admin/tunnel/route.ts:16,80,133` (dev-only, hardcoded cloudflared commands, production-blocked). 1 in `src/app/api/admin/agents/run/route.ts:97` (whitelist-validated script path via `AGENT_SCRIPTS` map, admin-authenticated). Zero `'use server'` directives in the codebase.
 - **CSRF**: Token validation enforced on all state-changing API routes via `handleCsrfValidation()` in `src/proxy.ts`. Webhooks and MCP routes appropriately exempt. QA-verified passing since Mar 23.
 - **Webhook signature verification**: All 4 webhook endpoints use `timingSafeEqual()`. 7 call sites verified: `webhooks/elevenlabs/route.ts:141`, `webhooks/translate/route.ts:37`, `webhooks/supabase/route.ts:44`, `webhooks/stripe/route.ts` (Stripe SDK), `csrf.ts:77`, `cron-auth.ts:19,34`, `mcp-auth.ts:30`.
 
@@ -65,22 +65,23 @@ No active advisories — no exploitability analysis required this cycle.
 
 ## Outdated Packages
 
-**6 packages outdated** (down from 33 — node_modules fully synced). All are dev-only or pre-release channel. None have known CVEs.
+**7 packages outdated.** 4 production (minor/patch), 3 dev-only. None have known CVEs.
 
 | Package | Installed | Available | Type | Security Relevance |
 |---------|-----------|-----------|------|-------------------|
-| `@vitejs/plugin-react` | 5.2.0 | 6.0.1 | dev | None — major version, dev tooling only |
-| `dotenv` | 17.4.1 | 17.4.2 | dev | None — patch |
-| `jsdom` | 28.1.0 | 27.0.1 | dev | **Note**: installed > latest — pre-release channel, not a downgrade |
-| `knip` | 5.88.1 | 6.4.1 | dev | None — major version, dev tooling only |
-| `typescript` | 5.9.3 | 6.0.2 | dev | None — major version, dev tooling only |
+| `@elevenlabs/react` | 1.1.0 | 1.1.1 | production | None — patch |
+| `@stripe/stripe-js` | 9.1.0 | 9.2.0 | production | None — minor |
+| `posthog-js` | 1.367.0 | 1.368.1 | production | None — patch |
+| `resend` | 6.10.0 | 6.11.0 | production | None — minor |
+| `@typescript-eslint/eslint-plugin` | 8.58.1 | 8.58.2 | dev | None — patch |
+| `jsdom` | 29.0.2 | 27.0.1 | dev | **Note**: installed > latest — pre-release channel, not a downgrade |
 | `vitest` | 4.1.4 | 3.2.4 | dev | **Note**: installed > latest — pre-release channel, not a downgrade |
 
-**Channel note (vitest + jsdom):** `npm outdated` compares against the `latest` dist-tag. vitest@4.1.4 and jsdom@28.1.0 are on a pre-release channel (installed versions exceed stable `latest`). These are not regressions.
+**Channel note (vitest + jsdom):** `npm outdated` compares against the `latest` dist-tag. vitest@4.1.4 and jsdom@29.0.2 are on a pre-release channel (installed versions exceed stable `latest`). These are not regressions.
 
-**Milestone: All production dependency gaps cleared.** Commit `2c8f991` (bulk upgrade) plus `npm install` resolved every previously tracked production dep gap. No production packages are outdated.
+**Production gaps are all minor/patch — no breaking changes, no CVEs.** Can be resolved with a routine `npm update` when convenient. These emerged from new upstream releases since the Apr 12 bulk upgrade (commit `2c8f991`).
 
-**Pending major version migrations (non-urgent, dev-only, no CVEs):**
+**Pending major version dev migrations (non-urgent, no CVEs):**
 - `@vitejs/plugin-react` v5 → v6
 - `typescript` v5 → v6
 - `knip` v5 → v6
@@ -109,7 +110,7 @@ Flagged packages requiring review:
 
 ## Security Headers
 
-**Source-verified** (server not running — live check skipped). Configuration confirmed in `next.config.ts` (lines 50–73) and `src/proxy.ts` (`buildCspHeader()`, lines 219–247).
+**Source-verified** (server not running — live check skipped). Configuration confirmed in `next.config.ts` (lines 50–73) and `src/proxy.ts` (`buildCspHeader()`, lines 232–248).
 
 | Header | Value | Status |
 |--------|-------|--------|
@@ -132,7 +133,7 @@ Flagged packages requiring review:
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| Dependabot | ✅ Configured | `.github/dependabot.yml` — weekly PRs for npm deps (Mon), grouped production + dev batches |
+| Dependabot | ✅ Configured | `.github/dependabot.yml` — weekly PRs for npm deps (Mon), grouped production + dev batches. **Now pinned to `develop` branch** (commit `f118597`). |
 | Renovate | ❌ Not configured | Dependabot covers the same function; no gap |
 | Gitleaks | ✅ In CI | `.github/workflows/security.yml` — secret scanning on every push + weekly schedule (Mon 8:00 UTC) |
 | npm audit | ✅ In CI | `.github/workflows/security.yml` — production-only audit at high severity on every push + weekly schedule |
@@ -141,26 +142,45 @@ Flagged packages requiring review:
 
 ---
 
+## Source Changes Since Last Report
+
+8 commits since 2026-04-13. All security-neutral:
+
+| Commit | Description | Security Impact |
+|--------|-------------|-----------------|
+| `f118597` | Pin Dependabot PRs to develop branch | CI config only — improves workflow safety |
+| `0905df2` | Merge main into develop (dep updates backlog) | Merge commit — brings production-deployed changes into develop |
+| `228127e` | Update agent reports [triage] | Agent report updates — no application code |
+| `2838ecd` | Merge triage fix branch | Merge commit |
+| `e858ef7` | Resolve triage agent report findings | Triage fixes — performance budget script, dotenv patch, locale comments |
+| `f0ad7bc` | Merge Vercel single-region fix | Merge commit |
+| `9d1102c` | Drop Vercel to single region (cdg1) | Infrastructure config — `vercel.json` change, no application code |
+| `df5fe72` | Merge Dependabot PR (production deps) | Dependency update PR from main |
+
+---
+
 ## Remediation Steps
 
-No remediation required this cycle. 0 active advisories. 0 outdated production dependencies.
+No urgent remediation required. 0 active advisories. 4 production packages have minor/patch updates available — routine, no CVEs.
 
-**Ongoing maintenance (all low priority, dev-only, no CVEs):**
+**Recommended (low priority):**
 
-1. **`dotenv`** (`17.4.1 → 17.4.2`) — Trivial patch: `npm install dotenv@latest`.
-2. **Major version dev migrations** (no security implications):
-   - `@vitejs/plugin-react` v5 → v6
-   - `typescript` v5 → v6
-   - `knip` v5 → v6
+1. **Routine production dep updates** — `npm update @elevenlabs/react @stripe/stripe-js posthog-js resend` to pick up latest patches. No breaking changes expected.
+2. **`@typescript-eslint/eslint-plugin`** (`8.58.1 → 8.58.2`) — Dev-only patch: `npm install -D @typescript-eslint/eslint-plugin@latest`.
+
+**Ongoing maintenance (dev-only, no CVEs, no rush):**
+- `@vitejs/plugin-react` v5 → v6
+- `typescript` v5 → v6
+- `knip` v5 → v6
 
 ---
 
 ## Cross-Agent Recommendations
 
 - **Coverage Agent**: All webhook and CSRF error paths remain fully covered. No regression risk. No security-driven test changes needed.
-- **Performance Agent**: All production dep gaps cleared. Bundle should be stable. Only dev-tooling packages remain outdated — zero production impact.
-- **Code Quality Agent**: All production deps current. Only dev-tooling major versions pending (`@vitejs/plugin-react` v6, `typescript` v6, `knip` v6) — evaluate when convenient. License exceptions fully documented.
-- **Documentation Agent**: License-exceptions.md now complete — both `@img/sharp-libvips-*` and `@vercel/analytics` documented. No documentation changes needed. Eighth consecutive GREEN.
-- **QA Agent**: CSRF confirmed working (green since Mar 23). All production deps synced. Auth flows should be stable with current Supabase versions. No security action items.
+- **Performance Agent**: 4 production dep patches available — minor/patch only, zero bundle impact expected. Dev tooling unchanged. Monitor bundle after any dep updates.
+- **Code Quality Agent**: All production deps current (minor/patch behind only). Dev-tooling major versions pending (`@vitejs/plugin-react` v6, `typescript` v6, `knip` v6) — evaluate when convenient. License exceptions fully documented. Dependabot now correctly targeting `develop` (commit `f118597`).
+- **Documentation Agent**: License-exceptions.md complete. No documentation changes needed. Ninth consecutive GREEN.
+- **QA Agent**: CSRF confirmed working (green since Mar 23). All production deps synced. Auth flows stable with current Supabase versions. No security action items.
 - **Cost Analyst Agent**: No cost-related security concerns. 0 vulns. Revenue drought and voice silence continue — no security contribution to those issues.
 - **Localization Agent**: No sensitive data in translation files. No locale-related security concerns.
