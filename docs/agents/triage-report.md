@@ -1,50 +1,62 @@
 # Triage Report
-> Generated on 2026-04-13 | 5 reports processed | 2 action items resolved
+> Generated on 2026-04-14 | 8 reports processed | 3 code action items resolved
 
 ## Agent Failures
 
-None — all 5 agents ran successfully. Error logs clean (empty).
+None — all overnight agents ran successfully. Error logs clean (no `*.error.log` modified in last 24h).
 
 ## Reports Reviewed
 
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | coverage-report.md | coverage | GREEN | 2 code (test fix + global timer cleanup) |
-| 2 | cost-analyst-report.md | cost-analyst | WATCH | 0 code (operational only) |
-| 3 | localization-report.md | localization | GREEN | 0 code (cosmetic comments deferred) |
-| 4 | documentation-report.md | documentation | GREEN (16th) | 0 |
-| 5 | cc-rpi-update-report.md | cc-rpi-update | GREEN | 0 (at v1.15.0) |
+| 1 | cc-rpi-update-report.md | cc-rpi-update | GREEN | 0 (at v1.15.0) |
+| 2 | cost-analyst-report.md | cost-analyst | WATCH | 0 code (all operational/business) |
+| 3 | coverage-report.md | coverage | GREEN (98.73%) | 0 (5718/5718 passing, at practical ceiling) |
+| 4 | documentation-report.md | documentation | GREEN (17th consecutive) | 0 |
+| 5 | localization-report.md | localization | GREEN (38 days stable) | 1 (cosmetic LOCATION-SPECIFIC comments in fr/de/pt) |
+| 6 | performance-report.md | performance | GREEN (10th consecutive) | 1 (retire 2,500 KB budget in agent script) |
+| 7 | security-report.md | security | GREEN (8th consecutive) | 1 (dotenv 17.4.1→17.4.2 patch) |
+| 8 | triage-report.md | triage | (prior run) | — |
 
 ## Overall Status: GREEN
 
-All code findings resolved. Cost Analyst WATCH items are operational (revenue drought, Twilio anomaly, Anthropic billing) — these require user action outside the code path and do not block GREEN.
+All 8 reports reflect stable multi-day GREEN streaks (Security 8th, Performance 10th, Documentation 17th, Localization 38 days, Coverage plateau at 98.73%). Cost Analyst WATCH items are business-level (revenue drought, voice silence, Twilio anomaly, Anthropic billing visibility) — none require code changes.
 
 ## Action Items Completed
 
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Commit coverage agent's `suggest-place-dialog.test.tsx` fix (uncommitted from Apr 12 run) — replaces fake-timer success test with real-timer `waitFor` approach | coverage | Rewrote existing test (27/27 pass) | ✅ |
-| 2 | Add global `afterEach(() => vi.useRealTimers())` to `src/test/setup.ts` to close the recurring fake-timer-leakage hazard (has bitten twice) | coverage | Existing suite (5716) validates | ✅ |
+| 1 | `scripts/performance-agent.sh` — replace retired 2,500 KB single budget with split 2,000 KB initial / 3,000 KB total (adopted 2026-04-04). Updates the metrics print label too. | performance | N/A (shell config) | ✅ |
+| 2 | `dotenv` 17.4.1 → 17.4.2 dev-dep patch (no CVE). | security | Existing suite validates | ✅ |
+| 3 | Add 8 inline `// LOCATION-SPECIFIC` comments to `src/lib/i18n/fr.ts`, `de.ts`, `pt.ts` to match `es.ts`/`en.ts`/`ast.ts` parity. Two prior cycles flagged this as cosmetic; clearing now. | localization | Existing suite validates | ✅ |
 
-Commit: `def9813` — "test: add global fake-timer cleanup to prevent leakage"
-
-## Deferred (Not Code Fixes)
-
-- **Anthropic billing manual check** — no billing API on personal account; user must check console.
-- **59-day revenue drought** — requires manual verification of Pelayo voice widget and Day Pass flow on production.
-- **Twilio $0.24 anomaly** (10 days unresolved) — user must check Twilio billing console.
-- **Archy failure escalation** (3 failures, 2 error types, Apr 11–12) — non-Paisaxe agent, no cost impact to us.
-- **Cosmetic localization comments** — 8 missing `// LOCATION-SPECIFIC` comments in fr/de/pt; no functional impact; skipped to avoid churn.
-- **Untracked utility scripts** (`scripts/compare-i18n-keys.ts`, `scripts/cost-analyst-fetch.sh`) — leftover from agent runs, not flagged by any report.
+**Commit**: `e858ef7` (merged via `2838ecd`) — `chore: resolve 2026-04-14 agent report findings [triage]`
 
 ## Verification
 
-- [x] All tests passing (5716/5716)
+- [x] All tests passing (5718/5718 on re-run)
 - [x] Typecheck clean
 - [x] Lint clean
-- [ ] CI green — background monitor spawned for commit `def9813` (3 workflows queued: CI, Security Scan, Lighthouse CI)
+- [ ] CI green — background monitor spawned for 4 workflows (CI, Security Scan, Lighthouse CI, E2E Tests)
+
+**Note on test flakiness**: The first full `npm run test` run in the worktree hit 32 concurrency-timeout failures in 164s (admin dashboards, story viewer, voice chat, suggest-place — unrelated to the edits). An immediate re-run cleanly passed 5718/5718 in 32s. Same individual tests passed on both worktrees in isolation. This is pre-existing parallel-execution noise, not triggered by the triage fixes. Worth monitoring if it becomes chronic.
+
+## Deferred (Not Code Fixes)
+
+- **Anthropic billing manual check** — no billing API on personal account; user must check console at https://console.anthropic.com/settings/billing.
+- **60-day revenue drought** (since Feb 13) — requires manual verification of Pelayo voice widget rendering, Day Pass flow end-to-end, and organic traffic on production. QA last confirmed browser journeys pass E2E on Mar 23; production behavior for paying flows unverified.
+- **56-day Paisaxe voice silence** (since Feb 17) — coupled with revenue drought.
+- **Twilio $0.24 anomaly** (Apr 3–4, now 11 days unresolved) — likely recurring regulatory surcharge. User must check https://console.twilio.com billing history.
+- **Archy failure pattern (Apr 11–12, stale)** — non-Paisaxe agent, 2+ days of silence since 3 consecutive failures. No new data; no Paisaxe cost impact.
+- **Untracked `scripts/tmp-cost-elevenlabs.py` and `scripts/tmp-cost-twilio.py`** — cost-analyst leftovers. Unclear if reusable; left alone.
+- **Mid-month checkpoint (Apr 15 tomorrow)** — cost analyst flagged: consider releasing Twilio number, reviewing Vercel Pro/Supabase Pro necessity at current dormant scale.
 
 ## Carried Items
 
-- **voice-agent-chat.tsx (45.6%)** and **agents-dashboard/index.tsx (48.5%)** — still require Playwright E2E. Unchanged from prior cycles. Not a triage-fixable item.
-- **Cost Analyst WATCH pattern** — 59-day revenue drought, 55-day voice silence. Persistent across multiple triage cycles; escalation to user attention.
+- **voice-agent-chat.tsx (45.6%)** and **agents-dashboard/index.tsx (48.5%)** — still require Playwright E2E for meaningful coverage gains. Unchanged from prior cycles. Not triage-fixable — tracked for when an E2E pass is scheduled.
+- **Cost Analyst WATCH pattern** — 60-day revenue drought, 56-day voice silence. Persistent across many triage cycles; now a two-month milestone. Escalation to user attention.
+- **Performance Initial Load Headroom** — narrowed from +37 KB → +28 KB this cycle (Supabase 2.97→2.103 added +22 KB). Still healthy, but P4 (Supabase realtime tree-shake) becomes increasingly relevant if next static dep adds >28 KB.
+
+---
+
+*Next triage: when new reports land. Triage marker updated to mark 2026-04-14 reports as processed.*

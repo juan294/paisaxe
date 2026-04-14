@@ -1,124 +1,22 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-04-13 06:00:03
+> Auto-generated on 2026-04-14
 
-## Changes Made This Run (2026-04-13)
+## Health Status: GREEN
 
-- **Status: GREEN** — No documentation gaps found. Sixteenth consecutive clean run.
-- **Feature flags**: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
+No documentation gaps found. **Seventeenth consecutive clean run.**
+
+## Changes Made This Run
+
+- None. All documentation is current.
+
+## Verification Summary
+
+- **Feature flags**: All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
 - **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require new documentation.
 - **CLAUDE.md**: Current (last modified 2026-03-28)
 - **features.md**: Complete — no additions needed.
-- **No source changes** since last run that introduce new user-facing features or flags.
+- **Recent commits**: 5 commits since last run — Vercel single-region config fix (#239), agent report updates, fake-timer test cleanup. All infrastructure/test changes, no new user-facing features or flags.
 - **No new migrations** since last documentation update.
-
-## CLAUDE.md Status
-
-Last modified: **2026-03-28**
-
-## Files Modified Since Documentation Update
-
-These source files have been modified since CLAUDE.md was last updated and may need documentation updates.
-
-### Source Files (src/)
-
-```
-src/app/admin/page.test.tsx
-src/app/admin/page.tsx
-src/app/api/chat/route.ts
-src/app/favorites/page.test.tsx
-src/app/immersive/immersive-page-content.test.tsx
-src/app/immersive/immersive-page-content.tsx
-src/app/layout.tsx
-src/components/admin/agents-dashboard/use-agent-runner.test.ts
-src/components/admin/agents-dashboard/use-agent-terminal.test.ts
-src/components/admin/elevenlabs-analytics-panel.test.tsx
-src/components/admin/github-analytics-panel.test.tsx
-src/components/admin/story-editor-dialog/use-image-editor.test.ts
-src/components/admin/stripe-analytics-panel.test.tsx
-src/components/admin/visitors-analytics-panel.test.tsx
-src/components/analytics.test.tsx
-src/components/analytics.tsx
-src/components/immersive/language-switcher.test.tsx
-src/components/immersive/suggest-place-dialog.test.tsx
-src/hooks/use-stories.test.ts
-src/lib/chat-action-detection.test.ts
-src/lib/stripe.test.ts
-src/lib/stripe.ts
-src/proxy.test.ts
-```
-
-No new migrations since documentation update.
-
-### Scripts
-
-```
-scripts/commit-reports.sh
-scripts/cost-analyst-fetch.sh
-scripts/documentation-agent.sh
-scripts/lib/sms-alerts.sh
-scripts/performance-agent.sh
-scripts/qa-agent.sh
-```
-
-## Documentation Gaps
-
-### Potentially Undocumented API Routes
-
-These API routes may not be documented in CLAUDE.md:
-
-```
-admin/agent-reports
-admin/agents-summary
-admin/agents/run
-admin/analytics
-admin/costs-analytics
-admin/costs-analytics/[id]
-admin/elevenlabs-analytics
-admin/feature-flags/[key]
-admin/github-analytics
-admin/marketing/accounts
-admin/marketing/agent
-admin/marketing/agent-logs
-admin/marketing/dashboard
-admin/marketing/posts
-admin/marketing/schedule
-admin/stories
-admin/stories/[id]
-admin/stories/[id]/content-images
-admin/stories/[id]/image
-admin/stories/[id]/image-source
-admin/stories/[id]/status
-admin/stories/[id]/translations
-admin/stories/approve-all
-admin/stories/bulk-delete
-admin/stories/bulk-status
-admin/stripe-analytics
-admin/suggestions
-admin/suggestions/[id]
-admin/tunnel
-chat
-chat/stream
-checkout/day-pass
-checkout/embedded
-checkout/health
-cron/content-discovery
-cron/github-traffic-sync
-cron/subscription-optimizer
-favorites
-feature-flags
-health/db
-mcp/make-booking
-mcp/make-booking/status
-mcp/places
-mcp/weather
-suggestions
-voice-access
-webhooks/elevenlabs
-webhooks/stripe
-webhooks/supabase
-webhooks/translate
-
-```
 
 ## Documentation File Ages
 

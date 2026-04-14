@@ -27,8 +27,10 @@ export const pt: Translations = {
     speech_hint: 'Pode usar o microfone para falar',
     error_processing: 'Desculpe, não consegui processar a sua pergunta.',
     error_generic: 'Desculpe, ocorreu um erro. Por favor, tente novamente.',
+    // LOCATION-SPECIFIC: Location name in alt text
     image_alt: 'Imagem das Astúrias',
     source: 'Fonte',
+    // LOCATION-SPECIFIC: Location name in privacy notice
     privacy_notice: 'As suas perguntas são processadas com inteligência artificial para lhe oferecer as melhores respostas sobre as Astúrias. Não guardamos as suas conversas.',
     understood: 'Entendido',
     call: 'Ligar',
@@ -60,6 +62,7 @@ export const pt: Translations = {
       culture: 'Cultura',
       activities: 'Atividades',
     },
+    // LOCATION-SPECIFIC: Region names
     locations: {
       eastern: 'Astúrias Oriental',
       central: 'Astúrias Central',
@@ -115,6 +118,7 @@ export const pt: Translations = {
     local_only_description: 'Se apagar os dados do navegador ou mudar de dispositivo, irá perdê-los.',
     sync_with_google: 'Sincronizar com Google',
     empty_title: 'Ainda não tem guardados',
+    // LOCATION-SPECIFIC: Location name
     empty_description: 'Explore as histórias das Astúrias e guarde as que mais gostar para ver depois.',
     explore: 'Explorar histórias',
     loading_more: 'A carregar mais...',
@@ -168,6 +172,7 @@ export const pt: Translations = {
     show_all: 'Mostrar tudo',
   },
 
+  // LOCATION-SPECIFIC: Persona name (Pelayo) in voice prompts
   voice: {
     try_voice: 'Falar',
     use_text: 'Escrever',
@@ -199,11 +204,13 @@ export const pt: Translations = {
     suggest_place: 'Sugerir um lugar',
     suggest_short: 'Sugerir',
     dialog_title: 'Sugerir um lugar',
+    // LOCATION-SPECIFIC: Location and site name
     dialog_description: 'Partilhe um lugar nas Astúrias que gostaria de ver no Paisaxe',
     place_name_label: 'Nome do lugar',
     place_name_placeholder: 'ex. Praia de Gulpiyuri',
     location_label: 'Zona (opcional)',
     location_placeholder: 'Selecione uma zona',
+    // LOCATION-SPECIFIC: Region names
     location_eastern: 'Astúrias Oriental',
     location_central: 'Astúrias Central',
     location_western: 'Astúrias Ocidental',
@@ -297,6 +304,7 @@ export const pt: Translations = {
   footer: {
     terms: 'Termos de Uso',
     privacy: 'Política de Privacidade',
+    // LOCATION-SPECIFIC: Content source attribution
     content_attribution: 'Conteúdo parcialmente baseado em materiais disponíveis gratuitamente em turismoasturias.es',
     ai_disclaimer: 'As respostas são geradas por IA e devem ser verificadas',
   },
