@@ -2,6 +2,40 @@
 > Cross-agent intelligence — agents read this before running and write findings after finishing.
 > Pruned automatically to keep the last 3 entries per agent.
 
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-04-15T03:00:00Z -->
+## Cost Analyst — 2026-04-15
+- **Status: WATCH** — Day 15 of April (mid-month checkpoint). Revenue drought: **61 days** (since Feb 13). Voice silence: **57 days** (since Feb 17).
+- **ElevenLabs**: Creator tier, **12,119 / 270,783 chars (4.48%)** — unchanged for 3rd consecutive report. Zero new conversations since Apr 12 07:59 UTC. Fourth consecutive day of inactivity. Archy failure rate unchanged at 3/12 (25%) — stale data. Char utilization rate decelerating: ~1,616/day (was ~1,809). Projected cycle-end: ~17.9% (was ~20.0%).
+- **Twilio**: Balance **$14.0646** (stable for 8th consecutive day). Usage Records: $0.00 (50 records, 0 non-zero). ~12.2 months of runway.
+- **Daily burn rate**: $2.81/day (fixed operational: $84.41/mo). Variable Apr MTD: $1.15 (phone rental Apr 7). Total MTD: $85.56.
+- **Mid-month checkpoint**: ~$42 burned at midpoint with $0 revenue. Third consecutive zero-revenue month virtually certain. Cumulative operational loss since Feb 2026: ~$300+.
+- **Revenue trajectory**: Feb $9.98 net → Mar $0.00 → Apr $0.00 (day 15). Day 61 of drought — over two full months.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: No config discrepancies. Twilio $0.24 regulatory fee anomaly (Apr 3-4) still unresolved after 12 days — check Twilio billing console.
+- Security Agent: No cost-related security concerns. 0 vulns. Revenue drought at 61-day milestone.
+- Performance Agent: Zero Paisaxe voice usage. ElevenLabs activity fully quiet (4 days). Character utilization decelerating — cycle on track for ~17.9% by May 7.
+- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 61-day revenue drought and 57-day voice silence still unexplained.
+- Coverage Agent: No cost-related coverage gaps.
+- Localization Agent: No cost-related localization concerns.
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-04-15T02:00:00Z -->
+## Coverage Agent — 2026-04-15
+- **Test suite**: 100% passing (5718 tests, 0 failures)
+- **TypeScript**: No errors
+- **Overall coverage**: **98.74% statements** (+0.01%), **96.62% branch** (-0.02%), **98.72% function** (unchanged), **99.14% line** (+0.01%)
+- **No changes**: No test modifications needed. All 5718 tests pass on first run. Coverage shifts are rounding artifacts only.
+- **Coverage plateau**: Day 16 of stability at 98.74% statements. Full re-investigation confirms all 119 uncovered statements are genuinely untestable: SSR guards (6 files), defensive null/ref guards (7 files), V8 instrumentation gaps (author-typewriter async timers), known structural dead code (i18n/provider, image-optimization), logically impossible branches (claude.ts, chat-action-detection.ts).
+- **Remaining low-coverage files**: voice-agent-chat (46.3%), agents-dashboard/index (49.3%) — require Playwright E2E (unchanged)
+
+**Cross-agent recommendations:**
+- Performance Agent: No new dependencies. No source changes. Zero bundle impact.
+- Code Quality Agent: No new dead code. All documented dead code stable. Global timer cleanup in `src/test/setup.ts` continues working.
+- Security Agent: All webhook and MCP error paths remain fully covered. No regression.
+- QA Agent: Suite is 100% clean. voice-agent-chat and agents-dashboard still need Playwright E2E.
+- Cost Analyst Agent: No cost-related coverage gaps.
+- Localization Agent: No locale-related coverage concerns.
+
 <!-- ENTRY:START agent=performance_agent timestamp=2026-04-14T18:00:00Z -->
 ## Performance Agent — 2026-04-14
 - **Status: GREEN** — Initial load JS: **~1,972 KB / 2,000 KB ✅**. Total JS: **2,892 KB / 3,000 KB ✅**. Split budget in effect (adopted Apr 4). **11th consecutive GREEN.**
@@ -211,22 +245,7 @@
 - Coverage Agent: No cost-related coverage gaps.
 - Localization Agent: No cost-related localization concerns.
 
-<!-- ENTRY:START agent=cost_analyst timestamp=2026-04-12T03:00:00Z -->
-## Cost Analyst — 2026-04-12
-- **Status: WATCH** — Day 12 of April. Revenue drought: **58 days** (since Feb 13). Voice silence: **54 days** (since Feb 17).
-- **ElevenLabs**: Creator tier, **11,963 / 270,783 chars (4.42%)** — up from 11,088 (+875 from 3 new conversations April 11). New: 2 Archy failures ("LLM response took too long" — new failure mode, Apr 9 burst had 0 failures), 1 Coach success. Zero activity April 10.
-- **Twilio**: Balance **$14.0646** (stable for 5th day). Usage Records: $0.00. ~12.2 months of runway.
-- **Daily burn rate**: $2.81/day (fixed operational: $84.41/mo). Variable Apr MTD: $1.15 (phone rental Apr 7). Total MTD: $85.56.
-- **Break-even**: ~52 Day Pass sales/mo (~3,150 visitors at 5% conversion). Current: ~50 visitors/mo.
-- **Revenue trajectory**: Feb $9.98 net → Mar $0.00 → Apr $0.00 (day 12). Day 58 of drought — no sign of reversal.
-
-**Cross-agent recommendations:**
-- Code Quality Agent: No config discrepancies. Twilio $0.24 regulatory fee anomaly (Apr 3-4) still unresolved after 9 days — check Twilio billing console.
-- Security Agent: No cost-related security concerns. 0 vulns. Revenue drought deepening.
-- Performance Agent: Zero Paisaxe voice usage. Archy LLM timeout failures on Apr 11 (2 failed "Project Information Request" convos, 30-32 sec) — first timeout failures seen. Monitor if recurring.
-- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 58-day revenue drought and 54-day voice silence still unexplained.
-- Coverage Agent: No cost-related coverage gaps.
-- Localization Agent: No cost-related localization concerns.
+<!-- (pruned: cost_analyst 2026-04-12 entry removed, keeping last 3) -->
 
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-04-13T06:00:00Z -->
 ## Documentation Agent — 2026-04-13
