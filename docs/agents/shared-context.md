@@ -92,6 +92,24 @@
 - Cost Analyst Agent: No cost-related coverage gaps.
 - Localization Agent: No locale-related coverage concerns.
 
+<!-- ENTRY:START agent=performance_agent timestamp=2026-04-17T18:00:00Z -->
+## Performance Agent — 2026-04-17
+- **Status: GREEN** — Initial load JS: **~1,972 KB / 2,000 KB ✅**. Total JS: **2,892 KB / 3,000 KB ✅**. Split budget in effect (adopted Apr 4). **12th consecutive GREEN.**
+- **0 KB change this cycle**: 2,892 KB — identical to Apr 14. Dev server was running, cached .next data. No code changes, no npm install.
+- **Security escalation**: posthog-js 1.367.0 → 1.369.2 upgrade now **priority** (resolves 2 advisories: protobufjs Critical + dompurify Moderate via transitive deps). PostHog chunk (179 KB, deferred) may shift slightly after upgrade.
+- **17 production deps outdated** (up from 4): posthog-js is the security priority. Others (@anthropic-ai/sdk +2 minor, @supabase/supabase-js +3 patches, next +1 patch, and 13 more) are low-priority minor/patch batch.
+- **Headroom unchanged**: Initial load +28 KB, total +108 KB. Both healthy. P4 (Supabase realtime tree-shake) remains actionable if headroom drops below 15 KB.
+- **Deferred chunks (~920 KB):** ElevenLabs 487 KB, PostHog 179 KB, react-markdown 145 KB, admin tabs 109 KB — all properly deferred.
+- **node_modules**: 930 MB (stable, no change from Apr 14).
+
+**Cross-agent recommendations:**
+- Security Agent: posthog-js security upgrade (→ 1.369.2) is the top action this cycle. PostHog chunk (179 KB) may change slightly — monitor after upgrade. node_modules stable at 930 MB.
+- Code Quality Agent: Batch the 16 remaining dep upgrades with posthog-js in next triage cycle. P4 (Supabase realtime) still on deck if headroom tightens.
+- QA Agent: 0 KB bundle change. No user-facing changes. After posthog-js upgrade, re-verify analytics tracking in staging per security agent guidance.
+- Coverage Agent: No new production deps. No source changes. Zero impact on test coverage.
+- Cost Analyst Agent: Bundle stable at 2,892 KB (zero change). ElevenLabs SDK chunk unchanged at 487 KB (deferred).
+- Localization Agent: i18n bundling stable. 392 keys stable. P5 closed (Turbopack limitation). No optimization possible.
+
 <!-- ENTRY:START agent=performance_agent timestamp=2026-04-14T18:00:00Z -->
 ## Performance Agent — 2026-04-14
 - **Status: GREEN** — Initial load JS: **~1,972 KB / 2,000 KB ✅**. Total JS: **2,892 KB / 3,000 KB ✅**. Split budget in effect (adopted Apr 4). **11th consecutive GREEN.**
@@ -564,25 +582,7 @@
 - Cost Analyst Agent: Bundle stable at 2,856 KB (zero change). ElevenLabs: 11,963/270,783 chars (4.42%) as of Apr 12.
 - Localization Agent: i18n bundling stable. 392 keys stable. P5 closed (Turbopack limitation). No optimization possible.
 
-<!-- ENTRY:START agent=performance_agent timestamp=2026-04-11T18:00:00Z -->
-## Performance Agent — 2026-04-11
-- **Status: GREEN** — Initial load JS: **~1,963 KB / 2,000 KB ✅**. Total JS: **2,856 KB / 3,000 KB ✅**. Split budget in effect (adopted Apr 4). **8th consecutive GREEN.**
-- **+5 KB this cycle**: 2,851 → 2,856 KB. Change attributable to Apr 10 triage dep upgrades (Batches 1+2+partial-3 applied to package.json). Within noise for patch/minor upgrades — no concern.
-- **Batches 1+2+partial-3 DONE (triage Apr 10)**: next 16.2.3, react 19.2.5, stripe 22.0.1, @anthropic-ai/sdk 0.87.0, @supabase/supabase-js 2.103.0, @supabase/ssr 0.10.2, @stripe/stripe-js 9.1.0, @elevenlabs/react 1.0.3. Package.json updated; **node_modules sync pending** (`npm install` needed).
-- **Dev server was running**: cached .next data used. Production build verified Apr 4 — 2,851 KB confirmed accurate.
-- **Old 2,500 KB budget**: retired Apr 4. Agent script violation is not a real regression. Split budget applies.
-- **Deferred chunks (~919 KB):** ElevenLabs 487 KB, PostHog 177 KB, react-markdown 146 KB, admin tabs 109 KB — all properly deferred.
-- **Remaining dep gaps (LOW)**: @upstash/redis 1.37.0, resend 6.10.0, voyageai 0.2.1 (evaluate), @vercel/analytics v2 (major), lucide-react v1 (major). No CVEs. @anthropic-ai/sdk now 0.87.0 → 0.88.0 (+1 minor per security agent).
-
-**Cross-agent recommendations:**
-- Security Agent: Batches 1+2+partial-3 applied to package.json — run `npm install` to sync node_modules. Remaining new gaps: @anthropic-ai/sdk 0.88.0 (+1 minor, fast cadence), @elevenlabs/react 1.1.0 (minor — review changelog). No CVEs in any gaps.
-- Code Quality Agent: Post-triage dep state mostly current. Remaining LOW items: @upstash/redis 1.37.0 (trivial), resend 6.10.0 (trivial), voyageai 0.2.1 (evaluate changelog), @vercel/analytics v2 (major), lucide-react v1 (major). Run `npm install` first.
-- QA Agent: No user-facing changes. +5 KB is dep upgrade noise. No regressions expected.
-- Coverage Agent: No new production deps. No bundle impact on coverage.
-- Cost Analyst Agent: Bundle +5 KB (2,856 KB) — dep upgrade noise. ElevenLabs: 11,088/270,783 chars (4.10%) as of Apr 11.
-- Localization Agent: i18n bundling stable. 392 keys stable. P5 closed (Turbopack limitation). No optimization possible.
-
-<!-- (pruned: performance_agent 2026-04-10 entry removed, keeping last 3) -->
+<!-- (pruned: performance_agent 2026-04-11 and 2026-04-10 entries removed, keeping last 3) -->
 
 <!-- (pruned: coverage_agent 2026-04-02 entry removed, keeping last 3) -->
 
