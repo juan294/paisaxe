@@ -62,7 +62,7 @@ async function checkSupabase(): Promise<SupabaseServiceStatus> {
 
 async function checkStories(): Promise<StoriesStatus> {
   try {
-    const { data, error } = await supabase
+    const { count, error } = await supabase
       .from("stories")
       .select("id", { count: "exact", head: true })
       .eq("is_active", true)
@@ -72,13 +72,17 @@ async function checkStories(): Promise<StoriesStatus> {
       return { status: "fallback", error: error.message };
     }
 
-    const count = data?.length ?? 0;
+    const approvedStoryCount = count ?? 0;
     // If zero approved stories, the immersive page will serve fallback content
-    if (count === 0) {
-      return { status: "fallback", count: 0, error: "No approved stories — fallback images will be served" };
+    if (approvedStoryCount === 0) {
+      return {
+        status: "fallback",
+        count: 0,
+        error: "No approved stories — fallback images will be served",
+      };
     }
 
-    return { status: "ok", count };
+    return { status: "ok", count: approvedStoryCount };
   } catch (err) {
     return {
       status: "fallback",

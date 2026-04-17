@@ -1,6 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const isCI = !!process.env.CI;
+const useDevServer = process.env.PLAYWRIGHT_USE_DEV_SERVER === "true";
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === "true";
+const e2ePort = process.env.PLAYWRIGHT_PORT ?? "3100";
+const baseURL = `http://localhost:${e2ePort}`;
+
+function getWebServerCommand() {
+  if (isCI) return `npm run start -- --port ${e2ePort}`;
+  if (useDevServer) return `npm run dev -- --port ${e2ePort}`;
+  return `npm run build && npm run start -- --port ${e2ePort}`;
+}
 
 export default defineConfig({
   testDir: "./e2e",
@@ -20,7 +30,7 @@ export default defineConfig({
   },
 
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: isCI ? "off" : "retain-on-failure",
@@ -57,9 +67,11 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: isCI ? "npm run start" : "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !isCI,
+    command: getWebServerCommand(),
+    url: baseURL,
+    // Default local runs to an isolated production-style server because next dev's
+    // issues overlay can intercept mobile clicks and hide real regressions.
+    reuseExistingServer,
     timeout: 120_000,
     // Wait for server to be fully ready before running tests (reduces flaky visual regression)
     ...(isCI && { stdout: "pipe" }),

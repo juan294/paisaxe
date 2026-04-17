@@ -29,9 +29,9 @@ function createChainMock(resolveValue: unknown) {
 function mockSupabaseSuccess() {
   vi.mocked(supabase.from).mockImplementation((table: string) => {
     if (table === "stories") {
-      const mock = createChainMock({ data: [{ id: "1" }], error: null });
+      const mock = createChainMock({ count: 1, error: null });
       // For stories, select() with head:true returns the chain which resolves via .eq()
-      const lastEq = vi.fn().mockResolvedValue({ data: [{ id: "1" }], error: null });
+      const lastEq = vi.fn().mockResolvedValue({ count: 1, error: null });
       const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
       mock.select.mockReturnValue({ eq: firstEq });
       return mock as never;
@@ -44,7 +44,10 @@ function mockSupabaseSuccess() {
 function mockSupabaseError(message: string) {
   vi.mocked(supabase.from).mockImplementation((table: string) => {
     if (table === "stories") {
-      const lastEq = vi.fn().mockResolvedValue({ data: null, error: { message } });
+      const lastEq = vi.fn().mockResolvedValue({
+        count: null,
+        error: { message },
+      });
       const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
       const mock = { select: vi.fn().mockReturnValue({ eq: firstEq }) };
       return mock as never;
@@ -338,6 +341,7 @@ describe("GET /api/health", () => {
 
     expect(data.services.stories).toBeDefined();
     expect(data.services.stories.status).toBe("ok");
+    expect(data.services.stories.count).toBe(1);
   });
 
   it('should return degraded when stories check fails (permission denied)', async () => {
@@ -345,7 +349,7 @@ describe("GET /api/health", () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === "stories") {
         const lastEq = vi.fn().mockResolvedValue({
-          data: null,
+          count: null,
           error: { message: "permission denied for table stories" },
         });
         const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
@@ -367,7 +371,7 @@ describe("GET /api/health", () => {
   it('should return degraded when stories returns zero approved rows', async () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === "stories") {
-        const lastEq = vi.fn().mockResolvedValue({ data: [], error: null });
+        const lastEq = vi.fn().mockResolvedValue({ count: 0, error: null });
         const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
         return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
       }
@@ -384,11 +388,11 @@ describe("GET /api/health", () => {
     expect(data.services.stories.count).toBe(0);
   });
 
-  it("should handle stories query returning null data without error (line 75 ?? fallback)", async () => {
-    // When stories query returns data: null but no error, the ?? 0 fallback triggers
+  it("should handle stories query returning null count without error", async () => {
+    // head:true queries return count metadata instead of row data
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === "stories") {
-        const lastEq = vi.fn().mockResolvedValue({ data: null, error: null });
+        const lastEq = vi.fn().mockResolvedValue({ count: null, error: null });
         const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
         return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
       }
