@@ -32,7 +32,7 @@ test.describe("Chat panel", () => {
 
   test("opens chat panel when Ask button is clicked", async ({ page }) => {
     // Find and click the "ask about" button
-    const askButton = page.locator('[data-testid="ask-button"]');
+    const askButton = page.locator('[data-testid="ask-button"]').first();
     await askButton.click();
 
     // Chat panel should appear (it's a fixed overlay with z-50)
@@ -42,7 +42,7 @@ test.describe("Chat panel", () => {
 
   test("sends a message and receives a mocked response", async ({ page }) => {
     // Open chat
-    const askButton = page.locator('[data-testid="ask-button"]');
+    const askButton = page.locator('[data-testid="ask-button"]').first();
     await askButton.click();
 
     // Wait for chat panel
@@ -74,7 +74,7 @@ test.describe("Chat panel", () => {
 
   test("closes chat panel via close button", async ({ page }) => {
     // Open chat
-    const askButton = page.locator('[data-testid="ask-button"]');
+    const askButton = page.locator('[data-testid="ask-button"]').first();
     await askButton.click();
 
     const chatPanel = page.locator(".fixed.inset-0.z-50");

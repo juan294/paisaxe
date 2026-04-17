@@ -58,7 +58,10 @@ npm run test:e2e         # Run all E2E tests headless
 npm run test:e2e:headed  # Run with visible browser windows
 npm run test:e2e:ui      # Open Playwright's interactive UI mode
 npm run test:e2e:debug   # Run with Playwright Inspector for step debugging
+npm run test:e2e:dev     # Opt into next dev for interactive debugging
 ```
+
+`npm run test:e2e` now starts a production-style local server (`build` + `start`) on a dedicated Playwright port by default. This avoids both the Next.js dev overlay intercepting pointer events and port collisions with a normal local dev server on `3000`. Use `npm run test:e2e:dev` only when you specifically want a dev server while debugging Playwright.
 
 ### Running Specific Tests
 

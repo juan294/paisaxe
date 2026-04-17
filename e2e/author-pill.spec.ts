@@ -135,6 +135,7 @@ test.describe("Author pill", () => {
     const pillGroup = page.locator('[aria-label="Made by Juan González"]').first().locator("..");
     await pillGroup.hover();
 
-    await expect(page.locator("text=Juan González")).toBeVisible();
+    const authorName = pillGroup.getByText("Juan González").first();
+    await expect(authorName).toBeVisible();
   });
 });
