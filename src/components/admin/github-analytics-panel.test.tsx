@@ -88,9 +88,8 @@ describe("GitHubAnalyticsPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("01 — Top Referrers")).toBeInTheDocument();
+      expect(screen.getByText("google.com")).toBeInTheDocument();
     });
-
-    expect(screen.getByText("google.com")).toBeInTheDocument();
   });
 
   it("displays paths table", async () => {
@@ -102,9 +101,8 @@ describe("GitHubAnalyticsPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("02 — Popular Paths")).toBeInTheDocument();
+      expect(screen.getByText("/paisaxe")).toBeInTheDocument();
     });
-
-    expect(screen.getByText("/paisaxe")).toBeInTheDocument();
   });
 
   it("shows empty state when no data", async () => {
