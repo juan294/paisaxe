@@ -341,7 +341,7 @@ All significant changes go through four phases:
 - Each RPI phase should be its own conversation. Don't run research + plan + implement in one session.
 - Use `/clear` between unrelated tasks. Use `/compact` when context is heavy but the task continues.
 - Subagents are context control mechanisms — they search/read in their window and return only distilled results.
-- Research and planning happen on the default branch. Implementation happens in worktrees or feature branches.
+- Research and planning happen against the integration branch. Implementation happens in worktrees or temporary branches.
 - If research comes back wrong, throw it out and restart with more specific steering.
 
 ### Rules for All Phases
