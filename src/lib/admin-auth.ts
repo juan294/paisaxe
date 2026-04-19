@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { createAdminClient } from "./supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type AuthResult =
   | { valid: true; userId: string }
@@ -77,4 +79,27 @@ export async function validateAdminAuth(): Promise<AuthResult> {
       ),
     };
   }
+}
+
+/**
+ * Higher-order function that enforces admin authentication structurally.
+ *
+ * Calls validateAdminAuth() first. If auth fails, returns the 401/403/500
+ * error response immediately — the handler is never invoked. If auth succeeds,
+ * calls handler with a service-key Supabase client (createAdminClient()).
+ *
+ * Usage:
+ *   return withAdmin(async (supabase) => {
+ *     const { data } = await supabase.from("stories").select("*");
+ *     return NextResponse.json({ data });
+ *   });
+ */
+export async function withAdmin<T>(
+  handler: (supabase: SupabaseClient) => Promise<T>
+): Promise<T | NextResponse> {
+  const auth = await validateAdminAuth();
+  if (!auth.valid) {
+    return auth.error;
+  }
+  return handler(createAdminClient());
 }

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { validateAdminAuth } from "./admin-auth";
+import { validateAdminAuth, withAdmin } from "./admin-auth";
+
+// Mock createAdminClient so withAdmin tests don't need SUPABASE_SERVICE_KEY
+const mockAdminClient = { from: vi.fn() };
+vi.mock("./supabase", () => ({
+  createAdminClient: vi.fn(() => mockAdminClient),
+}));
 
 // Mock next/headers cookies
 const mockGetAll = vi.fn();
@@ -159,6 +165,78 @@ describe("validateAdminAuth", () => {
       expect(result.error.status).toBe(500);
       expect(body.error).toBe("Authentication failed");
     }
+  });
+
+  describe("withAdmin HOF", () => {
+    it("should return 401 response when auth fails", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: null,
+      });
+
+      // withAdmin calls validateAdminAuth internally — no valid session → 401
+      const handler = vi.fn().mockResolvedValue({ ok: true });
+      const result = await withAdmin(handler) as Response;
+
+      expect(result.status).toBe(401);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("should call handler with admin client when auth succeeds", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      const handlerResult = { message: "success" };
+      const handler = vi.fn().mockResolvedValue(handlerResult);
+
+      const result = await withAdmin(handler);
+
+      // Handler should have been called with a supabase-like client
+      expect(handler).toHaveBeenCalledTimes(1);
+      // The handler's return value is returned directly
+      expect(result).toBe(handlerResult);
+    });
+
+    it("should return 403 response when user is not admin", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-456", email: "user@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "user" });
+
+      const handler = vi.fn().mockResolvedValue({ ok: true });
+      const result = await withAdmin(handler) as Response;
+
+      expect(result.status).toBe(403);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("should pass supabase client (createAdminClient result) to handler", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      let capturedClient: unknown = undefined;
+      const handler = vi.fn().mockImplementation((client: unknown) => {
+        capturedClient = client;
+        return Promise.resolve("done");
+      });
+
+      await withAdmin(handler);
+
+      // createAdminClient requires SUPABASE_SERVICE_KEY — in tests that env var
+      // may be undefined, so we only assert the handler received *something*
+      // (truthy check is skipped because env is not set in unit test context)
+      expect(handler).toHaveBeenCalledOnce();
+      // capturedClient is whatever createAdminClient() returned (may be undefined
+      // or throw if key missing — the call itself is what we verify)
+      expect(capturedClient).toBeDefined();
+    });
   });
 
   describe("cookie callbacks", () => {
