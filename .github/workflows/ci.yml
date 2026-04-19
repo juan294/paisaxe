@@ -1,5 +1,15 @@
 name: CI
 
+# NOTE: This workflow builds/tests with dummy env vars.
+# It catches compile errors, unit-test failures, and type regressions.
+# It does NOT exercise the real Vercel runtime or real backend services.
+#
+# For PRs targeting main, a SEPARATE required check runs:
+#   .github/workflows/preview-smoke.yml  — "Smoke test Vercel preview"
+# That workflow waits for the Vercel preview deployment and hits
+# /api/health + homepage against real env vars, catching runtime failures
+# that dummy-key builds cannot detect (see incident: Next.js 16.2.1).
+
 on:
   push:
     branches: [develop, main]
