@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import * as Sentry from "@sentry/nextjs";
 import { LOCATION_CONFIG } from "@/config/location";
 import { getEnvironment } from "@/lib/environment";
 import crypto from "crypto";
@@ -147,6 +148,7 @@ async function isMaintenanceModeEnabled(): Promise<boolean> {
     return false;
   } catch (error) {
     console.error("[TABLE_FALLBACK]", { table: "feature_flags", key: "maintenance_mode", error: error instanceof Error ? error.message : String(error) });
+    Sentry.captureException(error);
     return false;
   }
 }
@@ -290,6 +292,24 @@ export function hasSupabaseAuthCookies(request: NextRequest): boolean {
 export const AUTH_REFRESH_TIMEOUT_MS = 1_500;
 
 /**
+ * Returns true if the JWT access token expires within `thresholdSeconds`.
+ * Called before `getUser()` to skip the Supabase round-trip for fresh sessions,
+ * reducing TTFB by 100-400ms on the hot path.
+ *
+ * Fails safe: any parse error returns true so `getUser()` still runs.
+ * Exported for testing.
+ */
+export function isTokenNearExpiry(token: string | undefined, thresholdSeconds = 300): boolean {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return (payload.exp - Date.now() / 1000) < thresholdSeconds;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Refresh Supabase auth session if expired.
  * This ensures the client and server auth states stay in sync.
  * Returns a response with updated cookies if session was refreshed.
@@ -316,6 +336,24 @@ async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
   // Skip auth refresh if no auth cookies exist (anonymous visitor)
   if (!hasSupabaseAuthCookies(request)) {
     return response;
+  }
+
+  // Skip getUser() if the session access token still has more than 5 minutes remaining.
+  // This avoids a 100-400ms Supabase round-trip on every authenticated page request.
+  // We extract the access token from the Supabase session cookie (URL-encoded JSON).
+  try {
+    const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+    const prefix = `sb-${projectRef}-auth-token`;
+    const sessionCookie =
+      request.cookies.get(prefix)?.value ??
+      request.cookies.get(`${prefix}.0`)?.value;
+    const decoded = decodeURIComponent(sessionCookie ?? "");
+    const parsed = JSON.parse(decoded) as { access_token?: string };
+    if (!isTokenNearExpiry(parsed.access_token)) {
+      return response;
+    }
+  } catch {
+    // Cannot parse session — fall through and call getUser() (fail safe)
   }
 
   try {
@@ -359,6 +397,7 @@ async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
       error.message !== "Auth refresh timeout"
     ) {
       console.error("Error refreshing auth session:", error);
+      Sentry.captureException(error);
     }
   }
 
