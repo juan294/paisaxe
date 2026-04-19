@@ -23,13 +23,51 @@ export async function GET(request: NextRequest) {
     const to = url.searchParams.get("to") ||
       new Date().toISOString().split("T")[0];
 
-    // Fetch daily traffic within date range
-    const { data: dailyData, error: dailyError } = await supabase
-      .from("github_traffic_daily")
-      .select("date, views, views_unique, clones, clones_unique")
-      .gte("date", from)
-      .lte("date", to)
-      .order("date", { ascending: true });
+    // -------------------------------------------------------------------------
+    // PE-L1 fix: 4 sequential Supabase awaits → 1 Promise.all (#307)
+    //
+    // Q1: daily traffic in date range
+    // Q2: most recent referrer snapshot (top 20)
+    // Q3: most recent paths snapshot (top 20)
+    // Q4: last synced timestamp
+    // -------------------------------------------------------------------------
+    const [
+      { data: dailyData, error: dailyError },
+      { data: referrerData },
+      { data: pathData },
+      { data: lastSync },
+    ] = await Promise.all([
+      // Q1: daily traffic within date range
+      supabase
+        .from("github_traffic_daily")
+        .select("date, views, views_unique, clones, clones_unique")
+        .gte("date", from)
+        .lte("date", to)
+        .order("date", { ascending: true }),
+
+      // Q2: referrers — most recent snapshot, ordered by count desc
+      supabase
+        .from("github_traffic_referrers")
+        .select("referrer, count, uniques, fetched_at")
+        .order("fetched_at", { ascending: false })
+        .order("count", { ascending: false })
+        .limit(20),
+
+      // Q3: paths — most recent snapshot, ordered by count desc
+      supabase
+        .from("github_traffic_paths")
+        .select("path, title, count, uniques, fetched_at")
+        .order("fetched_at", { ascending: false })
+        .order("count", { ascending: false })
+        .limit(20),
+
+      // Q4: last synced timestamp
+      supabase
+        .from("github_traffic_daily")
+        .select("fetched_at")
+        .order("fetched_at", { ascending: false })
+        .limit(1),
+    ]);
 
     if (dailyError) {
       console.error("Failed to fetch daily traffic:", dailyError);
@@ -52,15 +90,7 @@ export async function GET(request: NextRequest) {
       dataPointCount: daily.length,
     };
 
-    // Fetch most recent referrer snapshot
-    const { data: referrerData } = await supabase
-      .from("github_traffic_referrers")
-      .select("referrer, count, uniques, fetched_at")
-      .order("fetched_at", { ascending: false })
-      .order("count", { ascending: false })
-      .limit(20);
-
-    // Deduplicate: only keep the latest snapshot
+    // Deduplicate referrers: only keep the latest snapshot
     const latestReferrerFetch = referrerData?.[0]?.fetched_at;
     const referrers: GitHubTrafficReferrer[] = (referrerData || [])
       .filter((r) => r.fetched_at === latestReferrerFetch)
@@ -71,14 +101,7 @@ export async function GET(request: NextRequest) {
         fetched_at: r.fetched_at,
       }));
 
-    // Fetch most recent paths snapshot
-    const { data: pathData } = await supabase
-      .from("github_traffic_paths")
-      .select("path, title, count, uniques, fetched_at")
-      .order("fetched_at", { ascending: false })
-      .order("count", { ascending: false })
-      .limit(20);
-
+    // Deduplicate paths: only keep the latest snapshot
     const latestPathFetch = pathData?.[0]?.fetched_at;
     const popularPaths: GitHubTrafficPath[] = (pathData || [])
       .filter((p) => p.fetched_at === latestPathFetch)
@@ -89,13 +112,6 @@ export async function GET(request: NextRequest) {
         uniques: p.uniques,
         fetched_at: p.fetched_at,
       }));
-
-    // Last synced timestamp from daily data
-    const { data: lastSync } = await supabase
-      .from("github_traffic_daily")
-      .select("fetched_at")
-      .order("fetched_at", { ascending: false })
-      .limit(1);
 
     const lastSyncedAt = lastSync?.[0]?.fetched_at || null;
 
