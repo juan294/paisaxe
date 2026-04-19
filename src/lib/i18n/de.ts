@@ -197,6 +197,7 @@ export const de: Translations = {
     error: 'Verbindungsfehler',
     no_permission: 'Mikrofonzugriff benötigt',
     you: 'Du',
+    loading: 'Sprachassistent wird geladen...',
   },
 
   suggestions: {
