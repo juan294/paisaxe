@@ -91,15 +91,15 @@ export async function POST(request: NextRequest) {
     // Generate slug from title if not provided
     const slug = body.slug?.trim() || generateSlug(body.title);
 
-    // Check if slug already exists
+    // Check if slug already exists — maybeSingle() returns {data: null, error: null}
+    // when no row is found, so any non-null error is a real DB error
     const { data: existingStory, error: slugCheckError } = await supabase
       .from("stories")
       .select("id, slug")
       .eq("slug", slug)
-      .single();
+      .maybeSingle();
 
-    // PGRST116 means no rows found, which is expected
-    if (slugCheckError && slugCheckError.code !== "PGRST116") {
+    if (slugCheckError) {
       console.error("Error checking slug:", slugCheckError);
       return NextResponse.json(
         { error: "Failed to validate slug" },
@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the next display_order if not provided
+    // maybeSingle() returns {data: null, error: null} when the table is empty
     let displayOrder = body.displayOrder;
     if (displayOrder === undefined) {
       const { data: maxOrderStory } = await supabase
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
         .select("display_order")
         .order("display_order", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       displayOrder = (maxOrderStory?.display_order ?? 0) + 1;
     }

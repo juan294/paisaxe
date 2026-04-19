@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
+import { z } from "zod";
 import { translateStory } from "@/lib/translate-story";
 import { translateWebhookSchema } from "@/lib/schemas";
 
+
+/**
+ * Zod schema for the translate webhook payload.
+ * Validates expected shape and warns on unexpected fields.
+ */
+const TranslateWebhookSchema = z
+  .object({
+    storyId: z.string().min(1),
+    locales: z.array(z.string()).optional(),
+    forceRetranslate: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * POST /api/webhooks/translate
@@ -40,6 +53,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         },
         { status: 400 }
       );
+    }
+
+    // Zod schema validation — warn on unexpected fields (after signature + basic shape check)
+    const parseResult = TranslateWebhookSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      const unknownFields = parseResult.error.issues.flatMap((i) =>
+        "keys" in i && Array.isArray(i.keys)
+          ? (i.keys as string[])
+          : i.path.length > 0
+          ? [i.path.join(".")]
+          : []
+      );
+      console.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "translate", fields: unknownFields });
     }
 
     const { storyId, locales, forceRetranslate } = parsed.data;

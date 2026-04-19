@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { timingSafeEqual } from "crypto";
+import { z } from "zod";
 
 interface WebhookPayload {
   table_name: string;
@@ -9,6 +10,20 @@ interface WebhookPayload {
   old_record?: Record<string, unknown>;
   timestamp: string;
 }
+
+/**
+ * Zod schema for the Supabase revalidation webhook payload.
+ * Validates expected shape and warns on unexpected fields.
+ */
+const SupabaseWebhookSchema = z
+  .object({
+    table_name: z.string(),
+    operation: z.string(),
+    timestamp: z.string(),
+    record: z.record(z.string(), z.unknown()).optional(),
+    old_record: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
 
 /**
  * Revalidation map: defines which paths to revalidate when a given table changes.
@@ -53,6 +68,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { error: "Bad request: missing required fields" },
         { status: 400 }
       );
+    }
+
+    // Zod schema validation — warn on unexpected fields (after signature + basic shape check)
+    const parseResult = SupabaseWebhookSchema.safeParse(body);
+    if (!parseResult.success) {
+      const unknownFields = parseResult.error.issues.flatMap((i) =>
+        "keys" in i && Array.isArray(i.keys)
+          ? (i.keys as string[])
+          : i.path.length > 0
+          ? [i.path.join(".")]
+          : []
+      );
+      console.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "supabase", fields: unknownFields });
     }
 
     const { table_name } = body;
