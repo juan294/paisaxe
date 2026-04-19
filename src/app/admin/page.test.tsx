@@ -1677,13 +1677,13 @@ describe("AdminPage", () => {
       });
     });
 
-    describe("Tab panel rendering (lines 629-641)", () => {
-      // These tests cover the visitedTabs.has("marketing/suggestions/agents") true branches.
-      // The content divs for these tabs only render once the tab has been visited.
-      it("renders MarketingDashboard when Marketing tab is visited (line 629-631)", async () => {
+    describe("Tab panel rendering (FE-M3: unmount on hide)", () => {
+      // FE-M3: Tab panels are now conditionally rendered — unmounted when inactive.
+      // Previously they were kept alive with display:none after first visit.
+      it("renders MarketingDashboard only when Marketing tab is active", async () => {
         render(<AdminPage />);
 
-        // Marketing has not been visited yet — content not rendered
+        // Marketing not mounted initially
         expect(screen.queryByTestId("marketing-dashboard")).not.toBeInTheDocument();
 
         // Click the Marketing tab
@@ -1691,23 +1691,21 @@ describe("AdminPage", () => {
           fireEvent.click(screen.getByText("Marketing"));
         });
 
-        // Now visitedTabs.has("marketing") is true — content renders (display: block)
         await waitFor(() => {
           expect(screen.getByTestId("marketing-dashboard")).toBeInTheDocument();
         });
 
-        // Navigate away to cover the display:none branch (activeTab !== "marketing")
+        // Navigate away — panel is UNMOUNTED (FE-M3)
         await act(async () => {
           fireEvent.click(screen.getByText("Stories"));
         });
 
-        // Content still exists in DOM (lazy-mount) but is hidden
         await waitFor(() => {
-          expect(screen.getByTestId("marketing-dashboard")).toBeInTheDocument();
+          expect(screen.queryByTestId("marketing-dashboard")).not.toBeInTheDocument();
         });
       });
 
-      it("renders SuggestionsPanel when Suggestions tab is visited (line 635-637)", async () => {
+      it("renders SuggestionsPanel only when Suggestions tab is active", async () => {
         render(<AdminPage />);
 
         expect(screen.queryByTestId("suggestions-panel")).not.toBeInTheDocument();
@@ -1720,17 +1718,17 @@ describe("AdminPage", () => {
           expect(screen.getByTestId("suggestions-panel")).toBeInTheDocument();
         });
 
-        // Navigate away to cover display:none branch
+        // Navigate away — panel is UNMOUNTED (FE-M3)
         await act(async () => {
           fireEvent.click(screen.getByText("Stories"));
         });
 
         await waitFor(() => {
-          expect(screen.getByTestId("suggestions-panel")).toBeInTheDocument();
+          expect(screen.queryByTestId("suggestions-panel")).not.toBeInTheDocument();
         });
       });
 
-      it("renders AgentsDashboard when Agents tab is visited (line 641-643)", async () => {
+      it("renders AgentsDashboard only when Agents tab is active", async () => {
         render(<AdminPage />);
 
         expect(screen.queryByTestId("agents-dashboard")).not.toBeInTheDocument();
@@ -1743,13 +1741,13 @@ describe("AdminPage", () => {
           expect(screen.getByTestId("agents-dashboard")).toBeInTheDocument();
         });
 
-        // Navigate away to cover display:none branch
+        // Navigate away — panel is UNMOUNTED (FE-M3)
         await act(async () => {
           fireEvent.click(screen.getByText("Stories"));
         });
 
         await waitFor(() => {
-          expect(screen.getByTestId("agents-dashboard")).toBeInTheDocument();
+          expect(screen.queryByTestId("agents-dashboard")).not.toBeInTheDocument();
         });
       });
     });
