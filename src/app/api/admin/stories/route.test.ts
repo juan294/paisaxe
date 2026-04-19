@@ -214,12 +214,13 @@ describe("POST /api/admin/stories", () => {
       }),
     });
     const mockSelect = vi.fn().mockReturnValue({
+      // maybeSingle: no row → {data: null, error: null} (no PGRST116 needed)
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
       order: vi.fn().mockReturnValue({
         limit: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
         }),
       }),
     });
@@ -262,11 +263,11 @@ describe("POST /api/admin/stories", () => {
     });
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
       order: vi.fn().mockReturnValue({
         limit: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
         }),
       }),
     });
@@ -293,7 +294,7 @@ describe("POST /api/admin/stories", () => {
   it("should return 409 when slug already exists", async () => {
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
+        maybeSingle: vi.fn().mockResolvedValue({
           data: { id: "existing-id", slug: "test-story" },
           error: null,
         }),
@@ -332,7 +333,7 @@ describe("POST /api/admin/stories", () => {
     });
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
     });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect, insert: mockInsert });
@@ -368,11 +369,11 @@ describe("POST /api/admin/stories", () => {
     });
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
       order: vi.fn().mockReturnValue({
         limit: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({
+          maybeSingle: vi.fn().mockResolvedValue({
             data: { display_order: 5 },
             error: null,
           }),
@@ -419,11 +420,11 @@ describe("POST /api/admin/stories", () => {
     });
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
       order: vi.fn().mockReturnValue({
         limit: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
         }),
       }),
     });
@@ -473,11 +474,11 @@ describe("POST /api/admin/stories", () => {
     });
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
       order: vi.fn().mockReturnValue({
         limit: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
         }),
       }),
     });
@@ -532,11 +533,11 @@ describe("POST /api/admin/stories", () => {
     });
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
       order: vi.fn().mockReturnValue({
         limit: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
         }),
       }),
     });
@@ -589,10 +590,11 @@ describe("POST /api/admin/stories", () => {
     expect(data.error).toBe("Internal server error");
   });
 
-  it("should return 500 when slug check has non-PGRST116 error", async () => {
+  it("should return 500 when slug check maybeSingle returns an error", async () => {
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
+        // maybeSingle returns any non-null error as a real DB error
+        maybeSingle: vi.fn().mockResolvedValue({
           data: null,
           error: { code: "UNEXPECTED_ERROR", message: "Something went wrong" },
         }),
@@ -623,11 +625,11 @@ describe("POST /api/admin/stories", () => {
     });
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
       order: vi.fn().mockReturnValue({
         limit: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
         }),
       }),
     });

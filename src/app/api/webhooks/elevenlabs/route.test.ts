@@ -110,10 +110,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
     // Default: SMS sends successfully
     vi.mocked(sendSMS).mockResolvedValue({ success: true, sid: "SM123" });
 
-    // Setup Supabase mock chain
+    // Setup Supabase mock chain (maybeSingle: no PGRST116 needed for no-row)
     mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: mockBooking, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: mockBooking, error: null }),
       }),
     });
 
@@ -352,10 +352,10 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.error).toBe("Missing conversation_id");
   });
 
-  it("should ignore webhook if no pending booking found", async () => {
+  it("should ignore webhook if no pending booking found (maybeSingle null data, null error)", async () => {
     mockSelect.mockReturnValue({
       eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       }),
     });
 
@@ -679,6 +679,85 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.outcome).toBe("confirmed");
+  });
+
+  describe("Zod schema validation", () => {
+    it("should emit WEBHOOK_UNKNOWN_SHAPE warn when payload has unexpected top-level fields", async () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: buildTranscript(
+          { role: "user", message: "Confirmado, le esperamos." }
+        ),
+        analysis: { call_successful: "success" },
+        unexpected_field: "surprise",
+        another_unknown: 42,
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[WEBHOOK_UNKNOWN_SHAPE]",
+        expect.objectContaining({ webhook: "elevenlabs" })
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should emit WEBHOOK_UNKNOWN_SHAPE warn when analysis has unexpected nested fields", async () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: buildTranscript(
+          { role: "user", message: "Perfecto." }
+        ),
+        analysis: {
+          call_successful: "success",
+          transcript_summary: "All good.",
+          unexpected_analysis_field: "extra",
+        },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[WEBHOOK_UNKNOWN_SHAPE]",
+        expect.objectContaining({ webhook: "elevenlabs" })
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle data-nested analysis path in Zod schema validation", async () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // Data-wrapped payload — should pass schema validation without warning
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        data: {
+          transcript: buildTranscript(
+            { role: "user", message: "Confirmado." }
+          ),
+          analysis: {
+            call_successful: "success",
+          },
+        },
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      // Valid known-shape payload should NOT trigger the warn
+      expect(consoleSpy).not.toHaveBeenCalledWith(
+        "[WEBHOOK_UNKNOWN_SHAPE]",
+        expect.anything()
+      );
+
+      consoleSpy.mockRestore();
+    });
   });
 
   it("should return 500 when request body is not valid JSON", async () => {
