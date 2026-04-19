@@ -64,8 +64,10 @@ test.describe("QA Journey: Anonymous User", () => {
     await expect(nextButton).toBeVisible();
     await nextButton.click();
 
-    // Wait for transition
-    await page.waitForTimeout(500);
+    // Wait for the title to change (story transition)
+    await expect(page.locator("h1").first()).not.toHaveText(firstTitle!, {
+      timeout: 3000,
+    });
 
     // Step 3: Verify story changed
     const secondTitle = await page.locator("h1").first().textContent();
@@ -75,7 +77,10 @@ test.describe("QA Journey: Anonymous User", () => {
     const prevButton = page.getByTestId("prev-story-button").first();
     await prevButton.click();
 
-    await page.waitForTimeout(500);
+    // Wait for the title to change back
+    await expect(page.locator("h1").first()).not.toHaveText(secondTitle!, {
+      timeout: 3000,
+    });
 
     // Step 5: Verify we're back to first story
     const returnedTitle = await page.locator("h1").first().textContent();
@@ -92,14 +97,18 @@ test.describe("QA Journey: Anonymous User", () => {
 
     // Navigate with right arrow key
     await page.keyboard.press("ArrowRight");
-    await page.waitForTimeout(500);
+    await expect(page.locator("h1").first()).not.toHaveText(firstTitle!, {
+      timeout: 3000,
+    });
 
     const secondTitle = await page.locator("h1").first().textContent();
     expect(secondTitle).not.toBe(firstTitle);
 
     // Navigate with left arrow key
     await page.keyboard.press("ArrowLeft");
-    await page.waitForTimeout(500);
+    await expect(page.locator("h1").first()).not.toHaveText(secondTitle!, {
+      timeout: 3000,
+    });
 
     const returnedTitle = await page.locator("h1").first().textContent();
     expect(returnedTitle).toBe(firstTitle);
@@ -180,18 +189,16 @@ test.describe("QA Journey: Anonymous User", () => {
 
     // Press 'i' to hide info
     await page.keyboard.press("i");
-    await page.waitForTimeout(600);
 
-    // Bottom panel should be hidden
+    // Bottom panel should be hidden (wait for CSS transition to complete)
     const bottomPanel = page.locator(".absolute.bottom-0.left-0.right-0");
     await expect(bottomPanel).toHaveCSS("opacity", "0", { timeout: 5000 });
 
     // Press 'i' again to show info
     await page.keyboard.press("i");
-    await page.waitForTimeout(600);
 
     // Bottom panel should be visible again
-    await expect(bottomPanel).toHaveCSS("opacity", "1");
+    await expect(bottomPanel).toHaveCSS("opacity", "1", { timeout: 5000 });
   });
 
   test("Journey 6: Navigate between stories and verify unique content", async ({
@@ -281,9 +288,10 @@ test.describe("QA Journey: Error Handling", () => {
     const sendButton = chatPanel.locator('button[type="submit"]');
     await sendButton.click();
 
-    // Should show error message (not crash)
+    // Should show error message (not crash) — wait for the chat panel to remain
+    // visible and stable after the API call completes (mocked as instant 500)
     // The app should handle errors gracefully
-    await page.waitForTimeout(2000);
+    await expect(chatPanel).toBeVisible({ timeout: 5000 });
 
     // Chat panel should still be functional (not broken)
     await expect(chatPanel).toBeVisible();
@@ -510,16 +518,13 @@ authTest.describe("QA Journey: Authenticated User", () => {
         }
       }, testStoryId);
 
-      // Navigate to favorites page
+      // Navigate to favorites page and wait for it to load
       await page.goto("/favorites");
-
-      // Wait for page to load
-      await page.waitForTimeout(1000);
+      const mainContent = page.locator("main");
+      await authExpect(mainContent).toBeVisible({ timeout: 5000 });
 
       // Should see content (not just empty state)
       // The favorites page should show the saved story
-      const mainContent = page.locator("main");
-      await authExpect(mainContent).toBeVisible();
 
       // Check we're not seeing just the empty state
       const hasContent = await page
@@ -561,11 +566,11 @@ authTest.describe("QA Journey: Authenticated User", () => {
         }
       }, testStoryId);
 
-      // Navigate away and back
+      // Navigate away and back — wait for each page to be fully loaded
       await page.goto("/favorites");
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle");
       await page.goto("/immersive");
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle");
 
       // Verify localStorage persisted across navigation
       const favorites = await page.evaluate(() => {

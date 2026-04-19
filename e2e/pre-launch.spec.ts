@@ -344,7 +344,8 @@ test.describe("Language switching", () => {
     // Click ES in the dropdown (aria-label is full name e.g. "Español (ES)")
     const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
-    await page.waitForTimeout(300);
+    // Wait for dropdown to close after selection
+    await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Open chat to check Spanish placeholder
     await page.locator('[data-testid="ask-button"]').first().click();
@@ -368,13 +369,15 @@ test.describe("Language switching", () => {
     await switcher.locator("button").first().click();
     const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
-    await page.waitForTimeout(300);
+    // Wait for dropdown to close after selection
+    await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Now switch back to EN
     await switcher.locator("button").first().click();
     const enButton = switcher.locator('button[aria-label$="(EN)"]');
     await enButton.click();
-    await page.waitForTimeout(300);
+    // Wait for dropdown to close after selection
+    await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Open chat to check English placeholder
     await page.locator('[data-testid="ask-button"]').first().click();
@@ -396,7 +399,8 @@ test.describe("Language switching", () => {
     await switcher.locator("button").first().click();
     const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
-    await page.waitForTimeout(300);
+    // Wait for dropdown to close after selection
+    await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     const storedLocale = await page.evaluate(() =>
       localStorage.getItem("paisaxe-locale")
@@ -436,7 +440,8 @@ test.describe("Language switching", () => {
     await switcher.locator("button").first().click();
     const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
-    await page.waitForTimeout(300);
+    // Wait for dropdown to close after selection
+    await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Re-open chat
     await page.locator('[data-testid="ask-button"]').first().click();
