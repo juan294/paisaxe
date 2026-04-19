@@ -5,7 +5,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SharedContextEntry } from "@/types/agents-dashboard";
 import { relativeTime } from "./constants";
-import { deduplicateByAgent, renderMarkdown } from "./markdown";
+import { deduplicateByAgent } from "./markdown";
+import { SafeMarkdown } from "./safe-markdown";
 
 export function CrossAgentInsights({ entries }: { entries: SharedContextEntry[] }) {
   const uniqueEntries = deduplicateByAgent(entries);
@@ -79,10 +80,9 @@ function SharedContextCard({ entry }: { entry: SharedContextEntry }) {
           {relativeTime(entry.timestamp)}
         </span>
       </div>
-      <div
-        className="mt-2 space-y-2 text-xs leading-relaxed text-[#6b6560] dark:text-[#a39e98] [&_ul]:mt-1"
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(entry.content) }}
-      />
+      <div className="mt-2 space-y-2 text-xs leading-relaxed text-[#6b6560] dark:text-[#a39e98] [&_ul]:mt-1">
+        <SafeMarkdown content={entry.content} />
+      </div>
     </div>
   );
 }

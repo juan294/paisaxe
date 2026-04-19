@@ -148,6 +148,40 @@ describe("agents-dashboard/markdown", () => {
       const result = renderMarkdown("just a line");
       expect(result).toBe("<div>just a line</div>");
     });
+
+    // Adversarial / regression tests — LLM output must never produce executable HTML
+    it("does not emit <script> tag from bold-injection attempt", () => {
+      const result = renderMarkdown("**</strong><script>alert(1)</script>");
+      expect(result).not.toContain("<script>");
+      expect(result).not.toContain("</script>");
+    });
+
+    it("does not emit unescaped <img> tag from injection", () => {
+      const result = renderMarkdown("<img src=x onerror=alert(1)>");
+      // No unescaped <img — the angle bracket must be HTML-escaped
+      expect(result).not.toContain("<img");
+    });
+
+    it("does not emit unescaped <a> tag with javascript: protocol", () => {
+      // renderMarkdown does not produce <a> tags — link syntax passes through as text
+      const result = renderMarkdown("[link](javascript:alert(1))");
+      // Must not produce an actual anchor element
+      expect(result).not.toContain('<a ');
+      expect(result).not.toContain('<a>');
+    });
+
+    it("does not emit executable event handler attributes from crafted bold input", () => {
+      const result = renderMarkdown('**x" onmouseover="alert(1)**');
+      // Quotes must be HTML-escaped; no unescaped attribute syntax like: <tag onmouseover=
+      // A real attribute would be: " onmouseover=" with a literal quote before it.
+      // After escapeHtml the quotes become &quot; so the pattern " onmouseover= cannot form.
+      expect(result).not.toContain('" onmouseover=');
+    });
+
+    it("does not emit raw HTML tags even from nested injection attempts", () => {
+      const result = renderMarkdown("## <h1>injected</h1>");
+      expect(result).not.toContain("<h1>");
+    });
   });
 
   describe("deduplicateByAgent", () => {
