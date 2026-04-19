@@ -146,7 +146,8 @@ describe("/api/mcp/make-booking", () => {
 
       expect(response.status).toBe(400);
       expect(data.success).toBe(false);
-      expect(data.message).toContain("Missing required fields");
+      // Zod validation returns field errors for missing required fields
+      expect(data.errors).toBeDefined();
     });
 
     it("should return 400 for invalid Spanish phone number", async () => {
@@ -1092,7 +1093,7 @@ describe("/api/mcp/make-booking", () => {
       expect(mockInsert).not.toHaveBeenCalled();
     });
 
-    it("should use default values when booking disabled and venue_name/phone_number not provided", async () => {
+    it("should return 400 with Zod errors when venue_name and phone_number are missing (Zod validates before feature flag check)", async () => {
       mockIsFeatureFlagEnabled.mockImplementation((key: string) => {
         if (key === "booking_system") return Promise.resolve(false);
         return Promise.resolve(true);
@@ -1114,12 +1115,10 @@ describe("/api/mcp/make-booking", () => {
       const response = await POST(request);
       const data = await response.json();
 
-      expect(response.status).toBe(200);
+      // Zod validates before the feature flag check — missing required fields → 400
+      expect(response.status).toBe(400);
       expect(data.success).toBe(false);
-      expect(data.status).toBe("not_configured");
-      // Should use the defaults: "the business" and "their phone number"
-      expect(data.message).toContain("the business");
-      expect(data.message).toContain("their phone number");
+      expect(data.errors).toBeDefined();
     });
 
     it("should handle ElevenLabs error with neither detail.message nor message", async () => {
@@ -1349,6 +1348,148 @@ describe("/api/mcp/make-booking", () => {
       const [, options] = mockFetch.mock.calls[0];
       const body = JSON.parse(options.body);
       expect(body.conversation_initiation_client_data.dynamic_variables.special_requests).toBe("ninguna");
+    });
+
+    // -----------------------------------------------------------------------
+    // Zod validation tests (issue #270)
+    // -----------------------------------------------------------------------
+
+    it("should return 400 with field errors when party_size is a non-numeric string", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34985887797",
+          party_size: "abc",
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.errors).toBeDefined();
+    });
+
+    it("should return 400 with field errors when party_size is NaN (passed as string '0abc')", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34985887797",
+          party_size: "0abc",
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+    });
+
+    it("should return 400 when party_size exceeds maximum of 50", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34985887797",
+          party_size: 999,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.errors).toBeDefined();
+    });
+
+    it("should return 400 when party_size is zero or negative", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34985887797",
+          party_size: 0,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+    });
+
+    it("should return 400 when venue_name exceeds 200 characters", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "A".repeat(201),
+          phone_number: "+34985887797",
+          party_size: 2,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+    });
+
+    it("should return 400 when MCP-nested party_size is non-numeric string", async () => {
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          tool: "make_booking",
+          arguments: {
+            venue_name: "Casa Gerardo",
+            phone_number: "+34985887797",
+            party_size: "twelve",
+            date: "hoy",
+            time: "21:00",
+            customer_name: "Juan",
+            customer_phone: "612345678",
+          },
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.errors).toBeDefined();
     });
   });
 });

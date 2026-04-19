@@ -169,7 +169,8 @@ describe("POST /api/admin/stories", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Title is required");
+    // Zod returns field-level errors
+    expect(data.errors).toBeDefined();
   });
 
   it("should return 400 when category is missing", async () => {
@@ -183,7 +184,7 @@ describe("POST /api/admin/stories", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Category is required");
+    expect(data.errors).toBeDefined();
   });
 
   it("should return 400 when category is invalid", async () => {
@@ -197,7 +198,7 @@ describe("POST /api/admin/stories", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Invalid category");
+    expect(data.errors).toBeDefined();
   });
 
   it("should auto-generate slug from title", async () => {
@@ -462,8 +463,8 @@ describe("POST /api/admin/stories", () => {
       body: JSON.stringify({
         title: "Suggested Place",
         category: "nature",
-        suggestionId: "suggestion-123",
-        sourceType: "user_submitted",
+        suggestionId: "550e8400-e29b-41d4-a716-446655440000",
+        sourceType: "user-suggested",
       }),
     });
     const response = await POST(request);
@@ -583,8 +584,8 @@ describe("POST /api/admin/stories", () => {
       body: JSON.stringify({
         title: "Suggested Place",
         category: "nature",
-        suggestionId: "suggestion-123",
-        sourceType: "user_submitted",
+        suggestionId: "550e8400-e29b-41d4-a716-446655440000",
+        sourceType: "user-suggested",
       }),
     });
     const response = await POST(request);
@@ -677,5 +678,78 @@ describe("POST /api/admin/stories", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to create story");
+  });
+
+  // -----------------------------------------------------------------------
+  // Zod validation tests (issue #270)
+  // -----------------------------------------------------------------------
+
+  it("should return 400 with Zod errors when title exceeds 300 characters", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: JSON.stringify({ title: "A".repeat(301), category: "nature" }),
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.errors).toBeDefined();
+  });
+
+  it("should return 400 with Zod errors when description exceeds 5000 characters", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "Valid Title",
+        category: "nature",
+        description: "D".repeat(5001),
+      }),
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.errors).toBeDefined();
+  });
+
+  it("should return 400 with Zod errors when metadata contains deeply nested arbitrary values", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    // metadata must be Record<string, unknown> — non-object top-level value should fail
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "Valid Title",
+        category: "nature",
+        metadata: "not-an-object",
+      }),
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.errors).toBeDefined();
+  });
+
+  it("should return 400 with Zod errors when bestMonths contains out-of-range values", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "Valid Title",
+        category: "nature",
+        bestMonths: [0, 5, 13],
+      }),
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.errors).toBeDefined();
   });
 });
