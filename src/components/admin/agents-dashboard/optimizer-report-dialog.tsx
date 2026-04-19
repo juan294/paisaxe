@@ -1,8 +1,8 @@
 "use client";
 
 import { X } from "lucide-react";
-import { renderMarkdown } from "./markdown";
 import { relativeTime } from "./constants";
+import { SafeMarkdown } from "./safe-markdown";
 
 interface OptimizerReportDialogProps {
   open: boolean;
@@ -52,12 +52,9 @@ export function OptimizerReportDialog({
         {/* Body */}
         <div className="overflow-y-auto px-6 py-5">
           {reportMarkdown ? (
-            <div
-              className="prose-sm text-xs leading-relaxed text-[#6b6560] dark:text-[#a39e98]"
-              dangerouslySetInnerHTML={{
-                __html: renderMarkdown(reportMarkdown),
-              }}
-            />
+            <div className="prose-sm text-xs leading-relaxed text-[#6b6560] dark:text-[#a39e98]">
+              <SafeMarkdown content={reportMarkdown} />
+            </div>
           ) : (
             <p className="text-sm text-[#a39e98]">
               No report available yet. Run the optimizer to generate a report.
