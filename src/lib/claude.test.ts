@@ -1155,6 +1155,7 @@ describe("claude", () => {
 describe("claude SDK path (NODE_ENV=production)", () => {
   const mockCreate = vi.fn();
   const mockStream = vi.fn();
+  let capturedConstructorOptions: Record<string, unknown> | undefined;
 
   beforeEach(() => {
     vi.resetModules();
@@ -1162,11 +1163,15 @@ describe("claude SDK path (NODE_ENV=production)", () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "test-api-key");
     mockCreate.mockReset();
     mockStream.mockReset();
+    capturedConstructorOptions = undefined;
 
     // Mock the Anthropic SDK module
     vi.doMock("@anthropic-ai/sdk", () => {
       return {
         default: class MockAnthropic {
+          constructor(options?: Record<string, unknown>) {
+            capturedConstructorOptions = options;
+          }
           messages = {
             create: mockCreate,
             stream: mockStream,
@@ -1210,7 +1215,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       expect(mockCreate).toHaveBeenCalledWith({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
-        system: "system prompt",
+        system: [{ type: "text", text: "system prompt", cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: "Hello" }],
       });
       expect(result.content[0]).toEqual({ type: "text", text: "SDK response" });
@@ -1330,7 +1335,10 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       const callArgs = mockStream.mock.calls[0][0];
       expect(callArgs.model).toBe("claude-sonnet-4-20250514");
       expect(callArgs.max_tokens).toBe(1024);
-      expect(callArgs.system).toContain("asturianu");
+      // PE-M5: system is an array with cache_control
+      expect(Array.isArray(callArgs.system)).toBe(true);
+      expect(callArgs.system[0].text).toContain("asturianu");
+      expect(callArgs.system[0].cache_control).toEqual({ type: "ephemeral" });
       expect(callArgs.messages).toEqual([
         { role: "user", content: expect.stringContaining("Test query") },
       ]);
@@ -1367,6 +1375,124 @@ describe("claude SDK path (NODE_ENV=production)", () => {
         chunks.push(chunk);
       }
       expect(chunks).toEqual([]);
+    });
+  });
+
+  // ─── BE-M3: maxRetries in SDK constructor ───────────────────────────
+
+  describe("BE-M3: Anthropic SDK constructor maxRetries", () => {
+    it("should instantiate Anthropic SDK with maxRetries: 3 when calling create", async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: "text", text: "response" }],
+      });
+
+      const { callAnthropicAPI } = await import("./claude");
+      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-4-20250514", 512);
+
+      expect(capturedConstructorOptions).toMatchObject({ maxRetries: 3 });
+    });
+
+    it("should instantiate Anthropic SDK with maxRetries: 3 when streaming", async () => {
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          yield { type: "content_block_delta", delta: { type: "text_delta", text: "hi" } };
+        },
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _chunk of streamChat("Test", [])) { /* noop */ }
+
+      expect(capturedConstructorOptions).toMatchObject({ maxRetries: 3 });
+    });
+
+    it("should retry the SDK stream once on first-token failure and succeed", async () => {
+      let callCount = 0;
+      mockStream.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            async *[Symbol.asyncIterator]() {
+              throw new Error("Connection reset");
+            },
+          };
+        }
+        return {
+          async *[Symbol.asyncIterator]() {
+            yield { type: "content_block_delta", delta: { type: "text_delta", text: "retry success" } };
+          },
+        };
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(["retry success"]);
+      expect(mockStream).toHaveBeenCalledTimes(2);
+    });
+
+    it("should surface the error after two failed SDK stream attempts", async () => {
+      mockStream.mockImplementation(() => ({
+        async *[Symbol.asyncIterator]() {
+          throw new Error("Persistent stream error");
+        },
+      }));
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      await expect(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _chunk of streamChat("Test", [])) { /* noop */ }
+      }).rejects.toThrow("Persistent stream error");
+
+      // Should have been called exactly twice (initial + one retry)
+      expect(mockStream).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ─── PE-M5: system prompt cache_control ────────────────────────────
+
+  describe("PE-M5: system prompt cache_control", () => {
+    it("should pass system as cache_control array to messages.create", async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: "text", text: "response" }],
+      });
+
+      const { callAnthropicAPI } = await import("./claude");
+      await callAnthropicAPI(
+        "my system prompt",
+        [{ role: "user", content: "question" }],
+        "claude-sonnet-4-20250514",
+        512
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.system).toEqual([
+        { type: "text", text: "my system prompt", cache_control: { type: "ephemeral" } },
+      ]);
+    });
+
+    it("should pass system as cache_control array to messages.stream", async () => {
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() { /* empty */ },
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _chunk of streamChat("Test", [])) { /* noop */ }
+
+      const callArgs = mockStream.mock.calls[0][0];
+      expect(Array.isArray(callArgs.system)).toBe(true);
+      expect(callArgs.system[0]).toMatchObject({
+        type: "text",
+        cache_control: { type: "ephemeral" },
+      });
+      expect(typeof callArgs.system[0].text).toBe("string");
+      expect(callArgs.system[0].text.length).toBeGreaterThan(0);
     });
   });
 });

@@ -29,6 +29,7 @@ async function* streamAnthropicAPI(
 
 /**
  * Stream using the Anthropic SDK (production).
+ * Adds a single retry on first-token failure; second failure surfaces the error.
  */
 async function* streamWithSDK(
   system: string,
@@ -37,18 +38,35 @@ async function* streamWithSDK(
   maxTokens: number
 ): AsyncGenerator<string, void, unknown> {
   const { default: AnthropicSDK } = await import("@anthropic-ai/sdk");
-  const client = new AnthropicSDK();
+  const client = new AnthropicSDK({ maxRetries: 3 });
 
-  const stream = await client.messages.stream({
+  const systemBlock = [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }];
+
+  const params = {
     model,
     max_tokens: maxTokens,
-    system,
+    system: systemBlock,
     messages,
-  });
+  };
 
-  for await (const event of stream) {
-    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-      yield event.delta.text;
+  let attempt = 0;
+  while (attempt < 2) {
+    attempt++;
+    try {
+      const stream = await client.messages.stream(params);
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          yield event.delta.text;
+        }
+      }
+      return; // success
+    } catch (err) {
+      if (attempt < 2) {
+        // Single retry
+        console.warn("[Claude Streaming] SDK stream failed on first attempt, retrying...", err);
+        continue;
+      }
+      throw err;
     }
   }
 }
@@ -201,12 +219,14 @@ async function callWithSDK(
   maxTokens: number
 ): Promise<Anthropic.Message> {
   const { default: AnthropicSDK } = await import("@anthropic-ai/sdk");
-  const client = new AnthropicSDK();
+  const client = new AnthropicSDK({ maxRetries: 3 });
+
+  const systemBlock = [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }];
 
   return client.messages.create({
     model,
     max_tokens: maxTokens,
-    system,
+    system: systemBlock,
     messages,
   });
 }
