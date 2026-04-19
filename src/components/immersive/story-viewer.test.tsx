@@ -267,6 +267,20 @@ describe("StoryViewer", () => {
       expect(img).toHaveAttribute("data-placeholder", "blur");
     });
 
+    it("PE-M2: should set priority=true only on the first story (index 0)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 0 })} />);
+
+      const img = screen.getByAltText("Lagos de Covadonga");
+      expect(img).toHaveAttribute("data-priority", "true");
+    });
+
+    it("PE-M2: should set priority=false for stories after index 0", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+
+      const img = screen.getByAltText("Oviedo Cathedral");
+      expect(img).toHaveAttribute("data-priority", "false");
+    });
+
     it("should use darkPlaceholder fallback when story has no blurDataUrl", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
@@ -1552,6 +1566,47 @@ describe("StoryViewer", () => {
         screen.getByText("Photo by Juan on Unsplash")
       ).toBeInTheDocument();
     });
+  });
+
+  describe("FE-M1: timer cancellation on rapid navigation", () => {
+    it("should cancel pending transition timer when navigating rapidly (no stacking)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const nextButton = screen.getAllByRole("button").find(
+        (btn) => btn.classList.contains("right-0")
+      );
+      expect(nextButton).toBeDefined();
+
+      // Rapid double-click: second click cancels the first timer
+      fireEvent.click(nextButton!);
+      fireEvent.click(nextButton!);
+
+      // Only advance once — should call onIndexChange exactly once (second call wins)
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      // onIndexChange called once, not twice (timers don't stack)
+      expect(onIndexChange).toHaveBeenCalledTimes(1);
+    }, 30000);
+
+    it("should clear transition timer on unmount", async () => {
+      const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+      const { unmount } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const nextButton = screen.getAllByRole("button").find(
+        (btn) => btn.classList.contains("right-0")
+      );
+      fireEvent.click(nextButton!);
+
+      // Unmount before timer fires
+      unmount();
+
+      // clearTimeout should have been called to clean up the transition timer
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    }, 30000);
   });
 
   describe("reduced motion navigation (lines 113-115, 127-128)", () => {
