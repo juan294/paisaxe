@@ -2,6 +2,102 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { verifyVercelCron, verifyWebhookSecret } from "./cron-auth";
 
+describe("checkCronSecretsConfigured (DO-H3)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("logs console.error with [CRON_AUTH_MISSING] in production when both secrets are missing", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("CRON_SECRET", "");
+    vi.stubEnv("WEBHOOK_SECRET", "");
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await import("./cron-auth");
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[CRON_AUTH_MISSING]")
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it("does not log when CRON_SECRET is set", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("CRON_SECRET", "some-secret");
+    vi.stubEnv("WEBHOOK_SECRET", "");
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await import("./cron-auth");
+
+    expect(consoleSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("[CRON_AUTH_MISSING]")
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it("does not log when WEBHOOK_SECRET is set", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("CRON_SECRET", "");
+    vi.stubEnv("WEBHOOK_SECRET", "some-webhook-secret");
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await import("./cron-auth");
+
+    expect(consoleSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("[CRON_AUTH_MISSING]")
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it("does not log in non-production environments even when both secrets are missing", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("CRON_SECRET", "");
+    vi.stubEnv("WEBHOOK_SECRET", "");
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await import("./cron-auth");
+
+    expect(consoleSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("[CRON_AUTH_MISSING]")
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it("only logs once even if module functions are called multiple times", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("CRON_SECRET", "");
+    vi.stubEnv("WEBHOOK_SECRET", "");
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const mod = await import("./cron-auth");
+
+    // Call functions multiple times — warning should only have fired once (at module load)
+    mod.verifyVercelCron({ headers: { get: () => null } } as never);
+    mod.verifyVercelCron({ headers: { get: () => null } } as never);
+    mod.verifyWebhookSecret({ headers: { get: () => null } } as never);
+
+    const missingCalls = consoleSpy.mock.calls.filter((args) =>
+      String(args[0]).includes("[CRON_AUTH_MISSING]")
+    );
+    expect(missingCalls).toHaveLength(1);
+
+    consoleSpy.mockRestore();
+  });
+});
+
 function makeRequest(
   url: string,
   headers: Record<string, string> = {},

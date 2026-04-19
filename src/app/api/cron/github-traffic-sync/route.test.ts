@@ -25,6 +25,7 @@ vi.mock("@/lib/admin-auth", () => ({
 const mockUpsert = vi.fn().mockResolvedValue({ error: null });
 const mockInsert = vi.fn().mockResolvedValue({ error: null });
 const mockLte = vi.fn().mockResolvedValue({ error: null });
+const mockRpc = vi.fn();
 const mockFrom = vi.fn((table: string) => {
   if (table === "github_traffic_daily") {
     return { upsert: mockUpsert };
@@ -39,7 +40,7 @@ const mockFrom = vi.fn((table: string) => {
 });
 
 vi.mock("@supabase/supabase-js", () => ({
-  createClient: () => ({ from: mockFrom }),
+  createClient: () => ({ from: mockFrom, rpc: mockRpc }),
 }));
 
 // Mock fetch for GitHub API
@@ -66,6 +67,13 @@ describe("POST /api/cron/github-traffic-sync", () => {
     mockUpsert.mockClear();
     mockInsert.mockClear();
     mockFrom.mockClear();
+    mockRpc.mockReset();
+    // Default: advisory lock succeeds (lock acquired, unlock succeeds)
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
   });
 
   afterEach(() => {
@@ -557,6 +565,12 @@ describe("GET /api/cron/github-traffic-sync (Vercel Cron)", () => {
     mockUpsert.mockClear();
     mockInsert.mockClear();
     mockFrom.mockClear();
+    mockRpc.mockReset();
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
   });
 
   afterEach(() => {
@@ -604,5 +618,124 @@ describe("GET /api/cron/github-traffic-sync (Vercel Cron)", () => {
       synced: true,
     }));
     expect(mockFetch).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe("Advisory lock (DO-M2) — github-traffic-sync", () => {
+  const originalEnv = process.env;
+  const WEBHOOK_SECRET = "test-webhook-secret-123";
+  const GITHUB_TOKEN = "ghp_test_token_123";
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = {
+      ...originalEnv,
+      WEBHOOK_SECRET,
+      CRON_SECRET: "test-cron-secret-456",
+      GITHUB_TOKEN,
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_SERVICE_KEY: "test-service-key",
+    };
+    global.fetch = mockFetch;
+    mockFetch.mockReset();
+    mockRpc.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("returns 409 when advisory lock is already held (concurrent run)", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: false, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual(
+      expect.objectContaining({ status: "skipped", reason: expect.stringContaining("concurrent") })
+    );
+  });
+
+  it("returns 409 when pg_try_advisory_lock returns an error", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock")
+        return Promise.resolve({ data: null, error: { message: "DB error" } });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(409);
+  });
+
+  it("executes sync and calls pg_advisory_unlock when lock is acquired", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ count: 0, uniques: 0, views: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ count: 0, uniques: 0, clones: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+
+    const unlockCalls = mockRpc.mock.calls.filter(
+      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+    );
+    expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("calls pg_advisory_unlock in finally block even when sync throws", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    // Even though sync failed, it should return 500 from the catch block inside the try
+    expect(response.status).toBe(500);
+
+    // pg_advisory_unlock must have been called in the finally block
+    const unlockCalls = mockRpc.mock.calls.filter(
+      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+    );
+    expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
+
+    consoleSpy.mockRestore();
   });
 });
