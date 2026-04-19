@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { resolveLocale } from "@/lib/i18n/detect-language";
 import { resolveTranslation } from "@/lib/i18n/resolve";
 import { es } from "@/lib/i18n/es";
@@ -23,6 +24,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   const locale = useMemo(() => resolveLocale(), []);
