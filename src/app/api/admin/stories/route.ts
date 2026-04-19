@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { withAdmin } from "@/lib/admin-auth";
 import {
   rowToAdminStory,
   type AdminStoryRow,
@@ -33,60 +32,49 @@ function generateSlug(title: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  // Validate admin auth
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
+  return withAdmin(async (supabase) => {
+    try {
+      // Get optional filter from query params
+      const { searchParams } = new URL(request.url);
+      const filter = searchParams.get("filter") as CurationStatus | null;
 
-  try {
-    const supabase = createAdminClient();
+      // Build query
+      let query = supabase
+        .from("stories")
+        .select("*")
+        .order("display_order", { ascending: true });
 
-    // Get optional filter from query params
-    const { searchParams } = new URL(request.url);
-    const filter = searchParams.get("filter") as CurationStatus | null;
+      // Apply filter if provided
+      if (filter === "needs_curation" || filter === "approved") {
+        query = query.eq("curation_status", filter);
+      }
 
-    // Build query
-    let query = supabase
-      .from("stories")
-      .select("*")
-      .order("display_order", { ascending: true });
+      const { data, error } = await query;
 
-    // Apply filter if provided
-    if (filter === "needs_curation" || filter === "approved") {
-      query = query.eq("curation_status", filter);
-    }
+      if (error) {
+        console.error("Error fetching stories:", error);
+        return NextResponse.json(
+          { error: "Failed to fetch stories" },
+          { status: 500 }
+        );
+      }
 
-    const { data, error } = await query;
+      // Convert to admin stories
+      const stories = (data as AdminStoryRow[]).map(rowToAdminStory);
 
-    if (error) {
-      console.error("Error fetching stories:", error);
+      return NextResponse.json({ data: stories });
+    } catch (error) {
+      console.error("Admin stories API error:", error);
       return NextResponse.json(
-        { error: "Failed to fetch stories" },
+        { error: "Internal server error" },
         { status: 500 }
       );
     }
-
-    // Convert to admin stories
-    const stories = (data as AdminStoryRow[]).map(rowToAdminStory);
-
-    return NextResponse.json({ data: stories });
-  } catch (error) {
-    console.error("Admin stories API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 export async function POST(request: NextRequest) {
-  // Validate admin auth
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
-
+  return withAdmin(async (supabase) => {
   try {
     const rawBody: unknown = await request.json();
     const parsed = createStorySchema.safeParse(rawBody);
@@ -99,7 +87,6 @@ export async function POST(request: NextRequest) {
     }
 
     const body = parsed.data;
-    const supabase = createAdminClient();
 
     // Generate slug from title if not provided
     const slug = body.slug?.trim() || generateSlug(body.title);
@@ -209,4 +196,5 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  });
 }
