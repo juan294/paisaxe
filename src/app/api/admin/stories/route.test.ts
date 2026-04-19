@@ -2,17 +2,29 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, POST } from "./route";
 
-// Mock dependencies
-vi.mock("@/lib/supabase", () => ({
-  createAdminClient: vi.fn(),
-}));
-
+// Mock withAdmin so tests control auth + client injection independently.
+// When withAdmin resolves as unauthorized, return a 401 response directly.
+// When withAdmin resolves as authorized, call the handler with a mock supabase client.
 vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
+  withAdmin: vi.fn(),
 }));
 
-import { createAdminClient } from "@/lib/supabase";
-import { validateAdminAuth } from "@/lib/admin-auth";
+import { withAdmin } from "@/lib/admin-auth";
+
+// Helper: make withAdmin call through to the real handler with a mock supabase client.
+function mockWithAdminAuthorized(mockSupabase: unknown) {
+  vi.mocked(withAdmin).mockImplementation(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async (handler: (client: any) => Promise<unknown>) => handler(mockSupabase)
+  );
+}
+
+// Helper: make withAdmin return a 401 without calling the handler.
+function mockWithAdminUnauthorized(status = 401) {
+  vi.mocked(withAdmin).mockResolvedValue(
+    new Response(JSON.stringify({ error: "Unauthorized" }), { status }) as never
+  );
+}
 
 describe("GET /api/admin/stories", () => {
   const mockStories = [
@@ -41,10 +53,7 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should return 401 when auth fails", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({
-      valid: false,
-      error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
-    });
+    mockWithAdminUnauthorized();
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories");
     const response = await GET(request);
@@ -53,14 +62,12 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should return stories when auth is valid", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockFrom = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         order: vi.fn().mockResolvedValue({ data: mockStories, error: null }),
       }),
     });
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories");
     const response = await GET(request);
@@ -73,16 +80,13 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should filter by needs_curation status", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const filteredStories = mockStories.filter(s => s.curation_status === "needs_curation");
 
     const mockEq = vi.fn().mockResolvedValue({ data: filteredStories, error: null });
     const mockOrder = vi.fn().mockReturnValue({ eq: mockEq });
     const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories?filter=needs_curation");
     await GET(request);
@@ -91,14 +95,11 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should filter by approved status", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockEq = vi.fn().mockResolvedValue({ data: [], error: null });
     const mockOrder = vi.fn().mockReturnValue({ eq: mockEq });
     const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories?filter=approved");
     await GET(request);
@@ -107,13 +108,10 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should return 500 when database query fails", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } });
     const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories");
     const response = await GET(request);
@@ -124,9 +122,9 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should return 500 on unexpected error", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-    vi.mocked(createAdminClient).mockImplementation(() => {
-      throw new Error("Unexpected error");
+    // withAdmin calls through but the handler throws due to bad mock
+    mockWithAdminAuthorized({
+      from: vi.fn().mockImplementation(() => { throw new Error("Unexpected error"); }),
     });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories");
@@ -144,10 +142,7 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should return 401 when auth fails", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({
-      valid: false,
-      error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
-    });
+    mockWithAdminUnauthorized();
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -159,7 +154,7 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should return 400 when title is missing", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    mockWithAdminAuthorized({ from: vi.fn() });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -173,7 +168,7 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should return 400 when category is missing", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    mockWithAdminAuthorized({ from: vi.fn() });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -187,7 +182,7 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should return 400 when category is invalid", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    mockWithAdminAuthorized({ from: vi.fn() });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -201,8 +196,6 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should auto-generate slug from title", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockInsert = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
@@ -235,8 +228,7 @@ describe("POST /api/admin/stories", () => {
       }
       return { select: mockSelect };
     });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -251,8 +243,6 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should handle Spanish diacritics in slug generation", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockInsert = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
@@ -285,8 +275,7 @@ describe("POST /api/admin/stories", () => {
       }
       return { select: mockSelect };
     });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -301,8 +290,6 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should return 409 when slug already exists", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
@@ -312,8 +299,7 @@ describe("POST /api/admin/stories", () => {
       }),
     });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -327,8 +313,6 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should use provided displayOrder when specified", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockInsert = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
@@ -351,8 +335,7 @@ describe("POST /api/admin/stories", () => {
       }),
     });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect, insert: mockInsert });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -366,8 +349,6 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should auto-calculate next display_order", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockInsert = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
@@ -403,8 +384,7 @@ describe("POST /api/admin/stories", () => {
       }
       return { select: mockSelect };
     });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -417,8 +397,6 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should update suggestion status when converting", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockUpdate = vi.fn().mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
     });
@@ -454,8 +432,7 @@ describe("POST /api/admin/stories", () => {
       }
       return { select: mockSelect, insert: mockInsert };
     });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -477,8 +454,6 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should create story with all optional fields", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockInsert = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
@@ -506,8 +481,7 @@ describe("POST /api/admin/stories", () => {
       }),
     });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect, insert: mockInsert });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -536,8 +510,6 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should log error but succeed when suggestion status update fails", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockUpdate = vi.fn().mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: { message: "Suggestion update failed" } }),
     });
@@ -573,8 +545,7 @@ describe("POST /api/admin/stories", () => {
       }
       return { select: mockSelect, insert: mockInsert };
     });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -600,7 +571,7 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should return 500 on unexpected POST error (catch block)", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    mockWithAdminAuthorized({ from: vi.fn() });
 
     // Make request.json() throw to trigger the outer catch block
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
@@ -618,8 +589,6 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should return 500 when slug check has non-PGRST116 error", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
@@ -629,8 +598,7 @@ describe("POST /api/admin/stories", () => {
       }),
     });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -644,8 +612,6 @@ describe("POST /api/admin/stories", () => {
   });
 
   it("should return 500 when insert fails", async () => {
-    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
     const mockInsert = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({
@@ -665,8 +631,7 @@ describe("POST /api/admin/stories", () => {
       }),
     });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect, insert: mockInsert });
-
-    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+    mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
