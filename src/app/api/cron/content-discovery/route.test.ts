@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 
-// vi.hoisted runs before vi.mock hoisting, so mockAuthError is available in the factory
-const { mockAuthError } = vi.hoisted(() => {
+// vi.hoisted runs before vi.mock hoisting, so mockAuthError and mockRpc are available in factories
+const { mockAuthError, mockRpc } = vi.hoisted(() => {
   // Cannot use NextResponse here (not imported yet), so use a plain sentinel object
   const mockAuthError = new Response(JSON.stringify({ error: "Unauthorized" }), {
     status: 401,
     headers: { "content-type": "application/json" },
   }) as unknown as import("next/server").NextResponse;
-  return { mockAuthError };
+  const mockRpc = vi.fn();
+  return { mockAuthError, mockRpc };
 });
 
 // Mock dependencies before importing route
@@ -23,7 +24,7 @@ vi.mock("@/lib/content-discovery", () => ({
 }));
 
 vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(() => ({ from: vi.fn() })),
+  createClient: vi.fn(() => ({ from: vi.fn(), rpc: mockRpc })),
 }));
 
 import { GET, POST } from "./route";
@@ -51,6 +52,12 @@ describe("POST /api/cron/content-discovery", () => {
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
       SUPABASE_SERVICE_KEY: "test-service-key",
     };
+    // Default: advisory lock succeeds
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
   });
 
   afterAll(() => {
@@ -186,6 +193,12 @@ describe("GET /api/cron/content-discovery (Vercel Cron)", () => {
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
       SUPABASE_SERVICE_KEY: "test-service-key",
     };
+    // Default: advisory lock succeeds
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
   });
 
   afterAll(() => {
@@ -218,5 +231,98 @@ describe("GET /api/cron/content-discovery (Vercel Cron)", () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.created).toBe(1);
+  });
+});
+
+describe("Advisory lock (DO-M2) — content-discovery", () => {
+  const ORIGINAL_ENV = { ...process.env };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env = {
+      ...ORIGINAL_ENV,
+      WEBHOOK_SECRET: "test-secret",
+      CRON_SECRET: "test-cron-secret",
+      GOOGLE_PLACES_API_KEY: "test-google-key",
+      ANTHROPIC_API_KEY: "test-anthropic-key",
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_SERVICE_KEY: "test-service-key",
+    };
+  });
+
+  afterAll(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it("returns 409 when advisory lock is already held (concurrent run)", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: false, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.status).toBe("skipped");
+    expect(body.reason).toMatch(/concurrent/);
+  });
+
+  it("returns 409 when pg_try_advisory_lock returns an error", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock")
+        return Promise.resolve({ data: null, error: { message: "DB error" } });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(409);
+  });
+
+  it("executes discovery and calls pg_advisory_unlock when lock is acquired", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    (runDiscovery as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      discovered: 1,
+      created: 1,
+      skippedDuplicates: 0,
+      errors: [],
+      stories: [],
+    });
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(200);
+
+    const unlockCalls = mockRpc.mock.calls.filter(
+      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+    );
+    expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("calls pg_advisory_unlock in finally block even when discovery throws", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    (runDiscovery as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("Discovery service unavailable")
+    );
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(500);
+
+    const unlockCalls = mockRpc.mock.calls.filter(
+      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+    );
+    expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
+
+    consoleSpy.mockRestore();
   });
 });

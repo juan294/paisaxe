@@ -15,6 +15,9 @@ import { createAdminClient } from "@/lib/supabase";
 import { runDiscovery, type DiscoverySupabaseClient } from "@/lib/content-discovery";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 
+/** Postgres advisory lock ID — unique per cron route. */
+const LOCK_ID = 1003;
+
 /** Core discovery logic shared by GET (Vercel Cron) and POST (pg_cron/admin). */
 async function discoverContent(): Promise<NextResponse> {
   const googleApiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
@@ -33,7 +36,21 @@ async function discoverContent(): Promise<NextResponse> {
     );
   }
 
-  const supabase = createAdminClient() as unknown as DiscoverySupabaseClient;
+  const supabaseAdmin = createAdminClient();
+
+  // Acquire advisory lock to prevent concurrent runs
+  const { data: locked, error: lockError } = await supabaseAdmin.rpc(
+    "pg_try_advisory_lock",
+    { lockid: LOCK_ID }
+  );
+  if (lockError || !locked) {
+    return NextResponse.json(
+      { status: "skipped", reason: "concurrent run in progress" },
+      { status: 409 }
+    );
+  }
+
+  const supabase = supabaseAdmin as unknown as DiscoverySupabaseClient;
 
   try {
     const result = await runDiscovery({
@@ -56,6 +73,8 @@ async function discoverContent(): Promise<NextResponse> {
       },
       { status: 500 }
     );
+  } finally {
+    await supabaseAdmin.rpc("pg_advisory_unlock", { lockid: LOCK_ID });
   }
 }
 
