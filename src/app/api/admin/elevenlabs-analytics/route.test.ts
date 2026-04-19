@@ -1036,4 +1036,60 @@ describe("ElevenLabs Analytics API Route", () => {
       expect(failedStatus.count).toBe(1);
     }
   });
+
+  /**
+   * PE-L1: live-count calls for multiple Paisaxe agents must be batched in
+   * parallel (Promise.all), not dispatched sequentially in a for...of loop.
+   *
+   * We verify this by giving each agent's live-count fetch a 50 ms delay and
+   * asserting the total elapsed time is much less than N * 50 ms.
+   */
+  it("PE-L1: fetches live-count for all Paisaxe agents concurrently (#307)", async () => {
+    const AGENT_COUNT = 3;
+    const DELAY_MS = 50;
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              agents: Array.from({ length: AGENT_COUNT }, (_, i) => ({
+                agent_id: `agent_paisaxe_${i}`,
+                name: `Paisaxe - Agent${i}`,
+              })),
+            }),
+        });
+      }
+      if (url.includes("/convai/analytics/live-count")) {
+        // Artificially delay each call to expose sequential vs. parallel behaviour.
+        return new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                ok: true,
+                json: () => Promise.resolve({ count: 1 }),
+              }),
+            DELAY_MS
+          )
+        );
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ conversations: [] }),
+      });
+    });
+
+    const start = Date.now();
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+    const elapsed = Date.now() - start;
+
+    expect(response.status).toBe(200);
+    // Sequential would take >= AGENT_COUNT * DELAY_MS; parallel stays well below that.
+    expect(elapsed).toBeLessThan(AGENT_COUNT * DELAY_MS);
+    // Active calls should be AGENT_COUNT * 1 = 3
+    const data = await response.json();
+    expect(data.data.activeCalls).toBe(AGENT_COUNT);
+  });
 });
