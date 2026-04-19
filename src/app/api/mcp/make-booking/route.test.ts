@@ -13,10 +13,13 @@ vi.mock("@/lib/feature-flags-server", () => ({
 
 // Mock Supabase
 const mockInsert = vi.fn();
+const mockSelect = vi.fn();
+const mockUpdate = vi.fn();
 vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(() => ({
     from: vi.fn(() => ({
       insert: mockInsert,
+      update: mockUpdate,
     })),
   })),
 }));
@@ -35,8 +38,13 @@ describe("/api/mcp/make-booking", () => {
       if (key === "sms_booking_confirmation") return Promise.resolve(true);
       return Promise.resolve(false);
     });
-    // Default: DB insert succeeds
-    mockInsert.mockResolvedValue({ error: null });
+    // Default: DB insert().select("id") chain — select returns { data: [], error: null }
+    mockSelect.mockResolvedValue({ data: [], error: null });
+    mockInsert.mockReturnValue({ select: mockSelect });
+    // Default: DB update succeeds
+    mockUpdate.mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    });
     process.env = { ...originalEnv };
     process.env.MCP_API_SECRET = MCP_SECRET;
     delete process.env.ELEVENLABS_API_KEY;
@@ -467,19 +475,27 @@ describe("/api/mcp/make-booking", () => {
 
       await POST(request);
 
-      // Verify pending booking was stored
-      expect(mockInsert).toHaveBeenCalledWith({
-        conversation_id: "conv_123456789",
-        venue_name: "Casa Gerardo",
-        venue_phone: "+34985887797",
-        customer_name: "Juan García López",
-        customer_phone: "+34612345678",
-        party_size: 4,
-        booking_date: "hoy",
-        booking_time: "21:00",
-        special_requests: "Trona para bebé",
-        status: "pending",
-      });
+      // Verify pending booking was initially inserted with status='initiating' (BE-B6 fix)
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          venue_name: "Casa Gerardo",
+          venue_phone: "+34985887797",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+          party_size: 4,
+          booking_date: "hoy",
+          booking_time: "21:00",
+          special_requests: "Trona para bebé",
+          status: "initiating",
+        })
+      );
+      // After call completes, the row should be updated with conversation_id and status=pending
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversation_id: "conv_123456789",
+          status: "pending",
+        })
+      );
     });
 
     it("should include SMS note in message when sms_booking_confirmation is enabled", async () => {
@@ -559,8 +575,10 @@ describe("/api/mcp/make-booking", () => {
         json: () => Promise.resolve({ conversation_id: "conv_123456789" }),
       });
 
-      // Simulate DB error
-      mockInsert.mockResolvedValueOnce({ error: { message: "Database error" } });
+      // Simulate DB error on the insert().select("id") chain
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({ data: null, error: { message: "Database error" } }),
+      });
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
@@ -796,8 +814,10 @@ describe("/api/mcp/make-booking", () => {
         json: () => Promise.resolve({ conversation_id: "conv_throw" }),
       });
 
-      // Mock insert to throw an exception (not return an error object)
-      mockInsert.mockRejectedValueOnce(new Error("Connection timeout"));
+      // Mock insert().select() to throw an exception (not return an error object)
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockRejectedValueOnce(new Error("Connection timeout")),
+      });
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
@@ -1047,8 +1067,8 @@ describe("/api/mcp/make-booking", () => {
       expect(data.success).toBe(true);
       expect(data.call_sid).toBe("CA_abc123");
 
-      // Verify the pending booking was stored with callSid as conversation_id
-      expect(mockInsert).toHaveBeenCalledWith(
+      // Verify the row was updated with callSid as conversation_id (BE-B6 flow)
+      expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           conversation_id: "CA_abc123",
         })
@@ -1088,8 +1108,12 @@ describe("/api/mcp/make-booking", () => {
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
-      // insert should NOT have been called since conversationId is falsy
-      expect(mockInsert).not.toHaveBeenCalled();
+      // BE-B6: insert is always called before the call (with status=initiating)
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "initiating" })
+      );
+      // update should NOT be called since there was no conversationId or callSid to set
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
 
     it("should use default values when booking disabled and venue_name/phone_number not provided", async () => {
@@ -1350,5 +1374,177 @@ describe("/api/mcp/make-booking", () => {
       const body = JSON.parse(options.body);
       expect(body.conversation_initiation_client_data.dynamic_variables.special_requests).toBe("ninguna");
     });
+
+    // === BE-B6: Race condition fix — insert BEFORE placing the call ===
+
+    it("BE-B6: should insert pending_bookings with status=initiating BEFORE placing the ElevenLabs call", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      const callOrder: string[] = [];
+
+      mockInsert.mockImplementation(() => ({
+        select: vi.fn().mockImplementation(async () => {
+          callOrder.push("insert");
+          return { data: [], error: null };
+        }),
+      }));
+
+      mockFetch.mockImplementation(async () => {
+        callOrder.push("elevenlabs_call");
+        return {
+          ok: true,
+          json: () => Promise.resolve({ conversation_id: "conv_race_test" }),
+        };
+      });
+
+      mockUpdate.mockReturnValue({
+        eq: vi.fn().mockImplementation(async () => {
+          callOrder.push("update");
+          return { error: null };
+        }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      await POST(request);
+
+      // Insert must happen BEFORE the ElevenLabs call
+      expect(callOrder.indexOf("insert")).toBeLessThan(callOrder.indexOf("elevenlabs_call"));
+      // Update must happen AFTER the ElevenLabs call
+      expect(callOrder.indexOf("update")).toBeGreaterThan(callOrder.indexOf("elevenlabs_call"));
+    });
+
+    it("BE-B6: should insert with status=initiating and no conversation_id before the call", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_before_test" }),
+      });
+
+      const insertCalls: unknown[] = [];
+      mockInsert.mockImplementation((data: unknown) => {
+        insertCalls.push(data);
+        return { select: vi.fn().mockResolvedValue({ data: [], error: null }) };
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      await POST(request);
+
+      // The first insert call should have status='initiating'
+      expect(insertCalls.length).toBeGreaterThan(0);
+      const firstInsert = insertCalls[0] as Record<string, unknown>;
+      expect(firstInsert.status).toBe("initiating");
+    });
+
+    it("BE-B6: should update the pending_bookings row with conversation_id and status=pending after the call", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_update_test" }),
+      });
+
+      const mockEq = vi.fn().mockResolvedValue({ error: null });
+      mockUpdate.mockReturnValue({ eq: mockEq });
+
+      // Make insert().select("id") return a row with an id so the update can reference it
+      mockInsert.mockReturnValue({
+        select: vi.fn().mockResolvedValue({ data: [{ id: "pending-row-id" }], error: null }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      await POST(request);
+
+      // After the call, update should set conversation_id and status=pending
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversation_id: "conv_update_test",
+          status: "pending",
+        })
+      );
+    });
+
+    it("BE-B6: should still succeed if the pre-call insert fails", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockInsert.mockReturnValue({
+        select: vi.fn().mockResolvedValue({ data: null, error: { message: "DB insert failed" } }),
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_insert_fail" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Call should still succeed
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe("initiated");
+    });
   });
 });
+
