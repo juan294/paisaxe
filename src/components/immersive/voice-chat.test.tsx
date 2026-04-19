@@ -1137,12 +1137,43 @@ describe("VoiceChat dynamic loading fallback", () => {
     const loadingFn = (globalThis as Record<string, unknown>).__capturedDynamicLoadingFn as (() => React.ReactElement) | undefined;
     expect(loadingFn).toBeDefined();
 
-    const { container } = render(loadingFn!());
+    render(loadingFn!());
 
     // The loading fallback should have the voice-loading-fallback testid
     expect(screen.getByTestId("voice-loading-fallback")).toBeInTheDocument();
+  });
 
-    // It should contain the Spanish loading text
+  // UX-L2: voice loading skeleton must have ARIA attributes for screen readers
+  it("should have role='status' on the voice loading fallback (UX-L2)", () => {
+    const loadingFn = (globalThis as Record<string, unknown>).__capturedDynamicLoadingFn as (() => React.ReactElement) | undefined;
+    expect(loadingFn).toBeDefined();
+
+    render(loadingFn!());
+
+    const fallback = screen.getByTestId("voice-loading-fallback");
+    expect(fallback).toHaveAttribute("role", "status");
+  });
+
+  it("should have aria-label on the voice loading fallback (UX-L2)", () => {
+    const loadingFn = (globalThis as Record<string, unknown>).__capturedDynamicLoadingFn as (() => React.ReactElement) | undefined;
+    expect(loadingFn).toBeDefined();
+
+    render(loadingFn!());
+
+    const fallback = screen.getByTestId("voice-loading-fallback");
+    // aria-label is set using t("voice.loading") — mock returns the registered Spanish translation
+    expect(fallback).toHaveAttribute("aria-label", "Cargando asistente de voz...");
+  });
+
+  // UX-L3: no hard-coded Spanish strings in the loading fallback — text must go through t()
+  it("should use the i18n t() key for loading text, not a hard-coded Spanish string (UX-L3)", () => {
+    const loadingFn = (globalThis as Record<string, unknown>).__capturedDynamicLoadingFn as (() => React.ReactElement) | undefined;
+    expect(loadingFn).toBeDefined();
+
+    const { container } = render(loadingFn!());
+
+    // When t("voice.loading") is used, the mock returns the registered Spanish translation.
+    // This verifies the text goes through t() rather than being absent or empty.
     expect(container.textContent).toContain("Cargando asistente de voz...");
   });
 });

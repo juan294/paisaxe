@@ -22,16 +22,23 @@ import dynamic from "next/dynamic";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
 import { usePostHog } from "posthog-js/react";
 
+/**
+ * Loading skeleton shown while the VoiceChatElevenLabs chunk is being fetched.
+ * Defined as a proper React component so it can use the useTranslation hook
+ * for i18n — the loading text is localised via voice.loading.
+ */
 function VoiceLoadingFallback() {
   const { t } = useTranslation();
   return (
     <div
       data-testid="voice-loading-fallback"
+      role="status"
+      aria-label={t("voice.loading")}
       className="h-64 md:h-96 lg:h-[28rem] flex items-center justify-center"
     >
       <div className="flex flex-col items-center gap-3">
         <div className="h-20 w-20 rounded-full bg-white/10 animate-pulse" />
-        <div className="animate-pulse text-white/50 text-sm" role="status" aria-live="polite">
+        <div className="animate-pulse text-white/50 text-sm">
           {t("voice.loading")}
         </div>
       </div>
