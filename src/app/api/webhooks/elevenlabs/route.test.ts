@@ -753,6 +753,80 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.outcome).toBe("failed");
   });
 
+  // === BE-B4: call_successful field normalization ===
+  describe("BE-B4: call_successful field normalization (isCallSuccessful helper)", () => {
+    // Helper to make a signed request with a specific call_successful value
+    function makeRequestWithCallSuccessful(callSuccessful: unknown) {
+      return createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: [],
+        analysis: { call_successful: callSuccessful },
+      });
+    }
+
+    it("should treat boolean true as successful call", async () => {
+      const response = await POST(makeRequestWithCallSuccessful(true));
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      // boolean true → call succeeded, no transcript keywords → default "failed" outcome
+      // key check: must NOT treat this as no_answer (which would mean it was treated as false)
+      expect(data.outcome).not.toBe("no_answer");
+    });
+
+    it("should treat boolean false as unsuccessful call → no_answer", async () => {
+      const response = await POST(makeRequestWithCallSuccessful(false));
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("no_answer");
+    });
+
+    it("should treat string 'success' as successful call", async () => {
+      const response = await POST(makeRequestWithCallSuccessful("success"));
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.outcome).not.toBe("no_answer");
+    });
+
+    it("should treat string 'failure' as unsuccessful call → no_answer", async () => {
+      const response = await POST(makeRequestWithCallSuccessful("failure"));
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("no_answer");
+    });
+
+    it("should treat string 'true' as successful call", async () => {
+      const response = await POST(makeRequestWithCallSuccessful("true"));
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.outcome).not.toBe("no_answer");
+    });
+
+    it("should treat string 'false' as unsuccessful call → no_answer", async () => {
+      const response = await POST(makeRequestWithCallSuccessful("false"));
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("no_answer");
+    });
+
+    it("should treat null as unsuccessful call → no_answer", async () => {
+      const response = await POST(makeRequestWithCallSuccessful(null));
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("no_answer");
+    });
+
+    it("should treat undefined (missing field) as unsuccessful call → no_answer", async () => {
+      const response = await POST(createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: [],
+        analysis: {},
+      }));
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.outcome).toBe("no_answer");
+    });
+  });
+
   it("should handle transcript entries with missing message field (line 167 fallback)", async () => {
     // Exercises `entry.message || ""` in extractTranscriptText — the "" fallback
     // when entry.message is undefined/null/empty
