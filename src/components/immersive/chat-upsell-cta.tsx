@@ -78,7 +78,8 @@ export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAPro
               "bg-gradient-to-r from-amber-500 to-yellow-500 text-black",
               "hover:from-amber-400 hover:to-yellow-400",
               "transition-all duration-200",
-              "flex items-center gap-1.5"
+              "flex items-center gap-1.5",
+              "focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2"
             )}
           >
             {t("upsell.try_voice")} - €1.99
