@@ -18,20 +18,51 @@ const cache: FlagsCache = {
 };
 
 /**
+ * Convert a `Partial<Record<FeatureFlagKey, boolean>>` map (as passed by a
+ * server component) into the full `FeatureFlag[]` shape expected by the hook.
+ */
+function initialFlagsToArray(
+  initial: Partial<Record<FeatureFlagKey, boolean>>
+): FeatureFlag[] {
+  return Object.entries(initial).map(([key, enabled]) => ({
+    id: `initial-${key}`,
+    flagKey: key as FeatureFlagKey,
+    enabled: enabled ?? false,
+    label: key,
+    description: null,
+    config: {},
+    environment: "development" as const,
+    createdAt: "",
+    updatedAt: "",
+  }));
+}
+
+/**
  * Feature flags hook with deferred loading.
  *
  * Returns flags immediately with defaults (all disabled) and fetches actual
  * values in the background. This prevents blocking the initial render while
  * still enabling feature flags to control UI behavior.
  *
+ * Pass `initialFlags` from a server component to eliminate the flag flash:
+ * the hook will use those values immediately and skip the initial client fetch.
+ * A background refetch still occurs after CACHE_TTL (60 s) to stay fresh.
+ *
  * Use `isReady` to determine if flags have actually been loaded from the server.
  * Use `isEnabled` to check individual flags (returns false if not loaded).
  */
-export function useFeatureFlags() {
-  const [flags, setFlags] = useState<FeatureFlag[]>(cache.data || []);
-  // isReady indicates whether flags have been fetched at least once
-  // This is different from isLoading - we render immediately with defaults
-  const [isReady, setIsReady] = useState(!!cache.data);
+export function useFeatureFlags(
+  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>
+) {
+  // If initialFlags are provided, seed the state and skip the first fetch.
+  // We still use the shared module-level cache so multiple hook instances
+  // on the same page share a single in-flight request on refetch.
+  const [flags, setFlags] = useState<FeatureFlag[]>(() => {
+    if (initialFlags) return initialFlagsToArray(initialFlags);
+    return cache.data ?? [];
+  });
+  // isReady is true immediately when initialFlags are provided — no flash.
+  const [isReady, setIsReady] = useState(initialFlags !== undefined || !!cache.data);
 
   const fetchFlags = useCallback(async (): Promise<FeatureFlag[]> => {
     const now = Date.now();
@@ -85,8 +116,23 @@ export function useFeatureFlags() {
       }
     }
 
+    if (initialFlags !== undefined) {
+      // Skip the immediate fetch — the caller provided fresh server-rendered values.
+      // Schedule a background refresh once the stale window has elapsed so the
+      // client eventually re-validates without causing a flash on first paint.
+      const delay = CACHE_TTL;
+      const timerId = setTimeout(() => {
+        if (mounted) load();
+      }, delay);
+      return () => {
+        mounted = false;
+        clearTimeout(timerId);
+      };
+    }
+
     load();
     return () => { mounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchFlags]);
 
   const isEnabled = useCallback(

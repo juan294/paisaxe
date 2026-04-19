@@ -250,6 +250,109 @@ describe("useFeatureFlags isEnabledWithDefault", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// initialFlags — TDD tests for FE-M7 (#306)
+// ---------------------------------------------------------------------------
+describe("useFeatureFlags initialFlags", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.resetModules();
+  });
+
+  it("should set isReady=true immediately when initialFlags provided", async () => {
+    // fetch should never be called — never-resolving to confirm
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result } = renderHook(() =>
+      useFeatureFlags({ contextual_prompts: true })
+    );
+
+    // isReady must be true synchronously — no async wait
+    expect(result.current.isReady).toBe(true);
+  });
+
+  it("should NOT call fetch on mount when initialFlags provided", async () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    renderHook(() => useFeatureFlags({ contextual_prompts: true }));
+
+    // Flush microtasks
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("should return correct isEnabled from initialFlags before fetch", async () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result } = renderHook(() =>
+      useFeatureFlags({ contextual_prompts: true, related_stories: false })
+    );
+
+    expect(result.current.isEnabled("contextual_prompts")).toBe(true);
+    expect(result.current.isEnabled("related_stories")).toBe(false);
+    // Flag not in initialFlags → false
+    expect(result.current.isEnabled("surprise_me")).toBe(false);
+  });
+
+  it("should eventually refetch after stale time and update flags", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    const initialFlagsArg = { contextual_prompts: false };
+    const freshFlags = [makeFlag("contextual_prompts", true)];
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: freshFlags }),
+    });
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result } = renderHook(() => useFeatureFlags(initialFlagsArg));
+
+    // Immediately ready with initial value — no fetch yet
+    expect(result.current.isReady).toBe(true);
+    expect(result.current.isEnabled("contextual_prompts")).toBe(false);
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    // Advance time past CACHE_TTL (60s) to trigger the deferred refetch
+    await vi.runAllTimersAsync();
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith("/api/feature-flags");
+    });
+
+    await waitFor(() => {
+      expect(result.current.isEnabled("contextual_prompts")).toBe(true);
+    });
+
+    vi.useRealTimers();
+  }, 10_000);
+
+  it("should fetch immediately when no initialFlags provided (existing behavior unchanged)", async () => {
+    const flags = [makeFlag("contextual_prompts", true)];
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: flags }),
+    });
+
+    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { result } = renderHook(() => useFeatureFlags());
+
+    // Initially not ready
+    expect(result.current.isReady).toBe(false);
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith("/api/feature-flags");
+    expect(result.current.isEnabled("contextual_prompts")).toBe(true);
+  });
+});
+
 describe("useFeatureFlags cache behavior", () => {
   beforeEach(() => {
     mockFetch.mockReset();

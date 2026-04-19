@@ -36,9 +36,15 @@ interface ImmersivePageContentProps {
   serverShuffleSeed: number | null;
   /** Server-fetched stories to seed the client cache and skip loading state */
   initialStories?: Story[];
+  /**
+   * Server-fetched feature flags.
+   * When provided, useFeatureFlags uses these as the initial state and sets
+   * isReady=true immediately — eliminating flag-gated UI flash on first paint.
+   */
+  initialFlags?: Partial<Record<import("@/types/feature-flags").FeatureFlagKey, boolean>>;
 }
 
-export function ImmersivePageContent({ serverShuffleSeed, initialStories }: ImmersivePageContentProps) {
+export function ImmersivePageContent({ serverShuffleSeed, initialStories, initialFlags }: ImmersivePageContentProps) {
   const { stories: allStories, isLoading } = useStories(initialStories);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
@@ -53,7 +59,9 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
   // This ensures shuffling happens on first render without flicker
   const shuffleSeed = useRef(serverShuffleSeed ?? Math.floor(Math.random() * 2147483647));
 
-  const { isEnabled, isReady: flagsReady } = useFeatureFlags();
+  // Pass server-fetched initialFlags so the hook is ready immediately on first
+  // paint — no client fetch on mount, no flag-gated UI flash.
+  const { isEnabled, isReady: flagsReady } = useFeatureFlags(initialFlags);
   const { t } = useTranslation();
   const { viewedIndices, markViewed } = useViewedStories();
   const searchParams = useSearchParams();
