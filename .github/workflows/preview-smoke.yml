@@ -1,0 +1,73 @@
+name: Preview Smoke Test
+
+# Runs only on PRs targeting main.
+# Waits for the Vercel preview deployment, then hits /api/health and
+# the homepage to verify the real Vercel runtime (real env vars, edge
+# config, etc.) before any merge is allowed.
+#
+# This is a SEPARATE check from the standard CI suite (ci.yml / e2e.yml).
+# Those jobs build with dummy env vars and catch compile/test regressions.
+# This job catches runtime failures that only surface on Vercel — the
+# kind that passed CI but crashed production (see incident: Next.js 16.2.1).
+#
+# Required secret: VERCEL_TOKEN  (repo or org secret, read-only token is fine)
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  preview-smoke:
+    name: Smoke test Vercel preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------ #
+      # Wait for Vercel to finish deploying the preview for this PR commit. #
+      # The action polls the GitHub Deployments API (no Vercel token needed #
+      # for the wait itself) and exports the preview URL.                   #
+      # ------------------------------------------------------------------ #
+      - name: Wait for Vercel preview deployment
+        id: vercel-wait
+        uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          max_timeout: 300
+          check_interval: 15
+
+      # ------------------------------------------------------------------ #
+      # Health endpoint — must return HTTP 200.                             #
+      # A 503 (degraded) means a backend dependency is down; still fail     #
+      # so we don't silently merge a broken deploy.                         #
+      # ------------------------------------------------------------------ #
+      - name: Smoke test - health endpoint
+        run: |
+          PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
+          echo "Testing: $PREVIEW_URL/api/health"
+          response=$(curl -sf "$PREVIEW_URL/api/health" -o /tmp/health.json -w "%{http_code}")
+          if [ "$response" != "200" ]; then
+            echo "Health check failed: HTTP $response"
+            cat /tmp/health.json
+            exit 1
+          fi
+          echo "Health check passed"
+          cat /tmp/health.json
+
+      # ------------------------------------------------------------------ #
+      # Homepage — must serve HTTP 200.                                     #
+      # Catches build/runtime errors that would produce a 500 on Vercel     #
+      # even though the local build with dummy keys succeeded.              #
+      # ------------------------------------------------------------------ #
+      - name: Smoke test - homepage loads
+        run: |
+          PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
+          echo "Testing: $PREVIEW_URL"
+          response=$(curl -sf "$PREVIEW_URL" -o /dev/null -w "%{http_code}")
+          if [ "$response" != "200" ]; then
+            echo "Homepage failed: HTTP $response"
+            exit 1
+          fi
+          echo "Homepage smoke test passed"
