@@ -118,4 +118,18 @@ describe("ChatUpsellCTA", () => {
 
     expect(container.firstChild).toHaveClass("custom-class");
   });
+
+  it("purchase button has visible focus ring for keyboard accessibility (WCAG 2.1 SC 2.4.7)", () => {
+    render(<ChatUpsellCTA {...defaultProps} />);
+
+    const purchaseButton = screen.getByRole("button", { name: /€1\.99/ });
+
+    // Must have a visible focus ring
+    expect(purchaseButton.className).toMatch(/focus-visible:ring-2/);
+    expect(purchaseButton.className).toMatch(/focus-visible:ring-amber-200/);
+    expect(purchaseButton.className).toMatch(/focus-visible:ring-offset-2/);
+
+    // Must NOT suppress focus outline without a ring fallback
+    expect(purchaseButton.className).not.toMatch(/focus-visible:outline-none/);
+  });
 });
