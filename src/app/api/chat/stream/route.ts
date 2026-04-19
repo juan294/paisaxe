@@ -14,9 +14,6 @@ import {
 } from "@/lib/chat-safety";
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 
-// Module-level cache for the asturianu_touches feature flag (60s TTL)
-let asturianCache: { value: boolean; expiresAt: number } | null = null;
-
 /**
  * Streaming chat endpoint using Server-Sent Events (SSE)
  *
@@ -96,7 +93,7 @@ export async function POST(request: NextRequest) {
     );
     const { generateEmbedding } = await import("@/lib/embeddings");
     const { search } = await import("@/lib/search");
-    const { supabase } = await import("@/lib/supabase");
+    const { isFeatureFlagEnabled } = await import("@/lib/feature-flags-server");
 
     // Generate embedding and search — fail gracefully on upstream errors
     let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
@@ -127,24 +124,8 @@ export async function POST(request: NextRequest) {
       ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
       : cleanMessage;
 
-    // Check Asturianu feature flag (60s module-level cache to avoid per-message DB hit)
-    let asturianEnabled = false;
-    if (asturianCache && Date.now() < asturianCache.expiresAt) {
-      asturianEnabled = asturianCache.value;
-    } else {
-      try {
-        const { data: flagData, error: flagError } = await supabase
-          .from("feature_flags")
-          .select("enabled")
-          .eq("flag_key", "asturianu_touches")
-          .single();
-        if (flagError) console.error("[TABLE_FALLBACK]", { table: "feature_flags", key: "asturianu_touches", error: flagError.message });
-        asturianEnabled = flagData?.enabled ?? false;
-        asturianCache = { value: asturianEnabled, expiresAt: Date.now() + 60_000 };
-      } catch (err) {
-        console.error("[TABLE_FALLBACK]", { table: "feature_flags", key: "asturianu_touches", error: err instanceof Error ? err.message : String(err) });
-      }
-    }
+    // Check Asturianu feature flag (cached via isFeatureFlagEnabled)
+    const asturianEnabled = await isFeatureFlagEnabled("asturianu_touches");
 
     // Extract sources for final event
     const sources = extractSourcesFromChunks(chunks);
@@ -178,7 +159,11 @@ export async function POST(request: NextRequest) {
 
           controller.close();
         } catch (error) {
-          console.error("[Stream Chat] Error:", error);
+          const err = error instanceof Error ? error : new Error(String(error));
+          console.error("[CHAT_STREAM_FAILURE]", {
+            error: err.message,
+            type: err.constructor?.name ?? "Error",
+          });
           const errorEvent = `data: ${JSON.stringify({
             type: "error",
             message: "Error generating response",

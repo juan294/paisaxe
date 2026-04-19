@@ -24,16 +24,8 @@ vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    from: vi.fn(() => ({
-      select: () => ({
-        eq: () => ({
-          single: vi.fn().mockResolvedValue({ data: { enabled: false }, error: null }),
-        }),
-      }),
-    })),
-  },
+vi.mock("@/lib/feature-flags-server", () => ({
+  isFeatureFlagEnabled: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("@/lib/chat-safety", () => ({
@@ -714,16 +706,9 @@ describe("POST /api/chat", () => {
     });
   });
 
-  it("should default asturianEnabled to false when flagData is null", async () => {
-    // Override the supabase mock to return null data
-    const { supabase } = await import("@/lib/supabase");
-    vi.mocked(supabase.from).mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-    } as never);
+  it("should default asturianEnabled to false when feature flag returns false", async () => {
+    const { isFeatureFlagEnabled } = await import("@/lib/feature-flags-server");
+    vi.mocked(isFeatureFlagEnabled).mockResolvedValueOnce(false);
 
     vi.mocked(validateChatRequest).mockReturnValue({
       valid: true,
@@ -747,7 +732,7 @@ describe("POST /api/chat", () => {
 
     expect(response.status).toBe(200);
     expect(data.message).toBe("Response about Asturias");
-    // asturianEnabled should be false (from null ?? false)
+    // asturianEnabled should be false
     expect(generateChatResponse).toHaveBeenCalledWith(
       "Tell me about Asturias",
       expect.any(Array),
