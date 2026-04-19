@@ -4,6 +4,34 @@ import packageJson from "../../../../package.json";
 
 const APP_VERSION: string = packageJson.version;
 
+// Cache for external probe results (60s TTL)
+const PROBE_CACHE_TTL_MS = 60_000;
+const PROBE_TIMEOUT_MS = 3_000;
+
+interface CachedProbeResult {
+  result: ExternalServiceStatus;
+  expiresAt: number;
+}
+
+const probeCache = new Map<string, CachedProbeResult>();
+
+function getCachedProbe(key: string): ExternalServiceStatus | null {
+  const cached = probeCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.result;
+  }
+  return null;
+}
+
+function setCachedProbe(key: string, result: ExternalServiceStatus): void {
+  probeCache.set(key, { result, expiresAt: Date.now() + PROBE_CACHE_TTL_MS });
+}
+
+/** Exported for tests only — clears the in-memory probe cache. */
+export function _clearProbeCacheForTests(): void {
+  probeCache.clear();
+}
+
 interface SupabaseServiceStatus {
   status: "connected" | "error";
   latency_ms: number;
@@ -27,6 +55,12 @@ interface DatabaseSizeErrorStatus {
   error: string;
 }
 
+interface ExternalServiceStatus {
+  status: "ok" | "degraded" | "not_configured";
+  latency_ms?: number;
+  error?: string;
+}
+
 interface HealthResponse {
   status: "healthy" | "degraded";
   timestamp: string;
@@ -36,6 +70,10 @@ interface HealthResponse {
     supabase: SupabaseServiceStatus;
     stories: StoriesStatus;
     database: DatabaseSizeStatus | DatabaseSizeErrorStatus;
+    anthropic: ExternalServiceStatus;
+    voyage: ExternalServiceStatus;
+    stripe: ExternalServiceStatus;
+    elevenlabs: ExternalServiceStatus;
   };
 }
 
@@ -117,12 +155,129 @@ async function checkDatabaseSize(): Promise<
   }
 }
 
+/**
+ * Wraps a promise with a timeout. Resolves to a degraded status if exceeded.
+ */
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  onTimeout: () => T
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) =>
+      setTimeout(() => resolve(onTimeout()), timeoutMs)
+    ),
+  ]);
+}
+
+/**
+ * Key-presence probe: checks that an env var is set. No network call needed.
+ */
+function checkEnvKeyOnly(
+  cacheKey: string,
+  envVarName: string
+): ExternalServiceStatus {
+  const cached = getCachedProbe(cacheKey);
+  if (cached) return cached;
+
+  const key = process.env[envVarName]?.trim();
+  const result: ExternalServiceStatus = key
+    ? { status: "ok" }
+    : { status: "not_configured" };
+
+  setCachedProbe(cacheKey, result);
+  return result;
+}
+
+/**
+ * Probe Anthropic: key-presence only (no network call — avoids token spend).
+ */
+async function checkAnthropic(): Promise<ExternalServiceStatus> {
+  return checkEnvKeyOnly("anthropic", "ANTHROPIC_API_KEY");
+}
+
+/**
+ * Probe Voyage AI: key-presence only (embedding endpoints are metered).
+ */
+async function checkVoyage(): Promise<ExternalServiceStatus> {
+  return checkEnvKeyOnly("voyage", "VOYAGE_API_KEY");
+}
+
+/**
+ * Probe ElevenLabs: key-presence only.
+ */
+async function checkElevenLabs(): Promise<ExternalServiceStatus> {
+  return checkEnvKeyOnly("elevenlabs", "ELEVENLABS_API_KEY");
+}
+
+/**
+ * Probe Stripe: ping /v1/charges?limit=0 with the secret key.
+ * A successful auth confirms the key is valid and Stripe is reachable.
+ */
+async function checkStripe(): Promise<ExternalServiceStatus> {
+  const cached = getCachedProbe("stripe");
+  if (cached) return cached;
+
+  const key = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!key) {
+    const result: ExternalServiceStatus = { status: "not_configured" };
+    setCachedProbe("stripe", result);
+    return result;
+  }
+
+  const start = performance.now();
+
+  const fetchResult = await withTimeout(
+    (async (): Promise<ExternalServiceStatus> => {
+      try {
+        const res = await fetch("https://api.stripe.com/v1/charges?limit=0", {
+          headers: { Authorization: `Bearer ${key}` },
+        });
+        const latency_ms = Math.round(performance.now() - start);
+        if (res.ok) {
+          return { status: "ok", latency_ms };
+        }
+        return { status: "degraded", latency_ms, error: `HTTP ${res.status}` };
+      } catch (err) {
+        const latency_ms = Math.round(performance.now() - start);
+        return {
+          status: "degraded",
+          latency_ms,
+          error: err instanceof Error ? err.message : "Unknown error",
+        };
+      }
+    })(),
+    PROBE_TIMEOUT_MS,
+    (): ExternalServiceStatus => ({
+      status: "degraded",
+      latency_ms: PROBE_TIMEOUT_MS,
+      error: "Probe timed out",
+    })
+  );
+
+  setCachedProbe("stripe", fetchResult);
+  return fetchResult;
+}
+
 export async function GET(): Promise<NextResponse<HealthResponse>> {
   try {
-    const [supabaseStatus, storiesStatus, databaseStatus] = await Promise.all([
+    const [
+      supabaseStatus,
+      storiesStatus,
+      databaseStatus,
+      anthropicStatus,
+      voyageStatus,
+      stripeStatus,
+      elevenLabsStatus,
+    ] = await Promise.all([
       checkSupabase(),
       checkStories(),
       checkDatabaseSize(),
+      checkAnthropic(),
+      checkVoyage(),
+      checkStripe(),
+      checkElevenLabs(),
     ]);
 
     const isSupabaseError = supabaseStatus.status !== "connected";
@@ -131,6 +286,8 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
       "usage_percent" in databaseStatus &&
       databaseStatus.usage_percent >= STORAGE_WARNING_THRESHOLD * 100;
 
+    // External service probes are informational — they do NOT degrade overall status.
+    // Only Supabase connectivity is required for the app to function.
     const overallStatus =
       isSupabaseError || isStoriesFallback || isDatabaseOverThreshold
         ? "degraded"
@@ -145,6 +302,10 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
         supabase: supabaseStatus,
         stories: storiesStatus,
         database: databaseStatus,
+        anthropic: anthropicStatus,
+        voyage: voyageStatus,
+        stripe: stripeStatus,
+        elevenlabs: elevenLabsStatus,
       },
     };
 
@@ -176,6 +337,10 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
         database: {
           error: err instanceof Error ? err.message : "Unknown error",
         },
+        anthropic: { status: "degraded" },
+        voyage: { status: "degraded" },
+        stripe: { status: "degraded" },
+        elevenlabs: { status: "degraded" },
       },
     };
 
