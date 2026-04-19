@@ -148,6 +148,12 @@ export const mockTranslations: Record<string, string> = {
   "info_menu.saved_places": "Guardados",
   "info_menu.sign_in": "Iniciar sesion",
 
+  // Voice
+  "voice.loading": "Cargando asistente de voz...",
+  "voice.use_text": "Usar texto",
+  "voice.try_voice": "Probar voz",
+  "voice.upgrade_cta": "Activar voz",
+
   // Accessibility
   "accessibility.language_switcher": "Cambiar idioma",
   "accessibility.related_stories": "Historias relacionadas",

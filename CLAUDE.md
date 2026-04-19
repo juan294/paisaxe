@@ -16,7 +16,7 @@ For operations (monitoring, pg_cron, webhooks, agents), see @docs/operations/ope
 | Styling | Tailwind CSS + shadcn/ui |
 | Database | Supabase (PostgreSQL + pgvector) |
 | AI Chat | Claude API (Anthropic) |
-| Embeddings | Voyage AI (voyage-3, 512 dims) |
+| Embeddings | Voyage AI (voyage-3.5, 512 dims) |
 | Reranking | Voyage AI (rerank-2.5) |
 | Voice | ElevenLabs Conversational AI |
 | Payments | Stripe |
@@ -231,7 +231,7 @@ All env vars are documented in `.env.local`. Key groups: Anthropic, Voyage AI, E
 ## Architecture Decisions
 
 ### Embeddings & Search
-- Model: `voyage-3` with 512 dimensions (Matryoshka)
+- Model: `voyage-3.5` with 512 dimensions (Matryoshka)
 - Hybrid search: vector similarity + keyword matching
 - Two-stage retrieval: fetch 10 candidates, rerank to top 3 via `rerank-2.5`
 

@@ -186,7 +186,7 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
   // Show message when no stories match filters
   if (filteredStories.length === 0) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
+      <div role="alert" aria-live="assertive" className="fixed inset-0 flex flex-col items-center justify-center bg-black">
         <div className="text-white text-lg mb-4">{t("stories.no_results")}</div>
         <button
           onClick={() => {

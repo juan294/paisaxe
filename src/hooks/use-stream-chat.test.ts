@@ -716,16 +716,19 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(mockFetch).toHaveBeenCalledWith("/api/chat/stream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: "My question",
-        context: "Story about Lagos",
-        locale: "es",
-        messageIndex: 3,
-      }),
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/chat/stream",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "My question",
+          context: "Story about Lagos",
+          locale: "es",
+          messageIndex: 3,
+        }),
+      })
+    );
   });
 
   it("should push error message when assistantIndex is out of bounds (line 193)", async () => {

@@ -581,8 +581,8 @@ describe("useStories with initialStories", () => {
     expect(result.current.isLoading).toBe(false);
   });
 
-  it("should prefer cache over initialStories when cache exists", async () => {
-    // First: populate cache
+  it("should overwrite cache with initialStories for freshness", async () => {
+    // First: populate cache via a hook with no initialStories
     const { result: result1 } = renderHook(() => useStories());
 
     await waitFor(() => {
@@ -590,9 +590,10 @@ describe("useStories with initialStories", () => {
     });
     expect(result1.current.stories).toEqual(mockStories);
 
-    // Second: render with initialStories — cache should win
+    // Second: render with initialStories — initialStories overwrites cache
+    // to ensure post-deploy freshness (FE-M2)
     const { result: result2 } = renderHook(() => useStories(serverStories));
-    expect(result2.current.stories).toEqual(mockStories);
+    expect(result2.current.stories).toEqual(serverStories);
     expect(result2.current.isLoading).toBe(false);
   });
 

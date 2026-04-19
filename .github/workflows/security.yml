@@ -6,8 +6,8 @@ on:
   pull_request:
     branches: [develop, main]
   schedule:
-    # Run weekly on Mondays at 8:00 UTC
-    - cron: '0 8 * * 1'
+    # Run daily at 8:00 UTC (was weekly — CVE detection latency reduced from ~6 days to <24h)
+    - cron: '0 8 * * *'
 
 jobs:
   gitleaks:
