@@ -43,8 +43,8 @@ test.describe("Immersive story viewer", () => {
     const nextButton = page.getByTestId("next-story-button").first();
     await nextButton.click();
 
-    // Wait for transition and verify title changed
-    await page.waitForTimeout(400);
+    // Wait for title to change after transition
+    await expect(title).not.toHaveText(firstTitle!, { timeout: 3000 });
     const secondTitle = await title.textContent();
     expect(secondTitle).not.toBe(firstTitle);
   });
@@ -60,8 +60,9 @@ test.describe("Immersive story viewer", () => {
     const firstTitle = await title.textContent();
 
     await page.keyboard.press("ArrowRight");
-    await page.waitForTimeout(400);
 
+    // Wait for title to change after transition
+    await expect(title).not.toHaveText(firstTitle!, { timeout: 3000 });
     const secondTitle = await title.textContent();
     expect(secondTitle).not.toBe(firstTitle);
   });
