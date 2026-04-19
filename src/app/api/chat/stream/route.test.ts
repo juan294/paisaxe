@@ -24,17 +24,9 @@ vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn(),
 }));
 
-const mockSingle = vi.fn().mockResolvedValue({ data: { enabled: false }, error: null });
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: mockSingle,
-        }),
-      }),
-    }),
-  },
+const mockIsFeatureFlagEnabled = vi.fn().mockResolvedValue(false);
+vi.mock("@/lib/feature-flags-server", () => ({
+  isFeatureFlagEnabled: mockIsFeatureFlagEnabled,
 }));
 
 vi.mock("@/lib/chat-safety", () => ({
@@ -348,6 +340,39 @@ describe("POST /api/chat/stream", () => {
     expect(errorEvent.message).toBe("Error generating response");
   });
 
+  it("should log [CHAT_STREAM_FAILURE] with structured metadata on stream error", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+    vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+
+    const apiError = new Error("Anthropic API timeout");
+    vi.mocked(streamChatResponse).mockImplementation(async function* () {
+      yield "partial";
+      throw apiError;
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Hello" }),
+    });
+
+    const response = await POST(request);
+    // Drain the stream so the catch block executes before we assert
+    await collectStreamEvents(response);
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[CHAT_STREAM_FAILURE]",
+      expect.objectContaining({
+        error: "Anthropic API timeout",
+        type: "Error",
+      })
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it("should return SSE error event when embedding fails before streaming", async () => {
     vi.mocked(generateEmbedding).mockRejectedValue(new Error("Embedding API Error"));
 
@@ -392,9 +417,8 @@ describe("POST /api/chat/stream", () => {
     expect(search).toHaveBeenCalledWith(mockEmbedding, 3, "Best hiking routes");
   });
 
-  it("should handle null flagData for asturianu feature flag (line 106 ?? fallback)", async () => {
-    // Override to return null data — triggers the ?? false fallback
-    mockSingle.mockResolvedValueOnce({ data: null, error: null });
+  it("should default asturianu flag to false when feature flag returns false", async () => {
+    mockIsFeatureFlagEnabled.mockResolvedValueOnce(false);
 
     const mockEmbedding = new Array(512).fill(0.1);
 
@@ -417,6 +441,13 @@ describe("POST /api/chat/stream", () => {
 
     const response = await POST(request);
     expect(response.status).toBe(200);
+    expect(streamChatResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      false, // asturianEnabled
+      expect.toSatisfy((v: unknown) => v === undefined || typeof v === "number"),
+      expect.any(Array)
+    );
   });
 
   // PE-H2: Cold-start penalty — heavy modules must not run for rejected requests
@@ -486,9 +517,8 @@ describe("POST /api/chat/stream", () => {
     });
   });
 
-  it("should pass asturianu enabled flag when feature flag is true (line 106)", async () => {
-    // Override the supabase mock to return enabled: true for asturianu_touches flag
-    mockSingle.mockResolvedValueOnce({ data: { enabled: true }, error: null });
+  it("should pass asturianu enabled=true when feature flag is true", async () => {
+    mockIsFeatureFlagEnabled.mockResolvedValueOnce(true);
 
     const mockEmbedding = new Array(512).fill(0.1);
 
@@ -511,9 +541,9 @@ describe("POST /api/chat/stream", () => {
 
     const response = await POST(request);
 
-    // Should succeed — the asturianu flag is read and used in the system prompt
     expect(response.status).toBe(200);
-    // Verify streamChatResponse was called (meaning the flow completed with the flag)
-    expect(streamChatResponse).toHaveBeenCalled();
+    // Verify the asturianu flag (3rd arg) is true
+    const callArgs = vi.mocked(streamChatResponse).mock.calls[0];
+    expect(callArgs[2]).toBe(true);
   });
 });

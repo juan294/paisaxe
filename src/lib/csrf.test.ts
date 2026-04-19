@@ -6,6 +6,7 @@ import {
   validateCsrfToken,
   isExemptFromCsrf,
   csrfCookieOptions,
+  validateOrigin,
 } from "./csrf";
 
 describe("generateCsrfToken", () => {
@@ -170,5 +171,56 @@ describe("csrfCookieOptions", () => {
 
   it("sets path to /", () => {
     expect(csrfCookieOptions(true).path).toBe("/");
+  });
+});
+
+describe("validateOrigin", () => {
+  const allowedOrigins = ["https://paisaxe.es", "https://www.paisaxe.es", "https://paisaxe.com"];
+
+  it("returns true when Origin header matches allowed origin", () => {
+    const req = new Request("https://paisaxe.es/api/chat", {
+      headers: { origin: "https://paisaxe.es" },
+    });
+    expect(validateOrigin(req, allowedOrigins)).toBe(true);
+  });
+
+  it("returns true when Origin header is www subdomain of allowed origin", () => {
+    const req = new Request("https://paisaxe.es/api/chat", {
+      headers: { origin: "https://www.paisaxe.es" },
+    });
+    expect(validateOrigin(req, allowedOrigins)).toBe(true);
+  });
+
+  it("returns false when Origin header is a different domain", () => {
+    const req = new Request("https://paisaxe.es/api/chat", {
+      headers: { origin: "https://evil.com" },
+    });
+    expect(validateOrigin(req, allowedOrigins)).toBe(false);
+  });
+
+  it("returns false when Origin header is a subdomain attack", () => {
+    const req = new Request("https://paisaxe.es/api/chat", {
+      headers: { origin: "https://evil.paisaxe.es" },
+    });
+    expect(validateOrigin(req, allowedOrigins)).toBe(false);
+  });
+
+  it("returns true when Origin header is absent (non-browser clients)", () => {
+    const req = new Request("https://paisaxe.es/api/chat");
+    expect(validateOrigin(req, allowedOrigins)).toBe(true);
+  });
+
+  it("uses Referer as fallback when Origin is absent but Referer is present", () => {
+    const req = new Request("https://paisaxe.es/api/chat", {
+      headers: { referer: "https://evil.com/page" },
+    });
+    expect(validateOrigin(req, allowedOrigins)).toBe(false);
+  });
+
+  it("returns true when Referer fallback matches allowed origin", () => {
+    const req = new Request("https://paisaxe.es/api/chat", {
+      headers: { referer: "https://paisaxe.es/immersive" },
+    });
+    expect(validateOrigin(req, allowedOrigins)).toBe(true);
   });
 });
