@@ -10,6 +10,9 @@ interface ProvidersProps {
   children: React.ReactNode;
 }
 
+// Providers wraps only client-context concerns (PostHog, i18n, Auth).
+// The <main id="main-content"> landmark lives in layout.tsx (server component)
+// so that server-rendered children are NOT pulled into the client hydration boundary.
 export function Providers({ children }: ProvidersProps) {
   return (
     <PostHogProviderWrapper>
@@ -17,9 +20,7 @@ export function Providers({ children }: ProvidersProps) {
         <AuthProvider>
           <SkipLink />
           <LangSync />
-          <main id="main-content">
-            {children}
-          </main>
+          {children}
         </AuthProvider>
       </LanguageProvider>
     </PostHogProviderWrapper>
