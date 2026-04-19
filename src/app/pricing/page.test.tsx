@@ -370,4 +370,49 @@ describe("PricingPage", () => {
       expect(spinner).toBeInTheDocument();
     });
   });
+
+  describe("UX-M4: responsive heading type scale", () => {
+    it("should apply responsive text scale classes to the h1 heading", () => {
+      render(<PricingPage />);
+
+      const heading = screen.getByRole("heading", { level: 1 });
+      expect(heading.className).toContain("md:text-3xl");
+      expect(heading.className).toContain("lg:text-4xl");
+    });
+  });
+
+  describe("UX-L4: accessible disabled button state", () => {
+    it("should apply gray gradient classes to the checkout button when disabled", () => {
+      mockUseVoiceAccess.mockReturnValue({
+        hasAccess: false,
+        isWhitelisted: false,
+        canUseVoice: false,
+        needsSignIn: false,
+        needsPurchase: true,
+        expiresAt: null,
+        hoursUntilExpiry: null,
+        agentId: "test-agent",
+        isLoading: true,
+        refresh: mockRefresh,
+      });
+
+      render(<PricingPage />);
+
+      const button = screen.getByRole("button");
+      // disabled:from-gray-500 desaturates the gradient, disabled:to-gray-600 and
+      // disabled:opacity-75 ensure WCAG AA contrast even under glare on mobile
+      expect(button.className).toContain("disabled:from-gray-500");
+      expect(button.className).toContain("disabled:to-gray-600");
+      expect(button.className).toContain("disabled:opacity-75");
+    });
+
+    it("should not use only opacity-50 as the sole disabled visual cue", () => {
+      render(<PricingPage />);
+
+      const button = screen.getByRole("button");
+      // opacity-50 alone is insufficient for WCAG AA; the button must use
+      // the gray gradient instead of (or in addition to replacing) opacity-50
+      expect(button.className).not.toContain("disabled:opacity-50");
+    });
+  });
 });
