@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
+import { favoritesPostSchema } from "@/lib/schemas";
 
 // GET /api/favorites - Get user's favorites
 export async function GET(request: NextRequest) {
@@ -44,15 +45,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = await request.json();
-  const { storyIds } = body;
+  const rawBody = await request.json();
+  const parsed = favoritesPostSchema.safeParse(rawBody);
 
-  if (!Array.isArray(storyIds) || storyIds.length === 0) {
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "storyIds array is required" },
+      { error: "Invalid request body", errors: parsed.error.flatten().fieldErrors },
       { status: 400 }
     );
   }
+
+  const { storyIds } = parsed.data;
 
   const supabase = await getSupabaseClient();
 

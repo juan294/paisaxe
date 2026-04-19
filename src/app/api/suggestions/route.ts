@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import type { CreateSuggestionRequest, StorySuggestionRow } from "@/types/suggestions";
+import type { StorySuggestionRow } from "@/types/suggestions";
 import { rowToStorySuggestion } from "@/types/suggestions";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 import { getClientIp } from "@/lib/request-utils";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { createSuggestionSchema } from "@/lib/schemas";
 
 const SUGGESTION_RATE_LIMIT = {
   windowMs: 60_000,     // 1 minute
@@ -51,9 +52,9 @@ export async function POST(request: NextRequest) {
   const user = sessionUser ?? await getUserFromRequest(request);
 
   // Parse and validate body BEFORE rate limiting — invalid requests shouldn't consume tokens
-  let body: CreateSuggestionRequest;
+  let rawBody: unknown;
   try {
-    body = await request.json();
+    rawBody = await request.json();
   } catch {
     return NextResponse.json(
       { error: "Invalid request body" },
@@ -61,42 +62,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Validate place_name
-  const placeName = body.placeName?.trim();
-  if (!placeName || placeName.length < 3 || placeName.length > 100) {
+  const parsed = createSuggestionSchema.safeParse(rawBody);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "Place name must be between 3 and 100 characters" },
+      { error: "Invalid request body", errors: parsed.error.flatten().fieldErrors },
       { status: 400 }
     );
   }
 
-  // Validate comment if provided
-  const comment = body.comment?.trim() || null;
-  if (comment && comment.length > 500) {
-    return NextResponse.json(
-      { error: "Comment must not exceed 500 characters" },
-      { status: 400 }
-    );
-  }
-
-  // Validate location if provided
-  const validLocations = ["eastern", "central", "western"];
-  const location = body.location || null;
-  if (location && !validLocations.includes(location)) {
-    return NextResponse.json(
-      { error: "Invalid location. Must be eastern, central, or western." },
-      { status: 400 }
-    );
-  }
-
-  // Validate attribution if provided (how they want to be credited)
-  const attribution = body.attribution?.trim() || null;
-  if (attribution && attribution.length > 100) {
-    return NextResponse.json(
-      { error: "Attribution must not exceed 100 characters" },
-      { status: 400 }
-    );
-  }
+  const { placeName, comment: rawComment, location: rawLocation, attribution: rawAttribution } = parsed.data;
+  const comment = rawComment?.trim() || null;
+  const location = rawLocation ?? null;
+  const attribution = rawAttribution?.trim() || null;
 
   // Rate limit after validation — only valid requests consume tokens
   const ip = getClientIp(request);

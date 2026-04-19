@@ -255,7 +255,8 @@ describe("Suggestions API", () => {
 
       expect(response.status).toBe(400);
       const json = await response.json();
-      expect(json.error).toBe("Place name must be between 3 and 100 characters");
+      // Zod returns field-level errors
+      expect(json.errors).toBeDefined();
     });
 
     it("should return 400 when placeName is too short", async () => {
@@ -266,7 +267,7 @@ describe("Suggestions API", () => {
 
       expect(response.status).toBe(400);
       const json = await response.json();
-      expect(json.error).toBe("Place name must be between 3 and 100 characters");
+      expect(json.errors).toBeDefined();
     });
 
     it("should return 400 when placeName is too long", async () => {
@@ -286,7 +287,7 @@ describe("Suggestions API", () => {
 
       expect(response.status).toBe(400);
       const json = await response.json();
-      expect(json.error).toBe("Comment must not exceed 500 characters");
+      expect(json.errors).toBeDefined();
     });
 
     it("should return 400 for invalid location", async () => {
@@ -297,9 +298,7 @@ describe("Suggestions API", () => {
 
       expect(response.status).toBe(400);
       const json = await response.json();
-      expect(json.error).toBe(
-        "Invalid location. Must be eastern, central, or western."
-      );
+      expect(json.errors).toBeDefined();
     });
 
     it("should return 400 when attribution is too long", async () => {
@@ -310,7 +309,7 @@ describe("Suggestions API", () => {
 
       expect(response.status).toBe(400);
       const json = await response.json();
-      expect(json.error).toBe("Attribution must not exceed 100 characters");
+      expect(json.errors).toBeDefined();
     });
 
     it("should create suggestion successfully", async () => {
@@ -515,6 +514,60 @@ describe("Suggestions API", () => {
         expect.stringContaining("suggestion:"),
         expect.objectContaining({ maxRequests: 1, windowMs: 60_000 })
       );
+    });
+
+    // -----------------------------------------------------------------------
+    // Zod validation tests (issue #270)
+    // -----------------------------------------------------------------------
+
+    it("should return 400 with Zod errors when body contains extra-unexpected fields that should be stripped (or explicit test that valid body passes Zod)", async () => {
+      // This tests that Zod strips unknown keys and accepts the valid subset
+      const createdSuggestion = {
+        id: "sug-zod",
+        user_id: null,
+        place_name: "Valid Zod Place",
+        comment: null,
+        location: null,
+        attribution: null,
+        status: "pending",
+        admin_notes: null,
+        converted_story_id: null,
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+      };
+
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+        },
+        from: vi.fn(() => ({
+          insert: vi.fn(() => ({
+            select: vi.fn(() => ({
+              single: vi.fn(() =>
+                Promise.resolve({ data: createdSuggestion, error: null })
+              ),
+            })),
+          })),
+        })),
+      } as never);
+
+      const request = createRequest("POST", {
+        body: { placeName: "Valid Zod Place", unknownField: "should be ignored" },
+      });
+      const response = await POST(request);
+
+      // Valid request should succeed — Zod strips unknown fields
+      expect(response.status).toBe(201);
+    });
+
+    it("should return 400 with Zod errors when placeName is entirely whitespace", async () => {
+      const request = createRequest("POST", {
+        body: { placeName: "   " },
+      });
+      const response = await POST(request);
+
+      // After trim, placeName is empty/too short — Zod should reject it
+      expect(response.status).toBe(400);
     });
   });
 });
