@@ -7,6 +7,11 @@ vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(() => ({
     from: vi.fn(() => ({
       insert: vi.fn(() => ({ error: null })),
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn(() => ({ data: null, error: null })),
+        })),
+      })),
     })),
   })),
 }));
@@ -22,10 +27,11 @@ import { createAdminClient } from "@/lib/supabase";
 
 function createCheckoutSessionEvent(
   userId: string | undefined,
-  paymentIntentId: string
+  paymentIntentId: string | null,
+  eventId: string = "evt_test123"
 ): Stripe.Event {
   return {
-    id: "evt_test123",
+    id: eventId,
     object: "event",
     api_version: "2024-12-18.acacia",
     created: 1234567890,
@@ -120,6 +126,20 @@ describe("POST /api/webhooks/stripe", () => {
     const event = createCheckoutSessionEvent(undefined, "pi_test123");
     vi.mocked(verifyWebhookSignature).mockReturnValue(event);
 
+    const mockMaybeSingle = vi.fn(() => ({ data: null, error: null }));
+    const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+    const mockSelect = vi.fn(() => ({ eq: mockEq }));
+    const mockInsert = vi.fn(() => ({ error: null }));
+    const mockFrom = vi.fn((table: string) => {
+      if (table === "stripe_webhook_events") {
+        return { select: mockSelect, insert: mockInsert };
+      }
+      return { insert: mockInsert };
+    });
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: mockFrom,
+    } as unknown as ReturnType<typeof createAdminClient>);
+
     const request = createRequest(JSON.stringify({}), {
       "stripe-signature": "valid-signature",
     });
@@ -131,12 +151,149 @@ describe("POST /api/webhooks/stripe", () => {
     expect(data.error).toBe("Missing user_id");
   });
 
+  it("should return 200 with duplicate status when event.id already exists", async () => {
+    // TDD: duplicate event.id — should NOT call voice_purchases insert
+    const event = createCheckoutSessionEvent(
+      "user-123",
+      "pi_test456",
+      "evt_already_processed"
+    );
+    vi.mocked(verifyWebhookSignature).mockReturnValue(event);
+
+    // Supabase returns existing row for this event.id
+    const mockMaybeSingle = vi.fn(() => ({
+      data: { id: "some-uuid", event_id: "evt_already_processed" },
+      error: null,
+    }));
+    const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+    const mockSelect = vi.fn(() => ({ eq: mockEq }));
+    const mockInsert = vi.fn(() => ({ error: null }));
+    const mockFrom = vi.fn((table: string) => {
+      if (table === "stripe_webhook_events") {
+        return { select: mockSelect, insert: mockInsert };
+      }
+      return { insert: mockInsert };
+    });
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: mockFrom,
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const request = createRequest(JSON.stringify({}), {
+      "stripe-signature": "valid-signature",
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.received).toBe(true);
+    expect(data.status).toBe("duplicate");
+    // Must NOT have inserted into voice_purchases
+    expect(mockFrom).not.toHaveBeenCalledWith("voice_purchases");
+  });
+
+  it("should insert into stripe_webhook_events and grant day pass for fresh event.id", async () => {
+    // TDD: fresh event.id — should insert dedup record then grant day pass
+    const event = createCheckoutSessionEvent(
+      "user-123",
+      "pi_test456",
+      "evt_fresh_event"
+    );
+    vi.mocked(verifyWebhookSignature).mockReturnValue(event);
+
+    // Supabase returns no existing row for this event.id
+    const mockMaybeSingle = vi.fn(() => ({ data: null, error: null }));
+    const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+    const mockSelect = vi.fn(() => ({ eq: mockEq }));
+    const mockWebhookInsert = vi.fn(() => ({ error: null }));
+    const mockPurchaseInsert = vi.fn(() => ({ error: null }));
+    const mockFrom = vi.fn((table: string) => {
+      if (table === "stripe_webhook_events") {
+        return { select: mockSelect, insert: mockWebhookInsert };
+      }
+      if (table === "voice_purchases") {
+        return { insert: mockPurchaseInsert };
+      }
+      return { insert: vi.fn(() => ({ error: null })) };
+    });
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: mockFrom,
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const request = createRequest(JSON.stringify({}), {
+      "stripe-signature": "valid-signature",
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    // Must have inserted deduplication record
+    expect(mockWebhookInsert).toHaveBeenCalledWith({ event_id: "evt_fresh_event" });
+    // Must have granted day pass
+    expect(mockPurchaseInsert).toHaveBeenCalledWith({
+      user_id: "user-123",
+      purchase_type: "day_pass",
+      payment_provider_id: "pi_test456",
+      expires_at: "2024-01-02T00:00:00.000Z",
+    });
+  });
+
+  it("should return 200 without granting when payment_intent is absent", async () => {
+    // payment_intent is null — no session.id fallback, just return 200 without granting
+    const event = createCheckoutSessionEvent("user-123", null, "evt_no_pi");
+    vi.mocked(verifyWebhookSignature).mockReturnValue(event);
+
+    // Supabase returns no existing row
+    const mockMaybeSingle = vi.fn(() => ({ data: null, error: null }));
+    const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+    const mockSelect = vi.fn(() => ({ eq: mockEq }));
+    const mockWebhookInsert = vi.fn(() => ({ error: null }));
+    const mockPurchaseInsert = vi.fn(() => ({ error: null }));
+    const mockFrom = vi.fn((table: string) => {
+      if (table === "stripe_webhook_events") {
+        return { select: mockSelect, insert: mockWebhookInsert };
+      }
+      if (table === "voice_purchases") {
+        return { insert: mockPurchaseInsert };
+      }
+      return { insert: vi.fn(() => ({ error: null })) };
+    });
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: mockFrom,
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const request = createRequest(JSON.stringify({}), {
+      "stripe-signature": "valid-signature",
+    });
+
+    const response = await POST(request);
+    await response.json();
+
+    expect(response.status).toBe(200);
+    // Must NOT have inserted into voice_purchases
+    expect(mockPurchaseInsert).not.toHaveBeenCalled();
+  });
+
   it("should create purchase record for valid webhook", async () => {
     const event = createCheckoutSessionEvent("user-123", "pi_test456");
     vi.mocked(verifyWebhookSignature).mockReturnValue(event);
 
-    const mockInsert = vi.fn(() => ({ error: null }));
-    const mockFrom = vi.fn(() => ({ insert: mockInsert }));
+    const mockMaybeSingle = vi.fn(() => ({ data: null, error: null }));
+    const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+    const mockSelect = vi.fn(() => ({ eq: mockEq }));
+    const mockWebhookInsert = vi.fn(() => ({ error: null }));
+    const mockPurchaseInsert = vi.fn(() => ({ error: null }));
+    const mockFrom = vi.fn((table: string) => {
+      if (table === "stripe_webhook_events") {
+        return { select: mockSelect, insert: mockWebhookInsert };
+      }
+      if (table === "voice_purchases") {
+        return { insert: mockPurchaseInsert };
+      }
+      return { insert: vi.fn(() => ({ error: null })) };
+    });
     vi.mocked(createAdminClient).mockReturnValue({
       from: mockFrom,
     } as unknown as ReturnType<typeof createAdminClient>);
@@ -151,7 +308,7 @@ describe("POST /api/webhooks/stripe", () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(mockFrom).toHaveBeenCalledWith("voice_purchases");
-    expect(mockInsert).toHaveBeenCalledWith({
+    expect(mockPurchaseInsert).toHaveBeenCalledWith({
       user_id: "user-123",
       purchase_type: "day_pass",
       payment_provider_id: "pi_test456",
@@ -159,38 +316,26 @@ describe("POST /api/webhooks/stripe", () => {
     });
   });
 
-  it("should handle duplicate orders gracefully", async () => {
-    const event = createCheckoutSessionEvent("user-123", "pi_test456");
-    vi.mocked(verifyWebhookSignature).mockReturnValue(event);
-
-    const mockInsert = vi.fn(() => ({
-      error: { code: "23505", message: "duplicate key" },
-    }));
-    const mockFrom = vi.fn(() => ({ insert: mockInsert }));
-    vi.mocked(createAdminClient).mockReturnValue({
-      from: mockFrom,
-    } as unknown as ReturnType<typeof createAdminClient>);
-
-    const request = createRequest(JSON.stringify({}), {
-      "stripe-signature": "valid-signature",
-    });
-
-    const response = await POST(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.duplicate).toBe(true);
-  });
-
   it("should return 500 on database error", async () => {
     const event = createCheckoutSessionEvent("user-123", "pi_test456");
     vi.mocked(verifyWebhookSignature).mockReturnValue(event);
 
-    const mockInsert = vi.fn(() => ({
+    const mockMaybeSingle = vi.fn(() => ({ data: null, error: null }));
+    const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+    const mockSelect = vi.fn(() => ({ eq: mockEq }));
+    const mockWebhookInsert = vi.fn(() => ({ error: null }));
+    const mockPurchaseInsert = vi.fn(() => ({
       error: { code: "42000", message: "database error" },
     }));
-    const mockFrom = vi.fn(() => ({ insert: mockInsert }));
+    const mockFrom = vi.fn((table: string) => {
+      if (table === "stripe_webhook_events") {
+        return { select: mockSelect, insert: mockWebhookInsert };
+      }
+      if (table === "voice_purchases") {
+        return { insert: mockPurchaseInsert };
+      }
+      return { insert: vi.fn(() => ({ error: null })) };
+    });
     vi.mocked(createAdminClient).mockReturnValue({
       from: mockFrom,
     } as unknown as ReturnType<typeof createAdminClient>);
@@ -211,8 +356,20 @@ describe("POST /api/webhooks/stripe", () => {
     const event = createCheckoutSessionEvent("user-123", "pi_test456");
     vi.mocked(verifyWebhookSignature).mockReturnValue(event);
 
-    const mockInsert = vi.fn(() => ({ error: null }));
-    const mockFrom = vi.fn(() => ({ insert: mockInsert }));
+    const mockMaybeSingle = vi.fn(() => ({ data: null, error: null }));
+    const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+    const mockSelect = vi.fn(() => ({ eq: mockEq }));
+    const mockWebhookInsert = vi.fn(() => ({ error: null }));
+    const mockPurchaseInsert = vi.fn(() => ({ error: null }));
+    const mockFrom = vi.fn((table: string) => {
+      if (table === "stripe_webhook_events") {
+        return { select: mockSelect, insert: mockWebhookInsert };
+      }
+      if (table === "voice_purchases") {
+        return { insert: mockPurchaseInsert };
+      }
+      return { insert: vi.fn(() => ({ error: null })) };
+    });
     vi.mocked(createAdminClient).mockReturnValue({
       from: mockFrom,
     } as unknown as ReturnType<typeof createAdminClient>);
@@ -252,48 +409,5 @@ describe("POST /api/webhooks/stripe", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("Internal server error");
-  });
-
-  it("should use checkout session ID as fallback when payment_intent is null", async () => {
-    const event: Stripe.Event = {
-      id: "evt_test123",
-      object: "event",
-      api_version: "2024-12-18.acacia",
-      created: 1234567890,
-      type: "checkout.session.completed",
-      livemode: false,
-      pending_webhooks: 0,
-      request: { id: "req_123", idempotency_key: null },
-      data: {
-        object: {
-          id: "cs_test789",
-          object: "checkout.session",
-          payment_intent: null,
-          payment_status: "paid",
-          status: "complete",
-          metadata: { user_id: "user-123" },
-        } as unknown as Stripe.Checkout.Session,
-      },
-    } as Stripe.Event;
-
-    vi.mocked(verifyWebhookSignature).mockReturnValue(event);
-
-    const mockInsert = vi.fn(() => ({ error: null }));
-    const mockFrom = vi.fn(() => ({ insert: mockInsert }));
-    vi.mocked(createAdminClient).mockReturnValue({
-      from: mockFrom,
-    } as unknown as ReturnType<typeof createAdminClient>);
-
-    const request = createRequest(JSON.stringify({}), {
-      "stripe-signature": "valid-signature",
-    });
-
-    await POST(request);
-
-    expect(mockInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        payment_provider_id: "cs_test789",
-      })
-    );
   });
 });
