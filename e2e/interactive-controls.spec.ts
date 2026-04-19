@@ -123,11 +123,12 @@ test.describe("Ambient toggle behavior", () => {
     // Get the title after stopping
     const titleAfterStop = await page.locator("h1").first().textContent();
 
-    // Wait well beyond the auto-advance interval
-    await page.waitForTimeout(7000);
-
-    // Title should be the same — no auto-advance happened
-    await expect(page.locator("h1").first()).toHaveText(titleAfterStop!);
+    // Title should remain the same — no auto-advance should happen.
+    // toHaveText with a generous timeout passes immediately when the title
+    // stays put; it only fails if the title unexpectedly changes.
+    await expect(page.locator("h1").first()).toHaveText(titleAfterStop!, {
+      timeout: 7000,
+    });
   });
 });
 
@@ -243,11 +244,10 @@ test.describe("Navigation behavior", () => {
 
     await page.keyboard.press("ArrowRight");
 
-    // Wait for transition
-    await page.waitForTimeout(500);
-
-    // Title should change
-    await expect(page.locator("h1").first()).not.toHaveText(initialTitle!);
+    // Title should change after transition
+    await expect(page.locator("h1").first()).not.toHaveText(initialTitle!, {
+      timeout: 3000,
+    });
   });
 
   test("left arrow key goes to previous story", async ({
@@ -257,17 +257,21 @@ test.describe("Navigation behavior", () => {
     test.skip(isMobile, "Keyboard navigation is desktop-only");
 
     // First go to second story
+    const initialTitle = await page.locator("h1").first().textContent();
     await page.keyboard.press("ArrowRight");
-    await page.waitForTimeout(500);
+    await expect(page.locator("h1").first()).not.toHaveText(initialTitle!, {
+      timeout: 3000,
+    });
 
     const secondTitle = await page.locator("h1").first().textContent();
 
     // Now go back
     await page.keyboard.press("ArrowLeft");
-    await page.waitForTimeout(500);
 
     // Title should change back
-    await expect(page.locator("h1").first()).not.toHaveText(secondTitle!);
+    await expect(page.locator("h1").first()).not.toHaveText(secondTitle!, {
+      timeout: 3000,
+    });
   });
 
   test("i key toggles info overlay visibility", async ({
@@ -308,10 +312,11 @@ test.describe("Navigation behavior", () => {
 
     if (segmentCount >= 3) {
       await segments.nth(2).click();
-      await page.waitForTimeout(500);
 
-      // Should navigate to a different story
-      await expect(page.locator("h1").first()).not.toHaveText(initialTitle!);
+      // Should navigate to a different story after transition
+      await expect(page.locator("h1").first()).not.toHaveText(initialTitle!, {
+        timeout: 3000,
+      });
     }
   });
 });
