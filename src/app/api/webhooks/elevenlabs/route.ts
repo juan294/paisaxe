@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
+import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import {
@@ -68,6 +69,45 @@ const NO_ANSWER_PATTERNS = [
 
 // 30-minute tolerance for timestamp validation (matches ElevenLabs SDK)
 const TIMESTAMP_TOLERANCE_SECONDS = 30 * 60;
+
+/**
+ * Zod schema for the ElevenLabs post_call_transcription payload.
+ * The analysis field has two possible nesting paths:
+ *   1. Top-level: { analysis: { call_successful, transcript_summary } }
+ *   2. Nested in data: { data: { analysis: { call_successful, transcript_summary } } }
+ */
+const TranscriptEntrySchema = z
+  .object({
+    role: z.enum(["user", "agent"]),
+    message: z.string().optional(),
+    time_in_call_secs: z.number().optional(),
+  })
+  .strict();
+
+const AnalysisSchema = z
+  .object({
+    call_successful: z.union([z.string(), z.boolean()]).optional(),
+    transcript_summary: z.string().optional(),
+  })
+  .strict();
+
+const ElevenLabsWebhookSchema = z
+  .object({
+    conversation_id: z.string().optional(),
+    event_type: z.string().optional(),
+    type: z.string().optional(),
+    transcript: z.union([z.array(TranscriptEntrySchema), z.string()]).optional(),
+    analysis: AnalysisSchema.optional(),
+    data: z
+      .object({
+        conversation_id: z.string().optional(),
+        transcript: z.union([z.array(TranscriptEntrySchema), z.string()]).optional(),
+        analysis: AnalysisSchema.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * Parse ElevenLabs signature header format: "t=timestamp,v0=signature"
@@ -285,6 +325,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Parse payload
     const body = JSON.parse(rawBody);
 
+    // Zod schema validation — warn on unexpected/missing fields
+    const parseResult = ElevenLabsWebhookSchema.safeParse(body);
+    if (!parseResult.success) {
+      const unknownFields = parseResult.error.issues.flatMap((i) =>
+        "keys" in i && Array.isArray(i.keys)
+          ? (i.keys as string[])
+          : i.path.length > 0
+          ? [i.path.join(".")]
+          : []
+      );
+      console.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "elevenlabs", fields: unknownFields });
+    }
+
     // ElevenLabs sends different event types - only handle post_call_transcription
     const eventType = body.event_type || body.type;
     if (eventType && eventType !== "post_call_transcription") {
@@ -305,13 +358,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Look up pending booking
     const supabase = createAdminClient();
 
+    // maybeSingle() returns {data: null, error: null} when no row is found
     const { data: booking, error: fetchError } = await supabase
       .from("pending_bookings")
       .select("*")
       .eq("conversation_id", conversationId)
-      .single();
+      .maybeSingle();
 
-    if (fetchError || !booking) {
+    if (fetchError) {
+      console.error(
+        `[elevenlabs-webhook] DB error fetching booking for conversation: ${conversationId}`,
+        fetchError
+      );
+    }
+
+    if (!booking) {
       console.warn(
         `[elevenlabs-webhook] No pending booking found for conversation: ${conversationId}`
       );
