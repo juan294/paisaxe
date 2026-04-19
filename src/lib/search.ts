@@ -16,8 +16,7 @@ export async function searchChunks(
   });
 
   if (error) {
-    console.error("Search error:", error);
-    return [];
+    throw new Error(`Search RPC failed: ${error.message ?? String(error)}`);
   }
 
   return data.map((row: {
