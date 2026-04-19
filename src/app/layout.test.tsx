@@ -123,6 +123,24 @@ describe("RootLayout", () => {
     });
   });
 
+  describe("main landmark", () => {
+    it("renders <main id='main-content'> as a server-side landmark (not delegated to client providers)", () => {
+      const Component = RootLayout({ children: <div data-testid="child">Child</div> });
+      const { container } = render(Component);
+      const mainElement = container.querySelector("main#main-content");
+      expect(mainElement).not.toBeNull();
+      expect(mainElement?.tagName).toBe("MAIN");
+    });
+
+    it("places children inside the <main id='main-content'> landmark", () => {
+      const Component = RootLayout({ children: <div data-testid="inner">Inner</div> });
+      const { container } = render(Component);
+      const mainElement = container.querySelector("main#main-content");
+      expect(mainElement).not.toBeNull();
+      expect(mainElement?.querySelector("[data-testid='inner']")).not.toBeNull();
+    });
+  });
+
   describe("preconnect links", () => {
     const layoutSource = fs.readFileSync(
       path.join(process.cwd(), "src/app/layout.tsx"),
