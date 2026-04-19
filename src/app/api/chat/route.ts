@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     );
     const { generateEmbedding } = await import("@/lib/embeddings");
     const { search } = await import("@/lib/search");
-    const { supabase } = await import("@/lib/supabase");
+    const { isFeatureFlagEnabled } = await import("@/lib/feature-flags-server");
     const { detectPromptLeakage } = await import("@/lib/chat-safety");
 
     // === MAIN PROCESSING ===
@@ -137,18 +137,8 @@ export async function POST(request: NextRequest) {
       ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
       : cleanMessage;
 
-    // Check if Asturianu touches feature is enabled
-    let asturianEnabled = false;
-    try {
-      const { data: flagData } = await supabase
-        .from("feature_flags")
-        .select("enabled")
-        .eq("flag_key", "asturianu_touches")
-        .single();
-      asturianEnabled = flagData?.enabled ?? false;
-    } catch {
-      // Default to false on error
-    }
+    // Check if Asturianu touches feature is enabled (cached via isFeatureFlagEnabled)
+    const asturianEnabled = await isFeatureFlagEnabled("asturianu_touches");
 
     // Generate response using Claude with context
     const responseText = await generateChatResponse(

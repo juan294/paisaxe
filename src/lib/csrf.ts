@@ -62,6 +62,41 @@ function parseCookieValue(
 }
 
 /**
+ * Validate the Origin (or Referer fallback) header against a list of allowed origins.
+ *
+ * Defense-in-depth layer for CSRF (SE-L2): if an Origin header is present and
+ * doesn't match the allowed list, the request is rejected regardless of the
+ * HMAC/double-submit token. Referer is used as a fallback only when Origin is
+ * absent — non-browser clients (curl, mobile, server-to-server) omit Origin
+ * and should pass through unchallenged.
+ *
+ * @param request     The incoming request
+ * @param allowedOrigins  List of fully-qualified origin strings (e.g. ["https://paisaxe.es"])
+ * @returns true if origin is allowed (or absent without Referer), false if rejected
+ */
+export function validateOrigin(request: Request, allowedOrigins: string[]): boolean {
+  const origin = request.headers.get("origin");
+
+  if (origin) {
+    return allowedOrigins.includes(origin);
+  }
+
+  // No Origin header — check Referer as a weaker fallback
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      const refererOrigin = new URL(referer).origin;
+      return allowedOrigins.includes(refererOrigin);
+    } catch {
+      return false;
+    }
+  }
+
+  // Neither Origin nor Referer present — allow (non-browser/server-to-server)
+  return true;
+}
+
+/**
  * Validate CSRF token using double-submit cookie pattern.
  * Compares the x-csrf-token header against the __csrf cookie using
  * timing-safe comparison.

@@ -6,6 +6,8 @@
  * - "production" for production domains (paisaxe.es, paisaxe.com)
  */
 
+import { getEnv } from "@/lib/env";
+
 type Environment = "development" | "production";
 
 /**
@@ -18,7 +20,7 @@ type Environment = "development" | "production";
  */
 export function getEnvironment(): Environment {
   // Check site URL first (most reliable for distinguishing environments)
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const siteUrl = getEnv("NEXT_PUBLIC_SITE_URL");
   if (siteUrl) {
     try {
       const url = new URL(siteUrl);
