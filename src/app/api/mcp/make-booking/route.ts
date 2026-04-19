@@ -335,40 +335,72 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // Normalize phone number for calling
     const normalizedPhone = normalizePhoneNumber(phone_number);
+    const normalizedCustomerPhone = normalizePhoneNumber(customer_phone);
+
+    // BE-B6: Insert pending_bookings row with status='initiating' BEFORE placing the call.
+    // This ensures the webhook handler can always find the booking row, even if the
+    // post_call_transcription webhook fires before we finish inserting after the call.
+    let pendingRowId: string | null = null;
+    try {
+      const supabase = createAdminClient();
+      const { data: insertedRows, error: insertError } = await supabase
+        .from("pending_bookings")
+        .insert({
+          venue_name,
+          venue_phone: normalizedPhone,
+          customer_name,
+          customer_phone: normalizedCustomerPhone,
+          party_size: Number(party_size),
+          booking_date: date,
+          booking_time: time,
+          special_requests: params.special_requests || null,
+          status: "initiating",
+        })
+        .select("id");
+
+      if (insertError) {
+        console.error("[make-booking] Failed to pre-insert pending booking:", insertError);
+        // Don't fail the request — proceed with the call anyway
+      } else if (insertedRows && insertedRows.length > 0) {
+        pendingRowId = (insertedRows[0] as { id: string }).id ?? null;
+      }
+    } catch (dbError) {
+      console.error("[make-booking] Database error pre-inserting pending booking:", dbError);
+      // Don't fail the request — proceed with the call anyway
+    }
 
     // Initiate the call via ElevenLabs
     const result = await initiateCall(normalizedPhone, callRequest);
 
     if (result.success) {
-      // Store pending booking for webhook to find later
+      // BE-B6: Now that we have the call ID, update the row with conversation_id and status='pending'.
+      // The webhook handler will look up the booking by conversation_id.
       const conversationId = result.conversationId || result.callSid;
-      const normalizedCustomerPhone = normalizePhoneNumber(customer_phone);
 
       if (conversationId) {
         try {
           const supabase = createAdminClient();
-          const { error: insertError } = await supabase
-            .from("pending_bookings")
-            .insert({
-              conversation_id: conversationId,
-              venue_name,
-              venue_phone: normalizedPhone,
-              customer_name,
-              customer_phone: normalizedCustomerPhone,
-              party_size,
-              booking_date: date,
-              booking_time: time,
-              special_requests: params.special_requests || null,
-              status: "pending",
-            });
+          const updateData: Record<string, unknown> = {
+            conversation_id: conversationId,
+            status: "pending",
+          };
 
-          if (insertError) {
-            console.error("[make-booking] Failed to store pending booking:", insertError);
-            // Don't fail the request - call was already initiated
+          // Update by id if we have it, otherwise update by initiating status + booking details
+          const updateQuery = supabase
+            .from("pending_bookings")
+            .update(updateData);
+
+          const { error: updateError } = pendingRowId
+            ? await updateQuery.eq("id", pendingRowId)
+            : await updateQuery.eq("venue_phone", normalizedPhone);
+
+          if (updateError) {
+            console.error("[make-booking] Failed to update pending booking with call ID:", updateError);
+            // Don't fail the request — call was already initiated
           }
         } catch (dbError) {
-          console.error("[make-booking] Database error storing pending booking:", dbError);
-          // Don't fail the request - call was already initiated
+          console.error("[make-booking] Database error updating pending booking:", dbError);
+          // Don't fail the request — call was already initiated
         }
       }
 

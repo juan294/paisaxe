@@ -171,6 +171,27 @@ function extractTranscriptText(
 }
 
 /**
+ * Normalize the call_successful field from ElevenLabs webhook analysis.
+ *
+ * ElevenLabs has delivered this field in multiple formats across API versions:
+ * - Boolean: true / false
+ * - String enum: "success" / "failure" / "unknown"
+ * - String boolean: "true" / "false"
+ * - Missing / null / undefined → treat as unsuccessful
+ *
+ * Returns:
+ *  "success"  → call connected and succeeded
+ *  "failure"  → call explicitly failed (no answer, network error, etc.)
+ *  "unknown"  → ambiguous — fall through to transcript keyword analysis
+ */
+export function isCallSuccessful(value: unknown): "success" | "failure" | "unknown" {
+  if (value === true || value === "success" || value === "true") return "success";
+  if (value === false || value === "failure" || value === "false") return "failure";
+  // null, undefined, "unknown", or any other value → unknown
+  return "unknown";
+}
+
+/**
  * Analyze call transcript/analysis to determine booking outcome.
  *
  * ElevenLabs payload format:
@@ -187,12 +208,16 @@ function analyzeOutcome(webhookData: {
 }): BookingOutcome {
   const { analysis, transcript } = webhookData;
 
-  // If call wasn't successful at all, it's a no_answer or failed
-  // ElevenLabs uses string enum: "success" | "failure" | "unknown"
-  if (
-    analysis?.call_successful === "failure" ||
-    analysis?.call_successful === false
-  ) {
+  // Normalize call_successful to handle all field variants
+  const callResult = isCallSuccessful(analysis?.call_successful);
+
+  // Explicit failure → no_answer (call didn't connect)
+  if (callResult === "failure") {
+    return "no_answer";
+  }
+
+  // null/undefined/missing also means no successful call → no_answer
+  if (callResult === "unknown" && analysis?.call_successful == null) {
     return "no_answer";
   }
 
