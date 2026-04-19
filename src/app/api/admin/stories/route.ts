@@ -5,10 +5,9 @@ import {
   rowToAdminStory,
   type AdminStoryRow,
   type CurationStatus,
-  type CreateStoryRequest,
 } from "@/types/admin";
-import { VALID_CATEGORIES } from "@/types/immersive";
 import type { StoryCategory } from "@/types/immersive";
+import { createStorySchema } from "@/lib/schemas";
 
 /**
  * Generate a URL-safe slug from a title.
@@ -89,27 +88,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body: CreateStoryRequest = await request.json();
+    const rawBody: unknown = await request.json();
+    const parsed = createStorySchema.safeParse(rawBody);
 
-    // Validate required fields
-    if (!body.title?.trim()) {
-      return NextResponse.json({ error: "Title is required" }, { status: 400 });
-    }
-
-    if (!body.category) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Category is required" },
+        { error: "Invalid request body", errors: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
 
-    if (!VALID_CATEGORIES.includes(body.category)) {
-      return NextResponse.json(
-        { error: "Invalid category" },
-        { status: 400 }
-      );
-    }
-
+    const body = parsed.data;
     const supabase = createAdminClient();
 
     // Generate slug from title if not provided

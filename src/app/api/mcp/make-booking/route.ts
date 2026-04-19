@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateMcpSecret } from "@/lib/mcp-auth";
+import { makeBookingRequestSchema } from "@/lib/schemas";
 
 /**
  * MCP-compatible Make Booking API endpoint for ElevenLabs voice agents.
@@ -249,16 +250,22 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const body = await request.json();
 
-    // Support both flat format and MCP format
-    let params: Partial<MakeBookingRequest>;
+    // Support both flat format and MCP format — validate with Zod
+    const parsed = makeBookingRequestSchema.safeParse(body);
 
-    if (body.arguments) {
-      // MCP tool call format
-      params = body.arguments;
-    } else {
-      // Flat format from ElevenLabs webhook
-      params = body;
+    if (!parsed.success) {
+      return NextResponse.json<MakeBookingResponse & { errors?: unknown }>(
+        {
+          success: false,
+          message: "Invalid request parameters",
+          status: "failed",
+          errors: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
     }
+
+    const params = parsed.data;
 
     // Check if booking system is enabled via feature flag
     const bookingEnabled = await isFeatureFlagEnabled("booking_system");
@@ -275,7 +282,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
     }
 
-    // Validate required fields
     const {
       venue_name,
       phone_number,
@@ -286,32 +292,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       customer_phone,
     } = params;
 
-    if (
-      !venue_name ||
-      !phone_number ||
-      !party_size ||
-      !date ||
-      !time ||
-      !customer_name ||
-      !customer_phone
-    ) {
-      return NextResponse.json<MakeBookingResponse>(
-        {
-          success: false,
-          message:
-            "Missing required fields: venue_name, phone_number, party_size, date, time, customer_name, customer_phone",
-          status: "failed",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate phone number
+    // Validate phone number format (isValidSpanishPhone uses a stricter regex than Zod schema)
     if (!isValidSpanishPhone(phone_number)) {
       return NextResponse.json<MakeBookingResponse>(
         {
           success: false,
-          message: `Invalid Spanish phone number: ${phone_number}. Please provide a valid Spanish phone number.`,
+          message: "Invalid Spanish phone number. Please provide a valid Spanish phone number.",
           status: "failed",
           fallback_action:
             "Ask the user to confirm the phone number or search for the restaurant again.",
@@ -334,11 +320,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
     }
 
-    // Build the full request object
+    // Build the full request object (party_size already validated as number by Zod)
     const callRequest: MakeBookingRequest = {
       venue_name,
       phone_number,
-      party_size: Number(party_size),
+      party_size,
       date,
       time,
       customer_name,
@@ -369,7 +355,7 @@ export async function POST(request: Request): Promise<NextResponse> {
               venue_phone: normalizedPhone,
               customer_name,
               customer_phone: normalizedCustomerPhone,
-              party_size: Number(party_size),
+              party_size,
               booking_date: date,
               booking_time: time,
               special_requests: params.special_requests || null,
