@@ -102,7 +102,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           signal: controller.signal,
         });
 
-        if (!response.ok) throw new Error("Failed");
+        if (!response.ok) {
+          setError(t("chat.error"));
+          throw new Error("Failed");
+        }
 
         // Check if we got a non-streaming JSON response (e.g., for flagged content)
         const contentType = response.headers.get("content-type");
@@ -205,6 +208,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         if (err instanceof Error && err.name === "AbortError") {
           return;
         }
+        setError(t("chat.error"));
         setMessages((prev) => {
           const updated = [...prev];
           if (updated[assistantIndex]) {

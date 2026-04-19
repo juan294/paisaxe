@@ -1426,3 +1426,194 @@ describe("VoiceChat upgrade and expiry", () => {
     });
   });
 });
+
+// UX-H1: Focus restoration on dialog close
+describe("VoiceChat focus restoration on close", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCapture.mockReset();
+    localStorageMock.clear();
+    resetMockVoiceAccess();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should call focus() on triggerRef when close button is clicked", () => {
+    const triggerRef = React.createRef<HTMLButtonElement | null>();
+    const triggerButton = document.createElement("button");
+    const focusSpy = vi.spyOn(triggerButton, "focus");
+    Object.defineProperty(triggerRef, "current", { value: triggerButton, writable: true });
+
+    render(
+      <VoiceChat
+        story={mockStory}
+        open={true}
+        onClose={() => {}}
+        triggerRef={triggerRef}
+      />
+    );
+
+    const buttons = screen.getAllByRole("button");
+    const closeButton = buttons.find((btn) => {
+      const svg = btn.querySelector("svg");
+      return svg?.classList.contains("lucide-x");
+    });
+    expect(closeButton).toBeDefined();
+    fireEvent.click(closeButton!);
+
+    expect(focusSpy).toHaveBeenCalled();
+  });
+
+  it("should call focus() on triggerRef when backdrop is clicked", () => {
+    const triggerRef = React.createRef<HTMLButtonElement | null>();
+    const triggerButton = document.createElement("button");
+    const focusSpy = vi.spyOn(triggerButton, "focus");
+    Object.defineProperty(triggerRef, "current", { value: triggerButton, writable: true });
+
+    render(
+      <VoiceChat
+        story={mockStory}
+        open={true}
+        onClose={() => {}}
+        triggerRef={triggerRef}
+      />
+    );
+
+    const backdrop = document.querySelector(".bg-black\\/60");
+    expect(backdrop).toBeTruthy();
+    fireEvent.click(backdrop!);
+
+    expect(focusSpy).toHaveBeenCalled();
+  });
+
+  it("should still call onClose when triggerRef is not provided", () => {
+    const onClose = vi.fn();
+    render(
+      <VoiceChat story={mockStory} open={true} onClose={onClose} />
+    );
+
+    const buttons = screen.getAllByRole("button");
+    const closeButton = buttons.find((btn) => {
+      const svg = btn.querySelector("svg");
+      return svg?.classList.contains("lucide-x");
+    });
+    fireEvent.click(closeButton!);
+
+    expect(onClose).toHaveBeenCalled();
+  });
+});
+
+// UX-H2: Error UI for chat API failures
+describe("VoiceChat error UI for API failures", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCapture.mockReset();
+    localStorageMock.clear();
+    resetMockVoiceAccess();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should show role=alert error banner when API returns non-ok response", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false });
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    await userEvent.type(input, "Question");
+    const form = input.closest("form");
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      const alert = screen.getByRole("alert");
+      expect(alert).toBeInTheDocument();
+    });
+  });
+
+  it("should show Spanish connection error message in the alert", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false });
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    await userEvent.type(input, "Question");
+    const form = input.closest("form");
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      const alert = screen.getByRole("alert");
+      expect(alert.textContent).toContain("No se pudo conectar");
+    });
+  });
+
+  it("should show a retry button in the error banner", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false });
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    await userEvent.type(input, "Question");
+    const form = input.closest("form");
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      const alert = screen.getByRole("alert");
+      const retryButton = alert.querySelector("button");
+      expect(retryButton).toBeTruthy();
+    });
+  });
+
+  it("should retry the last message when retry button is clicked", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false });
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    await userEvent.type(input, "Retry question");
+    const form = input.closest("form");
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+
+    mockFetch.mockResolvedValueOnce(createStreamingResponse("Retry success"));
+
+    const alert = screen.getByRole("alert");
+    const retryButton = alert.querySelector("button")!;
+    fireEvent.click(retryButton);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      const retryCall = mockFetch.mock.calls[1][1].body;
+      expect(retryCall).toContain("Retry question");
+    });
+  });
+
+  it("should clear the error alert on successful retry", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false });
+
+    render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+    const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+    await userEvent.type(input, "Question");
+    const form = input.closest("form");
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+
+    mockFetch.mockResolvedValueOnce(createStreamingResponse("Success response"));
+    const retryButton = screen.getByRole("alert").querySelector("button")!;
+    fireEvent.click(retryButton);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
+});

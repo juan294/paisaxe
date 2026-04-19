@@ -27,6 +27,8 @@ export const de: Translations = {
     speech_hint: 'Sie können das Mikrofon zum Sprechen verwenden',
     error_processing: 'Entschuldigung, ich konnte Ihre Frage nicht verarbeiten.',
     error_generic: 'Entschuldigung, ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
+    error: 'Verbindung fehlgeschlagen. Bitte versuchen Sie es erneut.',
+    retry: 'Erneut versuchen',
     // LOCATION-SPECIFIC: Location name in alt text
     image_alt: 'Bild aus Asturien',
     source: 'Quelle',

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, RefObject } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
@@ -51,6 +51,8 @@ interface StoryViewerProps {
   onClearFilters: () => void;
   // Surprise Me props
   viewedIndices?: Set<number>;
+  /** Ref forwarded to the "ask about" trigger button for focus restoration when VoiceChat closes */
+  chatTriggerRef?: RefObject<HTMLButtonElement | null>;
 }
 
 export function StoryViewer({
@@ -68,6 +70,7 @@ export function StoryViewer({
   onDurationChange,
   onClearFilters,
   viewedIndices,
+  chatTriggerRef,
 }: StoryViewerProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
@@ -355,6 +358,7 @@ export function StoryViewer({
         {/* Action buttons */}
         <div className="flex flex-wrap items-center gap-3 mt-3">
           <button
+            ref={chatTriggerRef}
             data-testid="ask-button"
             onClick={(e) => {
               e.stopPropagation();

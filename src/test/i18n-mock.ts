@@ -14,6 +14,8 @@ export const mockTranslations: Record<string, string> = {
   "chat.speech_hint": "Puedes usar el micrófono para hablar",
   "chat.error_generic": "Lo siento, hubo un error. Intenta de nuevo.",
   "chat.error_processing": "Lo siento, no pude procesar tu pregunta.",
+  "chat.error": "No se pudo conectar. Por favor, inténtalo de nuevo.",
+  "chat.retry": "Reintentar",
   "chat.privacy_notice": "Tus preguntas se procesan con inteligencia artificial. No guardamos tus conversaciones.",
   "chat.understood": "Entendido",
   "chat.source": "Fuente",

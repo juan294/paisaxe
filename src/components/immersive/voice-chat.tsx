@@ -54,12 +54,14 @@ interface VoiceChatProps {
   open: boolean;
   onClose: () => void;
   initialMessage?: string;
+  triggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
-export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatProps) {
+export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: VoiceChatProps) {
   const [inputValue, setInputValue] = useState("");
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const [useElevenLabs, setUseElevenLabs] = useState(false);
+  const [lastMessage, setLastMessage] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const { t, locale } = useTranslation();
@@ -67,6 +69,11 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const posthog = usePostHog();
   const stableOnClose = useMemo(() => onClose, [onClose]);
   useFocusTrap(dialogRef, open, stableOnClose);
+
+  const handleClose = useCallback(() => {
+    triggerRef?.current?.focus();
+    onClose();
+  }, [onClose, triggerRef]);
 
   // Check for voice access (whitelisted OR paid)
   const {
@@ -82,6 +89,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const {
     messages,
     isStreaming: isLoading,
+    error: chatError,
     sendMessage,
     resetMessages,
     dismissUpsell: handleUpsellDismiss,
@@ -139,6 +147,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     const userMessage = inputValue.trim();
     const isFirstMessage = messages.length === 0;
     setInputValue("");
+    setLastMessage(userMessage);
 
     // Track chat events in PostHog
     if (isFirstMessage) {
@@ -156,6 +165,15 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     });
   };
 
+  const handleRetry = useCallback(async () => {
+    if (!lastMessage || isLoading) return;
+    await sendMessage(lastMessage, {
+      context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
+      locale,
+      messageIndex: messages.filter((m) => m.role === "user").length,
+    });
+  }, [lastMessage, isLoading, sendMessage, localizedStory, story, locale, messages]);
+
   if (!open) return null;
 
   return (
@@ -168,7 +186,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Chat panel */}
@@ -213,7 +231,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             <Button
               variant="ghost"
               size="icon"
-              onClick={onClose}
+              onClick={handleClose}
               aria-label={t("accessibility.close_chat")}
               className="text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             >
@@ -340,6 +358,24 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Error banner for chat API failures */}
+            {chatError && (
+              <div
+                role="alert"
+                className="mx-4 mb-3 flex items-center justify-between gap-3 rounded-lg bg-red-500/10 px-4 py-3 border border-red-500/20"
+              >
+                <p className="text-sm text-red-200">{chatError}</p>
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  disabled={isLoading}
+                  className="shrink-0 text-xs font-medium text-red-300 hover:text-red-100 underline disabled:opacity-50"
+                >
+                  {t("chat.retry")}
+                </button>
+              </div>
+            )}
 
             {/* Context-aware action buttons */}
             <ChatActions messages={messages} isLoading={isLoading} />
