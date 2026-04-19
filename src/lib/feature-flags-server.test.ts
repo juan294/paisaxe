@@ -145,4 +145,73 @@ describe("isFeatureFlagEnabled", () => {
     const fetchOptions = mockFetch.mock.calls[0][1];
     expect(fetchOptions.cache).toBe("no-store");
   });
+
+  it("emits console.error with [FEATURE_FLAG_FAILURE] when fetch throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockRejectedValue(new Error("Connection failed"));
+
+    const { isFeatureFlagEnabled } = await import("./feature-flags-server");
+    const result = await isFeatureFlagEnabled("randomized_order");
+
+    expect(result).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[FEATURE_FLAG_FAILURE]",
+      expect.objectContaining({
+        flag: "randomized_order",
+        error: "Connection failed",
+      })
+    );
+  });
+
+  it("emits console.error with [FEATURE_FLAG_FAILURE] on non-200 response", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+    });
+
+    const { isFeatureFlagEnabled } = await import("./feature-flags-server");
+    const result = await isFeatureFlagEnabled("randomized_order");
+
+    expect(result).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[FEATURE_FLAG_FAILURE]",
+      expect.objectContaining({
+        flag: "randomized_order",
+        statusCode: 503,
+      })
+    );
+  });
+
+  it("returns false and emits console.error on AbortError (timeout)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const abortError = new DOMException("The operation was aborted", "AbortError");
+    mockFetch.mockRejectedValue(abortError);
+
+    const { isFeatureFlagEnabled } = await import("./feature-flags-server");
+    const result = await isFeatureFlagEnabled("randomized_order");
+
+    expect(result).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[FEATURE_FLAG_FAILURE]",
+      expect.objectContaining({
+        flag: "randomized_order",
+        error: expect.stringContaining("aborted"),
+      })
+    );
+  });
+
+  it("passes an AbortSignal to fetch for timeout control", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => [{ enabled: true }],
+    });
+
+    const { isFeatureFlagEnabled } = await import("./feature-flags-server");
+    await isFeatureFlagEnabled("randomized_order");
+
+    const fetchOptions = mockFetch.mock.calls[0][1];
+    expect(fetchOptions.signal).toBeDefined();
+    expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+  });
 });
