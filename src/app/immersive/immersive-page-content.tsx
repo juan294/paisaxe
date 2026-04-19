@@ -47,6 +47,7 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
   const [moodDismissed, setMoodDismissed] = useState(false);
   const [, startTransition] = useTransition();
   const deepLinkHandled = useRef(false);
+  const chatTriggerRef = useRef<HTMLButtonElement>(null);
 
   // Use server-provided seed if available, otherwise generate client-side
   // This ensures shuffling happens on first render without flicker
@@ -224,6 +225,7 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
           onDurationChange={setSelectedDuration}
           onClearFilters={clearAll}
           viewedIndices={viewedIndices}
+          chatTriggerRef={chatTriggerRef}
         />
       </ComponentErrorBoundary>
       {/* Only render VoiceChat when opened - lazy loaded */}
@@ -235,6 +237,7 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
               open={chatOpen}
               onClose={handleCloseChat}
               initialMessage={initialMessage}
+              triggerRef={chatTriggerRef}
             />
           </ComponentErrorBoundary>
         </Suspense>

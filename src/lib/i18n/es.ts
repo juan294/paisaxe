@@ -27,6 +27,8 @@ export const es: Translations = {
     speech_hint: 'Puedes usar el microfono para hablar',
     error_processing: 'Lo siento, no pude procesar tu pregunta.',
     error_generic: 'Lo siento, hubo un error. Intenta de nuevo.',
+    error: 'No se pudo conectar. Por favor, inténtalo de nuevo.',
+    retry: 'Reintentar',
     // LOCATION-SPECIFIC: Location name in alt text
     image_alt: 'Imagen relacionada de Asturias',
     source: 'Fuente',

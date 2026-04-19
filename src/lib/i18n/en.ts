@@ -27,6 +27,8 @@ export const en: Translations = {
     speech_hint: 'You can use the microphone to speak',
     error_processing: 'Sorry, I could not process your question.',
     error_generic: 'Sorry, there was an error. Please try again.',
+    error: 'Could not connect. Please try again.',
+    retry: 'Retry',
     // LOCATION-SPECIFIC: Location name in alt text
     image_alt: 'Related image of Asturias',
     source: 'Source',
