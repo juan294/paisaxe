@@ -1,31 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor, cleanup, act, fireEvent } from "@testing-library/react";
 
-// Mock next/dynamic to resolve synchronously in tests.
-// The loader function (e.g., () => import("@/components/admin/...")) is called,
-// and since vi.mock replaces those modules, we use waitFor in tests.
-vi.mock("next/dynamic", async () => {
-  const React = await import("react");
-  return {
-    default: (loader: () => Promise<{ default: React.ComponentType }>, _opts?: unknown) => {
-      let Resolved: React.ComponentType | null = null;
-      const pending = loader().then((mod) => {
-        Resolved = mod.default || (mod as unknown as { default: React.ComponentType }).default;
-      });
-      return function DynamicWrapper(props: Record<string, unknown>) {
-        const [ready, setReady] = React.useState(!!Resolved);
-        React.useEffect(() => {
-          if (!ready) {
-            pending.then(() => setReady(true));
-          }
-        }, [ready]);
-        if (!Resolved) return null;
-        return React.createElement(Resolved, props);
-      };
-    },
-  };
-});
+/**
+ * FE-M3 regression: Tab panels are unmounted when not active.
+ *
+ * Previously tabs were kept alive with display:none after first visit.
+ * Now each tab panel is only in the DOM when its tab is active.
+ * This prevents idle panels from polling/fetching.
+ *
+ * These tests exercise AdminPage (page.tsx -> AdminShell) directly
+ * without the next/dynamic mock, since AdminShell handles tab routing.
+ */
 
 // Mock auth hooks — admin user
 vi.mock("@/hooks/use-auth", () => ({
@@ -49,6 +34,7 @@ vi.mock("@/lib/admin-api", () => ({
   fetchStories: vi.fn().mockResolvedValue({ data: [], error: null }),
   bulkUpdateStoryStatus: vi.fn(),
   bulkDeleteStories: vi.fn(),
+  approveAllPendingStories: vi.fn(),
 }));
 
 // Mock all tab panel components
@@ -98,33 +84,35 @@ vi.mock("@/components/admin/theme-toggle", () => ({
   ThemeToggle: () => <button data-testid="theme-toggle">Theme</button>,
 }));
 
-describe("AdminPage top-level lazy-mount", () => {
+// Import AdminShell directly to avoid next/dynamic complexity in this test
+import { AdminShell } from "@/components/admin/admin-shell";
+
+describe("AdminPage tab unmount behavior (FE-M3)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  async function renderAdmin() {
-    const AdminPage = (await import("./page")).default;
-    return render(<AdminPage />);
-  }
+  afterEach(() => {
+    cleanup();
+  });
 
   it("only renders the default tab (analytics) content initially", async () => {
-    await renderAdmin();
+    render(<AdminShell />);
 
-    // Wait for dynamic import to resolve
+    // Wait for dynamic import to load analytics
     await waitFor(() => {
       expect(screen.getByTestId("analytics-panel")).toBeInTheDocument();
     });
 
-    // Other tab panels should NOT be in the DOM
+    // Other tab panels must NOT be in the DOM
     expect(screen.queryByTestId("features-panel")).not.toBeInTheDocument();
     expect(screen.queryByTestId("marketing-panel")).not.toBeInTheDocument();
     expect(screen.queryByTestId("suggestions-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agents-panel")).not.toBeInTheDocument();
   });
 
   it("mounts a new tab's content when switching to it", async () => {
-    const user = userEvent.setup();
-    await renderAdmin();
+    render(<AdminShell />);
 
     await waitFor(() => {
       expect(screen.getByTestId("analytics-panel")).toBeInTheDocument();
@@ -134,7 +122,9 @@ describe("AdminPage top-level lazy-mount", () => {
     expect(screen.queryByTestId("features-panel")).not.toBeInTheDocument();
 
     // Click the Features tab
-    await user.click(screen.getByRole("tab", { name: /Features/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: /Features/i }));
+    });
 
     // Features should now be mounted
     await waitFor(() => {
@@ -142,31 +132,76 @@ describe("AdminPage top-level lazy-mount", () => {
     });
   });
 
-  it("preserves previously visited tab content when switching away", async () => {
-    const user = userEvent.setup();
-    await renderAdmin();
+  it("unmounts previous tab content when switching away (FE-M3 core behavior)", async () => {
+    render(<AdminShell />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("analytics-panel")).toBeInTheDocument();
+    });
+
+    // Switch to Features
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: /Features/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("features-panel")).toBeInTheDocument();
+    });
+
+    // Analytics should be UNMOUNTED (not just hidden) — FE-M3 regression check
+    expect(screen.queryByTestId("analytics-panel")).not.toBeInTheDocument();
+  });
+
+  it("only one tab panel is in the DOM at a time", async () => {
+    render(<AdminShell />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("analytics-panel")).toBeInTheDocument();
+    });
+
+    // Navigate to Marketing
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: /Marketing/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("marketing-panel")).toBeInTheDocument();
+    });
+
+    // Only marketing should be mounted — all others gone
+    expect(screen.queryByTestId("analytics-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("features-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("suggestions-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agents-panel")).not.toBeInTheDocument();
+  });
+
+  it("re-mounts a previously visited tab when returning to it", async () => {
+    render(<AdminShell />);
 
     await waitFor(() => {
       expect(screen.getByTestId("analytics-panel")).toBeInTheDocument();
     });
 
     // Visit Features
-    await user.click(screen.getByRole("tab", { name: /Features/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: /Features/i }));
+    });
+
     await waitFor(() => {
       expect(screen.getByTestId("features-panel")).toBeInTheDocument();
     });
 
-    // Switch to Marketing
-    await user.click(screen.getByRole("tab", { name: /Marketing/i }));
-
-    // Wait for Marketing to mount
-    await waitFor(() => {
-      expect(screen.getByTestId("marketing-panel")).toBeInTheDocument();
+    // Return to Analytics
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: /Analytics/i }));
     });
 
-    // Features should still be in the DOM (hidden)
-    expect(screen.getByTestId("features-panel")).toBeInTheDocument();
-    // Analytics (default) should also still be mounted
-    expect(screen.getByTestId("analytics-panel")).toBeInTheDocument();
+    await waitFor(() => {
+      // Analytics is re-mounted when we come back
+      expect(screen.getByTestId("analytics-panel")).toBeInTheDocument();
+    });
+
+    // Features is unmounted
+    expect(screen.queryByTestId("features-panel")).not.toBeInTheDocument();
   });
 });
