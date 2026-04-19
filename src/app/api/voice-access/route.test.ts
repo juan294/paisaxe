@@ -14,7 +14,7 @@ vi.mock("@supabase/ssr", () => ({
           gt: vi.fn(() => ({
             order: vi.fn(() => ({
               limit: vi.fn(() => ({
-                single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+                maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
               })),
             })),
           })),
@@ -110,7 +110,7 @@ describe("Voice Access API", () => {
       expect(response.status).toBe(401);
     });
 
-    it("should return hasAccess: false when no active voice purchase found", async () => {
+    it("should return hasAccess: false when no active voice purchase found (maybeSingle returns null data)", async () => {
       mockCreateServerClient.mockReturnValue({
         auth: {
           getUser: vi.fn().mockResolvedValue({
@@ -124,8 +124,9 @@ describe("Voice Access API", () => {
               gt: vi.fn(() => ({
                 order: vi.fn(() => ({
                   limit: vi.fn(() => ({
-                    single: vi.fn(() =>
-                      Promise.resolve({ data: null, error: { code: "PGRST116" } })
+                    maybeSingle: vi.fn(() =>
+                      // maybeSingle returns {data: null, error: null} for no rows — no PGRST116
+                      Promise.resolve({ data: null, error: null })
                     ),
                   })),
                 })),
@@ -162,7 +163,7 @@ describe("Voice Access API", () => {
               gt: vi.fn(() => ({
                 order: vi.fn(() => ({
                   limit: vi.fn(() => ({
-                    single: vi.fn(() =>
+                    maybeSingle: vi.fn(() =>
                       Promise.resolve({
                         data: {
                           id: "purchase-123",
@@ -192,7 +193,7 @@ describe("Voice Access API", () => {
       expect(json.purchaseType).toBe("day_pass");
     });
 
-    it("should return 500 on database error (non-PGRST116)", async () => {
+    it("should return 500 on database error (maybeSingle returns non-null error)", async () => {
       mockCreateServerClient.mockReturnValue({
         auth: {
           getUser: vi.fn().mockResolvedValue({
@@ -206,7 +207,8 @@ describe("Voice Access API", () => {
               gt: vi.fn(() => ({
                 order: vi.fn(() => ({
                   limit: vi.fn(() => ({
-                    single: vi.fn(() =>
+                    maybeSingle: vi.fn(() =>
+                      // With maybeSingle, any non-null error is a real DB error
                       Promise.resolve({
                         data: null,
                         error: { code: "PGRST500", message: "Database error" },

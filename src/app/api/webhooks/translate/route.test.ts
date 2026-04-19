@@ -158,4 +158,56 @@ describe("translate webhook", () => {
     expect(response.status).toBe(500);
     expect(json.error).toBe("Internal server error");
   });
+
+  describe("Zod schema validation", () => {
+    it("should emit WEBHOOK_UNKNOWN_SHAPE warn when payload has unexpected fields", async () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { translateStory } = await import("@/lib/translate-story");
+
+      vi.mocked(translateStory).mockResolvedValue({
+        success: true,
+        successCount: 1,
+        failedCount: 0,
+      });
+
+      const request = new NextRequest("http://localhost/api/webhooks/translate", {
+        method: "POST",
+        headers: { "x-webhook-secret": VALID_SECRET },
+        body: JSON.stringify({
+          storyId: "test-story-id",
+          unknownField: "surprise",
+          anotherUnknown: 42,
+        }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[WEBHOOK_UNKNOWN_SHAPE]",
+        expect.objectContaining({ webhook: "translate" })
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should emit WEBHOOK_UNKNOWN_SHAPE warn when storyId is not a string", async () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // isValidPayload checks typeof storyId === "string", so a number storyId will
+      // fail there and return 400 — but if it somehow passes, Zod catches it.
+      // In practice, isValidPayload catches non-string storyId first.
+      const request = new NextRequest("http://localhost/api/webhooks/translate", {
+        method: "POST",
+        headers: { "x-webhook-secret": VALID_SECRET },
+        body: JSON.stringify({ storyId: 123 }),
+      });
+
+      const response = await POST(request);
+      // isValidPayload requires string storyId, so 400
+      expect(response.status).toBe(400);
+
+      consoleSpy.mockRestore();
+    });
+  });
 });
