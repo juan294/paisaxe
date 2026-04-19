@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ChatResponse } from "@/types";
 
+// Module-level cache for the asturianu_touches feature flag (60s TTL)
+let asturianCache: { value: boolean; expiresAt: number } | null = null;
+
 /**
  * Extended response type with security metadata
  */
@@ -137,17 +140,23 @@ export async function POST(request: NextRequest) {
       ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
       : cleanMessage;
 
-    // Check if Asturianu touches feature is enabled
+    // Check Asturianu feature flag (60s module-level cache to avoid per-message DB hit)
     let asturianEnabled = false;
-    try {
-      const { data: flagData } = await supabase
-        .from("feature_flags")
-        .select("enabled")
-        .eq("flag_key", "asturianu_touches")
-        .single();
-      asturianEnabled = flagData?.enabled ?? false;
-    } catch {
-      // Default to false on error
+    if (asturianCache && Date.now() < asturianCache.expiresAt) {
+      asturianEnabled = asturianCache.value;
+    } else {
+      try {
+        const { data: flagData, error: flagError } = await supabase
+          .from("feature_flags")
+          .select("enabled")
+          .eq("flag_key", "asturianu_touches")
+          .single();
+        if (flagError) console.error("[TABLE_FALLBACK]", { table: "feature_flags", key: "asturianu_touches", error: flagError.message });
+        asturianEnabled = flagData?.enabled ?? false;
+        asturianCache = { value: asturianEnabled, expiresAt: Date.now() + 60_000 };
+      } catch (err) {
+        console.error("[TABLE_FALLBACK]", { table: "feature_flags", key: "asturianu_touches", error: err instanceof Error ? err.message : String(err) });
+      }
     }
 
     // Generate response using Claude with context

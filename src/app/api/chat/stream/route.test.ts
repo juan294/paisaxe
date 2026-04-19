@@ -348,7 +348,7 @@ describe("POST /api/chat/stream", () => {
     expect(errorEvent.message).toBe("Error generating response");
   });
 
-  it("should return 500 on internal error before streaming", async () => {
+  it("should return SSE error event when embedding fails before streaming", async () => {
     vi.mocked(generateEmbedding).mockRejectedValue(new Error("Embedding API Error"));
 
     const request = new NextRequest("http://localhost:3000/api/chat/stream", {
@@ -357,10 +357,14 @@ describe("POST /api/chat/stream", () => {
     });
 
     const response = await POST(request);
-    const data = await response.json();
+    const events = await collectStreamEvents(response);
 
-    expect(response.status).toBe(500);
-    expect(data.error).toBe("Internal server error");
+    expect(response.status).toBe(200);
+    const errorEvent = events.find((e) => (e as { type: string }).type === "error") as {
+      type: string;
+      message: string;
+    };
+    expect(errorEvent).toBeDefined();
   });
 
   it("should pass query text to search for reranking", async () => {

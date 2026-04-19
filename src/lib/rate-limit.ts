@@ -152,8 +152,23 @@ export async function checkRateLimit(
   if (useUpstash) {
     try {
       return await checkUpstash(identifier, config);
-    } catch {
-      // Upstash failed — fall back to in-memory so requests aren't blocked
+    } catch (err) {
+      const isProduction = process.env.NODE_ENV === "production";
+      console.error("[RATE_LIMIT_FALLBACK]", {
+        identifier,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      if (isProduction) {
+        // Fail closed in production: deny the request so Upstash failure doesn't bypass limits
+        return {
+          allowed: false,
+          limit: config.maxRequests,
+          remaining: 0,
+          resetAt: Date.now() + config.windowMs,
+          retryAfter: Math.ceil(config.windowMs / 1000),
+        };
+      }
+      // Dev/test: fall through to in-memory
       return checkInMemory(identifier, config);
     }
   }

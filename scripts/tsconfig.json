@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["./**/*.ts"],
+  "exclude": [
+    "../node_modules",
+    "extract-images.ts",
+    "seed-database.ts",
+    "seed-images.ts",
+    "seed-images.test.ts"
+  ]
+}

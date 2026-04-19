@@ -121,10 +121,10 @@ export default function RootLayout({
     <html lang={LOCATION_CONFIG.primaryLanguage} suppressHydrationWarning>
       <head>
         {/* Supabase preconnects - critical for image loading LCP */}
-        <link rel="dns-prefetch" href="https://axoishtlumlswzhegseq.supabase.co" />
+        <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL} />
         <link
           rel="preconnect"
-          href="https://axoishtlumlswzhegseq.supabase.co"
+          href={process.env.NEXT_PUBLIC_SUPABASE_URL}
           crossOrigin="anonymous"
         />
         {/* Unsplash preconnect for external images */}

@@ -39,7 +39,7 @@ export async function isFeatureFlagEnabled(
     );
 
     if (!response.ok) {
-      console.warn(`Failed to fetch feature flag "${key}":`, response.status);
+      console.error("[TABLE_FALLBACK]", { table: "feature_flags", key, status: response.status });
       return false;
     }
 
@@ -50,7 +50,7 @@ export async function isFeatureFlagEnabled(
 
     return false;
   } catch (error) {
-    console.warn(`Error checking feature flag "${key}":`, error);
+    console.error("[TABLE_FALLBACK]", { table: "feature_flags", key, error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 }

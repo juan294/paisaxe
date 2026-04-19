@@ -128,13 +128,13 @@ async function isMaintenanceModeEnabled(): Promise<boolean> {
         },
         ...(isDev
           ? { cache: "no-store" as const }
-          : { next: { revalidate: 30 } }
+          : { next: { revalidate: 300 } }
         ),
       }
     );
 
     if (!response.ok) {
-      console.error("Failed to fetch maintenance mode flag:", response.status);
+      console.error("[TABLE_FALLBACK]", { table: "feature_flags", key: "maintenance_mode", status: response.status });
       return false;
     }
 
@@ -146,8 +146,7 @@ async function isMaintenanceModeEnabled(): Promise<boolean> {
     // Flag not found in database - default to off
     return false;
   } catch (error) {
-    console.error("Error checking maintenance mode:", error);
-    // On error, default to off to avoid blocking users
+    console.error("[TABLE_FALLBACK]", { table: "feature_flags", key: "maintenance_mode", error: error instanceof Error ? error.message : String(error) });
     return false;
   }
 }

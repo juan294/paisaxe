@@ -152,10 +152,8 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
       },
     };
 
-    const httpStatus = overallStatus === "healthy" ? 200 : 503;
-
     return NextResponse.json(body, {
-      status: httpStatus,
+      status: 200,
       headers: {
         "Cache-Control": "no-store, max-age=0",
         "Content-Type": "application/json",
@@ -184,7 +182,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     };
 
     return NextResponse.json(body, {
-      status: 503,
+      status: 200,
       headers: {
         "Cache-Control": "no-store, max-age=0",
         "Content-Type": "application/json",

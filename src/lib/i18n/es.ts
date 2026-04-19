@@ -197,6 +197,7 @@ export const es: Translations = {
     error: 'Error de conexion',
     no_permission: 'Necesito acceso al microfono',
     you: 'Tu',
+    loading: 'Cargando asistente de voz...',
   },
 
   suggestions: {

@@ -338,11 +338,14 @@ describe("VoiceChat", () => {
       fireEvent.submit(form!);
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith("/api/chat/stream", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: expect.stringContaining("Tell me about the lakes"),
-        });
+        expect(mockFetch).toHaveBeenCalledWith(
+          "/api/chat/stream",
+          expect.objectContaining({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: expect.stringContaining("Tell me about the lakes"),
+          })
+        );
       });
     });
 
@@ -1349,7 +1352,7 @@ describe("VoiceChat upgrade and expiry", () => {
 
     render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
 
-    const upgradeLink = screen.getByText("voice.upgrade_cta");
+    const upgradeLink = screen.getByText("Activar voz");
     expect(upgradeLink).toBeInTheDocument();
     expect(upgradeLink.closest("a")).toHaveAttribute("href", "/pricing");
   });
@@ -1360,7 +1363,7 @@ describe("VoiceChat upgrade and expiry", () => {
 
     render(<VoiceChat story={storyWithSlug} open={true} onClose={() => {}} />);
 
-    const upgradeLink = screen.getByText("voice.upgrade_cta");
+    const upgradeLink = screen.getByText("Activar voz");
     expect(upgradeLink.closest("a")).toHaveAttribute(
       "href",
       "/pricing?returnTo=lagos-de-covadonga"

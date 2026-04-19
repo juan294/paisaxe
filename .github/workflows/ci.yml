@@ -33,6 +33,9 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+      - name: Check env vars documented
+        run: npm run check-env
+
   test:
     name: Test
     runs-on: ubuntu-latest

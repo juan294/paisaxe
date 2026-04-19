@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server";
 
+// Module-level cache for the asturianu_touches feature flag (60s TTL)
+let asturianCache: { value: boolean; expiresAt: number } | null = null;
+
 /**
  * Streaming chat endpoint using Server-Sent Events (SSE)
  *
@@ -86,26 +89,52 @@ export async function POST(request: NextRequest) {
 
     const cleanMessage = sanitizeInput(message!);
 
-    // Generate embedding and search
-    const queryEmbedding = await generateEmbedding(cleanMessage);
-    const { chunks, images } = await search(queryEmbedding, 3, cleanMessage);
+    // Generate embedding and search — fail gracefully on upstream errors
+    let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
+    let images: Awaited<ReturnType<typeof search>>["images"] = [];
+    try {
+      const queryEmbedding = await generateEmbedding(cleanMessage);
+      ({ chunks, images } = await search(queryEmbedding, 3, cleanMessage));
+    } catch (searchErr) {
+      console.error("[CHAT_STREAM] Embedding/search failed:", searchErr);
+      const encoder = new TextEncoder();
+      const errorStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "error", message: "search_unavailable" })}\n\n`
+            )
+          );
+          controller.close();
+        },
+      });
+      return new Response(errorStream, {
+        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      });
+    }
 
     // Enrich message with context
     const enrichedMessage = context
       ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
       : cleanMessage;
 
-    // Check Asturianu feature flag
+    // Check Asturianu feature flag (60s module-level cache to avoid per-message DB hit)
     let asturianEnabled = false;
-    try {
-      const { data: flagData } = await supabase
-        .from("feature_flags")
-        .select("enabled")
-        .eq("flag_key", "asturianu_touches")
-        .single();
-      asturianEnabled = flagData?.enabled ?? false;
-    } catch {
-      // Default to false
+    if (asturianCache && Date.now() < asturianCache.expiresAt) {
+      asturianEnabled = asturianCache.value;
+    } else {
+      try {
+        const { data: flagData, error: flagError } = await supabase
+          .from("feature_flags")
+          .select("enabled")
+          .eq("flag_key", "asturianu_touches")
+          .single();
+        if (flagError) console.error("[TABLE_FALLBACK]", { table: "feature_flags", key: "asturianu_touches", error: flagError.message });
+        asturianEnabled = flagData?.enabled ?? false;
+        asturianCache = { value: asturianEnabled, expiresAt: Date.now() + 60_000 };
+      } catch (err) {
+        console.error("[TABLE_FALLBACK]", { table: "feature_flags", key: "asturianu_touches", error: err instanceof Error ? err.message : String(err) });
+      }
     }
 
     // Extract sources for final event

@@ -22,25 +22,30 @@ import dynamic from "next/dynamic";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
 import { usePostHog } from "posthog-js/react";
 
+function VoiceLoadingFallback() {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-testid="voice-loading-fallback"
+      className="h-64 md:h-96 lg:h-[28rem] flex items-center justify-center"
+    >
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-20 w-20 rounded-full bg-white/10 animate-pulse" />
+        <div className="animate-pulse text-white/50 text-sm" role="status" aria-live="polite">
+          {t("voice.loading")}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Dynamically import VoiceChatElevenLabs to defer the ~471KB LiveKit/ElevenLabs chunk.
 // This code only loads when voice mode is active (user has access + agent configured).
 const VoiceChatElevenLabs = dynamic(
   () => import("./voice-chat-elevenlabs").then((mod) => mod.VoiceChatElevenLabs),
   {
     ssr: false,
-    loading: () => (
-      <div
-        data-testid="voice-loading-fallback"
-        className="h-64 md:h-96 lg:h-[28rem] flex items-center justify-center"
-      >
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-20 w-20 rounded-full bg-white/10 animate-pulse" />
-          <div className="animate-pulse text-white/50 text-sm">
-            Cargando asistente de voz...
-          </div>
-        </div>
-      </div>
-    ),
+    loading: () => <VoiceLoadingFallback />,
   }
 );
 
@@ -55,7 +60,6 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const [inputValue, setInputValue] = useState("");
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const [useElevenLabs, setUseElevenLabs] = useState(false);
-  const [hasSetDefaultMode, setHasSetDefaultMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const { t, locale } = useTranslation();
@@ -83,18 +87,15 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     dismissUpsell: handleUpsellDismiss,
   } = useStreamChat({ canUseVoice });
 
-  // Set voice mode as default when user has access (only on first load)
+  // Sync voice mode whenever access status resolves or changes (e.g., mid-session purchase)
   useEffect(() => {
-    if (!isVoiceAccessLoading && !hasSetDefaultMode) {
-      if (canUseVoice && agentId) {
-        setUseElevenLabs(true);
-      }
-      setHasSetDefaultMode(true);
+    if (!isVoiceAccessLoading && canUseVoice && agentId) {
+      setUseElevenLabs(true);
     }
-  }, [isVoiceAccessLoading, canUseVoice, agentId, hasSetDefaultMode]);
+  }, [isVoiceAccessLoading, canUseVoice, agentId]);
 
   // Don't render content until we've determined the default mode
-  const isInitializing = isVoiceAccessLoading || !hasSetDefaultMode;
+  const isInitializing = isVoiceAccessLoading;
 
   // Reset messages when story changes
   useEffect(() => {
@@ -160,7 +161,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   return (
     <div
       ref={dialogRef}
-      className="fixed inset-0 z-50 flex items-end justify-center p-4 md:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] md:items-center"
       role="dialog"
       aria-label={t("accessibility.chat_dialog").replace("{title}", localizedStory.title)}
     >

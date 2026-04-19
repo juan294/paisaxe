@@ -197,6 +197,7 @@ export const en: Translations = {
     error: 'Connection error',
     no_permission: 'Microphone access needed',
     you: 'You',
+    loading: 'Loading voice assistant...',
   },
 
   suggestions: {

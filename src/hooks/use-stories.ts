@@ -117,8 +117,8 @@ export function useStories(initialStories?: Story[]) {
   // Initialize cache from storage on first render
   const initialized = useRef(false);
   if (!initialized.current) {
-    if (initialStories?.length && !cache.data) {
-      // Seed cache with server-provided stories
+    if (initialStories?.length) {
+      // Always apply server-provided stories to ensure freshness post-deploy
       cache.data = initialStories;
       cache.timestamp = Date.now();
     } else if (typeof window !== "undefined") {

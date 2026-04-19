@@ -155,20 +155,20 @@ describe("GET /api/health", () => {
     expect(typeof data.uptime).toBe("number");
   });
 
-  it('should return 503 with status "degraded" when supabase check fails', async () => {
+  it('should return 200 with status "degraded" when supabase check fails', async () => {
     mockSupabaseError("Connection refused");
     mockDatabaseSize(DB_SIZE_BYTES);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.services.supabase.status).toBe("error");
     expect(data.services.supabase.error).toBe("Connection refused");
   });
 
-  it("should return 503 when supabase throws an exception", async () => {
+  it("should return 200 when supabase throws an exception", async () => {
     vi.mocked(supabase.from).mockImplementation(() => {
       throw new Error("Unexpected failure");
     });
@@ -177,7 +177,7 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.services.supabase.status).toBe("error");
   });
@@ -275,7 +275,7 @@ describe("GET /api/health", () => {
 
   // --- Coverage for outer GET() catch block (lines 122-139) ---
 
-  it("should return 503 with degraded status when outer try block throws (Error)", async () => {
+  it("should return 200 with degraded status when outer try block throws (Error)", async () => {
     mockSupabaseSuccess();
     mockDatabaseSize(DB_SIZE_BYTES);
     // Make process.uptime() throw only on first call (inside try block) to trigger
@@ -294,7 +294,7 @@ describe("GET /api/health", () => {
 
     process.uptime = originalUptime;
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.services.supabase.status).toBe("error");
     expect(data.services.supabase.latency_ms).toBe(0);
@@ -324,7 +324,7 @@ describe("GET /api/health", () => {
 
     process.uptime = originalUptime;
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.services.supabase.error).toBe("Unknown error");
     expect(data.services.database.error).toBe("Unknown error");
@@ -362,7 +362,7 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.services.stories.status).toBe("fallback");
     expect(data.services.stories.error).toContain("permission denied");
@@ -382,7 +382,7 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.services.stories.status).toBe("fallback");
     expect(data.services.stories.count).toBe(0);
@@ -403,7 +403,7 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.services.stories.status).toBe("fallback");
     expect(data.services.stories.count).toBe(0);
@@ -424,7 +424,7 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.services.stories.status).toBe("fallback");
     expect(data.services.stories.error).toBe("Unknown error");
@@ -444,7 +444,7 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.services.stories.status).toBe("fallback");
     expect(data.services.stories.error).toBe("stories table missing");
@@ -463,7 +463,7 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.services.supabase.status).toBe("error");
     expect(data.services.supabase.error).toBe("Unknown error");

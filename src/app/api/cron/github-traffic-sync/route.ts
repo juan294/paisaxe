@@ -38,6 +38,7 @@ async function fetchGitHub<T>(endpoint: string, token: string): Promise<T> {
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
     },
+    signal: AbortSignal.timeout(8_000),
   });
 
   if (!response.ok) {
