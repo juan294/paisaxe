@@ -6,6 +6,9 @@ import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 const GITHUB_API_BASE = "https://api.github.com";
 const REPO = "juan294/paisaxe";
 
+/** Postgres advisory lock ID — unique per cron route. */
+const LOCK_ID = 1001;
+
 interface GitHubTrafficViewsResponse {
   count: number;
   uniques: number;
@@ -60,6 +63,18 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
   }
 
   const supabase = createAdminClient();
+
+  // Acquire advisory lock to prevent concurrent runs
+  const { data: locked, error: lockError } = await supabase.rpc(
+    "pg_try_advisory_lock",
+    { lockid: LOCK_ID }
+  );
+  if (lockError || !locked) {
+    return NextResponse.json(
+      { status: "skipped", reason: "concurrent run in progress" },
+      { status: 409 }
+    );
+  }
 
   try {
     // Fetch all 4 GitHub Traffic endpoints in parallel
@@ -189,6 +204,8 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
       { error: "Sync failed", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
+  } finally {
+    await supabase.rpc("pg_advisory_unlock", { lockid: LOCK_ID });
   }
 }
 
