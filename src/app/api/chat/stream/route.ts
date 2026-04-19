@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   const { search } = await import("@/lib/search");
   const { validateChatRequest } = await import("@/lib/validation");
   const { checkRateLimit } = await import("@/lib/rate-limit");
-  const { supabase } = await import("@/lib/supabase");
+  const { isFeatureFlagEnabled } = await import("@/lib/feature-flags-server");
 
   // Security modules
   const {
@@ -95,18 +95,8 @@ export async function POST(request: NextRequest) {
       ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
       : cleanMessage;
 
-    // Check Asturianu feature flag
-    let asturianEnabled = false;
-    try {
-      const { data: flagData } = await supabase
-        .from("feature_flags")
-        .select("enabled")
-        .eq("flag_key", "asturianu_touches")
-        .single();
-      asturianEnabled = flagData?.enabled ?? false;
-    } catch {
-      // Default to false
-    }
+    // Check Asturianu feature flag (cached via isFeatureFlagEnabled)
+    const asturianEnabled = await isFeatureFlagEnabled("asturianu_touches");
 
     // Extract sources for final event
     const sources = extractSourcesFromChunks(chunks);
@@ -140,7 +130,11 @@ export async function POST(request: NextRequest) {
 
           controller.close();
         } catch (error) {
-          console.error("[Stream Chat] Error:", error);
+          const err = error instanceof Error ? error : new Error(String(error));
+          console.error("[CHAT_STREAM_FAILURE]", {
+            error: err.message,
+            type: err.constructor?.name ?? "Error",
+          });
           const errorEvent = `data: ${JSON.stringify({
             type: "error",
             message: "Error generating response",
