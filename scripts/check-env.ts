@@ -48,7 +48,7 @@ function walkTs(dir: string): string[] {
     const stat = statSync(full);
     if (stat.isDirectory()) {
       files.push(...walkTs(full));
-    } else if ([".ts", ".tsx"].includes(extname(entry))) {
+    } else if ([".ts", ".tsx"].includes(extname(entry)) && !entry.includes(".test.")) {
       files.push(full);
     }
   }
