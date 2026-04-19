@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { GET } from "./route";
+import { GET, _clearProbeCacheForTests } from "./route";
 import packageJson from "../../../../package.json";
 
 // Mock the supabase client
@@ -11,6 +11,10 @@ vi.mock("@/lib/supabase", () => ({
 }));
 
 import { supabase } from "@/lib/supabase";
+
+// Mock global fetch for external service probes
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
 
 function createChainMock(resolveValue: unknown) {
   const mock = {
@@ -77,8 +81,15 @@ function mockDatabaseSizeError(message: string) {
 describe("GET /api/health", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    _clearProbeCacheForTests();
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://test.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-key");
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-anthropic-key");
+    vi.stubEnv("VOYAGE_API_KEY", "test-voyage-key");
+    vi.stubEnv("STRIPE_SECRET_KEY", "test-stripe-key");
+    vi.stubEnv("ELEVENLABS_API_KEY", "test-elevenlabs-key");
+    // Default: fetch resolves successfully (Stripe probe)
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
   });
 
   it("should return 200 status", async () => {
@@ -448,6 +459,183 @@ describe("GET /api/health", () => {
     expect(data.status).toBe("degraded");
     expect(data.services.stories.status).toBe("fallback");
     expect(data.services.stories.error).toBe("stories table missing");
+  });
+
+  // --- External service probe tests ---
+
+  it("should include external services in health response", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.anthropic).toBeDefined();
+    expect(data.services.voyage).toBeDefined();
+    expect(data.services.stripe).toBeDefined();
+    expect(data.services.elevenlabs).toBeDefined();
+  });
+
+  it("should report anthropic as ok when env key is configured", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.anthropic.status).toBe("ok");
+  });
+
+  it("should report anthropic as not_configured when ANTHROPIC_API_KEY is missing", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.anthropic.status).toBe("not_configured");
+  });
+
+  it("should report voyage as ok when env key is configured", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.voyage.status).toBe("ok");
+  });
+
+  it("should report voyage as not_configured when VOYAGE_API_KEY is missing", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    vi.stubEnv("VOYAGE_API_KEY", "");
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.voyage.status).toBe("not_configured");
+  });
+
+  it("should report elevenlabs as ok when env key is configured", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.elevenlabs.status).toBe("ok");
+  });
+
+  it("should report elevenlabs as not_configured when ELEVENLABS_API_KEY is missing", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    vi.stubEnv("ELEVENLABS_API_KEY", "");
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.elevenlabs.status).toBe("not_configured");
+  });
+
+  it("should report stripe as ok when fetch succeeds", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.stripe.status).toBe("ok");
+  });
+
+  it("should report stripe as not_configured when STRIPE_SECRET_KEY is missing", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    vi.stubEnv("STRIPE_SECRET_KEY", "");
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.stripe.status).toBe("not_configured");
+  });
+
+  it("should report stripe as degraded when fetch fails", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    mockFetch.mockRejectedValue(new Error("Network error"));
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.stripe.status).toBe("degraded");
+  });
+
+  it("should report stripe as degraded when fetch returns non-ok status", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    mockFetch.mockResolvedValue({ ok: false, status: 503 });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.stripe.status).toBe("degraded");
+  });
+
+  it("should report stripe as degraded when fetch times out", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    // Simulate a timeout by having fetch never resolve within our race window
+    mockFetch.mockImplementation(
+      () => new Promise<Response>((resolve) => setTimeout(() => resolve({ ok: true, status: 200 } as Response), 60000))
+    );
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.services.stripe.status).toBe("degraded");
+  }, 10000);
+
+  it("should NOT fail overall health when external service probes are degraded", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    // Stripe fails
+    mockFetch.mockRejectedValue(new Error("Stripe down"));
+    // But anthropic/voyage/elevenlabs are configured (env vars set in beforeEach)
+
+    const response = await GET();
+    const data = await response.json();
+
+    // External probe failures do NOT degrade the overall status
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
+    expect(data.services.stripe.status).toBe("degraded");
+  });
+
+  it("should run probes in parallel and respond quickly", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    const start = Date.now();
+    const response = await GET();
+    const elapsed = Date.now() - start;
+
+    expect(response.status).toBe(200);
+    // Total response time should be well under 5s even with parallel probes
+    expect(elapsed).toBeLessThan(5000);
+  });
+
+  it("should include probe latency_ms in stripe status", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(typeof data.services.stripe.latency_ms).toBe("number");
   });
 
   // --- Coverage for checkSupabase() non-Error exception (line 51) ---
