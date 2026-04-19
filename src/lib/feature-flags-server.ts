@@ -5,10 +5,14 @@ import { getEnvironment } from "@/lib/environment";
  * Server-side function to check if a feature flag is enabled.
  * Uses Supabase REST API with Next.js cache revalidation.
  * Falls back to false if the flag doesn't exist or there's an error.
+ * Errors are logged with [FEATURE_FLAG_FAILURE] so Supabase outages are observable.
  */
 export async function isFeatureFlagEnabled(
   key: FeatureFlagKey
 ): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
@@ -28,6 +32,7 @@ export async function isFeatureFlagEnabled(
     const response = await fetch(
       `${supabaseUrl}/rest/v1/feature_flags?flag_key=eq.${key}&environment=eq.${environment}&select=enabled`,
       {
+        signal: controller.signal,
         headers: {
           apikey: supabaseKey,
           Authorization: `Bearer ${supabaseKey}`,
@@ -39,7 +44,10 @@ export async function isFeatureFlagEnabled(
     );
 
     if (!response.ok) {
-      console.error("[TABLE_FALLBACK]", { table: "feature_flags", key, status: response.status });
+      console.error("[FEATURE_FLAG_FAILURE]", {
+        flag: key,
+        statusCode: response.status,
+      });
       return false;
     }
 
@@ -50,7 +58,13 @@ export async function isFeatureFlagEnabled(
 
     return false;
   } catch (error) {
-    console.error("[TABLE_FALLBACK]", { table: "feature_flags", key, error: error instanceof Error ? error.message : String(error) });
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("[FEATURE_FLAG_FAILURE]", {
+      flag: key,
+      error: err.message,
+    });
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
