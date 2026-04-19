@@ -36,8 +36,10 @@ describe("translate webhook", () => {
     expect(response.status).toBe(401);
   });
 
+  const VALID_STORY_ID = "550e8400-e29b-41d4-a716-446655440000";
+
   it("should reject requests when body is null", async () => {
-    // JSON.parse("null") returns null — exercises the `body === null` branch in isValidPayload
+    // JSON.parse("null") returns null — Zod rejects non-object at root
     const request = new NextRequest("http://localhost/api/webhooks/translate", {
       method: "POST",
       headers: { "x-webhook-secret": VALID_SECRET },
@@ -47,7 +49,7 @@ describe("translate webhook", () => {
     const response = await POST(request);
     expect(response.status).toBe(400);
     const json = await response.json();
-    expect(json.error).toContain("storyId");
+    expect(json.errors).toBeDefined();
   });
 
   it("should reject requests without storyId", async () => {
@@ -60,7 +62,7 @@ describe("translate webhook", () => {
     const response = await POST(request);
     expect(response.status).toBe(400);
     const json = await response.json();
-    expect(json.error).toContain("storyId");
+    expect(json.errors).toBeDefined();
   });
 
   it("should call translateStory with valid payload", async () => {
@@ -75,7 +77,7 @@ describe("translate webhook", () => {
     const request = new NextRequest("http://localhost/api/webhooks/translate", {
       method: "POST",
       headers: { "x-webhook-secret": VALID_SECRET },
-      body: JSON.stringify({ storyId: "test-story-id" }),
+      body: JSON.stringify({ storyId: VALID_STORY_ID }),
     });
 
     const response = await POST(request);
@@ -84,7 +86,7 @@ describe("translate webhook", () => {
     expect(response.status).toBe(200);
     expect(json.success).toBe(true);
     expect(json.successCount).toBe(5);
-    expect(translateStory).toHaveBeenCalledWith("test-story-id", {
+    expect(translateStory).toHaveBeenCalledWith(VALID_STORY_ID, {
       locales: undefined,
       forceRetranslate: undefined,
     });
@@ -103,7 +105,7 @@ describe("translate webhook", () => {
       method: "POST",
       headers: { "x-webhook-secret": VALID_SECRET },
       body: JSON.stringify({
-        storyId: "test-story-id",
+        storyId: VALID_STORY_ID,
         locales: ["en", "fr"],
         forceRetranslate: true,
       }),
@@ -111,7 +113,7 @@ describe("translate webhook", () => {
 
     await POST(request);
 
-    expect(translateStory).toHaveBeenCalledWith("test-story-id", {
+    expect(translateStory).toHaveBeenCalledWith(VALID_STORY_ID, {
       locales: ["en", "fr"],
       forceRetranslate: true,
     });
@@ -130,7 +132,7 @@ describe("translate webhook", () => {
     const request = new NextRequest("http://localhost/api/webhooks/translate", {
       method: "POST",
       headers: { "x-webhook-secret": VALID_SECRET },
-      body: JSON.stringify({ storyId: "test-story-id" }),
+      body: JSON.stringify({ storyId: VALID_STORY_ID }),
     });
 
     const response = await POST(request);
@@ -149,7 +151,7 @@ describe("translate webhook", () => {
     const request = new NextRequest("http://localhost/api/webhooks/translate", {
       method: "POST",
       headers: { "x-webhook-secret": VALID_SECRET },
-      body: JSON.stringify({ storyId: "test-story-id" }),
+      body: JSON.stringify({ storyId: VALID_STORY_ID }),
     });
 
     const response = await POST(request);
@@ -157,5 +159,66 @@ describe("translate webhook", () => {
 
     expect(response.status).toBe(500);
     expect(json.error).toBe("Internal server error");
+  });
+
+  // -----------------------------------------------------------------------
+  // Zod validation tests (issue #270)
+  // -----------------------------------------------------------------------
+
+  it("should return 400 with Zod errors when storyId is not a UUID", async () => {
+    const request = new NextRequest("http://localhost/api/webhooks/translate", {
+      method: "POST",
+      headers: { "x-webhook-secret": VALID_SECRET },
+      body: JSON.stringify({ storyId: "not-a-uuid" }),
+    });
+
+    const response = await POST(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(json.errors).toBeDefined();
+  });
+
+  it("should return 400 with Zod errors when locales contains an invalid locale", async () => {
+    const request = new NextRequest("http://localhost/api/webhooks/translate", {
+      method: "POST",
+      headers: { "x-webhook-secret": VALID_SECRET },
+      body: JSON.stringify({
+        storyId: "550e8400-e29b-41d4-a716-446655440000",
+        locales: ["en", "xx"],
+      }),
+    });
+
+    const response = await POST(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(json.errors).toBeDefined();
+  });
+
+  it("should accept a valid UUID storyId and call translateStory", async () => {
+    const { translateStory } = await import("@/lib/translate-story");
+
+    vi.mocked(translateStory).mockResolvedValue({
+      success: true,
+      successCount: 1,
+      failedCount: 0,
+    });
+
+    const request = new NextRequest("http://localhost/api/webhooks/translate", {
+      method: "POST",
+      headers: { "x-webhook-secret": VALID_SECRET },
+      body: JSON.stringify({ storyId: "550e8400-e29b-41d4-a716-446655440000" }),
+    });
+
+    const response = await POST(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(translateStory).toHaveBeenCalledWith(
+      "550e8400-e29b-41d4-a716-446655440000",
+      { locales: undefined, forceRetranslate: undefined }
+    );
   });
 });

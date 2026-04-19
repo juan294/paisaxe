@@ -1,20 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { translateStory } from "@/lib/translate-story";
+import { translateWebhookSchema } from "@/lib/schemas";
 
-interface TranslateWebhookPayload {
-  storyId: string;
-  /** Optional: specific locales to translate */
-  locales?: string[];
-  /** Optional: force retranslate even if translations exist */
-  forceRetranslate?: boolean;
-}
-
-function isValidPayload(body: unknown): body is TranslateWebhookPayload {
-  if (typeof body !== "object" || body === null) return false;
-  const payload = body as Record<string, unknown>;
-  return typeof payload.storyId === "string" && payload.storyId.length > 0;
-}
 
 /**
  * POST /api/webhooks/translate
@@ -40,17 +28,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body: unknown = await request.json();
+    const rawBody: unknown = await request.json();
+    const parsed = translateWebhookSchema.safeParse(rawBody);
 
-    if (!isValidPayload(body)) {
-      console.error("[translate-webhook] Bad request: invalid payload", body);
+    if (!parsed.success) {
+      console.error("[translate-webhook] Bad request: invalid payload", rawBody);
       return NextResponse.json(
-        { error: "Bad request: storyId is required" },
+        {
+          error: "Bad request: invalid payload",
+          errors: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
-    const { storyId, locales, forceRetranslate } = body;
+    const { storyId, locales, forceRetranslate } = parsed.data;
 
     // Run translation (this may take a few seconds)
     const result = await translateStory(storyId, {
