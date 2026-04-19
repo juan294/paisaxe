@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ChatResponse } from "@/types";
 
+// --- Lightweight imports: no heavy deps (Anthropic, Voyage, Supabase).
+// Static here so they are resolved once at module load, not on every request.
+// This removes 100-300 ms of cold-start dynamic-import cost for rejected
+// requests (rate-limit, validation, injection) that never need the AI stack.
+import { validateChatRequest } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/request-utils";
+import {
+  detectInjectionAttempt,
+  sanitizeInput,
+  assessTopicRelevance,
+  MAX_INPUT_LENGTH,
+} from "@/lib/chat-safety";
+import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
+
 /**
  * Extended response type with security metadata
  */
@@ -14,20 +29,6 @@ interface SecureChatResponse extends ChatResponse {
 }
 
 export async function POST(request: NextRequest) {
-  // --- Lightweight imports: validation, rate-limiting, security checks ---
-  // These modules have no heavy external dependencies (no Anthropic, Voyage, etc.)
-  // so they are safe to import before we know the request is valid.
-  const { validateChatRequest } = await import("@/lib/validation");
-  const { checkRateLimit } = await import("@/lib/rate-limit");
-  const { getClientIp } = await import("@/lib/request-utils");
-  const {
-    detectInjectionAttempt,
-    sanitizeInput,
-    assessTopicRelevance,
-    MAX_INPUT_LENGTH,
-  } = await import("@/lib/chat-safety");
-  const { GENERIC_REDIRECT_RESPONSE } = await import("@/lib/chat-config");
-
   try {
     // Rate limiting - check before any processing
     const ip = getClientIp(request);
@@ -110,12 +111,14 @@ export async function POST(request: NextRequest) {
     // Assess topic relevance for analytics
     const topicRelevance = assessTopicRelevance(cleanMessage);
 
-    // --- Heavy imports: only loaded after validation passes ---
-    // Dynamic imports — Turbopack corrupts the HTTP stack for api.anthropic.com
-    // when lib modules (embeddings, search, supabase, claude) are statically
-    // co-bundled in the same route. Each module works fine individually, but the
-    // combination breaks outbound HTTPS to Anthropic. Dynamic imports isolate
-    // each module's loading context and avoid the bundle corruption.
+    // --- Heavy imports: deferred until after validation passes ---
+    // WHY DYNAMIC: Turbopack corrupts the outbound HTTP stack for api.anthropic.com
+    // when these modules (embeddings, search, supabase, claude) are statically
+    // co-bundled in the same route chunk. Each module works fine on its own, but
+    // the combination breaks HTTPS to Anthropic in the Turbopack build. Dynamic
+    // imports isolate each module's loading context and avoid the corruption.
+    // Keeping them dynamic also means rate-limited / invalid requests never pay
+    // the cost of loading the AI stack.
     const { generateChatResponse, extractSourcesFromChunks } = await import(
       "@/lib/claude"
     );

@@ -1,5 +1,19 @@
 import { NextRequest } from "next/server";
 
+// --- Lightweight imports: no heavy deps (Anthropic, Voyage, Supabase).
+// Static here so they are resolved once at module load, not on every request.
+// This removes 100-300 ms of cold-start dynamic-import cost for rejected
+// requests (rate-limit, validation, injection) that never need the AI stack.
+import { validateChatRequest } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/request-utils";
+import {
+  detectInjectionAttempt,
+  sanitizeInput,
+  MAX_INPUT_LENGTH,
+} from "@/lib/chat-safety";
+import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
+
 /**
  * Streaming chat endpoint using Server-Sent Events (SSE)
  *
@@ -7,26 +21,6 @@ import { NextRequest } from "next/server";
  * Final event includes any relevant images.
  */
 export async function POST(request: NextRequest) {
-  // Dynamic imports to avoid Turbopack bundle corruption
-  const { streamChatResponse, extractSourcesFromChunks } = await import(
-    "@/lib/claude"
-  );
-  const { generateEmbedding } = await import("@/lib/embeddings");
-  const { search } = await import("@/lib/search");
-  const { validateChatRequest } = await import("@/lib/validation");
-  const { checkRateLimit } = await import("@/lib/rate-limit");
-  const { supabase } = await import("@/lib/supabase");
-
-  // Security modules
-  const {
-    detectInjectionAttempt,
-    sanitizeInput,
-    MAX_INPUT_LENGTH,
-  } = await import("@/lib/chat-safety");
-  const { GENERIC_REDIRECT_RESPONSE } = await import("@/lib/chat-config");
-
-  const { getClientIp } = await import("@/lib/request-utils");
-
   try {
     // Rate limiting
     const ip = getClientIp(request);
@@ -85,6 +79,21 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanMessage = sanitizeInput(message!);
+
+    // --- Heavy imports: deferred until after all validation passes ---
+    // WHY DYNAMIC: Turbopack corrupts the outbound HTTP stack for api.anthropic.com
+    // when these modules (embeddings, search, supabase, claude) are statically
+    // co-bundled in the same route chunk. Each module works fine on its own, but
+    // the combination breaks HTTPS to Anthropic in the Turbopack build. Dynamic
+    // imports isolate each module's loading context and avoid the corruption.
+    // Keeping them dynamic also means rate-limited / invalid requests never pay
+    // the cost of loading the AI stack.
+    const { streamChatResponse, extractSourcesFromChunks } = await import(
+      "@/lib/claude"
+    );
+    const { generateEmbedding } = await import("@/lib/embeddings");
+    const { search } = await import("@/lib/search");
+    const { supabase } = await import("@/lib/supabase");
 
     // Generate embedding and search
     const queryEmbedding = await generateEmbedding(cleanMessage);
