@@ -96,7 +96,7 @@ test.describe("API route smoke tests", () => {
     expect(response.status()).toBe(400);
 
     const body = await response.json();
-    expect(body.error).toContain("3");
+    expect(body.errors?.placeName?.[0]).toContain("3");
   });
 
   test("GET /api/voice-access returns 401 without auth", async ({
