@@ -63,4 +63,60 @@ describe("env module", () => {
       );
     });
   });
+
+  describe("typed constant helpers", () => {
+    it("getPostHogHost returns the default when env var is unset", async () => {
+      delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
+      const { getPostHogHost } = await import("./env");
+      expect(getPostHogHost()).toBe("https://eu.i.posthog.com");
+    });
+
+    it("getPostHogHost returns trimmed env var when set", async () => {
+      process.env.NEXT_PUBLIC_POSTHOG_HOST = "  https://us.i.posthog.com  ";
+      const { getPostHogHost } = await import("./env");
+      expect(getPostHogHost()).toBe("https://us.i.posthog.com");
+    });
+
+    it("getSupabaseUrl returns trimmed SUPABASE_URL", async () => {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = "https://abc.supabase.co";
+      const { getSupabaseUrl } = await import("./env");
+      expect(getSupabaseUrl()).toBe("https://abc.supabase.co");
+    });
+
+    it("getSupabaseAnonKey returns trimmed SUPABASE_ANON_KEY", async () => {
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJtest";
+      const { getSupabaseAnonKey } = await import("./env");
+      expect(getSupabaseAnonKey()).toBe("eyJtest");
+    });
+
+    it("getStripeSecretKey returns trimmed STRIPE_SECRET_KEY", async () => {
+      process.env.STRIPE_SECRET_KEY = "sk_test_123";
+      const { getStripeSecretKey } = await import("./env");
+      expect(getStripeSecretKey()).toBe("sk_test_123");
+    });
+
+    it("getStripeDayPassPriceId returns trimmed STRIPE_DAY_PASS_PRICE_ID", async () => {
+      process.env.STRIPE_DAY_PASS_PRICE_ID = "price_abc";
+      const { getStripeDayPassPriceId } = await import("./env");
+      expect(getStripeDayPassPriceId()).toBe("price_abc");
+    });
+
+    it("getStripeWebhookSecret returns trimmed STRIPE_WEBHOOK_SECRET", async () => {
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
+      const { getStripeWebhookSecret } = await import("./env");
+      expect(getStripeWebhookSecret()).toBe("whsec_test");
+    });
+
+    it("getSiteUrl returns trimmed SITE_URL", async () => {
+      process.env.NEXT_PUBLIC_SITE_URL = "https://paisaxe.es";
+      const { getSiteUrl } = await import("./env");
+      expect(getSiteUrl()).toBe("https://paisaxe.es");
+    });
+
+    it("getPostHogKey returns trimmed POSTHOG_KEY", async () => {
+      process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_testkey";
+      const { getPostHogKey } = await import("./env");
+      expect(getPostHogKey()).toBe("phc_testkey");
+    });
+  });
 });

@@ -392,6 +392,86 @@ describe("POST /api/webhooks/stripe", () => {
     consoleSpy.mockRestore();
   });
 
+  it("should return 200 with duplicate status when dedup INSERT hits a unique constraint (race condition)", async () => {
+    // Two concurrent requests: the second one finds dedupError.code === "23505"
+    const event = createCheckoutSessionEvent("user-123", "pi_race_test", "evt_race");
+    vi.mocked(verifyWebhookSignature).mockReturnValue(event);
+
+    // Supabase: no existing row on select (both requests pass idempotency check)
+    // but INSERT fails with 23505 unique violation (the other request won the race)
+    const mockMaybeSingle = vi.fn(() => ({ data: null, error: null }));
+    const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+    const mockSelect = vi.fn(() => ({ eq: mockEq }));
+    const mockWebhookInsert = vi.fn(() => ({
+      error: { code: "23505", message: "duplicate key value violates unique constraint" },
+    }));
+    const mockPurchaseInsert = vi.fn(() => ({ error: null }));
+    const mockFrom = vi.fn((table: string) => {
+      if (table === "stripe_webhook_events") {
+        return { select: mockSelect, insert: mockWebhookInsert };
+      }
+      if (table === "voice_purchases") {
+        return { insert: mockPurchaseInsert };
+      }
+      return { insert: vi.fn(() => ({ error: null })) };
+    });
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: mockFrom,
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const request = createRequest(JSON.stringify({}), {
+      "stripe-signature": "valid-signature",
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    // Should acknowledge the duplicate without granting day pass
+    expect(response.status).toBe(200);
+    expect(data.received).toBe(true);
+    expect(data.status).toBe("duplicate");
+    // voice_purchases must NOT be inserted
+    expect(mockPurchaseInsert).not.toHaveBeenCalled();
+  });
+
+  it("should return 500 when dedup INSERT fails with a non-constraint database error", async () => {
+    const event = createCheckoutSessionEvent("user-123", "pi_db_err", "evt_db_err");
+    vi.mocked(verifyWebhookSignature).mockReturnValue(event);
+
+    const mockMaybeSingle = vi.fn(() => ({ data: null, error: null }));
+    const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+    const mockSelect = vi.fn(() => ({ eq: mockEq }));
+    // INSERT fails with a generic DB error (not 23505)
+    const mockWebhookInsert = vi.fn(() => ({
+      error: { code: "42000", message: "syntax error" },
+    }));
+    const mockPurchaseInsert = vi.fn(() => ({ error: null }));
+    const mockFrom = vi.fn((table: string) => {
+      if (table === "stripe_webhook_events") {
+        return { select: mockSelect, insert: mockWebhookInsert };
+      }
+      if (table === "voice_purchases") {
+        return { insert: mockPurchaseInsert };
+      }
+      return { insert: vi.fn(() => ({ error: null })) };
+    });
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: mockFrom,
+    } as unknown as ReturnType<typeof createAdminClient>);
+
+    const request = createRequest(JSON.stringify({}), {
+      "stripe-signature": "valid-signature",
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Database error");
+    // Must NOT have inserted into voice_purchases
+    expect(mockPurchaseInsert).not.toHaveBeenCalled();
+  });
+
   it("should return 500 when an unexpected error is thrown", async () => {
     const event = createCheckoutSessionEvent("user-123", "pi_test456");
     vi.mocked(verifyWebhookSignature).mockReturnValue(event);
