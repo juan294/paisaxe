@@ -11,6 +11,19 @@
 
 The audit identified one Critical Ship Blocker (non-atomic Stripe dedup → voice grant, §3.1) and four High-severity hardening tasks (§3.2–§3.5). This plan sequences the remediation in 10 phases: P1 is the ship blocker, P2–P6 run in parallel worktrees, and P7–P10 follow as dependencies allow.
 
+## Implementation Status
+
+- [x] P1 — Implemented and verified on 2026-04-22 in worktree `fix/stripe-webhook-atomicity`; `typecheck`, `lint`, targeted Stripe tests, full Vitest suite, and `npm run test:e2e` all passed. Local Supabase verification passed after freeing Docker port `54322`, running `supabase db reset`, and confirming `grant_day_pass_idempotent` exists as a `SECURITY DEFINER` function.
+- [ ] P2
+- [ ] P3
+- [ ] P4
+- [ ] P5
+- [ ] P6
+- [ ] P7
+- [ ] P8
+- [ ] P9
+- [ ] P10
+
 ## Design Decisions (from clarification pass)
 
 | Question | Answer | Impact |
