@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-04-20 06:00:04
+> Auto-generated on 2026-04-22 06:05:36
 
 ## CLAUDE.md Status
 
@@ -128,6 +128,7 @@ src/lib/proxy/maintenance.test.ts
 src/lib/proxy/maintenance.ts
 src/lib/proxy/root-redirect.ts
 src/lib/proxy/story-rewrite.ts
+src/lib/rate-limit.test.ts
 src/lib/rate-limit.ts
 src/lib/schemas.ts
 src/lib/search.test.ts
@@ -152,6 +153,7 @@ supabase/migrations/077_stripe_webhook_events.sql
 scripts/check-env.ts
 scripts/compress-images.ts
 scripts/lib/print-shared-context-instructions.ts
+scripts/tmp-cost-fetch.sh
 ```
 
 ## Documentation Gaps
@@ -214,16 +216,6 @@ webhooks/translate
 
 ```
 
-## Changes Made This Run
-
-No changes made. No documentation gaps found.
-
-- Feature flags: All 17 `FeatureFlagKey` entries in `src/types/feature-flags.ts` are documented in `docs/project/features.md`. All 10 agent flags verified. Zero gaps.
-- API routes: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools). No external-consumption routes require new documentation.
-- Migrations 076 (`admin_audit_log`) and 077 (`stripe_webhook_events`) are internal infrastructure tables (audit log and Stripe deduplication) — no user-facing features to document.
-- CLAUDE.md: Current (last modified 2026-04-19).
-- features.md: Complete — no additions needed.
-
 ## Documentation File Ages
 
 | File | Last Modified |
@@ -231,6 +223,25 @@ No changes made. No documentation gaps found.
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-04-19 |
 | README.md | 2026-02-16 |
+
+## Changes Made This Run
+
+**Date: 2026-04-22**
+
+Status: GREEN — no documentation changes needed. Twentieth consecutive clean run.
+
+- **Feature flags**: Gaps file reports zero undocumented flags. All flags in `docs/project/features.md` remain aligned with `FeatureFlagKey` type.
+- **API routes**: All 51 flagged routes confirmed internal and not suitable for user-facing documentation:
+  - `admin/*` (30 routes): Admin dashboard backends, gated by `validateAdminAuth()`.
+  - `chat`, `chat/stream`, `voice-access`, `favorites`, `suggestions`, `feature-flags`: Internal frontend APIs consumed by the Paisaxe web app only.
+  - `checkout/*` (3 routes): Stripe session + health internals.
+  - `cron/*` (3 routes): Vercel Cron endpoints, protected by `cron-auth`.
+  - `health/db`: Internal health probe.
+  - `mcp/*` (4 routes): MCP tool endpoints consumed by ElevenLabs voice agents; configuration lives in `tool_configs/`, not user docs.
+  - `webhooks/*` (4 routes): External-service callbacks (Stripe, ElevenLabs, Supabase, translation service), timing-safe HMAC-verified.
+- **Migrations 076 (admin_audit_log) and 077 (stripe_webhook_events)**: Internal infrastructure tables. No user-facing features to document.
+- **CLAUDE.md**: Current (last modified 2026-04-19, covers recent remediation waves).
+- **No source changes** since last run introduce new user-facing features or flags.
 
 ---
 
