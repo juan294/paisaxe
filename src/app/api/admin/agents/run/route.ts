@@ -3,6 +3,7 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 import { spawn, ChildProcess } from "child_process";
 import path from "path";
 import type { AgentLogLine } from "@/types/agents-dashboard";
+import { logger } from "@/lib/logger";
 
 /** Map agent flag keys to their script filenames (all live in scripts/). */
 const AGENT_SCRIPTS: Record<string, string> = {
@@ -16,6 +17,7 @@ const AGENT_SCRIPTS: Record<string, string> = {
 };
 
 const MAX_LOG_LINES = 500;
+const FINISHED_AGENT_TTL_MS = 60 * 60 * 1000;
 
 interface RunningAgent {
   pid: number;
@@ -25,6 +27,7 @@ interface RunningAgent {
   finished: boolean;
   exitCode: number | null;
   stoppedByUser: boolean;
+  finishedAt: number | null;
 }
 
 /** In-memory tracking of running agent processes. */
@@ -43,6 +46,41 @@ function appendLog(agent: RunningAgent, text: string) {
   }
 }
 
+function buildLocalOnlyResponse() {
+  logger.warn("[AGENT_RUNNER]", {
+    reason: "not_local",
+    vercelEnv: process.env.VERCEL_ENV,
+  });
+  return NextResponse.json(
+    { error: "Agent runs are only allowed in local development." },
+    { status: 403 }
+  );
+}
+
+function ensureLocalRuntime() {
+  if (process.env.VERCEL_ENV !== undefined) {
+    return buildLocalOnlyResponse();
+  }
+
+  return null;
+}
+
+function markAgentFinished(agent: RunningAgent, code: number | null) {
+  agent.exitCode = code;
+  agent.finished = true;
+  agent.finishedAt = Date.now();
+}
+
+function pruneFinishedAgents(now = Date.now()) {
+  const cutoff = now - FINISHED_AGENT_TTL_MS;
+
+  for (const [key, agent] of runningAgents) {
+    if (agent.finishedAt !== null && agent.finishedAt < cutoff) {
+      runningAgents.delete(key);
+    }
+  }
+}
+
 /**
  * POST: Start an agent run.
  * Body: { agentKey: string }
@@ -51,11 +89,9 @@ export async function POST(request: NextRequest) {
   const auth = await validateAdminAuth();
   if (!auth.valid) return auth.error;
 
-  if (process.env.NODE_ENV !== "development" && !process.env.ALLOW_AGENT_RUN) {
-    return NextResponse.json(
-      { error: "Agent runs are only allowed in development" },
-      { status: 403 },
-    );
+  const localOnlyResponse = ensureLocalRuntime();
+  if (localOnlyResponse) {
+    return localOnlyResponse;
   }
 
   let body: { agentKey?: string };
@@ -85,7 +121,8 @@ export async function POST(request: NextRequest) {
       );
     } catch {
       // Process died without us noticing — mark as finished
-      existing.finished = true;
+      markAgentFinished(existing, existing.exitCode);
+      pruneFinishedAgents();
     }
   }
 
@@ -118,6 +155,7 @@ export async function POST(request: NextRequest) {
     finished: false,
     exitCode: null,
     stoppedByUser: false,
+    finishedAt: null,
   };
 
   // Listen to stdout/stderr and push to ring buffer
@@ -148,8 +186,8 @@ export async function POST(request: NextRequest) {
     if (stdoutBuffer.trim()) appendLog(agent, stdoutBuffer);
     if (stderrBuffer.trim()) appendLog(agent, `[stderr] ${stderrBuffer}`);
     appendLog(agent, `Process exited with code ${code ?? "unknown"}`);
-    agent.exitCode = code ?? null;
-    agent.finished = true;
+    markAgentFinished(agent, code ?? null);
+    pruneFinishedAgents();
   });
 
   runningAgents.set(agentKey, agent);
@@ -166,6 +204,11 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const auth = await validateAdminAuth();
   if (!auth.valid) return auth.error;
+
+  const localOnlyResponse = ensureLocalRuntime();
+  if (localOnlyResponse) {
+    return localOnlyResponse;
+  }
 
   const { searchParams } = request.nextUrl;
   const agentKey = searchParams.get("agentKey");
@@ -200,7 +243,8 @@ export async function GET(request: NextRequest) {
       running[key] = { startedAt: agent.startedAt };
     } catch {
       // Process no longer alive — mark finished
-      agent.finished = true;
+      markAgentFinished(agent, agent.exitCode);
+      pruneFinishedAgents();
     }
   }
 
@@ -214,6 +258,11 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const auth = await validateAdminAuth();
   if (!auth.valid) return auth.error;
+
+  const localOnlyResponse = ensureLocalRuntime();
+  if (localOnlyResponse) {
+    return localOnlyResponse;
+  }
 
   let body: { agentKey?: string };
   try {
@@ -246,7 +295,8 @@ export async function DELETE(request: NextRequest) {
 
   appendLog(agent, "Process stopped by user");
   agent.stoppedByUser = true;
-  agent.finished = true;
+  markAgentFinished(agent, agent.exitCode);
+  pruneFinishedAgents();
 
   return NextResponse.json({ stopped: true, agentKey });
 }

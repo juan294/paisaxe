@@ -14,7 +14,7 @@ The audit identified one Critical Ship Blocker (non-atomic Stripe dedup → voic
 ## Implementation Status
 
 - [x] P1 — Implemented and verified on 2026-04-22 in worktree `fix/stripe-webhook-atomicity`; `typecheck`, `lint`, targeted Stripe tests, full Vitest suite, and `npm run test:e2e` all passed. Local Supabase verification passed after freeing Docker port `54322`, running `supabase db reset`, and confirming `grant_day_pass_idempotent` exists as a `SECURITY DEFINER` function.
-- [ ] P2
+- [x] P2 — Implemented and verified on 2026-04-22 in worktree `fix/agent-runner-boundary`; the agent runner is now local-only via `VERCEL_ENV === undefined`, the legacy override is removed from live code paths, the route has regression coverage for the new gate and stale-entry cleanup, and CI now checks Vercel env config for the removed override. `typecheck`, `lint`, full Vitest, `build`, and `npm run test:e2e` all passed.
 - [ ] P3
 - [ ] P4
 - [ ] P5

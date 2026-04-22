@@ -37,7 +37,7 @@ test.describe("Ambient toggle behavior", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
   });
 
   test("play button starts auto-rotation and switches to pause icon", async ({
@@ -92,7 +92,8 @@ test.describe("Ambient toggle behavior", () => {
 
   test("auto-rotation advances to next story", async ({ page }) => {
     // Get the initial story title
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
 
     // Start auto-rotation
     const playButton = page
@@ -102,7 +103,7 @@ test.describe("Ambient toggle behavior", () => {
 
     // Wait for auto-advance (ambient mode is 12 seconds)
     // Use a generous timeout since transitions add delay
-    await expect(page.locator("h1").first()).not.toHaveText(initialTitle!, {
+    await expect(title).not.toHaveText(initialTitle!, {
       timeout: 15000,
     });
   });
@@ -121,12 +122,13 @@ test.describe("Ambient toggle behavior", () => {
       .click();
 
     // Get the title after stopping
-    const titleAfterStop = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const titleAfterStop = await title.textContent();
 
     // Title should remain the same — no auto-advance should happen.
     // toHaveText with a generous timeout passes immediately when the title
     // stays put; it only fails if the title unexpectedly changes.
-    await expect(page.locator("h1").first()).toHaveText(titleAfterStop!, {
+    await expect(title).toHaveText(titleAfterStop!, {
       timeout: 7000,
     });
   });
@@ -145,7 +147,7 @@ test.describe("Language switcher behavior", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
   });
 
   test("switcher opens dropdown and closes on selection", async ({ page }) => {
@@ -200,7 +202,7 @@ test.describe("Bookmark button behavior", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
   });
 
   test("bookmark button is visible and clickable", async ({ page }) => {
@@ -350,13 +352,15 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    const title = page.getByTestId("story-title").first();
+    await expect(title).toContainText(/\S+/);
   });
 
   test("space bar types a space in input instead of advancing story", async ({
     page,
   }) => {
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
 
     // Open the suggest place dialog
     const suggestButton = page.locator("[data-suggest-place-trigger]");
@@ -373,11 +377,12 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     await expect(placeInput).toHaveValue("Playa del");
 
     // Also verify story did NOT advance (title unchanged)
-    await expect(page.locator("h1").first()).toHaveText(initialTitle!);
+    await expect(title).toHaveText(initialTitle!);
   });
 
   test("space bar in textarea does not advance story", async ({ page }) => {
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
 
     // Open the suggest place dialog
     await page.locator("[data-suggest-place-trigger]").click();
@@ -390,6 +395,6 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     await expect(commentArea).toHaveValue("Great hidden beach");
 
     // Story should NOT have advanced
-    await expect(page.locator("h1").first()).toHaveText(initialTitle!);
+    await expect(title).toHaveText(initialTitle!);
   });
 });
