@@ -55,3 +55,33 @@ jobs:
       - name: Report all vulnerabilities (informational)
         if: always()
         run: npm audit || true
+
+  vercel-env-safety:
+    name: Vercel env safety
+    if: ${{ secrets.VERCEL_TOKEN != '' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Load Vercel project metadata
+        run: |
+          echo "VERCEL_PROJECT_ID=$(jq -r '.projectId' .vercel/project.json)" >> "$GITHUB_ENV"
+          echo "VERCEL_ORG_ID=$(jq -r '.orgId' .vercel/project.json)" >> "$GITHUB_ENV"
+
+      - name: Assert legacy agent override is absent from Vercel env
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          legacy_key="$(printf '%s_%s_%s\n' ALLOW AGENT RUN)"
+          response="$(curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID&limit=100")"
+
+          echo "$response" | jq -r '.envs[]?.key' > env-keys.txt
+
+          if grep -Fxq "$legacy_key" env-keys.txt; then
+            echo "::error::Legacy agent runner override is still configured in Vercel. Remove it before deploy."
+            exit 1
+          fi
