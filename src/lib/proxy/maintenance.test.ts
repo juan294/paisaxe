@@ -150,4 +150,86 @@ describe("isMaintenanceModeEnabled", () => {
     const result = await isMaintenanceModeEnabled();
     expect(result).toBe(false);
   });
+
+  describe("production cache (NODE_ENV != 'test', env = 'production')", () => {
+    beforeEach(() => {
+      delete process.env.MAINTENANCE_MODE;
+      vi.stubEnv("NODE_ENV", "production");
+      resetMaintenanceModeCache();
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      resetMaintenanceModeCache();
+    });
+
+    it("populates the cache on first fetch (covers lines 114-116)", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => [{ enabled: true }],
+      });
+      const result = await isMaintenanceModeEnabled();
+      expect(result).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns cached value on subsequent calls without refetching (covers line 87)", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => [{ enabled: true }],
+      });
+      const first = await isMaintenanceModeEnabled();
+      const second = await isMaintenanceModeEnabled();
+      const third = await isMaintenanceModeEnabled();
+      expect(first).toBe(true);
+      expect(second).toBe(true);
+      expect(third).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("refetches when cache URL changes (different Supabase project)", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => [{ enabled: false }],
+      });
+      await isMaintenanceModeEnabled();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      process.env.NEXT_PUBLIC_SUPABASE_URL = "https://different.supabase.co";
+      await isMaintenanceModeEnabled();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("refetches after cache expiry (30s TTL)", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => [{ enabled: false }],
+      });
+      const nowSpy = vi.spyOn(Date, "now");
+      nowSpy.mockReturnValue(1_000_000);
+      await isMaintenanceModeEnabled();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Advance past the 30s TTL
+      nowSpy.mockReturnValue(1_000_000 + 31_000);
+      await isMaintenanceModeEnabled();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      nowSpy.mockRestore();
+    });
+
+    it("does not cache when DB response is not ok", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      mockFetch.mockResolvedValue({ ok: false, status: 500 });
+      await isMaintenanceModeEnabled();
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => [{ enabled: true }],
+      });
+      // Next call should refetch because prior error did not populate cache
+      const result = await isMaintenanceModeEnabled();
+      expect(result).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      consoleError.mockRestore();
+    });
+  });
 });

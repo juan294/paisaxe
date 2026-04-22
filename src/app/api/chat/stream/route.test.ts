@@ -546,4 +546,30 @@ describe("POST /api/chat/stream", () => {
     const callArgs = vi.mocked(streamChatResponse).mock.calls[0];
     expect(callArgs[2]).toBe(true);
   });
+
+  it("returns 500 from outer catch when pre-stream setup throws", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Trigger the outer try/catch by making checkRateLimit reject. This exercises
+    // the outer catch (route.ts:185-193) which is distinct from the inner stream
+    // error handler.
+    vi.mocked(checkRateLimit).mockRejectedValueOnce(new Error("Upstash outage"));
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Hello" }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error).toBe("Internal server error");
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Stream chat API error:",
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
 });

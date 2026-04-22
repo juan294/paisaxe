@@ -222,6 +222,30 @@ describe("rate-limit", () => {
       expect(result.remaining).toBe(9);
     });
 
+    it("fails closed (denies) in production when Upstash call fails", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubEnv("NODE_ENV", "production");
+      mockLimit.mockRejectedValue(new Error("Redis down"));
+
+      const result = await checkRateLimit("user1", {
+        windowMs: 60_000,
+        maxRequests: 10,
+        maxEntries: 100,
+      });
+
+      expect(result.allowed).toBe(false);
+      expect(result.remaining).toBe(0);
+      expect(result.limit).toBe(10);
+      expect(result.retryAfter).toBe(60);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[RATE_LIMIT_FALLBACK]",
+        expect.objectContaining({ identifier: "user1" })
+      );
+
+      vi.unstubAllEnvs();
+      consoleSpy.mockRestore();
+    });
+
     it("uses identifier as-is in Upstash key", async () => {
       mockLimit.mockResolvedValue({
         success: true,

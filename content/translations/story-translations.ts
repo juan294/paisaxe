@@ -351,7 +351,7 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
     },
   },
 
-  'descenso-del-sella': {
+  'descenso-sella': {
     en: {
       title: 'Sella River Descent',
       subtitle: 'The Canoe Race',
@@ -491,7 +491,7 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
     },
   },
 
-  'bufones-de-pria': {
+  'bufones-pria': {
     en: {
       title: 'Bufones de Pría',
       subtitle: 'The roar of the sea',
@@ -1455,7 +1455,7 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
   // ACTIVITIES & FAMILY
   // ============================================
 
-  'museo-del-jurasico-muja': {
+  'museo-jurrasico': {
     en: {
       title: 'Jurassic Museum (MUJA)',
       subtitle: 'Colunga',
@@ -2704,6 +2704,150 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       title: 'Sienda l\'Osu',
       subtitle: 'Ruta familiar',
       description: 'Una vía verde perfecta pa percorrer en familia, al traviés de paisaxes de monte y cola posibilidá de ver osos nel cercáu.',
+    },
+  },
+
+  // ============================================
+  // CYCLING STORIES (from seed-cycling-stories.ts)
+  // ============================================
+
+  'angliru-bestia-asturias': {
+    en: {
+      title: 'Angliru: The Beast of Asturias',
+      subtitle: 'Sierra del Aramo, Riosa',
+      description: 'The Alto del Angliru is the most feared climb in the Vuelta a España. With ramps exceeding 23% gradient, this mythical ascent has been the stage of epic feats in world cycling. The road winds through the lonely Sierra del Aramo, independent from the rest of the Cantabrian Range, where wolves and broom-heath hares find refuge. At the foot of the Angliru, the ancient Texeo Mines, rich in copper since 2000 BC, add history to this legendary landscape. For mountain bike fans, the Central Mountain cycling loop offers a less vertical but equally spectacular alternative.',
+    },
+    fr: {
+      title: 'Angliru : La Bête des Asturies',
+      subtitle: 'Sierra del Aramo, Riosa',
+      description: 'L\'Alto del Angliru est l\'ascension la plus redoutée de la Vuelta a España. Avec des rampes dépassant 23% de pente, cette montée mythique a été le théâtre d\'exploits épiques du cyclisme mondial. La route serpente à travers la solitaire Sierra del Aramo, indépendante du reste de la Cordillère Cantabrique, où loups et lièvres des landes trouvent refuge. Au pied de l\'Angliru, les anciennes Mines de Texeo, riches en cuivre depuis l\'an 2000 av. J.-C., ajoutent de l\'histoire à ce paysage de légende. Pour les amateurs de VTT, le circuit cycliste de la Montagne Centrale offre une alternative moins verticale mais tout aussi spectaculaire.',
+    },
+    de: {
+      title: 'Angliru: Die Bestie Asturiens',
+      subtitle: 'Sierra del Aramo, Riosa',
+      description: 'Der Alto del Angliru ist der gefürchtetste Anstieg der Vuelta a España. Mit Rampen von über 23% Steigung war dieser legendäre Aufstieg Schauplatz epischer Taten des Weltradsports. Die Straße schlängelt sich durch die einsame Sierra del Aramo, unabhängig vom Rest des Kantabrischen Gebirges, wo Wölfe und Ginsterhasen Zuflucht finden. Am Fuße des Angliru fügen die alten Texeo-Minen, seit 2000 v. Chr. reich an Kupfer, dieser legendären Landschaft Geschichte hinzu. Für Mountainbike-Fans bietet der Radring des Zentralgebirges eine weniger vertikale, aber ebenso spektakuläre Alternative.',
+    },
+    pt: {
+      title: 'Angliru: A Besta das Astúrias',
+      subtitle: 'Sierra del Aramo, Riosa',
+      description: 'O Alto do Angliru é a subida mais temida da Volta a Espanha. Com rampas que ultrapassam os 23% de inclinação, esta ascensão mítica tem sido palco de feitos épicos do ciclismo mundial. A estrada serpenteia pela solitária Serra do Aramo, independente do resto da Cordilheira Cantábrica, onde lobos e lebres do urzal encontram refúgio. Aos pés do Angliru, as antigas Minas de Texeo, ricas em cobre desde o ano 2000 a.C., acrescentam história a esta paisagem de lenda. Para os aficionados de BTT, o anel ciclista da Montanha Central oferece uma alternativa menos vertical mas igualmente espetacular.',
+    },
+    ast: {
+      title: 'Angliru: La Bestia d\'Asturies',
+      subtitle: 'Sierra l\'Aramu, Riosa',
+      description: 'L\'Altu l\'Angliru ye\'l puertu más temíu de La Vuelta a España. Con rampes que superen el 23% de pindia, esta xubida mítica foi escenariu de fazañes épiques del ciclismu mundial. La carretera culebrea pela solitaria Sierra l\'Aramu, independiente del restu de la Cordalera Cantábrica, onde llobos y llebres del piornal atopen abellugu. Al pie l\'Angliru, les antigües Mines de Texeo, riques en cobre dende l\'añu 2000 a.C., amiesten historia a esti paisaxe de lleenda. Pa los aficionaos a la BTT, l\'aniellu ciclista de la Montaña Central ufierta una alternativa menos vertical pero igualmente espectacular.',
+    },
+  },
+
+  'lagos-covadonga-bicicleta': {
+    en: {
+      title: 'Lakes of Covadonga by Bike',
+      subtitle: 'Picos de Europa',
+      description: 'The climb to the Lakes of Covadonga is one of the most iconic ascents in Spanish cycling. This epic route cuts through the heart of the Picos de Europa until reaching the glacial lakes of Enol and Ercina, surrounded by the most imposing summits of the massif. The course combines the toughness of its ramps with landscapes of breathtaking beauty: beech forests, high mountain meadows and views that leave you speechless. A regular stage of the Vuelta a España, every pedal stroke here is a tribute to the cycling greats who have left their mark on these legendary roads.',
+    },
+    fr: {
+      title: 'Lacs de Covadonga à Vélo',
+      subtitle: 'Pics d\'Europe',
+      description: 'La montée aux Lacs de Covadonga est l\'une des ascensions les plus emblématiques du cyclisme espagnol. Cette route épique traverse le cœur des Pics d\'Europe jusqu\'à atteindre les lacs glaciaires d\'Enol et d\'Ercina, entourés des sommets les plus imposants du massif. Le parcours combine la dureté de ses rampes avec des paysages d\'une beauté saisissante : forêts de hêtres, prairies de haute montagne et vues à couper le souffle. Étape habituelle de la Vuelta a España, chaque coup de pédale ici est un hommage aux grands du cyclisme qui ont laissé leur empreinte sur ces routes légendaires.',
+    },
+    de: {
+      title: 'Seen von Covadonga mit dem Fahrrad',
+      subtitle: 'Picos de Europa',
+      description: 'Der Anstieg zu den Seen von Covadonga ist einer der ikonischsten Anstiege des spanischen Radsports. Diese epische Route durchquert das Herz der Picos de Europa bis zu den Gletscherseen Enol und Ercina, umgeben von den imposantesten Gipfeln des Massivs. Die Strecke vereint die Härte ihrer Rampen mit Landschaften von atemberaubender Schönheit: Buchenwälder, Hochgebirgswiesen und Ausblicke, die einem den Atem rauben. Als regelmäßige Etappe der Vuelta a España ist jeder Pedaltritt hier eine Hommage an die Radsportgrößen, die auf diesen legendären Straßen ihre Spuren hinterlassen haben.',
+    },
+    pt: {
+      title: 'Lagos de Covadonga de Bicicleta',
+      subtitle: 'Picos da Europa',
+      description: 'A subida aos Lagos de Covadonga é uma das ascensões mais icónicas do ciclismo espanhol. Esta rota épica atravessa o coração dos Picos da Europa até alcançar os lagos glaciares de Enol e Ercina, rodeados pelos picos mais imponentes do maciço. O percurso combina a dureza das suas rampas com paisagens de beleza estonteante: florestas de faias, prados de alta montanha e vistas de cortar a respiração. Palco habitual da Volta a Espanha, cada pedalada aqui é uma homenagem aos grandes do ciclismo que deixaram a sua marca nestas estradas lendárias.',
+    },
+    ast: {
+      title: 'Llagos de Cuadonga en Bicicleta',
+      subtitle: 'Picos d\'Europa',
+      description: 'La xubida a los Llagos de Cuadonga ye una de les ascensiones más icóniques del ciclismu español. Esta ruta épica traviesa\'l corazón de los Picos d\'Europa hasta algamar los llagos glaciares d\'Enol y Ercina, arrodiaos pe les cumes más imponentes del macizu. El recorríu combina la dureza de les sos rampes con paisaxes d\'una guapura sobrecoxedora: carbayeres de faya, praos d\'altor y vistes que quiten l\'aliendu. Escenariu avezáu de La Vuelta a España, cada pedalada equí ye un homenaxe a los grandes del ciclismu que dexaron la so buelga nestes carreteres llexendaries.',
+    },
+  },
+
+  'vias-verdes-asturias': {
+    en: {
+      title: 'Green Routes: From Rails to Trails',
+      subtitle: 'Cycling routes for everyone',
+      description: 'The former mining railway tracks of Asturias have been transformed into green paths perfect for cycling. The Fuso la Reina Greenway, near Oviedo, invites us to immerse ourselves in the tranquility of Asturian natural landscapes. The Camocha route in Gijón connects with beautiful riverside paths. The Turón Valley offers a 20 km circuit among meadows and mining heritage. And the Eo Greenway, with its 14 entirely flat kilometers, is ideal for families. All preserve the spirit of those locomotives that, with technical ingenuity and human effort, overcame the mountains surrounding the Principality.',
+    },
+    fr: {
+      title: 'Voies Vertes : Des Rails aux Sentiers',
+      subtitle: 'Itinéraires cyclistes pour tous',
+      description: 'Les anciennes voies du chemin de fer minier des Asturies se sont transformées en sentiers verts parfaits pour le vélo. La Voie Verte de Fuso la Reina, près d\'Oviedo, nous invite à nous immerger dans la tranquillité des paysages naturels asturiens. Celle de La Camocha à Gijón relie de magnifiques sentiers fluviaux. La Vallée de Turón offre un circuit de 20 km entre prairies et vestiges de l\'histoire minière. Et la Voie Verte d\'Eo, avec ses 14 km entièrement plats, est idéale pour les familles. Toutes conservent l\'esprit de ces locomotives qui, avec ingéniosité technique et effort humain, ont franchi les montagnes entourant la Principauté.',
+    },
+    de: {
+      title: 'Grüne Wege: Von Schienen zu Pfaden',
+      subtitle: 'Radrouten für alle',
+      description: 'Die alten Bergbaubahnen Asturiens sind zu grünen Wegen umgewandelt worden, die perfekt zum Radfahren sind. Der Grüne Weg von Fuso la Reina in der Nähe von Oviedo lädt uns ein, in die Ruhe der asturischen Naturlandschaften einzutauchen. Der von La Camocha in Gijón verbindet sich mit wunderschönen Flusswegen. Das Turón-Tal bietet einen 20 km langen Rundweg zwischen Wiesen und Überresten der Bergbaugeschichte. Und der Grüne Weg des Eo mit seinen 14 km völlig flach ist ideal für Familien. Alle bewahren den Geist jener Lokomotiven, die mit technischem Einfallsreichtum und menschlichem Einsatz die Berge rund um das Fürstentum überwanden.',
+    },
+    pt: {
+      title: 'Vias Verdes: De Carris a Trilhos',
+      subtitle: 'Rotas cicláveis para todos',
+      description: 'As antigas vias do caminho de ferro mineiro das Astúrias transformaram-se em trilhos verdes perfeitos para percorrer de bicicleta. A Via Verde de Fuso la Reina, perto de Oviedo, convida-nos a mergulhar na tranquilidade das paisagens naturais asturianas. A de La Camocha em Gijón liga-se a trilhos fluviais de grande beleza. O Vale de Turón oferece um circuito de 20 km entre prados e vestígios da história mineira. E a Via Verde do Eo, com os seus 14 km completamente planos, é ideal para famílias. Todas conservam o espírito daquelas locomotivas que, com engenho técnico e empenho humano, venceram as montanhas que rodeiam o Principado.',
+    },
+    ast: {
+      title: 'Víes Verdes: De Carriles a Sendes',
+      subtitle: 'Rutes ciclistes pa toos',
+      description: 'Les antigües víes del ferrocarril mineru d\'Asturies treslladáronse en sendes verdes perfectes pa percorrer en bicicleta. La Vía Verde de Fuso la Reina, cerca d\'Uviéu, convídanos a somorguianos na tranquilidá de los paisaxes naturales asturianos. La de La Camocha en Xixón coneuta con sendes fluviales de gran guapura. El Valle Turón ufierta un circuitu de 20 km entre praeríes y vestixos de la historia minera. Y la Vía Verde del Eo, colos sos 14 km dafechu llanos, ye ideal pa les families. Toes caltienen l\'espíritu d\'aquelles llocomotores que, con inxeniu téunicu y emplegu humanu, vencieron les montañes qu\'arrodien el Principáu.',
+    },
+  },
+
+  'ruta-costera-llanes-niembro': {
+    en: {
+      title: 'Pedaling Between Beaches: Llanes to Niembro',
+      subtitle: 'Eastern coast of Asturias',
+      description: 'A 9-kilometer route connecting some of the most beautiful beaches on the Asturian coast. Starting from Poo beach, the trail winds along the sea past the beaches of San Martín, Celoriu, Borizu, Troenzo, Sorraos and Barro, until reaching the picturesque Niembro estuary with its church of Santa María de los Dolores. The path offers constant views of the Cantabrian Sea and the chance to stop for a refreshing dip at any of these dreamy coves. The return can be made along the same path or by taking the train in Celoriu back to Llanes, combining bicycle and railway in a perfect day out.',
+    },
+    fr: {
+      title: 'À Vélo Entre les Plages : Llanes à Niembro',
+      subtitle: 'Côte orientale des Asturies',
+      description: 'Un itinéraire de 9 kilomètres qui relie certaines des plus belles plages de la côte asturienne. Au départ de la plage de Poo, le parcours serpente le long de la mer, passant par les plages de San Martín, Celoriu, Borizu, Troenzo, Sorraos et Barro, jusqu\'à la pittoresque ria de Niembro et son église de Santa María de los Dolores. Le chemin offre des vues constantes sur le Cantabrique et la possibilité de s\'arrêter pour se rafraîchir dans l\'une de ces criques de rêve. Le retour peut se faire par le même chemin ou en prenant le train à Celoriu pour revenir à Llanes, combinant vélo et chemin de fer en une journée parfaite.',
+    },
+    de: {
+      title: 'Radeln zwischen Stränden: Von Llanes nach Niembro',
+      subtitle: 'Ostküste Asturiens',
+      description: 'Eine 9 Kilometer lange Route, die einige der schönsten Strände der asturischen Küste verbindet. Vom Strand Poo aus schlängelt sich die Strecke am Meer entlang, vorbei an den Stränden San Martín, Celoriu, Borizu, Troenzo, Sorraos und Barro, bis zur malerischen Niembro-Ría mit ihrer Kirche Santa María de los Dolores. Der Weg bietet ständige Ausblicke auf das Kantabrische Meer und die Möglichkeit, sich in einer dieser traumhaften Buchten zu erfrischen. Die Rückkehr kann auf demselben Weg oder mit dem Zug ab Celoriu zurück nach Llanes erfolgen und vereint Fahrrad und Schiene zu einem perfekten Tag.',
+    },
+    pt: {
+      title: 'A Pedalar entre Praias: Llanes a Niembro',
+      subtitle: 'Costa oriental das Astúrias',
+      description: 'Uma rota de 9 quilómetros que liga algumas das praias mais belas da costa asturiana. Partindo da praia de Poo, o percurso serpenteia junto ao mar passando pelas praias de San Martín, Celoriu, Borizu, Troenzo, Sorraos e Barro, até à pitoresca ria de Niembro com a sua igreja de Santa María de los Dolores. O caminho oferece vistas constantes do Cantábrico e a possibilidade de parar para se refrescar em qualquer uma destas enseadas de sonho. O regresso pode fazer-se pelo mesmo caminho ou apanhando o comboio em Celoriu para voltar a Llanes, combinando bicicleta e caminho de ferro numa jornada perfeita.',
+    },
+    ast: {
+      title: 'Pedaliando ente Playes: Llanes a Niembro',
+      subtitle: 'Costa oriental d\'Asturies',
+      description: 'Una ruta de 9 quilómetros que coneuta delles de les playes más guapes de la costa asturiana. Partiendo de la playa de Poo, el recorríu culebrea xunto al mar pasando peles playes de San Martín, Celoriu, Borizu, Troenzo, Sorraos y Barro, hasta aportar a la pintoresca ría de Niembro cola so ilesia de Santa María de los Dolores. El camín ufierta vistes permanentes del Cantábricu y la posibilidá de parar a refrescase en cualesquier d\'estes cales de suañu. La güelta pue facese pel mesmu camín o garrando\'l tren en Celoriu pa tornar a Llanes, combinando bicicleta y ferrocarril nuna xornada perfeuta.',
+    },
+  },
+
+  'camino-santiago-bicicleta': {
+    en: {
+      title: 'The Way of Saint James on Two Wheels',
+      subtitle: '200 km of cycling pilgrimage',
+      description: 'Cycling the Way of Saint James is a unique way to live this millenary experience. From Asturias, two historic routes depart: the Primitive Way, the oldest Jacobean route born at Oviedo Cathedral, and the Northern Way, which follows the spectacular Cantabrian coast among cliffs, beaches and seafaring towns. To earn the Compostela, pilgrims must complete at least the last 200 kilometers by bike. Public hostels reserved for pilgrims offer services designed for cyclists: bike storage, workshop area with tools, washing space and laundry service. An adventure that combines culture, history, nature and sustainability.',
+    },
+    fr: {
+      title: 'Le Chemin de Saint-Jacques sur Deux Roues',
+      subtitle: '200 km de pèlerinage à vélo',
+      description: 'Parcourir le Chemin de Saint-Jacques à vélo est une façon unique de vivre cette expérience millénaire. Depuis les Asturies partent deux routes historiques : le Chemin Primitif, la plus ancienne route jacquaire née à la cathédrale d\'Oviedo, et le Chemin du Nord, qui longe la spectaculaire côte cantabrique entre falaises, plages et villages de pêcheurs. Pour obtenir la Compostela, les pèlerins doivent parcourir au moins les 200 derniers kilomètres à vélo. Les auberges publiques réservées aux pèlerins offrent des services pensés pour les cyclistes : garage pour vélos, atelier avec outils, espace de lavage et service de blanchisserie. Une aventure qui unit culture, histoire, nature et durabilité.',
+    },
+    de: {
+      title: 'Der Jakobsweg auf zwei Rädern',
+      subtitle: '200 km Radpilgerfahrt',
+      description: 'Den Jakobsweg mit dem Fahrrad zu befahren, ist eine einzigartige Art, diese jahrtausendealte Erfahrung zu erleben. Aus Asturien führen zwei historische Routen: der Primitive Weg, die älteste Jakobsroute, die an der Kathedrale von Oviedo beginnt, und der Nordweg, der die spektakuläre kantabrische Küste zwischen Klippen, Stränden und Fischerdörfern durchquert. Um die Compostela zu erhalten, müssen Pilger mindestens die letzten 200 Kilometer mit dem Fahrrad zurücklegen. Die öffentlichen Herbergen für Pilger bieten Dienste für Radfahrer: Fahrradunterstellplätze, Werkstattbereich mit Werkzeugen, Waschbereich und Wäscheservice. Ein Abenteuer, das Kultur, Geschichte, Natur und Nachhaltigkeit verbindet.',
+    },
+    pt: {
+      title: 'O Caminho de Santiago sobre Duas Rodas',
+      subtitle: '200 km de peregrinação ciclista',
+      description: 'Percorrer o Caminho de Santiago de bicicleta é uma forma única de viver esta experiência milenar. Das Astúrias partem duas rotas históricas: o Caminho Primitivo, a rota jacobeia mais antiga que nasce na Catedral de Oviedo, e o Caminho do Norte, que percorre a espetacular costa cantábrica entre falésias, praias e vilas piscatórias. Para obter a Compostela, os peregrinos devem percorrer pelo menos os últimos 200 quilómetros de bicicleta. Os albergues públicos reservados para peregrinos oferecem serviços pensados para ciclistas: garagem para bicicletas, oficina com ferramentas, zona de lavagem e serviço de lavandaria. Uma aventura que une cultura, história, natureza e sustentabilidade.',
+    },
+    ast: {
+      title: 'El Camín de Santiagu sobre Dos Ruedes',
+      subtitle: '200 km de pelegrinaxe ciclista',
+      description: 'Percorrer el Camín de Santiagu en bicicleta ye una forma única de vivir esta esperiencia milenaria. D\'Asturies parten dos rutes históriques: el Camín Primitivu, la ruta xacobea más antigua que naz na Catedral d\'Uviéu, y el Camín del Norte, que percuerre la espectacular costa cantábrica ente cantiles, playes y villes marineres. Pa llograr la Compostela, los pelegrinos tienen de percorrer polo menos los caberos 200 quilómetros en bicicleta. Los albergues públicos acutaos pa pelegrinos ufierten servicios pensaos pa ciclistes: garax pa bicicletes, zona de taller con ferramientes, espaciu de llaváu y serviciu de llavandería. Una aventura qu\'amiesta cultura, historia, naturaleza y sostenibilidá.',
     },
   },
 };
