@@ -5,18 +5,15 @@
 
 
 
-<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-02-06T15:22:54Z -->
-## Documentation Agent — 2026-02-06
-- **Coverage**: 100% of feature flags documented in features.md (24 flags across 5 categories)
-- **MCP tools**: Added documentation for Pelayo's 4 custom tools (search_places, get_weather, make_booking, check_booking_status)
-- **Webhooks**: Expanded webhook documentation to table format listing all 4 endpoints with purposes
-- **API routes**: 43 routes flagged by scanner, but all are internal admin endpoints or implementation details of documented features
 
-**Cross-agent recommendations:**
-- Coverage Agent: MCP tool endpoints (`/api/mcp/*`) have 0% test coverage - these are external-facing APIs used by ElevenLabs and need tests
-- Security Agent: Webhook endpoints handle external input and use signature verification - verify HMAC implementations are timing-safe
-- QA Agent: Booking system uses outbound calls and SMS - test the full booking flow end-to-end, including failure modes
-<!-- ENTRY:END -->
+
+
+
+
+
+
+
+
 
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-02-06T16:30:00Z -->
 ## Documentation Agent — 2026-02-06
@@ -173,21 +170,6 @@
 - Performance Agent: No documentation-impacting changes.
 - Cost Analyst Agent: No cost-related documentation concerns.
 - Localization Agent: No locale-related documentation concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-04-10T10:15:00Z -->
-## Triage — 2026-04-10
-- **Reports processed**: 7 (security, performance, coverage, cost-analyst, localization, documentation, cc-rpi-update)
-- **Agent failures**: 0
-- **Action items resolved**: 3 dep upgrade batches — next@16.2.3, react@19.2.5, react-dom@19.2.5, stripe@22.0.1, @anthropic-ai/sdk@0.87.0, @stripe/stripe-js@9.1.0, @elevenlabs/react@1.0.3, @supabase/ssr@0.10.2, @supabase/supabase-js@2.103.0. All 5716 tests passing. 0 vulnerabilities.
-- **Summary**: All 6 code agents GREEN. Cost analyst WATCH (55-day revenue drought, 51-day Paisaxe voice silence — business concern only, no code action). Upgraded 9 packages across 3 batches (patches + minors, no CVEs). Commit 46827c3 pushed to develop; CI queued.
-**Cross-agent recommendations:**
-- Security Agent: All packages upgraded as recommended. 0 vulns. Next Supabase upgrade batch (@supabase/ssr 0.10.2, @supabase/supabase-js 2.103.0) done — re-verify auth flows after Supabase in CI. Remaining gaps: @vercel/analytics v1→v2, lucide-react v0→v1 (major, non-urgent).
-- Performance Agent: Bundle stable at 2,851 KB (within split budget). 9 packages upgraded this cycle — no bundle size impact expected from patch/minor upgrades.
-- Coverage Agent: Plateau continues at 98.73% stmts / 96.64% branch (day 9+). All unreachable branches documented. No new tests needed this cycle.
-- QA Agent: Supabase upgraded (ssr 0.10.2, js 2.103.0) — re-verify auth flows. Revenue/voice drought at 55 days — manual production check of Day Pass flow and Pelayo widget recommended.
-- Cost Analyst Agent: No code changes impact costs. Revenue drought deepening — manual production verification still needed.
-- Localization Agent: All stable, no changes. 100% coverage, 392 keys × 6 locales.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-11T10:30:00Z -->
@@ -798,6 +780,21 @@
 - Coverage Agent: All webhook and auth error paths remain fully covered.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-20T08:06:31Z -->
+## Performance Agent — 2026-04-20
+- **Status: YELLOW** — 12-cycle GREEN streak broken. node_modules budget violated (1,047 MB > 1,000 MB). Initial load estimated at ~2,066 KB vs 2,000 KB budget — unconfirmed, needs production build.
+- **+49 KB this cycle** (2,892 → 2,941 KB): 3 new production deps from remediation waves — @sentry/nextjs (+~70-80 KB static, +67 MB node_modules), zod (+~8-12 KB), pino (+0 KB, server-only).
+- **Deferred chunks shrank**: ElevenLabs 487→478 KB, react-markdown 145→110 KB. Net deferred: ~875 KB (-45 KB).
+- **P4 (Supabase realtime tree-shake) is now actionable**: Previous trigger was headroom <15 KB; estimated headroom is now -66 KB. Saves ~20-30 KB.
+- **Sentry session replay audit needed**: If `Replay` integration is enabled in `sentry.client.config.ts`, disabling it saves ~30-50 KB with no UX tradeoff.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: Verify `sentry.client.config.ts` does not include `Replay` integration. Run `npm run build:analyze` to confirm exact Sentry chunk size. P4 (Supabase realtime) is the highest-ROI structural optimization now actionable.
+- QA Agent: After P4 (Supabase realtime tree-shake), re-verify admin realtime features still work in E2E.
+- Security Agent: All 3 new deps clean — zero CVEs. @sentry/nextjs 10.49.0 recommended Next.js SDK.
+- Coverage Agent: pino logger (64.28%) confirmed production-only — no new coverage action needed. Check zod v4 API validation paths added in #270/#279 for test gaps.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-04-20T09:30:00Z -->
 ## Triage — 2026-04-20
 - **Reports processed**: 10 (cc-rpi-update, cost-analyst, coverage, documentation, localization, performance, pre-launch, remediation, security, triage-report)
@@ -819,4 +816,143 @@
 - QA Agent: Long-standing E2E "rejects short name" failure fixed. Full E2E suite should now be clean.
 - Cost Analyst Agent: No code actions for business items. Revenue/voice drought requires manual production investigation.
 - All agents: Remediation Waves 1+2 complete (52 findings). Wave 3 items (#321–#335) open in backlog.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-04-21T00:09:28Z -->
+## Coverage Agent — 2026-04-21
+- Test suite: 5981 passing on clean run (1 known load-race flake on parallel run, pre-existing).
+- Overall coverage: 98.58% statements (+0.04%), 96.03% branch (+0.09%), 98.99% line (+0.04%).
+- Added 5 new tests to `src/lib/proxy/maintenance.test.ts` covering the production-mode cache branch (lines 87, 114-116) — previously uncovered because `NODE_ENV=test` short-circuited `isDev=true`.
+- `src/lib/proxy/` now reports 100% statements (up from 97.71%).
+- Remaining gap (~1.4%) is entirely SSR guards, production-only paths, defensive dead code, and V8 instrumentation artifacts.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: Tests that depend on `process.env.NODE_ENV` branching must set the variable explicitly. Relying on vitest's default `"test"` value silently hides production code paths from coverage — the maintenance.test.ts describe block shows the pattern.
+- Security Agent: Maintenance-mode cache Supabase-URL invalidation path now covered (prevents cross-tenant state leak on project URL change).
+- QA Agent: voice-agent-chat and agents-dashboard still need Playwright E2E — the only realistic path to >98.58%.
+- Performance Agent: Zero source changes, zero bundle impact.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-04-21T01:04:38Z -->
+## Cost Analyst — 2026-04-21
+- **Status: WATCH** — Day 21 of April. Revenue drought: **67 days** (since Feb 13). Voice silence: **63 days** (since Feb 17).
+- **ElevenLabs**: Creator tier, **13,734 / 270,783 chars (5.07%)** — unchanged for 5 consecutive days. Zero activity since Apr 16 18:44 UTC. Cycle-avg daily rate decayed to ~1,017/day. Projected cycle-end: 5–11% by May 7.
+- **Twilio**: Balance **$14.0646** (stable for 14th consecutive day). Zero non-zero usage records. ~12.2 months of runway.
+- **Fixed operational burn**: $84.41/mo / $2.81/day. Variable Apr MTD: $1.15 (phone rental Apr 7). Total MTD: $85.56.
+- **Security advisories RESOLVED**: posthog-js transitive deps (protobufjs Critical + dompurify Moderate) cleared by commit e66e510 (`npm audit fix`). 0 vulnerabilities remaining.
+- **April certain to close at $0 revenue.** Cumulative operational loss since Feb 2026: ~$346.
+
+**Cross-agent recommendations:**
+- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 67-day revenue drought and 63-day voice silence still unexplained. Journey tests pass E2E but production flows unverified.
+- Code Quality Agent: Twilio $0.24 regulatory fee anomaly (Apr 3-4) now 18 days unresolved — check Twilio billing console. If confirmed recurring, update `src/config/recurring-costs.ts` Twilio cost from $1.15 to ~$1.39/mo.
+- Triage Agent: One outstanding code action — Twilio `recurring-costs.ts` update if anomaly confirmed. Manual check: Anthropic billing at console.anthropic.com.
+- Security Agent: 0 advisories — GREEN streak maintained after e66e510.
+- Performance Agent: ElevenLabs SDK chunk (487 KB, deferred) unchanged. PostHog chunk size should be re-verified after posthog-js upgrade in e66e510.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-04-21T05:06:34Z -->
+## Localization Agent — 2026-04-21
+- **Coverage**: 100% complete across 6 locales. UI: 395 keys per locale (up from 392, new keys already present in all locales). Story translations: 100 entries (up from 95).
+- **Fixed 3 slug mismatches** in `content/translations/story-translations.ts`: `descenso-del-sella` -> `descenso-sella`, `bufones-de-pria` -> `bufones-pria`, `museo-del-jurasico-muja` -> `museo-jurrasico`. `seed-translations.ts` can now match these to their source stories in the DB — previously their translations were never seeded.
+- **Added 5 cycling story translations** (en/fr/de/pt/ast) for `angliru-bestia-asturias`, `lagos-covadonga-bicicleta`, `vias-verdes-asturias`, `ruta-costera-llanes-niembro`, `camino-santiago-bicicleta`. All 25 source-story slugs in seed scripts now have matching translations (was 17/25).
+- **Type safety**: Pass. No new TS errors. The 2 pre-existing errors in `src/lib/proxy/maintenance.test.ts` (NODE_ENV readonly) are unrelated.
+
+**Cross-agent recommendations:**
+- Performance Agent: `story-translations.ts` is imported only by `scripts/seed-translations.ts`, never shipped in the client bundle — zero production bundle impact from the +5 entries.
+- Coverage Agent: Data-only change. Zero coverage impact.
+- Code Quality Agent: 75 orphaned translation entries remain (mostly unused curated place entries, plus duplicates like `senda-del-oso`/`senda-oso`). Consider a consolidation pass.
+- QA Agent: After re-running `scripts/seed-translations.ts`, verify the 3 slug-aligned stories (descenso-sella, bufones-pria, museo-jurrasico) now have `metadata.translations` populated — they previously did not.
+- Triage Agent: Data-only edits to `content/translations/story-translations.ts`. Safe to commit once reviewed.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-21T07:02:18Z -->
+## Security Agent — 2026-04-21
+- Status GREEN. 0 advisories, 0 exploitable. 2nd consecutive GREEN after Apr 17 1-run YELLOW.
+- protobufjs Critical (CVE-2024-31130) and dompurify Moderate (CVE-2025-26791) both resolved by commit e66e510 (`npm audit fix`) — dompurify now 3.4.0.
+- 7 outdated packages (down from 17). All minor/patch or dev-only pre-release channel. Zero production gaps.
+- CSP, HSTS, X-Frame-Options, CSRF, timingSafeEqual webhooks all verified in source. Live header check skipped (dev server not running).
+- License compliance clean. All 7 flagged packages approved; LGPL (sharp-libvips) and MPL-2.0 (dompurify dual-licensed) documented in license-exceptions.md.
+
+**Cross-agent recommendations:**
+- Performance Agent: No new deps. Zero bundle impact. PostHog remains the transitive source of both recent advisories — worth watching if a third appears.
+- Code Quality Agent: `.security-metrics.tmp` should be `.gitignore`d if not already — scan artifact currently showing in git status. Dev-tooling majors (typescript v6, @vitejs/plugin-react v6) still open.
+- Coverage Agent: New CSRF origin-check + Stripe dedup + maintenance.ts tests directly improve security-path coverage. Good posture.
+- QA Agent: No security cause for the 66-day revenue drought. CSRF is confirmed working. Manual production verification of Day Pass is the right next step.
+- Triage Agent: No urgent code action. Consider gitignoring `.security-metrics.tmp`.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-21T08:03:09Z -->
+## Performance Agent — 2026-04-21
+- Status: YELLOW (carried from Apr 20). Bundle unchanged at 2,941 KB / 3,000 KB total (+59 KB headroom). Initial load est. ~2,066 KB vs 2,000 KB budget — unconfirmed without prod build.
+- Zero KB change this cycle. Only commits since Apr 20: knip 6.4.1->6.5.0 (dev-only), 36 coverage tests, agent-report updates. No source changes affecting client chunks.
+- New finding: `sentry.client.config.ts:10-12` has session replay enabled (replaysOnErrorSampleRate: 1.0, replaysSessionSampleRate: 0.01). Replay integration adds ~30-50 KB to static bundle — highest-ROI action available.
+- Introduced P8: disable Sentry Replay. Trivial effort, ~30-50 KB savings, likely brings initial load back under 2,000 KB budget without touching P4.
+- node_modules stable at 1,047 MB (47 MB over budget — @sentry/nextjs is the 67 MB driver).
+
+**Cross-agent recommendations:**
+- Security Agent: Disabling Sentry Replay does not affect error reporting or stack-trace quality — only removes session recording. Zero security impact.
+- Code Quality Agent: `sentry.client.config.ts` edits are 3-line change. Consider gating Replay behind an env var if Juan wants it re-enabled on staging only.
+- QA Agent: P8 affects only Sentry instrumentation — no user-facing behavior changes. Bundle analyzer run recommended before/after for verification.
+- Coverage Agent: No source changes this cycle. 36 new tests confirmed, zero bundle impact.
+- Cost Analyst Agent: Bundle stable. Sentry is a new fixed cost driver — verify the Sentry plan tier matches current traffic (free tier may suffice given 50 visitors/mo).
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-04-22T04:06:17Z -->
+## Documentation Agent — 2026-04-22
+- Status: GREEN — twentieth consecutive clean run. No documentation changes needed.
+- Zero undocumented feature flags. All 17 feature flags + 10 agent flags in `docs/project/features.md` aligned with source.
+- All 51 flagged API routes confirmed internal (admin, cron, webhooks, MCP voice-agent, checkout/health). None require user-facing documentation.
+- Migrations 076 (admin_audit_log) + 077 (stripe_webhook_events) are internal infrastructure — no docs needed.
+- CLAUDE.md current as of 2026-04-19.
+
+**Cross-agent recommendations:**
+- All agents: No documentation-impacting changes this cycle. Feature flag count stable. QA mock sets do not need updating.
+- Triage Agent: No code actions from documentation agent this cycle.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-04-22T05:07:03Z -->
+## Localization Agent — 2026-04-22
+- Coverage: 100% complete across 6 locales (es, en, fr, de, pt, ast).
+- UI strings: 395 leaf keys per locale, 0 missing, 0 orphans. Grew from 392 to 395 since last run (locales stayed in sync).
+- Story translations: 100 stories × 5 locales = 500 entries, all complete (title + subtitle + description). Grew from 95 to 100 since last run.
+- Type safety: Pass — `npx tsc --noEmit` reports zero i18n errors.
+- Changes this run: None. All translations stable and in sync.
+
+**Cross-agent recommendations:**
+- Performance Agent: Locale bundle sizes stable; es+en static, fr/de/pt/ast dynamic. 5 new stories and 3 new UI keys add negligible bytes. No optimization needed.
+- Code Quality Agent: No dead translations found. All 395 keys actively referenced.
+- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
+- Coverage Agent: No locale-related coverage concerns.
+- QA Agent: No locale-related issues. Journeys with localized content remain testable against all 6 locales.
+- Cost Analyst Agent: No cost-related localization concerns.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-22T07:01:46Z -->
+## Security Agent — 2026-04-22
+- Status: GREEN. 0 advisories, 0 exploitable. Third consecutive GREEN since e66e510 (Apr 20).
+- 10 outdated packages, all minor/patch, zero CVEs. 3 production patches available (@supabase/supabase-js 2.104.0, posthog-js 1.369.5, resend 6.12.2) — batch in next triage.
+- All security headers, 4 webhook timingSafeEqual sites, CSRF + auth gates verified in source. License check clean.
+- No source-code security regressions this cycle.
+
+**Cross-agent recommendations:**
+- Performance Agent: Sentry session replay is enabled at 1.0 on-error / 0.01 baseline — before any sample-rate increase, verify PII masking in `sentry.client.config.ts`. Disabling replay is safe security-wise.
+- Code Quality Agent: Only dev-tooling majors remain (typescript v6, knip v6, @vitejs/plugin-react v6) — no CVEs, low urgency.
+- Triage Agent: No code actions required this cycle. GitHub Dependabot alerts may lag local audit (0 vulns locally) — local is authoritative.
+- QA Agent: CSRF, webhook, and auth paths fully test-covered. No security-driven test changes needed.
+- Coverage Agent: Maintenance-mode cross-tenant invalidation path now covered — the prior highest-risk uncovered security path is closed.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-22T08:02:59Z -->
+## Performance Agent — 2026-04-22
+- Status: YELLOW (carried from Apr 20). Total JS 2,941 KB / 3,000 KB under budget (+59 KB headroom). Initial load ~2,066 KB / 2,000 KB potentially over — needs production build to confirm.
+- 0 KB change for 2nd consecutive cycle. Zero commits between Apr 21 and Apr 22 runs. Bundle byte-identical to Apr 21.
+- P8 (disable Sentry session replay) still unimplemented — `sentry.client.config.ts:11-12` still sets `replaysOnErrorSampleRate: 1.0` and `replaysSessionSampleRate: 0.01`. Highest-ROI fix available: ~30-50 KB savings, 3-line edit, zero functional risk.
+- node_modules at 1,047 MB (47 MB over 1,000 MB budget) driven by @sentry/nextjs at 67 MB — consider raising budget to 1,100 MB.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: P8 is a 3-line edit to `sentry.client.config.ts` — remove `replaysOnErrorSampleRate` and `replaysSessionSampleRate`. Replay has only 48 hours of production time and no proven value yet.
+- Security Agent: Agreed with Apr 22 note about verifying PII masking before *increasing* replay sampling. *Disabling* replay (P8) is strictly safer from a PII perspective.
+- QA Agent: After P8 lands, re-verify Sentry error capture still works in staging — tracesSampleRate and source-mapped stacks are unaffected.
+- Triage Agent: Consider running `npm run build` + `npm run build:analyze` this cycle to produce real production numbers and settle whether YELLOW can be cleared without P8.
+- Coverage Agent: No source changes this cycle. Zero coverage impact.
 <!-- ENTRY:END -->

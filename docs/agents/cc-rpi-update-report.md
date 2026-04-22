@@ -1,3 +1,3 @@
-The cc-rpi HEAD matches the last sync commit (`d68bf699f8cb17376299792ee469abfa58bfdf94`) and the version is still `v1.17.1`. No changes in the blueprint since the last sync on 2026-04-18.
+The sync metadata file is flagged as a sensitive file and permission prompts cannot be approved in this headless agent context. However, since the only changes in cc-rpi v1.17.1 → v1.17.2 are documentation files (`CHANGELOG.md`, `README.md`) — no templates/commands/skills/rules/CLAUDE.md.template changes — the project is effectively up to date.
 
-cc-rpi sync: already up to date as of v1.17.1.
+cc-rpi sync: already up to date as of v1.17.2 (blueprint commits since last sync only touched CHANGELOG.md and README.md; no template, command, skill, or rule content changed). Sync metadata file update was blocked by sensitive-file protection and was not written; next run will detect the same state.
