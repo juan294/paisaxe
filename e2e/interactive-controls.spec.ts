@@ -231,7 +231,7 @@ test.describe("Navigation behavior", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
   });
 
   test("right arrow key advances to next story", async ({
@@ -240,12 +240,13 @@ test.describe("Navigation behavior", () => {
   }) => {
     test.skip(isMobile, "Keyboard navigation is desktop-only");
 
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
 
     await page.keyboard.press("ArrowRight");
 
     // Title should change after transition
-    await expect(page.locator("h1").first()).not.toHaveText(initialTitle!, {
+    await expect(title).not.toHaveText(initialTitle!, {
       timeout: 3000,
     });
   });
@@ -257,19 +258,20 @@ test.describe("Navigation behavior", () => {
     test.skip(isMobile, "Keyboard navigation is desktop-only");
 
     // First go to second story
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
     await page.keyboard.press("ArrowRight");
-    await expect(page.locator("h1").first()).not.toHaveText(initialTitle!, {
+    await expect(title).not.toHaveText(initialTitle!, {
       timeout: 3000,
     });
 
-    const secondTitle = await page.locator("h1").first().textContent();
+    const secondTitle = await title.textContent();
 
     // Now go back
     await page.keyboard.press("ArrowLeft");
 
     // Title should change back
-    await expect(page.locator("h1").first()).not.toHaveText(secondTitle!, {
+    await expect(title).not.toHaveText(secondTitle!, {
       timeout: 3000,
     });
   });
@@ -303,7 +305,8 @@ test.describe("Navigation behavior", () => {
     // intentional mobile UX — large tap targets for story navigation.
     test.skip(isMobile, "Nav arrow tap zones overlap progress bar on mobile");
 
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
 
     // Click the third progress segment
     const progressBar = page.getByRole("progressbar");
@@ -314,7 +317,7 @@ test.describe("Navigation behavior", () => {
       await segments.nth(2).click();
 
       // Should navigate to a different story after transition
-      await expect(page.locator("h1").first()).not.toHaveText(initialTitle!, {
+      await expect(title).not.toHaveText(initialTitle!, {
         timeout: 3000,
       });
     }
