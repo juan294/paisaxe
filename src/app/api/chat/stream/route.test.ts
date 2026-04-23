@@ -373,6 +373,42 @@ describe("POST /api/chat/stream", () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it("should stringify non-Error throws in [CHAT_STREAM_FAILURE]", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+    vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+
+    vi.mocked(streamChatResponse).mockImplementation(async function* () {
+      yield "partial";
+       
+      throw "unexpected-string-throw";
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Hello" }),
+    });
+
+    const response = await POST(request);
+    const events = await collectStreamEvents(response);
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[CHAT_STREAM_FAILURE]",
+      expect.objectContaining({
+        error: "unexpected-string-throw",
+        type: "Error",
+      })
+    );
+    const errorEvent = events.find(
+      (e) => (e as { type: string }).type === "error"
+    ) as { message: string } | undefined;
+    expect(errorEvent?.message).toBe("Error generating response");
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it("should return SSE error event when embedding fails before streaming", async () => {
     vi.mocked(generateEmbedding).mockRejectedValue(new Error("Embedding API Error"));
 
