@@ -75,6 +75,11 @@ Identify:
 - What the timeout SHOULD be (audit existing cron files in `src/app/api/cron/` for style; a 30-minute timeout is a reasonable default).
 - Whether a retry vs. fail decision is needed.
 
+Audit note (2026-04-23):
+- This repo does not store translation state in dedicated top-level columns.
+- The live source of truth is `stories.metadata.translation_status[locale]`, where each locale tracks `status`, optional `error`, and `updatedAt`.
+- The stale cutoff therefore needs to operate on JSONB metadata, not on standalone `translation_started_at` / `translation_error` columns.
+
 ### Target State
 
 A cron job (Vercel Cron) runs every 15 minutes. Finds rows with `translation_status = 'translating'` AND `translation_started_at < NOW() - INTERVAL '30 minutes'`. Marks them `translation_status = 'failed'` with `translation_error = 'timeout'`. Logs via structured logger.
