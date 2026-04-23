@@ -294,4 +294,73 @@ describe("POST /api/webhooks/stripe", () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe("Internal server error");
   });
+
+  it("returns 401 with the stringified signature error when a non-Error is thrown", async () => {
+    vi.mocked(verifyWebhookSignature).mockImplementation(() => {
+      throw "string-thrown-signature-failure";
+    });
+
+    const response = await POST(
+      createRequest(JSON.stringify({}), {
+        "stripe-signature": "invalid-signature",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error).toBe("Invalid signature");
+    expect(logger.warn).toHaveBeenCalledWith("[STRIPE_WEBHOOK_INVALID_REQUEST]", {
+      reason: "invalid_signature",
+      error: "string-thrown-signature-failure",
+    });
+  });
+
+  it("defaults amount_paid to 0 when session.amount_total is null", async () => {
+    const event = createCheckoutSessionEvent(
+      "user-123",
+      "pi_zero_amount",
+      "evt_zero_amount"
+    );
+    (event.data.object as Stripe.Checkout.Session).amount_total = null;
+
+    vi.mocked(verifyWebhookSignature).mockReturnValue(event);
+    mockRpc.mockResolvedValue({ data: "granted", error: null });
+
+    const response = await POST(
+      createRequest(JSON.stringify({}), {
+        "stripe-signature": "valid-signature",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ status: "granted" });
+    expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
+      p_event_id: "evt_zero_amount",
+      p_user_id: "user-123",
+      p_payment_provider_id: "pi_zero_amount",
+      p_expires_at: "2024-01-02T00:00:00.000Z",
+      p_amount_paid: 0,
+    });
+  });
+
+  it("returns 500 and stringifies non-Error throws from the outer handler", async () => {
+    vi.mocked(verifyWebhookSignature).mockReturnValue(
+      createCheckoutSessionEvent("user-123", "pi_nonerror", "evt_nonerror")
+    );
+    mockRpc.mockRejectedValue("non-error-string-throw");
+
+    const response = await POST(
+      createRequest(JSON.stringify({}), {
+        "stripe-signature": "valid-signature",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
+    expect(logger.error).toHaveBeenCalledWith("[STRIPE_WEBHOOK_FAILURE]", {
+      error: "non-error-string-throw",
+    });
+  });
 });
