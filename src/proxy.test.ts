@@ -114,6 +114,28 @@ describe("CORS proxy", () => {
     const response = await proxy(request);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
+
+  it("adds an X-Request-ID response header when upstream did not provide one", async () => {
+    const request = new NextRequest("http://localhost:3000/api/chat");
+
+    const response = await proxy(request);
+
+    expect(response.headers.get("X-Request-ID")).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
+  });
+
+  it("preserves a well-formed upstream X-Request-ID header", async () => {
+    const request = new NextRequest("http://localhost:3000/api/chat", {
+      headers: {
+        "x-request-id": "req-upstream-1234",
+      },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.headers.get("X-Request-ID")).toBe("req-upstream-1234");
+  });
 });
 
 describe("CORS proxy - development", () => {

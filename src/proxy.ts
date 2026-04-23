@@ -7,6 +7,7 @@ import { handleCORS, addCORSHeaders } from "@/lib/proxy/cors";
 import { handleCsrfValidation, setCsrfCookie } from "@/lib/proxy/csrf-proxy";
 import { buildCspHeader } from "@/lib/proxy/csp";
 import { refreshAuthSession } from "@/lib/proxy/auth-refresh";
+import { getOrCreateRequestId, getRequestIdHeaderName } from "@/lib/proxy/request-id";
 
 // Re-export symbols that other modules depend on (backwards compatibility)
 export {
@@ -17,35 +18,59 @@ export { buildCspHeader } from "@/lib/proxy/csp";
 export { hasSupabaseAuthCookies, AUTH_REFRESH_TIMEOUT_MS, isTokenNearExpiry } from "@/lib/proxy/auth-refresh";
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
+  const requestIdHeader = getRequestIdHeaderName();
+  const requestId = getOrCreateRequestId(request);
+  const forwardedHeaders = new Headers(request.headers);
+  forwardedHeaders.set(requestIdHeader, requestId);
+
   // 0a. Redirect alternate domains to canonical domain (single hop)
   const canonicalRedirect = handleCanonicalDomain(request);
-  if (canonicalRedirect) return canonicalRedirect;
+  if (canonicalRedirect) {
+    canonicalRedirect.headers.set("X-Request-ID", requestId);
+    return canonicalRedirect;
+  }
 
   // 0b. Rewrite /story/:slug → /immersive?story=:slug (before maintenance check)
   const storyRewrite = handleStoryRewrite(request);
-  if (storyRewrite) return storyRewrite;
+  if (storyRewrite) {
+    storyRewrite.headers.set("X-Request-ID", requestId);
+    return storyRewrite;
+  }
 
   // 1. Check maintenance mode (applies to all routes)
   const maintenanceResponse = await handleMaintenanceMode(request);
-  if (maintenanceResponse) return maintenanceResponse;
+  if (maintenanceResponse) {
+    maintenanceResponse.headers.set("X-Request-ID", requestId);
+    return maintenanceResponse;
+  }
 
   // 2. Redirect root path to /immersive
   const rootRedirect = handleRootRedirect(request);
-  if (rootRedirect) return rootRedirect;
+  if (rootRedirect) {
+    rootRedirect.headers.set("X-Request-ID", requestId);
+    return rootRedirect;
+  }
 
   // 3. Handle CORS preflight for API routes
   const corsResponse = handleCORS(request);
-  if (corsResponse) return corsResponse;
+  if (corsResponse) {
+    corsResponse.headers.set("X-Request-ID", requestId);
+    return corsResponse;
+  }
 
   // 4. Validate CSRF token + Origin check for state-changing API requests
   const csrfResponse = handleCsrfValidation(request);
-  if (csrfResponse) return csrfResponse;
+  if (csrfResponse) {
+    csrfResponse.headers.set("X-Request-ID", requestId);
+    return csrfResponse;
+  }
 
   // 5. Refresh auth session if needed (handles expired tokens)
-  const response = await refreshAuthSession(request);
+  const response = await refreshAuthSession(request, forwardedHeaders);
 
   // 6. Set static CSP header (unsafe-inline is intentional; see csp.ts)
   response.headers.set("Content-Security-Policy", buildCspHeader());
+  response.headers.set("X-Request-ID", requestId);
 
   // 7. Set CSRF cookie on page requests (if not already set)
   setCsrfCookie(request, response);

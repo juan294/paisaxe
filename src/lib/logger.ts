@@ -13,6 +13,7 @@
  */
 
 import pino from "pino";
+import { getRequestId } from "./request-context";
 
 type LogLevel = "info" | "warn" | "error";
 
@@ -183,6 +184,11 @@ function sanitizeMeta(meta?: Record<string, unknown>) {
   return sanitizeValue(meta) as Record<string, unknown>;
 }
 
+function getRequestIdBindings() {
+  const requestId = getRequestId();
+  return requestId ? { request_id: requestId } : undefined;
+}
+
 export type Logger = {
   info: (msg: string, meta?: Record<string, unknown>) => void;
   warn: (msg: string, meta?: Record<string, unknown>) => void;
@@ -194,10 +200,12 @@ function makeDevLogger(bindings?: Record<string, unknown>): Logger {
   const sanitizedBindings = sanitizeMeta(bindings);
 
   const emit = (level: LogLevel, msg: string, meta?: Record<string, unknown>) => {
+    const requestIdBindings = sanitizeMeta(getRequestIdBindings());
     const entry = JSON.stringify({
       time: Date.now(),
       level,
       msg: sanitizeString(msg),
+      ...requestIdBindings,
       ...sanitizedBindings,
       ...sanitizeMeta(meta),
     });
@@ -225,10 +233,13 @@ function makePinoLogger(instance = pino({
   },
 })): Logger {
   const emit = (level: LogLevel, msg: string, meta?: Record<string, unknown>) => {
-    const sanitizedMeta = sanitizeMeta(meta);
+    const sanitizedMeta = {
+      ...sanitizeMeta(getRequestIdBindings()),
+      ...sanitizeMeta(meta),
+    };
     const sanitizedMsg = sanitizeString(msg);
 
-    if (sanitizedMeta) {
+    if (Object.keys(sanitizedMeta).length > 0) {
       instance[level](sanitizedMeta, sanitizedMsg);
       return;
     }
