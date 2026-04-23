@@ -122,6 +122,16 @@ Check critical flags at https://paisaxe.es/api/feature-flags:
 
 Real User Monitoring (RUM) for Core Web Vitals in production. View data in the Vercel Dashboard under Speed Insights.
 
+## Function Region Verification
+
+Verified on **2026-04-23**:
+
+- Vercel function region: `fra1` (Frankfurt) via `vercel.json`
+- Linked Supabase project: `asturias`
+- Supabase region: `Central Europe (Zurich)` via `supabase projects list`
+
+Vercel's current public region list does not expose a Zurich function region, so `fra1` is the nearest supported region and replaces the previous `cdg1` setting.
+
 ## Database Maintenance (pg_cron)
 
 Automated maintenance jobs run on Supabase via pg_cron:
