@@ -70,6 +70,7 @@ const NO_ANSWER_PATTERNS = [
 
 // 30-minute tolerance for timestamp validation (matches ElevenLabs SDK)
 const TIMESTAMP_TOLERANCE_SECONDS = 30 * 60;
+const SMS_JOB_LEASE_SECONDS = 15 * 60;
 
 /**
  * Zod schema for the ElevenLabs post_call_transcription payload.
@@ -190,6 +191,13 @@ interface TranscriptEntry {
   role: "user" | "agent";
   message: string;
   time_in_call_secs?: number;
+}
+
+interface ClaimedSMSJob {
+  booking_id: string;
+  event_key: string;
+  to_phone: string;
+  message: string;
 }
 
 /**
@@ -442,19 +450,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
-    if (rpcStatus === "duplicate") {
-      return NextResponse.json(
-        {
-          success: true,
-          status: "duplicate",
-          bookingId: booking.id,
-          outcome,
-          smsSent: false,
-        },
-        { status: 200 }
-      );
-    }
-
     if (rpcStatus === "booking_missing") {
       logger.warn("[ELEVENLABS_WEBHOOK_BOOKING_MISSING_AT_RPC]", {
         booking_id: booking.id,
@@ -482,16 +477,100 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let smsError: string | undefined;
 
     if (smsEnabled) {
-      const smsResult = await sendSMS(booking.customer_phone, smsMessage);
-      smsSent = smsResult.success;
-      smsError = smsResult.error;
+      const { error: enqueueError } = await supabase.rpc(
+        "enqueue_booking_sms_job",
+        {
+          p_event_key: eventKey,
+          p_booking_id: booking.id,
+          p_to_phone: booking.customer_phone,
+          p_message: smsMessage,
+        }
+      );
 
-      if (!smsResult.success) {
-        logger.error("[ELEVENLABS_WEBHOOK_SMS_FAILED]", {
+      if (enqueueError) {
+        logger.error("[ELEVENLABS_WEBHOOK_SMS_ENQUEUE_FAILED]", {
           booking_id: booking.id,
-          error: smsResult.error,
+          event_key: eventKey,
+          error: enqueueError.message,
         });
-      } else {
+        return NextResponse.json({ error: "Database error" }, { status: 500 });
+      }
+
+      const { data: claimedSMSJob, error: claimSMSError } = await supabase.rpc(
+        "claim_booking_sms_job",
+        {
+          p_event_key: eventKey,
+          p_lease_seconds: SMS_JOB_LEASE_SECONDS,
+        }
+      );
+
+      if (claimSMSError) {
+        logger.error("[ELEVENLABS_WEBHOOK_SMS_CLAIM_FAILED]", {
+          booking_id: booking.id,
+          event_key: eventKey,
+          error: claimSMSError.message,
+        });
+        return NextResponse.json({ error: "Database error" }, { status: 500 });
+      }
+
+      const smsJob = claimedSMSJob as ClaimedSMSJob | null;
+
+      if (smsJob) {
+        const smsResult = await sendSMS(smsJob.to_phone, smsJob.message);
+        smsSent = smsResult.success;
+        smsError = smsResult.error;
+
+        if (!smsResult.success) {
+          logger.error("[ELEVENLABS_WEBHOOK_SMS_FAILED]", {
+            booking_id: booking.id,
+            error: smsResult.error,
+          });
+
+          const { error: failSMSError } = await supabase.rpc(
+            "fail_booking_sms_job",
+            {
+              p_event_key: eventKey,
+              p_error: smsResult.error ?? "SMS delivery failed",
+            }
+          );
+
+          if (failSMSError) {
+            logger.error("[ELEVENLABS_WEBHOOK_SMS_FAIL_MARK_FAILED]", {
+              booking_id: booking.id,
+              event_key: eventKey,
+              error: failSMSError.message,
+            });
+          }
+
+          return NextResponse.json(
+            {
+              success: false,
+              status: rpcStatus,
+              bookingId: booking.id,
+              outcome,
+              smsSent: false,
+              smsError,
+            },
+            { status: 500 }
+          );
+        }
+
+        const { error: completeSMSError } = await supabase.rpc(
+          "complete_booking_sms_job",
+          {
+            p_event_key: eventKey,
+            p_provider_sid: smsResult.sid ?? null,
+          }
+        );
+
+        if (completeSMSError) {
+          logger.error("[ELEVENLABS_WEBHOOK_SMS_COMPLETE_FAILED]", {
+            booking_id: booking.id,
+            event_key: eventKey,
+            error: completeSMSError.message,
+          });
+        }
+
         const { error: outcomeMessageError } = await supabase
           .from("pending_bookings")
           .update({

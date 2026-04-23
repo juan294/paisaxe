@@ -122,7 +122,36 @@ describe("POST /api/webhooks/elevenlabs", () => {
     mockUpdate = vi.fn().mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
     });
-    mockRpc = vi.fn().mockResolvedValue({ data: "processed", error: null });
+    mockRpc = vi.fn().mockImplementation((fn: string) => {
+      if (fn === "process_elevenlabs_event_idempotent") {
+        return Promise.resolve({ data: "processed", error: null });
+      }
+
+      if (fn === "enqueue_booking_sms_job") {
+        return Promise.resolve({ data: "queued", error: null });
+      }
+
+      if (fn === "claim_booking_sms_job") {
+        return Promise.resolve({
+          data: {
+            booking_id: "booking-123",
+            event_key: "post_call_transcription:conv_456",
+            to_phone: "+34612345678",
+            message: "Confirmation SMS",
+          },
+          error: null,
+        });
+      }
+
+      if (
+        fn === "complete_booking_sms_job" ||
+        fn === "fail_booking_sms_job"
+      ) {
+        return Promise.resolve({ data: true, error: null });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
 
     mockFrom = vi.fn((table: string) => {
       if (table === "pending_bookings") {
@@ -376,7 +405,21 @@ describe("POST /api/webhooks/elevenlabs", () => {
   });
 
   it("should return duplicate without sending SMS when the event was already processed", async () => {
-    mockRpc.mockResolvedValue({ data: "duplicate", error: null });
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "process_elevenlabs_event_idempotent") {
+        return Promise.resolve({ data: "duplicate", error: null });
+      }
+
+      if (fn === "enqueue_booking_sms_job") {
+        return Promise.resolve({ data: "queued", error: null });
+      }
+
+      if (fn === "claim_booking_sms_job") {
+        return Promise.resolve({ data: null, error: null });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
 
     const request = createSignedRequest({
       conversation_id: "conv_456",
@@ -665,7 +708,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
     });
   });
 
-  it("should handle SMS failure gracefully", async () => {
+  it("should return 500 and keep SMS retryable when delivery fails", async () => {
     vi.mocked(sendSMS).mockResolvedValue({
       success: false,
       error: "Invalid phone number",
@@ -682,10 +725,64 @@ describe("POST /api/webhooks/elevenlabs", () => {
     const response = await POST(request);
     const data = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
+    expect(response.status).toBe(500);
+    expect(data.success).toBe(false);
     expect(data.smsSent).toBe(false);
     expect(data.smsError).toBe("Invalid phone number");
+    expect(mockRpc).toHaveBeenCalledWith("fail_booking_sms_job", {
+      p_event_key: "post_call_transcription:conv_456",
+      p_error: "Invalid phone number",
+    });
+  });
+
+  it("should retry a queued SMS when the webhook is delivered again", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "process_elevenlabs_event_idempotent") {
+        return Promise.resolve({ data: "duplicate", error: null });
+      }
+
+      if (fn === "enqueue_booking_sms_job") {
+        return Promise.resolve({ data: "queued", error: null });
+      }
+
+      if (fn === "claim_booking_sms_job") {
+        return Promise.resolve({
+          data: {
+            booking_id: "booking-123",
+            event_key: "post_call_transcription:conv_456",
+            to_phone: "+34612345678",
+            message: "Confirmation SMS",
+          },
+          error: null,
+        });
+      }
+
+      if (fn === "complete_booking_sms_job") {
+        return Promise.resolve({ data: true, error: null });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      transcript: buildTranscript(
+        { role: "user", message: "Confirmado, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("duplicate");
+    expect(data.smsSent).toBe(true);
+    expect(sendSMS).toHaveBeenCalledWith("+34612345678", "Confirmation SMS");
+    expect(mockRpc).toHaveBeenCalledWith("complete_booking_sms_job", {
+      p_event_key: "post_call_transcription:conv_456",
+      p_provider_sid: "SM123",
+    });
   });
 
   it("should return 401 when ELEVENLABS_WEBHOOK_SECRET is not configured", async () => {
