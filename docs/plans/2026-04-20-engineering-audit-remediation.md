@@ -22,7 +22,7 @@ The audit identified one Critical Ship Blocker (non-atomic Stripe dedup → voic
 - [x] P7
 - [x] P8
 - [x] P9
-- [ ] P10
+- [x] P10
 
 ## Design Decisions (from clarification pass)
 

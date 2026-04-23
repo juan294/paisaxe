@@ -41,18 +41,32 @@ export default defineConfig({
     {
       name: "desktop",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: ["**/qa-journey.spec.ts", "**/visual-regression.spec.ts"],
+      testIgnore: [
+        "**/qa-journey.spec.ts",
+        "**/visual-regression.spec.ts",
+        "**/stripe-real-checkout.spec.ts",
+      ],
     },
     {
       name: "mobile",
       use: { ...devices["Pixel 7"] },
-      testIgnore: ["**/qa-journey.spec.ts", "**/visual-regression.spec.ts"],
+      testIgnore: [
+        "**/qa-journey.spec.ts",
+        "**/visual-regression.spec.ts",
+        "**/stripe-real-checkout.spec.ts",
+      ],
     },
     {
       name: "qa-journey",
       use: { ...devices["Desktop Chrome"] },
       testMatch: "qa-journey.spec.ts",
       timeout: 30_000,
+    },
+    {
+      name: "stripe-integration",
+      use: { ...devices["Desktop Chrome"], locale: "en-US" },
+      testMatch: "stripe-real-checkout.spec.ts",
+      timeout: 120_000,
     },
     {
       name: "visual-desktop",
