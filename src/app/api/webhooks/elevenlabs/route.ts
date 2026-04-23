@@ -313,6 +313,10 @@ function getSMSMessage(booking: PendingBooking, outcome: BookingOutcome): string
   }
 }
 
+function buildElevenLabsEventKey(conversationId: string) {
+  return `post_call_transcription:${conversationId}`;
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Get raw body for signature verification
@@ -412,15 +416,63 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    // Check if SMS confirmation feature is enabled
-    const smsEnabled = await isFeatureFlagEnabled("sms_booking_confirmation");
-
     // Analyze call outcome
     // ElevenLabs may send transcript/analysis at top level or nested in data
     const outcome = analyzeOutcome({
       analysis: body.analysis ?? body.data?.analysis,
       transcript: body.transcript ?? body.data?.transcript,
     });
+
+    const eventKey = buildElevenLabsEventKey(conversationId);
+    const { data: rpcStatus, error: rpcError } = await supabase.rpc(
+      "process_elevenlabs_event_idempotent",
+      {
+        p_event_key: eventKey,
+        p_booking_id: booking.id,
+        p_outcome: outcome,
+      }
+    );
+
+    if (rpcError) {
+      logger.error("[ELEVENLABS_WEBHOOK_RPC_FAILURE]", {
+        booking_id: booking.id,
+        conversation_id: conversationId,
+        error: rpcError.message,
+      });
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
+
+    if (rpcStatus === "duplicate") {
+      return NextResponse.json(
+        {
+          success: true,
+          status: "duplicate",
+          bookingId: booking.id,
+          outcome,
+          smsSent: false,
+        },
+        { status: 200 }
+      );
+    }
+
+    if (rpcStatus === "booking_missing") {
+      logger.warn("[ELEVENLABS_WEBHOOK_BOOKING_MISSING_AT_RPC]", {
+        booking_id: booking.id,
+        conversation_id: conversationId,
+      });
+      return NextResponse.json(
+        {
+          success: true,
+          ignored: true,
+          reason: "Booking missing during processing",
+        },
+        { status: 200 }
+      );
+    }
+
+    // Check if SMS confirmation feature is enabled only after the event claim
+    // succeeds, so duplicate deliveries never send duplicate messages.
+    const smsEnabled = await isFeatureFlagEnabled("sms_booking_confirmation");
 
     // Build SMS message
     const smsMessage = getSMSMessage(booking as PendingBooking, outcome);
@@ -439,28 +491,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           booking_id: booking.id,
           error: smsResult.error,
         });
+      } else {
+        const { error: outcomeMessageError } = await supabase
+          .from("pending_bookings")
+          .update({
+            outcome_message: smsMessage,
+          })
+          .eq("id", booking.id);
+
+        if (outcomeMessageError) {
+          logger.error("[ELEVENLABS_WEBHOOK_OUTCOME_MESSAGE_UPDATE_FAILED]", {
+            booking_id: booking.id,
+            error: outcomeMessageError,
+          });
+        }
       }
-    }
-
-    // Update booking status in database
-    const { error: updateError } = await supabase
-      .from("pending_bookings")
-      .update({
-        status: outcome,
-        outcome_message: smsEnabled && smsSent ? smsMessage : null,
-      })
-      .eq("id", booking.id);
-
-    if (updateError) {
-      logger.error("[ELEVENLABS_WEBHOOK_UPDATE_BOOKING_FAILED]", {
-        booking_id: booking.id,
-        error: updateError,
-      });
-      // Don't return error - SMS was already sent
     }
 
     return NextResponse.json({
       success: true,
+      status: rpcStatus,
       bookingId: booking.id,
       outcome,
       smsSent,

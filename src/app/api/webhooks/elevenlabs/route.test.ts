@@ -96,6 +96,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
   let mockSelect: ReturnType<typeof vi.fn>;
   let mockUpdate: ReturnType<typeof vi.fn>;
   let mockFrom: ReturnType<typeof vi.fn>;
+  let mockRpc: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -121,6 +122,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
     mockUpdate = vi.fn().mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
     });
+    mockRpc = vi.fn().mockResolvedValue({ data: "processed", error: null });
 
     mockFrom = vi.fn((table: string) => {
       if (table === "pending_bookings") {
@@ -134,6 +136,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
 
     vi.mocked(createAdminClient).mockReturnValue({
       from: mockFrom,
+      rpc: mockRpc,
     } as unknown as ReturnType<typeof createAdminClient>);
   });
 
@@ -372,6 +375,47 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.ignored).toBe(true);
   });
 
+  it("should return duplicate without sending SMS when the event was already processed", async () => {
+    mockRpc.mockResolvedValue({ data: "duplicate", error: null });
+
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      transcript: buildTranscript(
+        { role: "user", message: "Confirmado, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("duplicate");
+    expect(sendSMS).not.toHaveBeenCalled();
+  });
+
+  it("should return 500 when the idempotency RPC fails", async () => {
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: "rpc failed" },
+    });
+
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      transcript: buildTranscript(
+        { role: "user", message: "Confirmado, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Database error");
+    expect(sendSMS).not.toHaveBeenCalled();
+  });
+
   describe("outcome detection with ElevenLabs payload format", () => {
     it("should detect confirmed from transcript array messages", async () => {
       const request = createSignedRequest({
@@ -608,8 +652,15 @@ describe("POST /api/webhooks/elevenlabs", () => {
 
     await POST(request);
 
+    expect(mockRpc).toHaveBeenCalledWith(
+      "process_elevenlabs_event_idempotent",
+      {
+        p_event_key: "post_call_transcription:conv_456",
+        p_booking_id: "booking-123",
+        p_outcome: "confirmed",
+      }
+    );
     expect(mockUpdate).toHaveBeenCalledWith({
-      status: "confirmed",
       outcome_message: "Confirmation SMS",
     });
   });
@@ -660,7 +711,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.error).toBe("Invalid signature");
   });
 
-  it("should handle database update error gracefully", async () => {
+  it("should handle outcome message update error gracefully", async () => {
     mockUpdate.mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: { message: "DB update failed" } }),
     });

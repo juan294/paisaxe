@@ -25,6 +25,20 @@ For each webhook, enumerate:
 3. The current transaction boundary (likely none).
 4. The current retry behavior (what HTTP status is returned on partial failure).
 
+### Audit Addendum — 2026-04-23
+
+- `webhooks/elevenlabs`
+  - Equivalent idempotency key: `conversation_id` for `post_call_transcription` deliveries.
+  - Current side effects: fetch `pending_bookings` row by `conversation_id` -> send SMS through Twilio -> update `pending_bookings.status` / `outcome_message`.
+  - Transaction boundary: none. Duplicate deliveries can resend SMS, and the SMS send happens before the database write.
+  - Retry behavior: route returns `200` for most downstream failures, including booking update failures after SMS has already been sent.
+
+- `webhooks/translate`
+  - Equivalent idempotency key: `storyId + locales + forceRetranslate` payload tuple.
+  - Current side effects: route delegates to `translateStory()`, which updates `stories.metadata.translation_status` to `translating`, calls Anthropic, then updates `stories.metadata.translations` / `translation_status` again for success or failure.
+  - Transaction boundary: none, and the external API call sits between two database writes.
+  - Retry behavior: translation failures return `500`, but there is no webhook-level dedup guard, so repeated deliveries rerun the whole flow.
+
 ## Target State
 
 For each webhook: a single `supabase.rpc('<name>_idempotent', { ... })` call wrapping dedup + side-effect writes in one Postgres function with `SECURITY DEFINER`, `SET search_path = ''`, `ON CONFLICT DO NOTHING`.
