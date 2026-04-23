@@ -6,7 +6,12 @@ const APP_VERSION: string = packageJson.version;
 
 // Cache for external probe results (60s TTL)
 const PROBE_CACHE_TTL_MS = 60_000;
-const PROBE_TIMEOUT_MS = 3_000;
+export const PROBE_TIMEOUTS_MS = {
+  supabase: 2_000,
+  stories: 2_000,
+  database: 2_000,
+  stripe: 2_000,
+} as const;
 
 interface CachedProbeResult {
   result: ExternalServiceStatus;
@@ -104,54 +109,73 @@ interface HealthResponse {
 
 async function checkSupabase(): Promise<SupabaseServiceStatus> {
   const start = performance.now();
-  try {
-    const { error } = await supabase.from("chunks").select("id").limit(1);
-    const latency_ms = Math.round(performance.now() - start);
+  return withTimeout(
+    (async (): Promise<SupabaseServiceStatus> => {
+      try {
+        const { error } = await supabase.from("chunks").select("id").limit(1);
+        const latency_ms = Math.round(performance.now() - start);
 
-    if (error) {
-      return { status: "error", latency_ms, error: error.message };
-    }
+        if (error) {
+          return { status: "error", latency_ms, error: error.message };
+        }
 
-    return { status: "connected", latency_ms };
-  } catch (err) {
-    const latency_ms = Math.round(performance.now() - start);
-    return {
+        return { status: "connected", latency_ms };
+      } catch (err) {
+        const latency_ms = Math.round(performance.now() - start);
+        return {
+          status: "error",
+          latency_ms,
+          error: err instanceof Error ? err.message : "Unknown error",
+        };
+      }
+    })(),
+    PROBE_TIMEOUTS_MS.supabase,
+    (): SupabaseServiceStatus => ({
       status: "error",
-      latency_ms,
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
-  }
+      latency_ms: PROBE_TIMEOUTS_MS.supabase,
+      error: "Probe timed out",
+    })
+  );
 }
 
 async function checkStories(): Promise<StoriesStatus> {
-  try {
-    const { count, error } = await supabase
-      .from("stories")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true)
-      .eq("curation_status", "approved");
+  return withTimeout(
+    (async (): Promise<StoriesStatus> => {
+      try {
+        const { count, error } = await supabase
+          .from("stories")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true)
+          .eq("curation_status", "approved");
 
-    if (error) {
-      return { status: "fallback", error: error.message };
-    }
+        if (error) {
+          return { status: "fallback", error: error.message };
+        }
 
-    const approvedStoryCount = count ?? 0;
-    // If zero approved stories, the immersive page will serve fallback content
-    if (approvedStoryCount === 0) {
-      return {
-        status: "fallback",
-        count: 0,
-        error: "No approved stories — fallback images will be served",
-      };
-    }
+        const approvedStoryCount = count ?? 0;
+        // If zero approved stories, the immersive page will serve fallback content
+        if (approvedStoryCount === 0) {
+          return {
+            status: "fallback",
+            count: 0,
+            error: "No approved stories — fallback images will be served",
+          };
+        }
 
-    return { status: "ok", count: approvedStoryCount };
-  } catch (err) {
-    return {
+        return { status: "ok", count: approvedStoryCount };
+      } catch (err) {
+        return {
+          status: "fallback",
+          error: err instanceof Error ? err.message : "Unknown error",
+        };
+      }
+    })(),
+    PROBE_TIMEOUTS_MS.stories,
+    (): StoriesStatus => ({
       status: "fallback",
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
-  }
+      error: "Probe timed out",
+    })
+  );
 }
 
 const STORAGE_LIMIT_MB = 8192; // Supabase Pro tier: 8 GB
@@ -160,28 +184,36 @@ const STORAGE_WARNING_THRESHOLD = 0.8; // 80%
 async function checkDatabaseSize(): Promise<
   DatabaseSizeStatus | DatabaseSizeErrorStatus
 > {
-  try {
-    const { data, error } = await supabase.rpc("get_database_size");
+  return withTimeout(
+    (async (): Promise<DatabaseSizeStatus | DatabaseSizeErrorStatus> => {
+      try {
+        const { data, error } = await supabase.rpc("get_database_size");
 
-    if (error) {
-      return { error: error.message };
-    }
+        if (error) {
+          return { error: error.message };
+        }
 
-    const sizeBytes = data as number;
-    const size_mb = Math.round((sizeBytes / (1024 * 1024)) * 10) / 10;
-    const usage_percent =
-      Math.round((size_mb / STORAGE_LIMIT_MB) * 1000) / 10;
+        const sizeBytes = data as number;
+        const size_mb = Math.round((sizeBytes / (1024 * 1024)) * 10) / 10;
+        const usage_percent =
+          Math.round((size_mb / STORAGE_LIMIT_MB) * 1000) / 10;
 
-    return {
-      size_mb,
-      limit_mb: STORAGE_LIMIT_MB,
-      usage_percent,
-    };
-  } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
-  }
+        return {
+          size_mb,
+          limit_mb: STORAGE_LIMIT_MB,
+          usage_percent,
+        };
+      } catch (err) {
+        return {
+          error: err instanceof Error ? err.message : "Unknown error",
+        };
+      }
+    })(),
+    PROBE_TIMEOUTS_MS.database,
+    (): DatabaseSizeErrorStatus => ({
+      error: "Probe timed out",
+    })
+  );
 }
 
 /**
@@ -277,10 +309,10 @@ async function checkStripe(): Promise<ExternalServiceStatus> {
         };
       }
     })(),
-    PROBE_TIMEOUT_MS,
+    PROBE_TIMEOUTS_MS.stripe,
     (): ExternalServiceStatus => ({
       status: "degraded",
-      latency_ms: PROBE_TIMEOUT_MS,
+      latency_ms: PROBE_TIMEOUTS_MS.stripe,
       error: "Probe timed out",
     })
   );

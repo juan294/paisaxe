@@ -4,6 +4,7 @@ import {
   _clearProbeCacheForTests,
   _getProbeCacheSizeForTests,
   _seedProbeCacheForTests,
+  PROBE_TIMEOUTS_MS,
 } from "./route";
 import packageJson from "../../../../package.json";
 
@@ -600,6 +601,52 @@ describe("GET /api/health", () => {
     const data = await response.json();
 
     expect(data.services.stripe.status).toBe("degraded");
+  }, 10000);
+
+  it("returns within the supabase timeout when the chunks probe hangs", async () => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        const lastEq = vi.fn().mockResolvedValue({ count: 1, error: null });
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return {
+          select: vi.fn().mockReturnValue({ eq: firstEq }),
+        } as never;
+      }
+
+      return {
+        select: vi.fn().mockReturnValue({
+          limit: vi.fn().mockReturnValue(new Promise(() => {})),
+        }),
+      } as never;
+    });
+    mockDatabaseSize(DB_SIZE_BYTES);
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    const start = Date.now();
+    const response = await GET();
+    const elapsed = Date.now() - start;
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(elapsed).toBeLessThan(PROBE_TIMEOUTS_MS.supabase + 400);
+    expect(data.services.supabase.status).toBe("error");
+    expect(data.services.supabase.error).toBe("Probe timed out");
+  }, 10000);
+
+  it("marks database size as timed out when the RPC never resolves", async () => {
+    mockSupabaseSuccess();
+    vi.mocked(supabase.rpc).mockImplementation((fn: string) => {
+      if (fn === "get_database_size") {
+        return new Promise(() => {}) as never;
+      }
+      return Promise.resolve({ data: null, error: null }) as never;
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.services.database.error).toBe("Probe timed out");
   }, 10000);
 
   it("should NOT fail overall health when external service probes are degraded", async () => {
