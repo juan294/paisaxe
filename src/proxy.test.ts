@@ -962,7 +962,7 @@ describe("Auth session refresh - error logging", () => {
   });
 });
 
-describe("CSP nonce", () => {
+describe("CSP header", () => {
   beforeEach(() => {
     process.env.MAINTENANCE_MODE = "false";
     mockFetch.mockReset();
@@ -978,8 +978,6 @@ describe("CSP nonce", () => {
 
     const csp = response.headers.get("Content-Security-Policy");
     expect(csp).toBeTruthy();
-    // Nonce is no longer embedded in the CSP header
-    expect(csp).not.toMatch(/'nonce-[A-Za-z0-9_-]+'/);
   });
 
   it("should include required script-src directives in the CSP", async () => {
@@ -1006,29 +1004,16 @@ describe("CSP nonce", () => {
     expect(styleSrc).toContain("'unsafe-inline'");
   });
 
-  it("should generate a unique nonce per request (via x-csp-nonce header)", async () => {
+  it("should not set the legacy nonce request header anymore", async () => {
+    const legacyNonceHeader = ["x", "csp", "nonce"].join("-");
     const request1 = new NextRequest("http://localhost:3000/immersive");
     const request2 = new NextRequest("http://localhost:3000/immersive");
 
     await proxy(request1);
     await proxy(request2);
 
-    const nonce1 = request1.headers.get("x-csp-nonce");
-    const nonce2 = request2.headers.get("x-csp-nonce");
-
-    expect(nonce1).toBeTruthy();
-    expect(nonce2).toBeTruthy();
-    expect(nonce1).not.toBe(nonce2);
-  });
-
-  it("should set x-csp-nonce request header for downstream server components", async () => {
-    const request = new NextRequest("http://localhost:3000/immersive");
-    await proxy(request);
-
-    // The nonce should be passed to downstream server components via request header
-    const nonce = request.headers.get("x-csp-nonce");
-    expect(nonce).toBeTruthy();
-    expect(nonce).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(request1.headers.get(legacyNonceHeader)).toBeNull();
+    expect(request2.headers.get(legacyNonceHeader)).toBeNull();
   });
 
   it("should NOT include strict-dynamic in script-src", async () => {
@@ -1058,6 +1043,8 @@ describe("CSP nonce", () => {
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("base-uri 'self'");
     expect(csp).toContain("form-action 'self'");
+    expect(csp).toContain("wss://api.elevenlabs.io");
+    expect(csp).not.toContain("wss://*.elevenlabs.io");
   });
 
   it("should not set CSP on redirect responses", async () => {

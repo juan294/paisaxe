@@ -6,7 +6,7 @@ import { buildCspHeader } from "@/proxy";
 /**
  * Tests for security headers.
  *
- * CSP is now dynamically generated per-request in proxy.ts with a nonce.
+ * CSP is dynamically generated in proxy.ts.
  * Static security headers remain in next.config.ts.
  */
 describe("Security headers in next.config.ts", () => {
@@ -38,7 +38,7 @@ describe("Security headers in next.config.ts", () => {
     });
 
     it("should NOT include static CSP in next.config.ts (now dynamic in proxy.ts)", () => {
-      // CSP is set per-request in proxy.ts with a nonce. next.config.ts must not
+      // CSP is set per-request in proxy.ts. next.config.ts must not
       // set a static CSP that would conflict with or override the dynamic one.
       expect(configContent).not.toMatch(/"Content-Security-Policy"/);
     });
@@ -46,12 +46,7 @@ describe("Security headers in next.config.ts", () => {
 });
 
 describe("CSP header via buildCspHeader (proxy.ts)", () => {
-  const testNonce = "test-nonce-abc123";
-  const csp = buildCspHeader(testNonce);
-
-  it("should NOT include nonce in script-src (nonce param is unused)", () => {
-    expect(csp).not.toContain(`'nonce-${testNonce}'`);
-  });
+  const csp = buildCspHeader();
 
   it("should include unsafe-inline in script-src", () => {
     const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
@@ -82,6 +77,9 @@ describe("CSP header via buildCspHeader (proxy.ts)", () => {
     const connectSrc = csp.split(";").find((d) => d.trim().startsWith("connect-src"))!;
     expect(connectSrc).toContain("https://vitals.vercel-insights.com");
     expect(connectSrc).toContain("https://va.vercel-scripts.com");
+    expect(connectSrc).toContain("wss://api.elevenlabs.io");
+    expect(connectSrc).toContain("wss://api.us.elevenlabs.io");
+    expect(connectSrc).not.toContain("wss://*.elevenlabs.io");
   });
 
   it("should include Stripe domains for embedded checkout", () => {

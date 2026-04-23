@@ -18,7 +18,7 @@ export {
   addCORSHeaders,
 } from "./cors";
 export { handleCsrfValidation, setCsrfCookie } from "./csrf-proxy";
-export { generateNonce, buildCspHeader } from "./csp";
+export { buildCspHeader } from "./csp";
 export {
   AUTH_REFRESH_TIMEOUT_MS,
   hasSupabaseAuthCookies,

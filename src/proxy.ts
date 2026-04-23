@@ -5,7 +5,7 @@ import { handleMaintenanceMode } from "@/lib/proxy/maintenance";
 import { handleRootRedirect } from "@/lib/proxy/root-redirect";
 import { handleCORS, addCORSHeaders } from "@/lib/proxy/cors";
 import { handleCsrfValidation, setCsrfCookie } from "@/lib/proxy/csrf-proxy";
-import { generateNonce, buildCspHeader } from "@/lib/proxy/csp";
+import { buildCspHeader } from "@/lib/proxy/csp";
 import { refreshAuthSession } from "@/lib/proxy/auth-refresh";
 
 // Re-export symbols that other modules depend on (backwards compatibility)
@@ -41,20 +41,16 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const csrfResponse = handleCsrfValidation(request);
   if (csrfResponse) return csrfResponse;
 
-  // 5. Generate CSP nonce and forward it to downstream server components
-  const nonce = generateNonce();
-  request.headers.set("x-csp-nonce", nonce);
-
-  // 6. Refresh auth session if needed (handles expired tokens)
+  // 5. Refresh auth session if needed (handles expired tokens)
   const response = await refreshAuthSession(request);
 
-  // 7. Set per-request CSP header
-  response.headers.set("Content-Security-Policy", buildCspHeader(nonce));
+  // 6. Set static CSP header (unsafe-inline is intentional; see csp.ts)
+  response.headers.set("Content-Security-Policy", buildCspHeader());
 
-  // 8. Set CSRF cookie on page requests (if not already set)
+  // 7. Set CSRF cookie on page requests (if not already set)
   setCsrfCookie(request, response);
 
-  // 9. Add CORS headers to the response
+  // 8. Add CORS headers to the response
   addCORSHeaders(request, response);
 
   return response;
