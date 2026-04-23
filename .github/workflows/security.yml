@@ -79,7 +79,6 @@ jobs:
 
       - name: Assert legacy agent override is absent from Vercel env
         if: ${{ env.VERCEL_TOKEN != '' }}
-        env:
         run: |
           legacy_key="$(printf '%s_%s_%s\n' ALLOW AGENT RUN)"
           response="$(curl -fsS \
