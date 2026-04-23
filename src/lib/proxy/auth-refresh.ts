@@ -76,9 +76,12 @@ function emitAuthRefreshTimeoutEvent(): void {
  * On timeout/error: logs a structured error (DO-M3), emits PostHog event,
  * and continues without refreshing.
  */
-export async function refreshAuthSession(request: NextRequest): Promise<NextResponse> {
+export async function refreshAuthSession(
+  request: NextRequest,
+  forwardedHeaders: Headers = request.headers
+): Promise<NextResponse> {
   let response = NextResponse.next({
-    request: { headers: request.headers },
+    request: { headers: forwardedHeaders },
   });
 
   const supabaseUrl = getEnv("NEXT_PUBLIC_SUPABASE_URL");
@@ -123,7 +126,7 @@ export async function refreshAuthSession(request: NextRequest): Promise<NextResp
             request.cookies.set(name, value)
           );
           response = NextResponse.next({
-            request: { headers: request.headers },
+            request: { headers: forwardedHeaders },
           });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)

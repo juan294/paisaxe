@@ -20,7 +20,7 @@ The audit identified one Critical Ship Blocker (non-atomic Stripe dedup → voic
 - [x] P5 — Implemented and verified on 2026-04-23 in worktree `fix/p5-sse-abort`; the chat SSE route now propagates `request.signal` into the Claude stream, the shared SSE event taxonomy lives in `src/types/sse.ts`, the client parser consumes that contract, and a new `e2e/sse-abort.spec.ts` regression covers in-flight aborts. `typecheck`, `lint`, full Vitest (`320` files, `6002` tests), targeted Playwright for chat/SSE abort, and the full Playwright suite (`144` passed, `32` skipped) all passed.
 - [x] P6
 - [x] P7
-- [ ] P8
+- [x] P8
 - [ ] P9
 - [ ] P10
 

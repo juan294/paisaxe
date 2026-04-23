@@ -95,6 +95,42 @@ describe("logger", () => {
       expect(parsed).toMatchObject({ level: "info", msg: "[STARTUP]" });
     });
 
+    it("merges child bindings into emitted log lines", async () => {
+      vi.stubEnv("NODE_ENV", "test");
+      const spy = vi.spyOn(process.stdout, "write");
+
+      const { logger } = await import("./logger");
+      logger.child({ request_id: "req-child-1234" }).info("[STARTUP]");
+
+      const written = spy.mock.calls.flatMap((args) => args).join("");
+      const parsed = JSON.parse(written);
+      expect(parsed).toMatchObject({
+        level: "info",
+        msg: "[STARTUP]",
+        request_id: "req-child-1234",
+      });
+    });
+
+    it("includes request context bindings automatically", async () => {
+      vi.stubEnv("NODE_ENV", "test");
+      const spy = vi.spyOn(process.stdout, "write");
+
+      const { logger } = await import("./logger");
+      const { runWithRequestContext } = await import("./request-context");
+
+      runWithRequestContext({ requestId: "req-context-1234" }, () => {
+        logger.info("[STARTUP]");
+      });
+
+      const written = spy.mock.calls.flatMap((args) => args).join("");
+      const parsed = JSON.parse(written);
+      expect(parsed).toMatchObject({
+        level: "info",
+        msg: "[STARTUP]",
+        request_id: "req-context-1234",
+      });
+    });
+
     it("redacts email, phone, token, and user identifiers in structured metadata", async () => {
       vi.stubEnv("NODE_ENV", "test");
       const spy = vi.spyOn(process.stdout, "write");
