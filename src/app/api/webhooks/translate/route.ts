@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { z } from "zod";
+import { createAdminClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 import { translateStory } from "@/lib/translate-story";
 import { translateWebhookSchema } from "@/lib/schemas";
-
 
 /**
  * Zod schema for the translate webhook payload.
@@ -18,6 +18,18 @@ const TranslateWebhookSchema = z
   })
   .strict();
 
+function buildTranslateEventKey(
+  storyId: string,
+  locales?: string[],
+  forceRetranslate?: boolean
+) {
+  const localeKey = locales && locales.length > 0
+    ? [...locales].sort().join(",")
+    : "all";
+
+  return `${storyId}:${forceRetranslate ? "force" : "default"}:${localeKey}`;
+}
+
 /**
  * POST /api/webhooks/translate
  *
@@ -27,6 +39,9 @@ const TranslateWebhookSchema = z
  * Security: Validates webhook secret header.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const supabase = createAdminClient();
+  let eventKey: string | undefined;
+
   try {
     const secret = request.headers.get("x-webhook-secret");
     const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
@@ -73,6 +88,37 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const { storyId, locales, forceRetranslate } = parsed.data;
+    eventKey = buildTranslateEventKey(
+      storyId,
+      locales,
+      forceRetranslate
+    );
+    const { data: rpcStatus, error: rpcError } = await supabase.rpc(
+      "process_translate_event_idempotent",
+      {
+        p_event_key: eventKey,
+        p_story_id: storyId,
+      }
+    );
+
+    if (rpcError) {
+      logger.error("[TRANSLATE_WEBHOOK_RPC_FAILURE]", {
+        story_id: storyId,
+        error: rpcError.message,
+      });
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
+
+    if (rpcStatus === "duplicate") {
+      return NextResponse.json(
+        {
+          success: true,
+          status: "duplicate",
+          storyId,
+        },
+        { status: 200 }
+      );
+    }
 
     // Run translation (this may take a few seconds)
     const result = await translateStory(storyId, {
@@ -81,6 +127,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     if (!result.success) {
+      const { error: releaseError } = await supabase
+        .from("translate_webhook_events")
+        .delete()
+        .eq("event_key", eventKey);
+
+      if (releaseError) {
+        logger.error("[TRANSLATE_WEBHOOK_CLAIM_RELEASE_FAILED]", {
+          story_id: storyId,
+          event_key: eventKey,
+          error: releaseError,
+        });
+      }
+
       logger.error("[TRANSLATE_WEBHOOK_TRANSLATION_FAILED]", {
         story_id: storyId,
         error: result.error,
@@ -90,6 +149,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         success: result.success,
+        status: rpcStatus,
         storyId,
         successCount: result.successCount,
         failedCount: result.failedCount,
@@ -98,6 +158,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: result.success ? 200 : 500 }
     );
   } catch (error) {
+    if (eventKey) {
+      const { error: releaseError } = await supabase
+        .from("translate_webhook_events")
+        .delete()
+        .eq("event_key", eventKey);
+
+      if (releaseError) {
+        logger.error("[TRANSLATE_WEBHOOK_CLAIM_RELEASE_FAILED]", {
+          event_key: eventKey,
+          error: releaseError,
+        });
+      }
+    }
+
     logger.error("[TRANSLATE_WEBHOOK_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },

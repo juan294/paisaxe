@@ -19,7 +19,7 @@ The audit identified one Critical Ship Blocker (non-atomic Stripe dedup → voic
 - [x] P4 — Implemented and verified on 2026-04-23 in worktree `fix/p4-csp-xss`; CSP nonce scaffolding was removed, the ElevenLabs WebSocket wildcard was tightened to explicit hosts, the markdown sink registry was added, and a real XSS canary Playwright spec now verifies chat markdown does not execute injected HTML. `typecheck`, `lint`, full Vitest (`319` files, `5994` tests), and `npm run test:e2e -- xss-canary` all passed.
 - [x] P5 — Implemented and verified on 2026-04-23 in worktree `fix/p5-sse-abort`; the chat SSE route now propagates `request.signal` into the Claude stream, the shared SSE event taxonomy lives in `src/types/sse.ts`, the client parser consumes that contract, and a new `e2e/sse-abort.spec.ts` regression covers in-flight aborts. `typecheck`, `lint`, full Vitest (`320` files, `6002` tests), targeted Playwright for chat/SSE abort, and the full Playwright suite (`144` passed, `32` skipped) all passed.
 - [x] P6
-- [ ] P7
+- [x] P7
 - [ ] P8
 - [ ] P9
 - [ ] P10
