@@ -24,6 +24,13 @@ vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn(),
 }));
 
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 const mockIsFeatureFlagEnabled = vi.fn().mockResolvedValue(false);
 vi.mock("@/lib/feature-flags-server", () => ({
   isFeatureFlagEnabled: mockIsFeatureFlagEnabled,
@@ -45,6 +52,7 @@ import { search } from "@/lib/search";
 import { validateChatRequest } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { detectInjectionAttempt, sanitizeInput } from "@/lib/chat-safety";
+import { logger } from "@/lib/logger";
 
 // Helper to collect SSE events from a streaming response
 async function collectStreamEvents(response: Response): Promise<unknown[]> {
@@ -259,7 +267,10 @@ describe("POST /api/chat/stream", () => {
       expect.any(Array),
       false,
       0,
-      expect.any(Array)
+      expect.any(Array),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
     );
   });
 
@@ -341,8 +352,6 @@ describe("POST /api/chat/stream", () => {
   });
 
   it("should log [CHAT_STREAM_FAILURE] with structured metadata on stream error", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
     vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
     vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
     vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
@@ -362,20 +371,16 @@ describe("POST /api/chat/stream", () => {
     // Drain the stream so the catch block executes before we assert
     await collectStreamEvents(response);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(logger.error).toHaveBeenCalledWith(
       "[CHAT_STREAM_FAILURE]",
       expect.objectContaining({
         error: "Anthropic API timeout",
         type: "Error",
       })
     );
-
-    consoleErrorSpy.mockRestore();
   });
 
   it("should stringify non-Error throws in [CHAT_STREAM_FAILURE]", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
     vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
     vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
     vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
@@ -394,7 +399,7 @@ describe("POST /api/chat/stream", () => {
     const response = await POST(request);
     const events = await collectStreamEvents(response);
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(logger.error).toHaveBeenCalledWith(
       "[CHAT_STREAM_FAILURE]",
       expect.objectContaining({
         error: "unexpected-string-throw",
@@ -403,10 +408,9 @@ describe("POST /api/chat/stream", () => {
     );
     const errorEvent = events.find(
       (e) => (e as { type: string }).type === "error"
-    ) as { message: string } | undefined;
+    ) as { message: string; hadPartialContent: boolean } | undefined;
     expect(errorEvent?.message).toBe("Error generating response");
-
-    consoleErrorSpy.mockRestore();
+    expect(errorEvent?.hadPartialContent).toBe(true);
   });
 
   it("should return SSE error event when embedding fails before streaming", async () => {
@@ -482,7 +486,10 @@ describe("POST /api/chat/stream", () => {
       expect.any(Array),
       false, // asturianEnabled
       expect.toSatisfy((v: unknown) => v === undefined || typeof v === "number"),
-      expect.any(Array)
+      expect.any(Array),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
     );
   });
 
@@ -581,11 +588,12 @@ describe("POST /api/chat/stream", () => {
     // Verify the asturianu flag (3rd arg) is true
     const callArgs = vi.mocked(streamChatResponse).mock.calls[0];
     expect(callArgs[2]).toBe(true);
+    expect(callArgs[5]).toEqual(expect.objectContaining({
+      signal: expect.any(AbortSignal),
+    }));
   });
 
   it("returns 500 from outer catch when pre-stream setup throws", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
     // Trigger the outer try/catch by making checkRateLimit reject. This exercises
     // the outer catch (route.ts:185-193) which is distinct from the inner stream
     // error handler.
@@ -601,11 +609,62 @@ describe("POST /api/chat/stream", () => {
     expect(response.status).toBe(500);
     const body = await response.json();
     expect(body.error).toBe("Internal server error");
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Stream chat API error:",
-      expect.any(Error)
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CHAT_STREAM_API_ERROR]",
+      expect.objectContaining({
+        error: expect.any(Error),
+      })
+    );
+  });
+
+  it("propagates request abort into streamChatResponse without emitting an error event", async () => {
+    vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+    vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+
+    const requestAbortController = new AbortController();
+
+    vi.mocked(streamChatResponse).mockImplementation(
+      async function* (
+        _message,
+        _chunks,
+        _asturianEnabled,
+        _messageIndex,
+        _images,
+        options
+      ) {
+        expect(options?.signal).toBeInstanceOf(AbortSignal);
+        yield "partial";
+
+        await new Promise((_, reject) => {
+          options?.signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true }
+          );
+        });
+      }
     );
 
-    consoleErrorSpy.mockRestore();
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Hello" }),
+      signal: requestAbortController.signal,
+    });
+
+    const response = await POST(request);
+    setTimeout(() => requestAbortController.abort(), 0);
+    const events = await collectStreamEvents(response);
+
+    expect(events).toEqual([
+      { type: "text", content: "partial" },
+    ]);
+    expect(logger.warn).toHaveBeenCalledWith("[CHAT_STREAM_ABORTED]", {
+      reason: "client_disconnect",
+    });
+    expect(logger.error).not.toHaveBeenCalledWith(
+      "[CHAT_STREAM_FAILURE]",
+      expect.anything()
+    );
   });
 });

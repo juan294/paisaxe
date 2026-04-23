@@ -790,7 +790,11 @@ describe("claude", () => {
     function createMockSpawnProcess() {
       const stdout = new EventEmitter();
       const stderr = new EventEmitter();
-      const proc = Object.assign(new EventEmitter(), { stdout, stderr });
+      const proc = Object.assign(new EventEmitter(), {
+        stdout,
+        stderr,
+        kill: vi.fn(),
+      });
       return proc;
     }
 
@@ -991,6 +995,24 @@ describe("claude", () => {
       const body = JSON.parse(curlArgs[dIndex + 1]);
       expect(body.stream).toBe(true);
       expect(body.model).toBe("claude-sonnet-4-20250514");
+    });
+
+    it("kills curl and surfaces AbortError when the stream signal aborts", async () => {
+      const proc = setupMockSpawn();
+      const controller = new AbortController();
+
+      setTimeout(() => controller.abort(), 10);
+
+      await expect(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _chunk of streamChatResponse("Test", [], false, 0, undefined, {
+          signal: controller.signal,
+        })) {
+          /* noop */
+        }
+      }).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(proc.kill).toHaveBeenCalled();
     });
 
     it("should yield with asturianu mode enabled", async () => {
@@ -1342,6 +1364,30 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       expect(callArgs.messages).toEqual([
         { role: "user", content: expect.stringContaining("Test query") },
       ]);
+    });
+
+    it("passes AbortSignal through to SDK stream options", async () => {
+      const controller = new AbortController();
+
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          yield { type: "content_block_delta", delta: { type: "text_delta", text: "ok" } };
+        },
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _chunk of streamChat("Test", [], false, 0, undefined, {
+        signal: controller.signal,
+      })) {
+        /* noop */
+      }
+
+      expect(mockStream).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ signal: controller.signal })
+      );
     });
 
     it("should propagate errors from SDK stream", async () => {

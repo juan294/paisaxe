@@ -6,6 +6,10 @@ interface AnthropicMessage {
   content: string;
 }
 
+type StreamOptions = {
+  signal?: AbortSignal;
+};
+
 // Use curl in development/test (Turbopack ECONNRESET workaround), SDK in production
 // Production is the only environment where Turbopack is not used
 const USE_CURL = process.env.NODE_ENV !== "production";
@@ -18,13 +22,20 @@ async function* streamAnthropicAPI(
   system: string,
   messages: AnthropicMessage[],
   model: string,
-  maxTokens: number
+  maxTokens: number,
+  options: StreamOptions = {}
 ): AsyncGenerator<string, void, unknown> {
   if (USE_CURL) {
-    yield* streamWithCurl(system, messages, model, maxTokens);
+    yield* streamWithCurl(system, messages, model, maxTokens, options);
   } else {
-    yield* streamWithSDK(system, messages, model, maxTokens);
+    yield* streamWithSDK(system, messages, model, maxTokens, options);
   }
+}
+
+function createAbortError() {
+  const error = new Error("Aborted");
+  error.name = "AbortError";
+  return error;
 }
 
 /**
@@ -35,7 +46,8 @@ async function* streamWithSDK(
   system: string,
   messages: AnthropicMessage[],
   model: string,
-  maxTokens: number
+  maxTokens: number,
+  options: StreamOptions = {}
 ): AsyncGenerator<string, void, unknown> {
   const { default: AnthropicSDK } = await import("@anthropic-ai/sdk");
   const client = new AnthropicSDK({ maxRetries: 3 });
@@ -53,7 +65,9 @@ async function* streamWithSDK(
   while (attempt < 2) {
     attempt++;
     try {
-      const stream = await client.messages.stream(params);
+      const stream = await client.messages.stream(params, {
+        signal: options.signal,
+      });
       for await (const event of stream) {
         if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
           yield event.delta.text;
@@ -78,9 +92,14 @@ async function* streamWithCurl(
   system: string,
   messages: AnthropicMessage[],
   model: string,
-  maxTokens: number
+  maxTokens: number,
+  options: StreamOptions = {}
 ): AsyncGenerator<string, void, unknown> {
   const { spawn } = await import("node:child_process");
+
+  if (options.signal?.aborted) {
+    throw createAbortError();
+  }
 
   const body = JSON.stringify({
     model,
@@ -112,6 +131,17 @@ async function* streamWithCurl(
   let resolveNext: (() => void) | null = null;
   let done = false;
   let error: Error | null = null;
+  const handleAbort = () => {
+    error = createAbortError();
+    done = true;
+    curlProcess.kill?.();
+    if (resolveNext) {
+      resolveNext();
+      resolveNext = null;
+    }
+  };
+
+  options.signal?.addEventListener("abort", handleAbort, { once: true });
 
   curlProcess.stdout.on("data", (data: Buffer) => {
     buffer += data.toString();
@@ -170,21 +200,25 @@ async function* streamWithCurl(
   });
 
   // Yield chunks as they arrive
-  while (true) {
-    if (error) throw error;
+  try {
+    while (true) {
+      if (error) throw error;
 
-    while (chunks.length > 0) {
-      yield chunks.shift()!;
+      while (chunks.length > 0) {
+        yield chunks.shift()!;
+      }
+
+      if (done) break;
+
+      // Wait for more data
+      await new Promise<void>((resolve) => {
+        resolveNext = resolve;
+        // Also resolve after a short timeout to check for completion
+        setTimeout(resolve, 100);
+      });
     }
-
-    if (done) break;
-
-    // Wait for more data
-    await new Promise<void>((resolve) => {
-      resolveNext = resolve;
-      // Also resolve after a short timeout to check for completion
-      setTimeout(resolve, 100);
-    });
+  } finally {
+    options.signal?.removeEventListener("abort", handleAbort);
   }
 }
 
@@ -436,7 +470,8 @@ export async function* streamChatResponse(
   context: Chunk[],
   asturianEnabled: boolean = false,
   messageIndex: number = 0,
-  images?: ImageResult[]
+  images?: ImageResult[],
+  options: StreamOptions = {}
 ): AsyncGenerator<string, void, unknown> {
   const contextText = buildContextText(context);
   const imageContext = formatImagesForContext(images);
@@ -454,7 +489,8 @@ export async function* streamChatResponse(
     systemPrompt,
     [{ role: "user", content: userContent }],
     "claude-sonnet-4-20250514",
-    1024
+    1024,
+    options
   );
 }
 

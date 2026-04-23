@@ -38,3 +38,6 @@ export interface ChatResponse {
   sources?: Source[];
   images?: ImageResult[];
 }
+
+export type { ChatDoneEvent, ChatErrorEvent, ChatStreamEvent, ChatTextEvent } from "./sse";
+export { encodeSseEvent, parseSseEvent } from "./sse";
