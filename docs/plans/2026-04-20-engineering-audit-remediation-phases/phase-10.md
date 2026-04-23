@@ -17,7 +17,7 @@ npm view lucide-react version
 grep '"lucide-react"' package.json
 ```
 
-Audit says "`^1.8.0` (verify — may be correct current major)". Lucide has been on 0.x for a long time; if the version is `0.x`, check whether a newer minor is available and whether there are breaking icon renames.
+Audit says "`^1.8.0`". On 2026-04-23, `npm view lucide-react version` still returned `1.8.0`, so no package update is required in this phase.
 
 ### Implementation
 
@@ -55,7 +55,7 @@ supabase projects list
 
 ### Action
 
-If mismatched (e.g., Vercel `cdg1` = Paris, Supabase in a US region), the round-trip latency is invisible in local profiling. Two options:
+If mismatched, the round-trip latency is invisible in local profiling. Two options:
 
 - **Option 1 (preferred):** Move Vercel to the Supabase region by updating `vercel.json`:
   ```json
@@ -63,7 +63,7 @@ If mismatched (e.g., Vercel `cdg1` = Paris, Supabase in a US region), the round-
   ```
 - **Option 2:** Move Supabase to the Vercel region (requires project migration — Supabase supports region transfer via support; much larger undertaking).
 
-If regions already match, document the verification in `docs/operations/operations.md` with the date.
+On 2026-04-23, `supabase projects list` showed the linked `asturias` project in `Central Europe (Zurich)` while `vercel.json` still used `cdg1`. Vercel's current public region list does not expose Zurich, so this phase moves the app to `fra1`, the nearest supported Vercel region, and documents the verification in `docs/operations/operations.md` and `docs/operations/vercel-regions.md`.
 
 ### Pre-deploy check
 
@@ -81,7 +81,7 @@ Audit identified `e2e/checkout.spec.ts` as a smoke test mocking `/api/voice-acce
 
 A new Playwright spec `e2e/stripe-real-checkout.spec.ts` that:
 1. Uses Stripe test-mode keys (from a dedicated `STRIPE_TEST_SECRET_KEY` env var, not prod keys).
-2. Spawns `stripe listen` locally (or uses `stripe trigger`) to forward webhooks to the local dev server.
+2. Uses dedicated Stripe test-mode credentials and replays a locally signed `checkout.session.completed` event into the real webhook route after the hosted checkout returns.
 3. Drives the UI through a real checkout session with `4242 4242 4242 4242`.
 4. Waits for the `voice_purchases` row to appear in the local DB.
 5. Asserts `/immersive` shows unlocked state after purchase.
@@ -123,7 +123,7 @@ test("real Stripe checkout grants access end-to-end", async ({ page, context }) 
 });
 ```
 
-Webhook forwarding: run `stripe listen --forward-to http://localhost:3000/api/webhooks/stripe` as a test fixture or precondition. Consider a `global-setup.ts` Playwright hook.
+The implemented version keeps the default suite untouched and avoids long-lived CLI forwarding in CI. A dedicated runner script starts the app with test-mode Stripe env, the Playwright spec completes the hosted checkout, then retrieves the Checkout Session from Stripe's API and posts a signed `checkout.session.completed` event to `/api/webhooks/stripe`.
 
 Add this spec to a **separate CI job** (not default `npm run test:e2e`) that runs only when `STRIPE_TEST_SECRET_KEY` is present — keeps local dev fast and avoids CI credential pressure. Schedule: nightly or pre-release.
 
@@ -156,15 +156,15 @@ npm run typecheck
 npm run lint
 npm run test
 npm run test:e2e          # baseline suite stays green
-# real Stripe E2E (only if STRIPE_TEST_SECRET_KEY is set locally):
-STRIPE_TEST_SECRET_KEY=... npm run test:e2e -- stripe-real-checkout
+# real Stripe E2E (requires the dedicated STRIPE_TEST_* env set locally):
+npm run test:e2e:stripe
 ```
 
 ## Manual Success Criteria
 
 1. **lucide-react:** Visual regression E2E passes; spot-check each admin page's icons look unchanged.
 2. **Vercel region:** `vercel.json` either already matches Supabase or is updated; preview-deployment latency measurement recorded in `docs/operations/operations.md`.
-3. **Stripe E2E:** Runs locally against a Stripe test account; asserts the full grant flow end-to-end.
+3. **Stripe E2E:** Runs locally against a Stripe test account; asserts the hosted checkout, signed webhook processing, DB grant, and unlocked immersive state end-to-end.
 4. Nightly CI job for the Stripe E2E is registered and green.
 
 ## Rollback
@@ -175,10 +175,10 @@ STRIPE_TEST_SECRET_KEY=... npm run test:e2e -- stripe-real-checkout
 
 ## Files Touched
 
-- `package.json`, `package-lock.json` (lucide-react)
+- `package.json` (new Stripe integration runner)
 - `vercel.json` (region, if changed)
 - `e2e/stripe-real-checkout.spec.ts` (new)
-- `e2e/global-setup.ts` (likely new — Stripe webhook listen setup)
+- `scripts/run-stripe-e2e.ts` (new)
 - `.github/workflows/e2e-stripe-integration.yml` (new)
 - `docs/operations/operations.md` (region verification note)
 
