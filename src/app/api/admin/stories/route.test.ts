@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, POST } from "./route";
+import { logger } from "@/lib/logger";
 
 // Mock withAdmin so tests control auth + client injection independently.
 // When withAdmin resolves as unauthorized, return a 401 response directly.
@@ -549,7 +550,7 @@ describe("POST /api/admin/stories", () => {
     });
     mockWithAdminAuthorized({ from: mockFrom });
 
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -564,12 +565,15 @@ describe("POST /api/admin/stories", () => {
 
     // Story creation should still succeed even though suggestion update failed
     expect(response.status).toBe(201);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "Error updating suggestion status:",
-      expect.objectContaining({ message: "Suggestion update failed" })
+    expect(loggerSpy).toHaveBeenCalledWith(
+      "[ADMIN_STORIES_SUGGESTION_UPDATE_FAILED]",
+      expect.objectContaining({
+        suggestion_id: "550e8400-e29b-41d4-a716-446655440000",
+        error: expect.objectContaining({ message: "Suggestion update failed" }),
+      })
     );
 
-    consoleSpy.mockRestore();
+    loggerSpy.mockRestore();
   });
 
   it("should return 500 on unexpected POST error (catch block)", async () => {

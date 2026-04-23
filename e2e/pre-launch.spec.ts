@@ -46,6 +46,27 @@ async function dismissPrivacyNotice(chatPanel: import("@playwright/test").Locato
   }
 }
 
+async function openChatPanel(page: import("@playwright/test").Page) {
+  const testIdTrigger = page.locator('[data-testid="ask-button"]').first();
+
+  if (await testIdTrigger.isVisible().catch(() => false)) {
+    await testIdTrigger.click();
+  } else {
+    await page
+      .getByRole("button", {
+        name: /descúbrelo|discover it|descobre|entdecke es|découvre/i,
+      })
+      .first()
+      .click();
+  }
+
+  const chatPanel = page.locator(".fixed.inset-0.z-50");
+  await expect(chatPanel).toBeVisible({ timeout: 10_000 });
+  await dismissPrivacyNotice(chatPanel);
+
+  return chatPanel;
+}
+
 // ─── Static Pages ────────────────────────────────────────────────
 
 test.describe("Static pages", () => {
@@ -156,13 +177,7 @@ test.describe("Chat messageIndex", () => {
     await page.goto("/immersive");
     await expect(page.locator("h1").first()).toBeVisible();
 
-    // Open chat
-    await page.locator('[data-testid="ask-button"]').first().click();
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    // Dismiss privacy notice if shown
-    await dismissPrivacyNotice(chatPanel);
+    const chatPanel = await openChatPanel(page);
 
     // Send first message
     await chatPanel.locator("input").fill("Question one");
@@ -201,13 +216,7 @@ test.describe("Chat messageIndex", () => {
     await page.goto("/immersive");
     await expect(page.locator("h1").first()).toBeVisible();
 
-    // Open chat
-    await page.locator('[data-testid="ask-button"]').first().click();
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    // Dismiss privacy notice
-    await dismissPrivacyNotice(chatPanel);
+    const chatPanel = await openChatPanel(page);
 
     // Send first message
     await chatPanel.locator("input").fill("Question one");
@@ -348,11 +357,7 @@ test.describe("Language switching", () => {
     await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Open chat to check Spanish placeholder
-    await page.locator('[data-testid="ask-button"]').first().click();
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    await dismissPrivacyNotice(chatPanel);
+    const chatPanel = await openChatPanel(page);
 
     const input = chatPanel.locator("input");
     await expect(input).toHaveAttribute(
@@ -380,11 +385,7 @@ test.describe("Language switching", () => {
     await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Open chat to check English placeholder
-    await page.locator('[data-testid="ask-button"]').first().click();
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    await dismissPrivacyNotice(chatPanel);
+    const chatPanel = await openChatPanel(page);
 
     const input = chatPanel.locator("input");
     await expect(input).toHaveAttribute(
@@ -421,11 +422,7 @@ test.describe("Language switching", () => {
     });
 
     // Open chat (default locale is EN in Desktop Chrome)
-    await page.locator('[data-testid="ask-button"]').first().click();
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    await dismissPrivacyNotice(chatPanel);
+    const chatPanel = await openChatPanel(page);
 
     const input = chatPanel.locator("input");
     const placeholderEN = await input.getAttribute("placeholder");
@@ -444,10 +441,7 @@ test.describe("Language switching", () => {
     await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Re-open chat
-    await page.locator('[data-testid="ask-button"]').first().click();
-    await expect(chatPanel).toBeVisible();
-
-    await dismissPrivacyNotice(chatPanel);
+    await openChatPanel(page);
 
     const placeholderES = await input.getAttribute("placeholder");
 

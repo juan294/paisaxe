@@ -6,6 +6,7 @@ import {
   type CurationStatus,
 } from "@/types/admin";
 import type { StoryCategory } from "@/types/immersive";
+import { logger } from "@/lib/logger";
 import { createStorySchema } from "@/lib/schemas";
 
 /**
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
       const { data, error } = await query;
 
       if (error) {
-        console.error("Error fetching stories:", error);
+        logger.error("[ADMIN_STORIES_FETCH_FAILED]", { error });
         return NextResponse.json(
           { error: "Failed to fetch stories" },
           { status: 500 }
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({ data: stories });
     } catch (error) {
-      console.error("Admin stories API error:", error);
+      logger.error("[ADMIN_STORIES_GET_UNHANDLED_ERROR]", { error });
       return NextResponse.json(
         { error: "Internal server error" },
         { status: 500 }
@@ -75,127 +76,131 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   return withAdmin(async (supabase) => {
-  try {
-    const rawBody: unknown = await request.json();
-    const parsed = createStorySchema.safeParse(rawBody);
+    try {
+      const rawBody: unknown = await request.json();
+      const parsed = createStorySchema.safeParse(rawBody);
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid request body", errors: parsed.error.flatten().fieldErrors },
-        { status: 400 }
-      );
-    }
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Invalid request body", errors: parsed.error.flatten().fieldErrors },
+          { status: 400 }
+        );
+      }
 
-    const body = parsed.data;
+      const body = parsed.data;
 
-    // Generate slug from title if not provided
-    const slug = body.slug?.trim() || generateSlug(body.title);
+      // Generate slug from title if not provided
+      const slug = body.slug?.trim() || generateSlug(body.title);
 
-    // Check if slug already exists — maybeSingle() returns {data: null, error: null}
-    // when no row is found, so any non-null error is a real DB error
-    const { data: existingStory, error: slugCheckError } = await supabase
-      .from("stories")
-      .select("id, slug")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (slugCheckError) {
-      console.error("Error checking slug:", slugCheckError);
-      return NextResponse.json(
-        { error: "Failed to validate slug" },
-        { status: 500 }
-      );
-    }
-
-    if (existingStory) {
-      return NextResponse.json(
-        { error: "A story with this slug already exists" },
-        { status: 409 }
-      );
-    }
-
-    // Get the next display_order if not provided
-    // maybeSingle() returns {data: null, error: null} when the table is empty
-    let displayOrder = body.displayOrder;
-    if (displayOrder === undefined) {
-      const { data: maxOrderStory } = await supabase
+      // Check if slug already exists — maybeSingle() returns {data: null, error: null}
+      // when no row is found, so any non-null error is a real DB error
+      const { data: existingStory, error: slugCheckError } = await supabase
         .from("stories")
-        .select("display_order")
-        .order("display_order", { ascending: false })
-        .limit(1)
+        .select("id, slug")
+        .eq("slug", slug)
         .maybeSingle();
 
-      displayOrder = (maxOrderStory?.display_order ?? 0) + 1;
-    }
+      if (slugCheckError) {
+        logger.error("[ADMIN_STORIES_SLUG_CHECK_FAILED]", { slug, error: slugCheckError });
+        return NextResponse.json(
+          { error: "Failed to validate slug" },
+          { status: 500 }
+        );
+      }
 
-    // Insert the new story
-    const { data: newStory, error: insertError } = await supabase
-      .from("stories")
-      .insert({
-        title: body.title.trim(),
-        slug,
-        subtitle: body.subtitle?.trim() || null,
-        description: body.description?.trim() || null,
-        category: body.category,
-        location: body.location || null,
-        duration: body.duration || null,
-        source_pdf: body.sourcePdf || null,
-        best_months: body.bestMonths || null,
-        metadata: body.metadata || {},
-        display_order: displayOrder,
-        curation_status: "needs_curation" as CurationStatus,
-        is_active: true,
-        source_type: body.sourceType || "curated",
-        suggestion_id: body.suggestionId || null,
-      })
-      .select("id, slug, title, category, display_order, curation_status, created_at")
-      .single();
+      if (existingStory) {
+        return NextResponse.json(
+          { error: "A story with this slug already exists" },
+          { status: 409 }
+        );
+      }
 
-    if (insertError || !newStory) {
-      console.error("Error creating story:", insertError);
+      // Get the next display_order if not provided
+      // maybeSingle() returns {data: null, error: null} when the table is empty
+      let displayOrder = body.displayOrder;
+      if (displayOrder === undefined) {
+        const { data: maxOrderStory } = await supabase
+          .from("stories")
+          .select("display_order")
+          .order("display_order", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        displayOrder = (maxOrderStory?.display_order ?? 0) + 1;
+      }
+
+      // Insert the new story
+      const { data: newStory, error: insertError } = await supabase
+        .from("stories")
+        .insert({
+          title: body.title.trim(),
+          slug,
+          subtitle: body.subtitle?.trim() || null,
+          description: body.description?.trim() || null,
+          category: body.category,
+          location: body.location || null,
+          duration: body.duration || null,
+          source_pdf: body.sourcePdf || null,
+          best_months: body.bestMonths || null,
+          metadata: body.metadata || {},
+          display_order: displayOrder,
+          curation_status: "needs_curation" as CurationStatus,
+          is_active: true,
+          source_type: body.sourceType || "curated",
+          suggestion_id: body.suggestionId || null,
+        })
+        .select("id, slug, title, category, display_order, curation_status, created_at")
+        .single();
+
+      if (insertError || !newStory) {
+        logger.error("[ADMIN_STORIES_CREATE_FAILED]", { slug, error: insertError });
+        return NextResponse.json(
+          { error: "Failed to create story" },
+          { status: 500 }
+        );
+      }
+
+      // If this is a conversion from a suggestion, update the suggestion status
+      if (body.suggestionId) {
+        const { error: updateSuggestionError } = await supabase
+          .from("story_suggestions")
+          .update({
+            status: "converted",
+            converted_story_id: newStory.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", body.suggestionId);
+
+        if (updateSuggestionError) {
+          // Log but don't fail - the story was created successfully
+          logger.error("[ADMIN_STORIES_SUGGESTION_UPDATE_FAILED]", {
+            suggestion_id: body.suggestionId,
+            story_id: newStory.id,
+            error: updateSuggestionError,
+          });
+        }
+      }
+
       return NextResponse.json(
-        { error: "Failed to create story" },
+        {
+          data: {
+            id: newStory.id,
+            slug: newStory.slug,
+            title: newStory.title,
+            category: newStory.category as StoryCategory,
+            displayOrder: newStory.display_order,
+            curationStatus: newStory.curation_status as CurationStatus,
+            createdAt: newStory.created_at,
+          },
+        },
+        { status: 201 }
+      );
+    } catch (error) {
+      logger.error("[ADMIN_STORIES_POST_UNHANDLED_ERROR]", { error });
+      return NextResponse.json(
+        { error: "Internal server error" },
         { status: 500 }
       );
     }
-
-    // If this is a conversion from a suggestion, update the suggestion status
-    if (body.suggestionId) {
-      const { error: updateSuggestionError } = await supabase
-        .from("story_suggestions")
-        .update({
-          status: "converted",
-          converted_story_id: newStory.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", body.suggestionId);
-
-      if (updateSuggestionError) {
-        // Log but don't fail - the story was created successfully
-        console.error("Error updating suggestion status:", updateSuggestionError);
-      }
-    }
-
-    return NextResponse.json(
-      {
-        data: {
-          id: newStory.id,
-          slug: newStory.slug,
-          title: newStory.title,
-          category: newStory.category as StoryCategory,
-          displayOrder: newStory.display_order,
-          curationStatus: newStory.curation_status as CurationStatus,
-          createdAt: newStory.created_at,
-        },
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Admin create story API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
   });
 }

@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
+import { logger } from "@/lib/logger";
 import {
   sendSMS,
   buildConfirmationSMS,
@@ -146,7 +147,7 @@ function verifySignature(
   const secret = process.env.ELEVENLABS_WEBHOOK_SECRET?.trim();
 
   if (!secret) {
-    console.error("[elevenlabs-webhook] ELEVENLABS_WEBHOOK_SECRET not configured");
+    logger.error("[ELEVENLABS_WEBHOOK_SECRET_MISSING]");
     return "missing_secret";
   }
 
@@ -321,7 +322,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const sigHeader = request.headers.get("elevenlabs-signature");
 
     if (!sigHeader) {
-      console.warn("[elevenlabs-webhook] Missing signature header");
+      logger.warn("[ELEVENLABS_WEBHOOK_SIGNATURE_MISSING]");
       return NextResponse.json(
         { error: "Missing signature" },
         { status: 401 }
@@ -332,7 +333,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const verifyResult = verifySignature(rawBody, sigHeader);
 
     if (verifyResult === "expired") {
-      console.warn("[elevenlabs-webhook] Signature timestamp expired");
+      logger.warn("[ELEVENLABS_WEBHOOK_SIGNATURE_EXPIRED]");
       return NextResponse.json(
         { error: "Signature expired" },
         { status: 401 }
@@ -340,7 +341,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     if (verifyResult !== "valid") {
-      console.warn(`[elevenlabs-webhook] Invalid signature: ${verifyResult}`);
+      logger.warn("[ELEVENLABS_WEBHOOK_SIGNATURE_INVALID]", {
+        verify_result: verifyResult,
+      });
       return NextResponse.json(
         { error: "Invalid signature" },
         { status: 401 }
@@ -360,7 +363,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           ? [i.path.join(".")]
           : []
       );
-      console.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "elevenlabs", fields: unknownFields });
+      logger.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "elevenlabs", fields: unknownFields });
     }
 
     // ElevenLabs sends different event types - only handle post_call_transcription
@@ -373,7 +376,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const conversationId = body.conversation_id || body.data?.conversation_id;
 
     if (!conversationId) {
-      console.error("[elevenlabs-webhook] Missing conversation_id in payload");
+      logger.error("[ELEVENLABS_WEBHOOK_CONVERSATION_ID_MISSING]");
       return NextResponse.json(
         { error: "Missing conversation_id" },
         { status: 400 }
@@ -391,16 +394,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .maybeSingle();
 
     if (fetchError) {
-      console.error(
-        `[elevenlabs-webhook] DB error fetching booking for conversation: ${conversationId}`,
-        fetchError
-      );
+      logger.error("[ELEVENLABS_WEBHOOK_FETCH_BOOKING_FAILED]", {
+        conversation_id: conversationId,
+        error: fetchError,
+      });
     }
 
     if (!booking) {
-      console.warn(
-        `[elevenlabs-webhook] No pending booking found for conversation: ${conversationId}`
-      );
+      logger.warn("[ELEVENLABS_WEBHOOK_BOOKING_NOT_FOUND]", {
+        conversation_id: conversationId,
+      });
       // Return 200 to acknowledge receipt - this might be a call we didn't initiate
       return NextResponse.json({
         success: true,
@@ -432,10 +435,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       smsError = smsResult.error;
 
       if (!smsResult.success) {
-        console.error(
-          `[elevenlabs-webhook] Failed to send SMS for booking ${booking.id}:`,
-          smsResult.error
-        );
+        logger.error("[ELEVENLABS_WEBHOOK_SMS_FAILED]", {
+          booking_id: booking.id,
+          error: smsResult.error,
+        });
       }
     }
 
@@ -449,10 +452,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .eq("id", booking.id);
 
     if (updateError) {
-      console.error(
-        `[elevenlabs-webhook] Failed to update booking ${booking.id}:`,
-        updateError
-      );
+      logger.error("[ELEVENLABS_WEBHOOK_UPDATE_BOOKING_FAILED]", {
+        booking_id: booking.id,
+        error: updateError,
+      });
       // Don't return error - SMS was already sent
     }
 
@@ -464,7 +467,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       smsError,
     });
   } catch (error) {
-    console.error("[elevenlabs-webhook] Error:", error);
+    logger.error("[ELEVENLABS_WEBHOOK_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

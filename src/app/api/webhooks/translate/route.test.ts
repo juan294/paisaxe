@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "./route";
 import { NextRequest } from "next/server";
+import { logger } from "@/lib/logger";
 
 // Mock translate-story module
 vi.mock("@/lib/translate-story", () => ({
@@ -163,7 +164,7 @@ describe("translate webhook", () => {
 
   describe("Zod schema validation", () => {
     it("should emit WEBHOOK_UNKNOWN_SHAPE warn when payload has unexpected fields", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const { translateStory } = await import("@/lib/translate-story");
 
       vi.mocked(translateStory).mockResolvedValue({
@@ -185,12 +186,12 @@ describe("translate webhook", () => {
       const response = await POST(request);
       expect(response.status).toBe(200);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(loggerSpy).toHaveBeenCalledWith(
         "[WEBHOOK_UNKNOWN_SHAPE]",
         expect.objectContaining({ webhook: "translate" })
       );
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it("should emit WEBHOOK_UNKNOWN_SHAPE warn when storyId is not a string", async () => {

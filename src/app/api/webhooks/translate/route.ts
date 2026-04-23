@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 import { translateStory } from "@/lib/translate-story";
 import { translateWebhookSchema } from "@/lib/schemas";
 
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       secret.length !== expectedSecret.length ||
       !timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret))
     ) {
-      console.error("[translate-webhook] Unauthorized: invalid or missing secret");
+      logger.error("[TRANSLATE_WEBHOOK_UNAUTHORIZED]");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -45,7 +46,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const parsed = translateWebhookSchema.safeParse(rawBody);
 
     if (!parsed.success) {
-      console.error("[translate-webhook] Bad request: invalid payload", rawBody);
+      logger.error("[TRANSLATE_WEBHOOK_INVALID_PAYLOAD]", {
+        raw_body: rawBody,
+        field_errors: parsed.error.flatten().fieldErrors,
+      });
       return NextResponse.json(
         {
           error: "Bad request: invalid payload",
@@ -65,7 +69,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           ? [i.path.join(".")]
           : []
       );
-      console.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "translate", fields: unknownFields });
+      logger.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "translate", fields: unknownFields });
     }
 
     const { storyId, locales, forceRetranslate } = parsed.data;
@@ -77,9 +81,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     if (!result.success) {
-      console.error(
-        `[translate-webhook] Translation failed for story ${storyId}: ${result.error}`
-      );
+      logger.error("[TRANSLATE_WEBHOOK_TRANSLATION_FAILED]", {
+        story_id: storyId,
+        error: result.error,
+      });
     }
 
     return NextResponse.json(
@@ -93,7 +98,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: result.success ? 200 : 500 }
     );
   } catch (error) {
-    console.error("[translate-webhook] Error processing webhook:", error);
+    logger.error("[TRANSLATE_WEBHOOK_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

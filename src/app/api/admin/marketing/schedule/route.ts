@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { logger } from "@/lib/logger";
 import {
   rowToMarketingSchedule,
   type MarketingScheduleRow,
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("Error fetching marketing schedule:", error);
+      logger.error("[MARKETING_SCHEDULE_FETCH_FAILED]", { error });
       return NextResponse.json(
         { error: "Failed to fetch schedule" },
         { status: 500 }
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: schedules });
   } catch (error) {
-    console.error("Marketing schedule GET error:", error);
+    logger.error("[MARKETING_SCHEDULE_GET_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -149,7 +150,10 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-      console.error("Error creating marketing schedule:", error);
+      logger.error("[MARKETING_SCHEDULE_CREATE_FAILED]", {
+        platform: body.platform,
+        error,
+      });
       return NextResponse.json(
         { error: "Failed to create schedule" },
         { status: 500 }
@@ -160,7 +164,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: schedule }, { status: 201 });
   } catch (error) {
-    console.error("Marketing schedule POST error:", error);
+    logger.error("[MARKETING_SCHEDULE_POST_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -245,7 +249,7 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Error updating marketing schedule:", error);
+      logger.error("[MARKETING_SCHEDULE_UPDATE_FAILED]", { id, error });
       return NextResponse.json(
         { error: "Failed to update schedule" },
         { status: 500 }
@@ -256,7 +260,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ data: schedule });
   } catch (error) {
-    console.error("Marketing schedule PUT error:", error);
+    logger.error("[MARKETING_SCHEDULE_PUT_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -293,7 +297,7 @@ export async function DELETE(request: NextRequest) {
       .eq("id", id);
 
     if (error) {
-      console.error("Error deleting marketing schedule:", error);
+      logger.error("[MARKETING_SCHEDULE_DELETE_FAILED]", { id, error });
       return NextResponse.json(
         { error: "Failed to delete schedule" },
         { status: 500 }
@@ -302,7 +306,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Marketing schedule DELETE error:", error);
+    logger.error("[MARKETING_SCHEDULE_DELETE_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

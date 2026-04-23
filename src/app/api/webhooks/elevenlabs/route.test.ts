@@ -20,6 +20,7 @@ vi.mock("@/lib/twilio-sms", () => ({
 }));
 
 import { POST } from "./route";
+import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { sendSMS } from "@/lib/twilio-sms";
@@ -683,7 +684,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
 
   describe("Zod schema validation", () => {
     it("should emit WEBHOOK_UNKNOWN_SHAPE warn when payload has unexpected top-level fields", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       const request = createSignedRequest({
         conversation_id: "conv_456",
@@ -698,16 +699,16 @@ describe("POST /api/webhooks/elevenlabs", () => {
       const response = await POST(request);
       expect(response.status).toBe(200);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(loggerSpy).toHaveBeenCalledWith(
         "[WEBHOOK_UNKNOWN_SHAPE]",
         expect.objectContaining({ webhook: "elevenlabs" })
       );
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it("should emit WEBHOOK_UNKNOWN_SHAPE warn when analysis has unexpected nested fields", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       const request = createSignedRequest({
         conversation_id: "conv_456",
@@ -724,12 +725,12 @@ describe("POST /api/webhooks/elevenlabs", () => {
       const response = await POST(request);
       expect(response.status).toBe(200);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(loggerSpy).toHaveBeenCalledWith(
         "[WEBHOOK_UNKNOWN_SHAPE]",
         expect.objectContaining({ webhook: "elevenlabs" })
       );
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it("should handle data-nested analysis path in Zod schema validation", async () => {
