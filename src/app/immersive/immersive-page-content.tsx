@@ -4,10 +4,10 @@ import { useState, useEffect, useMemo, useRef, Suspense, useTransition, useCallb
 import dynamic from "next/dynamic";
 import { StoryViewer } from "@/components/immersive/story-viewer";
 import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
-import { useStories } from "@/hooks/use-stories";
+import { StoriesProvider, useStories } from "@/hooks/use-stories";
 import type { Story } from "@/types/immersive";
 import { useStoryFilters } from "@/hooks/use-story-filters";
-import { useFeatureFlags } from "@/hooks/use-feature-flags";
+import { FeatureFlagsProvider, useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useViewedStories } from "@/hooks/use-viewed-stories";
 import { fisherYatesShuffle } from "@/lib/shuffle";
 import { applySeasonalWeighting } from "@/lib/seasonal-weighting";
@@ -45,7 +45,21 @@ interface ImmersivePageContentProps {
 }
 
 export function ImmersivePageContent({ serverShuffleSeed, initialStories, initialFlags }: ImmersivePageContentProps) {
-  const { stories: allStories, isLoading } = useStories(initialStories);
+  return (
+    <StoriesProvider initialStories={initialStories}>
+      <FeatureFlagsProvider initialFlags={initialFlags}>
+        <ImmersivePageContentInner serverShuffleSeed={serverShuffleSeed} />
+      </FeatureFlagsProvider>
+    </StoriesProvider>
+  );
+}
+
+interface ImmersivePageContentInnerProps {
+  serverShuffleSeed: number | null;
+}
+
+function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentInnerProps) {
+  const { stories: allStories, isLoading } = useStories();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | undefined>();
@@ -61,7 +75,7 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories, initia
 
   // Pass server-fetched initialFlags so the hook is ready immediately on first
   // paint — no client fetch on mount, no flag-gated UI flash.
-  const { isEnabled, isReady: flagsReady } = useFeatureFlags(initialFlags);
+  const { isEnabled, isReady: flagsReady } = useFeatureFlags();
   const { t } = useTranslation();
   const { viewedIndices, markViewed } = useViewedStories();
   const searchParams = useSearchParams();

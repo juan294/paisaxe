@@ -137,6 +137,22 @@ describe("FavoritesPage", () => {
       });
     });
 
+    it("renders the anonymous empty state even while stories are still resolving", async () => {
+      mockUseStories.mockReturnValue({
+        stories: [],
+        isLoading: true,
+        error: null,
+        refresh: vi.fn(),
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.empty_title"))).toBeInTheDocument();
+      });
+      expect(screen.queryByText(mockT("common.loading"))).not.toBeInTheDocument();
+    });
+
     it("should show explore button in empty state", async () => {
       render(<FavoritesPage />);
 

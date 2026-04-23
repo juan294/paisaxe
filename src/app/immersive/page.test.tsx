@@ -57,6 +57,7 @@ Object.defineProperty(window, "matchMedia", {
 
 // Mock feature flags - all disabled by default
 vi.mock("@/hooks/use-feature-flags", () => ({
+  FeatureFlagsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useFeatureFlags: () => ({
     flags: [],
     isLoading: false,
