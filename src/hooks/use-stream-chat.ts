@@ -13,6 +13,7 @@ import {
   recordUpsellDismissed,
 } from "@/lib/chat-upsell-throttle";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { parseSseEvent } from "@/types/sse";
 
 interface StreamChatMessage {
   role: "user" | "assistant";
@@ -131,57 +132,60 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         let buffer = "";
 
         const processEvent = (line: string) => {
-          if (!line.startsWith("data: ")) return;
+          const event = parseSseEvent(line);
+          if (!event) {
+            return;
+          }
 
-          const jsonStr = line.slice(6);
-          try {
-            const event = JSON.parse(jsonStr);
+          if (event.type === "text") {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const current = updated[assistantIndex];
+              updated[assistantIndex] = {
+                ...current,
+                content: current.content + event.content,
+              };
+              return updated;
+            });
+          } else if (event.type === "done") {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const currentMsg = updated[assistantIndex];
+              const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
+                currentMsg.content
+              );
 
-            if (event.type === "text") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                const current = updated[assistantIndex];
-                updated[assistantIndex] = {
-                  ...current,
-                  content: current.content + event.content,
-                };
-                return updated;
-              });
-            } else if (event.type === "done") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                const currentMsg = updated[assistantIndex];
-                const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
-                  currentMsg.content
-                );
+              const shouldShowUpsell =
+                hasUpsell && !canUseVoice && canShowUpsell(assistantIndex);
 
-                const shouldShowUpsell =
-                  hasUpsell && !canUseVoice && canShowUpsell(assistantIndex);
+              if (shouldShowUpsell) {
+                recordUpsellShown();
+              }
 
-                if (shouldShowUpsell) {
-                  recordUpsellShown();
-                }
+              updated[assistantIndex] = {
+                ...currentMsg,
+                content: cleanContent,
+                images: event.images,
+                upsellReason: shouldShowUpsell ? reason ?? undefined : undefined,
+              };
+              return updated;
+            });
+          } else if (event.type === "error") {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const current = updated[assistantIndex];
 
-                updated[assistantIndex] = {
-                  ...currentMsg,
-                  content: cleanContent,
-                  images: event.images,
-                  upsellReason: shouldShowUpsell ? reason ?? undefined : undefined,
-                };
-                return updated;
-              });
-            } else if (event.type === "error") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[assistantIndex] = {
-                  role: "assistant",
-                  content: t("chat.error_generic"),
-                };
-                return updated;
-              });
-            }
-          } catch {
-            // Ignore parse errors
+              updated[assistantIndex] = {
+                role: "assistant",
+                // Replace partial text with the generic fallback when the server
+                // marks the streamed answer as incomplete.
+                content: event.hadPartialContent
+                  ? t("chat.error_generic")
+                  : t("chat.error_generic"),
+                images: current?.images,
+              };
+              return updated;
+            });
           }
         };
 

@@ -224,11 +224,53 @@ describe("useStreamChat", () => {
 
   it("should handle SSE error events", async () => {
     const encoder = new TextEncoder();
-    const errorEvent = `data: ${JSON.stringify({ type: "error", message: "Error" })}\n\n`;
+    const errorEvent = `data: ${JSON.stringify({ type: "error", message: "Error", hadPartialContent: false })}\n\n`;
     const stream = new ReadableStream({
       start(controller) {
         controller.enqueue(encoder.encode(errorEvent));
         controller.close();
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: stream,
+    });
+
+    const { result } = renderHook(() =>
+      useStreamChat({ canUseVoice: false })
+    );
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.messages[1].content).toBe(
+      "Lo siento, hubo un error. Intenta de nuevo."
+    );
+  });
+
+  it("should discard partial assistant text when SSE error reports partial content", async () => {
+    const encoder = new TextEncoder();
+    const events = [
+      `data: ${JSON.stringify({ type: "text", content: "Partial answer" })}\n\n`,
+      `data: ${JSON.stringify({ type: "error", message: "stream_failed", hadPartialContent: true })}\n\n`,
+    ];
+
+    let index = 0;
+    const stream = new ReadableStream({
+      pull(controller) {
+        if (index < events.length) {
+          controller.enqueue(encoder.encode(events[index]));
+          index++;
+        } else {
+          controller.close();
+        }
       },
     });
 

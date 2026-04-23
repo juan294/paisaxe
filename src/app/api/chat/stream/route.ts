@@ -13,6 +13,15 @@ import {
   MAX_INPUT_LENGTH,
 } from "@/lib/chat-safety";
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
+import { logger } from "@/lib/logger";
+import { encodeSseEvent } from "@/types/sse";
+
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
 
 /**
  * Streaming chat endpoint using Server-Sent Events (SSE)
@@ -80,14 +89,23 @@ export async function POST(request: NextRequest) {
 
     const cleanMessage = sanitizeInput(message!);
 
+    const streamAbortController = new AbortController();
+    const handleRequestAbort = () => {
+      streamAbortController.abort();
+    };
+
+    if (request.signal.aborted) {
+      handleRequestAbort();
+    } else {
+      request.signal.addEventListener("abort", handleRequestAbort, { once: true });
+    }
+
     // --- Heavy imports: deferred until after all validation passes ---
-    // WHY DYNAMIC: Turbopack corrupts the outbound HTTP stack for api.anthropic.com
-    // when these modules (embeddings, search, supabase, claude) are statically
-    // co-bundled in the same route chunk. Each module works fine on its own, but
-    // the combination breaks HTTPS to Anthropic in the Turbopack build. Dynamic
-    // imports isolate each module's loading context and avoid the corruption.
-    // Keeping them dynamic also means rate-limited / invalid requests never pay
-    // the cost of loading the AI stack.
+    // VERIFIED 2026-04-23 on Next.js 16.2.4: keep these imports deferred.
+    // They still avoid loading the AI stack for rejected requests, and the repo's
+    // Turbopack/Anthropic regression remains documented in
+    // docs/engineering/turbopack-fix.md. Do not convert back to static imports
+    // without re-running that reproduction with live upstream credentials.
     const { streamChatResponse, extractSourcesFromChunks } = await import(
       "@/lib/claude"
     );
@@ -102,13 +120,18 @@ export async function POST(request: NextRequest) {
       const queryEmbedding = await generateEmbedding(cleanMessage);
       ({ chunks, images } = await search(queryEmbedding, 3, cleanMessage));
     } catch (searchErr) {
-      console.error("[CHAT_STREAM] Embedding/search failed:", searchErr);
+      request.signal.removeEventListener("abort", handleRequestAbort);
+      logger.warn("[CHAT_STREAM_SEARCH_UNAVAILABLE]", { error: searchErr });
       const encoder = new TextEncoder();
       const errorStream = new ReadableStream({
         start(controller) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: "error", message: "search_unavailable" })}\n\n`
+              encodeSseEvent({
+                type: "error",
+                message: "search_unavailable",
+                hadPartialContent: false,
+              })
             )
           );
           controller.close();
@@ -135,6 +158,7 @@ export async function POST(request: NextRequest) {
 
     const stream = new ReadableStream({
       async start(controller) {
+        let hasEmittedText = false;
         try {
           // Stream text chunks
           for await (const chunk of streamChatResponse(
@@ -142,35 +166,60 @@ export async function POST(request: NextRequest) {
             chunks,
             asturianEnabled,
             messageIndex,
-            images
+            images,
+            { signal: streamAbortController.signal }
           )) {
+            if (streamAbortController.signal.aborted) {
+              break;
+            }
+
+            hasEmittedText = true;
             // Send text chunk as SSE event
-            const event = `data: ${JSON.stringify({ type: "text", content: chunk })}\n\n`;
-            controller.enqueue(encoder.encode(event));
+            controller.enqueue(encoder.encode(
+              encodeSseEvent({ type: "text", content: chunk })
+            ));
           }
 
           // Send final event with images and sources
-          const finalEvent = `data: ${JSON.stringify({
-            type: "done",
-            images,
-            sources,
-          })}\n\n`;
-          controller.enqueue(encoder.encode(finalEvent));
+          if (!streamAbortController.signal.aborted) {
+            controller.enqueue(encoder.encode(
+              encodeSseEvent({
+                type: "done",
+                images,
+                sources,
+              })
+            ));
+          }
 
-          controller.close();
         } catch (error) {
-          const err = error instanceof Error ? error : new Error(String(error));
-          console.error("[CHAT_STREAM_FAILURE]", {
-            error: err.message,
-            type: err.constructor?.name ?? "Error",
-          });
-          const errorEvent = `data: ${JSON.stringify({
-            type: "error",
-            message: "Error generating response",
-          })}\n\n`;
-          controller.enqueue(encoder.encode(errorEvent));
-          controller.close();
+          if (isAbortError(error) || streamAbortController.signal.aborted) {
+            logger.warn("[CHAT_STREAM_ABORTED]", { reason: "client_disconnect" });
+          } else {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.error("[CHAT_STREAM_FAILURE]", {
+              error: err.message,
+              type: err.constructor?.name ?? "Error",
+            });
+            controller.enqueue(encoder.encode(
+              encodeSseEvent({
+                type: "error",
+                message: "Error generating response",
+                hadPartialContent: hasEmittedText,
+              })
+            ));
+          }
+        } finally {
+          request.signal.removeEventListener("abort", handleRequestAbort);
+          try {
+            controller.close();
+          } catch {
+            // Ignore close races caused by upstream cancellation.
+          }
         }
+      },
+      cancel() {
+        streamAbortController.abort();
+        request.signal.removeEventListener("abort", handleRequestAbort);
       },
     });
 
@@ -183,7 +232,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Stream chat API error:", error);
+    logger.error("[CHAT_STREAM_API_ERROR]", { error });
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
       {
