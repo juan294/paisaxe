@@ -15,7 +15,16 @@ interface CachedProbeResult {
 
 const probeCache = new Map<string, CachedProbeResult>();
 
+function purgeExpiredProbes(now = Date.now()): void {
+  for (const [key, cached] of probeCache) {
+    if (cached.expiresAt <= now) {
+      probeCache.delete(key);
+    }
+  }
+}
+
 function getCachedProbe(key: string): ExternalServiceStatus | null {
+  purgeExpiredProbes();
   const cached = probeCache.get(key);
   if (cached && Date.now() < cached.expiresAt) {
     return cached.result;
@@ -24,12 +33,28 @@ function getCachedProbe(key: string): ExternalServiceStatus | null {
 }
 
 function setCachedProbe(key: string, result: ExternalServiceStatus): void {
-  probeCache.set(key, { result, expiresAt: Date.now() + PROBE_CACHE_TTL_MS });
+  const now = Date.now();
+  probeCache.set(key, { result, expiresAt: now + PROBE_CACHE_TTL_MS });
+  purgeExpiredProbes(now);
 }
 
 /** Exported for tests only — clears the in-memory probe cache. */
 export function _clearProbeCacheForTests(): void {
   probeCache.clear();
+}
+
+/** Exported for tests only — seeds the in-memory probe cache with a custom TTL. */
+export function _seedProbeCacheForTests(
+  key: string,
+  result: ExternalServiceStatus,
+  expiresAt: number
+): void {
+  probeCache.set(key, { result, expiresAt });
+}
+
+/** Exported for tests only — inspects the current in-memory probe cache size. */
+export function _getProbeCacheSizeForTests(): number {
+  return probeCache.size;
 }
 
 interface SupabaseServiceStatus {

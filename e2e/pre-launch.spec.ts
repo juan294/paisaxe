@@ -326,6 +326,9 @@ test.describe("Feature flag gating", () => {
 // ─── Language Switching ──────────────────────────────────────────
 
 test.describe("Language switching", () => {
+  const languageSwitcherSelector =
+    'div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]';
+
   test.beforeEach(async ({ page }) => {
     await page.route("**/api/feature-flags", (route) =>
       route.fulfill({
@@ -336,18 +339,18 @@ test.describe("Language switching", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.locator(languageSwitcherSelector).first()).toBeVisible();
   });
 
   test("language switcher visible in toolbar", async ({ page }) => {
     // The switcher is a div with role="group" and language-related aria-label
-    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     await expect(switcher).toBeVisible();
   });
 
   test("switching to ES changes UI text", async ({ page }) => {
     // Desktop Chrome defaults to English — switch to ES
-    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     await switcher.locator("button").first().click();
 
     // Click ES in the dropdown (aria-label is full name e.g. "Español (ES)")
@@ -368,7 +371,7 @@ test.describe("Language switching", () => {
 
   test("switching to EN shows English text", async ({ page }) => {
     // First switch to ES, then back to EN to verify round-trip
-    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
 
     // Switch to ES first (aria-label is full name e.g. "Español (ES)")
     await switcher.locator("button").first().click();
@@ -396,7 +399,7 @@ test.describe("Language switching", () => {
 
   test("language persists in localStorage", async ({ page }) => {
     // Switch to ES (different from default EN)
-    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     await switcher.locator("button").first().click();
     const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
@@ -433,7 +436,7 @@ test.describe("Language switching", () => {
     await expect(chatPanel).not.toBeVisible();
 
     // Switch to ES (aria-label is full name e.g. "Español (ES)")
-    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     await switcher.locator("button").first().click();
     const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();

@@ -125,7 +125,7 @@ describe("rerank", () => {
 
     it("should log token usage when available", async () => {
       const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-      const chunks = makeChunks(3);
+      const chunks = makeChunks(4);
       mockRerank.mockResolvedValue({
         data: [
           { index: 1, relevanceScore: 0.95 },
@@ -165,21 +165,15 @@ describe("rerank", () => {
       consoleSpy.mockRestore();
     });
 
-    it("should handle when chunks count is less than topK", async () => {
+    it("should return chunks unchanged and skip Voyage when chunks count is less than topK", async () => {
       const chunks = makeChunks(2);
-      mockRerank.mockResolvedValue({
-        data: [
-          { index: 1, relevanceScore: 0.9 },
-          { index: 0, relevanceScore: 0.8 },
-        ],
-      });
 
       const { rerankChunks } = await import("./rerank");
       const result = await rerankChunks("query", chunks, 5);
 
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe("chunk-1");
-      expect(result[1].id).toBe("chunk-0");
+      expect(result).toEqual(chunks);
+      expect(mockRerank).not.toHaveBeenCalled();
     });
   });
 });

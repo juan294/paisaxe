@@ -150,7 +150,8 @@ test.describe("Language switcher behavior", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
+    const switcher = page.locator(languageSwitcherSelector).first();
+    await expect(switcher).toBeVisible();
   });
 
   test("switcher opens dropdown and closes on selection", async ({ page }) => {
@@ -158,6 +159,7 @@ test.describe("Language switcher behavior", () => {
     const trigger = switcher.locator("button").first();
     const options = switcher.locator('[role="option"]');
 
+    await expect(trigger).toBeVisible();
     // Trigger should start collapsed
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
 
@@ -181,6 +183,7 @@ test.describe("Language switcher behavior", () => {
     const trigger = switcher.locator("button").first();
     const options = switcher.locator('[role="option"]');
 
+    await expect(trigger).toBeVisible();
     // Open dropdown
     await trigger.click();
     await expect(options.first()).toBeVisible();
@@ -390,7 +393,9 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     const initialTitle = await title.textContent();
 
     // Open the suggest place dialog
-    await page.locator("[data-suggest-place-trigger]").click();
+    const suggestButton = page.locator("[data-suggest-place-trigger]");
+    await expect(suggestButton).toBeVisible();
+    await suggestButton.click();
 
     const commentArea = page.locator("#comment");
     await expect(commentArea).toBeVisible();

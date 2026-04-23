@@ -9,6 +9,10 @@ on:
     # Run daily at 8:00 UTC (was weekly — CVE detection latency reduced from ~6 days to <24h)
     - cron: '0 8 * * *'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gitleaks:
     name: Gitleaks secret scan

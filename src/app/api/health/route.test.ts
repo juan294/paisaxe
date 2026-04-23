@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { GET, _clearProbeCacheForTests } from "./route";
+import {
+  GET,
+  _clearProbeCacheForTests,
+  _getProbeCacheSizeForTests,
+  _seedProbeCacheForTests,
+} from "./route";
 import packageJson from "../../../../package.json";
 
 // Mock the supabase client
@@ -636,6 +641,22 @@ describe("GET /api/health", () => {
     const data = await response.json();
 
     expect(typeof data.services.stripe.latency_ms).toBe("number");
+  });
+
+  it("purges expired probe cache entries on write", async () => {
+    mockSupabaseSuccess();
+    mockDatabaseSize(DB_SIZE_BYTES);
+
+    const nowSpy = vi.spyOn(Date, "now");
+    nowSpy.mockReturnValue(1_000);
+
+    _seedProbeCacheForTests("stale-probe", { status: "ok" }, 500);
+    expect(_getProbeCacheSizeForTests()).toBe(1);
+
+    await GET();
+
+    expect(_getProbeCacheSizeForTests()).toBe(4);
+    nowSpy.mockRestore();
   });
 
   // --- Coverage for checkSupabase() non-Error exception (line 51) ---

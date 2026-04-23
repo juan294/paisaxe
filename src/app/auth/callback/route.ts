@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -41,9 +42,17 @@ export async function GET(request: NextRequest) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+    if (error) {
+      const loginUrl = new URL("/login", origin);
+      loginUrl.searchParams.set("error", "session_exchange_failed");
+      logger.error("[AUTH_CALLBACK_FAILURE]", {
+        error: error.message,
+        code_present: true,
+      });
+      return NextResponse.redirect(loginUrl);
     }
+
+    return NextResponse.redirect(`${origin}${next}`);
   }
 
   // Return to homepage on error
