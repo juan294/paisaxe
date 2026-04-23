@@ -137,6 +137,9 @@ test.describe("Ambient toggle behavior", () => {
 // ─── Language Switcher Behavior ─────────────────────────────────
 
 test.describe("Language switcher behavior", () => {
+  const languageSwitcherSelector =
+    'div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]';
+
   test.beforeEach(async ({ page }) => {
     await page.route("**/api/feature-flags", (route) =>
       route.fulfill({
@@ -151,19 +154,19 @@ test.describe("Language switcher behavior", () => {
   });
 
   test("switcher opens dropdown and closes on selection", async ({ page }) => {
-    const switcher = page.locator('div[role="group"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     const trigger = switcher.locator("button").first();
+    const options = switcher.locator('[role="option"]');
 
     // Trigger should start collapsed
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
 
     // Open dropdown
     await trigger.click();
-    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await expect(options.first()).toBeVisible();
 
     // Options should be visible
-    const options = switcher.locator('[role="option"]');
-    await expect(options.first()).toBeVisible();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
 
     // Select a language
     await options.first().click();
@@ -174,11 +177,13 @@ test.describe("Language switcher behavior", () => {
   });
 
   test("switcher closes on Escape key", async ({ page }) => {
-    const switcher = page.locator('div[role="group"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     const trigger = switcher.locator("button").first();
+    const options = switcher.locator('[role="option"]');
 
     // Open dropdown
     await trigger.click();
+    await expect(options.first()).toBeVisible();
     await expect(trigger).toHaveAttribute("aria-expanded", "true");
 
     // Press Escape
