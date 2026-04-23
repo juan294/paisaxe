@@ -1,0 +1,104 @@
+name: Stripe E2E Integration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-stripe:
+    name: Real Stripe Checkout
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Check required secrets
+        id: secrets
+        env:
+          STRIPE_TEST_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+          STRIPE_TEST_DAY_PASS_PRICE_ID: ${{ secrets.STRIPE_TEST_DAY_PASS_PRICE_ID }}
+          NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY }}
+          STRIPE_TEST_WEBHOOK_SECRET: ${{ secrets.STRIPE_TEST_WEBHOOK_SECRET }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
+          QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
+        run: |
+          missing=0
+          for key in \
+            STRIPE_TEST_SECRET_KEY \
+            STRIPE_TEST_DAY_PASS_PRICE_ID \
+            NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY \
+            STRIPE_TEST_WEBHOOK_SECRET \
+            NEXT_PUBLIC_SUPABASE_URL \
+            NEXT_PUBLIC_SUPABASE_ANON_KEY \
+            SUPABASE_SERVICE_KEY \
+            QA_TEST_USER_EMAIL \
+            QA_TEST_USER_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -eq 1 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Skip when secrets are unavailable
+        if: steps.secrets.outputs.run != 'true'
+        run: echo "Skipping Stripe integration workflow because required secrets are not configured."
+
+      - name: Install canvas system dependencies
+        if: steps.secrets.outputs.run == 'true'
+        run: sudo apt-get update && sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+
+      - name: Install dependencies
+        if: steps.secrets.outputs.run == 'true'
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        if: steps.secrets.outputs.run == 'true'
+        run: npx playwright install chromium --with-deps
+
+      - name: Run real Stripe checkout integration
+        if: steps.secrets.outputs.run == 'true'
+        env:
+          ANTHROPIC_API_KEY: dummy_key_for_e2e
+          VOYAGE_API_KEY: dummy_key_for_e2e
+          MAINTENANCE_MODE: "false"
+          STRIPE_TEST_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+          STRIPE_TEST_DAY_PASS_PRICE_ID: ${{ secrets.STRIPE_TEST_DAY_PASS_PRICE_ID }}
+          NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY }}
+          STRIPE_TEST_WEBHOOK_SECRET: ${{ secrets.STRIPE_TEST_WEBHOOK_SECRET }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
+          QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
+        run: npm run test:e2e:stripe
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() && steps.secrets.outputs.run == 'true' }}
+        with:
+          name: playwright-report-stripe
+          path: playwright-report/
+          retention-days: 14
