@@ -58,21 +58,28 @@ jobs:
 
   vercel-env-safety:
     name: Vercel env safety
-    if: ${{ secrets.VERCEL_TOKEN != '' }}
     runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
     steps:
+      - name: Skip when Vercel token is unavailable
+        if: ${{ env.VERCEL_TOKEN == '' }}
+        run: echo "VERCEL_TOKEN is not configured; skipping Vercel env safety check."
+
       - name: Checkout code
+        if: ${{ env.VERCEL_TOKEN != '' }}
         uses: actions/checkout@v6
 
       - name: Load Vercel project metadata
+        if: ${{ env.VERCEL_TOKEN != '' }}
         run: |
           echo "VERCEL_PROJECT_ID=$(jq -r '.projectId' .vercel/project.json)" >> "$GITHUB_ENV"
           echo "VERCEL_ORG_ID=$(jq -r '.orgId' .vercel/project.json)" >> "$GITHUB_ENV"
 
       - name: Assert legacy agent override is absent from Vercel env
+        if: ${{ env.VERCEL_TOKEN != '' }}
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           legacy_key="$(printf '%s_%s_%s\n' ALLOW AGENT RUN)"
           response="$(curl -fsS \
