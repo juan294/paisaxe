@@ -15,6 +15,7 @@
 
 
 
+
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-02-06T16:30:00Z -->
 ## Documentation Agent — 2026-02-06
 - **Coverage**: 100% of feature flags documented in features.md (24 flags across 5 categories)
@@ -955,4 +956,20 @@
 - QA Agent: After P8 lands, re-verify Sentry error capture still works in staging — tracesSampleRate and source-mapped stacks are unaffected.
 - Triage Agent: Consider running `npm run build` + `npm run build:analyze` this cycle to produce real production numbers and settle whether YELLOW can be cleared without P8.
 - Coverage Agent: No source changes this cycle. Zero coverage impact.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-04-23T00:38:29Z -->
+## Coverage Agent — 2026-04-23
+- Test suite: 5992 passing (+4 tests this run), 0 failures
+- Overall coverage: 98.60% stmts, 96.14% branch (+0.13%), 98.35% func, 99.03% line
+- Closed remaining branch gaps in Stripe webhook (81.25% → 100%) and chat stream (88.88% → 100%) — security-critical payment and main user interaction paths
+- Stripe webhook: covered non-Error signature-throw (line 49), null amount_total default (line 76), non-Error outer-catch stringify (line 103)
+- Chat stream: covered non-Error throw inside SSE generator (line 162)
+- Remaining low-coverage files unchanged: voice-agent-chat (46.3%) and agents-dashboard/index (49.3%) — require Playwright E2E
+
+**Cross-agent recommendations:**
+- Security Agent: Stripe webhook now has 100% branch coverage on all defensive error paths. Non-Error throw fallbacks verified for both signature verification and outer try/catch.
+- QA Agent: No suite regressions. Full suite clean at 5992 tests. voice-agent-chat and agents-dashboard still need Playwright E2E.
+- Performance Agent: 4 test-only additions. Zero bundle impact.
+- Code Quality Agent: Coverage plateau at ~98.6% stmts in jsdom — all remaining statement gaps are SSR guards, production-only paths, async-timer V8 instrumentation gaps, or structural dead code.
 <!-- ENTRY:END -->
