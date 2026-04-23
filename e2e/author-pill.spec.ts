@@ -11,8 +11,9 @@ test.describe("Author pill", () => {
       })
     );
     await page.goto("/immersive", { waitUntil: "domcontentloaded" });
-    // Wait for the story to render
-    await expect(page.getByTestId("story-title").first()).toBeVisible({
+    // Wait for story content to hydrate; the title node can exist before it
+    // becomes visible during the immersive intro transition.
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/, {
       timeout: 15_000,
     });
   });
