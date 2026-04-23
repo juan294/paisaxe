@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { createAdminClient } from "@/lib/supabase";
+import { logger } from "@/lib/logger";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { makeBookingRequestSchema } from "@/lib/schemas";
 
@@ -218,7 +219,10 @@ async function initiateCall(
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("[make-booking] ElevenLabs error:", data);
+      logger.error("[MAKE_BOOKING_ELEVENLABS_REQUEST_FAILED]", {
+        response_status: response.status,
+        error_body: data,
+      });
       return {
         success: false,
         error: data.detail?.message || data.message || `ElevenLabs API error: ${response.status}`,
@@ -231,7 +235,7 @@ async function initiateCall(
       conversationId: data.conversation_id,
     };
   } catch (error) {
-    console.error("[make-booking] Failed to initiate call:", error);
+    logger.error("[MAKE_BOOKING_CALL_INITIATION_FAILED]", { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -359,13 +363,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         .select("id");
 
       if (insertError) {
-        console.error("[make-booking] Failed to pre-insert pending booking:", insertError);
+        logger.error("[MAKE_BOOKING_PENDING_INSERT_FAILED]", { error: insertError });
         // Don't fail the request — proceed with the call anyway
       } else if (insertedRows && insertedRows.length > 0) {
         pendingRowId = (insertedRows[0] as { id: string }).id ?? null;
       }
     } catch (dbError) {
-      console.error("[make-booking] Database error pre-inserting pending booking:", dbError);
+      logger.error("[MAKE_BOOKING_PENDING_INSERT_DB_ERROR]", { error: dbError });
       // Don't fail the request — proceed with the call anyway
     }
 
@@ -395,11 +399,19 @@ export async function POST(request: Request): Promise<NextResponse> {
             : await updateQuery.eq("venue_phone", normalizedPhone);
 
           if (updateError) {
-            console.error("[make-booking] Failed to update pending booking with call ID:", updateError);
+            logger.error("[MAKE_BOOKING_PENDING_UPDATE_FAILED]", {
+              pending_booking_id: pendingRowId,
+              conversation_id: conversationId,
+              error: updateError,
+            });
             // Don't fail the request — call was already initiated
           }
         } catch (dbError) {
-          console.error("[make-booking] Database error updating pending booking:", dbError);
+          logger.error("[MAKE_BOOKING_PENDING_UPDATE_DB_ERROR]", {
+            pending_booking_id: pendingRowId,
+            conversation_id: conversationId,
+            error: dbError,
+          });
           // Don't fail the request — call was already initiated
         }
       }
@@ -429,7 +441,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
   } catch (err) {
-    console.error("[make-booking] Error:", err);
+    logger.error("[MAKE_BOOKING_UNHANDLED_ERROR]", { error: err });
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json<MakeBookingResponse>(
       {

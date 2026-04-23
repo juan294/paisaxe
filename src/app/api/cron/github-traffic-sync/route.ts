@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 
@@ -137,7 +138,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
         .upsert(dailyRows, { onConflict: "date" });
 
       if (dailyError) {
-        console.error("Failed to upsert daily traffic:", dailyError);
+        logger.error("[GITHUB_TRAFFIC_SYNC_DAILY_UPSERT_FAILED]", { error: dailyError });
       } else {
         dailyCount = dailyRows.length;
       }
@@ -158,7 +159,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
         .insert(referrerRows);
 
       if (refError) {
-        console.error("Failed to insert referrers:", refError);
+        logger.error("[GITHUB_TRAFFIC_SYNC_REFERRERS_INSERT_FAILED]", { error: refError });
       } else {
         referrerCount = referrerRows.length;
       }
@@ -180,7 +181,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
         .insert(pathRows);
 
       if (pathError) {
-        console.error("Failed to insert paths:", pathError);
+        logger.error("[GITHUB_TRAFFIC_SYNC_PATHS_INSERT_FAILED]", { error: pathError });
       } else {
         pathCount = pathRows.length;
       }
@@ -199,7 +200,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
       paths: pathCount,
     });
   } catch (error) {
-    console.error("GitHub traffic sync error:", error);
+    logger.error("[GITHUB_TRAFFIC_SYNC_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Sync failed", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

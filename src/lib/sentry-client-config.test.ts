@@ -26,10 +26,13 @@ describe("sentry.client.config", () => {
     await import("../../sentry.client.config");
 
     expect(initSpy).toHaveBeenCalledTimes(1);
-    expect(initSpy).toHaveBeenCalledWith({
-      dsn: "https://examplePublicKey@o0.ingest.sentry.io/0",
-      tracesSampleRate: 0.1,
-    });
+    expect(initSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dsn: "https://examplePublicKey@o0.ingest.sentry.io/0",
+        tracesSampleRate: 0.1,
+        beforeSend: expect.any(Function),
+      })
+    );
   });
 
   it("does not initialize Sentry when the DSN is missing", async () => {

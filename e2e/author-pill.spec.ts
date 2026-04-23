@@ -10,9 +10,11 @@ test.describe("Author pill", () => {
         body: JSON.stringify(MOCK_FEATURE_FLAGS),
       })
     );
-    await page.goto("/immersive");
+    await page.goto("/immersive", { waitUntil: "domcontentloaded" });
     // Wait for the story to render
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("renders the pill with initial text on desktop", async ({

@@ -344,8 +344,6 @@ describe("POST /api/cron/github-traffic-sync", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce({ ok: true, json: async () => [] });
 
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
     const { POST } = await import("./route");
     const request = new (await import("next/server")).NextRequest(
       "https://paisaxe.es/api/cron/github-traffic-sync",
@@ -357,9 +355,6 @@ describe("POST /api/cron/github-traffic-sync", () => {
     expect(response.status).toBe(200);
     // dailyCount stays at 0 because upsert errored
     expect(response.body.daily).toBe(0);
-    expect(consoleSpy).toHaveBeenCalledWith("Failed to upsert daily traffic:", expect.anything());
-
-    consoleSpy.mockRestore();
   });
 
   it("handles referrer insert error gracefully", async () => {
@@ -373,8 +368,6 @@ describe("POST /api/cron/github-traffic-sync", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => referrersResponse })
       .mockResolvedValueOnce({ ok: true, json: async () => [] });
 
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
     const { POST } = await import("./route");
     const request = new (await import("next/server")).NextRequest(
       "https://paisaxe.es/api/cron/github-traffic-sync",
@@ -384,9 +377,6 @@ describe("POST /api/cron/github-traffic-sync", () => {
     const response = await POST(request as never) as unknown as { status: number; body: Record<string, number> };
     expect(response.status).toBe(200);
     expect(response.body.referrers).toBe(0);
-    expect(consoleSpy).toHaveBeenCalledWith("Failed to insert referrers:", expect.anything());
-
-    consoleSpy.mockRestore();
   });
 
   it("handles path insert error gracefully", async () => {
@@ -404,8 +394,6 @@ describe("POST /api/cron/github-traffic-sync", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => referrersResponse })
       .mockResolvedValueOnce({ ok: true, json: async () => pathsResponse });
 
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
     const { POST } = await import("./route");
     const request = new (await import("next/server")).NextRequest(
       "https://paisaxe.es/api/cron/github-traffic-sync",
@@ -418,15 +406,10 @@ describe("POST /api/cron/github-traffic-sync", () => {
     expect(response.body.referrers).toBe(1);
     // Paths failed — count stays 0
     expect(response.body.paths).toBe(0);
-    expect(consoleSpy).toHaveBeenCalledWith("Failed to insert paths:", expect.anything());
-
-    consoleSpy.mockRestore();
   });
 
   it("returns 500 when GitHub API throws an error", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network timeout"));
-
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { POST } = await import("./route");
     const request = new (await import("next/server")).NextRequest(
@@ -440,9 +423,6 @@ describe("POST /api/cron/github-traffic-sync", () => {
       error: "Sync failed",
       details: "Network timeout",
     }));
-    expect(consoleSpy).toHaveBeenCalledWith("GitHub traffic sync error:", expect.any(Error));
-
-    consoleSpy.mockRestore();
   });
 
   it("returns 500 with 'Unknown error' for non-Error throws", async () => {

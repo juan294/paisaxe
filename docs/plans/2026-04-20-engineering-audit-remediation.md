@@ -15,7 +15,7 @@ The audit identified one Critical Ship Blocker (non-atomic Stripe dedup → voic
 
 - [x] P1 — Implemented and verified on 2026-04-22 in worktree `fix/stripe-webhook-atomicity`; `typecheck`, `lint`, targeted Stripe tests, full Vitest suite, and `npm run test:e2e` all passed. Local Supabase verification passed after freeing Docker port `54322`, running `supabase db reset`, and confirming `grant_day_pass_idempotent` exists as a `SECURITY DEFINER` function.
 - [x] P2 — Implemented and verified on 2026-04-22 in worktree `fix/agent-runner-boundary`; the agent runner is now local-only via `VERCEL_ENV === undefined`, the legacy override is removed from live code paths, the route has regression coverage for the new gate and stale-entry cleanup, and CI now checks Vercel env config for the removed override. `typecheck`, `lint`, full Vitest, `build`, and `npm run test:e2e` all passed.
-- [ ] P3
+- [x] P3 — Implemented and verified on 2026-04-22 in worktree `fix/logging-sentry-hardening`; shared log redaction now covers the logger, console shim, and Sentry `beforeSend`, the planned high-PII API routes use structured logger calls, and the API-route lint guard now blocks new `console.*` usage outside a temporary legacy allowlist. `typecheck`, `lint`, full Vitest, `build`, and `npm run test:e2e` all passed after updating stale logger/Sentry expectations and hardening the affected E2E specs. `next build` still emits a non-fatal Next.js warning about `process.stdout` in the logger's dev/test branch when analyzing edge imports, but the production build and Playwright smoke paths are green.
 - [ ] P4
 - [ ] P5
 - [ ] P6
