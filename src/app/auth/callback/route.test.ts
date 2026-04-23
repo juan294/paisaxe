@@ -36,6 +36,14 @@ vi.mock("next/headers", () => ({
   })),
 }));
 
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    error: vi.fn(),
+  },
+}));
+
+import { logger } from "@/lib/logger";
+
 describe("Auth Callback Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -115,7 +123,7 @@ describe("Auth Callback Route", () => {
       expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
     });
 
-    it("should redirect to /immersive on code exchange error", async () => {
+    it("should redirect to /login with an explicit error on code exchange failure", async () => {
       mockExchangeCodeForSession.mockResolvedValue({
         error: { message: "Invalid code" },
       });
@@ -124,7 +132,16 @@ describe("Auth Callback Route", () => {
       const response = await GET(request);
 
       expect(response.status).toBe(307);
-      expect(response.headers.get("location")).toContain("/immersive");
+      expect(response.headers.get("location")).toBe(
+        "http://localhost:3000/login?error=session_exchange_failed"
+      );
+      expect(logger.error).toHaveBeenCalledWith(
+        "[AUTH_CALLBACK_FAILURE]",
+        expect.objectContaining({
+          error: "Invalid code",
+          code_present: true,
+        })
+      );
     });
 
     it("should redirect to /immersive (not /immersive prefixed path) when no code and no next param", async () => {

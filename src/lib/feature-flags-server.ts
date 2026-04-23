@@ -52,6 +52,8 @@ export async function getAllFeatureFlagsServer(): Promise<
 /**
  * Server-side function to check if a feature flag is enabled.
  * Uses Supabase REST API with Next.js cache revalidation.
+ * Production reads are cached for 60s via `next.revalidate`; development
+ * intentionally uses `cache: "no-store"` so flag flips are immediate locally.
  * Falls back to false if the flag doesn't exist or there's an error.
  * Errors are logged with [FEATURE_FLAG_FAILURE] so Supabase outages are observable.
  */

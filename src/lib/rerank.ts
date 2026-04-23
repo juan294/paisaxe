@@ -20,8 +20,8 @@ export async function rerankChunks(
   chunks: Chunk[],
   topK: number = DEFAULT_TOP_K
 ): Promise<Chunk[]> {
-  if (chunks.length === 0) {
-    return [];
+  if (chunks.length <= topK) {
+    return chunks;
   }
 
   try {

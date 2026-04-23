@@ -110,11 +110,8 @@ test.describe("Author pill", () => {
     const pill = page.locator('[aria-label="Made by Juan González"]').first();
     await pill.click();
 
-    // Wait for any potential transition
-    await page.waitForTimeout(600);
-
-    // Info should still be visible
-    await expect(bottomPanel).toHaveCSS("opacity", "1");
+    // Info should remain visible after the click settles.
+    await expect.poll(async () => bottomPanel.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
   });
 
   test("pill has blinking cursor", async ({ page, isMobile }) => {
