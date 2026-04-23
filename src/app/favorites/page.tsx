@@ -22,8 +22,11 @@ export default function FavoritesPage() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
 
+  const canWaitForStories = !!user || favorites.length > 0;
+  const stories = canWaitForStories ? allStories : [];
+
   // Filter to only favorited stories
-  const favoriteStories = allStories.filter((story) =>
+  const favoriteStories = stories.filter((story) =>
     favorites.includes(story.id)
   );
 
@@ -76,7 +79,7 @@ export default function FavoritesPage() {
     }
   }, [favoriteStories.length, displayCount]);
 
-  if (isLoading || favoritesLoading) {
+  if (favoritesLoading || (canWaitForStories && isLoading)) {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center">
         <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />

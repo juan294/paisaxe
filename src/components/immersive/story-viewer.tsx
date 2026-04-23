@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
-import { Play, Pause, Share2, Shuffle, Lightbulb } from "lucide-react";
+import { Play, Pause, Share2, Shuffle } from "lucide-react";
 import { BookmarkButton } from "./bookmark-button";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import { SiteInfoMenu } from "./site-info-menu";
@@ -452,14 +452,7 @@ export function StoryViewer({
             />
           )}
           {isEnabled("user_story_suggestions") && (
-            <ToolbarOverflowItem
-              icon={<Lightbulb className="h-4 w-4" />}
-              label={t("suggestions.suggest_short")}
-              onClick={() => {
-                // Trigger suggest place dialog - need to use a global event or ref
-                document.querySelector<HTMLButtonElement>('[data-suggest-place-trigger]')?.click();
-              }}
-            />
+            <SuggestPlaceButton variant="menu" />
           )}
         </ToolbarOverflowMenu>
 

@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { FALLBACK_STORIES, getStoriesFromDB } from "@/lib/stories-data";
 import type { Story } from "@/types/immersive";
 
@@ -30,6 +39,15 @@ const cache: StoriesCache = {
   timestamp: 0,
   promise: null,
 };
+
+interface UseStoriesResult {
+  stories: Story[];
+  isLoading: boolean;
+  error: Error | null;
+  refresh: () => Promise<void>;
+}
+
+const StoriesContext = createContext<UseStoriesResult | null>(null);
 
 /**
  * Try to load stories from localStorage
@@ -113,7 +131,10 @@ function initializeCache(): void {
  * - Deduplicates concurrent requests
  * - Persists to localStorage for next visit
  */
-export function useStories(initialStories?: Story[]) {
+function useStoriesState(
+  initialStories?: Story[],
+  enabled: boolean = true
+): UseStoriesResult {
   // Initialize cache from storage on first render
   const initialized = useRef(false);
   if (!initialized.current) {
@@ -174,6 +195,10 @@ export function useStories(initialStories?: Story[]) {
 
   // Initial load
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let mounted = true;
 
     async function load() {
@@ -214,10 +239,14 @@ export function useStories(initialStories?: Story[]) {
     return () => {
       mounted = false;
     };
-  }, [fetchStories]);
+  }, [enabled, fetchStories]);
 
   // Revalidate on window focus (like SWR)
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     function handleFocus() {
       const isStale = Date.now() - cache.timestamp > CACHE_TTL;
       if (isStale && cache.data) {
@@ -227,7 +256,7 @@ export function useStories(initialStories?: Story[]) {
 
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [fetchStories]);
+  }, [enabled, fetchStories]);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -247,6 +276,23 @@ export function useStories(initialStories?: Story[]) {
     error,
     refresh,
   };
+}
+
+interface StoriesProviderProps {
+  children: ReactNode;
+  initialStories?: Story[];
+}
+
+export function StoriesProvider({ children, initialStories }: StoriesProviderProps) {
+  const value = useStoriesState(initialStories);
+
+  return createElement(StoriesContext.Provider, { value }, children);
+}
+
+export function useStories(initialStories?: Story[]) {
+  const context = useContext(StoriesContext);
+  const fallback = useStoriesState(initialStories, !context);
+  return context ?? fallback;
 }
 
 /**
