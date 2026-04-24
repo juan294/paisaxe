@@ -28,7 +28,20 @@ function waitForServer(url: string, timeoutMs: number): Promise<void> {
     const check = () => {
       const req = httpRequest(url, (res) => {
         res.resume();
-        resolve();
+        const code = res.statusCode ?? 0;
+        if (code >= 200 && code < 400) {
+          resolve();
+          return;
+        }
+        if (Date.now() - start > timeoutMs) {
+          reject(
+            new Error(
+              `Server at ${url} returned HTTP ${code} after ${timeoutMs}ms`,
+            ),
+          );
+          return;
+        }
+        setTimeout(check, 1000);
       });
 
       req.on("error", () => {

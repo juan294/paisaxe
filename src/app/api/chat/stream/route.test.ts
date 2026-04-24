@@ -408,9 +408,8 @@ describe("POST /api/chat/stream", () => {
     );
     const errorEvent = events.find(
       (e) => (e as { type: string }).type === "error"
-    ) as { message: string; hadPartialContent: boolean } | undefined;
+    ) as { message: string } | undefined;
     expect(errorEvent?.message).toBe("Error generating response");
-    expect(errorEvent?.hadPartialContent).toBe(true);
   });
 
   it("should return SSE error event when embedding fails before streaming", async () => {

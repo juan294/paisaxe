@@ -22,23 +22,23 @@ describe("types/sse", () => {
     expect(parseSseEvent(`data: ${JSON.stringify(event)}`)).toEqual(event);
   });
 
-  it("parses error events with partial-content metadata", () => {
+  it("parses error events", () => {
     const event = {
       type: "error",
       message: "stream_failed",
-      hadPartialContent: true,
     } as const;
 
     expect(parseSseEvent(`data: ${JSON.stringify(event)}`)).toEqual(event);
   });
 
-  it("defaults missing hadPartialContent to false for backward compatibility", () => {
+  it("ignores unknown fields on error events", () => {
     expect(
-      parseSseEvent(`data: ${JSON.stringify({ type: "error", message: "legacy" })}`)
+      parseSseEvent(
+        `data: ${JSON.stringify({ type: "error", message: "legacy", extra: 1 })}`
+      )
     ).toEqual({
       type: "error",
       message: "legacy",
-      hadPartialContent: false,
     });
   });
 

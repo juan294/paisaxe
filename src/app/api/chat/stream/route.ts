@@ -138,7 +138,6 @@ export async function POST(request: NextRequest) {
               encodeSseEvent({
                 type: "error",
                 message: "search_unavailable",
-                hadPartialContent: false,
               })
             )
           );
@@ -162,7 +161,6 @@ export async function POST(request: NextRequest) {
 
     const stream = new ReadableStream({
       async start(controller) {
-        let hasEmittedText = false;
         try {
           // Stream text chunks
           for await (const chunk of streamChatResponse(
@@ -177,7 +175,6 @@ export async function POST(request: NextRequest) {
               break;
             }
 
-            hasEmittedText = true;
             // Send text chunk as SSE event
             controller.enqueue(encoder.encode(
               encodeSseEvent({ type: "text", content: chunk })
@@ -209,7 +206,6 @@ export async function POST(request: NextRequest) {
               encodeSseEvent({
                 type: "error",
                 message: "Error generating response",
-                hadPartialContent: hasEmittedText,
               })
             ));
           }

@@ -24,14 +24,8 @@ describe("fail stale translations cron", () => {
     vi.stubEnv("WEBHOOK_SECRET", "webhook-secret");
 
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") {
-        return Promise.resolve({ data: true, error: null });
-      }
-      if (fn === "fail_stale_story_translations") {
+      if (fn === "fail_stale_story_translations_locked") {
         return Promise.resolve({ data: 2, error: null });
-      }
-      if (fn === "pg_advisory_unlock") {
-        return Promise.resolve({ data: true, error: null });
       }
       return Promise.resolve({ data: null, error: null });
     });
@@ -72,9 +66,10 @@ describe("fail stale translations cron", () => {
     expect(response.status).toBe(200);
     expect(json.status).toBe("ok");
     expect(json.failed_count).toBe(2);
-    expect(mockRpc).toHaveBeenCalledWith("fail_stale_story_translations", {
-      p_cutoff: "2026-04-23T11:30:00.000Z",
-    });
+    expect(mockRpc).toHaveBeenCalledWith(
+      "fail_stale_story_translations_locked",
+      { p_cutoff: "2026-04-23T11:30:00.000Z" }
+    );
   });
 
   it("allows webhook-secret POST requests without admin auth", async () => {
@@ -104,10 +99,10 @@ describe("fail stale translations cron", () => {
 
   it("returns 409 when the advisory lock is already held", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") {
-        return Promise.resolve({ data: false, error: null });
+      if (fn === "fail_stale_story_translations_locked") {
+        return Promise.resolve({ data: -1, error: null });
       }
-      return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
     });
 
     const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
@@ -125,17 +120,11 @@ describe("fail stale translations cron", () => {
 
   it("returns 500 when the stale-translation RPC fails", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") {
-        return Promise.resolve({ data: true, error: null });
-      }
-      if (fn === "fail_stale_story_translations") {
+      if (fn === "fail_stale_story_translations_locked") {
         return Promise.resolve({
           data: null,
           error: { message: "rpc failed" },
         });
-      }
-      if (fn === "pg_advisory_unlock") {
-        return Promise.resolve({ data: true, error: null });
       }
       return Promise.resolve({ data: null, error: null });
     });
@@ -153,7 +142,7 @@ describe("fail stale translations cron", () => {
     expect(json.error).toBe("Failed to fail stale translations");
   });
 
-  it("always releases the advisory lock", async () => {
+  it("performs the work in a single RPC call (no separate lock/unlock round-trips)", async () => {
     const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
       headers: {
         authorization: "Bearer cron-secret",
@@ -162,8 +151,14 @@ describe("fail stale translations cron", () => {
 
     await GET(request);
 
-    expect(mockRpc).toHaveBeenCalledWith("pg_advisory_unlock", {
-      lockid: 1006,
-    });
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).not.toHaveBeenCalledWith(
+      "pg_try_advisory_lock",
+      expect.anything()
+    );
+    expect(mockRpc).not.toHaveBeenCalledWith(
+      "pg_advisory_unlock",
+      expect.anything()
+    );
   });
 });

@@ -61,8 +61,8 @@ const nextConfig: NextConfig = {
         { key: "X-Frame-Options", value: "DENY" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" },
-        // CSP is set dynamically per-request in proxy.ts with a nonce.
-        // See buildCspHeader() in src/proxy.ts.
+        // CSP is set per-request by proxy.ts. See src/lib/proxy/csp.ts
+        // for the `unsafe-inline` rationale (PPR compatibility).
       ],
     },
     {
