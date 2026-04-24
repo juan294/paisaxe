@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { PATCH } from "./route";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger,
+}));
+
 // Mock dependencies
 vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(),
@@ -231,6 +239,11 @@ describe("PATCH /api/admin/stories/[id]", () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
+    expect(logger.error).toHaveBeenCalledWith("[ADMIN_STORY_SLUG_CHECK_FAILED]", {
+      story_id: "story-1",
+      slug: "some-slug",
+      error: { code: "UNEXPECTED_ERROR", message: "Something went wrong" },
+    });
     expect(data.error).toBe("Failed to validate slug");
   });
 
@@ -276,6 +289,9 @@ describe("PATCH /api/admin/stories/[id]", () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
+    expect(logger.error).toHaveBeenCalledWith("[ADMIN_STORY_UPDATE_UNHANDLED_ERROR]", {
+      error: expect.any(Error),
+    });
     expect(data.error).toBe("Internal server error");
   });
 
@@ -356,6 +372,10 @@ describe("PATCH /api/admin/stories/[id]", () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
+    expect(logger.error).toHaveBeenCalledWith("[ADMIN_STORY_UPDATE_FAILED]", {
+      story_id: "story-1",
+      error: { message: "Update failed" },
+    });
     expect(data.error).toBe("Failed to update story");
   });
 });
