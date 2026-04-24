@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { createAdminClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
-import { validateMcpSecret } from "@/lib/mcp-auth";
+import { getMcpIdempotencyKey, validateMcpSecret } from "@/lib/mcp-auth";
 import { makeBookingRequestSchema } from "@/lib/schemas";
 
 /**
@@ -44,9 +44,20 @@ interface MakeBookingResponse {
   success: boolean;
   message: string;
   call_sid?: string;
-  status?: "initiated" | "queued" | "failed" | "not_configured";
+  status?: "initiated" | "queued" | "failed" | "not_configured" | "duplicate";
   estimated_wait?: string;
   fallback_action?: string;
+}
+
+function buildClaimPersistenceFailureResponse(): NextResponse<MakeBookingResponse> {
+  return NextResponse.json<MakeBookingResponse>(
+    {
+      success: false,
+      message: "Could not persist booking request before placing the call.",
+      status: "failed",
+    },
+    { status: 500 }
+  );
 }
 
 // Validate Spanish phone number format
@@ -340,16 +351,30 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Normalize phone number for calling
     const normalizedPhone = normalizePhoneNumber(phone_number);
     const normalizedCustomerPhone = normalizePhoneNumber(customer_phone);
+    const idempotencyKey = getMcpIdempotencyKey(request);
 
-    // BE-B6: Insert pending_bookings row with status='initiating' BEFORE placing the call.
-    // This ensures the webhook handler can always find the booking row, even if the
-    // post_call_transcription webhook fires before we finish inserting after the call.
+    if (!idempotencyKey) {
+      return NextResponse.json<MakeBookingResponse>(
+        {
+          success: false,
+          message: "Idempotency key is required for booking requests.",
+          status: "failed",
+          fallback_action:
+            "Retry the booking request with the same Idempotency-Key header to avoid duplicate calls.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Claim the booking request before the outbound call so retries cannot place duplicates.
     let pendingRowId: string | null = null;
     try {
       const supabase = createAdminClient();
       const { data: insertedRows, error: insertError } = await supabase
         .from("pending_bookings")
         .insert({
+          idempotency_key: idempotencyKey,
+          conversation_id: null,
           venue_name,
           venue_phone: normalizedPhone,
           customer_name,
@@ -363,14 +388,44 @@ export async function POST(request: Request): Promise<NextResponse> {
         .select("id");
 
       if (insertError) {
-        logger.error("[MAKE_BOOKING_PENDING_INSERT_FAILED]", { error: insertError });
-        // Don't fail the request — proceed with the call anyway
-      } else if (insertedRows && insertedRows.length > 0) {
-        pendingRowId = (insertedRows[0] as { id: string }).id ?? null;
+        if ((insertError as { code?: string }).code === "23505") {
+          logger.error("[MAKE_BOOKING_IDEMPOTENCY_CONFLICT]", {
+            idempotency_key: idempotencyKey,
+            error: insertError,
+          });
+          return NextResponse.json<MakeBookingResponse>(
+            {
+              success: false,
+              message:
+                "A booking request with this Idempotency Key is already being processed.",
+              status: "duplicate",
+            },
+            { status: 409 }
+          );
+        }
+
+        logger.error("[MAKE_BOOKING_PENDING_INSERT_FAILED]", {
+          idempotency_key: idempotencyKey,
+          error: insertError,
+        });
+        return buildClaimPersistenceFailureResponse();
+      }
+
+      pendingRowId = (insertedRows?.[0] as { id?: string } | undefined)?.id ?? null;
+
+      if (!pendingRowId) {
+        logger.error("[MAKE_BOOKING_PENDING_INSERT_MISSING_ID]", {
+          idempotency_key: idempotencyKey,
+          inserted_rows: insertedRows,
+        });
+        return buildClaimPersistenceFailureResponse();
       }
     } catch (dbError) {
-      logger.error("[MAKE_BOOKING_PENDING_INSERT_DB_ERROR]", { error: dbError });
-      // Don't fail the request — proceed with the call anyway
+      logger.error("[MAKE_BOOKING_PENDING_INSERT_DB_ERROR]", {
+        idempotency_key: idempotencyKey,
+        error: dbError,
+      });
+      return buildClaimPersistenceFailureResponse();
     }
 
     // Initiate the call via ElevenLabs
@@ -384,23 +439,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (conversationId) {
         try {
           const supabase = createAdminClient();
-          const updateData: Record<string, unknown> = {
+          const { error: updateError } = await supabase
+            .from("pending_bookings")
+            .update({
             conversation_id: conversationId,
             status: "pending",
-          };
-
-          // Update by id if we have it, otherwise update by initiating status + booking details
-          const updateQuery = supabase
-            .from("pending_bookings")
-            .update(updateData);
-
-          const { error: updateError } = pendingRowId
-            ? await updateQuery.eq("id", pendingRowId)
-            : await updateQuery.eq("venue_phone", normalizedPhone);
+            })
+            .eq("id", pendingRowId);
 
           if (updateError) {
             logger.error("[MAKE_BOOKING_PENDING_UPDATE_FAILED]", {
               pending_booking_id: pendingRowId,
+              idempotency_key: idempotencyKey,
               conversation_id: conversationId,
               error: updateError,
             });
@@ -409,6 +459,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         } catch (dbError) {
           logger.error("[MAKE_BOOKING_PENDING_UPDATE_DB_ERROR]", {
             pending_booking_id: pendingRowId,
+            idempotency_key: idempotencyKey,
             conversation_id: conversationId,
             error: dbError,
           });
@@ -477,6 +528,7 @@ export async function GET(): Promise<NextResponse> {
       "customer_name",
       "customer_phone",
     ],
+    required_headers: ["x-mcp-secret", "Idempotency-Key"],
     optional_fields: ["special_requests", "language"],
     example_request: {
       venue_name: "Casa Gerardo",

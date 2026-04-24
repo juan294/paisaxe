@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PUT } from "./route";
 import { NextRequest } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger,
+}));
+
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
@@ -154,6 +162,9 @@ describe("PUT /api/admin/stories/bulk-status", () => {
 
     const response = await PUT(request);
     expect(response.status).toBe(500);
+    expect(logger.error).toHaveBeenCalledWith("[ADMIN_STORIES_BULK_STATUS_UNHANDLED_ERROR]", {
+      error: expect.any(Error),
+    });
     const data = await response.json();
     expect(data.error).toBe("Internal server error");
   });
@@ -175,5 +186,10 @@ describe("PUT /api/admin/stories/bulk-status", () => {
 
     const response = await PUT(request);
     expect(response.status).toBe(500);
+    expect(logger.error).toHaveBeenCalledWith("[ADMIN_STORIES_BULK_STATUS_UPDATE_FAILED]", {
+      story_ids_count: 1,
+      status: "approved",
+      error: { message: "Database error" },
+    });
   });
 });

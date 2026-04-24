@@ -11,6 +11,8 @@ name: Preview Smoke Test
 # kind that passed CI but crashed production (see incident: Next.js 16.2.1).
 #
 # Required secret: VERCEL_TOKEN  (repo or org secret, read-only token is fine)
+# Branch protection on `main` should require this workflow's check:
+#   Smoke test Vercel preview
 
 on:
   pull_request:
@@ -43,17 +45,23 @@ jobs:
           check_interval: 15
 
       # ------------------------------------------------------------------ #
-      # Health endpoint — must return HTTP 200.                             #
-      # A 503 (degraded) means a backend dependency is down; still fail     #
-      # so we don't silently merge a broken deploy.                         #
+      # Health endpoint — must return HTTP 200 and JSON status "healthy".   #
+      # A 503 (degraded) or a non-healthy body means a backend dependency   #
+      # is down, so fail the preview gate instead of silently merging it.   #
       # ------------------------------------------------------------------ #
       - name: Smoke test - health endpoint
         run: |
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
           echo "Testing: $PREVIEW_URL/api/health"
-          response=$(curl -sf "$PREVIEW_URL/api/health" -o /tmp/health.json -w "%{http_code}")
+          response=$(curl -sS "$PREVIEW_URL/api/health" -o /tmp/health.json -w "%{http_code}")
+          status=$(python3 -c 'import json; print(json.load(open("/tmp/health.json"))["status"])')
           if [ "$response" != "200" ]; then
             echo "Health check failed: HTTP $response"
+            cat /tmp/health.json
+            exit 1
+          fi
+          if [ "$status" != "healthy" ]; then
+            echo "Health check failed: status=$status"
             cat /tmp/health.json
             exit 1
           fi

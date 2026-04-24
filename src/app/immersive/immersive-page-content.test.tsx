@@ -13,12 +13,14 @@ import type { Story } from "@/types/immersive";
 
 vi.mock("@/hooks/use-stories", () => ({
   useStories: vi.fn(),
+  StoriesProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/hooks/use-story-filters", () => ({
   useStoryFilters: vi.fn(),
 }));
 vi.mock("@/hooks/use-feature-flags", () => ({
   useFeatureFlags: vi.fn(),
+  FeatureFlagsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/hooks/use-viewed-stories", () => ({
   useViewedStories: vi.fn(),

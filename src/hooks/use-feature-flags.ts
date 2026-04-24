@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 
 interface FlagsCache {
@@ -10,12 +18,22 @@ interface FlagsCache {
 }
 
 const CACHE_TTL = 60_000; // 1 minute
+const E2E_SUPABASE_URL = "https://example.supabase.co";
 
 const cache: FlagsCache = {
   data: null,
   timestamp: 0,
   promise: null,
 };
+
+interface UseFeatureFlagsResult {
+  flags: FeatureFlag[];
+  isReady: boolean;
+  isEnabled: (key: FeatureFlagKey) => boolean;
+  isEnabledWithDefault: (key: FeatureFlagKey, defaultValue?: boolean) => boolean;
+}
+
+const FeatureFlagsContext = createContext<UseFeatureFlagsResult | null>(null);
 
 /**
  * Convert a `Partial<Record<FeatureFlagKey, boolean>>` map (as passed by a
@@ -51,9 +69,10 @@ function initialFlagsToArray(
  * Use `isReady` to determine if flags have actually been loaded from the server.
  * Use `isEnabled` to check individual flags (returns false if not loaded).
  */
-export function useFeatureFlags(
-  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>
-) {
+function useFeatureFlagsState(
+  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>,
+  enabled: boolean = true
+) : UseFeatureFlagsResult {
   // If initialFlags are provided, seed the state and skip the first fetch.
   // We still use the shared module-level cache so multiple hook instances
   // on the same page share a single in-flight request on refetch.
@@ -63,16 +82,21 @@ export function useFeatureFlags(
   });
   // isReady is true immediately when initialFlags are provided — no flash.
   const [isReady, setIsReady] = useState(initialFlags !== undefined || !!cache.data);
+  const isE2EDummySupabase =
+    process.env.NEXT_PUBLIC_SUPABASE_URL === E2E_SUPABASE_URL;
+  const shouldUseServerSeedOnly =
+    initialFlags !== undefined &&
+    !isE2EDummySupabase;
 
   const fetchFlags = useCallback(async (): Promise<FeatureFlag[]> => {
     const now = Date.now();
     const isStale = now - cache.timestamp > CACHE_TTL;
 
-    if (cache.data && !isStale) {
+    if (cache.data && !isStale && !isE2EDummySupabase) {
       return cache.data;
     }
 
-    if (cache.promise) {
+    if (cache.promise && !isE2EDummySupabase) {
       return cache.promise;
     }
 
@@ -96,9 +120,13 @@ export function useFeatureFlags(
       });
 
     return cache.promise;
-  }, []);
+  }, [isE2EDummySupabase]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let mounted = true;
 
     async function load() {
@@ -116,7 +144,7 @@ export function useFeatureFlags(
       }
     }
 
-    if (initialFlags !== undefined) {
+    if (shouldUseServerSeedOnly) {
       // Skip the immediate fetch — the caller provided fresh server-rendered values.
       // Schedule a background refresh once the stale window has elapsed so the
       // client eventually re-validates without causing a flash on first paint.
@@ -132,8 +160,7 @@ export function useFeatureFlags(
 
     load();
     return () => { mounted = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchFlags]);
+  }, [enabled, fetchFlags, shouldUseServerSeedOnly]);
 
   const isEnabled = useCallback(
     (key: FeatureFlagKey): boolean => {
@@ -165,4 +192,26 @@ export function useFeatureFlags(
     /** Check if a flag is enabled with a default value while loading */
     isEnabledWithDefault,
   };
+}
+
+interface FeatureFlagsProviderProps {
+  children: ReactNode;
+  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>;
+}
+
+export function FeatureFlagsProvider({
+  children,
+  initialFlags,
+}: FeatureFlagsProviderProps) {
+  const value = useFeatureFlagsState(initialFlags);
+
+  return createElement(FeatureFlagsContext.Provider, { value }, children);
+}
+
+export function useFeatureFlags(
+  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>
+): UseFeatureFlagsResult {
+  const context = useContext(FeatureFlagsContext);
+  const fallback = useFeatureFlagsState(initialFlags, !context);
+  return context ?? fallback;
 }

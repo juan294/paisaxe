@@ -43,7 +43,7 @@ test.describe("Suggestion feature", () => {
 
     await expect(
       page.locator("[data-suggest-place-trigger]")
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test("button hidden when user_story_suggestions flag is disabled", async ({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { logger } from "@/lib/logger";
 import { VALID_CATEGORIES } from "@/types/immersive";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 
@@ -71,7 +72,11 @@ export async function PATCH(
         .single();
 
       if (slugCheckError && slugCheckError.code !== "PGRST116") {
-        console.error("Error checking slug:", slugCheckError);
+        logger.error("[ADMIN_STORY_SLUG_CHECK_FAILED]", {
+          story_id: id,
+          slug: body.slug,
+          error: slugCheckError,
+        });
         return NextResponse.json(
           { error: "Failed to validate slug" },
           { status: 500 }
@@ -111,7 +116,7 @@ export async function PATCH(
       .single();
 
     if (updateError) {
-      console.error("Error updating story:", updateError);
+      logger.error("[ADMIN_STORY_UPDATE_FAILED]", { story_id: id, error: updateError });
       return NextResponse.json(
         { error: "Failed to update story" },
         { status: 500 }
@@ -141,7 +146,7 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error("Admin update story API error:", error);
+    logger.error("[ADMIN_STORY_UPDATE_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -1,16 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ImageResult, Source } from "@/types";
-import {
-  encodeSseEvent,
-  parseSseEvent,
-  type ChatDoneEvent,
-  type ChatErrorEvent,
-  type ChatTextEvent,
-} from "./sse";
+import { encodeSseEvent, parseSseEvent } from "./sse";
 
 describe("types/sse", () => {
   it("encodes and parses text events", () => {
-    const event: ChatTextEvent = { type: "text", content: "Hola" };
+    const event = { type: "text" as const, content: "Hola" };
 
     expect(encodeSseEvent(event)).toBe(`data: ${JSON.stringify(event)}\n\n`);
     expect(parseSseEvent(`data: ${JSON.stringify(event)}`)).toEqual(event);
@@ -23,17 +17,17 @@ describe("types/sse", () => {
     const sources: Source[] = [
       { id: "src-1", title: "Guide", sourcePdf: "guide.pdf", snippet: "Snippet" },
     ];
-    const event: ChatDoneEvent = { type: "done", images, sources };
+    const event = { type: "done" as const, images, sources };
 
     expect(parseSseEvent(`data: ${JSON.stringify(event)}`)).toEqual(event);
   });
 
   it("parses error events with partial-content metadata", () => {
-    const event: ChatErrorEvent = {
+    const event = {
       type: "error",
       message: "stream_failed",
       hadPartialContent: true,
-    };
+    } as const;
 
     expect(parseSseEvent(`data: ${JSON.stringify(event)}`)).toEqual(event);
   });

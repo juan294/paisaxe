@@ -19,10 +19,10 @@ import { z } from "zod";
 // ---------------------------------------------------------------------------
 
 /** Any valid UUID v4 string. */
-export const uuidSchema = z.string().uuid();
+const uuidSchema = z.string().uuid();
 
 /** Non-empty string trimmed to at most `max` characters. */
-export const boundedString = (max: number, min = 1) =>
+const boundedString = (max: number, min = 1) =>
   z.string().trim().min(min).max(max);
 
 /**
@@ -30,13 +30,13 @@ export const boundedString = (max: number, min = 1) =>
  * Format validation (Spanish E.164 / national) is handled by isValidSpanishPhone()
  * in the route, which supports flexible space/dash separators.
  */
-export const spanishPhoneSchema = z.string().trim().min(9).max(20);
+const spanishPhoneSchema = z.string().trim().min(9).max(20);
 
 // ---------------------------------------------------------------------------
 // make-booking
 // ---------------------------------------------------------------------------
 
-export const makeBookingSchema = z.object({
+const makeBookingSchema = z.object({
   venue_name: boundedString(200),
   phone_number: spanishPhoneSchema,
   party_size: z
