@@ -1,4 +1,4 @@
-PERFORMANCE METRICS (2026-04-23)
+PERFORMANCE METRICS (2026-04-24)
 =========================================
 
 NOTE: Production build was skipped (dev server was running).
@@ -6,14 +6,14 @@ Bundle sizes below are from the dev server's .next cache — they may
 differ from a production build. Dependency and disk metrics are still accurate.
 
 BUNDLE SIZES:
-- Total JS: 2941 KB (previous: 2941 KB, change: 0 KB)
+- Total JS: 2940 KB (previous: 2941 KB, change: -1 KB)
 - Total CSS: 125 KB
 - Budget (split, since 2026-04-04): initial 2000 KB / total 3000 KB
 
 LARGEST JS CHUNKS:
 489726 .next/static/chunks/0jgxvc_nt0fmz.js
 233018 .next/static/chunks/07y9atwelbm1e.js
-191174 .next/static/chunks/0725zmn7nfom..js
+191438 .next/static/chunks/0o~u430-x9btt.js
 183807 .next/static/chunks/01jcq5ly8dpgu.js
 134887 .next/static/chunks/0wu4~xh-5rs6g.js
 125174 .next/static/chunks/0gb0~kkj~zqpo.js
@@ -23,7 +23,7 @@ LARGEST JS CHUNKS:
 85120 .next/static/chunks/0c_qd452s0tgs.js
 
 DEPENDENCIES:
-- Production: 34 (previous: 34, change: 0)
+- Production: 35 (previous: 34, change: 1)
 - Development: 29
 - Budget: 40 production deps
 
@@ -46,7 +46,7 @@ LARGEST NODE_MODULES PACKAGES:
 
 DISK USAGE:
 - node_modules: 1047 MB
-- .next: 801 MB
+- .next: 800 MB
 
 BUDGET VIOLATIONS:
 
