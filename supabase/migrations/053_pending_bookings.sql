@@ -4,7 +4,8 @@
 
 CREATE TABLE pending_bookings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversation_id TEXT UNIQUE NOT NULL,  -- From ElevenLabs call initiation
+  idempotency_key TEXT NOT NULL,         -- Caller-supplied claim key before placing the call
+  conversation_id TEXT,                  -- From ElevenLabs call initiation
   venue_name TEXT NOT NULL,
   venue_phone TEXT NOT NULL,
   customer_name TEXT NOT NULL,
@@ -13,14 +14,19 @@ CREATE TABLE pending_bookings (
   booking_date TEXT NOT NULL,
   booking_time TEXT NOT NULL,
   special_requests TEXT,
-  status TEXT NOT NULL DEFAULT 'pending', -- pending, confirmed, denied, no_answer, failed
+  status TEXT NOT NULL DEFAULT 'initiating', -- initiating, pending, confirmed, denied, no_answer, failed
   outcome_message TEXT,                   -- What we told the customer via SMS
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index for webhook lookup by conversation_id
-CREATE INDEX idx_pending_bookings_conversation_id ON pending_bookings(conversation_id);
+-- Unique claim key for request idempotency
+CREATE UNIQUE INDEX idx_pending_bookings_idempotency_key ON pending_bookings(idempotency_key);
+
+-- Unique webhook lookup key once ElevenLabs returns a conversation id
+CREATE UNIQUE INDEX idx_pending_bookings_conversation_id
+  ON pending_bookings(conversation_id)
+  WHERE conversation_id IS NOT NULL;
 
 -- Index for status-based queries (e.g., finding stale pending bookings)
 CREATE INDEX idx_pending_bookings_status ON pending_bookings(status);

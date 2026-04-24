@@ -1,5 +1,11 @@
 import { timingSafeEqual } from "crypto";
 
+const MCP_IDEMPOTENCY_HEADER_NAMES = [
+  "idempotency-key",
+  "x-idempotency-key",
+  "x-mcp-idempotency-key",
+];
+
 /**
  * Validate the MCP API secret from the request header using
  * constant-time comparison to prevent timing attacks.
@@ -28,4 +34,15 @@ export function validateMcpSecret(request: Request): boolean {
   }
 
   return timingSafeEqual(Buffer.from(provided), Buffer.from(secret));
+}
+
+export function getMcpIdempotencyKey(request: Request): string | null {
+  for (const headerName of MCP_IDEMPOTENCY_HEADER_NAMES) {
+    const value = request.headers.get(headerName)?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
 }

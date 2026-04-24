@@ -38,8 +38,8 @@ describe("/api/mcp/make-booking", () => {
       if (key === "sms_booking_confirmation") return Promise.resolve(true);
       return Promise.resolve(false);
     });
-    // Default: DB insert().select("id") chain — select returns { data: [], error: null }
-    mockSelect.mockResolvedValue({ data: [], error: null });
+    // Default: DB insert().select("id") chain returns the claimed booking row id
+    mockSelect.mockResolvedValue({ data: [{ id: "pending-row-id" }], error: null });
     mockInsert.mockReturnValue({ select: mockSelect });
     // Default: DB update succeeds
     mockUpdate.mockReturnValue({
@@ -115,7 +115,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -142,7 +142,7 @@ describe("/api/mcp/make-booking", () => {
     it("should return 400 for missing required fields", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           // Missing other required fields
@@ -161,7 +161,7 @@ describe("/api/mcp/make-booking", () => {
     it("should return 400 for invalid Spanish phone number", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "123-456-7890", // US format, not Spanish
@@ -184,7 +184,7 @@ describe("/api/mcp/make-booking", () => {
     it("should accept valid Spanish phone number in national format", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "985 88 77 97", // National format
@@ -208,7 +208,7 @@ describe("/api/mcp/make-booking", () => {
     it("should accept valid Spanish phone number in international format", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97", // International format
@@ -229,7 +229,7 @@ describe("/api/mcp/make-booking", () => {
     it("should support MCP tool call format", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           tool: "make_booking",
           arguments: {
@@ -269,7 +269,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -298,6 +298,112 @@ describe("/api/mcp/make-booking", () => {
       expect(options.headers["xi-api-key"]).toBe("test-api-key");
     });
 
+    it("should reject configured booking requests without an idempotency key", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Idempotency key");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("should not place a duplicate call when the idempotency key is already claimed", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { code: "23505", message: "duplicate key value violates unique constraint" },
+        }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "booking-dup-1",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("already being processed");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("should fail before the call when the idempotency claim cannot be persisted", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { message: "Database unavailable" },
+        }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "booking-db-fail-1",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Could not persist");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it("should NOT say reservation is confirmed in initiated response", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
@@ -310,7 +416,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -349,7 +455,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -382,7 +488,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -426,7 +532,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -461,7 +567,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -479,6 +585,7 @@ describe("/api/mcp/make-booking", () => {
       // Verify pending booking was initially inserted with status='initiating' (BE-B6 fix)
       expect(mockInsert).toHaveBeenCalledWith(
         expect.objectContaining({
+          idempotency_key: "test-idempotency-key",
           venue_name: "Casa Gerardo",
           venue_phone: "+34985887797",
           customer_name: "Juan García López",
@@ -511,7 +618,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -548,7 +655,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -566,15 +673,10 @@ describe("/api/mcp/make-booking", () => {
       expect(data.message).not.toContain("SMS");
     });
 
-    it("should handle pending booking insert failure gracefully", async () => {
+    it("should fail when the pending booking claim cannot be persisted", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ conversation_id: "conv_123456789" }),
-      });
 
       // Simulate DB error on the insert().select("id") chain
       mockInsert.mockReturnValueOnce({
@@ -583,7 +685,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -598,10 +700,10 @@ describe("/api/mcp/make-booking", () => {
       const response = await POST(request);
       const data = await response.json();
 
-      // Call should still succeed even if DB insert fails
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.status).toBe("initiated");
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Could not persist");
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("should handle fetch throwing a network error during ElevenLabs call", async () => {
@@ -614,7 +716,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -648,7 +750,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -682,7 +784,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request1 = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -708,7 +810,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request2 = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -740,7 +842,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request1 = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -764,7 +866,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request2 = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -788,7 +890,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request3 = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -805,15 +907,10 @@ describe("/api/mcp/make-booking", () => {
       expect(body3.conversation_initiation_client_data.dynamic_variables.time).toBe("una menos cuarto de la mañana");
     });
 
-    it("should handle DB insert throwing an exception", async () => {
+    it("should fail when the pending booking claim throws", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ conversation_id: "conv_throw" }),
-      });
 
       // Mock insert().select() to throw an exception (not return an error object)
       mockInsert.mockReturnValueOnce({
@@ -822,7 +919,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -837,10 +934,10 @@ describe("/api/mcp/make-booking", () => {
       const response = await POST(request);
       const data = await response.json();
 
-      // Call should still succeed even if DB insert throws
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.status).toBe("initiated");
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Could not persist");
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("should handle missing booking agent ID", async () => {
@@ -850,7 +947,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -883,7 +980,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "34985887797", // Starts with 34 but no +
@@ -915,7 +1012,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -947,7 +1044,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -979,7 +1076,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -1002,7 +1099,7 @@ describe("/api/mcp/make-booking", () => {
     it("should handle request.json() throwing", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: "not valid json{{{",
       });
 
@@ -1018,7 +1115,7 @@ describe("/api/mcp/make-booking", () => {
       // Override request.json to throw a non-Error value
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({}),
       });
       // Override json() to throw a non-Error
@@ -1049,7 +1146,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -1092,7 +1189,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -1125,7 +1222,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           // No venue_name or phone_number provided
           party_size: 4,
@@ -1159,7 +1256,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -1192,7 +1289,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Late Night Bar",
           phone_number: "+34985887797",
@@ -1224,7 +1321,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -1258,7 +1355,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -1292,7 +1389,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -1322,7 +1419,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -1354,7 +1451,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -1386,7 +1483,7 @@ describe("/api/mcp/make-booking", () => {
       mockInsert.mockImplementation(() => ({
         select: vi.fn().mockImplementation(async () => {
           callOrder.push("insert");
-          return { data: [], error: null };
+          return { data: [{ id: "pending-row-id" }], error: null };
         }),
       }));
 
@@ -1407,7 +1504,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -1440,12 +1537,12 @@ describe("/api/mcp/make-booking", () => {
       const insertCalls: unknown[] = [];
       mockInsert.mockImplementation((data: unknown) => {
         insertCalls.push(data);
-        return { select: vi.fn().mockResolvedValue({ data: [], error: null }) };
+        return { select: vi.fn().mockResolvedValue({ data: [{ id: "pending-row-id" }], error: null }) };
       });
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -1485,7 +1582,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -1508,7 +1605,7 @@ describe("/api/mcp/make-booking", () => {
       );
     });
 
-    it("BE-B6: should still succeed if the pre-call insert fails", async () => {
+    it("BE-B6: should stop before the call if the pre-call insert fails", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
@@ -1524,7 +1621,7 @@ describe("/api/mcp/make-booking", () => {
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34 985 88 77 97",
@@ -1539,10 +1636,10 @@ describe("/api/mcp/make-booking", () => {
       const response = await POST(request);
       const data = await response.json();
 
-      // Call should still succeed
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.status).toBe("initiated");
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Could not persist");
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     // -----------------------------------------------------------------------
@@ -1552,7 +1649,7 @@ describe("/api/mcp/make-booking", () => {
     it("should return 400 with field errors when party_size is a non-numeric string", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -1575,7 +1672,7 @@ describe("/api/mcp/make-booking", () => {
     it("should return 400 with field errors when party_size is NaN (passed as string '0abc')", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -1597,7 +1694,7 @@ describe("/api/mcp/make-booking", () => {
     it("should return 400 when party_size exceeds maximum of 50", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -1620,7 +1717,7 @@ describe("/api/mcp/make-booking", () => {
     it("should return 400 when party_size is zero or negative", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
           phone_number: "+34985887797",
@@ -1642,7 +1739,7 @@ describe("/api/mcp/make-booking", () => {
     it("should return 400 when venue_name exceeds 200 characters", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           venue_name: "A".repeat(201),
           phone_number: "+34985887797",
@@ -1664,7 +1761,7 @@ describe("/api/mcp/make-booking", () => {
     it("should return 400 when MCP-nested party_size is non-numeric string", async () => {
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
         body: JSON.stringify({
           tool: "make_booking",
           arguments: {
@@ -1688,4 +1785,3 @@ describe("/api/mcp/make-booking", () => {
     });
   });
 });
-
