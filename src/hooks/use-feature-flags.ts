@@ -18,6 +18,7 @@ interface FlagsCache {
 }
 
 const CACHE_TTL = 60_000; // 1 minute
+const E2E_SUPABASE_URL = "https://example.supabase.co";
 
 const cache: FlagsCache = {
   data: null,
@@ -81,16 +82,21 @@ function useFeatureFlagsState(
   });
   // isReady is true immediately when initialFlags are provided — no flash.
   const [isReady, setIsReady] = useState(initialFlags !== undefined || !!cache.data);
+  const isE2EDummySupabase =
+    process.env.NEXT_PUBLIC_SUPABASE_URL === E2E_SUPABASE_URL;
+  const shouldUseServerSeedOnly =
+    initialFlags !== undefined &&
+    !isE2EDummySupabase;
 
   const fetchFlags = useCallback(async (): Promise<FeatureFlag[]> => {
     const now = Date.now();
     const isStale = now - cache.timestamp > CACHE_TTL;
 
-    if (cache.data && !isStale) {
+    if (cache.data && !isStale && !isE2EDummySupabase) {
       return cache.data;
     }
 
-    if (cache.promise) {
+    if (cache.promise && !isE2EDummySupabase) {
       return cache.promise;
     }
 
@@ -114,7 +120,7 @@ function useFeatureFlagsState(
       });
 
     return cache.promise;
-  }, []);
+  }, [isE2EDummySupabase]);
 
   useEffect(() => {
     if (!enabled) {
@@ -138,7 +144,7 @@ function useFeatureFlagsState(
       }
     }
 
-    if (initialFlags !== undefined) {
+    if (shouldUseServerSeedOnly) {
       // Skip the immediate fetch — the caller provided fresh server-rendered values.
       // Schedule a background refresh once the stale window has elapsed so the
       // client eventually re-validates without causing a flash on first paint.
@@ -154,8 +160,7 @@ function useFeatureFlagsState(
 
     load();
     return () => { mounted = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, fetchFlags]);
+  }, [enabled, fetchFlags, shouldUseServerSeedOnly]);
 
   const isEnabled = useCallback(
     (key: FeatureFlagKey): boolean => {

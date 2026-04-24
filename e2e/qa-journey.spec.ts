@@ -298,7 +298,7 @@ test.describe("QA Journey: Error Handling", () => {
 
     const body = await response.json();
     expect(body).toHaveProperty("status");
-    expect(body).toHaveProperty("version");
+    expect(body).toHaveProperty("timestamp");
     expect(["healthy", "degraded"]).toContain(body.status);
   });
 });

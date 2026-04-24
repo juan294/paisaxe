@@ -1,23 +1,23 @@
 import type { ImageResult, Source } from "@/types";
 
-export type ChatTextEvent = {
+type ChatTextEvent = {
   type: "text";
   content: string;
 };
 
-export type ChatDoneEvent = {
+type ChatDoneEvent = {
   type: "done";
   images: ImageResult[];
   sources: Source[];
 };
 
-export type ChatErrorEvent = {
+type ChatErrorEvent = {
   type: "error";
   message: string;
   hadPartialContent: boolean;
 };
 
-export type ChatStreamEvent = ChatTextEvent | ChatDoneEvent | ChatErrorEvent;
+type ChatStreamEvent = ChatTextEvent | ChatDoneEvent | ChatErrorEvent;
 
 export function encodeSseEvent(event: ChatStreamEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;

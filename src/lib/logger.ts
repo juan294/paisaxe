@@ -189,7 +189,7 @@ function getRequestIdBindings() {
   return requestId ? { request_id: requestId } : undefined;
 }
 
-export type Logger = {
+type Logger = {
   info: (msg: string, meta?: Record<string, unknown>) => void;
   warn: (msg: string, meta?: Record<string, unknown>) => void;
   error: (msg: string, meta?: Record<string, unknown>) => void;

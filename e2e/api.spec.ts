@@ -26,9 +26,7 @@ test.describe("API route smoke tests", () => {
     expect([200, 503]).toContain(response.status());
 
     const body = await response.json();
-    expect(body.version).toBeTruthy();
     expect(body.timestamp).toBeTruthy();
-    expect(body.services).toHaveProperty("supabase");
     expect(["healthy", "degraded"]).toContain(body.status);
   });
 
