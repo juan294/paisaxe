@@ -10,7 +10,7 @@ name: Preview Smoke Test
 # This job catches runtime failures that only surface on Vercel — the
 # kind that passed CI but crashed production (see incident: Next.js 16.2.1).
 #
-# Required secret: VERCEL_TOKEN  (repo or org secret, read-only token is fine)
+# Required secret: VERCEL_AUTOMATION_BYPASS_SECRET
 # Branch protection on `main` should require this workflow's check:
 #   Smoke test Vercel preview
 
@@ -37,18 +37,40 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # ------------------------------------------------------------------ #
-      # Wait for Vercel to finish deploying the preview for this PR commit. #
-      # The action polls the GitHub Deployments API (no Vercel token needed #
-      # for the wait itself) and exports the preview URL.                   #
-      # ------------------------------------------------------------------ #
       - name: Wait for Vercel preview deployment
         id: vercel-wait
-        uses: patrickedqvist/wait-for-vercel-preview@v1.3.3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          max_timeout: 300
-          check_interval: 15
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          for attempt in $(seq 1 20); do
+            deployment_id=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/deployments" \
+              -f sha="$HEAD_SHA" \
+              --jq '[.[] | select(.creator.login == "vercel[bot]" and .environment == "Preview")][0].id // empty')
+
+            if [ -n "$deployment_id" ]; then
+              state=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" --jq '.[0].state // empty')
+              preview_url=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" --jq '.[0].environment_url // .[0].target_url // empty')
+              echo "Vercel deployment state: ${state:-unknown}"
+
+              if [ "$state" = "success" ] && [ -n "$preview_url" ]; then
+                echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              if [ "$state" = "failure" ] || [ "$state" = "error" ]; then
+                echo "Vercel deployment failed with state=$state"
+                exit 1
+              fi
+            else
+              echo "No Vercel preview deployment found yet (attempt $attempt / 20)"
+            fi
+
+            sleep 15
+          done
+
+          echo "Timed out waiting for Vercel preview deployment"
+          exit 1
 
       # ------------------------------------------------------------------ #
       # Health endpoint — must return HTTP 200 and JSON status "healthy".   #
@@ -56,10 +78,16 @@ jobs:
       # is down, so fail the preview gate instead of silently merging it.   #
       # ------------------------------------------------------------------ #
       - name: Smoke test - health endpoint
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
+          if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
+            echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
+            exit 1
+          fi
           echo "Testing: $PREVIEW_URL/api/health"
-          response=$(curl -sS "$PREVIEW_URL/api/health" -o /tmp/health.json -w "%{http_code}")
+          response=$(curl -sS -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL/api/health" -o /tmp/health.json -w "%{http_code}")
           status=$(python3 -c 'import json; print(json.load(open("/tmp/health.json"))["status"])')
           if [ "$response" != "200" ]; then
             echo "Health check failed: HTTP $response"
@@ -80,10 +108,12 @@ jobs:
       # even though the local build with dummy keys succeeded.              #
       # ------------------------------------------------------------------ #
       - name: Smoke test - homepage loads
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
           echo "Testing: $PREVIEW_URL"
-          response=$(curl -sf "$PREVIEW_URL" -o /dev/null -w "%{http_code}")
+          response=$(curl -sf -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL" -o /dev/null -w "%{http_code}")
           if [ "$response" != "200" ]; then
             echo "Homepage failed: HTTP $response"
             exit 1
