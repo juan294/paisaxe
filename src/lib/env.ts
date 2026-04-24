@@ -45,6 +45,12 @@ export const getSupabaseUrl = () => getEnv("NEXT_PUBLIC_SUPABASE_URL");
 /** Supabase anonymous key (public, trimmed) */
 export const getSupabaseAnonKey = () => getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
+/** Supabase service role key (server-only, trimmed) */
+export const getSupabaseServiceRoleKey = () => getEnv("SUPABASE_SERVICE_ROLE_KEY");
+
+/** Legacy Supabase service key (server-only, trimmed) */
+export const getSupabaseServiceKey = () => getEnv("SUPABASE_SERVICE_KEY");
+
 /** Stripe secret key (server-only, trimmed) */
 export const getStripeSecretKey = () => getEnv("STRIPE_SECRET_KEY");
 

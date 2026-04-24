@@ -124,6 +124,20 @@ describe("AuthProvider", () => {
     });
   });
 
+  it("can treat anonymous as resolved while auth bootstraps in the background", () => {
+    mockGetSession.mockImplementation(() => new Promise(() => {}));
+    mockGetUser.mockImplementation(() => new Promise(() => {}));
+
+    render(
+      <AuthProvider deferInitialAuth>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    expect(screen.getByTestId("loading").textContent).toBe("false");
+    expect(screen.getByTestId("user").textContent).toBe("none");
+  });
+
   it("handles getSession error gracefully (sets isLoading false)", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mockGetSession.mockRejectedValue(new Error("Session fetch failed"));

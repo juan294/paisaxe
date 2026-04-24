@@ -114,6 +114,12 @@ describe("PricingPage", () => {
   });
 
   it("should show disabled button with spinner during loading", () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: "user-123", email: "test@example.com" },
+      session: { access_token: "token" },
+      signInWithGoogle: mockSignInWithGoogle,
+      isLoading: false,
+    });
     mockUseVoiceAccess.mockReturnValue({
       hasAccess: false,
       isWhitelisted: false,
@@ -134,6 +140,27 @@ describe("PricingPage", () => {
     expect(button).toBeDisabled();
     const spinner = button.querySelector(".animate-spin");
     expect(spinner).toBeInTheDocument();
+  });
+
+  it("keeps the anonymous sign-in CTA usable while access checks are still resolving", () => {
+    mockUseVoiceAccess.mockReturnValue({
+      hasAccess: false,
+      isWhitelisted: false,
+      canUseVoice: false,
+      needsSignIn: true,
+      needsPurchase: false,
+      expiresAt: null,
+      hoursUntilExpiry: null,
+      agentId: "",
+      isLoading: true,
+      refresh: mockRefresh,
+    });
+
+    render(<PricingPage />);
+
+    const button = screen.getByRole("button", { name: "premium.sign_in_to_purchase" });
+    expect(button).not.toBeDisabled();
+    expect(button.querySelector(".animate-spin")).not.toBeInTheDocument();
   });
 
   it("should not show access banner during loading", () => {
@@ -347,6 +374,12 @@ describe("PricingPage", () => {
     });
 
     it("should have accessible loading state in CTA button during loading", () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-123", email: "test@example.com" },
+        session: { access_token: "token" },
+        signInWithGoogle: mockSignInWithGoogle,
+        isLoading: false,
+      });
       mockUseVoiceAccess.mockReturnValue({
         hasAccess: false,
         isWhitelisted: false,
