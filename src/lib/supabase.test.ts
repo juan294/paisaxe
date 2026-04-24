@@ -23,12 +23,13 @@ describe("supabase", () => {
     it("should export a supabase client", async () => {
       const { supabase } = await import("./supabase");
       expect(supabase).toBeDefined();
-      expect(supabase).toHaveProperty("from");
+      expect(typeof supabase.from).toBe("function");
     });
 
     it("should create client with correct config", async () => {
       const { createClient } = await import("@supabase/supabase-js");
-      await import("./supabase");
+      const { supabase } = await import("./supabase");
+      void supabase.from;
 
       expect(createClient).toHaveBeenCalledWith(
         "https://test.supabase.co",
@@ -36,34 +37,42 @@ describe("supabase", () => {
       );
     });
 
-    it("should throw if NEXT_PUBLIC_SUPABASE_URL is missing", async () => {
+    it("should throw if NEXT_PUBLIC_SUPABASE_URL is missing when the client is accessed", async () => {
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-      await expect(import("./supabase")).rejects.toThrow(
+      const { supabase } = await import("./supabase");
+
+      expect(() => supabase.from).toThrow(
         "NEXT_PUBLIC_SUPABASE_URL is required"
       );
     });
 
-    it("should throw if NEXT_PUBLIC_SUPABASE_URL is empty string", async () => {
+    it("should throw if NEXT_PUBLIC_SUPABASE_URL is empty string when the client is accessed", async () => {
       process.env.NEXT_PUBLIC_SUPABASE_URL = "   ";
 
-      await expect(import("./supabase")).rejects.toThrow(
+      const { supabase } = await import("./supabase");
+
+      expect(() => supabase.from).toThrow(
         "NEXT_PUBLIC_SUPABASE_URL is required"
       );
     });
 
-    it("should throw if NEXT_PUBLIC_SUPABASE_ANON_KEY is missing", async () => {
+    it("should throw if NEXT_PUBLIC_SUPABASE_ANON_KEY is missing when the client is accessed", async () => {
       delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-      await expect(import("./supabase")).rejects.toThrow(
+      const { supabase } = await import("./supabase");
+
+      expect(() => supabase.from).toThrow(
         "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"
       );
     });
 
-    it("should throw if NEXT_PUBLIC_SUPABASE_ANON_KEY is empty string", async () => {
+    it("should throw if NEXT_PUBLIC_SUPABASE_ANON_KEY is empty string when the client is accessed", async () => {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "  ";
 
-      await expect(import("./supabase")).rejects.toThrow(
+      const { supabase } = await import("./supabase");
+
+      expect(() => supabase.from).toThrow(
         "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"
       );
     });
@@ -73,7 +82,8 @@ describe("supabase", () => {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "  test-anon-key  ";
 
       const { createClient } = await import("@supabase/supabase-js");
-      await import("./supabase");
+      const { supabase } = await import("./supabase");
+      void supabase.from;
 
       expect(createClient).toHaveBeenCalledWith(
         "https://test.supabase.co",

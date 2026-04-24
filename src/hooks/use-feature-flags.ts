@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 
 interface FlagsCache {
@@ -16,6 +24,15 @@ const cache: FlagsCache = {
   timestamp: 0,
   promise: null,
 };
+
+interface UseFeatureFlagsResult {
+  flags: FeatureFlag[];
+  isReady: boolean;
+  isEnabled: (key: FeatureFlagKey) => boolean;
+  isEnabledWithDefault: (key: FeatureFlagKey, defaultValue?: boolean) => boolean;
+}
+
+const FeatureFlagsContext = createContext<UseFeatureFlagsResult | null>(null);
 
 /**
  * Convert a `Partial<Record<FeatureFlagKey, boolean>>` map (as passed by a
@@ -51,9 +68,10 @@ function initialFlagsToArray(
  * Use `isReady` to determine if flags have actually been loaded from the server.
  * Use `isEnabled` to check individual flags (returns false if not loaded).
  */
-export function useFeatureFlags(
-  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>
-) {
+function useFeatureFlagsState(
+  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>,
+  enabled: boolean = true
+) : UseFeatureFlagsResult {
   // If initialFlags are provided, seed the state and skip the first fetch.
   // We still use the shared module-level cache so multiple hook instances
   // on the same page share a single in-flight request on refetch.
@@ -99,6 +117,10 @@ export function useFeatureFlags(
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let mounted = true;
 
     async function load() {
@@ -133,7 +155,7 @@ export function useFeatureFlags(
     load();
     return () => { mounted = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchFlags]);
+  }, [enabled, fetchFlags]);
 
   const isEnabled = useCallback(
     (key: FeatureFlagKey): boolean => {
@@ -165,4 +187,26 @@ export function useFeatureFlags(
     /** Check if a flag is enabled with a default value while loading */
     isEnabledWithDefault,
   };
+}
+
+interface FeatureFlagsProviderProps {
+  children: ReactNode;
+  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>;
+}
+
+export function FeatureFlagsProvider({
+  children,
+  initialFlags,
+}: FeatureFlagsProviderProps) {
+  const value = useFeatureFlagsState(initialFlags);
+
+  return createElement(FeatureFlagsContext.Provider, { value }, children);
+}
+
+export function useFeatureFlags(
+  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>
+): UseFeatureFlagsResult {
+  const context = useContext(FeatureFlagsContext);
+  const fallback = useFeatureFlagsState(initialFlags, !context);
+  return context ?? fallback;
 }

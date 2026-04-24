@@ -153,7 +153,7 @@ describe("RootLayout", () => {
     });
 
     it("should keep Supabase preconnect links", () => {
-      expect(layoutSource).toContain("NEXT_PUBLIC_SUPABASE_URL");
+      expect(layoutSource).toContain("getSupabaseUrl");
     });
 
     it("should keep Unsplash preconnect links", () => {
