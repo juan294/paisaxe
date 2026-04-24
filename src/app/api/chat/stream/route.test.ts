@@ -593,6 +593,37 @@ describe("POST /api/chat/stream", () => {
     }));
   });
 
+  it("starts the asturianu flag lookup before retrieval finishes to reduce pre-stream latency", async () => {
+    vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+    let resolveSearch!: (value: { chunks: []; images: [] }) => void;
+    vi.mocked(search).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSearch = resolve;
+        })
+    );
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+    vi.mocked(streamChatResponse).mockImplementation(async function* () {
+      yield "Response";
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Tell me about Asturias" }),
+    });
+
+    const responsePromise = POST(request);
+
+    await vi.waitFor(() => {
+      expect(search).toHaveBeenCalledTimes(1);
+    });
+    expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith("asturianu_touches");
+
+    resolveSearch({ chunks: [], images: [] });
+    const response = await responsePromise;
+    expect(response.status).toBe(200);
+  });
+
   it("returns 500 from outer catch when pre-stream setup throws", async () => {
     // Trigger the outer try/catch by making checkRateLimit reject. This exercises
     // the outer catch (route.ts:185-193) which is distinct from the inner stream
