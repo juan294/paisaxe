@@ -18,6 +18,7 @@
 
 
 
+
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-02-06T16:30:00Z -->
 ## Documentation Agent — 2026-02-06
 - **Coverage**: 100% of feature flags documented in features.md (24 flags across 5 categories)
@@ -768,21 +769,6 @@
 - Localization Agent: No locale-related documentation concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-20T08:06:31Z -->
-## Performance Agent — 2026-04-20
-- **Status: YELLOW** — 12-cycle GREEN streak broken. node_modules budget violated (1,047 MB > 1,000 MB). Initial load estimated at ~2,066 KB vs 2,000 KB budget — unconfirmed, needs production build.
-- **+49 KB this cycle** (2,892 → 2,941 KB): 3 new production deps from remediation waves — @sentry/nextjs (+~70-80 KB static, +67 MB node_modules), zod (+~8-12 KB), pino (+0 KB, server-only).
-- **Deferred chunks shrank**: ElevenLabs 487→478 KB, react-markdown 145→110 KB. Net deferred: ~875 KB (-45 KB).
-- **P4 (Supabase realtime tree-shake) is now actionable**: Previous trigger was headroom <15 KB; estimated headroom is now -66 KB. Saves ~20-30 KB.
-- **Sentry session replay audit needed**: If `Replay` integration is enabled in `sentry.client.config.ts`, disabling it saves ~30-50 KB with no UX tradeoff.
-
-**Cross-agent recommendations:**
-- Code Quality Agent: Verify `sentry.client.config.ts` does not include `Replay` integration. Run `npm run build:analyze` to confirm exact Sentry chunk size. P4 (Supabase realtime) is the highest-ROI structural optimization now actionable.
-- QA Agent: After P4 (Supabase realtime tree-shake), re-verify admin realtime features still work in E2E.
-- Security Agent: All 3 new deps clean — zero CVEs. @sentry/nextjs 10.49.0 recommended Next.js SDK.
-- Coverage Agent: pino logger (64.28%) confirmed production-only — no new coverage action needed. Check zod v4 API validation paths added in #270/#279 for test gaps.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=triage timestamp=2026-04-20T09:30:00Z -->
 ## Triage — 2026-04-20
 - **Reports processed**: 10 (cc-rpi-update, cost-analyst, coverage, documentation, localization, performance, pre-launch, remediation, security, triage-report)
@@ -991,4 +977,21 @@
 - QA Agent: No security action items. CSRF + webhook HMAC paths remain covered.
 - Cost Analyst Agent: No cost-related security concerns this cycle.
 - Triage Agent: Non-urgent code action — `npm install` to sync resend pin. Advisory stays open until svix upstream fix regardless.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-24T08:04:39Z -->
+## Performance Agent -- 2026-04-24
+- Status: YELLOW -- total JS 2,940 KB / 3,000 KB (under), initial load ~2,065 KB / 2,000 KB (est., potentially over). -1 KB cache-churn only; dev cache does not reflect the Replay removal.
+- P8 DONE: Sentry Replay removed in `fef651f5` (Apr 22). `sentry.client.config.ts` no longer sets replay sample rates. Expected ~30-50 KB initial-load savings -- verification requires `npm run build` on a clean `.next`.
+- Production dep count +1 (34 -> 35): `@sentry/core@10.49.0` pinned as explicit direct dep by AR-H2 remediation (d3ffaa50). Bundle-neutral.
+- Dev cache is stale across 4 cycles at 2,940-2,941 KB. Next production build should break the plateau downward.
+- Carried: Two zero-byte untracked files `svix` and `uuid` in repo root -- stray shell output, worth cleaning up.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: `svix` and `uuid` empty files in repo root are leftover shell output from recent work; safe to delete. Also confirm no `'use client'` component is importing `zod` (would bloat initial load).
+- Security Agent: P8 removes `@sentry/replay` from the static client bundle, which also eliminates the Replay PII exfiltration surface that was flagged last cycle. `resend` pin drift (6.12.0 installed vs ^6.12.2) resolves with `npm install`. No other security-relevant bundle changes.
+- Triage Agent: URGENT action -- run `rm -rf .next && npm run build` to measure the actual P8 savings. If initial load drops below 2,000 KB, status goes GREEN without P4.
+- Coverage Agent: `src/lib/sentry-client-config.test.ts` now locks the "no Replay sample rates" invariant -- good regression protection.
+- QA Agent: Replay removal means no session replays captured in production. Error reporting, stack traces, and perf traces are unaffected.
+- Cost Analyst Agent: No bundle cost change user-observable yet. Production build verification remains pending.
 <!-- ENTRY:END -->
