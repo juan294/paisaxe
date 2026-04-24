@@ -24,7 +24,7 @@ const CORS_HEADERS = {
   "Access-Control-Max-Age": "86400",
 };
 
-export function isAllowedOrigin(origin: string | null): boolean {
+function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
   return ALLOWED_ORIGINS.includes(origin);
 }

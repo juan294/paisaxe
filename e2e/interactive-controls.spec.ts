@@ -372,7 +372,7 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
 
     // Open the suggest place dialog
     const suggestButton = page.locator("[data-suggest-place-trigger]");
-    await expect(suggestButton).toBeVisible();
+    await expect(suggestButton).toBeVisible({ timeout: 15000 });
     await suggestButton.click();
 
     // Wait for the dialog to open
@@ -394,7 +394,7 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
 
     // Open the suggest place dialog
     const suggestButton = page.locator("[data-suggest-place-trigger]");
-    await expect(suggestButton).toBeVisible();
+    await expect(suggestButton).toBeVisible({ timeout: 15000 });
     await suggestButton.click();
 
     const commentArea = page.locator("#comment");

@@ -35,6 +35,7 @@ export function SuggestPlaceButton({
       {variant === "menu" ? (
         <button
           role="menuitem"
+          data-suggest-place-trigger
           onClick={handleOpen}
           className={cn(
             "flex items-center gap-3 w-full px-3 py-2 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors text-sm",
@@ -48,6 +49,7 @@ export function SuggestPlaceButton({
         </button>
       ) : (
         <button
+          data-suggest-place-trigger
           onClick={handleOpen}
           className={cn(
             "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
