@@ -4,7 +4,7 @@ Detailed documentation for database maintenance, monitoring, webhooks, and autom
 
 ## Health Check Endpoint
 
-`GET /api/health` — returns service status, uptime, Supabase connectivity with latency, and database storage usage (size in MB, percentage of 8 GB Pro tier limit). Reports "degraded" if Supabase connection fails or database usage exceeds 80%. Always returns HTTP 200. Used by Upptime for uptime monitoring.
+`GET /api/health` — returns a minimal public payload: `{ "status": "healthy" | "degraded", "timestamp": "..." }`. Returns HTTP 200 only when the app is healthy. Returns HTTP 503 when Supabase connectivity fails, approved stories are unavailable, or database usage reaches the 80% warning threshold. Used by preview smoke and Upptime as the machine health gate. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
 
 ## Pre-Launch Checklist
 
@@ -30,14 +30,13 @@ npm run build          # Production build succeeds
 ### 2. Health Endpoint
 
 ```bash
-curl -s https://paisaxe.es/api/health | jq
+curl -sS https://paisaxe.es/api/health -o /tmp/paisaxe-health.json -w "%{http_code}\n"
+cat /tmp/paisaxe-health.json | jq
 ```
 
 **Verify:**
-- `status`: "healthy"
-- `services.supabase.status`: "connected"
-- `services.supabase.latency_ms`: < 1000ms
-- `services.database.usage_percent`: < 80%
+- HTTP status: `200`
+- `status`: `"healthy"`
 
 ### 3. Core Endpoints
 
@@ -107,7 +106,7 @@ Check critical flags at https://paisaxe.es/api/feature-flags:
 | Types | `npm run typecheck` | No errors |
 | Lint | `npm run lint` | No errors |
 | Build | `npm run build` | Completes |
-| Health | `curl .../api/health` | status: healthy |
+| Health | `curl .../api/health` | HTTP 200 and `status: healthy` |
 | Site | `curl -w "%{http_code}" .../` | 200 (after launch) |
 
 ## Upptime Status Page
@@ -115,6 +114,7 @@ Check critical flags at https://paisaxe.es/api/feature-flags:
 - **Repo**: https://github.com/juan294/paisaxe-upptime
 - **Status page**: https://juan294.github.io/paisaxe-upptime/
 - **Monitors**: `paisaxe.es` and `paisaxe.es/api/health` every 5 minutes
+- **Machine gate behavior**: `/api/health` returns HTTP 503 on degraded state, so Upptime opens an incident instead of masking a bad backend with a 200
 - Opens GitHub Issues automatically on detected downtime
 - Reference config kept in `.github/upptime/.upptimerc.yml`
 
