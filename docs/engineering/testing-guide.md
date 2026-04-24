@@ -1,7 +1,7 @@
 # Testing Guide
 
 > Complete reference for Paisaxe's testing infrastructure.
-> Last updated: 2026-01-27
+> Last updated: 2026-04-24
 
 ---
 
@@ -11,8 +11,8 @@ Paisaxe uses a two-layer testing strategy:
 
 | Layer | Tool | Scope | Files | Tests |
 |-------|------|-------|-------|-------|
-| **Unit & Component** | Vitest + React Testing Library | Functions, components, hooks, API routes | 86 | 1,054 |
-| **End-to-End** | Playwright | Full browser journeys across pages | 6 | 50 (25 desktop + 25 mobile) |
+| **Unit & Component** | Vitest + React Testing Library | Functions, components, hooks, API routes | 324 | ~6,000 |
+| **End-to-End** | Playwright | Full browser journeys across pages | 16 | 32 (16 desktop + 16 mobile) |
 
 Both layers run in CI on every push and pull request to `develop` and `main`.
 
@@ -127,7 +127,7 @@ The helper provides 115+ Spanish translation strings covering all UI areas: comm
 
 ### Unit Test File Inventory
 
-**86 files, 1,054 tests** organized by area:
+**324 files, ~6,000 tests** organized by area (representative sample — the inventory below covers the original core files; the full test suite has grown significantly as new features were added):
 
 #### Pages & Layouts (15 files)
 
@@ -141,20 +141,31 @@ The helper provides 115+ Spanish translation strings covering all UI areas: comm
 | `app/*/error.test.tsx` | — | Error boundaries display error UI |
 | `app/*/layout.test.tsx` | — | Layouts wrap children correctly |
 
-#### API Routes (13 files)
+#### API Routes (representative sample)
 
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `api/chat/route.test.ts` | — | Input validation, embedding generation, Claude response, rate limiting |
-| `api/health/route.test.ts` | 9 | Status JSON, Supabase connectivity, degraded state, version |
+| `api/health/route.test.ts` | — | Status JSON, Supabase connectivity, degraded state, DB sub-check |
+| `api/health/db/route.test.ts` | — | Database connectivity sub-endpoint |
 | `api/favorites/route.test.ts` | — | GET/POST/DELETE with auth, 401 without auth |
-| `api/feature-flags/route.test.ts` | 5 | Flag listing, error handling |
-| `api/analytics/route.test.ts` | — | Event ingestion |
+| `api/feature-flags/route.test.ts` | — | Flag listing, error handling |
 | `api/admin/stories/route.test.ts` | — | Story listing with admin auth |
 | `api/admin/stories/[id]/status/route.test.ts` | — | Curation status updates |
-| `api/admin/stories/[id]/image/route.test.ts` | — | Image URL and file uploads |
+| `api/admin/stories/[id]/translations/route.test.ts` | — | Story translation management |
 | `api/admin/feature-flags/[key]/route.test.ts` | — | Feature flag toggle |
-| `api/admin/analytics/route.test.ts` | — | Analytics dashboard data |
+| `api/admin/costs-analytics/route.test.ts` | — | Platform cost summary |
+| `api/admin/stripe-analytics/route.test.ts` | — | Stripe revenue analytics |
+| `api/admin/github-analytics/route.test.ts` | — | GitHub traffic data |
+| `api/webhooks/stripe/route.test.ts` | — | Stripe webhook idempotency, grant_day_pass_idempotent |
+| `api/webhooks/elevenlabs/route.test.ts` | — | Post-call transcript + SMS dispatch |
+| `api/mcp/weather/route.test.ts` | — | Weather endpoint for Pelayo |
+| `api/mcp/places/route.test.ts` | — | Places search for Pelayo |
+| `api/mcp/make-booking/route.test.ts` | — | Booking initiation via ElevenLabs + Twilio |
+| `api/checkout/day-pass/route.test.ts` | — | Stripe day-pass checkout |
+| `api/cron/content-discovery/route.test.ts` | — | Content discovery cron |
+| `api/cron/fail-stale-translations/route.test.ts` | — | Stale translation cleanup |
+| `api/cron/github-traffic-sync/route.test.ts` | — | GitHub traffic sync |
 | `auth/callback/route.test.ts` | — | OAuth callback handling |
 
 #### Components (39 files)
@@ -193,29 +204,28 @@ The helper provides 115+ Spanish translation strings covering all UI areas: comm
 | `use-analytics.test.ts` | — | Event tracking with feature flag context |
 | `use-viewed-stories.test.ts` | — | Session-based viewed story tracking |
 
-#### Libraries & Utilities (22 files)
+#### Libraries & Utilities (representative sample)
 
 | File | Tests | What it covers |
 |------|-------|----------------|
-| `validation.test.ts` | 19 | Chat input sanitization, length limits, XSS prevention |
-| `i18n/translations.test.ts` | 72 | All translation keys resolve for all locales |
-| `i18n/detect-language.test.ts` | 23 | Browser language detection, Accept-Language parsing |
-| `i18n/resolve.test.ts` | 12 | Translation key resolution, fallback chains |
+| `validation.test.ts` | — | Chat input sanitization, length limits, XSS prevention |
+| `i18n/translations.test.ts` | — | All translation keys resolve for all locales |
+| `i18n/detect-language.test.ts` | — | Browser language detection, Accept-Language parsing |
+| `i18n/resolve.test.ts` | — | Translation key resolution, fallback chains |
 | `claude.test.ts` | — | Chat response generation, source extraction |
-| `search.test.ts` | 8 | Vector similarity search, hybrid keyword matching |
-| `embeddings.test.ts` | — | Voyage AI embedding generation, batching |
-| `embedding-cache.test.ts` | 9 | LRU cache, TTL expiration |
-| `rate-limit.test.ts` | — | Sliding window rate limiting |
-| `admin-auth.test.ts` | — | Bearer token validation, timing-safe comparison |
-| `shuffle.test.ts` | 7 | Fisher-Yates shuffle determinism with seeds |
-| `seasonal-weighting.test.ts` | 6 | Season-aware story boosting |
-| `mood-mapping.test.ts` | 6 | Mood-to-category mapping and filtering |
-| `freshness.test.ts` | 6 | Story age calculation for freshness badge |
-| `related-stories.test.ts` | — | Category and location matching |
-| `asturianu.test.ts` | 6 | Asturian language label lookups |
-| `stories-data.test.ts` | — | DB fetch, fallback stories on error |
-| `supabase.test.ts` | — | Client initialization |
-| `admin-api.test.ts` | — | Admin API client functions |
+| `search.test.ts` | — | Vector similarity search, hybrid keyword matching |
+| `csrf.test.ts` | — | CSRF token generation, double-submit cookie validation |
+| `request-context.test.ts` | — | Request correlation ID propagation |
+| `rate-limit.test.ts` | — | Sliding window rate limiting (Upstash Redis + fallback) |
+| `admin-auth.test.ts` | — | `withAdmin` HOF, session cookie validation, timing-safe comparison |
+| `logger.test.ts` | — | Structured log output, PII sanitization |
+| `env.test.ts` | — | Centralized env validation, `.trim()` enforcement |
+| `admin-api/*.test.ts` | — | Modular admin API (stories, costs, agents, optimizer, etc.) |
+| `shuffle.test.ts` | — | Fisher-Yates shuffle determinism with seeds |
+| `seasonal-weighting.test.ts` | — | Season-aware story boosting |
+| `mood-mapping.test.ts` | — | Mood-to-category mapping and filtering |
+| `freshness.test.ts` | — | Story age calculation for freshness badge |
+| `asturianu.test.ts` | — | Asturian language label lookups |
 | `utils.test.ts` | — | `cn()` class merging utility |
 
 #### Types & Metadata (5 files)
@@ -316,7 +326,7 @@ expect(response.status).toBe(200);
 | `desktop` | Desktop Chrome | 1280 x 720 |
 | `mobile` | Pixel 7 | 393 x 851 |
 
-Every test file runs twice — once per project — giving 50 total tests from 25 test cases.
+Every test file runs twice — once per project — giving 32 test configurations from 16 spec files.
 
 **Artifacts on failure:**
 - Screenshots (PNG)
@@ -340,72 +350,65 @@ Provides shared mock responses used by route interception across test files:
 
 ### E2E Test Files
 
-#### `smoke.spec.ts` — App Basics (4 tests)
+The E2E suite has grown to 16 spec files. Key specs:
+
+#### `smoke.spec.ts` — App Basics + CSP Canary
 
 | Test | What it verifies |
 |------|-----------------|
-| `/` redirects to `/immersive` | Server-side redirect works (waits for URL change) |
+| `/` redirects to `/immersive` | Server-side redirect works |
 | `/immersive` loads successfully | HTTP 200, non-empty page body |
 | Non-existent page returns 404 | Next.js 404 handling |
-| Health endpoint responds with JSON | `/api/health` returns `status`, `version`, `timestamp` |
+| Health endpoint responds with JSON | `/api/health` returns `status`, `timestamp` |
+| CSP canary | JavaScript actually executes (catches CSP misconfigurations) |
 
-No mocking needed — these tests exercise the raw app behavior.
+#### `immersive.spec.ts` — Story Viewer
 
-#### `immersive.spec.ts` — Story Viewer (5 tests)
+Story rendering, navigation arrows, keyboard arrow keys, info overlay toggle.
 
-| Test | What it verifies |
-|------|-----------------|
-| Renders a story with title and description | Fallback stories load, `h1` is visible |
-| Shows navigation arrows | Left arrow disabled on first story, right arrow enabled |
-| Navigates to next story via arrow click | Title changes after clicking the right arrow |
-| Navigates via keyboard arrow keys | `ArrowRight` key changes the story |
-| Toggles info overlay with 'i' key | Bottom panel's CSS opacity transitions to 0 |
+#### `chat.spec.ts` — Chat Panel
 
-**Mocking:** Feature flags mocked to disable mood overlay and feature-gated UI.
+Open/close chat, send message with mocked Claude response, SSE stream handling.
 
-#### `chat.spec.ts` — Chat Panel (3 tests)
+#### `sse-abort.spec.ts` — SSE Stream Abort
 
-| Test | What it verifies |
-|------|-----------------|
-| Opens chat panel when Ask button is clicked | Clicking the ask button opens the chat overlay (`z-50`) |
-| Sends a message and receives a mocked response | Types a question, submits, sees user message, sees mocked assistant response |
-| Closes chat panel via close button | X button dismisses the overlay |
+Verifies the chat stream is properly aborted and the Claude API call cancelled when the user closes the panel mid-stream.
 
-**Mocking:** Feature flags (to avoid overlays) + chat API (returns `MOCK_CHAT_RESPONSE`). The privacy notice is dismissed if it appears.
+#### `xss-canary.spec.ts` — XSS Safety
 
-#### `favorites.spec.ts` — Favorites Page (3 tests)
+Verifies that `SafeMarkdown` correctly sanitizes malicious payloads — `<script>` tags, `javascript:` links, `onerror` handlers.
 
-| Test | What it verifies |
-|------|-----------------|
-| Shows empty state when no favorites saved | The "explore" link is visible (empty state CTA) |
-| Has a back link to immersive | Header contains a link to `/immersive` |
-| Shows header with title | `<header>` element is present |
+#### `checkout.spec.ts` — Stripe Checkout
 
-No mocking needed — the page renders with empty localStorage.
+Embedded Stripe checkout session flow, return URL after payment.
 
-#### `admin.spec.ts` — Admin Dashboard (4 tests)
+#### `author-pill.spec.ts` — Author Attribution
 
-| Test | What it verifies |
-|------|-----------------|
-| Shows login form | "Paisaxe Admin" heading, password input, Continue button |
-| Shows error for empty key submission | Submitting without a key shows "Please enter the admin key" |
-| Rejects invalid admin key | Mocked 403 response shows "Invalid admin key" error |
-| Logs in with correct key and shows dashboard | Mocked 200 response transitions to dashboard with logout button |
+Author pill typewriter animation renders correctly in the immersive viewer.
 
-**Mocking:** Admin stories API mocked to accept `TEST_ADMIN_KEY` and reject anything else.
+#### `pre-launch.spec.ts` — Pre-Launch Smoke
 
-#### `api.spec.ts` — API Route Smoke Tests (6 tests)
+Exercises feature flags, story suggestions, i18n language switching across the full app.
 
-| Test | What it verifies |
-|------|-----------------|
-| `GET /api/health` returns valid JSON | Version, timestamp, supabase service status |
-| `GET /api/feature-flags` returns data or error | Valid JSON regardless of Supabase connectivity |
-| `POST /api/chat` rejects empty body | 400 status with error message |
-| `GET /api/favorites` returns 401 without auth | Unauthorized access blocked |
-| `POST /api/favorites` returns 401 without auth | Same for POST |
-| `DELETE /api/favorites` returns 401 without auth | Same for DELETE |
+#### `qa-journey.spec.ts` — Authenticated Journey
 
-**No page navigation** — these use Playwright's `request` API to call endpoints directly.
+Full user journey with Google OAuth (test user), favorites sync, voice access gating.
+
+#### `interactive-controls.spec.ts` — Keyboard & Touch
+
+Arrow-key navigation, mobile tap zones, progress bar keyboard interaction.
+
+#### `visual-regression.spec.ts` — Screenshot Baselines
+
+Playwright screenshots of key UI states compared against committed baselines.
+
+#### `stripe-real-checkout.spec.ts` — Stripe Integration (separate workflow)
+
+End-to-end Stripe test mode checkout. Runs in dedicated `e2e-stripe-integration.yml` workflow with real Stripe test credentials.
+
+#### Other specs
+
+`admin.spec.ts`, `favorites.spec.ts`, `api.spec.ts`, `suggestions.spec.ts` — cover admin dashboard login, favorites page, API smoke tests, and place suggestions respectively.
 
 ### How E2E Mocking Works
 
@@ -428,14 +431,24 @@ The app is designed to degrade gracefully when external services are unavailable
 ```
 e2e/
 ├── fixtures/
-│   └── mock-data.ts      # Shared mock responses
-├── smoke.spec.ts
-├── immersive.spec.ts
-├── chat.spec.ts
-├── favorites.spec.ts
+│   └── mock-data.ts          # Shared mock responses
+├── smoke.spec.ts             # App basics + CSP canary
+├── immersive.spec.ts         # Story viewer
+├── chat.spec.ts              # Chat panel
+├── sse-abort.spec.ts         # SSE stream abort
+├── xss-canary.spec.ts        # XSS safety validation
+├── checkout.spec.ts          # Stripe embedded checkout
+├── author-pill.spec.ts       # Author attribution
+├── pre-launch.spec.ts        # Feature flags + i18n smoke
+├── qa-journey.spec.ts        # Authenticated user journey
+├── interactive-controls.spec.ts  # Keyboard + touch
+├── visual-regression.spec.ts # Screenshot baselines
+├── stripe-real-checkout.spec.ts  # Stripe test mode (separate CI)
 ├── admin.spec.ts
+├── favorites.spec.ts
 ├── api.spec.ts
-└── tsconfig.json          # Isolated from app TypeScript
+├── suggestions.spec.ts
+└── tsconfig.json             # Isolated from app TypeScript
 ```
 
 **Naming:** `<feature>.spec.ts` (Playwright convention, distinct from Vitest's `.test.ts`).
@@ -531,7 +544,7 @@ Every `git commit` runs these checks sequentially:
 ```
 1. npm run typecheck    → TypeScript compilation
 2. npm run lint         → ESLint
-3. npm run test         → Full Vitest suite (1,054 tests)
+3. npm run test         → Full Vitest suite (~6,000 tests)
 ```
 
 If any step fails, the commit is rejected. This ensures no broken code reaches the repository.
@@ -547,7 +560,7 @@ Note: E2E tests do not run in pre-commit hooks (they require a running server an
 - Native TypeScript support without transpilation
 - ESM-first (matches Next.js App Router)
 - Compatible with Vite's plugin ecosystem (`@vitejs/plugin-react`)
-- Faster than Jest for this project size (~10 seconds for 1,054 tests)
+- Faster than Jest for this project size
 - Built-in UI mode for interactive debugging
 
 ### Why Playwright (not Cypress)

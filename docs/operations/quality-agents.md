@@ -3,7 +3,7 @@
 > Comprehensive guide to the automation, security, and quality infrastructure for Paisaxe.
 > Designed to be replicable by other teams on any Next.js + GitHub + Vercel + Supabase stack.
 
-**Last Updated**: January 31, 2026
+**Last Updated**: April 24, 2026
 **Scope**: CI/CD workflows, local agents, security measures, monitoring, and admin controls
 
 ---
@@ -30,7 +30,9 @@
 ```
 GitHub Actions (Push/PR)
   +-- ci.yml .............. Lint, Typecheck, Tests, Build
-  +-- e2e.yml ............. Playwright E2E tests
+  +-- e2e.yml ............. Playwright E2E tests (16 spec files)
+  +-- e2e-stripe-integration.yml .. Stripe test-mode E2E
+  +-- preview-smoke.yml ... Smoke test on Vercel preview deploy
   +-- gitleaks.yml ........ Secret scanning
   +-- license-check.yml ... Dependency license compliance
   +-- lighthouse.yml ...... Performance & accessibility audit
@@ -48,6 +50,15 @@ Local Agents (macOS launchd)
   +-- security-agent ...... Weekly Monday 09:00 AM - npm audit + licenses
   +-- documentation-agent  Weekly Sunday 06:00 AM - stale docs detection
   +-- performance-agent ... Weekly Saturday 10:00 AM - Lighthouse + bundles
+  +-- qa-agent ............ Weekly Sunday 08:00 AM - LLM response quality
+  +-- localization-agent .. Weekly Sunday 07:00 AM - translation coverage
+  +-- cost-analyst-agent .. Daily 03:00 AM - API spend monitoring
+
+Vercel Cron (serverless)
+  +-- content-discovery ... Weekly Monday 03:00 AM UTC
+  +-- fail-stale-translations Daily 06:00 AM UTC
+  +-- github-traffic-sync . Daily 01:00 AM UTC
+  +-- subscription-optimizer Weekly Monday 04:00 AM UTC
 
 Database (pg_cron)
   +-- vacuum-analyze ...... Weekly - database maintenance
@@ -56,6 +67,7 @@ Database (pg_cron)
 External Monitoring
   +-- Upptime ............. Every 5 minutes - site & API health
   +-- Vercel Speed Insights Real User Monitoring (Core Web Vitals)
+  +-- Sentry .............. Error tracking (client + server + edge)
 ```
 
 ### Cost
@@ -71,7 +83,7 @@ All free or included in existing services:
 
 ## Local Automated Agents
 
-Four agents run locally via macOS launchd, controlled via feature flags in the admin panel.
+Seven agents run locally via macOS launchd, controlled via feature flags in the admin panel.
 
 ### Agent Overview
 
@@ -81,10 +93,20 @@ Four agents run locally via macOS launchd, controlled via feature flags in the a
 | Security | `scripts/security-agent.sh` | Mon 9:00 AM | `docs/agents/security-report.md` | Disabled |
 | Documentation | `scripts/documentation-agent.sh` | Sun 6:00 AM | `docs/agents/documentation-report.md` | Disabled |
 | Performance | `scripts/performance-agent.sh` | Sat 10:00 AM | `docs/agents/performance-report.md` | Disabled |
+| QA | `scripts/qa-agent.sh` | Sun 8:00 AM | `docs/agents/qa-report.md` | Disabled |
+| Localization | `scripts/localization-agent.sh` | Sun 7:00 AM | `docs/agents/localization-report.md` | Disabled |
+| Cost Analyst | `scripts/cost-analyst-agent.sh` | Daily 3:00 AM | `docs/agents/cost-analyst-report.md` | Enabled |
 
 ### Feature Flag Control
 
-Agents check feature flags before running. Control them via the **production admin panel** (paisaxe.es/admin → Toggles → System category).
+Agents check feature flags before running. Control them via the **production admin panel** (paisaxe.es/admin → Agents tab) or via the local CLI:
+
+```bash
+scripts/agent-ctl.sh status           # Show all flags
+scripts/agent-ctl.sh enable <key>     # Enable agent
+scripts/agent-ctl.sh disable <key>    # Disable agent
+scripts/agent-ctl.sh master on|off    # Master toggle
+```
 
 | Flag | Purpose |
 |------|---------|
@@ -93,6 +115,11 @@ Agents check feature flags before running. Control them via the **production adm
 | `security_agent_enabled` | Enable/disable security agent |
 | `documentation_agent_enabled` | Enable/disable documentation agent |
 | `performance_agent_enabled` | Enable/disable performance agent |
+| `qa_agent_enabled` | Enable/disable QA agent |
+| `localization_agent_enabled` | Enable/disable localization agent |
+| `cost_analyst_agent_enabled` | Enable/disable cost analyst agent |
+
+**Important**: Local agents fetch flags from the **production** API (`paisaxe.es/api/feature-flags`). Agent config is stored in `scripts/agent-config.json` (gitignored); defaults in `scripts/agent-config.defaults.json`.
 
 **Important**: Local agents fetch flags from the **production** API (`paisaxe.es/api/feature-flags`), not localhost. This allows control even when the dev server isn't running.
 
@@ -105,6 +132,10 @@ com.paisaxe.coverage-agent.plist
 com.paisaxe.security-agent.plist
 com.paisaxe.documentation-agent.plist
 com.paisaxe.performance-agent.plist
+com.paisaxe.qa-agent.plist
+com.paisaxe.localization-agent.plist
+com.paisaxe.cost-analyst-agent.plist
+com.paisaxe.agent.cc-rpi-update.plist   (daily 3:30 AM — cc-rpi blueprint sync)
 ```
 
 **Manage agents**:
@@ -176,6 +207,34 @@ Runs weekly on Saturday at 10:00 AM. Analyzes:
 - Dependency counts
 
 Output: `docs/agents/performance-report.md`
+
+#### QA Agent
+
+Runs weekly on Sunday at 8:00 AM. Automated LLM testing for:
+- RAG response quality and source attribution
+- Content safety and boundaries
+- Hallucination detection
+- Budget-conscious sampling (configurable via feature flag config)
+
+Output: `docs/agents/qa-report.md`
+
+#### Localization Agent
+
+Runs weekly on Sunday at 7:00 AM. Ensures:
+- 100% translation coverage across all 6 locales (es, en, fr, de, pt, ast)
+- Missing UI strings detected and auto-filled (Spanish is source of truth)
+- Story translations in sync with source
+
+Output: `docs/agents/localization-report.md`
+
+#### Cost Analyst Agent
+
+Runs daily at 3:00 AM. Queries billing APIs (Anthropic, ElevenLabs, Twilio):
+- Spending trends and anomaly detection (>20% spikes)
+- Tier proximity warnings
+- Cost forecasting at 1x/3x/10x growth
+
+Output: `docs/agents/cost-analyst-report.md`
 
 ---
 
@@ -357,23 +416,35 @@ AI code review on every PR. Also responds to `@claude` mentions.
 
 ### Health Check Endpoint
 
-**Endpoint**: `GET /api/health`
+**Endpoint**: `GET /api/health` — returns `{ "status": "healthy"|"degraded", "timestamp": "..." }`.
 
-Returns:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2026-01-31T10:00:00.000Z",
-  "version": "1.0.0",
-  "uptime": 3600,
-  "services": {
-    "supabase": { "status": "connected", "latency": 45 }
-  },
-  "database": { "size_mb": 150, "usage_percent": 1.8 }
-}
-```
+Returns HTTP 200 when healthy; HTTP 503 when Supabase connectivity fails, approved stories are unavailable, or database usage reaches the 80% warning threshold. Used by Upptime and the preview smoke CI as the machine health gate.
 
-Always returns HTTP 200. Reports "degraded" in body if issues detected.
+**Sub-endpoint**: `GET /api/health/db` — database connectivity only (used internally by health checks and preview smoke tests).
+
+### Sentry Error Tracking
+
+Sentry is integrated across all three runtimes:
+
+| File | Runtime |
+|------|---------|
+| `sentry.client.config.ts` | Browser |
+| `sentry.server.config.ts` | Node.js (API routes) |
+| `sentry.edge.config.ts` | Vercel Edge Runtime |
+| `src/instrumentation.ts` | Next.js startup hook |
+
+**PII redaction**: The `beforeSend` hook in `src/lib/logger-sanitize.ts` strips emails, phone numbers, and API keys from error events before they reach Sentry.
+
+**Console guard**: An ESLint rule blocks raw `console.*` calls in API routes — use `import { logger } from "@/lib/logger"` instead.
+
+### Request Correlation IDs
+
+Every request gets a `x-request-id` header generated by `src/lib/proxy/request-id.ts`. The ID propagates through:
+- Server logs (included in every structured log line via `src/lib/request-context.ts`)
+- Sentry breadcrumbs
+- API response headers (for client-side correlation in browser devtools)
+
+Use the correlation ID to trace a single user request across distributed logs.
 
 ### Upptime Status Page
 
@@ -445,6 +516,11 @@ docs/agents/
 | `security_agent_enabled` | Security Agent | Disabled |
 | `documentation_agent_enabled` | Documentation Agent | Disabled |
 | `performance_agent_enabled` | Performance Agent | Disabled |
+| `qa_agent_enabled` | QA Agent | Disabled |
+| `localization_agent_enabled` | Localization Agent | Disabled |
+| `cost_analyst_agent_enabled` | Cost Analyst Agent | Enabled |
+| `subscription_optimizer_enabled` | Subscription Optimizer | Disabled |
+| `content_discovery_agent_enabled` | Content Discovery | Disabled |
 | `maintenance_mode` | Maintenance Mode | Disabled |
 
 ### GitHub Secrets
@@ -463,10 +539,21 @@ docs/agents/
 | `scripts/security-agent.sh` | Security agent script |
 | `scripts/documentation-agent.sh` | Docs freshness agent script |
 | `scripts/performance-agent.sh` | Performance agent script |
+| `scripts/qa-agent.sh` | QA agent script |
+| `scripts/localization-agent.sh` | Localization agent script |
+| `scripts/cost-analyst-agent.sh` | Cost analyst agent script |
+| `scripts/agent-ctl.sh` | CLI for toggling agent flags |
+| `scripts/agent-config.defaults.json` | Default agent flag values |
 | `.github/workflows/*.yml` | CI/CD workflows |
 | `lighthouserc.json` | Lighthouse thresholds |
 | `knip.json` | Dead code detection config |
 | `src/app/api/health/route.ts` | Health check endpoint |
+| `src/app/api/health/db/route.ts` | DB connectivity sub-check |
+| `sentry.client.config.ts` | Sentry browser config |
+| `sentry.server.config.ts` | Sentry server config |
+| `sentry.edge.config.ts` | Sentry edge config |
+| `src/lib/proxy/request-id.ts` | Request correlation ID middleware |
+| `src/lib/request-context.ts` | Request context propagation |
 | `src/components/admin/agent-config-panel.tsx` | Agent config UI |
 | `src/components/admin/maintenance-config-panel.tsx` | Maintenance config UI |
 
@@ -480,3 +567,6 @@ Located in `~/Library/LaunchAgents/`:
 | `com.paisaxe.security-agent.plist` | Security Agent |
 | `com.paisaxe.documentation-agent.plist` | Documentation Agent |
 | `com.paisaxe.performance-agent.plist` | Performance Agent |
+| `com.paisaxe.qa-agent.plist` | QA Agent |
+| `com.paisaxe.localization-agent.plist` | Localization Agent |
+| `com.paisaxe.cost-analyst-agent.plist` | Cost Analyst Agent |

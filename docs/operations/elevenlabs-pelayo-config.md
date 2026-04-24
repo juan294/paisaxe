@@ -1,10 +1,12 @@
 # ElevenLabs Pelayo Agent Configuration
 
-> **Last Updated:** 2026-02-04
-> **Agent ID (Guide):** `agent_3101kg5bvnf4f1r94f0cav0v9y61`
+> **Last Updated:** 2026-04-24
+> **Agent ID (Guide):** `agent_1201kgqhsdzxfkk9x7m1bjaew9mv` (recreated 2026-02-05)
 > **Agent ID (Booking):** `agent_5201kgm2956ge8ct95yxjas867z5`
 
 Pelayo is the primary voice agent for Paisaxe immersive stories - a warm and knowledgeable tourism guide for Asturias, Spain.
+
+> **Agent configs are now tracked in git.** Edit `agent_configs/` JSON files → run `npm run agents:push:dry` to preview → `npm run agents:push` to apply. See `docs/operations/elevenlabs-agents-as-code.md` for the full CLI workflow.
 
 ---
 
