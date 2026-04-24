@@ -14,7 +14,6 @@ type ChatDoneEvent = {
 type ChatErrorEvent = {
   type: "error";
   message: string;
-  hadPartialContent: boolean;
 };
 
 type ChatStreamEvent = ChatTextEvent | ChatDoneEvent | ChatErrorEvent;
@@ -50,7 +49,6 @@ export function parseSseEvent(line: string): ChatStreamEvent | null {
       return {
         type: "error",
         message: event.message,
-        hadPartialContent: event.hadPartialContent === true,
       };
     }
   } catch {

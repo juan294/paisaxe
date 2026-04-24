@@ -224,7 +224,7 @@ describe("useStreamChat", () => {
 
   it("should handle SSE error events", async () => {
     const encoder = new TextEncoder();
-    const errorEvent = `data: ${JSON.stringify({ type: "error", message: "Error", hadPartialContent: false })}\n\n`;
+    const errorEvent = `data: ${JSON.stringify({ type: "error", message: "Error" })}\n\n`;
     const stream = new ReadableStream({
       start(controller) {
         controller.enqueue(encoder.encode(errorEvent));
@@ -255,11 +255,11 @@ describe("useStreamChat", () => {
     );
   });
 
-  it("should discard partial assistant text when SSE error reports partial content", async () => {
+  it("should replace partial assistant text with the generic fallback on SSE error", async () => {
     const encoder = new TextEncoder();
     const events = [
       `data: ${JSON.stringify({ type: "text", content: "Partial answer" })}\n\n`,
-      `data: ${JSON.stringify({ type: "error", message: "stream_failed", hadPartialContent: true })}\n\n`,
+      `data: ${JSON.stringify({ type: "error", message: "stream_failed" })}\n\n`,
     ];
 
     let index = 0;

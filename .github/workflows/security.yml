@@ -65,24 +65,22 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
 
     steps:
-      - name: Skip when Vercel token is unavailable
-        if: ${{ env.VERCEL_TOKEN == '' }}
-        run: echo "VERCEL_TOKEN is not configured; skipping Vercel env safety check."
-
-      - name: Checkout code
-        if: ${{ env.VERCEL_TOKEN != '' }}
-        uses: actions/checkout@v6
-
-      - name: Load Vercel project metadata
-        if: ${{ env.VERCEL_TOKEN != '' }}
+      # `.vercel/project.json` is gitignored, so project/org IDs must come
+      # from repository variables instead of a checked-in metadata file.
+      # Configure `VERCEL_PROJECT_ID` and `VERCEL_ORG_ID` under
+      # Settings → Secrets and variables → Actions → Variables.
+      - name: Skip when Vercel credentials are unavailable
+        if: ${{ env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '' }}
         run: |
-          echo "VERCEL_PROJECT_ID=$(jq -r '.projectId' .vercel/project.json)" >> "$GITHUB_ENV"
-          echo "VERCEL_ORG_ID=$(jq -r '.orgId' .vercel/project.json)" >> "$GITHUB_ENV"
+          echo "Vercel env safety check requires VERCEL_TOKEN (secret) plus"
+          echo "VERCEL_PROJECT_ID and VERCEL_ORG_ID (repo variables). Skipping."
 
       - name: Assert legacy agent override is absent from Vercel env
-        if: ${{ env.VERCEL_TOKEN != '' }}
+        if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_PROJECT_ID != '' && env.VERCEL_ORG_ID != '' }}
         run: |
           legacy_key="$(printf '%s_%s_%s\n' ALLOW AGENT RUN)"
           response="$(curl -fsS \

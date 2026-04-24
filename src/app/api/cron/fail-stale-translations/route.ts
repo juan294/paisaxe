@@ -4,7 +4,6 @@ import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase";
 
-const LOCK_ID = 1006;
 const STALE_TRANSLATION_WINDOW_MS = 30 * 60 * 1000;
 
 async function failStaleTranslations(): Promise<NextResponse> {
@@ -13,15 +12,28 @@ async function failStaleTranslations(): Promise<NextResponse> {
     Date.now() - STALE_TRANSLATION_WINDOW_MS
   ).toISOString();
 
-  const { data: locked, error: lockError } = await supabase.rpc(
-    "pg_try_advisory_lock",
-    { lockid: LOCK_ID }
+  const { data, error } = await supabase.rpc(
+    "fail_stale_story_translations_locked",
+    { p_cutoff: cutoff }
   );
 
-  if (lockError || !locked) {
+  if (error) {
+    logger.error("[CRON_FAIL_STALE_TRANSLATIONS_FAILED]", {
+      cutoff,
+      error: error.message,
+    });
+    return NextResponse.json(
+      { error: "Failed to fail stale translations" },
+      { status: 500 }
+    );
+  }
+
+  // The RPC returns -1 when another cron invocation holds the
+  // transaction-scoped advisory lock; surface that as 409 to keep the
+  // existing response contract intact.
+  if (data === -1) {
     logger.warn("[CRON_FAIL_STALE_TRANSLATIONS_SKIPPED]", {
       reason: "lock_held",
-      error: lockError?.message,
     });
     return NextResponse.json(
       { status: "skipped", reason: "lock_held" },
@@ -29,36 +41,18 @@ async function failStaleTranslations(): Promise<NextResponse> {
     );
   }
 
-  try {
-    const { data, error } = await supabase.rpc(
-      "fail_stale_story_translations",
-      { p_cutoff: cutoff }
-    );
+  const failed_count = typeof data === "number" ? data : 0;
 
-    if (error) {
-      logger.error("[CRON_FAIL_STALE_TRANSLATIONS_FAILED]", {
-        cutoff,
-        error: error.message,
-      });
-      return NextResponse.json(
-        { error: "Failed to fail stale translations" },
-        { status: 500 }
-      );
-    }
+  logger.info("[CRON_FAIL_STALE_TRANSLATIONS]", {
+    cutoff,
+    failed_count,
+  });
 
-    logger.info("[CRON_FAIL_STALE_TRANSLATIONS]", {
-      cutoff,
-      failed_count: data ?? 0,
-    });
-
-    return NextResponse.json({
-      status: "ok",
-      failed_count: data ?? 0,
-      cutoff,
-    });
-  } finally {
-    await supabase.rpc("pg_advisory_unlock", { lockid: LOCK_ID });
-  }
+  return NextResponse.json({
+    status: "ok",
+    failed_count,
+    cutoff,
+  });
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

@@ -177,11 +177,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
 
               updated[assistantIndex] = {
                 role: "assistant",
-                // Replace partial text with the generic fallback when the server
-                // marks the streamed answer as incomplete.
-                content: event.hadPartialContent
-                  ? t("chat.error_generic")
-                  : t("chat.error_generic"),
+                content: t("chat.error_generic"),
                 images: current?.images,
               };
               return updated;
