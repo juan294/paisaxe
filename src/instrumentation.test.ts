@@ -29,7 +29,7 @@ describe("instrumentation register", () => {
   it("routes console.error through the shared logger with redaction", async () => {
     vi.stubEnv("NEXT_RUNTIME", "nodejs");
     vi.stubEnv("NODE_ENV", "test");
-    const spy = vi.spyOn(process.stdout, "write");
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { register } = await import("./instrumentation");
     await register();
