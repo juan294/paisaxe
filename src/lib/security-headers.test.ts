@@ -58,6 +58,17 @@ describe("CSP header via buildCspHeader (proxy.ts)", () => {
     expect(scriptSrc).not.toContain("'strict-dynamic'");
   });
 
+  it("should include unsafe-eval only in development script-src", () => {
+    const developmentCsp = buildCspHeader({ nodeEnv: "development" });
+    const developmentScriptSrc = developmentCsp
+      .split(";")
+      .find((d) => d.trim().startsWith("script-src"))!;
+    const defaultScriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
+
+    expect(developmentScriptSrc).toContain("'unsafe-eval'");
+    expect(defaultScriptSrc).not.toContain("'unsafe-eval'");
+  });
+
   it("should include blob: in script-src for AudioWorklet support", () => {
     const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
     expect(scriptSrc).toContain("blob:");

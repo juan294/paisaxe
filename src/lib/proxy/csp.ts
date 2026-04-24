@@ -19,10 +19,23 @@
  * https://js.stripe.com/v3 in place and does not publish stable integrity
  * hashes for it.
  */
-export function buildCspHeader(): string {
+type BuildCspHeaderOptions = {
+  nodeEnv?: NodeJS.ProcessEnv["NODE_ENV"];
+};
+
+export function buildCspHeader({ nodeEnv = process.env.NODE_ENV }: BuildCspHeaderOptions = {}): string {
+  const scriptSrc = [
+    "script-src 'self' 'unsafe-inline'",
+    nodeEnv === "development" ? "'unsafe-eval'" : null,
+    "blob:",
+    "https://js.stripe.com",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com`,
+    scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.googleusercontent.com",
     "font-src 'self' data:",
