@@ -43,7 +43,8 @@ export function useFavorites(): UseFavoritesReturn {
     setIsLoading(false);
   }, [user, authLoading]);
 
-  // Sync with cloud when user logs in
+  // Sync authenticated favorites from the cloud. localStorage is only a cache of
+  // the server state, not a second anonymous persistence model.
   useEffect(() => {
     if (!user || !session) return;
 
@@ -59,31 +60,8 @@ export function useFavorites(): UseFavoritesReturn {
 
         if (response.ok) {
           const cloudFavorites: string[] = await response.json();
-
-          // Merge local and cloud favorites
-          const localFavorites = JSON.parse(
-            localStorage.getItem(STORAGE_KEY) || "[]"
-          );
-          const merged = [...new Set([...cloudFavorites, ...localFavorites])];
-
-          // Upload any new local favorites to cloud
-          const newFavorites = localFavorites.filter(
-            (id: string) => !cloudFavorites.includes(id)
-          );
-          if (newFavorites.length > 0) {
-            await fetch("/api/favorites", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${session.access_token}`,
-                ...csrfHeaders(),
-              },
-              body: JSON.stringify({ storyIds: newFavorites }),
-            });
-          }
-
-          setFavorites(merged);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          setFavorites(cloudFavorites);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudFavorites));
         }
       } catch (error) {
         console.error("Error syncing favorites:", error);

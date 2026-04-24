@@ -448,18 +448,11 @@ describe("useFavorites", () => {
   });
 
   describe("cloud sync on login", () => {
-    it("should merge local and cloud favorites when user logs in", async () => {
-      // Local has story-1, cloud has story-2
+    it("should replace local cache with cloud favorites when user logs in", async () => {
+      // Local cache has story-1, cloud is source of truth with story-2
       localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
 
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
-        if (!options?.method || options.method === "GET") {
-          // Cloud returns story-2
-          return { ok: true, json: async () => ["story-2"] };
-        }
-        // POST for uploading new local favorites
-        return { ok: true, json: async () => ({}) };
-      });
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ["story-2"] });
 
       mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
       mockAuthReturn.session = { access_token: "test-token" };
@@ -470,25 +463,17 @@ describe("useFavorites", () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      // Should have merged favorites
       await waitFor(() => {
-        expect(result.current.favorites).toContain("story-1");
-        expect(result.current.favorites).toContain("story-2");
+        expect(result.current.favorites).toEqual(["story-2"]);
       });
     });
 
-    it("should upload new local favorites to cloud", async () => {
+    it("should not upload stale local favorites to cloud", async () => {
       localStorageMock.getItem.mockReturnValue(
         JSON.stringify(["story-1", "story-3"])
       );
 
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
-        if (!options?.method || options.method === "GET") {
-          // Cloud only has story-1; story-3 is new to cloud
-          return { ok: true, json: async () => ["story-1"] };
-        }
-        return { ok: true, json: async () => ({}) };
-      });
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ["story-1"] });
 
       mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
       mockAuthReturn.session = { access_token: "test-token" };
@@ -499,27 +484,14 @@ describe("useFavorites", () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      // Wait for sync to complete
       await waitFor(() => {
-        const postCalls = mockFetch.mock.calls.filter(
-          (call: unknown[]) => (call[1] as Record<string, unknown>)?.method === "POST"
-        );
-        expect(postCalls.length).toBeGreaterThanOrEqual(1);
+        expect(result.current.favorites).toEqual(["story-1"]);
       });
 
-      // Should have uploaded story-3 (local-only) to cloud
       const postCalls = mockFetch.mock.calls.filter(
         (call: unknown[]) => (call[1] as Record<string, unknown>)?.method === "POST"
       );
-      const uploadCall = postCalls.find((call: unknown[]) => {
-        try {
-          const body = JSON.parse((call[1] as Record<string, string>)?.body);
-          return body.storyIds && body.storyIds.includes("story-3");
-        } catch {
-          return false;
-        }
-      });
-      expect(uploadCall).toBeDefined();
+      expect(postCalls).toHaveLength(0);
     });
 
     it("should not upload to cloud if no new local favorites", async () => {
@@ -586,19 +558,14 @@ describe("useFavorites", () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      // Should not crash - just skip the merge
+      // Should not crash - just skip the cloud cache refresh
       expect(result.current.favorites).toBeDefined();
     });
 
-    it("should save merged favorites to localStorage", async () => {
+    it("should save cloud favorites to localStorage", async () => {
       localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
 
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
-        if (!options?.method || options.method === "GET") {
-          return { ok: true, json: async () => ["story-2"] };
-        }
-        return { ok: true, json: async () => ({}) };
-      });
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ["story-2"] });
 
       mockAuthReturn.user = { id: "user-1", email: "test@test.com" };
       mockAuthReturn.session = { access_token: "test-token" };
@@ -610,17 +577,16 @@ describe("useFavorites", () => {
       });
 
       await waitFor(() => {
-        expect(result.current.favorites.length).toBe(2);
+        expect(result.current.favorites).toEqual(["story-2"]);
       });
 
-      // localStorage should be updated with merged favorites
+      // localStorage should be updated with cloud favorites only
       const setItemCalls = localStorageMock.setItem.mock.calls.filter(
         (call: unknown[]) => call[0] === "paisaxe_favorites"
       );
       const lastCall = setItemCalls[setItemCalls.length - 1];
       const savedFavorites = JSON.parse(lastCall[1]);
-      expect(savedFavorites).toContain("story-1");
-      expect(savedFavorites).toContain("story-2");
+      expect(savedFavorites).toEqual(["story-2"]);
     });
 
     it("should set isLoading during cloud sync", async () => {
