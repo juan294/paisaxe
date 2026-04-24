@@ -70,7 +70,7 @@ develop   # Active development (DEFAULT)
 **This is a user-initiated process. Agents prepare, users authorize.**
 
 `main` is protected with branch protection rules:
-- **Required status checks**: `lint-and-typecheck`, `test`, `build`, `e2e` must all pass
+- **Required status checks**: `lint-and-typecheck`, `test`, `build`, `e2e`, `Smoke test Vercel preview` must all pass
 - **Force pushes blocked**, **deletion blocked**
 - **PRs required** (0 approvals — solo dev can self-merge after CI passes)
 
@@ -101,7 +101,7 @@ Present the summary to the user:
 # Create the PR
 gh pr create --base main --head develop --title "Release: description of changes"
 
-# Wait for all 4 status checks to pass
+# Wait for all 5 status checks to pass
 gh pr checks
 ```
 
@@ -114,8 +114,8 @@ gh pr merge --merge
 **Step 5: Verify deployment** (agent can do this autonomously after merge):
 ```bash
 vercel ls --limit 5
-# Check /api/health on production
-curl -s https://paisaxe.es/api/health
+# Check /api/health on production (must return HTTP 200 with status=healthy)
+curl -sS https://paisaxe.es/api/health
 ```
 
 **Never bypass branch protection.** If CI fails on the PR, fix on `develop` first, push, and let the PR update.

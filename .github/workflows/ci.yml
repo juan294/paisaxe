@@ -9,6 +9,7 @@ name: CI
 # That workflow waits for the Vercel preview deployment and hits
 # /api/health + homepage against real env vars, catching runtime failures
 # that dummy-key builds cannot detect (see incident: Next.js 16.2.1).
+# The health probe fails on non-200 or JSON status != "healthy".
 
 on:
   push:
