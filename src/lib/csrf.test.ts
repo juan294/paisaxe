@@ -223,4 +223,12 @@ describe("validateOrigin", () => {
     });
     expect(validateOrigin(req, allowedOrigins)).toBe(true);
   });
+
+  it("returns false when Referer header is a malformed URL", () => {
+    // Exercises the `new URL(referer)` catch branch (csrf.ts:91)
+    const req = new Request("https://paisaxe.es/api/chat", {
+      headers: { referer: "not a valid url" },
+    });
+    expect(validateOrigin(req, allowedOrigins)).toBe(false);
+  });
 });

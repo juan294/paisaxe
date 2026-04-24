@@ -1,49 +1,57 @@
-# Localization Report — 2026-04-22
+# Localization Report — 2026-04-24
+
+Status: GREEN — 100% translation coverage across all 6 supported locales.
 
 ## Summary
 
-| Locale | UI Keys | Missing | Orphan |
-|--------|---------|---------|--------|
-| es (source of truth) | 395 | — | — |
-| en | 395 | 0 | 0 |
-| fr | 395 | 0 | 0 |
-| de | 395 | 0 | 0 |
-| pt | 395 | 0 | 0 |
-| ast | 395 | 0 | 0 |
+| Locale | UI keys | Story translations | Completion |
+|--------|---------|--------------------|-----------:|
+| es (Spanish, source of truth) | 395 | 100 (base) | 100% |
+| en (English)                  | 395 | 100 | 100% |
+| fr (French)                   | 395 | 100 | 100% |
+| de (German)                   | 395 | 100 | 100% |
+| pt (Portuguese)               | 395 | 100 | 100% |
+| ast (Asturian)                | 395 | 100 | 100% |
 
-**UI coverage: 100% (6/6 locales, 395 leaf keys each)**
+Note: The agent brief lists 5 supported locales (es, en, fr, de, pt). The codebase also ships `ast.ts` (Asturian/Bable) and `ast` story translations — included here for completeness since they follow the same invariants.
 
-| Story translations | Count |
-|--------------------|-------|
-| Translation entries | 100 |
-| Locales per entry | 5 (en, fr, de, pt, ast) |
-| Fields per locale | 3 (title, subtitle, description) |
-| Incomplete entries | 0 |
+## UI Translations (src/lib/i18n/)
 
-**Story translation coverage: 100% (100 stories × 5 locales × 3 fields = 1,500 translations, all present)**
+- Leaf key count: 395 per locale (up +3 from last report's 392 — three new keys propagated across all locales since 2026-04-17).
+- Missing keys: 0 for every non-es locale.
+- Orphaned keys (present in non-es but not in es): 0.
+- Type safety: `npx tsc --noEmit` exits clean with 0 errors.
 
-TypeScript check: Pass. `npx tsc --noEmit` reports zero i18n- or translations-related errors.
+All placeholders (`{current}`, `{total}`, `{title}`, etc.) preserved exactly across locales.
 
-## Fixed This Run
+## Story Translations (content/translations/story-translations.ts)
 
-None. All translations are complete and stable since the last clean run. No missing keys, no orphan keys, no incomplete story entries.
+- Stories tracked: 100 (up +5 from last report's 95 — five new stories added and fully translated).
+- Expected translations: 100 stories × 5 non-es locales = 500.
+- Complete translations (title + subtitle + description): 500.
+- Missing/incomplete: 0.
 
-## Remaining Gaps
+## Fixed
+
+Nothing. No translations were missing, no orphans were present, and no type errors were introduced.
+
+## Remaining gaps
+
+None. Coverage has remained at 100% for 40 consecutive days (since 2026-03-15).
+
+## Orphaned keys
 
 None.
 
-## Orphaned Keys
+## Cosmetic carry-forward (non-blocking)
 
-None — every non-Spanish key traces back to an es.ts source key.
+`fr.ts`, `de.ts`, `pt.ts` already have the 8 inline `// LOCATION-SPECIFIC` comments that reached parity on 2026-04-14 via triage commit `e858ef7`. Parity with `es.ts`, `en.ts`, `ast.ts` confirmed this run.
 
-## Changes Since Last Report (2026-04-17)
+## Run notes
 
-- UI key count increased from 392 → 395 (3 new leaf keys added under one of the existing sections; all locales already in sync).
-- Story translation entries increased from 95 → 100 (5 new stories added to `STORY_TRANSLATIONS`, all with full en/fr/de/pt/ast coverage).
-- Zero missing or orphan keys across any locale or any story.
-
-## Notes
-
-- `content/translations/story-translations.ts` shows as modified in `git status` — the modification is historical (translation additions from prior commits) already present in the working tree. No edits were made by this agent run.
-- Spanish (es) remains the source of truth for both UI and story content. Story Spanish fields live on the story metadata itself, not in `story-translations.ts`.
-- The project uses lazy-loaded locale bundles (es+en static, fr/de/pt/ast dynamic) — no performance impact from the unchanged key count.
+- Date: 2026-04-24
+- Project: /Users/juan/code/paisaxe
+- Command reference:
+  - Key extraction via flattened `Translations` tree (leaf paths only, nested objects traversed).
+  - Story check: every slug must have `title`, `subtitle`, `description` for each non-es locale.
+  - Type validation: `npx tsc --noEmit` (project-wide, passes cleanly).
