@@ -3,7 +3,7 @@
 [![CI](https://github.com/juan294/paisaxe/actions/workflows/ci.yml/badge.svg)](https://github.com/juan294/paisaxe/actions/workflows/ci.yml)
 [![E2E Tests](https://github.com/juan294/paisaxe/actions/workflows/e2e.yml/badge.svg)](https://github.com/juan294/paisaxe/actions/workflows/e2e.yml)
 [![Security Scan](https://github.com/juan294/paisaxe/actions/workflows/security.yml/badge.svg)](https://github.com/juan294/paisaxe/actions/workflows/security.yml)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-24_LTS-green)](https://nodejs.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
