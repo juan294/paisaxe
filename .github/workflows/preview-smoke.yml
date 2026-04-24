@@ -113,7 +113,7 @@ jobs:
         run: |
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
           echo "Testing: $PREVIEW_URL"
-          response=$(curl -sf -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL" -o /dev/null -w "%{http_code}")
+          response=$(curl -sfL -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL" -o /dev/null -w "%{http_code}")
           if [ "$response" != "200" ]; then
             echo "Homepage failed: HTTP $response"
             exit 1
