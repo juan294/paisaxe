@@ -1,3 +1,9 @@
-The sync metadata file is flagged as a sensitive file and permission prompts cannot be approved in this headless agent context. However, since the only changes in cc-rpi v1.17.1 → v1.17.2 are documentation files (`CHANGELOG.md`, `README.md`) — no templates/commands/skills/rules/CLAUDE.md.template changes — the project is effectively up to date.
+`.claude/` is gitignored in this project — metadata update stays local. No commit needed.
 
-cc-rpi sync: already up to date as of v1.17.2 (blueprint commits since last sync only touched CHANGELOG.md and README.md; no template, command, skill, or rule content changed). Sync metadata file update was blocked by sensitive-file protection and was not written; next run will detect the same state.
+cc-rpi sync: v1.17.1 → v1.17.2 (commit `7313cc3`).
+
+Changes in blueprint since last sync:
+- `docs: add Chapa impact badge to README`
+- `release: v1.17.2 -- document one-harness-per-blueprint scope policy`
+
+Only `CHANGELOG.md` and `README.md` changed upstream — no template, command, skill, rule, AGENTS.md, CLAUDE.md, or settings.json updates required. Sync metadata at `.claude/cc-rpi-sync.json` updated locally (directory is gitignored, so no commit).

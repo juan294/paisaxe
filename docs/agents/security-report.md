@@ -1,135 +1,132 @@
-# Security Report
+# Security Report — 2026-04-24
 
-> Auto-generated on 2026-04-22
+## Status: YELLOW
 
-## Health Status: GREEN
+3 moderate advisories detected, **0 exploitable** in this codebase. GREEN streak ends at 2 runs.
+Root cause is a transitive `uuid <14.0.0` advisory reaching us through the `resend -> svix -> uuid` chain. The vulnerable code path (`uuid.v3/v5/v6` with caller-provided `buf`) is not reachable from Paisaxe application code.
 
-**Executive Summary:** 0 advisories detected, **0 exploitable**. Third consecutive GREEN since commit `e66e510` (Apr 20) cleared the protobufjs Critical + dompurify Moderate advisories that had interrupted the prior 9-cycle streak on Apr 17. Production dependency surface fully clean. npm audit reports 0 vulnerabilities across the full tree. Remaining outdated packages are minor/patch only, with zero CVEs. No source-code security regressions this cycle.
+## Executive Summary
 
----
+- **Advisories**: 3 moderate, 0 high, 0 critical
+- **Exploitable**: 0 (both intermediates — svix and uuid — only surface via Resend's internal webhook/ID generation, with no user-controlled `buf` input)
+- **Fixable via `npm audit fix`**: 0 (requires `--force` because fix path upgrades `resend` to 6.1.3 and npm reads it as a breaking downgrade from 6.12.x)
+- **Production dep gaps**: 7 production packages have newer minor/patch (non-security)
+- **License compliance**: Pass — no unapproved copyleft
+- **CI/CD security automation**: Dependabot + Gitleaks + npm audit active
+- **Security headers**: All in source. Live HTTP header check skipped (dev server was not running)
+- **Package manifest drift**: `package.json` pins `resend@^6.12.2` but `node_modules` has `6.12.0`. `npm install` has not been run since the pin. Low severity — this is what `npm ls` flagged as `invalid`.
 
-## Vulnerability Analysis
+## Vulnerability Table
 
-**npm audit: 0 vulnerabilities across all dependencies.**
+| Severity | Package        | Advisory (GHSA)                 | CVE       | Attack Vector                                                                                                                                                          | Fixable                              | Risk Here    |
+|----------|----------------|---------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------|--------------|
+| Moderate | uuid 10.0.0    | GHSA-w5hq-g745-h8pq             | Pending   | Missing buffer bounds check in `uuid.v3/v5/v6` when caller passes a `buf` argument. Affects name-based (v3/v5) and time-based (v6) only. v1/v4/v7 not affected.         | Only via `--force` (breaking)        | NOT EXPLOITABLE |
+| Moderate | svix 1.90.0    | Transitive via uuid             | Pending   | svix uses `uuid` internally to generate webhook message IDs. These are v4 (random), so the v3/v5/v6 bounds-check bug never triggers.                                    | Only via `--force` (breaking)        | NOT EXPLOITABLE |
+| Moderate | resend 6.12.0  | Transitive via svix -> uuid     | Pending   | `resend` client uses `svix` only for inbound webhook verification. Paisaxe calls `resend.emails.send(...)` — outbound only (see `src/lib/email.ts:93`). Webhook-verify path is unused. | Only via `--force` (breaking)        | NOT EXPLOITABLE |
 
-| Severity | Package | Advisory | CVE | Attack Vector | Fixable | Risk Assessment |
-|----------|---------|----------|-----|---------------|---------|-----------------|
-| — | — | No active advisories | — | — | — | — |
+CVE identifiers: the npm audit output does not yet carry a CVE alias for GHSA-w5hq-g745-h8pq. GitHub Security Advisories has not assigned one as of the scan time.
 
-### Recently Resolved (retained for audit trail)
+## Detailed Exploitability Analysis
 
-| Advisory | CVE | Resolution | Commit |
-|----------|-----|-----------|--------|
-| `protobufjs@7.5.4` — Critical (GHSA-xq3m-2v4x-88gg) | CVE-2024-31130 (prototype pollution via Object.setPrototypeOf on untrusted .proto input) | Transitive bump to >=7.5.5 via `npm audit fix` | `e66e510` (2026-04-20) |
-| `dompurify@3.3.3` — Moderate (GHSA-39q2-94rc-95cp) | CVE-2025-26791 (ADD_TAGS/FORBID_TAGS bypass allowing mXSS) | Transitive bump to >3.3.3 (now 3.4.0) | `e66e510` (2026-04-20) |
+### uuid bounds-check bug (GHSA-w5hq-g745-h8pq)
 
-**Exploitability assessment for the resolved pair:** neither was exploitable in this codebase — `protobufjs` was used only by `@opentelemetry/otlp-transformer` to serialize internal telemetry (no user input flowed into `.proto` parsing), and `dompurify` was pulled in solely by PostHog's internal sanitizer (application code has zero direct `DOMPurify.sanitize` call sites in `src/`). Fix was still applied on the general principle of keeping audit clean and avoiding future chain-of-trust issues.
+- **The bug**: `uuid.v3(name, namespace, buf, offset)`, `v5(...)`, and `v6(...)` do not validate that `buf` is large enough to hold the 16-byte UUID. A caller passing a too-small `Buffer` and a non-zero `offset` can write out of bounds.
+- **Who can trigger it**: only code that calls `uuid.v3/v5/v6` with caller-controlled `buf` **and** caller-controlled `offset`.
+- **Where it enters Paisaxe**: only via `svix` (used by `resend`). svix generates webhook IDs with `uuid.v4()` — not v3/v5/v6 — and does not expose `buf` to the caller.
+- **Our code path**: `src/lib/email.ts:54` -> `resend.emails.send(...)`. This is an outbound HTTPS call with no round-trip through `svix` UUID generation. We do not import `svix` or `uuid` directly in production code. `grep` confirms the six `src/**/uuid` matches are all in test files (mocked) or schema files (unrelated).
+- **Conclusion**: the vulnerable surface never gets exercised. Upgrading clears the advisory but does not close a real exposure.
 
----
+### Fix strategy (non-urgent, tracked)
 
-## Persistent Security Controls (Verified)
+```bash
+# Option A (recommended): install resend 6.12.2 which is already pinned in package.json.
+# This is non-breaking — 6.12.0 and 6.12.2 are both v6.x patches.
+# It does NOT upgrade svix past the vulnerable range on its own, so the GHSA stays open.
+npm install
 
-### Security Headers
+# Option B: wait for resend to bump its svix dependency past 1.91.1 upstream.
+# No manual action required — Dependabot will open a PR when available.
 
-Verified in source. Live check skipped — dev server not running this cycle.
+# Option C: force the fix today (NOT recommended — downgrades resend from 6.12.x to 6.1.3,
+# which would break typed signatures used in src/lib/email.ts and require rewriting the
+# sendEmail payload shape).
+# npm audit fix --force
+```
 
-| Header | Source | Value | Status |
-|--------|--------|-------|--------|
-| `Strict-Transport-Security` | `next.config.ts` | `max-age=63072000; includeSubDomains; preload` (prod only) | Pass |
-| `X-Content-Type-Options` | `next.config.ts` | `nosniff` | Pass |
-| `X-Frame-Options` | `next.config.ts` | `DENY` | Pass |
-| `Referrer-Policy` | `next.config.ts` | `strict-origin-when-cross-origin` | Pass |
-| `Permissions-Policy` | `next.config.ts` | `camera=(), geolocation=(), microphone=(self)` | Pass |
-| `Content-Security-Policy` | `src/lib/proxy/csp.ts` | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com; object-src 'none'; frame-ancestors 'none'; ...` | Pass |
+The practical path: (A) run `npm install` to sync the lockfile, then wait for the upstream svix fix rather than forcing a resend major downgrade.
 
-**CSP note (load-bearing):** `'self' 'unsafe-inline'` is intentional and required because PPR (`cacheComponents`) prerenders HTML at build time without nonces. Reintroducing `'strict-dynamic'` or nonce-only policy would block all scripts. The `CSP canary` test in `e2e/smoke.spec.ts` guards this. Do not "tighten" the script-src without first reverting PPR or adding nonces through a dynamic root layout.
+## Prioritized Remediation
 
-### Webhook / Request Authentication
-
-- 4 production webhook endpoints (Stripe, ElevenLabs x2, Voice) all verify signatures via `crypto.timingSafeEqual`.
-- 7 `timingSafeEqual` call sites audited — all use equal-length buffers (preventing length-leak side channel).
-- CSRF middleware active on all state-changing routes. Origin-not-allowed path covered by tests (coverage agent, 2026-04-20).
-
-### Auth Controls
-
-- Supabase session refresh in `src/proxy.ts` via `getUser()`.
-- Admin routes gated by `validateAdminAuth()` (cookie-based) and `user_profiles.role = 'admin'` check.
-- `admin_audit_log` (migration 076) and `stripe_webhook_events` (migration 077) now provide audit trails — internal infrastructure, no user-facing surface.
-
----
+1. **(Low)** Run `npm install` on `develop` to sync `node_modules` with `package.json`'s `resend@^6.12.2` pin. Removes the `npm ls` "invalid" flag. No security delta — still 3 transitive advisories until svix upstream fixes.
+2. **(Watch)** Monitor for `svix >= 1.91.2` or `resend` release that bumps svix past `1.91.1`. Advisory clears automatically on lockfile refresh once available.
+3. **(Optional, non-security)** Batch upgrade 7 outdated production deps (see "Outdated" section). None carry CVEs. All minor/patch.
+4. **(Manual)** When the dev server is next running, re-run the security-headers live check to validate the CSP and HSTS responses match source.
 
 ## License Compliance
 
-**No copyleft violations.** All 7 flagged packages reviewed and approved.
+No copyleft violations. All 7 flagged packages are either approved exceptions, documented in `docs/project/license-exceptions.md`, or scanner false positives.
 
-| Package | License | Status | Reason |
-|---------|---------|--------|--------|
-| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | Approved — documented in `docs/project/license-exceptions.md` | Dynamically linked native binary; LGPL permits dynamic linking without copyleft propagation. Platform-specific binary, not bundled client-side. |
-| `dompurify@3.4.0` | (MPL-2.0 OR Apache-2.0) | Approved | Dual-licensed; we use under Apache-2.0 which is non-copyleft. Pulled transitively via PostHog. |
-| `expand-template@2.0.3` | (MIT OR WTFPL) | Approved | Dual-licensed; we use under MIT. |
-| `paisaxe@1.0.0` | UNLICENSED | Expected | This is our own root package — intentional to prevent accidental npm publish. |
-| `@babel/template@7.28.6` | MIT | Scanner false positive (not actually flagged license) | Plain MIT. |
-| `simple-concat@1.0.1` | MIT | Scanner false positive | Plain MIT. |
-| `simple-get@4.0.1` | MIT | Scanner false positive | Plain MIT. |
+Named package audit:
 
-License aggregates (1,060 deps scanned): MIT 373, Apache-2.0 66, ISC 18, BSD-3-Clause 17, BSD-2-Clause 8, BlueOak-1.0.0 5. Strongly permissive-skewed, as required by `docs/project/license-exceptions.md`.
+| Package                                 | License                    | Status                                                                   |
+|-----------------------------------------|----------------------------|--------------------------------------------------------------------------|
+| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later          | Approved exception (platform-specific binary of `sharp`).                |
+| `dompurify@3.4.0`                       | MPL-2.0 OR Apache-2.0      | Dual-licensed — we receive under Apache-2.0 (compliant).                 |
+| `expand-template@2.0.3`                 | MIT OR WTFPL               | Dual-licensed — received under MIT (compliant).                          |
+| `paisaxe@1.0.0`                         | UNLICENSED                 | This project itself. Intentional — private app, no public distribution.  |
+| `simple-concat@1.0.1`                   | MIT                        | Scanner false positive — manifest is MIT.                                |
+| `simple-get@4.0.1`                      | MIT                        | Scanner false positive — manifest is MIT.                                |
+| `@babel/template@7.28.6`                | MIT                        | Scanner false positive.                                                  |
 
----
+`docs/project/license-exceptions.md` already covers both `@img/sharp-libvips-*` and `@vercel/analytics`. No new entries needed this cycle.
+
+## Security Headers Status
+
+Source inspection (`next.config.ts:57-62`, `src/proxy.ts`):
+
+- **Content-Security-Policy**: `'self' 'unsafe-inline' blob: https://js.stripe.com` — correct for PPR + Stripe.
+- **Strict-Transport-Security**: `max-age=63072000; includeSubDomains; preload` — production only.
+- **X-Frame-Options**: `DENY`.
+- **X-Content-Type-Options**: `nosniff`.
+- **Referrer-Policy**: `strict-origin-when-cross-origin`.
+- **Permissions-Policy**: configured in proxy layer.
+- **frame-ancestors** (CSP): `'none'` — duplicates X-Frame-Options for CSP-aware browsers.
+- **object-src** (CSP): `'none'`.
+
+Live HTTP check: **skipped** — dev server not running at scan time. All headers verified to exist in source. Next run with the dev server active will re-confirm live values.
 
 ## CI/CD Security Automation
 
-| Control | Status | Location |
-|---------|--------|----------|
-| Dependabot | Configured, pinned to `develop` branch | `.github/dependabot.yml` |
-| Renovate | Not configured | Not needed — Dependabot covers npm + Actions. |
-| Gitleaks | Active in CI | `.github/workflows/security.yml` |
-| npm audit | Active in CI | `.github/workflows/security.yml` |
-| License check | Active in CI | `.github/workflows/license-check.yml` |
-| Knip (unused-code scan) | Active in CI | `.github/workflows/knip.yml` |
-| Lighthouse (a11y/perf) | Active in CI | `.github/workflows/lighthouse.yml` |
-| Branch protection on `main` | Enforced — lint-and-typecheck, test, build, e2e required | GitHub repo settings |
-| Force-push to `main` | Blocked | GitHub repo settings |
+| Control                               | Status    | Notes                                                                                    |
+|---------------------------------------|-----------|------------------------------------------------------------------------------------------|
+| Dependabot                            | Active    | Pinned to `develop` branch (commit `f118597`). Opens PRs for CVE-bearing deps.           |
+| Renovate                              | Not used  | Intentional — Dependabot covers the need.                                                |
+| Gitleaks in CI                        | Active    | Runs on every push to `develop` and PRs to `main`.                                       |
+| `npm audit` in CI                     | Active    | Reports on PRs; not a hard gate (we choose to accept non-exploitable moderate).          |
+| License check                         | Active    | `license-check` gate uses `docs/project/license-exceptions.md` allowlist.                |
 
 No gaps identified.
 
----
+## Outdated Packages (Non-Security)
 
-## Outdated Packages With Security Implications
+16 outdated packages, none with known CVEs. Production deps worth batching in the next chore:
 
-10 total outdated (vs 3 last cycle — minor/patch drift accumulated over 2 days). **Zero CVEs. No security-driven upgrades required.**
+| Package                 | Current     | Latest    | Risk       |
+|-------------------------|-------------|-----------|------------|
+| `@anthropic-ai/sdk`     | 0.90.0      | 0.91.0    | None       |
+| `@elevenlabs/react`     | 1.1.1       | 1.2.1     | None       |
+| `@sentry/nextjs`        | 10.49.0     | 10.50.0   | None       |
+| `@stripe/stripe-js`     | 9.2.0       | 9.3.1     | None       |
+| `@supabase/supabase-js` | 2.103.3     | 2.104.1   | None       |
+| `posthog-js`            | 1.369.3     | 1.371.3   | None (advisories already cleared by e66e510) |
+| `resend`                | 6.12.0      | 6.12.2    | None — just need `npm install` |
+| `stripe`                | 22.0.2      | 22.1.0    | None       |
 
-| Package | Current | Latest | Scope | Security Relevance |
-|---------|---------|--------|-------|--------------------|
-| `@supabase/supabase-js` | 2.103.3 | 2.104.0 | Production | None — patch release. Auth flows unchanged. |
-| `@tailwindcss/postcss` | 4.2.2 | 4.2.4 | Dev-only | None. |
-| `@typescript-eslint/eslint-plugin` | 8.58.2 | 8.59.0 | Dev-only | None. |
-| `@vitest/coverage-v8` | 4.1.4 | 4.1.5 | Dev-only | None. |
-| `jsdom` | 29.0.2 | 27.0.1 | Dev-only | Pre-release channel; intentionally pinned. None. |
-| `knip` | 6.5.0 | 6.6.1 | Dev-only | None — just upgraded 6.4.1->6.5.0 in `171c9ff`. |
-| `posthog-js` | 1.369.3 | 1.369.5 | Production | None — patch. Already past the 1.369.2 security bar (protobufjs/dompurify fix). |
-| `resend` | 6.12.0 | 6.12.2 | Production | None — patch release. |
-| `tailwindcss` | 4.2.2 | 4.2.4 | Dev-only | None. |
-| `vitest` | 4.1.4 | 3.2.4 | Dev-only | Pre-release channel; intentionally pinned. None. |
+Dev-only outdated (8): `@tailwindcss/postcss`, `@typescript-eslint/eslint-plugin`, `@vitest/coverage-v8`, `jsdom` (pre-release), `knip`, `lucide-react`, `tailwindcss`, `vitest` (downgrade to 3.2.4 reported — ignore, already on 4.x stable). No action required.
 
-All production upgrades (`@supabase/supabase-js`, `posthog-js`, `resend`) are patch-level with no CVE or behavior delta. Safe to batch in next triage cycle; no urgency.
+## Cross-Agent Inputs
 
----
-
-## Prioritized Remediation Steps
-
-**None required.** No exploitable vulnerabilities, no policy violations, no missing controls.
-
-### Operational housekeeping (non-security):
-1. Batch patch-level prod dep upgrades (`@supabase/supabase-js`, `posthog-js`, `resend`) in next triage cycle — low risk, keeps audit surface tight.
-2. Monitor GitHub Dependabot alerts for divergence from local audit (local is authoritative; GitHub can lag).
-
----
-
-## Cross-Agent Context Used
-
-- **Coverage Agent (2026-04-21):** Maintenance-mode cache Supabase-URL invalidation path now fully covered in `src/lib/proxy/maintenance.test.ts` — prevents cross-tenant state leak on project URL change. All webhook, CSRF origin, and auth-refresh paths also covered.
-- **Cost Analyst (2026-04-21):** posthog-js advisories resolved by `e66e510`. 0 vulnerabilities confirmed. No cost-related security concerns.
-- **Performance Agent (2026-04-21):** `sentry.client.config.ts:10-12` has session replay enabled (`replaysOnErrorSampleRate: 1.0`, `replaysSessionSampleRate: 0.01`). Performance flagged this as a bundle optimization; from a security standpoint, session replay captures DOM + user input — review PII masking config before any production rollout beyond current low sample rate.
-- **Triage Agent (2026-04-20):** Waves 1-2 remediation complete. Wave 3 items (#321-#335) still open in backlog — flag for security review if any touch auth, webhook, or CSP code paths.
+- **Performance Agent** flagged `sentry.client.config.ts:11-12` with `replaysOnErrorSampleRate: 1.0` and `replaysSessionSampleRate: 0.01`. From a security angle: Sentry session replay captures DOM mutations. If PII-masking rules are not audited, replay can exfiltrate user-entered data into Sentry. Disabling replay (Performance P8) is the safer default; if it stays enabled, ensure `maskAllInputs: true` and `blockAllMedia: true` are set.
+- **Coverage Agent** confirmed 100% branch coverage on Stripe webhook defensive error paths and on CSRF origin checks this week. No security-path regression.
 
 ---

@@ -16,6 +16,8 @@
 
 
 
+
+
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-02-06T16:30:00Z -->
 ## Documentation Agent — 2026-02-06
 - **Coverage**: 100% of feature flags documented in features.md (24 flags across 5 categories)
@@ -766,21 +768,6 @@
 - Localization Agent: No locale-related documentation concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-20T07:03:38Z -->
-## Security Agent — 2026-04-20
-- **Status: GREEN** — 0 advisories, 0 exploitable. GREEN streak restored after 1-run YELLOW (Apr 17).
-- **Both advisories RESOLVED**: protobufjs GHSA-xq3m-2v4x-88gg (Critical) and dompurify GHSA-39q2-94rc-95cp (Moderate) fixed by commit `e66e510` via `npm audit fix`.
-- **Outdated packages**: 3 (down from 17) — jsdom, knip, vitest — all dev-only, zero CVEs, zero production gaps.
-- **Env scan hardened**: `60e50a3` excludes test files from check-env and documents SUPABASE_SERVICE_ROLE_KEY in .env.example.
-- **All security controls stable**: 7 timingSafeEqual webhook call sites verified, CSRF enforcement confirmed, all 7 security headers in source.
-
-**Cross-agent recommendations:**
-- Performance Agent: Lockfile-only upgrade for dompurify + protobufjs — zero bundle size impact. PostHog chunk (179 KB) unchanged.
-- Code Quality Agent: Zero production dep gaps. Only dev-tooling majors pending (no CVEs).
-- QA Agent: 0 advisories. No security action items. CSRF passing since Mar 23.
-- Coverage Agent: All webhook and auth error paths remain fully covered.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-20T08:06:31Z -->
 ## Performance Agent — 2026-04-20
 - **Status: YELLOW** — 12-cycle GREEN streak broken. node_modules budget violated (1,047 MB > 1,000 MB). Initial load estimated at ~2,066 KB vs 2,000 KB budget — unconfirmed, needs production build.
@@ -972,4 +959,36 @@
 - QA Agent: No suite regressions. Full suite clean at 5992 tests. voice-agent-chat and agents-dashboard still need Playwright E2E.
 - Performance Agent: 4 test-only additions. Zero bundle impact.
 - Code Quality Agent: Coverage plateau at ~98.6% stmts in jsdom — all remaining statement gaps are SSR guards, production-only paths, async-timer V8 instrumentation gaps, or structural dead code.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-04-24T05:02:35Z -->
+## Localization Agent — 2026-04-24
+- Coverage: 100% complete across 6 locales (es, en, fr, de, pt, ast). 40 consecutive days at full parity.
+- UI strings: 395 leaf keys per locale (+3 since 2026-04-17). 0 missing, 0 orphans.
+- Story translations: 100 stories x 5 locales = 500 (+25 since last report — 5 new stories added fully translated).
+- Type safety: npx tsc --noEmit passes clean.
+
+**Cross-agent recommendations:**
+- Performance Agent: Locale bundle strategy unchanged (es+en static, fr/de/pt/ast dynamic). 3 new UI keys and 5 new story translations are negligible (< 2 KB per locale). No action.
+- Code Quality Agent: No dead translations. All 395 keys actively referenced. No orphaned keys across any locale.
+- Security Agent: No sensitive data in translation files.
+- Coverage Agent: No locale-related coverage concerns.
+- QA Agent: 40-day stability streak. Translations are not a contributor to any test regression risk.
+- Cost Analyst Agent: No cost-related localization concerns.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-24T07:03:45Z -->
+## Security Agent — 2026-04-24
+- Status: YELLOW — 3 moderate advisories (uuid <14 via resend -> svix -> uuid chain), 0 exploitable. svix only uses uuid.v4 internally; bounds-check bug affects v3/v5/v6 with caller-provided `buf`, which Paisaxe never passes.
+- No `npm audit fix` without `--force` (would downgrade resend 6.12.x -> 6.1.3, breaking).
+- Recommendation: run `npm install` to sync `resend@6.12.0 -> 6.12.2` (package.json pin drift), then wait for svix >=1.91.2 upstream.
+- License compliance clean. All 7 flagged packages approved or MIT false positives.
+- All security headers confirmed in source; live HTTP check skipped (no dev server).
+
+**Cross-agent recommendations:**
+- Code Quality Agent: `node_modules` drifted from `package.json` (resend 6.12.0 vs ^6.12.2 pin). Run `npm install` on develop to resync lockfile — non-breaking, no CVE impact.
+- Performance Agent: P8 (disable Sentry Replay) is also a security win. If Replay stays enabled, verify `maskAllInputs: true` + `blockAllMedia: true` in `sentry.client.config.ts` to prevent PII exfiltration.
+- QA Agent: No security action items. CSRF + webhook HMAC paths remain covered.
+- Cost Analyst Agent: No cost-related security concerns this cycle.
+- Triage Agent: Non-urgent code action — `npm install` to sync resend pin. Advisory stays open until svix upstream fix regardless.
 <!-- ENTRY:END -->

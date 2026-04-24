@@ -4,6 +4,7 @@ import {
   TRANSLATION_LOCALES,
 } from "./admin-formatters";
 import type { AdminStory } from "@/types/admin";
+import type { StoryMetadata } from "@/types/immersive";
 
 const baseStory: AdminStory = {
   id: "s1",
@@ -87,6 +88,28 @@ describe("hasMissingTranslations", () => {
     const story: AdminStory = {
       ...baseStory,
       metadata: { translations, translation_status },
+    };
+    expect(hasMissingTranslations(story)).toBe(true);
+  });
+
+  it("returns true when metadata has no translations field at all", () => {
+    // Exercises the `metadata.translations || {}` fallback branch
+    const story: AdminStory = {
+      ...baseStory,
+      metadata: { translation_status: {} } as StoryMetadata,
+    };
+    expect(hasMissingTranslations(story)).toBe(true);
+  });
+
+  it("returns true when metadata has no translation_status field at all", () => {
+    // Exercises the `metadata.translation_status || {}` fallback branch
+    const translations: Record<string, typeof completeTranslation> = {};
+    for (const locale of TRANSLATION_LOCALES) {
+      translations[locale] = completeTranslation;
+    }
+    const story: AdminStory = {
+      ...baseStory,
+      metadata: { translations } as StoryMetadata,
     };
     expect(hasMissingTranslations(story)).toBe(true);
   });
