@@ -34,6 +34,10 @@ const nextConfig: NextConfig = {
       "./marketing/**",
     ],
   },
+  outputFileTracingIncludes: {
+    // Next 16.2.4's Vercel launcher loads this console extension at runtime.
+    "/*": ["./node_modules/next/dist/server/dev/browser-logs/file-logger.js"],
+  },
   // Root redirect (/ → /immersive) is handled in proxy.ts, NOT here.
   // next.config.ts redirects run at CDN level before proxy.ts,
   // which would bypass canonical domain checks (paisaxe.com → paisaxe.es).
