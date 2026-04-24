@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useStories } from "@/hooks/use-stories";
 import { useAuth } from "@/hooks/use-auth";
-import { Bookmark, ArrowLeft, Trash2, RefreshCw, Cloud } from "lucide-react";
+import { Bookmark, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import type { Story } from "@/types/immersive";
@@ -16,7 +16,7 @@ const ITEMS_PER_PAGE = 20;
 export default function FavoritesPage() {
   const { favorites, toggleFavorite, isLoading: favoritesLoading } = useFavorites();
   const { stories: allStories, isLoading } = useStories();
-  const { user, signInWithGoogle } = useAuth();
+  const { user } = useAuth();
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -116,29 +116,6 @@ export default function FavoritesPage() {
           </div>
         </div>
       </header>
-
-      {/* Sync banner for non-logged-in users with favorites */}
-      {!user && favoriteStories.length > 0 && (
-        <div className="border-b border-amber-500/20 bg-amber-500/10">
-          <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-            <Cloud className="h-5 w-5 shrink-0 text-amber-400" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-amber-200">
-                {t("favorites.local_only")}
-              </p>
-              <p className="text-xs text-amber-200/60">
-                {t("favorites.local_only_description")}
-              </p>
-            </div>
-            <button
-              onClick={() => signInWithGoogle()}
-              className="shrink-0 rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
-            >
-              {t("favorites.sync_with_google")}
-            </button>
-          </div>
-        </div>
-      )}
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {favoriteStories.length === 0 ? (
