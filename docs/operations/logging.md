@@ -12,6 +12,14 @@ The module uses **pino** in production (fast JSON serialisation, Vercel-compatib
 synchronous console shim in development and test environments (same JSON schema, easy to
 assert in unit tests).
 
+**Console guard**: An ESLint rule blocks raw `console.*` calls in API routes (`src/app/api/**`).
+All diagnostic output in server code must go through `logger` so it is structured, sanitized,
+and forwarded to Sentry.
+
+**Sentry integration**: All `logger.error()` calls also surface in Sentry with the full metadata
+object as extra context. PII is stripped via `beforeSend` in `src/lib/logger-sanitize.ts` before
+events are transmitted.
+
 ---
 
 ## Using the Logger
@@ -59,6 +67,11 @@ alert on.
 | `[SEARCH_COMPLETE]` | info | Hybrid search returned results (include `duration_ms`) |
 | `[STARTUP]` | info | Application cold start (edge / serverless function warm-up) |
 | `[RERANK_FAILURE]` | error | Voyage reranking step failed; results returned unranked |
+| `[CSRF_VALIDATION_FAILURE]` | warn | CSRF double-submit cookie mismatch on a state-mutating request |
+| `[RATE_LIMIT_EXCEEDED]` | warn | Per-IP rate limit hit; includes `ip` and `route` in meta |
+| `[STRIPE_WEBHOOK_INVALID_SIG]` | error | Stripe webhook signature verification failed |
+| `[TRANSLATION_STALE]` | warn | Story stuck in `translating` state past timeout; marked failed |
+| `[ELEVENLABS_WEBHOOK_FAILURE]` | error | Post-call ElevenLabs webhook could not parse transcript |
 
 Add new keys here when introducing new diagnostic log points.
 

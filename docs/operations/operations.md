@@ -22,7 +22,7 @@ npm run build          # Production build succeeds
 ```
 
 **Expected results:**
-- Tests: All passing (currently ~2000 tests)
+- Tests: All passing (currently ~6,000 tests)
 - TypeScript: Exit code 0, no output
 - Lint: Exit code 0, no output
 - Build: "Generating static pages" completes successfully
@@ -143,6 +143,10 @@ Automated maintenance jobs run on Supabase via pg_cron:
 | `cleanup-cron-history` | Sundays 5:00 AM UTC | 011 | Delete cron history older than 30 days |
 | `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Database activity safeguard |
 | `edge-keep-alive` | Every 3 days 12:00 PM UTC | 014 | Call keep-alive Edge Function via pg_net |
+| `content-discovery` | Weekly Monday 3:00 AM UTC | Vercel Cron | Discovers new Asturias places via Google Places API |
+| `fail-stale-translations` | Daily 6:00 AM UTC | Vercel Cron | Mark stories stuck in `translating` state as failed |
+| `github-traffic-sync` | Daily 1:00 AM UTC | Vercel Cron | Sync GitHub traffic stats to admin dashboard |
+| `subscription-optimizer` | Weekly Monday 4:00 AM UTC | Vercel Cron | Analyze service costs and spending |
 
 Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
 
@@ -347,9 +351,19 @@ Revenue analytics are available in the admin panel under Analytics → Revenue t
 
 **Caching** — All analytics API routes (`/api/admin/analytics`, `/api/admin/elevenlabs-analytics`, `/api/admin/stripe-analytics`, `/api/admin/costs-analytics`) return `Cache-Control: private, max-age=120, stale-while-revalidate=300`. The client-side `AnalyticsCacheProvider` maintains an in-memory cache with a 2-minute stale time. Cache is invalidated on manual refresh or after CRUD mutations (costs panel).
 
+## Proxy Architecture
+
+Request interception uses `src/proxy.ts` (Next.js 16 replacement for `middleware.ts`). The middleware chain order is: canonical-domain → maintenance → CORS → CSP → CSRF → auth-refresh → request-id → story-rewrite.
+
+See [proxy-architecture.md](./proxy-architecture.md) for the full module map.
+
+---
+
 ## ElevenLabs Voice Agents
 
-Voice agents for the Paisaxe experience, configured in `src/config/elevenlabs-agents.ts`.
+Voice agents for the Paisaxe experience. Configs are tracked in git via the ElevenLabs CLI — see [elevenlabs-agents-as-code.md](./elevenlabs-agents-as-code.md) for the workflow.
+
+Configured in `src/config/elevenlabs-agents.ts`.
 
 ### Agents
 
