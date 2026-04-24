@@ -106,12 +106,20 @@ export async function POST(request: NextRequest) {
     // Turbopack/Anthropic regression remains documented in
     // docs/engineering/turbopack-fix.md. Do not convert back to static imports
     // without re-running that reproduction with live upstream credentials.
-    const { streamChatResponse, extractSourcesFromChunks } = await import(
-      "@/lib/claude"
-    );
-    const { generateEmbedding } = await import("@/lib/embeddings");
-    const { search } = await import("@/lib/search");
-    const { isFeatureFlagEnabled } = await import("@/lib/feature-flags-server");
+    const [
+      { streamChatResponse, extractSourcesFromChunks },
+      { generateEmbedding },
+      { search },
+      { isFeatureFlagEnabled },
+    ] = await Promise.all([
+      import("@/lib/claude"),
+      import("@/lib/embeddings"),
+      import("@/lib/search"),
+      import("@/lib/feature-flags-server"),
+    ]);
+
+    const asturianEnabledPromise = isFeatureFlagEnabled("asturianu_touches");
+    void asturianEnabledPromise.catch(() => {});
 
     // Generate embedding and search — fail gracefully on upstream errors
     let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
@@ -147,11 +155,7 @@ export async function POST(request: NextRequest) {
       ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
       : cleanMessage;
 
-    // Check Asturianu feature flag (cached via isFeatureFlagEnabled)
-    const asturianEnabled = await isFeatureFlagEnabled("asturianu_touches");
-
-    // Extract sources for final event
-    const sources = extractSourcesFromChunks(chunks);
+    const asturianEnabled = await asturianEnabledPromise;
 
     // Create a readable stream for SSE
     const encoder = new TextEncoder();
@@ -182,6 +186,7 @@ export async function POST(request: NextRequest) {
 
           // Send final event with images and sources
           if (!streamAbortController.signal.aborted) {
+            const sources = extractSourcesFromChunks(chunks);
             controller.enqueue(encoder.encode(
               encodeSseEvent({
                 type: "done",

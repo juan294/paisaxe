@@ -1,4 +1,4 @@
-import { sanitizeValue } from "@/lib/logger";
+import { sanitizeValue } from "@/lib/logger-sanitize";
 
 declare global {
   var __paisaxeConsolePatched: boolean | undefined;

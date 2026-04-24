@@ -1,5 +1,6 @@
 import type { Story, StoryRow } from "@/types/immersive";
 import { rowToStory } from "@/types/immersive";
+import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/env";
 import { FALLBACK_STORIES } from "@/lib/stories-data";
 import { getEnvironment } from "@/lib/environment";
 
@@ -21,8 +22,8 @@ function logFallback(reason: string): void {
  * so Next.js can cache and deduplicate the request.
  */
 export async function getStoriesServer(): Promise<Story[]> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabaseAnonKey();
 
   if (!supabaseUrl || !supabaseKey) {
     logFallback("Missing Supabase credentials");

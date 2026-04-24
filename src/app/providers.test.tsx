@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { Providers } from "./providers";
 
+const mockUsePathname = vi.fn(() => "/");
+
 // Mock all provider dependencies to isolate the Providers component
 vi.mock("@/lib/i18n", () => ({
   LanguageProvider: ({ children }: { children: React.ReactNode }) => (
@@ -11,9 +13,15 @@ vi.mock("@/lib/i18n", () => ({
 }));
 
 vi.mock("@/components/auth/auth-provider", () => ({
-  AuthProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="auth-provider">{children}</div>
+  AuthProvider: ({ children, deferInitialAuth }: { children: React.ReactNode; deferInitialAuth?: boolean }) => (
+    <div data-testid="auth-provider" data-defer-initial-auth={String(!!deferInitialAuth)}>
+      {children}
+    </div>
   ),
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => mockUsePathname(),
 }));
 
 vi.mock("@/components/a11y/skip-link", () => ({
@@ -78,5 +86,19 @@ describe("Providers", () => {
     expect(container.querySelector("[data-testid='auth-provider']")).not.toBeNull();
     // Child should be reachable through the provider tree
     expect(container.querySelector("p[data-testid='nested-child']")).not.toBeNull();
+  });
+
+  it("defers auth bootstrap on anonymous-first public routes", () => {
+    mockUsePathname.mockReturnValue("/pricing");
+    const { container } = render(
+      <Providers>
+        <p>Content</p>
+      </Providers>
+    );
+
+    expect(container.querySelector("[data-testid='auth-provider']")).toHaveAttribute(
+      "data-defer-initial-auth",
+      "true"
+    );
   });
 });

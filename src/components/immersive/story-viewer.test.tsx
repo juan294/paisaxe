@@ -260,6 +260,18 @@ describe("StoryViewer", () => {
       expect(screen.getByText(/navegar/)).toBeInTheDocument();
     });
 
+    it("uses a first-class mobile suggest action instead of querying a hidden desktop trigger", async () => {
+      mockIsEnabled.mockImplementation((flag?: string) => flag === "user_story_suggestions");
+      const querySelectorSpy = vi.spyOn(document, "querySelector");
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Más opciones" }));
+      fireEvent.click(screen.getByRole("menuitem"));
+
+      expect(querySelectorSpy).not.toHaveBeenCalled();
+    });
+
     it("should render story image with blur placeholder", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
@@ -1275,17 +1287,11 @@ describe("StoryViewer", () => {
   });
 
   describe("mobile overflow suggest place", () => {
-    it("should click the suggest-place trigger when suggest place item is clicked", async () => {
+    it("should render a first-class suggest place action without a DOM trigger lookup", async () => {
       mockIsEnabled.mockImplementation(
         (flag: string) => flag === "user_story_suggestions"
       );
-
-      // Create a mock trigger button in the DOM
-      const triggerButton = document.createElement("button");
-      triggerButton.setAttribute("data-suggest-place-trigger", "");
-      const clickSpy = vi.fn();
-      triggerButton.addEventListener("click", clickSpy);
-      document.body.appendChild(triggerButton);
+      const querySelectorSpy = vi.spyOn(document, "querySelector");
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
@@ -1295,10 +1301,7 @@ describe("StoryViewer", () => {
       const suggestItem = screen.getByText("suggestions.suggest_short");
       fireEvent.click(suggestItem);
 
-      expect(clickSpy).toHaveBeenCalled();
-
-      // Clean up
-      document.body.removeChild(triggerButton);
+      expect(querySelectorSpy).not.toHaveBeenCalled();
       mockIsEnabled.mockReturnValue(false);
     });
   });
@@ -1666,10 +1669,9 @@ describe("StoryViewer", () => {
       // The SuggestPlaceButton is rendered inside a hidden md:block div
       // Verify the feature flag was checked and the component rendered
       expect(mockIsEnabled).toHaveBeenCalledWith("user_story_suggestions");
-
-      // The suggest-place trigger button should exist in the DOM
-      const suggestTrigger = document.querySelector('[data-suggest-place-trigger]');
-      expect(suggestTrigger).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "suggestions.suggest_place" })
+      ).toBeInTheDocument();
 
       mockIsEnabled.mockReturnValue(false);
     });

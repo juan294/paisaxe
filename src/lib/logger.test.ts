@@ -22,7 +22,7 @@ describe("logger", () => {
   describe("in test/development environment", () => {
     it("emits structured JSON output on logger.info", async () => {
       vi.stubEnv("NODE_ENV", "test");
-      const spy = vi.spyOn(process.stdout, "write");
+      const spy = vi.spyOn(console, "info").mockImplementation(() => {});
 
       const { logger } = await import("./logger");
       logger.info("[TEST_KEY]", { foo: "bar" });
@@ -36,7 +36,7 @@ describe("logger", () => {
 
     it("emits structured JSON output on logger.warn", async () => {
       vi.stubEnv("NODE_ENV", "test");
-      const spy = vi.spyOn(process.stdout, "write");
+      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const { logger } = await import("./logger");
       logger.warn("[FEATURE_FLAG_FAILURE]", { flag: "visitor_voice_agent" });
@@ -50,7 +50,7 @@ describe("logger", () => {
 
     it("emits structured JSON output on logger.error", async () => {
       vi.stubEnv("NODE_ENV", "test");
-      const spy = vi.spyOn(process.stdout, "write");
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const { logger } = await import("./logger");
       logger.error("[CHAT_STREAM_FAILURE]", { duration_ms: 500, error: "timeout" });
@@ -69,7 +69,7 @@ describe("logger", () => {
 
     it("includes a timestamp in the output", async () => {
       vi.stubEnv("NODE_ENV", "test");
-      const spy = vi.spyOn(process.stdout, "write");
+      const spy = vi.spyOn(console, "info").mockImplementation(() => {});
 
       const { logger } = await import("./logger");
       logger.info("[TABLE_FALLBACK]", { table: "chunks" });
@@ -83,7 +83,7 @@ describe("logger", () => {
 
     it("works with no metadata (message only)", async () => {
       vi.stubEnv("NODE_ENV", "test");
-      const spy = vi.spyOn(process.stdout, "write");
+      const spy = vi.spyOn(console, "info").mockImplementation(() => {});
 
       const { logger } = await import("./logger");
       logger.info("[STARTUP]");
@@ -97,7 +97,7 @@ describe("logger", () => {
 
     it("merges child bindings into emitted log lines", async () => {
       vi.stubEnv("NODE_ENV", "test");
-      const spy = vi.spyOn(process.stdout, "write");
+      const spy = vi.spyOn(console, "info").mockImplementation(() => {});
 
       const { logger } = await import("./logger");
       logger.child({ request_id: "req-child-1234" }).info("[STARTUP]");
@@ -113,7 +113,7 @@ describe("logger", () => {
 
     it("includes request context bindings automatically", async () => {
       vi.stubEnv("NODE_ENV", "test");
-      const spy = vi.spyOn(process.stdout, "write");
+      const spy = vi.spyOn(console, "info").mockImplementation(() => {});
 
       const { logger } = await import("./logger");
       const { runWithRequestContext } = await import("./request-context");
@@ -133,7 +133,7 @@ describe("logger", () => {
 
     it("redacts email, phone, token, and user identifiers in structured metadata", async () => {
       vi.stubEnv("NODE_ENV", "test");
-      const spy = vi.spyOn(process.stdout, "write");
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const { logger } = await import("./logger");
       logger.error("[PII_TEST]", {
@@ -160,7 +160,7 @@ describe("logger", () => {
 
     it("redacts deeply nested request headers and JSON payload strings", async () => {
       vi.stubEnv("NODE_ENV", "test");
-      const spy = vi.spyOn(process.stdout, "write");
+      const spy = vi.spyOn(console, "info").mockImplementation(() => {});
 
       const { logger } = await import("./logger");
       logger.info("[REQUEST_TEST]", {

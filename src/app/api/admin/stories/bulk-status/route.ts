@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { logger } from "@/lib/logger";
 import type { CurationStatus } from "@/types/admin";
 
 export async function PUT(request: NextRequest) {
@@ -39,7 +40,11 @@ export async function PUT(request: NextRequest) {
       .select("id");
 
     if (error) {
-      console.error("Bulk update error:", error);
+      logger.error("[ADMIN_STORIES_BULK_STATUS_UPDATE_FAILED]", {
+        story_ids_count: storyIds.length,
+        status,
+        error,
+      });
       return NextResponse.json(
         { error: "Failed to update stories" },
         { status: 500 }
@@ -53,7 +58,7 @@ export async function PUT(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Admin bulk status API error:", error);
+    logger.error("[ADMIN_STORIES_BULK_STATUS_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -558,12 +558,10 @@ describe("ElevenLabsAnalyticsPanel", () => {
 
     render(<ElevenLabsAnalyticsPanel />, { wrapper });
 
-    await waitFor(() => {
-      expect(screen.getByText("02 — By Language")).toBeInTheDocument();
-    });
-
     // "ja" is not in the languageNames map, so it should be returned as-is
-    expect(screen.getByText("ja")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("ja")).toBeInTheDocument();
+    });
   });
 
   it("handles unknown status code in formatStatus (line 216 fallback)", async () => {

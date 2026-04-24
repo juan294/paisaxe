@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger,
+}));
+
 import { GET } from "./route";
 
 // Mock Supabase SSR
@@ -228,6 +237,10 @@ describe("Voice Access API", () => {
       const response = await GET(request);
 
       expect(response.status).toBe(500);
+      expect(logger.error).toHaveBeenCalledWith("[VOICE_ACCESS_FETCH_FAILED]", {
+        user_id: "user-123",
+        error: { code: "PGRST500", message: "Database error" },
+      });
       const json = await response.json();
       expect(json.error).toBe("Failed to check access");
     });

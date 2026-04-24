@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { logger } from "@/lib/logger";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 
 export interface VoiceAccessResponse {
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .maybeSingle();
 
   if (error) {
-    console.error("[voice-access] Error fetching access:", error);
+    logger.error("[VOICE_ACCESS_FETCH_FAILED]", { user_id: user.id, error });
     return NextResponse.json(
       { error: "Failed to check access" },
       { status: 500 }

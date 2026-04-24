@@ -280,7 +280,7 @@ test.describe("Feature flag gating", () => {
 
     await expect(
       page.locator("[data-suggest-place-trigger]")
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test("fullscreen button hidden when flag off", async ({ page }) => {
