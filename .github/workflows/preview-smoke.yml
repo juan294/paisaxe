@@ -11,8 +11,15 @@ name: Preview Smoke Test
 # kind that passed CI but crashed production (see incident: Next.js 16.2.1).
 #
 # Required secret: VERCEL_AUTOMATION_BYPASS_SECRET
-# Branch protection on `main` should require this workflow's check:
+#
+# DO-H2: Branch protection on `main` requires this workflow's check as a
+# required status check. The check name that must be registered in GitHub
+# Settings → Branches → main → Required status checks is:
 #   Smoke test Vercel preview
+# (This matches the job `name:` field below.)
+# As of 2026-04-25 this check IS registered. Verify with:
+#   gh api repos/juan294/paisaxe/branches/main/protection \
+#     --jq '.required_status_checks.checks[].context'
 
 on:
   pull_request:

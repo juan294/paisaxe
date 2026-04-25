@@ -192,4 +192,43 @@ describe("GET /api/health", () => {
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  // SE-M1 regression: public endpoint must never leak operational recon data
+  it("SE-M1: public response contains only status and timestamp — no recon fields", async () => {
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    // Only two fields allowed on the public tier
+    expect(Object.keys(data)).toEqual(["status", "timestamp"]);
+
+    // Explicit deny-list of fields that must never appear unauthenticated
+    const sensitiveFields = [
+      "version",
+      "uptime",
+      "db_size",
+      "db_usage_percent",
+      "services",
+      "checks",
+      "env",
+      "keys",
+      "config",
+    ];
+    for (const field of sensitiveFields) {
+      expect(data).not.toHaveProperty(field);
+    }
+  });
+
+  it("SE-M1: degraded response also exposes no recon fields", async () => {
+    mockSupabaseProbeError("Connection refused");
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(Object.keys(data)).toEqual(["status", "timestamp"]);
+  });
 });
