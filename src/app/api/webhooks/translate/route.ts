@@ -8,7 +8,9 @@ import { translateStory } from "@/lib/translate-story";
 import type { StoryLocale } from "@/types/immersive";
 
 const TRANSLATE_WORKER_LOCK_ID = 1007;
-const TRANSLATE_JOB_LEASE_SECONDS = 15 * 60;
+// BE-H3: 10-minute lease matches migration 082 DB default — crashed handlers
+// release faster so the cron recovery path picks up stranded jobs sooner.
+const TRANSLATE_JOB_LEASE_SECONDS = 10 * 60;
 const TRANSLATE_JOB_BATCH_SIZE = 10;
 
 const StrictTranslateWebhookSchema = z
