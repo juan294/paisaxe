@@ -1,4 +1,4 @@
-# Localization Report — 2026-04-24
+# Localization Report — 2026-04-25
 
 Status: GREEN — 100% translation coverage across all 6 supported locales.
 
@@ -37,7 +37,7 @@ Nothing. No translations were missing, no orphans were present, and no type erro
 
 ## Remaining gaps
 
-None. Coverage has remained at 100% for 40 consecutive days (since 2026-03-15).
+None. Coverage has remained at 100% for 41 consecutive days (since 2026-03-15).
 
 ## Orphaned keys
 
@@ -49,7 +49,7 @@ None.
 
 ## Run notes
 
-- Date: 2026-04-24
+- Date: 2026-04-25
 - Project: /Users/juan/code/paisaxe
 - Command reference:
   - Key extraction via flattened `Translations` tree (leaf paths only, nested objects traversed).
