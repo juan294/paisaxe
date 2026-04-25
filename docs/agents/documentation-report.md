@@ -1,9 +1,19 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-04-24 06:00:04
+> Auto-generated on 2026-04-25 06:00:05
+
+## Changes Made This Run
+
+**Status: GREEN** — No documentation gaps found. Twentieth consecutive clean run.
+
+- **Feature flags**: Verified all 17 `FeatureFlagKey` values in `src/types/feature-flags.ts` against `docs/project/features.md`. All documented. Zero gaps.
+- **Agent flags**: All 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
+- **API routes**: All 51 flagged routes confirmed internal — admin dashboard APIs, Vercel cron jobs, internal chat/checkout/favorites APIs, webhooks already documented in Infrastructure section, MCP voice-agent tools already documented in Voice section. No external-consumption routes require new documentation.
+- **Recent migrations (079-081)**: `webhook_idempotency_rpcs`, `fail_stale_translations_support`, `fail_stale_story_translations_locked` — internal infrastructure, no user-facing features or flags introduced.
+- **No changes made to `docs/project/features.md`** — all content remains accurate.
 
 ## CLAUDE.md Status
 
-Last modified: **2026-04-19**
+Last modified: **2026-04-24**
 
 ## Files Modified Since Documentation Update
 
@@ -12,178 +22,89 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
-src/app/admin/admin-page-lazy-mount.test.tsx
-src/app/admin/page.test.tsx
-src/app/admin/page.tsx
-src/app/api/admin/agents/run/route.test.ts
-src/app/api/admin/agents/run/route.ts
-src/app/api/admin/analytics/route.test.ts
-src/app/api/admin/analytics/route.ts
-src/app/api/admin/costs-analytics/route.ts
-src/app/api/admin/elevenlabs-analytics/route.test.ts
-src/app/api/admin/elevenlabs-analytics/route.ts
-src/app/api/admin/github-analytics/route.test.ts
-src/app/api/admin/github-analytics/route.ts
-src/app/api/admin/marketing/accounts/route.ts
-src/app/api/admin/marketing/posts/route.ts
-src/app/api/admin/marketing/schedule/route.ts
-src/app/api/admin/stories/route.test.ts
-src/app/api/admin/stories/route.ts
-src/app/api/admin/stripe-analytics/route.test.ts
-src/app/api/chat/route.test.ts
-src/app/api/chat/route.ts
+src/app/api/admin/stories/[id]/route.test.ts
+src/app/api/admin/stories/[id]/route.ts
+src/app/api/admin/stories/bulk-status/route.test.ts
+src/app/api/admin/stories/bulk-status/route.ts
 src/app/api/chat/stream/route.test.ts
 src/app/api/chat/stream/route.ts
-src/app/api/checkout/day-pass/route.ts
-src/app/api/cron/content-discovery/route.test.ts
-src/app/api/cron/content-discovery/route.ts
 src/app/api/cron/fail-stale-translations/route.test.ts
 src/app/api/cron/fail-stale-translations/route.ts
-src/app/api/cron/github-traffic-sync/route.test.ts
-src/app/api/cron/github-traffic-sync/route.ts
-src/app/api/cron/subscription-optimizer/route.test.ts
-src/app/api/cron/subscription-optimizer/route.ts
-src/app/api/favorites/route.test.ts
-src/app/api/favorites/route.ts
 src/app/api/health/route.test.ts
 src/app/api/health/route.ts
 src/app/api/mcp/make-booking/route.test.ts
 src/app/api/mcp/make-booking/route.ts
-src/app/api/mcp/places/route.ts
-src/app/api/mcp/weather/route.test.ts
-src/app/api/mcp/weather/route.ts
-src/app/api/suggestions/route.test.ts
-src/app/api/suggestions/route.ts
 src/app/api/voice-access/route.test.ts
 src/app/api/voice-access/route.ts
 src/app/api/webhooks/elevenlabs/route.test.ts
 src/app/api/webhooks/elevenlabs/route.ts
-src/app/api/webhooks/stripe/route.test.ts
-src/app/api/webhooks/stripe/route.ts
-src/app/api/webhooks/supabase/route.test.ts
-src/app/api/webhooks/supabase/route.ts
 src/app/api/webhooks/translate/route.test.ts
 src/app/api/webhooks/translate/route.ts
-src/app/auth/callback/route.test.ts
-src/app/auth/callback/route.ts
-src/app/error.tsx
-src/app/global-error.tsx
+src/app/favorites/page.test.tsx
+src/app/favorites/page.tsx
+src/app/immersive/immersive-page-content.test.tsx
 src/app/immersive/immersive-page-content.tsx
 src/app/immersive/page.test.tsx
-src/app/immersive/page.tsx
 src/app/layout.test.tsx
 src/app/layout.tsx
 src/app/pricing/page.test.tsx
 src/app/pricing/page.tsx
 src/app/providers.test.tsx
 src/app/providers.tsx
-src/components/admin/admin-shell.test.tsx
-src/components/admin/admin-shell.tsx
-src/components/admin/agents-dashboard/cross-agent-insights.tsx
-src/components/admin/agents-dashboard/markdown.test.ts
-src/components/admin/agents-dashboard/markdown.ts
-src/components/admin/agents-dashboard/optimizer-report-dialog.tsx
-src/components/admin/agents-dashboard/safe-markdown.test.tsx
-src/components/admin/agents-dashboard/safe-markdown.tsx
-src/components/immersive/chat-upsell-cta.test.tsx
-src/components/immersive/chat-upsell-cta.tsx
-src/components/immersive/story-info-panel.test.tsx
-src/components/immersive/story-info-panel.tsx
-src/components/immersive/story-toolbar.test.tsx
-src/components/immersive/story-toolbar.tsx
+src/components/admin/elevenlabs-analytics-panel.test.tsx
+src/components/auth/auth-provider.test.tsx
+src/components/auth/auth-provider.tsx
 src/components/immersive/story-viewer.test.tsx
 src/components/immersive/story-viewer.tsx
-src/components/immersive/voice-chat.test.tsx
-src/components/immersive/voice-chat.tsx
-src/components/seo/json-ld.tsx
-src/config/vercel-config.test.ts
-src/hooks/use-feature-flags.test.ts
+src/components/immersive/suggest-place-button.tsx
+src/hooks/use-favorites.test.ts
+src/hooks/use-favorites.ts
+src/hooks/use-feature-flags.provider.test.tsx
 src/hooks/use-feature-flags.ts
-src/hooks/use-stories.test.ts
+src/hooks/use-stories.provider.test.tsx
 src/hooks/use-stories.ts
-src/hooks/use-story-keyboard-nav.test.ts
-src/hooks/use-story-keyboard-nav.ts
 src/hooks/use-stream-chat.test.ts
 src/hooks/use-stream-chat.ts
+src/hooks/use-visitor-voice-access.test.ts
+src/hooks/use-visitor-voice-access.ts
+src/hooks/use-voice-access.test.ts
+src/hooks/use-voice-access.ts
 src/instrumentation.test.ts
 src/instrumentation.ts
-src/lib/admin-auth.test.ts
-src/lib/admin-auth.ts
-src/lib/admin-formatters.test.ts
-src/lib/admin-formatters.ts
-src/lib/claude.test.ts
-src/lib/claude.ts
-src/lib/cron-auth.test.ts
-src/lib/cron-auth.ts
-src/lib/csrf.test.ts
-src/lib/csrf.ts
-src/lib/env.test.ts
 src/lib/env.ts
-src/lib/environment.ts
-src/lib/feature-flags-server.test.ts
-src/lib/feature-flags-server.ts
-src/lib/i18n/ast.ts
-src/lib/i18n/de.ts
-src/lib/i18n/en.ts
-src/lib/i18n/es.ts
-src/lib/i18n/fr.ts
-src/lib/i18n/pt.ts
-src/lib/i18n/translations.test.ts
+src/lib/logger-sanitize.ts
 src/lib/logger.test.ts
 src/lib/logger.ts
-src/lib/proxy/auth-refresh.ts
-src/lib/proxy/canonical-domain.ts
+src/lib/mcp-auth.ts
 src/lib/proxy/cors.ts
 src/lib/proxy/csp.ts
-src/lib/proxy/csrf-proxy.ts
-src/lib/proxy/index.ts
-src/lib/proxy/maintenance.test.ts
-src/lib/proxy/maintenance.ts
-src/lib/proxy/request-id.test.ts
-src/lib/proxy/request-id.ts
-src/lib/proxy/root-redirect.ts
-src/lib/proxy/story-rewrite.ts
-src/lib/rate-limit.test.ts
-src/lib/rate-limit.ts
-src/lib/request-context.test.ts
 src/lib/request-context.ts
-src/lib/rerank.test.ts
-src/lib/rerank.ts
 src/lib/schemas.ts
-src/lib/search.test.ts
-src/lib/search.ts
 src/lib/security-headers.test.ts
 src/lib/sentry-before-send.test.ts
-src/lib/sentry-before-send.ts
-src/lib/sentry-client-config.test.ts
+src/lib/stories-server.ts
+src/lib/stripe.ts
 src/lib/supabase.test.ts
 src/lib/supabase.ts
-src/proxy.test.ts
-src/proxy.ts
-src/test/i18n-mock.ts
 src/types/index.ts
 src/types/sse.test.ts
 src/types/sse.ts
+src/types/suggestions.ts
 ```
 
 ### Database Migrations
 
 ```
-supabase/migrations/076_admin_audit_log.sql
-supabase/migrations/077_stripe_webhook_events.sql
-supabase/migrations/078_grant_day_pass_idempotent.sql
+supabase/migrations/053_pending_bookings.sql
 supabase/migrations/079_webhook_idempotency_rpcs.sql
 supabase/migrations/080_fail_stale_translations_support.sql
+supabase/migrations/081_fail_stale_story_translations_locked.sql
 ```
 
 ### Scripts
 
 ```
-scripts/check-env.ts
-scripts/compress-images.ts
-scripts/lib/print-shared-context-instructions.ts
 scripts/run-stripe-e2e.ts
-scripts/tmp-cost-fetch.sh
 ```
 
 ## Documentation Gaps
@@ -252,17 +173,8 @@ webhooks/translate
 | File | Last Modified |
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
-| CLAUDE.md | 2026-04-19 |
-| README.md | 2026-02-16 |
-
-## Changes Made This Run
-
-No documentation changes required. Twentieth consecutive clean run.
-
-- **Feature flags**: Gap file reports 0 undocumented flags. All existing flags in `docs/project/features.md` verified against source.
-- **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, chat stream, checkout, favorites, health probes). None are external-consumption endpoints requiring public documentation.
-- **CLAUDE.md**: Current (last modified 2026-04-19).
-- **features.md**: No additions needed.
+| CLAUDE.md | 2026-04-24 |
+| README.md | 2026-04-24 |
 
 ---
 
