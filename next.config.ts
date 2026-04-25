@@ -13,6 +13,13 @@ const nextConfig: NextConfig = {
   // the <nextjs-portal> overlay from intercepting pointer events in E2E tests.
   devIndicators: false,
   cacheComponents: true,
+  // voyageai v0.2.x ESM build uses bare directory/extensionless imports that
+  // Turbopack cannot resolve. Force the CJS build which handles them via require().
+  turbopack: {
+    resolveAlias: {
+      voyageai: "voyageai/dist/cjs/extended/index.js",
+    },
+  },
   experimental: {
     // Tree-shake barrel exports — avoids bundling all 1,000+ lucide icons
     optimizePackageImports: ["lucide-react", "posthog-js"],
