@@ -31,7 +31,7 @@ cd "$PROJECT_DIR"
 BUDGET_INITIAL_JS_KB=2000    # 2 MB initial load JS (static chunks only, excl. deferred)
 BUDGET_TOTAL_JS_KB=3000      # 3 MB total JS (including deferred dynamic chunks)
 BUDGET_LARGEST_CHUNK_KB=500  # 500 KB per chunk
-BUDGET_NODE_MODULES_MB=1000  # 1 GB node_modules
+BUDGET_NODE_MODULES_MB=1100  # 1.1 GB node_modules (@sentry/nextjs 67 MB is permanent)
 BUDGET_PROD_DEPS=40          # Max production dependencies
 
 # Initialize metrics collection
