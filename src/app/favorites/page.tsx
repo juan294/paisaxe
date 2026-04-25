@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useStories } from "@/hooks/use-stories";
-import { useAuth } from "@/hooks/use-auth";
 import { Bookmark, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
@@ -14,15 +13,15 @@ import type { Story } from "@/types/immersive";
 const ITEMS_PER_PAGE = 20;
 
 export default function FavoritesPage() {
-  const { favorites, toggleFavorite, isLoading: favoritesLoading } = useFavorites();
+  const { favorites, toggleFavorite, isLoading: favoritesLoading, requiresAuth } = useFavorites();
   const { stories: allStories, isLoading } = useStories();
-  const { user } = useAuth();
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
 
-  const canWaitForStories = !!user || favorites.length > 0;
+  // requiresAuth is true for anonymous users — they can never have saved favorites.
+  const canWaitForStories = !requiresAuth || favorites.length > 0;
   const stories = canWaitForStories ? allStories : [];
 
   // Filter to only favorited stories
@@ -124,9 +123,15 @@ export default function FavoritesPage() {
             <h2 className="text-lg font-medium text-white mb-2">
               {t("favorites.empty_title")}
             </h2>
-            <p className="text-neutral-500 mb-6 max-w-sm text-sm">
-              {t("favorites.empty_description")}
-            </p>
+            {requiresAuth ? (
+              <p className="text-neutral-500 mb-6 max-w-sm text-sm">
+                {t("favorites.sign_in_to_save")}
+              </p>
+            ) : (
+              <p className="text-neutral-500 mb-6 max-w-sm text-sm">
+                {t("favorites.empty_description")}
+              </p>
+            )}
             <Link
               href="/immersive"
               className="px-5 py-2.5 bg-white text-neutral-900 rounded-full text-sm font-medium transition-all hover:bg-neutral-200"

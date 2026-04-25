@@ -105,6 +105,7 @@ describe("FavoritesPage", () => {
       favorites: [],
       toggleFavorite: mockToggleFavorite,
       isLoading: false,
+      requiresAuth: true, // default: anonymous user
     });
     mockUseStories.mockReturnValue({
       stories: mockStories,

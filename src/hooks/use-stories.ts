@@ -106,53 +106,68 @@ function saveToStorage(data: Story[]): void {
   }
 }
 
-/**
- * Initialize cache from localStorage if available
- * Called once when module loads on client
- */
-function initializeCache(): void {
-  if (cache.data) return; // Already initialized
-
-  const stored = loadFromStorage();
-  if (stored && stored.length > 0) {
-    cache.data = stored;
-    // Use stored timestamp but mark as slightly stale to trigger revalidation
-    cache.timestamp = Date.now() - CACHE_TTL + 30000; // Will revalidate in 30s
-  }
-}
 
 /**
  * Hook for fetching and caching stories data.
  *
  * Implements stale-while-revalidate pattern with localStorage persistence:
- * - On first load, tries to restore from localStorage (instant render)
- * - Returns cached data immediately if available
+ * - On first load, tries to restore from localStorage (after hydration, in useEffect)
+ * - Returns server-provided initialStories immediately when available
  * - Revalidates in background if cache is stale
  * - Deduplicates concurrent requests
  * - Persists to localStorage for next visit
+ *
+ * localStorage bootstrap is intentionally deferred to a useEffect so the initial
+ * render is identical between server and client, preventing hydration mismatches.
+ * Only server-provided `initialStories` may seed the cache during render.
  */
 function useStoriesState(
   initialStories?: Story[],
   enabled: boolean = true
 ): UseStoriesResult {
-  // Initialize cache from storage on first render
-  const initialized = useRef(false);
-  if (!initialized.current) {
+  // Seed in-memory cache from server-provided stories during render.
+  // localStorage is intentionally NOT read here — that happens in useEffect
+  // below so the server render and first client render produce identical output.
+  const initializedFromServer = useRef(false);
+  if (!initializedFromServer.current) {
     if (initialStories?.length) {
       // Always apply server-provided stories to ensure freshness post-deploy
       cache.data = initialStories;
       cache.timestamp = Date.now();
-    } else if (typeof window !== "undefined") {
-      initializeCache();
     }
-    initialized.current = true;
+    initializedFromServer.current = true;
   }
 
   const hasInitial = !!(initialStories && initialStories.length > 0);
-  const [stories, setStories] = useState<Story[]>(cache.data || (hasInitial ? initialStories : FALLBACK_STORIES));
-  // If we have cached data OR server-provided initial stories, don't show loading
+  // Initial state: use server-provided stories or in-memory cache (set by StoriesProvider
+  // or a previous mount), but never from localStorage at render time.
+  const [stories, setStories] = useState<Story[]>(cache.data || FALLBACK_STORIES);
+  // If we have server-provided initial stories or a warm in-memory cache, skip loading.
   const [isLoading, setIsLoading] = useState(!cache.data && !hasInitial);
   const [error, setError] = useState<Error | null>(null);
+
+  // Bootstrap from localStorage after hydration.
+  // This effect runs once per hook instance on the client, after the first render.
+  // By running in useEffect (not during render), the server render and first client
+  // render produce identical output, preventing hydration mismatches.
+  const localStorageBootstrapped = useRef(false);
+  useEffect(() => {
+    if (localStorageBootstrapped.current) return;
+    localStorageBootstrapped.current = true;
+
+    // If in-memory cache already has data (from initialStories or a prior mount), skip.
+    if (cache.data) return;
+
+    const stored = loadFromStorage();
+    if (stored && stored.length > 0) {
+      cache.data = stored;
+      // Mark as slightly stale so the initial-load effect below triggers revalidation.
+      cache.timestamp = Date.now() - CACHE_TTL + 30000; // Revalidate in ~30 s
+      setStories(stored);
+      setIsLoading(false);
+    }
+   
+  }, []);
 
   const fetchStories = useCallback(async (force = false): Promise<Story[]> => {
     const now = Date.now();
