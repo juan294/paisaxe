@@ -131,7 +131,7 @@ describe("translate webhook", () => {
     });
     expect(mockRpc).toHaveBeenCalledWith("claim_next_translate_webhook_event", {
       p_event_key: `${VALID_STORY_ID}:default:all`,
-      p_lease_seconds: 900,
+      p_lease_seconds: 600,
       p_batch_size: 10,
     });
     expect(mockRpc).toHaveBeenCalledWith("complete_translate_webhook_event", {
@@ -408,6 +408,113 @@ describe("translate webhook", () => {
     expect(mockRpc).toHaveBeenCalledWith("fail_translate_webhook_event", {
       p_event_key: `${VALID_STORY_ID}:default:all`,
       p_error: "Unexpected crash",
+    });
+  });
+
+  describe("BE-H3: lease expiry allows reclaim of stranded jobs", () => {
+    it("processes a job that was reclaimed after its lease expired", async () => {
+      // Arrange: claim_next returns a job that was previously processing with an
+      // expired lease — simulating a crashed handler being retried.
+      const { translateStory } = await import("@/lib/translate-story");
+
+      vi.mocked(translateStory).mockResolvedValue({
+        success: true,
+        successCount: 3,
+        failedCount: 0,
+      });
+
+      const expiredLeaseKey = `${VALID_STORY_ID}:default:all`;
+
+      mockRpc.mockImplementation((fn: string, _args?: Record<string, unknown>) => {
+        if (fn === "pg_try_advisory_lock") {
+          return Promise.resolve({ data: true, error: null });
+        }
+
+        if (fn === "claim_next_translate_webhook_event") {
+          // Simulates DB returning a job previously held by a crashed handler
+          // (status was 'processing', lease_expires_at is now in the past).
+          return Promise.resolve({
+            data: [
+              {
+                event_key: expiredLeaseKey,
+                story_id: VALID_STORY_ID,
+                locales: null,
+                force_retranslate: false,
+                // The handler sees it as a normal job — DB already reclaimed it
+              },
+            ],
+            error: null,
+          });
+        }
+
+        if (
+          fn === "complete_translate_webhook_event" ||
+          fn === "pg_advisory_unlock"
+        ) {
+          return Promise.resolve({ data: true, error: null });
+        }
+
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      // Act: recovery mode (no direct enqueue — mimics cron kicking the worker)
+      const response = await POST(createRequest({ eventKey: expiredLeaseKey }));
+      const json = await response.json();
+
+      // Assert: job is processed successfully despite previously being 'processing'
+      expect(response.status).toBe(200);
+      expect(json.status).toBe("processed");
+      expect(json.storyId).toBe(VALID_STORY_ID);
+      expect(translateStory).toHaveBeenCalledWith(VALID_STORY_ID, {
+        locales: undefined,
+        forceRetranslate: false,
+      });
+      expect(mockRpc).toHaveBeenCalledWith("complete_translate_webhook_event", {
+        p_event_key: expiredLeaseKey,
+      });
+    });
+
+    it("marks a reclaimed job as failed when translation throws during retry", async () => {
+      const { translateStory } = await import("@/lib/translate-story");
+      vi.mocked(translateStory).mockRejectedValue(new Error("Retry crash"));
+
+      const expiredLeaseKey = `${VALID_STORY_ID}:default:all`;
+
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "pg_try_advisory_lock") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        if (fn === "claim_next_translate_webhook_event") {
+          return Promise.resolve({
+            data: [
+              {
+                event_key: expiredLeaseKey,
+                story_id: VALID_STORY_ID,
+                locales: null,
+                force_retranslate: false,
+              },
+            ],
+            error: null,
+          });
+        }
+        if (
+          fn === "fail_translate_webhook_event" ||
+          fn === "pg_advisory_unlock"
+        ) {
+          return Promise.resolve({ data: true, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const response = await POST(createRequest({ eventKey: expiredLeaseKey }));
+      const json = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(json.error).toBe("Retry crash");
+      expect(mockRpc).toHaveBeenCalledWith("fail_translate_webhook_event", {
+        p_event_key: expiredLeaseKey,
+        p_error: "Retry crash",
+      });
     });
   });
 
