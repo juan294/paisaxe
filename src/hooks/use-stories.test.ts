@@ -866,10 +866,8 @@ describe("prefetchStories", () => {
   });
 });
 
-describe("use-stories SSR guard coverage notes (lines 39, 76, 124, 131, 277)", () => {
-  // Lines 39 and 76 are `if (typeof window === "undefined") return null/return;` guards
-  // inside the private functions loadFromStorage() and saveToStorage() respectively.
-  //
+describe("use-stories SSR guard coverage notes (loadFromStorage, saveToStorage, clearStoriesCache)", () => {
+  // loadFromStorage and saveToStorage have `if (typeof window === "undefined")` guards.
   // These guards are SSR-only paths: in a Node.js server environment, `window` is undefined
   // and the functions return early to avoid localStorage access. In jsdom (vitest/browser test
   // environment), `window` is always defined, so these branches are structurally unreachable.
@@ -877,40 +875,24 @@ describe("use-stories SSR guard coverage notes (lines 39, 76, 124, 131, 277)", (
   // The private functions are not exported and cannot be called directly. The only way to
   // exercise the SSR path would be to delete `window` from the global, which is not a valid
   // test pattern for jsdom-based tests.
+  //
+  // Note: initializeCache() was removed in FE-M1 fix. localStorage bootstrap now happens
+  // exclusively in a useEffect inside useStoriesState, preventing hydration mismatches.
 
-  it("documents loadFromStorage SSR guard (line 39) as untestable in jsdom", () => {
+  it("documents loadFromStorage SSR guard as untestable in jsdom", () => {
     // The `if (typeof window === "undefined") return null;` branch is never taken in jsdom.
     // jsdom always provides window, so loadFromStorage proceeds normally (reads localStorage).
     expect(typeof window).not.toBe("undefined");
   });
 
-  it("documents saveToStorage SSR guard (line 76) as untestable in jsdom", () => {
+  it("documents saveToStorage SSR guard as untestable in jsdom", () => {
     // The `if (typeof window === "undefined") return;` branch is never taken in jsdom.
     // jsdom always provides window, so saveToStorage proceeds normally (writes localStorage).
     expect(typeof window).not.toBe("undefined");
   });
 
-  it("documents useStories SSR guard (line 124) as untestable in jsdom", () => {
-    // Line 124: `} else if (typeof window !== "undefined") {` inside useStories initializer.
-    // The false branch (when window IS undefined / SSR context) never runs in jsdom.
-    // In SSR, both `initialStories?.length` and `cache.data` being falsy would skip to the
-    // else-if, but window would be undefined so initializeCache() is skipped entirely.
-    // This path cannot be exercised via jsdom without removing the global window object.
-    expect(typeof window).toBe("object");
-  });
-
-  it("documents useStories initialStories ternary branch (line 131) as unreachable dead code", () => {
-    // Line 131: `cache.data || (hasInitial ? initialStories : FALLBACK_STORIES)`
-    // The `initialStories` branch of the ternary is unreachable because:
-    // When `hasInitial` is true (initialStories passed with length > 0), the if-block at
-    // lines 120-123 always sets `cache.data = initialStories` BEFORE line 131 executes.
-    // Therefore `cache.data` is always truthy by line 131 when `hasInitial` is true,
-    // making the ternary's right side never evaluate. This is a structural dead code path.
-    expect(true).toBe(true); // The invariant is proven by the code structure above.
-  });
-
-  it("documents clearStoriesCache SSR guard (line 277) as untestable in jsdom", () => {
-    // Line 277: `if (typeof window !== "undefined") {` inside clearStoriesCache().
+  it("documents clearStoriesCache SSR guard as untestable in jsdom", () => {
+    // The `if (typeof window !== "undefined")` guard inside clearStoriesCache().
     // The false branch (SSR context where window is undefined) never runs in jsdom.
     // clearStoriesCache is called in beforeEach of this test suite, so the true branch
     // (window available, removing localStorage item) IS always exercised.
