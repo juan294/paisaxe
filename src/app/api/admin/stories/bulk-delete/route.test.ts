@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DELETE } from "./route";
 import { NextRequest } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger,
+}));
+
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
@@ -63,7 +72,10 @@ describe("DELETE /api/admin/stories/bulk-delete", () => {
 
   it("should successfully delete stories", async () => {
     const mockSelect = vi.fn().mockResolvedValue({
-      data: [{ id: "1" }, { id: "2" }],
+      data: [
+        { id: "550e8400-e29b-41d4-a716-446655440001" },
+        { id: "550e8400-e29b-41d4-a716-446655440002" },
+      ],
       error: null,
     });
     const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
@@ -73,17 +85,25 @@ describe("DELETE /api/admin/stories/bulk-delete", () => {
 
     const request = new NextRequest("http://localhost/api/admin/stories/bulk-delete", {
       method: "DELETE",
-      body: JSON.stringify({ storyIds: ["1", "2"] }),
+      body: JSON.stringify({
+        storyIds: ["550e8400-e29b-41d4-a716-446655440001", "550e8400-e29b-41d4-a716-446655440002"],
+      }),
     });
 
     const response = await DELETE(request);
     expect(response.status).toBe(200);
 
     const data = await response.json();
-    expect(data.data.deletedIds).toEqual(["1", "2"]);
+    expect(data.data.deletedIds).toEqual([
+      "550e8400-e29b-41d4-a716-446655440001",
+      "550e8400-e29b-41d4-a716-446655440002",
+    ]);
 
     expect(mockDelete).toHaveBeenCalled();
-    expect(mockIn).toHaveBeenCalledWith("id", ["1", "2"]);
+    expect(mockIn).toHaveBeenCalledWith("id", [
+      "550e8400-e29b-41d4-a716-446655440001",
+      "550e8400-e29b-41d4-a716-446655440002",
+    ]);
   });
 
   it("should handle null data response gracefully", async () => {
@@ -98,7 +118,9 @@ describe("DELETE /api/admin/stories/bulk-delete", () => {
 
     const request = new NextRequest("http://localhost/api/admin/stories/bulk-delete", {
       method: "DELETE",
-      body: JSON.stringify({ storyIds: ["1", "2"] }),
+      body: JSON.stringify({
+        storyIds: ["550e8400-e29b-41d4-a716-446655440001", "550e8400-e29b-41d4-a716-446655440002"],
+      }),
     });
 
     const response = await DELETE(request);
@@ -134,10 +156,83 @@ describe("DELETE /api/admin/stories/bulk-delete", () => {
 
     const request = new NextRequest("http://localhost/api/admin/stories/bulk-delete", {
       method: "DELETE",
-      body: JSON.stringify({ storyIds: ["1"] }),
+      body: JSON.stringify({ storyIds: ["550e8400-e29b-41d4-a716-446655440000"] }),
     });
 
     const response = await DELETE(request);
     expect(response.status).toBe(500);
+  });
+
+  // -----------------------------------------------------------------------
+  // Zod validation tests (BE-M1 / issue #407)
+  // -----------------------------------------------------------------------
+
+  it("should return 400 with Zod errors when storyIds contains non-UUID values", async () => {
+    const request = new NextRequest("http://localhost/api/admin/stories/bulk-delete", {
+      method: "DELETE",
+      body: JSON.stringify({ storyIds: ["not-a-uuid"] }),
+    });
+
+    const response = await DELETE(request);
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.errors).toBeDefined();
+  });
+
+  it("should return 400 when storyIds field is missing entirely", async () => {
+    const request = new NextRequest("http://localhost/api/admin/stories/bulk-delete", {
+      method: "DELETE",
+      body: JSON.stringify({}),
+    });
+
+    const response = await DELETE(request);
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    // Missing storyIds falls through to the backward-compatible error message
+    expect(data.error ?? data.errors).toBeTruthy();
+  });
+
+  // -----------------------------------------------------------------------
+  // SE-M3: logger migration tests (console.error → logger.error)
+  // -----------------------------------------------------------------------
+
+  it("should use logger.error (not console.error) when DB delete fails", async () => {
+    const mockSelect = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "DB error" },
+    });
+    const mockIn = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockDelete = vi.fn().mockReturnValue({ in: mockIn });
+    const mockFrom = vi.fn().mockReturnValue({ delete: mockDelete });
+    mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const request = new NextRequest("http://localhost/api/admin/stories/bulk-delete", {
+      method: "DELETE",
+      body: JSON.stringify({ storyIds: ["550e8400-e29b-41d4-a716-446655440000"] }),
+    });
+    await DELETE(request);
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith("[ADMIN_BULK_DELETE_FAILED]", expect.anything());
+
+    consoleSpy.mockRestore();
+  });
+
+  it("should use logger.error (not console.error) on unexpected error", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const request = new NextRequest("http://localhost/api/admin/stories/bulk-delete", {
+      method: "DELETE",
+      body: "not valid json",
+    });
+    vi.spyOn(request, "json").mockRejectedValue(new Error("Unexpected parse error"));
+    await DELETE(request);
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith("[ADMIN_BULK_DELETE_UNHANDLED_ERROR]", expect.anything());
+
+    consoleSpy.mockRestore();
   });
 });
