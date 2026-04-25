@@ -118,10 +118,17 @@ export async function POST(request: NextRequest) {
       import("@/lib/feature-flags-server"),
     ]);
 
+    // PE-H3: start the feature-flag lookup concurrently with embedding generation.
+    // The flag is independent of the retrieval pipeline, so firing it now lets it
+    // resolve (typically a fast cached Supabase read) while the embedding round-trip
+    // is in flight.  We suppress unhandled rejections here; the promise is awaited
+    // below once retrieval is complete.
     const asturianEnabledPromise = isFeatureFlagEnabled("asturianu_touches");
     void asturianEnabledPromise.catch(() => {});
 
-    // Generate embedding and search — fail gracefully on upstream errors
+    // Generate embedding and search — fail gracefully on upstream errors.
+    // search() depends on the embedding result, so these two steps remain serial.
+    // The feature-flag promise above runs in parallel with both.
     let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
     let images: Awaited<ReturnType<typeof search>>["images"] = [];
     try {
