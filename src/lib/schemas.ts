@@ -110,3 +110,56 @@ export const translateWebhookSchema = z.object({
     .optional(),
   forceRetranslate: z.boolean().optional(),
 });
+
+// ---------------------------------------------------------------------------
+// admin/stories/[id] PATCH (update)
+// ---------------------------------------------------------------------------
+
+/**
+ * Nullable bounded string — allows empty/whitespace-only values (converted to
+ * null by the route handler) while still enforcing an upper length limit.
+ */
+const nullableBoundedString = (max: number) => z.string().trim().max(max).optional().nullable();
+
+export const updateStorySchema = z.object({
+  title: boundedString(300).optional(),
+  slug: boundedString(300).optional(),
+  subtitle: nullableBoundedString(500),
+  description: nullableBoundedString(5000),
+  category: z.enum(["nature", "cities", "food", "culture", "activities"]).optional(),
+  location: z.enum(["eastern", "central", "western"]).optional().nullable(),
+  duration: z.enum(["day-trip", "weekend", "week"]).optional().nullable(),
+  sourcePdf: nullableBoundedString(500),
+  bestMonths: z.array(z.number().int().min(1).max(12)).optional().nullable(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// admin/stories/bulk-delete DELETE
+// ---------------------------------------------------------------------------
+
+export const bulkDeleteStoriesSchema = z.object({
+  storyIds: z.array(uuidSchema).min(1, "storyIds must contain at least one ID"),
+});
+
+// ---------------------------------------------------------------------------
+// admin/stories/bulk-status PUT
+// ---------------------------------------------------------------------------
+
+export const bulkStatusStoriesSchema = z.object({
+  storyIds: z.array(uuidSchema).min(1, "storyIds must contain at least one ID"),
+  status: z.enum(["needs_curation", "approved"]),
+});
+
+// ---------------------------------------------------------------------------
+// admin/feature-flags/[key] PUT
+// ---------------------------------------------------------------------------
+
+export const updateFeatureFlagSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
+  })
+  .refine((data) => data.enabled !== undefined || data.config !== undefined, {
+    message: "Must provide enabled (boolean) or config (object)",
+  });

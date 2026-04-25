@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
-import type { CurationStatus } from "@/types/admin";
+import { bulkStatusStoriesSchema } from "@/lib/schemas";
 
 export async function PUT(request: NextRequest) {
   // Validate admin auth
@@ -13,23 +13,34 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { storyIds, status } = body as { storyIds: string[]; status: CurationStatus };
 
-    // Validate input
-    if (!Array.isArray(storyIds) || storyIds.length === 0) {
+    // Zod schema validation (BE-M1)
+    const parsed = bulkStatusStoriesSchema.safeParse(body);
+    if (!parsed.success) {
+      const hasStoryIds = Array.isArray(body?.storyIds);
+      if (!hasStoryIds || body.storyIds.length === 0) {
+        return NextResponse.json(
+          { error: "Story IDs array is required" },
+          { status: 400 }
+        );
+      }
+      // Surface field-level validation errors (UUID failures, invalid status, etc.)
+      const flat = parsed.error.flatten();
+      // Keep backward-compatible message for invalid status
+      const statusErrors = flat.fieldErrors.status;
+      if (statusErrors?.length) {
+        return NextResponse.json(
+          { error: "Invalid status. Must be 'needs_curation' or 'approved'" },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        { error: "Story IDs array is required" },
+        { errors: flat.fieldErrors },
         { status: 400 }
       );
     }
 
-    if (status !== "needs_curation" && status !== "approved") {
-      return NextResponse.json(
-        { error: "Invalid status. Must be 'needs_curation' or 'approved'" },
-        { status: 400 }
-      );
-    }
-
+    const { storyIds, status } = parsed.data;
     const supabase = createAdminClient();
 
     // Update all stories at once
@@ -50,6 +61,14 @@ export async function PUT(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // SE-M4: Audit log for admin mutations
+    logger.info("[ADMIN_AUDIT]", {
+      event: "bulk_status_change",
+      actor: auth.userId,
+      story_ids_count: storyIds.length,
+      status,
+    });
 
     return NextResponse.json({
       data: {

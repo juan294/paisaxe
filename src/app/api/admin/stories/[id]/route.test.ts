@@ -4,6 +4,7 @@ import { PATCH } from "./route";
 
 const logger = vi.hoisted(() => ({
   error: vi.fn(),
+  info: vi.fn(),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -377,5 +378,100 @@ describe("PATCH /api/admin/stories/[id]", () => {
       error: { message: "Update failed" },
     });
     expect(data.error).toBe("Failed to update story");
+  });
+
+  // -----------------------------------------------------------------------
+  // Zod validation tests (BE-M1 / issue #407)
+  // -----------------------------------------------------------------------
+
+  it("should return 400 with Zod errors when title exceeds 300 characters", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ title: "A".repeat(301) }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.errors).toBeDefined();
+  });
+
+  it("should return 400 with Zod errors when category is not a valid enum value (via Zod)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ category: "invalid-category" }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    // Zod returns structured errors; manual check returns { error: "..." }
+    // Either format is acceptable, the key is status 400
+    expect(data.errors ?? data.error).toBeTruthy();
+  });
+
+  it("should return 400 with Zod errors when description exceeds 5000 characters", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Valid", description: "D".repeat(5001) }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.errors).toBeDefined();
+  });
+
+  // -----------------------------------------------------------------------
+  // SE-M4 audit log tests (issue #415)
+  // -----------------------------------------------------------------------
+
+  it("should emit audit log entry on successful story update", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin-user-id" });
+
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({
+            data: {
+              id: "story-1",
+              slug: "updated-story",
+              title: "Updated Story",
+              subtitle: null,
+              description: null,
+              category: "nature",
+              location: null,
+              duration: null,
+              source_pdf: null,
+              metadata: null,
+              updated_at: "2024-01-01T00:00:00Z",
+            },
+            error: null,
+          }),
+        }),
+      }),
+    });
+
+    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Updated Story" }),
+    });
+    const response = await PATCH(request, { params: Promise.resolve({ id: "story-1" }) });
+
+    expect(response.status).toBe(200);
+    expect(logger.info).toHaveBeenCalledWith("[ADMIN_AUDIT]", {
+      event: "story.update",
+      actor: "admin-user-id",
+      story_id: "story-1",
+    });
   });
 });
