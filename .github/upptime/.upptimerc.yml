@@ -18,8 +18,10 @@ sites:
   - name: Paisaxe API Health
     url: https://paisaxe.es/api/health
     method: GET
-    # Healthy returns HTTP 200. Degraded intentionally returns HTTP 503 so
-    # Upptime opens an incident instead of masking a broken backend.
+    # Healthy state returns HTTP 200; degraded state intentionally returns HTTP 503.
+    # Upptime expects 200 here — a 503 will open an incident automatically,
+    # surfacing any Supabase outage, zero approved stories, or DB capacity alert
+    # without requiring manual investigation.
     expectedStatusCode: 200
 
 status-website:
