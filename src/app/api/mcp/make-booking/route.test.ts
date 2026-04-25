@@ -1439,6 +1439,158 @@ describe("/api/mcp/make-booking", () => {
       expect(data.message).toContain("Unknown error");
     });
 
+    // === #386 (BE-B1): pre-call row must be nullable + fatal on failure ===
+
+    it("#386 BE-B1: should insert pending_bookings row with NULL conversation_id BEFORE placing the call", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      const insertedData: unknown[] = [];
+      mockInsert.mockImplementation((data: unknown) => {
+        insertedData.push(data);
+        return { select: vi.fn().mockResolvedValue({ data: [{ id: "pre-call-row" }], error: null }) };
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_be_b1" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "be-b1-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      await POST(request);
+
+      expect(insertedData.length).toBeGreaterThan(0);
+      const firstInsert = insertedData[0] as Record<string, unknown>;
+      // conversation_id MUST be null on the pre-call insert (nullable column)
+      expect(firstInsert.conversation_id).toBeNull();
+      // status must be 'initiating' (pre-call state)
+      expect(firstInsert.status).toBe("initiating");
+      // idempotency_key must be set
+      expect(firstInsert.idempotency_key).toBe("be-b1-key");
+    });
+
+    it("#386 BE-B1: persistence failure must be fatal — ElevenLabs must NOT be called", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({ data: null, error: { message: "connection timeout" } }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "be-b1-fatal-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Persistence failure MUST return 500 (fatal — not silently ignored)
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      // ElevenLabs call MUST NOT have been placed
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    // === #398 (BE-H1): idempotency key required; duplicate key claims rejected ===
+
+    it("#398 BE-H1: should require an idempotency key before placing the outbound call", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // No Idempotency-Key header
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Idempotency key");
+      // ElevenLabs call MUST NOT be placed without a key
+      expect(mockFetch).not.toHaveBeenCalled();
+      // DB insert MUST NOT be attempted without a key
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it("#398 BE-H1: duplicate idempotency key must return 409 without placing a second call", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // Simulate Postgres UNIQUE constraint violation (23505) on the idempotency_key column
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { code: "23505", message: "duplicate key value violates unique constraint" },
+        }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "idempotent-key-already-claimed",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Must return 409 Conflict — not 500
+      expect(response.status).toBe(409);
+      expect(data.status).toBe("duplicate");
+      // Second outbound call MUST NOT be placed
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it("should default special_requests to 'ninguna' when not provided", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
