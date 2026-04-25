@@ -1,8 +1,31 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import type { FeatureFlagRow } from "@/types/feature-flags";
+import type { FeatureFlag, FeatureFlagRow } from "@/types/feature-flags";
 import { rowToFeatureFlag } from "@/types/feature-flags";
 import { getEnvironment } from "@/lib/environment";
+
+/**
+ * SE-H1: Scrub sensitive fields from specific flag configs before sending to clients.
+ *
+ * visitor_voice_agent may contain whitelisted_emails and agent_id in its config.
+ * These must never reach the browser — authorization is performed server-side by
+ * /api/voice-access.
+ */
+const SENSITIVE_CONFIG_KEYS: Partial<Record<FeatureFlag["flagKey"], string[]>> = {
+  visitor_voice_agent: ["whitelisted_emails", "agent_id"],
+};
+
+function scrubSensitiveConfig(flag: FeatureFlag): FeatureFlag {
+  const sensitiveKeys = SENSITIVE_CONFIG_KEYS[flag.flagKey];
+  if (!sensitiveKeys || sensitiveKeys.length === 0) return flag;
+
+  const scrubbedConfig = { ...flag.config };
+  for (const key of sensitiveKeys) {
+    delete scrubbedConfig[key];
+  }
+
+  return { ...flag, config: scrubbedConfig };
+}
 
 export async function GET() {
   // Skip database call when using dummy/invalid Supabase credentials (CI/E2E).
@@ -33,7 +56,7 @@ export async function GET() {
       );
     }
 
-    const flags = (data as FeatureFlagRow[]).map(rowToFeatureFlag);
+    const flags = (data as FeatureFlagRow[]).map(rowToFeatureFlag).map(scrubSensitiveConfig);
 
     return NextResponse.json({ data: flags }, {
       headers: {
