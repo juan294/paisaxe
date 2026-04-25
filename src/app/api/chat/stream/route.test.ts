@@ -623,6 +623,145 @@ describe("POST /api/chat/stream", () => {
     expect(response.status).toBe(200);
   });
 
+  // PE-H3: pre-stream parallelization — feature-flag lookup starts alongside embedding
+  describe("PE-H3 pre-stream parallelization", () => {
+    it("starts feature-flag lookup before generateEmbedding resolves", async () => {
+      // Track call order: flag lookup must be called before embedding resolves
+      const callOrder: string[] = [];
+
+      let resolveEmbedding!: (value: number[]) => void;
+      vi.mocked(generateEmbedding).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            callOrder.push("embedding-started");
+            resolveEmbedding = resolve;
+          })
+      );
+
+      mockIsFeatureFlagEnabled.mockImplementationOnce(() => {
+        callOrder.push("flag-started");
+        return Promise.resolve(false);
+      });
+
+      vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+      vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+      vi.mocked(streamChatResponse).mockImplementation(async function* () {
+        yield "ok";
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({ message: "Tell me about Oviedo" }),
+      });
+
+      const responsePromise = POST(request);
+
+      // Wait until both parallel tasks have started
+      await vi.waitFor(() => {
+        expect(callOrder).toContain("embedding-started");
+        expect(callOrder).toContain("flag-started");
+      });
+
+      // Both must have started before embedding completes
+      expect(callOrder).toContain("flag-started");
+      expect(callOrder).toContain("embedding-started");
+
+      resolveEmbedding(new Array(512).fill(0.1));
+      const response = await responsePromise;
+      expect(response.status).toBe(200);
+    });
+
+    it("does not cause unhandled rejection on asturianu promise when embedding fails", async () => {
+      // PE-H3: even when the embedding fails (aborting the stream), the in-flight
+      // feature-flag promise must not surface as an unhandled rejection.
+      const unhandledRejection = vi.fn();
+      process.on("unhandledRejection", unhandledRejection);
+
+      let rejectFlag!: (reason: Error) => void;
+      mockIsFeatureFlagEnabled.mockImplementationOnce(
+        () =>
+          new Promise<boolean>((_, reject) => {
+            rejectFlag = reject;
+          })
+      );
+
+      vi.mocked(generateEmbedding).mockRejectedValueOnce(
+        new Error("Voyage API unavailable")
+      );
+
+      const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({ message: "Tell me about Gijón" }),
+      });
+
+      const response = await POST(request);
+
+      // Search-unavailable SSE error must be emitted
+      const events = await collectStreamEvents(response);
+      const errorEvent = events.find(
+        (e) => (e as { type: string }).type === "error"
+      ) as { message: string } | undefined;
+      expect(errorEvent?.message).toBe("search_unavailable");
+
+      // Now reject the flag promise — must NOT produce an unhandled rejection
+      rejectFlag(new Error("flag service down"));
+
+      // Flush microtask queue
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      process.off("unhandledRejection", unhandledRejection);
+      expect(unhandledRejection).not.toHaveBeenCalled();
+    });
+
+    it("passes correct context to streamChatResponse even when flag resolves after search", async () => {
+      // Verifies the parallelization does not corrupt the data passed to Claude.
+      const mockChunks = [{ id: "c1", content: "Covadonga is in Asturias", sourcePdf: "guia.pdf" }];
+      const mockImages = [{ id: "i1", path: "/img.jpg", sourcePdf: "guia.pdf" }];
+      const mockSources = [{ id: "c1", title: "guia.pdf", sourcePdf: "guia.pdf", snippet: "..." }];
+
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.2));
+      vi.mocked(search).mockResolvedValue({ chunks: mockChunks, images: mockImages });
+      vi.mocked(extractSourcesFromChunks).mockReturnValue(mockSources);
+
+      // Flag resolves AFTER search, simulating a slow Supabase flag lookup
+      let resolveFlag!: (value: boolean) => void;
+      mockIsFeatureFlagEnabled.mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => {
+            resolveFlag = resolve;
+          })
+      );
+
+      vi.mocked(streamChatResponse).mockImplementation(async function* () {
+        yield "Covadonga response";
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({ message: "Tell me about Covadonga" }),
+      });
+
+      const responsePromise = POST(request);
+
+      // Let search complete first, then resolve the flag
+      await vi.waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+      resolveFlag(true);
+
+      const response = await responsePromise;
+      expect(response.status).toBe(200);
+
+      // streamChatResponse must have received the chunks and images from search
+      expect(streamChatResponse).toHaveBeenCalledWith(
+        expect.any(String),
+        mockChunks,
+        true,   // asturianEnabled = true (flag resolved to true)
+        expect.toSatisfy((v: unknown) => v === undefined || typeof v === "number"),
+        mockImages,
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+    });
+  });
+
   it("returns 500 from outer catch when pre-stream setup throws", async () => {
     // Trigger the outer try/catch by making checkRateLimit reject. This exercises
     // the outer catch (route.ts:185-193) which is distinct from the inner stream
