@@ -432,12 +432,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     const eventKey = buildElevenLabsEventKey(conversationId);
+
+    // Check if SMS confirmation feature is enabled before calling the RPC so we
+    // can pass the phone + message atomically.  This means the SMS outbox row is
+    // inserted in the same transaction as the booking status update, eliminating
+    // the window where booking state is committed but no outbox row exists yet.
+    const smsEnabled = await isFeatureFlagEnabled("sms_booking_confirmation");
+    const smsMessage = getSMSMessage(booking as PendingBooking, outcome);
+
     const { data: rpcStatus, error: rpcError } = await supabase.rpc(
       "process_elevenlabs_event_idempotent",
       {
         p_event_key: eventKey,
         p_booking_id: booking.id,
         p_outcome: outcome,
+        // Pass SMS data so the outbox row is enqueued atomically with the
+        // booking state update.  NULL values are safe — the function skips
+        // the INSERT when either parameter is absent.
+        p_to_phone: smsEnabled ? booking.customer_phone : null,
+        p_sms_message: smsEnabled ? smsMessage : null,
       }
     );
 
@@ -465,18 +478,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Check if SMS confirmation feature is enabled only after the event claim
-    // succeeds, so duplicate deliveries never send duplicate messages.
-    const smsEnabled = await isFeatureFlagEnabled("sms_booking_confirmation");
-
-    // Build SMS message
-    const smsMessage = getSMSMessage(booking as PendingBooking, outcome);
-
     // Send SMS if feature is enabled
     let smsSent = false;
     let smsError: string | undefined;
 
     if (smsEnabled) {
+      // enqueue_booking_sms_job is now an idempotent upsert — for freshly
+      // processed events the row was already inserted atomically above;
+      // this call is a no-op for those rows.  For duplicate events it
+      // re-queues a previously failed job so the webhook can retry it.
       const { error: enqueueError } = await supabase.rpc(
         "enqueue_booking_sms_job",
         {
@@ -516,7 +526,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const smsJob = claimedSMSJob as ClaimedSMSJob | null;
 
       if (smsJob) {
-        const smsResult = await sendSMS(smsJob.to_phone, smsJob.message);
+        // Attempt SMS send outside the transaction. If it fails the durable
+        // booking_sms_jobs row (sms_outbox) persists with status=failed and can
+        // be retried by a cron job or re-attempted on the next webhook event for
+        // the same booking. We must NOT return 500 here — the booking state was
+        // already committed transactionally by process_elevenlabs_event_idempotent.
+        let smsResult: Awaited<ReturnType<typeof sendSMS>>;
+        try {
+          smsResult = await sendSMS(smsJob.to_phone, smsJob.message);
+        } catch (sendError) {
+          const errMsg =
+            sendError instanceof Error ? sendError.message : "SMS send threw unexpectedly";
+          logger.error("[ELEVENLABS_WEBHOOK_SMS_THREW]", {
+            booking_id: booking.id,
+            error: errMsg,
+          });
+          smsResult = { success: false, error: errMsg };
+        }
+
         smsSent = smsResult.success;
         smsError = smsResult.error;
 
@@ -542,16 +569,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
           }
 
+          // Booking state was committed — return 200. The sms_outbox row is
+          // persisted with status=failed and will be retried asynchronously.
           return NextResponse.json(
             {
-              success: false,
+              success: true,
               status: rpcStatus,
               bookingId: booking.id,
               outcome,
               smsSent: false,
               smsError,
             },
-            { status: 500 }
+            { status: 200 }
           );
         }
 

@@ -695,12 +695,16 @@ describe("POST /api/webhooks/elevenlabs", () => {
 
     await POST(request);
 
+    // BE-H2: SMS data is now passed atomically to the RPC so the outbox row
+    // is inserted in the same transaction as the booking state update.
     expect(mockRpc).toHaveBeenCalledWith(
       "process_elevenlabs_event_idempotent",
       {
         p_event_key: "post_call_transcription:conv_456",
         p_booking_id: "booking-123",
         p_outcome: "confirmed",
+        p_to_phone: "+34612345678",
+        p_sms_message: "Confirmation SMS",
       }
     );
     expect(mockUpdate).toHaveBeenCalledWith({
@@ -708,7 +712,9 @@ describe("POST /api/webhooks/elevenlabs", () => {
     });
   });
 
-  it("should return 500 and keep SMS retryable when delivery fails", async () => {
+  // BE-H2: SMS failure must NOT return 500 — booking state was already persisted
+  // and the durable sms_outbox row (booking_sms_jobs) will allow retries.
+  it("should return 200 (not 500) and keep SMS retryable when delivery fails", async () => {
     vi.mocked(sendSMS).mockResolvedValue({
       success: false,
       error: "Invalid phone number",
@@ -725,14 +731,94 @@ describe("POST /api/webhooks/elevenlabs", () => {
     const response = await POST(request);
     const data = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(data.success).toBe(false);
+    // Booking was persisted — return 200, not 500
+    expect(response.status).toBe(200);
+    // success=true because booking state was committed
+    expect(data.success).toBe(true);
     expect(data.smsSent).toBe(false);
     expect(data.smsError).toBe("Invalid phone number");
+    // SMS job must still be marked as failed for retry
     expect(mockRpc).toHaveBeenCalledWith("fail_booking_sms_job", {
       p_event_key: "post_call_transcription:conv_456",
       p_error: "Invalid phone number",
     });
+  });
+
+  // BE-H2: SMS outbox row (booking_sms_jobs) must be enqueued before attempting send
+  it("should enqueue SMS outbox row before attempting Twilio send", async () => {
+    const callOrder: string[] = [];
+
+    vi.mocked(sendSMS).mockImplementation(async () => {
+      callOrder.push("sendSMS");
+      return { success: true, sid: "SM123" };
+    });
+
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "process_elevenlabs_event_idempotent") {
+        callOrder.push("process_elevenlabs_event_idempotent");
+        return Promise.resolve({ data: "processed", error: null });
+      }
+      if (fn === "enqueue_booking_sms_job") {
+        callOrder.push("enqueue_booking_sms_job");
+        return Promise.resolve({ data: "queued", error: null });
+      }
+      if (fn === "claim_booking_sms_job") {
+        callOrder.push("claim_booking_sms_job");
+        return Promise.resolve({
+          data: {
+            booking_id: "booking-123",
+            event_key: "post_call_transcription:conv_456",
+            to_phone: "+34612345678",
+            message: "Confirmation SMS",
+          },
+          error: null,
+        });
+      }
+      if (fn === "complete_booking_sms_job") {
+        callOrder.push("complete_booking_sms_job");
+        return Promise.resolve({ data: true, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      transcript: buildTranscript(
+        { role: "user", message: "Confirmado, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
+    });
+
+    await POST(request);
+
+    // enqueue must happen before sendSMS
+    const enqueueIdx = callOrder.indexOf("enqueue_booking_sms_job");
+    const sendSMSIdx = callOrder.indexOf("sendSMS");
+    expect(enqueueIdx).toBeGreaterThanOrEqual(0);
+    expect(sendSMSIdx).toBeGreaterThanOrEqual(0);
+    expect(enqueueIdx).toBeLessThan(sendSMSIdx);
+  });
+
+  // BE-H2: Booking state must be persisted even when Twilio is completely unavailable
+  it("should persist booking state when Twilio throws an exception", async () => {
+    vi.mocked(sendSMS).mockRejectedValue(new Error("Network timeout"));
+
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      transcript: buildTranscript(
+        { role: "user", message: "Confirmado, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    // Booking was persisted regardless of Twilio state
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.outcome).toBe("confirmed");
+    expect(data.smsSent).toBe(false);
   });
 
   it("should retry a queued SMS when the webhook is delivered again", async () => {
