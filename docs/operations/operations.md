@@ -274,13 +274,17 @@ Automated quality checks run on every push and pull request to `develop` and `ma
 
 | Job | Description |
 |-----|-------------|
-| **lint-and-typecheck** | Runs `npm run typecheck` and `npm run lint` |
+| **lint-and-typecheck** | Runs `npm run typecheck`, `npm run lint`, `npm run check-env`, and migration numbering check (`npx tsx scripts/check-migrations.ts`) |
 | **test** | Runs `npm run test` |
 | **build** | Verifies production build with `npm run build` |
 
 ### E2E Tests (`e2e.yml`)
 
 Playwright E2E tests run against a built app on push/PR to `develop` and `main`.
+
+### Preview Smoke Test (`preview-smoke.yml`)
+
+On PRs targeting `main`, waits for the Vercel preview deployment and hits `/api/health` and the homepage against real env vars. This is a **required status check** — `Smoke test Vercel preview` must pass before any merge to `main`. It catches runtime failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js 16.2.1 incident).
 
 ### Quality & Security Workflows
 

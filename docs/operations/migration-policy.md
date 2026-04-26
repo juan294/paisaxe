@@ -141,6 +141,22 @@ Examples:
 076_revert_drop_legacy_sessions.sql   # compensation migration
 ```
 
+### Automated Numbering Check (CI)
+
+The `lint-and-typecheck` CI job runs `npx tsx scripts/check-migrations.ts` on every push. The script validates:
+
+1. **Filename format** — every file matches `NNN_description.sql`
+2. **No duplicates** — no two files share the same sequence number
+3. **No unexpected gaps** — sequence numbers are contiguous, except for deliberate historical gaps documented in `KNOWN_GAPS` inside `scripts/check-migrations.ts`
+
+If you create a migration with a number that is already taken, or skip a number without adding it to `KNOWN_GAPS`, CI will fail. Run the check locally before pushing:
+
+```bash
+npx tsx scripts/check-migrations.ts
+```
+
+The known historical gaps in this project (numbers 5, 23, and 24) were applied out-of-band during early development. They are registered in `KNOWN_GAPS` and will not trigger a CI failure.
+
 ---
 
 ## Migration Authoring Guidelines
