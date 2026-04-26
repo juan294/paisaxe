@@ -12,6 +12,19 @@ import { render, screen, waitFor, cleanup, act, fireEvent } from "@testing-libra
  * without the next/dynamic mock, since AdminShell handles tab routing.
  */
 
+// Mock next/navigation for URL-backed tab state.
+// Return a stable searchParams reference so the sync useEffect doesn't
+// re-fire on every render and reset the active tab back to "analytics".
+const stableSearchParams = { get: (_key: string) => null as string | null };
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => stableSearchParams,
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+}));
+
 // Mock auth hooks — admin user
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({

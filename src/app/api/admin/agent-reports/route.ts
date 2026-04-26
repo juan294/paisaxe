@@ -19,6 +19,13 @@ export async function GET() {
     return auth.error;
   }
 
+  // Agent report files are gitignored and local-only (docs/agents/).
+  // They don't exist in production builds, so skip filesystem reads there.
+  // This also prevents Next.js from tracing docs/** into the function bundle.
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ lastRuns: {} });
+  }
+
   const lastRuns: Record<string, string> = {};
   const reportsDir = path.join(process.cwd(), "docs", "agents");
 

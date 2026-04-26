@@ -2,6 +2,23 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { AdminShell } from "./admin-shell";
 
+// Mock next/navigation for URL-backed tab state.
+// The component uses useState for immediate UI updates and router.push() for
+// URL sync. useSearchParams() must return a stable reference so the
+// sync useEffect doesn't re-fire on every render and override tab state.
+const mockPush = vi.fn();
+// Stable object — same reference across renders, so useEffect([searchParams]) doesn't re-run.
+const stableSearchParams = { get: (_key: string) => null as string | null };
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => stableSearchParams,
+  useRouter: () => ({
+    push: mockPush,
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+}));
+
 // Mock matchMedia for next-themes
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -395,6 +412,47 @@ describe("AdminShell", () => {
       });
 
       expect(mockSignOut).toHaveBeenCalled();
+    });
+  });
+
+  describe("FE-S1: URL-backed tab state", () => {
+    beforeEach(() => {
+      setupAdminAuth();
+    });
+
+    it("defaults to analytics tab when no tab param in URL", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+    });
+
+    it("calls router.push with ?tab= when tab changes", async () => {
+      render(<AdminShell />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Marketing"));
+      });
+
+      expect(mockPush).toHaveBeenCalledWith("?tab=marketing", { scroll: false });
+    });
+
+    it("switches the active tab immediately via useState (not waiting for URL)", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Features"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("feature-toggles-panel")).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId("analytics-dashboard")).not.toBeInTheDocument();
     });
   });
 });
