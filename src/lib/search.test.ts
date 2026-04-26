@@ -20,9 +20,19 @@ vi.mock("./rerank", () => ({
   rerankChunks: vi.fn(),
 }));
 
+// Mock logger — factory must not reference outer variables (vi.mock is hoisted)
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 import { searchChunks, getRelatedImages, search, keywordSearch } from "./search";
 import { supabase } from "./supabase";
 import { rerankChunks } from "./rerank";
+import { logger } from "@/lib/logger";
 
 describe("search", () => {
   beforeEach(() => {
@@ -143,6 +153,25 @@ describe("search", () => {
 
       const results = await getRelatedImages(["test.jpg"]);
       expect(results).toEqual([]);
+    });
+
+    it("logs [TABLE_FALLBACK] with logger.error on images fetch error (#249)", async () => {
+      vi.mocked(logger.error).mockClear();
+
+      const mockSelect = vi.fn().mockReturnValue({
+        in: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { message: "DB connection failed" },
+        }),
+      });
+      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+      await getRelatedImages(["test.jpg"]);
+
+      expect(logger.error).toHaveBeenCalledWith(
+        "[TABLE_FALLBACK]",
+        expect.objectContaining({ table: "images" })
+      );
     });
   });
 
@@ -382,6 +411,26 @@ describe("search", () => {
 
       const results = await keywordSearch("test");
       expect(results).toEqual([]);
+    });
+
+    it("logs [TABLE_FALLBACK] with logger.error on keyword search error (#249)", async () => {
+      vi.mocked(logger.error).mockClear();
+
+      const mockTextSearch = vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { message: "DB error" },
+        }),
+      });
+      const mockSelect = vi.fn().mockReturnValue({ textSearch: mockTextSearch });
+      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+      await keywordSearch("test");
+
+      expect(logger.error).toHaveBeenCalledWith(
+        "[TABLE_FALLBACK]",
+        expect.objectContaining({ table: "chunks" })
+      );
     });
   });
 });

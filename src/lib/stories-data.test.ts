@@ -16,11 +16,21 @@ import {
   isBuildPhase,
 } from "./stories-data";
 import { supabase } from "./supabase";
+import { logger } from "@/lib/logger";
 
 // Mock supabase
 vi.mock("./supabase", () => ({
   supabase: {
     from: vi.fn(),
+  },
+}));
+
+// Mock logger — factory must not reference outer variables (vi.mock is hoisted)
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
   },
 }));
 
@@ -821,21 +831,26 @@ describe("stories-data", () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it("should log warnings at runtime (non-build phase) for getStoryBySlugFromDB", async () => {
+    it("logs [TABLE_FALLBACK] with logger.error at runtime for getStoryBySlugFromDB (#249)", async () => {
       process.env = { ...originalEnv };
       delete process.env.NEXT_PHASE;
+      vi.mocked(logger.error).mockClear();
       mockSupabaseFrom.mockImplementation(() => {
         throw new Error("Connection failed");
       });
 
       await getStoryBySlugFromDB("fabada");
 
-      expect(warnSpy).toHaveBeenCalled();
+      expect(logger.error).toHaveBeenCalledWith(
+        "[TABLE_FALLBACK]",
+        expect.objectContaining({ table: "stories" })
+      );
     });
 
-    it("should log warnings at runtime for getStoriesFromDB on DB error", async () => {
+    it("logs [TABLE_FALLBACK] with logger.error at runtime for getStoriesFromDB on DB error (#249)", async () => {
       process.env = { ...originalEnv };
       delete process.env.NEXT_PHASE;
+      vi.mocked(logger.error).mockClear();
       const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } });
       const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
       const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
@@ -844,7 +859,10 @@ describe("stories-data", () => {
 
       await getStoriesFromDB();
 
-      expect(warnSpy).toHaveBeenCalled();
+      expect(logger.error).toHaveBeenCalledWith(
+        "[TABLE_FALLBACK]",
+        expect.objectContaining({ table: "stories" })
+      );
     });
   });
 });

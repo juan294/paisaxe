@@ -5,6 +5,15 @@ vi.mock("@/lib/environment", () => ({
   getEnvironment: vi.fn(() => "production"),
 }));
 
+// Mock logger
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 // Mock stories-data for FALLBACK_STORIES
 const MOCK_FALLBACK_STORIES = [
   {
@@ -220,5 +229,35 @@ describe("getStoriesServer", () => {
       apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test-anon-key",
       Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test-anon-key",
     });
+  });
+
+  it("includes AbortSignal.timeout(8000) on fetch call (#252)", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    });
+
+    const { getStoriesServer } = await import("./stories-server");
+    await getStoriesServer();
+
+    const fetchOptions = mockFetch.mock.calls[0][1];
+    expect(fetchOptions.signal).toBeDefined();
+    // AbortSignal.timeout returns an AbortSignal instance
+    expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("logs [TABLE_FALLBACK] with logger.error on fetch error (#249)", async () => {
+    mockFetch.mockRejectedValue(new Error("Network error"));
+
+    const loggerModule = await import("@/lib/logger");
+    const errorSpy = vi.spyOn(loggerModule.logger, "error");
+
+    const { getStoriesServer } = await import("./stories-server");
+    await getStoriesServer();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[TABLE_FALLBACK]",
+      expect.objectContaining({ table: "stories", error: "Network error" })
+    );
   });
 });

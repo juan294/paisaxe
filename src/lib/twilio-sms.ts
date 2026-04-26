@@ -63,6 +63,7 @@ export async function sendSMS(to: string, body: string): Promise<SendSMSResult> 
           From: fromNumber,
           Body: body,
         }),
+        signal: AbortSignal.timeout(8_000),
       }
     );
 

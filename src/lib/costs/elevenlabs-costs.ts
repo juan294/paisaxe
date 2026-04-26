@@ -55,6 +55,7 @@ export async function fetchElevenLabsCosts(
         headers: {
           "xi-api-key": apiKey,
         },
+        signal: AbortSignal.timeout(8_000),
       }
     );
 
