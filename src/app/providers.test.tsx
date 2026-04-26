@@ -101,4 +101,32 @@ describe("Providers", () => {
       "true"
     );
   });
+
+  it.each(["/about", "/privacy", "/terms"])(
+    "skips AuthProvider entirely on static route %s",
+    (path) => {
+      mockUsePathname.mockReturnValue(path);
+      const { container } = render(
+        <Providers>
+          <p data-testid="page-content">Content</p>
+        </Providers>
+      );
+
+      // AuthProvider must NOT be in the tree — no auth bootstrap occurs
+      expect(container.querySelector("[data-testid='auth-provider']")).toBeNull();
+      // But children must still render
+      expect(container.querySelector("p[data-testid='page-content']")).not.toBeNull();
+    }
+  );
+
+  it("renders AuthProvider on non-static routes", () => {
+    mockUsePathname.mockReturnValue("/immersive");
+    const { container } = render(
+      <Providers>
+        <p>Content</p>
+      </Providers>
+    );
+
+    expect(container.querySelector("[data-testid='auth-provider']")).not.toBeNull();
+  });
 });
