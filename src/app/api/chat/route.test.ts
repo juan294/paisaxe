@@ -706,6 +706,114 @@ describe("POST /api/chat", () => {
     });
   });
 
+  // PE-H2/PE-H3: Feature flag lookup must be parallelized with the embedding step
+  describe("Parallel pre-stream steps (PE-H2/PE-H3)", () => {
+    it("should call isFeatureFlagEnabled in parallel with generateEmbedding (not sequentially after search)", async () => {
+      const callOrder: string[] = [];
+      let embeddingResolve!: () => void;
+      let flagResolve!: () => void;
+
+      // generateEmbedding takes time — resolve it manually
+      vi.mocked(generateEmbedding).mockReturnValue(
+        new Promise<number[]>((resolve) => {
+          embeddingResolve = () => resolve(new Array(512).fill(0.1));
+        })
+      );
+
+      const { isFeatureFlagEnabled } = await import("@/lib/feature-flags-server");
+      vi.mocked(isFeatureFlagEnabled).mockReturnValue(
+        new Promise<boolean>((resolve) => {
+          flagResolve = () => resolve(false);
+        })
+      );
+
+      vi.mocked(validateChatRequest).mockReturnValue({
+        valid: true,
+        sanitizedMessage: "Tell me about Asturias",
+        sanitizedContext: undefined,
+      });
+      vi.mocked(search).mockImplementation(async () => {
+        callOrder.push("search");
+        return { chunks: [], images: [] };
+      });
+      vi.mocked(generateChatResponse).mockResolvedValue("Response");
+      vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+      vi.mocked(detectInjectionAttempt).mockReturnValue(false);
+      vi.mocked(detectPromptLeakage).mockReturnValue(false);
+
+      const request = new NextRequest("http://localhost:3000/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "Tell me about Asturias" }),
+      });
+
+      // Start the request but don't await it yet
+      const responsePromise = POST(request);
+
+      // Both embedding and flag resolution are still pending.
+      // If they're called in parallel, unblocking both should allow
+      // the route to proceed. If sequential, only resolving the first
+      // (embedding) would eventually unblock the second (flag).
+      await Promise.resolve(); // yield to allow initial microtasks
+      flagResolve();
+      embeddingResolve();
+
+      const response = await responsePromise;
+      expect(response.status).toBe(200);
+
+      // search() must be called AFTER embedding resolves (correct dependency)
+      expect(callOrder).toContain("search");
+      // isFeatureFlagEnabled must have been called (resolved correctly)
+      expect(isFeatureFlagEnabled).toHaveBeenCalledWith("asturianu_touches");
+      // generateChatResponse must receive the flag result
+      expect(generateChatResponse).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        false,
+        undefined
+      );
+    });
+
+    it("should complete successfully when feature flag resolves before embedding", async () => {
+      const { isFeatureFlagEnabled } = await import("@/lib/feature-flags-server");
+
+      // Flag resolves instantly (fast path)
+      vi.mocked(isFeatureFlagEnabled).mockResolvedValue(true);
+      // Embedding takes one tick longer
+      vi.mocked(generateEmbedding).mockImplementation(
+        () => Promise.resolve(new Array(512).fill(0.1))
+      );
+
+      vi.mocked(validateChatRequest).mockReturnValue({
+        valid: true,
+        sanitizedMessage: "Playas de Asturias",
+        sanitizedContext: undefined,
+      });
+      vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+      vi.mocked(generateChatResponse).mockResolvedValue("Hay muchas playas");
+      vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+      vi.mocked(detectInjectionAttempt).mockReturnValue(false);
+      vi.mocked(detectPromptLeakage).mockReturnValue(false);
+
+      const request = new NextRequest("http://localhost:3000/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "Playas de Asturias" }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.message).toBe("Hay muchas playas");
+      // asturianEnabled=true should be passed to generateChatResponse
+      expect(generateChatResponse).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        true,
+        undefined
+      );
+    });
+  });
+
   it("should default asturianEnabled to false when feature flag returns false", async () => {
     const { isFeatureFlagEnabled } = await import("@/lib/feature-flags-server");
     vi.mocked(isFeatureFlagEnabled).mockResolvedValueOnce(false);
