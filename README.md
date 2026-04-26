@@ -36,7 +36,7 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 | Styling | Tailwind CSS 4 + shadcn/ui |
 | Database | Supabase (PostgreSQL + pgvector) |
 | AI Chat | Claude API (Anthropic) |
-| Embeddings | Voyage AI (voyage-3, 512 dims) |
+| Embeddings | Voyage AI (voyage-3.5, 512 dims) |
 | Reranking | Voyage AI (rerank-2.5) |
 | Voice Agents | ElevenLabs Conversational AI |
 | Auth | Google OAuth via Supabase Auth |
@@ -224,7 +224,7 @@ Dependabot opens weekly PRs for dependency updates.
 ### Chat Pipeline
 
 1. User sends a question (text or voice)
-2. Generate embedding via Voyage AI (`voyage-3`, 512 dims)
+2. Generate embedding via Voyage AI (`voyage-3.5`, 512 dims)
 3. Find top-10 candidate chunks via pgvector similarity search
 4. Rerank candidates to top-3 via Voyage AI `rerank-2.5`
 5. Pass reranked context to Claude for response generation
