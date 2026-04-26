@@ -10,7 +10,12 @@ export function escapeHtml(text: string): string {
     .replace(/'/g, "&#039;");
 }
 
-/** Convert basic markdown (headings, bold, list items) to HTML. Input is escaped first for safety. */
+/**
+ * Convert basic markdown (headings, bold, list items) to HTML. Input is escaped first for safety.
+ *
+ * @deprecated Use `<SafeMarkdown>` from `./safe-markdown` instead.
+ * This function is kept for reference and its adversarial regression tests.
+ */
 export function renderMarkdown(md: string): string {
   const escaped = escapeHtml(md);
   return escaped

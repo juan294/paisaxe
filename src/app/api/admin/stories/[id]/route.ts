@@ -1,25 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { VALID_CATEGORIES } from "@/types/immersive";
+import { logger } from "@/lib/logger";
+import { updateStorySchema } from "@/lib/schemas";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
-
-const VALID_LOCATIONS: StoryLocation[] = ["eastern", "central", "western"];
-
-const VALID_DURATIONS: StoryDuration[] = ["day-trip", "weekend", "week"];
-
-interface UpdateStoryBody {
-  title?: string;
-  slug?: string;
-  subtitle?: string;
-  description?: string;
-  category?: StoryCategory;
-  location?: StoryLocation | null;
-  duration?: StoryDuration | null;
-  sourcePdf?: string | null;
-  bestMonths?: number[] | null;
-  metadata?: Record<string, unknown>;
-}
 
 export async function PATCH(
   request: NextRequest,
@@ -33,31 +17,26 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const body: UpdateStoryBody = await request.json();
+    const rawBody = await request.json();
 
-    // Validate category if provided
-    if (body.category && !VALID_CATEGORIES.includes(body.category)) {
-      return NextResponse.json(
-        { error: "Invalid category" },
-        { status: 400 }
-      );
+    // Zod schema validation (BE-M1)
+    const parsed = updateStorySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const flat = parsed.error.flatten();
+      // Preserve backward-compatible single-field error messages
+      if (flat.fieldErrors.category?.length) {
+        return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+      }
+      if (flat.fieldErrors.location?.length) {
+        return NextResponse.json({ error: "Invalid location" }, { status: 400 });
+      }
+      if (flat.fieldErrors.duration?.length) {
+        return NextResponse.json({ error: "Invalid duration" }, { status: 400 });
+      }
+      return NextResponse.json({ errors: flat.fieldErrors }, { status: 400 });
     }
 
-    // Validate location if provided (allow null to clear it)
-    if (body.location !== undefined && body.location !== null && !VALID_LOCATIONS.includes(body.location)) {
-      return NextResponse.json(
-        { error: "Invalid location" },
-        { status: 400 }
-      );
-    }
-
-    // Validate duration if provided (allow null to clear it)
-    if (body.duration !== undefined && body.duration !== null && !VALID_DURATIONS.includes(body.duration)) {
-      return NextResponse.json(
-        { error: "Invalid duration" },
-        { status: 400 }
-      );
-    }
+    const body = parsed.data;
 
     const supabase = createAdminClient();
 
@@ -71,7 +50,11 @@ export async function PATCH(
         .single();
 
       if (slugCheckError && slugCheckError.code !== "PGRST116") {
-        console.error("Error checking slug:", slugCheckError);
+        logger.error("[ADMIN_STORY_SLUG_CHECK_FAILED]", {
+          story_id: id,
+          slug: body.slug,
+          error: slugCheckError,
+        });
         return NextResponse.json(
           { error: "Failed to validate slug" },
           { status: 500 }
@@ -111,7 +94,7 @@ export async function PATCH(
       .single();
 
     if (updateError) {
-      console.error("Error updating story:", updateError);
+      logger.error("[ADMIN_STORY_UPDATE_FAILED]", { story_id: id, error: updateError });
       return NextResponse.json(
         { error: "Failed to update story" },
         { status: 500 }
@@ -124,6 +107,13 @@ export async function PATCH(
         { status: 404 }
       );
     }
+
+    // SE-M4: Audit log for admin mutations
+    logger.info("[ADMIN_AUDIT]", {
+      event: "story.update",
+      actor: auth.userId,
+      story_id: id,
+    });
 
     return NextResponse.json({
       data: {
@@ -141,7 +131,7 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error("Admin update story API error:", error);
+    logger.error("[ADMIN_STORY_UPDATE_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

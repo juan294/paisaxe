@@ -12,6 +12,10 @@ vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(),
 }));
 
+// Mock fetch for webhook fan-out
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
+
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { createAdminClient } from "@/lib/supabase";
 
@@ -120,6 +124,102 @@ describe("POST /api/admin/stories/approve-all", () => {
     expect(response.status).toBe(500);
     const data = await response.json();
     expect(data.error).toBe("Internal server error");
+  });
+
+  describe("BE-H3: bulk approval concurrency cap", () => {
+    it("fires at most 5 concurrent webhook notifications when approving stories", async () => {
+      // Arrange: 10 stories approved — fan-out must be capped at 5 concurrent
+      const storyIds = Array.from({ length: 10 }, (_, i) => `story-id-${i}`);
+      const inflightCounts: number[] = [];
+      let inflight = 0;
+
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: storyIds.map((id) => ({ id })),
+        error: null,
+      });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+      mockFetch.mockImplementation(async () => {
+        inflight += 1;
+        inflightCounts.push(inflight);
+        // Small async pause so concurrent calls can accumulate
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        inflight -= 1;
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      });
+
+      vi.stubEnv("WEBHOOK_SECRET", "test-secret");
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
+
+      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+        method: "POST",
+      });
+
+      await POST(request);
+
+      // At no point should more than 5 concurrent webhook calls have been in-flight
+      const maxConcurrent = Math.max(...inflightCounts);
+      expect(maxConcurrent).toBeLessThanOrEqual(5);
+      // All 10 stories should have been notified
+      expect(mockFetch).toHaveBeenCalledTimes(10);
+    });
+
+    it("does not call webhook when no stories are approved", async () => {
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ success: true }), { status: 200 })
+      );
+
+      vi.stubEnv("WEBHOOK_SECRET", "test-secret");
+
+      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+        method: "POST",
+      });
+
+      await POST(request);
+
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("still returns success even when some webhook pings fail", async () => {
+      // Webhook failures should not block the approve-all response
+      const storyIds = ["story-a", "story-b"];
+      const mockSelect = vi.fn().mockResolvedValue({
+        data: storyIds.map((id) => ({ id })),
+        error: null,
+      });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+      mockFetch.mockRejectedValue(new Error("Network error"));
+
+      vi.stubEnv("WEBHOOK_SECRET", "test-secret");
+      vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
+
+      const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+        method: "POST",
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Webhook failures are non-fatal — stories are still approved
+      expect(response.status).toBe(200);
+      expect(data.data.approvedCount).toBe(2);
+    });
   });
 
   it("should return 500 on database error", async () => {

@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { PUT } from "./route";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger,
+}));
+
 // Mock dependencies
 vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(),
@@ -235,6 +244,59 @@ describe("PUT /api/admin/feature-flags/[key]", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("Internal server error");
+  });
+
+  // -----------------------------------------------------------------------
+  // SE-M3: logger migration tests (console.error → logger.error)
+  // -----------------------------------------------------------------------
+
+  it("should use logger.error (not console.error) when DB update fails", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const mockSingle = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "DB error" },
+    });
+    const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+    const mockEqEnv = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockEqKey = vi.fn().mockReturnValue({ eq: mockEqEnv });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqKey });
+    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+      method: "PUT",
+      body: JSON.stringify({ enabled: true }),
+    });
+    await PUT(request, mockParams);
+
+    // Must use structured logger, NOT console.error
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith("[FEATURE_FLAG_UPDATE_FAILED]", expect.anything());
+
+    consoleSpy.mockRestore();
+  });
+
+  it("should use logger.error (not console.error) on unexpected error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    vi.mocked(createAdminClient).mockImplementation(() => {
+      throw new Error("Unexpected");
+    });
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const request = new NextRequest("http://localhost:3000/api/admin/feature-flags/contextual_prompts", {
+      method: "PUT",
+      body: JSON.stringify({ enabled: true }),
+    });
+    await PUT(request, mockParams);
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith("[FEATURE_FLAG_UPDATE_UNHANDLED_ERROR]", expect.anything());
+
+    consoleSpy.mockRestore();
   });
 
   describe("config updates", () => {

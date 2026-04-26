@@ -100,7 +100,7 @@ async function fetchWeather(city: string): Promise<WeatherResponse> {
     url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)},ES&appid=${apiKey}&units=metric&lang=es`;
   }
 
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
 
   if (!response.ok) {
     if (response.status === 404) {

@@ -198,7 +198,8 @@ describe("Favorites API", () => {
 
       expect(response.status).toBe(400);
       const json = await response.json();
-      expect(json.error).toBe("storyIds array is required");
+      // Zod returns field-level errors
+      expect(json.errors).toBeDefined();
     });
 
     it("should return 400 when storyIds is empty array", async () => {
@@ -236,7 +237,12 @@ describe("Favorites API", () => {
 
       const request = createRequest("POST", {
         headers: { Authorization: "Bearer valid-token" },
-        body: { storyIds: ["story-1", "story-2"] },
+        body: {
+          storyIds: [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+          ],
+        },
       });
       const response = await POST(request);
 
@@ -260,7 +266,7 @@ describe("Favorites API", () => {
 
       const request = createRequest("POST", {
         headers: { Authorization: "Bearer valid-token" },
-        body: { storyIds: ["story-1"] },
+        body: { storyIds: ["550e8400-e29b-41d4-a716-446655440000"] },
       });
       const response = await POST(request);
 
@@ -358,6 +364,88 @@ describe("Favorites API", () => {
       const response = await DELETE(request);
 
       expect(response.status).toBe(500);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Zod validation tests (issue #270)
+  // -------------------------------------------------------------------------
+
+  describe("POST /api/favorites - Zod validation", () => {
+    it("should return 400 when storyIds contains a non-UUID string", async () => {
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-123" } },
+            error: null,
+          }),
+        },
+        from: vi.fn(),
+      } as never);
+
+      const request = createRequest("POST", {
+        headers: { Authorization: "Bearer valid-token" },
+        body: { storyIds: ["not-a-uuid"] },
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.errors).toBeDefined();
+    });
+
+    it("should return 400 when storyIds contains a mix of valid and invalid UUIDs", async () => {
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-123" } },
+            error: null,
+          }),
+        },
+        from: vi.fn(),
+      } as never);
+
+      const request = createRequest("POST", {
+        headers: { Authorization: "Bearer valid-token" },
+        body: {
+          storyIds: [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "not-a-uuid",
+          ],
+        },
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.errors).toBeDefined();
+    });
+
+    it("should accept valid UUIDs in storyIds", async () => {
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-123" } },
+            error: null,
+          }),
+        },
+        from: vi.fn(() => ({
+          upsert: vi.fn(() => Promise.resolve({ error: null })),
+        })),
+      } as never);
+
+      const request = createRequest("POST", {
+        headers: { Authorization: "Bearer valid-token" },
+        body: {
+          storyIds: [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+          ],
+        },
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
     });
   });
 });

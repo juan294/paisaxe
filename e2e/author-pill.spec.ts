@@ -10,9 +10,12 @@ test.describe("Author pill", () => {
         body: JSON.stringify(MOCK_FEATURE_FLAGS),
       })
     );
-    await page.goto("/immersive");
-    // Wait for the story to render
-    await expect(page.locator("h1").first()).toBeVisible();
+    await page.goto("/immersive", { waitUntil: "domcontentloaded" });
+    // Wait for story content to hydrate; the title node can exist before it
+    // becomes visible during the immersive intro transition.
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/, {
+      timeout: 15_000,
+    });
   });
 
   test("renders the pill with initial text on desktop", async ({
@@ -108,11 +111,8 @@ test.describe("Author pill", () => {
     const pill = page.locator('[aria-label="Made by Juan González"]').first();
     await pill.click();
 
-    // Wait for any potential transition
-    await page.waitForTimeout(600);
-
-    // Info should still be visible
-    await expect(bottomPanel).toHaveCSS("opacity", "1");
+    // Info should remain visible after the click settles.
+    await expect.poll(async () => bottomPanel.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
   });
 
   test("pill has blinking cursor", async ({ page, isMobile }) => {
@@ -135,6 +135,7 @@ test.describe("Author pill", () => {
     const pillGroup = page.locator('[aria-label="Made by Juan González"]').first().locator("..");
     await pillGroup.hover();
 
-    await expect(page.locator("text=Juan González")).toBeVisible();
+    const authorName = pillGroup.getByText("Juan González").first();
+    await expect(authorName).toBeVisible();
   });
 });

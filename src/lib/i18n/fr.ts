@@ -27,6 +27,8 @@ export const fr: Translations = {
     speech_hint: 'Vous pouvez utiliser le micro pour parler',
     error_processing: 'Désolé, je n\'ai pas pu traiter votre question.',
     error_generic: 'Désolé, une erreur est survenue. Veuillez réessayer.',
+    error: 'Impossible de se connecter. Veuillez réessayer.',
+    retry: 'Réessayer',
     // LOCATION-SPECIFIC: Location name in alt text
     image_alt: 'Image des Asturies',
     source: 'Source',
@@ -197,6 +199,7 @@ export const fr: Translations = {
     error: 'Erreur de connexion',
     no_permission: 'Accès au micro requis',
     you: 'Vous',
+    loading: "Chargement de l'assistant vocal...",
   },
 
   suggestions: {

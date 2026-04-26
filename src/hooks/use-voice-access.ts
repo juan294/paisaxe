@@ -81,19 +81,20 @@ export function useVoiceAccess(): UseVoiceAccessResult {
   }, [fetchPaidAccess]);
 
   return useMemo(() => {
-    // Loading if: auth loading, visitor check loading, fetching, OR
-    // user exists but we haven't checked their paid access yet
+    // Anonymous public routes should not block on visitor-flag hydration.
     const needsPaidAccessCheck = !!user && !hasCheckedPaidAccess;
-    const isLoading = isAuthLoading || visitorAccess.isLoading || isFetchingAccess || needsPaidAccessCheck;
-
-    // Check whitelist access from visitor voice access hook
-    const isWhitelisted = visitorAccess.canUseVoice;
+    const isLoading =
+      isAuthLoading ||
+      isFetchingAccess ||
+      needsPaidAccessCheck ||
+      (!!user && visitorAccess.isLoading);
 
     // Check paid access
     const hasPaidAccess = paidAccess?.hasAccess ?? false;
 
-    // User can use voice if whitelisted OR has paid access
-    const canUseVoice = isWhitelisted || hasPaidAccess;
+    // Visitor allowlist authorization now lives on the server boundary.
+    const isWhitelisted = false;
+    const canUseVoice = hasPaidAccess;
 
     // Parse expiry date for paid access
     const expiresAt = paidAccess?.expiresAt
@@ -109,10 +110,11 @@ export function useVoiceAccess(): UseVoiceAccessResult {
     const needsSignIn = visitorAccess.needsSignIn;
 
     // Needs purchase: signed in, not whitelisted, no paid access
-    const needsPurchase = !!user && !isWhitelisted && !hasPaidAccess;
+    const needsPurchase =
+      !!user && visitorAccess.featureEnabled && !hasPaidAccess;
 
-    // Get agentId - use feature flag config first, fallback to Pelayo for paid users
-    const agentId = visitorAccess.agentId || (hasPaidAccess ? ELEVENLABS_AGENT_IDS.pelayo : "");
+    // Only expose the public visitor agent when access has already been granted.
+    const agentId = hasPaidAccess ? ELEVENLABS_AGENT_IDS.pelayo : "";
 
     return {
       hasAccess: hasPaidAccess,

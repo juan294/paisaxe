@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, RefObject } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Play, Pause, Bookmark, Share2, Shuffle, Lightbulb, Camera } from "lucide-react";
+import { Play, Pause, Share2, Shuffle } from "lucide-react";
 import { BookmarkButton } from "./bookmark-button";
 import { CategoryFilterBadge } from "./category-filter-badge";
 import { SiteInfoMenu } from "./site-info-menu";
@@ -15,21 +15,20 @@ import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { getRelatedStories } from "@/lib/related-stories";
 import { RelatedStories } from "./related-stories";
-import { QuestionPrompts } from "./question-prompts";
 import { SurpriseMeButton } from "./surprise-me-button";
-import { FreshnessBadge } from "./freshness-badge";
 import { ShareButton } from "./share-button";
 import { LanguageSwitcher } from "./language-switcher";
 import { SuggestPlaceButton } from "./suggest-place-button";
-import { UserSubmittedBadge } from "./user-submitted-badge";
 import { ToolbarOverflowMenu, ToolbarOverflowItem } from "./toolbar-overflow-menu";
 import { FullscreenButton } from "./fullscreen-button";
-import { getLabel } from "@/lib/asturianu";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { NavigationHint } from "./navigation-hint";
 import { AuthorTypewriter } from "./author-typewriter";
 import { StoryProgressBar } from "./story-progress-bar";
+import { StoryToolbar } from "./story-toolbar";
+import { StoryInfoPanel } from "./story-info-panel";
+import { useStoryKeyboardNav } from "@/hooks/use-story-keyboard-nav";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -51,6 +50,8 @@ interface StoryViewerProps {
   onClearFilters: () => void;
   // Surprise Me props
   viewedIndices?: Set<number>;
+  /** Ref forwarded to the "ask about" trigger button for focus restoration when VoiceChat closes */
+  chatTriggerRef?: RefObject<HTMLButtonElement | null>;
 }
 
 export function StoryViewer({
@@ -68,6 +69,7 @@ export function StoryViewer({
   onDurationChange,
   onClearFilters,
   viewedIndices,
+  chatTriggerRef,
 }: StoryViewerProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
@@ -85,6 +87,9 @@ export function StoryViewer({
   const story = stories[currentIndex];
   const prefetchedUrls = useRef<Set<string>>(new Set());
   const ambientStartRef = useRef<number | null>(null);
+  // FE-M1: Single ref to track the pending transition timer so rapid navigation
+  // cancels any in-flight timer before setting a new one, preventing stacking.
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Prefetch adjacent images for smoother navigation
   useEffect(() => {
@@ -114,8 +119,13 @@ export function StoryViewer({
       onIndexChange(nextIndex);
       return;
     }
+    // FE-M1: Cancel any in-flight transition timer before starting a new one.
+    if (transitionTimerRef.current !== null) {
+      clearTimeout(transitionTimerRef.current);
+    }
     setIsTransitioning(true);
-    setTimeout(() => {
+    transitionTimerRef.current = setTimeout(() => {
+      transitionTimerRef.current = null;
       onIndexChange(nextIndex);
       setIsTransitioning(false);
     }, 300);
@@ -127,43 +137,35 @@ export function StoryViewer({
       onIndexChange(prevIndex);
       return;
     }
+    // FE-M1: Cancel any in-flight transition timer before starting a new one.
+    if (transitionTimerRef.current !== null) {
+      clearTimeout(transitionTimerRef.current);
+    }
     setIsTransitioning(true);
-    setTimeout(() => {
+    transitionTimerRef.current = setTimeout(() => {
+      transitionTimerRef.current = null;
       onIndexChange(prevIndex);
       setIsTransitioning(false);
     }, 300);
   }, [currentIndex, stories.length, onIndexChange, prefersReducedMotion]);
 
-  // Keyboard navigation (disabled while chat is open)
+  // Keyboard navigation — extracted to useStoryKeyboardNav (FE-H2)
+  const toggleInfo = useCallback(() => setShowInfo((prev) => !prev), []);
+  useStoryKeyboardNav({
+    onNext: goToNext,
+    onPrev: goToPrev,
+    onToggleInfo: toggleInfo,
+    chatOpen,
+  });
+
+  // FE-M1: Clear any pending transition timer on unmount to prevent memory leaks.
   useEffect(() => {
-    if (chatOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept keys when user is typing in a form element
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        tag === "SELECT" ||
-        (e.target as HTMLElement)?.isContentEditable
-      ) {
-        return;
-      }
-
-      if (e.key === "ArrowRight" || e.key === " ") {
-        e.preventDefault();
-        goToNext();
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        goToPrev();
-      } else if (e.key === "i") {
-        setShowInfo((prev) => !prev);
+    return () => {
+      if (transitionTimerRef.current !== null) {
+        clearTimeout(transitionTimerRef.current);
       }
     };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [chatOpen, goToNext, goToPrev]);
+  }, []);
 
   // Auto-play (paused while chat is open, disabled when reduced motion is preferred)
   const autoPlayInterval = ambientMode && isEnabled("ambient_discovery") ? 12000 : 6000;
@@ -251,7 +253,7 @@ export function StoryViewer({
           fill
           sizes="100vw"
           className={cn("object-cover", zoomClass)}
-          priority
+          priority={currentIndex === 0}
           placeholder="blur"
           blurDataURL={story.blurDataUrl || darkPlaceholder}
           key={`${story.id}-${isAmbient ? "ambient" : autoPlay ? "auto" : "static"}`}
@@ -295,116 +297,27 @@ export function StoryViewer({
         />
       )}
 
-      {/* Main content */}
-      <article
-        data-testid="story-info-panel"
-        onClick={(e) => {
-          e.stopPropagation();
-          setShowInfo((prev) => !prev);
-        }}
-        className={cn(
-          "absolute bottom-0 left-0 right-0 p-8 pb-[max(2rem,env(safe-area-inset-bottom))] md:p-12 z-10 transition-all duration-500 motion-reduce:transition-none",
-          showInfo ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 motion-reduce:translate-y-0"
-        )}
-      >
-        {/* Badges */}
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {/* Freshness badge */}
-          {isEnabled("story_freshness") && (
-            <FreshnessBadge createdAt={story.createdAt} storyId={story.id} />
-          )}
-          {/* User-submitted badge */}
-          {story.sourceType === "user_submitted" && (
-            <UserSubmittedBadge />
-          )}
-        </div>
+      {/* Main content — extracted to StoryInfoPanel (FE-H2) */}
+      <StoryInfoPanel
+        story={story}
+        localizedStory={localizedStory}
+        showInfo={showInfo}
+        t={t}
+        onAskAbout={onAskAbout}
+        onToggleInfo={toggleInfo}
+        ast={ast}
+        isEnabled={isEnabled}
+        questionPrompts={questionPrompts}
+        requiresAuth={requiresAuth}
+        onAuthRequired={signInWithGoogle}
+        onFavoritesNav={() => router.push("/favorites")}
+        isFavorite={isFavorite(story.id)}
+        onToggleFavorite={() => toggleFavorite(story.id)}
+        chatTriggerRef={chatTriggerRef}
+      />
 
-        <p className="text-white/70 text-sm md:text-base font-medium mb-2 tracking-wider uppercase">
-          {ast && story.metadata?.asturianu_subtitle
-            ? story.metadata.asturianu_subtitle
-            : localizedStory.subtitle}
-        </p>
-        <h1 data-testid="story-title" className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight">
-          {ast && story.metadata?.asturianu_title
-            ? story.metadata.asturianu_title
-            : localizedStory.title}
-        </h1>
-        <p className="text-lg md:text-xl text-white/80 max-w-2xl leading-relaxed mb-2">
-          {localizedStory.description}
-        </p>
-
-        {/* Image source attribution */}
-        {story.imageSource && (
-          <p className="text-xs text-white/60 mb-6 flex items-center gap-1">
-            <Camera className="h-3 w-3" aria-hidden="true" />
-            <span>{story.imageSource}</span>
-          </p>
-        )}
-
-        {!story.imageSource && <div className="mb-6" />}
-
-        {/* Contextual question prompts */}
-        {isEnabled("contextual_prompts") && questionPrompts.length > 0 && (
-          <QuestionPrompts
-            prompts={questionPrompts}
-            storyId={story.id}
-            onSelectPrompt={(prompt) => onAskAbout(prompt)}
-          />
-        )}
-
-        {/* Action buttons */}
-        <div className="flex flex-wrap items-center gap-3 mt-3">
-          <button
-            data-testid="ask-button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAskAbout();
-            }}
-            className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-          >
-            {ast ? getLabel("ask_about", true) : t("stories.ask_about")}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (requiresAuth) {
-                signInWithGoogle();
-              } else {
-                router.push("/favorites");
-              }
-            }}
-            className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full font-medium transition-all motion-reduce:transition-none hover:scale-105 motion-reduce:hover:scale-100 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-          >
-            <Bookmark className="h-5 w-5" />
-            <span>{ast ? getLabel("bookmarks", true) : t("favorites.bookmarks")}</span>
-          </button>
-        </div>
-      </article>
-
-      {/* Navigation arrows - invisible tap zones on phones, visible buttons on tablets/desktop */}
-      <button
-        data-testid="prev-story-button"
-        onClick={(e) => {
-          e.stopPropagation();
-          goToPrev();
-        }}
-        aria-label={t("accessibility.previous_story")}
-        className="absolute left-0 top-0 h-full w-20 z-20 flex items-center justify-start pl-4 sm:left-4 sm:top-1/2 sm:h-auto sm:w-auto sm:-translate-y-1/2 sm:p-3 sm:rounded-full sm:bg-white/10 sm:hover:bg-white/20 sm:backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black touch-nav-reset touch-nav-left"
-      >
-        <ChevronLeft className="h-8 w-8 text-white hidden sm:block" />
-      </button>
-
-      <button
-        data-testid="next-story-button"
-        onClick={(e) => {
-          e.stopPropagation();
-          goToNext();
-        }}
-        aria-label={t("accessibility.next_story")}
-        className="absolute right-0 top-0 h-full w-20 z-20 flex items-center justify-end pr-4 sm:right-4 sm:top-1/2 sm:h-auto sm:w-auto sm:-translate-y-1/2 sm:p-3 sm:rounded-full sm:bg-white/10 sm:hover:bg-white/20 sm:backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black touch-nav-reset touch-nav-right"
-      >
-        <ChevronRight className="h-8 w-8 text-white hidden sm:block" />
-      </button>
+      {/* Navigation arrows — extracted to StoryToolbar (FE-H2) */}
+      <StoryToolbar onPrev={goToPrev} onNext={goToNext} t={t} />
 
       {/* Top-right controls: Language + Auth + Auto-play + Share + Surprise + Favorites */}
       <nav
@@ -539,14 +452,7 @@ export function StoryViewer({
             />
           )}
           {isEnabled("user_story_suggestions") && (
-            <ToolbarOverflowItem
-              icon={<Lightbulb className="h-4 w-4" />}
-              label={t("suggestions.suggest_short")}
-              onClick={() => {
-                // Trigger suggest place dialog - need to use a global event or ref
-                document.querySelector<HTMLButtonElement>('[data-suggest-place-trigger]')?.click();
-              }}
-            />
+            <SuggestPlaceButton variant="menu" />
           )}
         </ToolbarOverflowMenu>
 

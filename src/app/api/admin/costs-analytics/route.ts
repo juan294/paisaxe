@@ -19,6 +19,7 @@ import type {
 } from "@/types/costs-analytics";
 import { queryPostHog, formatForHogQL } from "@/lib/posthog-query";
 import { ELEVENLABS_API_BASE } from "@/config/elevenlabs-agents";
+import { logger } from "@/lib/logger";
 
 function formatUsd(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -170,7 +171,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Costs analytics API error:", error);
+    logger.error("[COSTS_ANALYTICS_GET_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Failed to fetch costs data" },
       { status: 500 }
@@ -233,7 +234,7 @@ async function fetchUsageMetrics(
         chatConversations = Number(chatsResult.results[0]?.[0] || 0);
         posthogEvents = Number(eventsResult.results[0]?.[0] || 0);
       } catch (error) {
-        console.warn("Failed to fetch PostHog usage metrics:", error);
+        logger.warn("[COSTS_ANALYTICS_POSTHOG_USAGE_FETCH_FAILED]", { error });
       }
     }
 
@@ -310,7 +311,7 @@ async function fetchUsageMetrics(
           voiceMinutes = Math.round(voiceMinutes * 10) / 10;
         }
       } catch (error) {
-        console.warn("Failed to fetch ElevenLabs usage metrics:", error);
+        logger.warn("[COSTS_ANALYTICS_ELEVENLABS_USAGE_FETCH_FAILED]", { error });
       }
     }
 
@@ -323,7 +324,7 @@ async function fetchUsageMetrics(
       posthogEvents,
     };
   } catch (error) {
-    console.warn("Failed to fetch usage metrics:", error);
+    logger.warn("[COSTS_ANALYTICS_USAGE_FETCH_FAILED]", { error });
     return undefined;
   }
 }
@@ -367,7 +368,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: entry });
   } catch (error) {
-    console.error("Create manual cost error:", error);
+    logger.error("[COSTS_ANALYTICS_CREATE_MANUAL_COST_FAILED]", { error });
     return NextResponse.json(
       { error: "Failed to create cost entry" },
       { status: 500 }

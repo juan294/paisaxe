@@ -27,6 +27,8 @@ export const ast: Translations = {
     speech_hint: 'Pues usar el micrófonu pa falar',
     error_processing: 'Sentílo, nun pudi procesar la to entruga.',
     error_generic: 'Sentílo, hebo un error. Intenta otra vuelta.',
+    error: 'Nun se pudo conectar. Por favor, intenta otra vuelta.',
+    retry: 'Tornar a intentar',
     // LOCATION-SPECIFIC: Location name in alt text
     image_alt: 'Imaxe rellacionada d\'Asturies',
     source: 'Fonte',
@@ -197,6 +199,7 @@ export const ast: Translations = {
     error: 'Error de conexón',
     no_permission: 'Necesito accesu al micrófonu',
     you: 'Tu',
+    loading: "Cargando l'asistente de voz...",
   },
 
   suggestions: {

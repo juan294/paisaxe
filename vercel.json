@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["cdg1"],
+  "regions": ["fra1"],
   "crons": [
     {
       "path": "/api/cron/github-traffic-sync",
@@ -13,6 +13,10 @@
     {
       "path": "/api/cron/subscription-optimizer",
       "schedule": "0 4 * * 1"
+    },
+    {
+      "path": "/api/cron/fail-stale-translations",
+      "schedule": "*/15 * * * *"
     }
   ],
   "redirects": [

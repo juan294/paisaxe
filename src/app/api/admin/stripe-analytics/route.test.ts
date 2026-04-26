@@ -753,5 +753,42 @@ describe("Stripe Analytics API Route", () => {
       expect(summary.thirtyDayNetRevenue).toBe(700);
       expect(summary.thirtyDayNetRevenueFormatted).toBeDefined();
     });
+
+    /**
+     * PE-L1: charge and refund balance transaction queries must be fetched
+     * in parallel (Promise.all), not sequentially (#307).
+     *
+     * Structural verification: we record the call-invocation timestamps and
+     * confirm both calls are initiated before either resolves (only possible
+     * with Promise.all, not sequential await).
+     */
+    it("PE-L1: fetches charge and refund balance transactions concurrently (#307)", async () => {
+      vi.mocked(isStripeConfigured).mockReturnValue(true);
+
+      mockPaymentIntentsList.mockResolvedValue({ data: [] });
+
+      const callTimes: number[] = [];
+      const resolveFns: Array<(v: { data: unknown[] }) => void> = [];
+
+      mockBalanceTransactionsList.mockImplementation(() => {
+        callTimes.push(Date.now());
+        return new Promise<{ data: unknown[] }>((resolve) => {
+          resolveFns.push(resolve);
+          // Resolve all pending promises once both have been initiated.
+          if (resolveFns.length === 2) {
+            for (const fn of resolveFns) fn({ data: [] });
+          }
+        });
+      });
+
+      const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      // Ensure both calls were made (charges + refunds).
+      expect(mockBalanceTransactionsList).toHaveBeenCalledTimes(2);
+      // Both calls initiated (array has 2 entries means both were started).
+      expect(callTimes).toHaveLength(2);
+    });
   });
 });

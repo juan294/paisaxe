@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { ImageResult } from "@/types";
 import { useTranslation } from "@/lib/i18n";
 import {
@@ -13,6 +13,7 @@ import {
   recordUpsellDismissed,
 } from "@/lib/chat-upsell-throttle";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { parseSseEvent } from "@/types/sse";
 
 interface StreamChatMessage {
   role: "user" | "assistant";
@@ -37,6 +38,13 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { t } = useTranslation();
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const resetMessages = useCallback(() => {
     setMessages([]);
@@ -63,13 +71,24 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
       const userMessage = message.trim();
       setError(null);
 
-      // Add user message
-      setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
-      setIsStreaming(true);
+      // Abort any previous in-flight request
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      const timeoutId = setTimeout(() => controller.abort(), 60_000);
 
-      // Calculate assistant index (current messages + 1 for the user message we just added)
-      const assistantIndex = messages.length + 1;
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      // Add both messages atomically; capture the assistant index from actual prev state
+      let assistantIndex = 0;
+      setMessages((prev) => {
+        const updated: StreamChatMessage[] = [
+          ...prev,
+          { role: "user", content: userMessage },
+          { role: "assistant", content: "" },
+        ];
+        assistantIndex = updated.length - 1;
+        return updated;
+      });
+      setIsStreaming(true);
 
       try {
         const response = await fetch("/api/chat/stream", {
@@ -81,9 +100,13 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             locale: options.locale,
             messageIndex: options.messageIndex,
           }),
+          signal: controller.signal,
         });
 
-        if (!response.ok) throw new Error("Failed");
+        if (!response.ok) {
+          setError(t("chat.error"));
+          throw new Error("Failed");
+        }
 
         // Check if we got a non-streaming JSON response (e.g., for flagged content)
         const contentType = response.headers.get("content-type");
@@ -109,57 +132,56 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         let buffer = "";
 
         const processEvent = (line: string) => {
-          if (!line.startsWith("data: ")) return;
+          const event = parseSseEvent(line);
+          if (!event) {
+            return;
+          }
 
-          const jsonStr = line.slice(6);
-          try {
-            const event = JSON.parse(jsonStr);
+          if (event.type === "text") {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const current = updated[assistantIndex];
+              updated[assistantIndex] = {
+                ...current,
+                content: current.content + event.content,
+              };
+              return updated;
+            });
+          } else if (event.type === "done") {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const currentMsg = updated[assistantIndex];
+              const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
+                currentMsg.content
+              );
 
-            if (event.type === "text") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                const current = updated[assistantIndex];
-                updated[assistantIndex] = {
-                  ...current,
-                  content: current.content + event.content,
-                };
-                return updated;
-              });
-            } else if (event.type === "done") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                const currentMsg = updated[assistantIndex];
-                const { hasUpsell, reason, cleanContent } = detectUpsellMarker(
-                  currentMsg.content
-                );
+              const shouldShowUpsell =
+                hasUpsell && !canUseVoice && canShowUpsell(assistantIndex);
 
-                const shouldShowUpsell =
-                  hasUpsell && !canUseVoice && canShowUpsell(assistantIndex);
+              if (shouldShowUpsell) {
+                recordUpsellShown();
+              }
 
-                if (shouldShowUpsell) {
-                  recordUpsellShown();
-                }
+              updated[assistantIndex] = {
+                ...currentMsg,
+                content: cleanContent,
+                images: event.images,
+                upsellReason: shouldShowUpsell ? reason ?? undefined : undefined,
+              };
+              return updated;
+            });
+          } else if (event.type === "error") {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const current = updated[assistantIndex];
 
-                updated[assistantIndex] = {
-                  ...currentMsg,
-                  content: cleanContent,
-                  images: event.images,
-                  upsellReason: shouldShowUpsell ? reason ?? undefined : undefined,
-                };
-                return updated;
-              });
-            } else if (event.type === "error") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[assistantIndex] = {
-                  role: "assistant",
-                  content: t("chat.error_generic"),
-                };
-                return updated;
-              });
-            }
-          } catch {
-            // Ignore parse errors
+              updated[assistantIndex] = {
+                role: "assistant",
+                content: t("chat.error_generic"),
+                images: current?.images,
+              };
+              return updated;
+            });
           }
         };
 
@@ -181,7 +203,12 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         if (buffer.trim()) {
           processEvent(buffer.trim());
         }
-      } catch {
+      } catch (err) {
+        // Ignore AbortError (user navigated away or timeout fired)
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
+        setError(t("chat.error"));
         setMessages((prev) => {
           const updated = [...prev];
           if (updated[assistantIndex]) {
@@ -198,10 +225,11 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           return updated;
         });
       } finally {
+        clearTimeout(timeoutId);
         setIsStreaming(false);
       }
     },
-    [isStreaming, messages.length, canUseVoice, t]
+    [isStreaming, canUseVoice, t]
   );
 
   return {

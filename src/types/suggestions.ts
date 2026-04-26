@@ -38,15 +38,6 @@ export interface AdminStorySuggestion extends StorySuggestion {
   userEmail: string | null;
 }
 
-// Request type for creating a suggestion
-export interface CreateSuggestionRequest {
-  placeName: string;
-  comment?: string;
-  location?: "eastern" | "central" | "western";
-  /** How the user wants to be credited (name, social handle, etc.) */
-  attribution?: string;
-}
-
 // Request type for updating a suggestion (admin)
 export interface UpdateSuggestionRequest {
   status?: SuggestionStatus;

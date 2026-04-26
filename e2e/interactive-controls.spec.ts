@@ -37,7 +37,7 @@ test.describe("Ambient toggle behavior", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
   });
 
   test("play button starts auto-rotation and switches to pause icon", async ({
@@ -92,7 +92,8 @@ test.describe("Ambient toggle behavior", () => {
 
   test("auto-rotation advances to next story", async ({ page }) => {
     // Get the initial story title
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
 
     // Start auto-rotation
     const playButton = page
@@ -102,7 +103,7 @@ test.describe("Ambient toggle behavior", () => {
 
     // Wait for auto-advance (ambient mode is 12 seconds)
     // Use a generous timeout since transitions add delay
-    await expect(page.locator("h1").first()).not.toHaveText(initialTitle!, {
+    await expect(title).not.toHaveText(initialTitle!, {
       timeout: 15000,
     });
   });
@@ -121,19 +122,24 @@ test.describe("Ambient toggle behavior", () => {
       .click();
 
     // Get the title after stopping
-    const titleAfterStop = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const titleAfterStop = await title.textContent();
 
-    // Wait well beyond the auto-advance interval
-    await page.waitForTimeout(7000);
-
-    // Title should be the same — no auto-advance happened
-    await expect(page.locator("h1").first()).toHaveText(titleAfterStop!);
+    // Title should remain the same — no auto-advance should happen.
+    // toHaveText with a generous timeout passes immediately when the title
+    // stays put; it only fails if the title unexpectedly changes.
+    await expect(title).toHaveText(titleAfterStop!, {
+      timeout: 7000,
+    });
   });
 });
 
 // ─── Language Switcher Behavior ─────────────────────────────────
 
 test.describe("Language switcher behavior", () => {
+  const languageSwitcherSelector =
+    'div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]';
+
   test.beforeEach(async ({ page }) => {
     await page.route("**/api/feature-flags", (route) =>
       route.fulfill({
@@ -144,23 +150,25 @@ test.describe("Language switcher behavior", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    const switcher = page.locator(languageSwitcherSelector).first();
+    await expect(switcher).toBeVisible();
   });
 
   test("switcher opens dropdown and closes on selection", async ({ page }) => {
-    const switcher = page.locator('div[role="group"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     const trigger = switcher.locator("button").first();
+    const options = switcher.locator('[role="option"]');
 
+    await expect(trigger).toBeVisible();
     // Trigger should start collapsed
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
 
     // Open dropdown
     await trigger.click();
-    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await expect(options.first()).toBeVisible();
 
     // Options should be visible
-    const options = switcher.locator('[role="option"]');
-    await expect(options.first()).toBeVisible();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
 
     // Select a language
     await options.first().click();
@@ -171,11 +179,14 @@ test.describe("Language switcher behavior", () => {
   });
 
   test("switcher closes on Escape key", async ({ page }) => {
-    const switcher = page.locator('div[role="group"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     const trigger = switcher.locator("button").first();
+    const options = switcher.locator('[role="option"]');
 
+    await expect(trigger).toBeVisible();
     // Open dropdown
     await trigger.click();
+    await expect(options.first()).toBeVisible();
     await expect(trigger).toHaveAttribute("aria-expanded", "true");
 
     // Press Escape
@@ -199,7 +210,7 @@ test.describe("Bookmark button behavior", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
   });
 
   test("bookmark button is visible and clickable", async ({ page }) => {
@@ -230,7 +241,7 @@ test.describe("Navigation behavior", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
   });
 
   test("right arrow key advances to next story", async ({
@@ -239,15 +250,15 @@ test.describe("Navigation behavior", () => {
   }) => {
     test.skip(isMobile, "Keyboard navigation is desktop-only");
 
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
 
     await page.keyboard.press("ArrowRight");
 
-    // Wait for transition
-    await page.waitForTimeout(500);
-
-    // Title should change
-    await expect(page.locator("h1").first()).not.toHaveText(initialTitle!);
+    // Title should change after transition
+    await expect(title).not.toHaveText(initialTitle!, {
+      timeout: 3000,
+    });
   });
 
   test("left arrow key goes to previous story", async ({
@@ -257,17 +268,22 @@ test.describe("Navigation behavior", () => {
     test.skip(isMobile, "Keyboard navigation is desktop-only");
 
     // First go to second story
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
     await page.keyboard.press("ArrowRight");
-    await page.waitForTimeout(500);
+    await expect(title).not.toHaveText(initialTitle!, {
+      timeout: 3000,
+    });
 
-    const secondTitle = await page.locator("h1").first().textContent();
+    const secondTitle = await title.textContent();
 
     // Now go back
     await page.keyboard.press("ArrowLeft");
-    await page.waitForTimeout(500);
 
     // Title should change back
-    await expect(page.locator("h1").first()).not.toHaveText(secondTitle!);
+    await expect(title).not.toHaveText(secondTitle!, {
+      timeout: 3000,
+    });
   });
 
   test("i key toggles info overlay visibility", async ({
@@ -299,7 +315,8 @@ test.describe("Navigation behavior", () => {
     // intentional mobile UX — large tap targets for story navigation.
     test.skip(isMobile, "Nav arrow tap zones overlap progress bar on mobile");
 
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
 
     // Click the third progress segment
     const progressBar = page.getByRole("progressbar");
@@ -308,10 +325,11 @@ test.describe("Navigation behavior", () => {
 
     if (segmentCount >= 3) {
       await segments.nth(2).click();
-      await page.waitForTimeout(500);
 
-      // Should navigate to a different story
-      await expect(page.locator("h1").first()).not.toHaveText(initialTitle!);
+      // Should navigate to a different story after transition
+      await expect(title).not.toHaveText(initialTitle!, {
+        timeout: 3000,
+      });
     }
   });
 });
@@ -342,17 +360,19 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    const title = page.getByTestId("story-title").first();
+    await expect(title).toContainText(/\S+/);
   });
 
   test("space bar types a space in input instead of advancing story", async ({
     page,
   }) => {
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
 
     // Open the suggest place dialog
     const suggestButton = page.locator("[data-suggest-place-trigger]");
-    await expect(suggestButton).toBeVisible();
+    await expect(suggestButton).toBeVisible({ timeout: 15000 });
     await suggestButton.click();
 
     // Wait for the dialog to open
@@ -365,14 +385,17 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     await expect(placeInput).toHaveValue("Playa del");
 
     // Also verify story did NOT advance (title unchanged)
-    await expect(page.locator("h1").first()).toHaveText(initialTitle!);
+    await expect(title).toHaveText(initialTitle!);
   });
 
   test("space bar in textarea does not advance story", async ({ page }) => {
-    const initialTitle = await page.locator("h1").first().textContent();
+    const title = page.getByTestId("story-title").first();
+    const initialTitle = await title.textContent();
 
     // Open the suggest place dialog
-    await page.locator("[data-suggest-place-trigger]").click();
+    const suggestButton = page.locator("[data-suggest-place-trigger]");
+    await expect(suggestButton).toBeVisible({ timeout: 15000 });
+    await suggestButton.click();
 
     const commentArea = page.locator("#comment");
     await expect(commentArea).toBeVisible();
@@ -382,6 +405,6 @@ test.describe("Keyboard shortcuts suppressed in form inputs", () => {
     await expect(commentArea).toHaveValue("Great hidden beach");
 
     // Story should NOT have advanced
-    await expect(page.locator("h1").first()).toHaveText(initialTitle!);
+    await expect(title).toHaveText(initialTitle!);
   });
 });

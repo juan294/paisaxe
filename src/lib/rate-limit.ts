@@ -1,5 +1,6 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { logger } from "./logger";
 
 interface RateLimitEntry {
   timestamps: number[];
@@ -152,8 +153,24 @@ export async function checkRateLimit(
   if (useUpstash) {
     try {
       return await checkUpstash(identifier, config);
-    } catch {
-      // Upstash failed — fall back to in-memory so requests aren't blocked
+    } catch (err) {
+      const isProduction = process.env.NODE_ENV === "production";
+      console.error("[RATE_LIMIT_FALLBACK]", {
+        identifier,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      if (isProduction) {
+        // Fail closed in production: deny the request so Upstash failure doesn't bypass limits
+        return {
+          allowed: false,
+          limit: config.maxRequests,
+          remaining: 0,
+          resetAt: Date.now() + config.windowMs,
+          retryAfter: Math.ceil(config.windowMs / 1000),
+        };
+      }
+      // Dev/test: fall through to in-memory — emit a warning so degradation is visible in logs
+      logger.warn("[RATE_LIMIT_DEGRADED]", { reason: "Redis unavailable" });
       return checkInMemory(identifier, config);
     }
   }

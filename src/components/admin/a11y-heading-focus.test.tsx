@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import React from "react";
 
 // Mock admin-api to avoid fetch calls
 vi.mock("@/lib/admin-api", () => ({
@@ -56,8 +57,38 @@ vi.mock("@/lib/csrf-client", () => ({
   csrfHeaders: () => ({}),
 }));
 
-// We need React for JSX
-import React from "react";
+const mockLoadStripe = vi.fn().mockResolvedValue(null);
+const mockUseSearchParams = vi.fn(() => ({
+  get: () => null,
+}));
+
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => ({
+    user: { id: "1" },
+    session: { access_token: "x" },
+    signInWithGoogle: vi.fn(),
+  }),
+}));
+
+vi.mock("@/lib/i18n", () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: mockUseSearchParams,
+}));
+
+vi.mock("@stripe/stripe-js", () => ({
+  loadStripe: mockLoadStripe,
+}));
+
+vi.mock("@stripe/react-stripe-js", () => ({
+  EmbeddedCheckoutProvider: ({ children }: { children: React.ReactNode }) =>
+    children,
+  EmbeddedCheckout: () => <div data-testid="stripe-checkout" />,
+}));
 
 describe("Admin a11y: heading hierarchy", () => {
   it("AnalyticsTabs should use h2 for its panel heading (not h1)", async () => {
@@ -237,32 +268,6 @@ describe("Admin a11y: focus-visible styles", () => {
 
 describe("Checkout a11y: breadcrumb heading", () => {
   it("checkout breadcrumb should not be an h1", async () => {
-    vi.mock("@/hooks/use-auth", () => ({
-      useAuth: () => ({
-        user: { id: "1" },
-        session: { access_token: "x" },
-        signInWithGoogle: vi.fn(),
-      }),
-    }));
-    vi.mock("@/lib/i18n", () => ({
-      useTranslation: () => ({
-        t: (key: string) => key,
-      }),
-    }));
-    vi.mock("next/navigation", () => ({
-      useSearchParams: () => ({
-        get: () => null,
-      }),
-    }));
-    vi.mock("@stripe/stripe-js", () => ({
-      loadStripe: vi.fn().mockResolvedValue(null),
-    }));
-    vi.mock("@stripe/react-stripe-js", () => ({
-      EmbeddedCheckoutProvider: ({ children }: { children: React.ReactNode }) =>
-        children,
-      EmbeddedCheckout: () => <div data-testid="stripe-checkout" />,
-    }));
-
     const CheckoutPage = (await import("@/app/pricing/checkout/page")).default;
     render(<CheckoutPage />);
 

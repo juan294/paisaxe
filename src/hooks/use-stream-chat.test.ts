@@ -255,6 +255,48 @@ describe("useStreamChat", () => {
     );
   });
 
+  it("should replace partial assistant text with the generic fallback on SSE error", async () => {
+    const encoder = new TextEncoder();
+    const events = [
+      `data: ${JSON.stringify({ type: "text", content: "Partial answer" })}\n\n`,
+      `data: ${JSON.stringify({ type: "error", message: "stream_failed" })}\n\n`,
+    ];
+
+    let index = 0;
+    const stream = new ReadableStream({
+      pull(controller) {
+        if (index < events.length) {
+          controller.enqueue(encoder.encode(events[index]));
+          index++;
+        } else {
+          controller.close();
+        }
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: stream,
+    });
+
+    const { result } = renderHook(() =>
+      useStreamChat({ canUseVoice: false })
+    );
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.messages[1].content).toBe(
+      "Lo siento, hubo un error. Intenta de nuevo."
+    );
+  });
+
   it("should handle JSON (non-streaming) responses", async () => {
     mockFetch.mockResolvedValueOnce(
       createJsonResponse("Flagged content response", [])
@@ -716,16 +758,19 @@ describe("useStreamChat", () => {
       });
     });
 
-    expect(mockFetch).toHaveBeenCalledWith("/api/chat/stream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: "My question",
-        context: "Story about Lagos",
-        locale: "es",
-        messageIndex: 3,
-      }),
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/chat/stream",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "My question",
+          context: "Story about Lagos",
+          locale: "es",
+          messageIndex: 3,
+        }),
+      })
+    );
   });
 
   it("should push error message when assistantIndex is out of bounds (line 193)", async () => {

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { createAdminClient } from "@/lib/supabase";
-import { validateMcpSecret } from "@/lib/mcp-auth";
+import { logger } from "@/lib/logger";
+import { getMcpIdempotencyKey, validateMcpSecret } from "@/lib/mcp-auth";
+import { makeBookingRequestSchema } from "@/lib/schemas";
 
 /**
  * MCP-compatible Make Booking API endpoint for ElevenLabs voice agents.
@@ -42,9 +44,20 @@ interface MakeBookingResponse {
   success: boolean;
   message: string;
   call_sid?: string;
-  status?: "initiated" | "queued" | "failed" | "not_configured";
+  status?: "initiated" | "queued" | "failed" | "not_configured" | "duplicate";
   estimated_wait?: string;
   fallback_action?: string;
+}
+
+function buildClaimPersistenceFailureResponse(): NextResponse<MakeBookingResponse> {
+  return NextResponse.json<MakeBookingResponse>(
+    {
+      success: false,
+      message: "Could not persist booking request before placing the call.",
+      status: "failed",
+    },
+    { status: 500 }
+  );
 }
 
 // Validate Spanish phone number format
@@ -217,7 +230,10 @@ async function initiateCall(
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("[make-booking] ElevenLabs error:", data);
+      logger.error("[MAKE_BOOKING_ELEVENLABS_REQUEST_FAILED]", {
+        response_status: response.status,
+        error_body: data,
+      });
       return {
         success: false,
         error: data.detail?.message || data.message || `ElevenLabs API error: ${response.status}`,
@@ -230,7 +246,7 @@ async function initiateCall(
       conversationId: data.conversation_id,
     };
   } catch (error) {
-    console.error("[make-booking] Failed to initiate call:", error);
+    logger.error("[MAKE_BOOKING_CALL_INITIATION_FAILED]", { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -249,16 +265,22 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const body = await request.json();
 
-    // Support both flat format and MCP format
-    let params: Partial<MakeBookingRequest>;
+    // Support both flat format and MCP format — validate with Zod
+    const parsed = makeBookingRequestSchema.safeParse(body);
 
-    if (body.arguments) {
-      // MCP tool call format
-      params = body.arguments;
-    } else {
-      // Flat format from ElevenLabs webhook
-      params = body;
+    if (!parsed.success) {
+      return NextResponse.json<MakeBookingResponse & { errors?: unknown }>(
+        {
+          success: false,
+          message: "Invalid request parameters",
+          status: "failed",
+          errors: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
     }
+
+    const params = parsed.data;
 
     // Check if booking system is enabled via feature flag
     const bookingEnabled = await isFeatureFlagEnabled("booking_system");
@@ -275,7 +297,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
     }
 
-    // Validate required fields
     const {
       venue_name,
       phone_number,
@@ -286,32 +307,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       customer_phone,
     } = params;
 
-    if (
-      !venue_name ||
-      !phone_number ||
-      !party_size ||
-      !date ||
-      !time ||
-      !customer_name ||
-      !customer_phone
-    ) {
-      return NextResponse.json<MakeBookingResponse>(
-        {
-          success: false,
-          message:
-            "Missing required fields: venue_name, phone_number, party_size, date, time, customer_name, customer_phone",
-          status: "failed",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate phone number
+    // Validate phone number format (isValidSpanishPhone uses a stricter regex than Zod schema)
     if (!isValidSpanishPhone(phone_number)) {
       return NextResponse.json<MakeBookingResponse>(
         {
           success: false,
-          message: `Invalid Spanish phone number: ${phone_number}. Please provide a valid Spanish phone number.`,
+          message: "Invalid Spanish phone number. Please provide a valid Spanish phone number.",
           status: "failed",
           fallback_action:
             "Ask the user to confirm the phone number or search for the restaurant again.",
@@ -334,11 +335,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
     }
 
-    // Build the full request object
+    // Build the full request object (party_size already validated as number by Zod)
     const callRequest: MakeBookingRequest = {
       venue_name,
       phone_number,
-      party_size: Number(party_size),
+      party_size,
       date,
       time,
       customer_name,
@@ -349,40 +350,120 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // Normalize phone number for calling
     const normalizedPhone = normalizePhoneNumber(phone_number);
+    const normalizedCustomerPhone = normalizePhoneNumber(customer_phone);
+    const idempotencyKey = getMcpIdempotencyKey(request);
+
+    if (!idempotencyKey) {
+      return NextResponse.json<MakeBookingResponse>(
+        {
+          success: false,
+          message: "Idempotency key is required for booking requests.",
+          status: "failed",
+          fallback_action:
+            "Retry the booking request with the same Idempotency-Key header to avoid duplicate calls.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Claim the booking request before the outbound call so retries cannot place duplicates.
+    let pendingRowId: string | null = null;
+    try {
+      const supabase = createAdminClient();
+      const { data: insertedRows, error: insertError } = await supabase
+        .from("pending_bookings")
+        .insert({
+          idempotency_key: idempotencyKey,
+          conversation_id: null,
+          venue_name,
+          venue_phone: normalizedPhone,
+          customer_name,
+          customer_phone: normalizedCustomerPhone,
+          party_size: Number(party_size),
+          booking_date: date,
+          booking_time: time,
+          special_requests: params.special_requests || null,
+          status: "initiating",
+        })
+        .select("id");
+
+      if (insertError) {
+        if ((insertError as { code?: string }).code === "23505") {
+          logger.error("[MAKE_BOOKING_IDEMPOTENCY_CONFLICT]", {
+            idempotency_key: idempotencyKey,
+            error: insertError,
+          });
+          return NextResponse.json<MakeBookingResponse>(
+            {
+              success: false,
+              message:
+                "A booking request with this Idempotency Key is already being processed.",
+              status: "duplicate",
+            },
+            { status: 409 }
+          );
+        }
+
+        logger.error("[MAKE_BOOKING_PENDING_INSERT_FAILED]", {
+          idempotency_key: idempotencyKey,
+          error: insertError,
+        });
+        return buildClaimPersistenceFailureResponse();
+      }
+
+      pendingRowId = (insertedRows?.[0] as { id?: string } | undefined)?.id ?? null;
+
+      if (!pendingRowId) {
+        logger.error("[MAKE_BOOKING_PENDING_INSERT_MISSING_ID]", {
+          idempotency_key: idempotencyKey,
+          inserted_rows: insertedRows,
+        });
+        return buildClaimPersistenceFailureResponse();
+      }
+    } catch (dbError) {
+      logger.error("[MAKE_BOOKING_PENDING_INSERT_DB_ERROR]", {
+        idempotency_key: idempotencyKey,
+        error: dbError,
+      });
+      return buildClaimPersistenceFailureResponse();
+    }
 
     // Initiate the call via ElevenLabs
     const result = await initiateCall(normalizedPhone, callRequest);
 
     if (result.success) {
-      // Store pending booking for webhook to find later
+      // BE-B6: Now that we have the call ID, update the row with conversation_id and status='pending'.
+      // The webhook handler will look up the booking by conversation_id.
       const conversationId = result.conversationId || result.callSid;
-      const normalizedCustomerPhone = normalizePhoneNumber(customer_phone);
 
       if (conversationId) {
         try {
           const supabase = createAdminClient();
-          const { error: insertError } = await supabase
+          const { error: updateError } = await supabase
             .from("pending_bookings")
-            .insert({
-              conversation_id: conversationId,
-              venue_name,
-              venue_phone: normalizedPhone,
-              customer_name,
-              customer_phone: normalizedCustomerPhone,
-              party_size: Number(party_size),
-              booking_date: date,
-              booking_time: time,
-              special_requests: params.special_requests || null,
-              status: "pending",
-            });
+            .update({
+            conversation_id: conversationId,
+            status: "pending",
+            })
+            .eq("id", pendingRowId);
 
-          if (insertError) {
-            console.error("[make-booking] Failed to store pending booking:", insertError);
-            // Don't fail the request - call was already initiated
+          if (updateError) {
+            logger.error("[MAKE_BOOKING_PENDING_UPDATE_FAILED]", {
+              pending_booking_id: pendingRowId,
+              idempotency_key: idempotencyKey,
+              conversation_id: conversationId,
+              error: updateError,
+            });
+            // Don't fail the request — call was already initiated
           }
         } catch (dbError) {
-          console.error("[make-booking] Database error storing pending booking:", dbError);
-          // Don't fail the request - call was already initiated
+          logger.error("[MAKE_BOOKING_PENDING_UPDATE_DB_ERROR]", {
+            pending_booking_id: pendingRowId,
+            idempotency_key: idempotencyKey,
+            conversation_id: conversationId,
+            error: dbError,
+          });
+          // Don't fail the request — call was already initiated
         }
       }
 
@@ -411,7 +492,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
   } catch (err) {
-    console.error("[make-booking] Error:", err);
+    logger.error("[MAKE_BOOKING_UNHANDLED_ERROR]", { error: err });
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json<MakeBookingResponse>(
       {
@@ -447,6 +528,7 @@ export async function GET(): Promise<NextResponse> {
       "customer_name",
       "customer_phone",
     ],
+    required_headers: ["x-mcp-secret", "Idempotency-Key"],
     optional_fields: ["special_requests", "language"],
     example_request: {
       venue_name: "Casa Gerardo",

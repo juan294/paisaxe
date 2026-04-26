@@ -136,19 +136,17 @@ export async function GET(request: NextRequest) {
       (conv) => paisaxeAgentIds.has(conv.agent_id)
     );
 
-    // Get active calls count per Paisaxe agent and sum them
-    let activeCalls = 0;
-    for (const agentId of paisaxeAgentIds) {
-      try {
-        const liveCount = await fetchElevenLabs<ElevenLabsLiveCountResponse>(
+    // PE-L1: Get active calls count for all Paisaxe agents concurrently (#307).
+    // Previously a sequential for...of loop — now a single Promise.all fan-out.
+    const liveCountResults = await Promise.all(
+      Array.from(paisaxeAgentIds).map((agentId) =>
+        fetchElevenLabs<ElevenLabsLiveCountResponse>(
           `/convai/analytics/live-count?agent_id=${agentId}`,
           apiKey
-        );
-        activeCalls += liveCount.count;
-      } catch {
-        // Ignore errors for individual agent counts
-      }
-    }
+        ).catch(() => ({ count: 0 as number }))
+      )
+    );
+    const activeCalls = liveCountResults.reduce((sum, r) => sum + r.count, 0);
 
     // Calculate summary
     const completedConvos = allConversations.filter(c => c.status === "done");

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { getSiteUrl, getSupabaseAnonKey } from "@/lib/env";
 import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
 import { mapSupabaseUser, type AuthUser, type AuthContextValue } from "@/types/auth";
 
@@ -16,14 +17,16 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 interface AuthProviderProps {
   children: ReactNode;
+  deferInitialAuth?: boolean;
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children, deferInitialAuth = false }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!deferInitialAuth);
 
-  const supabase = createSupabaseBrowserClient();
+  const [supabase] = useState(() => createSupabaseBrowserClient());
+  const siteUrl = getSiteUrl();
 
   useEffect(() => {
     // Get initial session using getUser() to validate with server
@@ -32,7 +35,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Skip auth with dummy credentials (CI/E2E) — real Supabase anon keys
       // are JWTs starting with 'eyJ'. Calling getUser() with dummy credentials
       // hangs on NXDOMAIN DNS resolution.
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const anonKey = getSupabaseAnonKey();
       if (!anonKey || !anonKey.startsWith("eyJ")) {
         setIsLoading(false);
         return;
@@ -81,8 +84,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signInWithGoogle = useCallback(async (redirectPath?: string) => {
     const baseRedirectTo = typeof window !== "undefined"
       ? `${window.location.origin}/auth/callback`
-      : process.env.NEXT_PUBLIC_SITE_URL
-        ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+      : siteUrl
+        ? `${siteUrl}/auth/callback`
         : "http://localhost:3000/auth/callback";
 
     const redirectTo = redirectPath
@@ -100,7 +103,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error("Error signing in with Google:", error);
       throw error;
     }
-  }, [supabase]);
+  }, [siteUrl, supabase]);
 
   const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();

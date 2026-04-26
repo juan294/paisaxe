@@ -1,5 +1,28 @@
 import { NextRequest } from "next/server";
 
+// --- Lightweight imports: no heavy deps (Anthropic, Voyage, Supabase).
+// Static here so they are resolved once at module load, not on every request.
+// This removes 100-300 ms of cold-start dynamic-import cost for rejected
+// requests (rate-limit, validation, injection) that never need the AI stack.
+import { validateChatRequest } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/request-utils";
+import {
+  detectInjectionAttempt,
+  sanitizeInput,
+  MAX_INPUT_LENGTH,
+} from "@/lib/chat-safety";
+import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
+import { logger } from "@/lib/logger";
+import { encodeSseEvent } from "@/types/sse";
+
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
+
 /**
  * Streaming chat endpoint using Server-Sent Events (SSE)
  *
@@ -7,26 +30,6 @@ import { NextRequest } from "next/server";
  * Final event includes any relevant images.
  */
 export async function POST(request: NextRequest) {
-  // Dynamic imports to avoid Turbopack bundle corruption
-  const { streamChatResponse, extractSourcesFromChunks } = await import(
-    "@/lib/claude"
-  );
-  const { generateEmbedding } = await import("@/lib/embeddings");
-  const { search } = await import("@/lib/search");
-  const { validateChatRequest } = await import("@/lib/validation");
-  const { checkRateLimit } = await import("@/lib/rate-limit");
-  const { supabase } = await import("@/lib/supabase");
-
-  // Security modules
-  const {
-    detectInjectionAttempt,
-    sanitizeInput,
-    MAX_INPUT_LENGTH,
-  } = await import("@/lib/chat-safety");
-  const { GENERIC_REDIRECT_RESPONSE } = await import("@/lib/chat-config");
-
-  const { getClientIp } = await import("@/lib/request-utils");
-
   try {
     // Rate limiting
     const ip = getClientIp(request);
@@ -86,30 +89,79 @@ export async function POST(request: NextRequest) {
 
     const cleanMessage = sanitizeInput(message!);
 
-    // Generate embedding and search
-    const queryEmbedding = await generateEmbedding(cleanMessage);
-    const { chunks, images } = await search(queryEmbedding, 3, cleanMessage);
+    const streamAbortController = new AbortController();
+    const handleRequestAbort = () => {
+      streamAbortController.abort();
+    };
+
+    if (request.signal.aborted) {
+      handleRequestAbort();
+    } else {
+      request.signal.addEventListener("abort", handleRequestAbort, { once: true });
+    }
+
+    // --- Heavy imports: deferred until after all validation passes ---
+    // VERIFIED 2026-04-23 on Next.js 16.2.4: keep these imports deferred.
+    // They still avoid loading the AI stack for rejected requests, and the repo's
+    // Turbopack/Anthropic regression remains documented in
+    // docs/engineering/turbopack-fix.md. Do not convert back to static imports
+    // without re-running that reproduction with live upstream credentials.
+    const [
+      { streamChatResponse, extractSourcesFromChunks },
+      { generateEmbedding },
+      { search },
+      { isFeatureFlagEnabled },
+    ] = await Promise.all([
+      import("@/lib/claude"),
+      import("@/lib/embeddings"),
+      import("@/lib/search"),
+      import("@/lib/feature-flags-server"),
+    ]);
+
+    // PE-H3: start the feature-flag lookup concurrently with embedding generation.
+    // The flag is independent of the retrieval pipeline, so firing it now lets it
+    // resolve (typically a fast cached Supabase read) while the embedding round-trip
+    // is in flight.  We suppress unhandled rejections here; the promise is awaited
+    // below once retrieval is complete.
+    const asturianEnabledPromise = isFeatureFlagEnabled("asturianu_touches");
+    void asturianEnabledPromise.catch(() => {});
+
+    // Generate embedding and search — fail gracefully on upstream errors.
+    // search() depends on the embedding result, so these two steps remain serial.
+    // The feature-flag promise above runs in parallel with both.
+    let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
+    let images: Awaited<ReturnType<typeof search>>["images"] = [];
+    try {
+      const queryEmbedding = await generateEmbedding(cleanMessage);
+      ({ chunks, images } = await search(queryEmbedding, 3, cleanMessage));
+    } catch (searchErr) {
+      request.signal.removeEventListener("abort", handleRequestAbort);
+      logger.warn("[CHAT_STREAM_SEARCH_UNAVAILABLE]", { error: searchErr });
+      const encoder = new TextEncoder();
+      const errorStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              encodeSseEvent({
+                type: "error",
+                message: "search_unavailable",
+              })
+            )
+          );
+          controller.close();
+        },
+      });
+      return new Response(errorStream, {
+        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      });
+    }
 
     // Enrich message with context
     const enrichedMessage = context
       ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
       : cleanMessage;
 
-    // Check Asturianu feature flag
-    let asturianEnabled = false;
-    try {
-      const { data: flagData } = await supabase
-        .from("feature_flags")
-        .select("enabled")
-        .eq("flag_key", "asturianu_touches")
-        .single();
-      asturianEnabled = flagData?.enabled ?? false;
-    } catch {
-      // Default to false
-    }
-
-    // Extract sources for final event
-    const sources = extractSourcesFromChunks(chunks);
+    const asturianEnabled = await asturianEnabledPromise;
 
     // Create a readable stream for SSE
     const encoder = new TextEncoder();
@@ -123,31 +175,59 @@ export async function POST(request: NextRequest) {
             chunks,
             asturianEnabled,
             messageIndex,
-            images
+            images,
+            { signal: streamAbortController.signal }
           )) {
+            if (streamAbortController.signal.aborted) {
+              break;
+            }
+
             // Send text chunk as SSE event
-            const event = `data: ${JSON.stringify({ type: "text", content: chunk })}\n\n`;
-            controller.enqueue(encoder.encode(event));
+            controller.enqueue(encoder.encode(
+              encodeSseEvent({ type: "text", content: chunk })
+            ));
           }
 
           // Send final event with images and sources
-          const finalEvent = `data: ${JSON.stringify({
-            type: "done",
-            images,
-            sources,
-          })}\n\n`;
-          controller.enqueue(encoder.encode(finalEvent));
+          if (!streamAbortController.signal.aborted) {
+            const sources = extractSourcesFromChunks(chunks);
+            controller.enqueue(encoder.encode(
+              encodeSseEvent({
+                type: "done",
+                images,
+                sources,
+              })
+            ));
+          }
 
-          controller.close();
         } catch (error) {
-          console.error("[Stream Chat] Error:", error);
-          const errorEvent = `data: ${JSON.stringify({
-            type: "error",
-            message: "Error generating response",
-          })}\n\n`;
-          controller.enqueue(encoder.encode(errorEvent));
-          controller.close();
+          if (isAbortError(error) || streamAbortController.signal.aborted) {
+            logger.warn("[CHAT_STREAM_ABORTED]", { reason: "client_disconnect" });
+          } else {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.error("[CHAT_STREAM_FAILURE]", {
+              error: err.message,
+              type: err.constructor?.name ?? "Error",
+            });
+            controller.enqueue(encoder.encode(
+              encodeSseEvent({
+                type: "error",
+                message: "Error generating response",
+              })
+            ));
+          }
+        } finally {
+          request.signal.removeEventListener("abort", handleRequestAbort);
+          try {
+            controller.close();
+          } catch {
+            // Ignore close races caused by upstream cancellation.
+          }
         }
+      },
+      cancel() {
+        streamAbortController.abort();
+        request.signal.removeEventListener("abort", handleRequestAbort);
       },
     });
 
@@ -160,7 +240,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Stream chat API error:", error);
+    logger.error("[CHAT_STREAM_API_ERROR]", { error });
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
       {

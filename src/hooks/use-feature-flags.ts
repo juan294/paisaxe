@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 
 interface FlagsCache {
@@ -10,12 +18,42 @@ interface FlagsCache {
 }
 
 const CACHE_TTL = 60_000; // 1 minute
+const E2E_SUPABASE_URL = "https://example.supabase.co";
 
 const cache: FlagsCache = {
   data: null,
   timestamp: 0,
   promise: null,
 };
+
+interface UseFeatureFlagsResult {
+  flags: FeatureFlag[];
+  isReady: boolean;
+  isEnabled: (key: FeatureFlagKey) => boolean;
+  isEnabledWithDefault: (key: FeatureFlagKey, defaultValue?: boolean) => boolean;
+}
+
+const FeatureFlagsContext = createContext<UseFeatureFlagsResult | null>(null);
+
+/**
+ * Convert a `Partial<Record<FeatureFlagKey, boolean>>` map (as passed by a
+ * server component) into the full `FeatureFlag[]` shape expected by the hook.
+ */
+function initialFlagsToArray(
+  initial: Partial<Record<FeatureFlagKey, boolean>>
+): FeatureFlag[] {
+  return Object.entries(initial).map(([key, enabled]) => ({
+    id: `initial-${key}`,
+    flagKey: key as FeatureFlagKey,
+    enabled: enabled ?? false,
+    label: key,
+    description: null,
+    config: {},
+    environment: "development" as const,
+    createdAt: "",
+    updatedAt: "",
+  }));
+}
 
 /**
  * Feature flags hook with deferred loading.
@@ -24,24 +62,41 @@ const cache: FlagsCache = {
  * values in the background. This prevents blocking the initial render while
  * still enabling feature flags to control UI behavior.
  *
+ * Pass `initialFlags` from a server component to eliminate the flag flash:
+ * the hook will use those values immediately and skip the initial client fetch.
+ * A background refetch still occurs after CACHE_TTL (60 s) to stay fresh.
+ *
  * Use `isReady` to determine if flags have actually been loaded from the server.
  * Use `isEnabled` to check individual flags (returns false if not loaded).
  */
-export function useFeatureFlags() {
-  const [flags, setFlags] = useState<FeatureFlag[]>(cache.data || []);
-  // isReady indicates whether flags have been fetched at least once
-  // This is different from isLoading - we render immediately with defaults
-  const [isReady, setIsReady] = useState(!!cache.data);
+function useFeatureFlagsState(
+  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>,
+  enabled: boolean = true
+) : UseFeatureFlagsResult {
+  // If initialFlags are provided, seed the state and skip the first fetch.
+  // We still use the shared module-level cache so multiple hook instances
+  // on the same page share a single in-flight request on refetch.
+  const [flags, setFlags] = useState<FeatureFlag[]>(() => {
+    if (initialFlags) return initialFlagsToArray(initialFlags);
+    return cache.data ?? [];
+  });
+  // isReady is true immediately when initialFlags are provided — no flash.
+  const [isReady, setIsReady] = useState(initialFlags !== undefined || !!cache.data);
+  const isE2EDummySupabase =
+    process.env.NEXT_PUBLIC_SUPABASE_URL === E2E_SUPABASE_URL;
+  const shouldUseServerSeedOnly =
+    initialFlags !== undefined &&
+    !isE2EDummySupabase;
 
   const fetchFlags = useCallback(async (): Promise<FeatureFlag[]> => {
     const now = Date.now();
     const isStale = now - cache.timestamp > CACHE_TTL;
 
-    if (cache.data && !isStale) {
+    if (cache.data && !isStale && !isE2EDummySupabase) {
       return cache.data;
     }
 
-    if (cache.promise) {
+    if (cache.promise && !isE2EDummySupabase) {
       return cache.promise;
     }
 
@@ -65,9 +120,13 @@ export function useFeatureFlags() {
       });
 
     return cache.promise;
-  }, []);
+  }, [isE2EDummySupabase]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let mounted = true;
 
     async function load() {
@@ -85,9 +144,23 @@ export function useFeatureFlags() {
       }
     }
 
+    if (shouldUseServerSeedOnly) {
+      // Skip the immediate fetch — the caller provided fresh server-rendered values.
+      // Schedule a background refresh once the stale window has elapsed so the
+      // client eventually re-validates without causing a flash on first paint.
+      const delay = CACHE_TTL;
+      const timerId = setTimeout(() => {
+        if (mounted) load();
+      }, delay);
+      return () => {
+        mounted = false;
+        clearTimeout(timerId);
+      };
+    }
+
     load();
     return () => { mounted = false; };
-  }, [fetchFlags]);
+  }, [enabled, fetchFlags, shouldUseServerSeedOnly]);
 
   const isEnabled = useCallback(
     (key: FeatureFlagKey): boolean => {
@@ -119,4 +192,26 @@ export function useFeatureFlags() {
     /** Check if a flag is enabled with a default value while loading */
     isEnabledWithDefault,
   };
+}
+
+interface FeatureFlagsProviderProps {
+  children: ReactNode;
+  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>;
+}
+
+export function FeatureFlagsProvider({
+  children,
+  initialFlags,
+}: FeatureFlagsProviderProps) {
+  const value = useFeatureFlagsState(initialFlags);
+
+  return createElement(FeatureFlagsContext.Provider, { value }, children);
+}
+
+export function useFeatureFlags(
+  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>
+): UseFeatureFlagsResult {
+  const context = useContext(FeatureFlagsContext);
+  const fallback = useFeatureFlagsState(initialFlags, !context);
+  return context ?? fallback;
 }

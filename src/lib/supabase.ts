@@ -1,15 +1,61 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  getSupabaseAnonKey,
+  getSupabaseServiceKey,
+  getSupabaseServiceRoleKey,
+  getSupabaseUrl,
+} from "@/lib/env";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+function getRequiredSupabaseUrl() {
+  const supabaseUrl = getSupabaseUrl();
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  if (!supabaseUrl) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is required");
+  }
+
+  return supabaseUrl;
+}
+
+function getPublicSupabaseConfig() {
+  const supabaseUrl = getRequiredSupabaseUrl();
+  const supabaseAnonKey = getSupabaseAnonKey();
+
+  if (!supabaseAnonKey) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required");
+  }
+
+  return { supabaseUrl, supabaseAnonKey };
+}
+
+type PublicSupabaseClient = SupabaseClient;
+
+let publicClient: PublicSupabaseClient | null = null;
+
+function getPublicClient() {
+  if (!publicClient) {
+    const { supabaseUrl, supabaseAnonKey } = getPublicSupabaseConfig();
+    publicClient = createClient(supabaseUrl, supabaseAnonKey);
+  }
+
+  return publicClient;
+}
+
+export const supabase = new Proxy({} as PublicSupabaseClient, {
+  get(_target, prop) {
+    const client = getPublicClient();
+    const value = client[prop as keyof typeof client];
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
 
 // Admin client for server-side operations (seeding, etc.)
 export function createAdminClient() {
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY;
+  const supabaseUrl = getRequiredSupabaseUrl();
+  const serviceKey = getSupabaseServiceRoleKey() ?? getSupabaseServiceKey();
   if (!serviceKey) {
-    throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY) is required for admin operations"
+    );
   }
   return createClient(supabaseUrl, serviceKey);
 }

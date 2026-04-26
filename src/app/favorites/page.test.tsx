@@ -105,6 +105,7 @@ describe("FavoritesPage", () => {
       favorites: [],
       toggleFavorite: mockToggleFavorite,
       isLoading: false,
+      requiresAuth: true, // default: anonymous user
     });
     mockUseStories.mockReturnValue({
       stories: mockStories,
@@ -135,6 +136,22 @@ describe("FavoritesPage", () => {
       await waitFor(() => {
         expect(screen.getByText(mockT("favorites.empty_title"))).toBeInTheDocument();
       });
+    });
+
+    it("renders the anonymous empty state even while stories are still resolving", async () => {
+      mockUseStories.mockReturnValue({
+        stories: [],
+        isLoading: true,
+        error: null,
+        refresh: vi.fn(),
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.empty_title"))).toBeInTheDocument();
+      });
+      expect(screen.queryByText(mockT("common.loading"))).not.toBeInTheDocument();
     });
 
     it("should show explore button in empty state", async () => {
@@ -905,8 +922,8 @@ describe("FavoritesPage", () => {
     });
   });
 
-  describe("sync banner", () => {
-    it("should show sync banner when user is not logged in and has favorites", async () => {
+  describe("anonymous favorites state", () => {
+    it("should not show a local-only sync banner for anonymous favorites", async () => {
       mockUseFavorites.mockReturnValue({
         favorites: ["story-1"],
         toggleFavorite: mockToggleFavorite,
@@ -916,10 +933,12 @@ describe("FavoritesPage", () => {
       render(<FavoritesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(mockT("favorites.local_only"))).toBeInTheDocument();
-        expect(screen.getByText(mockT("favorites.local_only_description"))).toBeInTheDocument();
-        expect(screen.getByText(mockT("favorites.sync_with_google"))).toBeInTheDocument();
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
       });
+
+      expect(screen.queryByText(mockT("favorites.local_only"))).not.toBeInTheDocument();
+      expect(screen.queryByText(mockT("favorites.local_only_description"))).not.toBeInTheDocument();
+      expect(screen.queryByText(mockT("favorites.sync_with_google"))).not.toBeInTheDocument();
     });
 
     it("should not show sync banner when user is logged in", async () => {
@@ -954,24 +973,6 @@ describe("FavoritesPage", () => {
       });
 
       expect(screen.queryByText(mockT("favorites.local_only"))).not.toBeInTheDocument();
-    });
-
-    it("should call signInWithGoogle when clicking sync button", async () => {
-      mockUseFavorites.mockReturnValue({
-        favorites: ["story-1"],
-        toggleFavorite: mockToggleFavorite,
-        isLoading: false,
-      });
-
-      render(<FavoritesPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText(mockT("favorites.sync_with_google"))).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText(mockT("favorites.sync_with_google")));
-
-      expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
     });
   });
 

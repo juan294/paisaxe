@@ -158,7 +158,8 @@ describe("/api/mcp/weather", () => {
       await GET(request);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("units=metric")
+        expect.stringContaining("units=metric"),
+        expect.any(Object)
       );
     });
   });

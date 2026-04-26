@@ -11,6 +11,7 @@ import { Inter } from "next/font/google";
 import { VercelAnalytics } from "@/components/analytics";
 import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
+import { getSiteUrl, getSupabaseUrl } from "@/lib/env";
 import { Providers } from "./providers";
 import { PostHogPageView } from "@/components/posthog-provider";
 import "./globals.css";
@@ -21,7 +22,8 @@ const inter = Inter({
 });
 
 // LOCATION-SPECIFIC: Site URL from config
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || `https://${LOCATION_CONFIG.domain}`;
+const SITE_URL = getSiteUrl() ?? `https://${LOCATION_CONFIG.domain}`;
+const SUPABASE_URL = getSupabaseUrl();
 
 // LOCATION-SPECIFIC: Title and description from config
 const title = `${LOCATION_CONFIG.siteName} | Descubre ${LOCATION_CONFIG.name}`;
@@ -121,12 +123,12 @@ export default function RootLayout({
     <html lang={LOCATION_CONFIG.primaryLanguage} suppressHydrationWarning>
       <head>
         {/* Supabase preconnects - critical for image loading LCP */}
-        <link rel="dns-prefetch" href="https://axoishtlumlswzhegseq.supabase.co" />
-        <link
-          rel="preconnect"
-          href="https://axoishtlumlswzhegseq.supabase.co"
-          crossOrigin="anonymous"
-        />
+        {SUPABASE_URL && (
+          <>
+            <link rel="dns-prefetch" href={SUPABASE_URL} />
+            <link rel="preconnect" href={SUPABASE_URL} crossOrigin="anonymous" />
+          </>
+        )}
         {/* Unsplash preconnect for external images */}
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
         <link
@@ -139,7 +141,9 @@ export default function RootLayout({
         <JsonLd type="website" />
         <Providers>
           <PostHogPageView />
-          {children}
+          <main id="main-content">
+            {children}
+          </main>
         </Providers>
         <VercelAnalytics />
       </body>

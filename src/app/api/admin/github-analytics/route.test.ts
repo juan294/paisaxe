@@ -465,4 +465,88 @@ describe("GET /api/admin/github-analytics", () => {
       "private, max-age=120, stale-while-revalidate=300"
     );
   });
+
+  /**
+   * PE-L1: The four Supabase queries (daily, referrers, paths, lastSync)
+   * must be dispatched concurrently via Promise.all, not sequentially.
+   *
+   * Strategy: inject a 40 ms delay per query and assert total elapsed < 4 * 40 ms.
+   */
+  it("PE-L1: fetches all four Supabase tables concurrently (#307)", async () => {
+    mockValidateAdminAuth.mockResolvedValue({
+      valid: true,
+      userId: "test-user-id",
+    });
+
+    const DELAY_MS = 40;
+
+    function delayedResolve<T>(data: T) {
+      return new Promise<{ data: T; error: null }>((resolve) =>
+        setTimeout(() => resolve({ data, error: null }), DELAY_MS)
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockFrom.mockImplementation((table: string): any => {
+      if (table === "github_traffic_daily") {
+        return {
+          select: (cols: string) => {
+            if (cols === "fetched_at") {
+              return {
+                order: () => ({
+                  limit: () => delayedResolve(mockLastSync),
+                }),
+              };
+            }
+            return {
+              gte: () => ({
+                lte: () => ({
+                  order: () => delayedResolve(mockDailyData),
+                }),
+              }),
+            };
+          },
+        };
+      }
+      if (table === "github_traffic_referrers") {
+        return {
+          select: () => ({
+            order: () => ({
+              order: () => ({
+                limit: () => delayedResolve(mockReferrerData),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "github_traffic_paths") {
+        return {
+          select: () => ({
+            order: () => ({
+              order: () => ({
+                limit: () => delayedResolve(mockPathData),
+              }),
+            }),
+          }),
+        };
+      }
+      return buildChain([]);
+    });
+
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/admin/github-analytics?from=2026-02-01&to=2026-02-07"
+    );
+
+    const start = Date.now();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await GET(request as never) as any;
+    const elapsed = Date.now() - start;
+
+    expect(response.status).toBe(200);
+    // Sequential would take >= 4 * DELAY_MS; parallel finishes in ~1 * DELAY_MS.
+    // We give a generous 3× budget to tolerate slow CI environments.
+    expect(elapsed).toBeLessThan(3 * DELAY_MS);
+    expect(response.body.data.summary.totalViews).toBe(110);
+  });
 });

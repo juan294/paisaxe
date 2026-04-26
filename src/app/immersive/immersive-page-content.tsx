@@ -4,10 +4,10 @@ import { useState, useEffect, useMemo, useRef, Suspense, useTransition, useCallb
 import dynamic from "next/dynamic";
 import { StoryViewer } from "@/components/immersive/story-viewer";
 import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
-import { useStories } from "@/hooks/use-stories";
+import { StoriesProvider, useStories } from "@/hooks/use-stories";
 import type { Story } from "@/types/immersive";
 import { useStoryFilters } from "@/hooks/use-story-filters";
-import { useFeatureFlags } from "@/hooks/use-feature-flags";
+import { FeatureFlagsProvider, useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useViewedStories } from "@/hooks/use-viewed-stories";
 import { fisherYatesShuffle } from "@/lib/shuffle";
 import { applySeasonalWeighting } from "@/lib/seasonal-weighting";
@@ -36,10 +36,30 @@ interface ImmersivePageContentProps {
   serverShuffleSeed: number | null;
   /** Server-fetched stories to seed the client cache and skip loading state */
   initialStories?: Story[];
+  /**
+   * Server-fetched feature flags.
+   * When provided, useFeatureFlags uses these as the initial state and sets
+   * isReady=true immediately — eliminating flag-gated UI flash on first paint.
+   */
+  initialFlags?: Partial<Record<import("@/types/feature-flags").FeatureFlagKey, boolean>>;
 }
 
-export function ImmersivePageContent({ serverShuffleSeed, initialStories }: ImmersivePageContentProps) {
-  const { stories: allStories, isLoading } = useStories(initialStories);
+export function ImmersivePageContent({ serverShuffleSeed, initialStories, initialFlags }: ImmersivePageContentProps) {
+  return (
+    <StoriesProvider initialStories={initialStories}>
+      <FeatureFlagsProvider initialFlags={initialFlags}>
+        <ImmersivePageContentInner serverShuffleSeed={serverShuffleSeed} />
+      </FeatureFlagsProvider>
+    </StoriesProvider>
+  );
+}
+
+interface ImmersivePageContentInnerProps {
+  serverShuffleSeed: number | null;
+}
+
+function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentInnerProps) {
+  const { stories: allStories, isLoading } = useStories();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | undefined>();
@@ -47,11 +67,14 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
   const [moodDismissed, setMoodDismissed] = useState(false);
   const [, startTransition] = useTransition();
   const deepLinkHandled = useRef(false);
+  const chatTriggerRef = useRef<HTMLButtonElement>(null);
 
   // Use server-provided seed if available, otherwise generate client-side
   // This ensures shuffling happens on first render without flicker
   const shuffleSeed = useRef(serverShuffleSeed ?? Math.floor(Math.random() * 2147483647));
 
+  // Pass server-fetched initialFlags so the hook is ready immediately on first
+  // paint — no client fetch on mount, no flag-gated UI flash.
   const { isEnabled, isReady: flagsReady } = useFeatureFlags();
   const { t } = useTranslation();
   const { viewedIndices, markViewed } = useViewedStories();
@@ -186,7 +209,7 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
   // Show message when no stories match filters
   if (filteredStories.length === 0) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
+      <div role="alert" aria-live="assertive" className="fixed inset-0 flex flex-col items-center justify-center bg-black">
         <div className="text-white text-lg mb-4">{t("stories.no_results")}</div>
         <button
           onClick={() => {
@@ -224,6 +247,7 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
           onDurationChange={setSelectedDuration}
           onClearFilters={clearAll}
           viewedIndices={viewedIndices}
+          chatTriggerRef={chatTriggerRef}
         />
       </ComponentErrorBoundary>
       {/* Only render VoiceChat when opened - lazy loaded */}
@@ -235,6 +259,7 @@ export function ImmersivePageContent({ serverShuffleSeed, initialStories }: Imme
               open={chatOpen}
               onClose={handleCloseChat}
               initialMessage={initialMessage}
+              triggerRef={chatTriggerRef}
             />
           </ComponentErrorBoundary>
         </Suspense>

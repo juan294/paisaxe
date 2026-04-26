@@ -153,6 +153,8 @@ describe('locale files', () => {
       'chat.speech_hint',
       'chat.error_processing',
       'chat.error_generic',
+      'chat.error',
+      'chat.retry',
       'chat.image_alt',
       'chat.source',
       'chat.privacy_notice',

@@ -14,6 +14,8 @@ export const mockTranslations: Record<string, string> = {
   "chat.speech_hint": "Puedes usar el micrófono para hablar",
   "chat.error_generic": "Lo siento, hubo un error. Intenta de nuevo.",
   "chat.error_processing": "Lo siento, no pude procesar tu pregunta.",
+  "chat.error": "No se pudo conectar. Por favor, inténtalo de nuevo.",
+  "chat.retry": "Reintentar",
   "chat.privacy_notice": "Tus preguntas se procesan con inteligencia artificial. No guardamos tus conversaciones.",
   "chat.understood": "Entendido",
   "chat.source": "Fuente",
@@ -147,6 +149,12 @@ export const mockTranslations: Record<string, string> = {
   "info_menu.about": "Acerca de Paisaxe",
   "info_menu.saved_places": "Guardados",
   "info_menu.sign_in": "Iniciar sesion",
+
+  // Voice
+  "voice.loading": "Cargando asistente de voz...",
+  "voice.use_text": "Usar texto",
+  "voice.try_voice": "Probar voz",
+  "voice.upgrade_cta": "Activar voz",
 
   // Accessibility
   "accessibility.language_switcher": "Cambiar idioma",

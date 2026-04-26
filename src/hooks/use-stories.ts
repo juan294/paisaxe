@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { FALLBACK_STORIES, getStoriesFromDB } from "@/lib/stories-data";
 import type { Story } from "@/types/immersive";
 
@@ -30,6 +39,15 @@ const cache: StoriesCache = {
   timestamp: 0,
   promise: null,
 };
+
+interface UseStoriesResult {
+  stories: Story[];
+  isLoading: boolean;
+  error: Error | null;
+  refresh: () => Promise<void>;
+}
+
+const StoriesContext = createContext<UseStoriesResult | null>(null);
 
 /**
  * Try to load stories from localStorage
@@ -88,50 +106,68 @@ function saveToStorage(data: Story[]): void {
   }
 }
 
-/**
- * Initialize cache from localStorage if available
- * Called once when module loads on client
- */
-function initializeCache(): void {
-  if (cache.data) return; // Already initialized
-
-  const stored = loadFromStorage();
-  if (stored && stored.length > 0) {
-    cache.data = stored;
-    // Use stored timestamp but mark as slightly stale to trigger revalidation
-    cache.timestamp = Date.now() - CACHE_TTL + 30000; // Will revalidate in 30s
-  }
-}
 
 /**
  * Hook for fetching and caching stories data.
  *
  * Implements stale-while-revalidate pattern with localStorage persistence:
- * - On first load, tries to restore from localStorage (instant render)
- * - Returns cached data immediately if available
+ * - On first load, tries to restore from localStorage (after hydration, in useEffect)
+ * - Returns server-provided initialStories immediately when available
  * - Revalidates in background if cache is stale
  * - Deduplicates concurrent requests
  * - Persists to localStorage for next visit
+ *
+ * localStorage bootstrap is intentionally deferred to a useEffect so the initial
+ * render is identical between server and client, preventing hydration mismatches.
+ * Only server-provided `initialStories` may seed the cache during render.
  */
-export function useStories(initialStories?: Story[]) {
-  // Initialize cache from storage on first render
-  const initialized = useRef(false);
-  if (!initialized.current) {
-    if (initialStories?.length && !cache.data) {
-      // Seed cache with server-provided stories
+function useStoriesState(
+  initialStories?: Story[],
+  enabled: boolean = true
+): UseStoriesResult {
+  // Seed in-memory cache from server-provided stories during render.
+  // localStorage is intentionally NOT read here — that happens in useEffect
+  // below so the server render and first client render produce identical output.
+  const initializedFromServer = useRef(false);
+  if (!initializedFromServer.current) {
+    if (initialStories?.length) {
+      // Always apply server-provided stories to ensure freshness post-deploy
       cache.data = initialStories;
       cache.timestamp = Date.now();
-    } else if (typeof window !== "undefined") {
-      initializeCache();
     }
-    initialized.current = true;
+    initializedFromServer.current = true;
   }
 
   const hasInitial = !!(initialStories && initialStories.length > 0);
-  const [stories, setStories] = useState<Story[]>(cache.data || (hasInitial ? initialStories : FALLBACK_STORIES));
-  // If we have cached data OR server-provided initial stories, don't show loading
+  // Initial state: use server-provided stories or in-memory cache (set by StoriesProvider
+  // or a previous mount), but never from localStorage at render time.
+  const [stories, setStories] = useState<Story[]>(cache.data || FALLBACK_STORIES);
+  // If we have server-provided initial stories or a warm in-memory cache, skip loading.
   const [isLoading, setIsLoading] = useState(!cache.data && !hasInitial);
   const [error, setError] = useState<Error | null>(null);
+
+  // Bootstrap from localStorage after hydration.
+  // This effect runs once per hook instance on the client, after the first render.
+  // By running in useEffect (not during render), the server render and first client
+  // render produce identical output, preventing hydration mismatches.
+  const localStorageBootstrapped = useRef(false);
+  useEffect(() => {
+    if (localStorageBootstrapped.current) return;
+    localStorageBootstrapped.current = true;
+
+    // If in-memory cache already has data (from initialStories or a prior mount), skip.
+    if (cache.data) return;
+
+    const stored = loadFromStorage();
+    if (stored && stored.length > 0) {
+      cache.data = stored;
+      // Mark as slightly stale so the initial-load effect below triggers revalidation.
+      cache.timestamp = Date.now() - CACHE_TTL + 30000; // Revalidate in ~30 s
+      setStories(stored);
+      setIsLoading(false);
+    }
+   
+  }, []);
 
   const fetchStories = useCallback(async (force = false): Promise<Story[]> => {
     const now = Date.now();
@@ -174,6 +210,10 @@ export function useStories(initialStories?: Story[]) {
 
   // Initial load
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let mounted = true;
 
     async function load() {
@@ -214,10 +254,14 @@ export function useStories(initialStories?: Story[]) {
     return () => {
       mounted = false;
     };
-  }, [fetchStories]);
+  }, [enabled, fetchStories]);
 
   // Revalidate on window focus (like SWR)
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     function handleFocus() {
       const isStale = Date.now() - cache.timestamp > CACHE_TTL;
       if (isStale && cache.data) {
@@ -227,7 +271,7 @@ export function useStories(initialStories?: Story[]) {
 
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [fetchStories]);
+  }, [enabled, fetchStories]);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -247,6 +291,23 @@ export function useStories(initialStories?: Story[]) {
     error,
     refresh,
   };
+}
+
+interface StoriesProviderProps {
+  children: ReactNode;
+  initialStories?: Story[];
+}
+
+export function StoriesProvider({ children, initialStories }: StoriesProviderProps) {
+  const value = useStoriesState(initialStories);
+
+  return createElement(StoriesContext.Provider, { value }, children);
+}
+
+export function useStories(initialStories?: Story[]) {
+  const context = useContext(StoriesContext);
+  const fallback = useStoriesState(initialStories, !context);
+  return context ?? fallback;
 }
 
 /**

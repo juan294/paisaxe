@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 
 const GITHUB_API_BASE = "https://api.github.com";
 const REPO = "juan294/paisaxe";
+
+/** Postgres advisory lock ID — unique per cron route. */
+const LOCK_ID = 1001;
 
 interface GitHubTrafficViewsResponse {
   count: number;
@@ -38,6 +42,7 @@ async function fetchGitHub<T>(endpoint: string, token: string): Promise<T> {
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
     },
+    signal: AbortSignal.timeout(8_000),
   });
 
   if (!response.ok) {
@@ -59,6 +64,18 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
   }
 
   const supabase = createAdminClient();
+
+  // Acquire advisory lock to prevent concurrent runs
+  const { data: locked, error: lockError } = await supabase.rpc(
+    "pg_try_advisory_lock",
+    { lockid: LOCK_ID }
+  );
+  if (lockError || !locked) {
+    return NextResponse.json(
+      { status: "skipped", reason: "concurrent run in progress" },
+      { status: 409 }
+    );
+  }
 
   try {
     // Fetch all 4 GitHub Traffic endpoints in parallel
@@ -121,7 +138,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
         .upsert(dailyRows, { onConflict: "date" });
 
       if (dailyError) {
-        console.error("Failed to upsert daily traffic:", dailyError);
+        logger.error("[GITHUB_TRAFFIC_SYNC_DAILY_UPSERT_FAILED]", { error: dailyError });
       } else {
         dailyCount = dailyRows.length;
       }
@@ -142,7 +159,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
         .insert(referrerRows);
 
       if (refError) {
-        console.error("Failed to insert referrers:", refError);
+        logger.error("[GITHUB_TRAFFIC_SYNC_REFERRERS_INSERT_FAILED]", { error: refError });
       } else {
         referrerCount = referrerRows.length;
       }
@@ -164,7 +181,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
         .insert(pathRows);
 
       if (pathError) {
-        console.error("Failed to insert paths:", pathError);
+        logger.error("[GITHUB_TRAFFIC_SYNC_PATHS_INSERT_FAILED]", { error: pathError });
       } else {
         pathCount = pathRows.length;
       }
@@ -183,11 +200,13 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
       paths: pathCount,
     });
   } catch (error) {
-    console.error("GitHub traffic sync error:", error);
+    logger.error("[GITHUB_TRAFFIC_SYNC_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Sync failed", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
+  } finally {
+    await supabase.rpc("pg_advisory_unlock", { lockid: LOCK_ID });
   }
 }
 

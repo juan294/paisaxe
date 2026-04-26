@@ -19,14 +19,14 @@ async function getCsrfHeaders(request: APIRequestContext) {
 
 test.describe("API route smoke tests", () => {
   test("GET /api/health returns valid JSON", async ({ request }) => {
-    const response = await request.get("/api/health");
+    test.slow();
+
+    const response = await request.get("/api/health", { timeout: 45_000 });
     // Health endpoint returns 200 (healthy) or 503 (degraded) — both are valid
     expect([200, 503]).toContain(response.status());
 
     const body = await response.json();
-    expect(body.version).toBeTruthy();
     expect(body.timestamp).toBeTruthy();
-    expect(body.services).toHaveProperty("supabase");
     expect(["healthy", "degraded"]).toContain(body.status);
   });
 

@@ -27,6 +27,8 @@ export const pt: Translations = {
     speech_hint: 'Pode usar o microfone para falar',
     error_processing: 'Desculpe, não consegui processar a sua pergunta.',
     error_generic: 'Desculpe, ocorreu um erro. Por favor, tente novamente.',
+    error: 'Não foi possível ligar. Por favor, tente novamente.',
+    retry: 'Tentar novamente',
     // LOCATION-SPECIFIC: Location name in alt text
     image_alt: 'Imagem das Astúrias',
     source: 'Fonte',
@@ -197,6 +199,7 @@ export const pt: Translations = {
     error: 'Erro de conexão',
     no_permission: 'Acesso ao microfone necessário',
     you: 'Você',
+    loading: 'Carregando assistente de voz...',
   },
 
   suggestions: {

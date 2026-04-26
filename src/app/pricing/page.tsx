@@ -14,6 +14,7 @@ export default function PricingPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const returnTo = searchParams.get("returnTo");
+  const isResolvingAuthenticatedAccess = isLoading && !!user && !!session;
 
   const handlePurchase = () => {
     if (!user || !session) {
@@ -61,7 +62,7 @@ export default function PricingPage() {
               ))}
             </div>
           </div>
-          <h1 className="text-2xl font-semibold text-white tracking-tight mb-2">
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-semibold text-white tracking-tight mb-2">
             {t("premium.pricing_title")}
           </h1>
           <p className="text-neutral-400">
@@ -70,7 +71,7 @@ export default function PricingPage() {
         </div>
 
         {/* Already has access */}
-        {!isLoading && canUseVoice && (
+        {!isResolvingAuthenticatedAccess && canUseVoice && (
           <div className="mb-8 p-5 rounded-xl bg-green-500/5 border border-green-500/10">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
@@ -97,7 +98,7 @@ export default function PricingPage() {
         )}
 
         {/* Pricing Card */}
-        {(isLoading || !canUseVoice) && (
+        {(!canUseVoice || isResolvingAuthenticatedAccess) && (
           <div className="rounded-xl border border-neutral-800 overflow-hidden">
             {/* Price */}
             <div className="p-6 text-center border-b border-neutral-800">
@@ -135,10 +136,10 @@ export default function PricingPage() {
             <div className="p-6 pt-2">
               <button
                 onClick={handlePurchase}
-                disabled={isLoading}
-                className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isResolvingAuthenticatedAccess}
+                className="w-full px-5 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black text-sm font-medium rounded-lg hover:from-green-400 hover:to-green-300 transition-colors flex items-center justify-center gap-2 disabled:from-gray-500 disabled:to-gray-600 disabled:opacity-75 disabled:cursor-not-allowed"
               >
-                {isLoading ? (
+                {isResolvingAuthenticatedAccess ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
                 ) : user ? (
                   t("premium.pricing_cta")

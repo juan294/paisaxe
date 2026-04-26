@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createDayPassCheckoutSession } from "@/lib/stripe";
 import { getSupabaseClient } from "@/lib/supabase-auth";
 
+const ALLOWED_ORIGINS = [
+  process.env.NEXT_PUBLIC_SITE_URL,
+  "https://paisaxe.es",
+  "https://paisaxe.com",
+  "https://www.paisaxe.es",
+  "https://www.paisaxe.com",
+  process.env.NODE_ENV === "development" ? "http://localhost:3000" : null,
+].filter(Boolean) as string[];
+
 /** Validate returnTo slug: only allow alphanumeric, hyphens, underscores */
 function isValidSlug(value: string): boolean {
   return /^[a-z0-9][a-z0-9_-]*$/i.test(value) && value.length <= 100;
@@ -17,18 +26,6 @@ function isValidSlug(value: string): boolean {
  * - returnTo: story slug to redirect back to after successful payment
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // Debug: Check env vars
-  const hasSecretKey = !!process.env.STRIPE_SECRET_KEY?.trim();
-  const hasPriceId = !!process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
-
-  if (!hasSecretKey || !hasPriceId) {
-    console.error("[checkout/day-pass] Missing env vars:", { hasSecretKey, hasPriceId });
-    return NextResponse.json(
-      { error: "Stripe not configured", hasSecretKey, hasPriceId },
-      { status: 500 }
-    );
-  }
-
   try {
     const supabase = await getSupabaseClient();
 
@@ -40,8 +37,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const hasSecretKey = !!process.env.STRIPE_SECRET_KEY?.trim();
+    const hasPriceId = !!process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
+
+    if (!hasSecretKey || !hasPriceId) {
+      console.error("[checkout/day-pass] Missing Stripe env vars");
+      return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
+    }
+
+    const rawOrigin = request.headers.get("origin");
     const origin =
-      request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL;
+      rawOrigin && ALLOWED_ORIGINS.includes(rawOrigin)
+        ? rawOrigin
+        : (process.env.NEXT_PUBLIC_SITE_URL ?? "https://paisaxe.es");
 
     // Parse optional returnTo slug from request body
     let returnTo: string | undefined;

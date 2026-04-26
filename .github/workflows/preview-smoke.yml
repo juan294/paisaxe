@@ -1,0 +1,128 @@
+name: Preview Smoke Test
+
+# Runs only on PRs targeting main.
+# Waits for the Vercel preview deployment, then hits /api/health and
+# the homepage to verify the real Vercel runtime (real env vars, edge
+# config, etc.) before any merge is allowed.
+#
+# This is a SEPARATE check from the standard CI suite (ci.yml / e2e.yml).
+# Those jobs build with dummy env vars and catch compile/test regressions.
+# This job catches runtime failures that only surface on Vercel — the
+# kind that passed CI but crashed production (see incident: Next.js 16.2.1).
+#
+# Required secret: VERCEL_AUTOMATION_BYPASS_SECRET
+#
+# DO-H2: Branch protection on `main` requires this workflow's check as a
+# required status check. The check name that must be registered in GitHub
+# Settings → Branches → main → Required status checks is:
+#   Smoke test Vercel preview
+# (This matches the job `name:` field below.)
+# As of 2026-04-25 this check IS registered. Verify with:
+#   gh api repos/juan294/paisaxe/branches/main/protection \
+#     --jq '.required_status_checks.checks[].context'
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  deployments: read
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview-smoke:
+    name: Smoke test Vercel preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Wait for Vercel preview deployment
+        id: vercel-wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          for attempt in $(seq 1 20); do
+            deployment_id=$(gh api -X GET "repos/${GITHUB_REPOSITORY}/deployments" \
+              -f sha="$HEAD_SHA" \
+              --jq '[.[] | select(.creator.login == "vercel[bot]" and .environment == "Preview")][0].id // empty')
+
+            if [ -n "$deployment_id" ]; then
+              state=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" --jq '.[0].state // empty')
+              preview_url=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" --jq '.[0].environment_url // .[0].target_url // empty')
+              echo "Vercel deployment state: ${state:-unknown}"
+
+              if [ "$state" = "success" ] && [ -n "$preview_url" ]; then
+                echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+
+              if [ "$state" = "failure" ] || [ "$state" = "error" ]; then
+                echo "Vercel deployment failed with state=$state"
+                exit 1
+              fi
+            else
+              echo "No Vercel preview deployment found yet (attempt $attempt / 20)"
+            fi
+
+            sleep 15
+          done
+
+          echo "Timed out waiting for Vercel preview deployment"
+          exit 1
+
+      # ------------------------------------------------------------------ #
+      # Health endpoint — must return HTTP 200 and JSON status "healthy".   #
+      # A 503 (degraded) or a non-healthy body means a backend dependency   #
+      # is down, so fail the preview gate instead of silently merging it.   #
+      # ------------------------------------------------------------------ #
+      - name: Smoke test - health endpoint
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
+          if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
+            echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
+            exit 1
+          fi
+          echo "Testing: $PREVIEW_URL/api/health"
+          response=$(curl -sS -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL/api/health" -o /tmp/health.json -w "%{http_code}")
+          if [ "$response" != "200" ]; then
+            echo "Health check failed: HTTP $response"
+            cat /tmp/health.json
+            exit 1
+          fi
+          status=$(python3 -c 'import json; print(json.load(open("/tmp/health.json"))["status"])')
+          if [ "$status" != "healthy" ]; then
+            echo "Health check failed: status=$status"
+            cat /tmp/health.json
+            exit 1
+          fi
+          echo "Health check passed"
+          cat /tmp/health.json
+
+      # ------------------------------------------------------------------ #
+      # Homepage — must serve HTTP 200.                                     #
+      # Catches build/runtime errors that would produce a 500 on Vercel     #
+      # even though the local build with dummy keys succeeded.              #
+      # ------------------------------------------------------------------ #
+      - name: Smoke test - homepage loads
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
+          echo "Testing: $PREVIEW_URL"
+          response=$(curl -sfL -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL" -o /dev/null -w "%{http_code}")
+          if [ "$response" != "200" ]; then
+            echo "Homepage failed: HTTP $response"
+            exit 1
+          fi
+          echo "Homepage smoke test passed"
