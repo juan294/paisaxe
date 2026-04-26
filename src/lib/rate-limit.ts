@@ -1,5 +1,6 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { logger } from "./logger";
 
 interface RateLimitEntry {
   timestamps: number[];
@@ -168,7 +169,8 @@ export async function checkRateLimit(
           retryAfter: Math.ceil(config.windowMs / 1000),
         };
       }
-      // Dev/test: fall through to in-memory
+      // Dev/test: fall through to in-memory — emit a warning so degradation is visible in logs
+      logger.warn("[RATE_LIMIT_DEGRADED]", { reason: "Redis unavailable" });
       return checkInMemory(identifier, config);
     }
   }

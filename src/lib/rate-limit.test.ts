@@ -222,6 +222,26 @@ describe("rate-limit", () => {
       expect(result.remaining).toBe(9);
     });
 
+    it("emits logger.warn([RATE_LIMIT_DEGRADED]) when falling back to in-memory in dev/test", async () => {
+      // Ensure we're NOT in production so the in-memory fallback path is taken
+      vi.stubEnv("NODE_ENV", "test");
+      mockLimit.mockRejectedValue(new Error("Redis connection failed"));
+
+      // Spy on the logger module's warn method
+      const loggerModule = await import("./logger");
+      const warnSpy = vi.spyOn(loggerModule.logger, "warn").mockImplementation(() => {});
+
+      await checkRateLimit("user1");
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[RATE_LIMIT_DEGRADED]",
+        expect.objectContaining({ reason: "Redis unavailable" })
+      );
+
+      vi.unstubAllEnvs();
+      warnSpy.mockRestore();
+    });
+
     it("fails closed (denies) in production when Upstash call fails", async () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       vi.stubEnv("NODE_ENV", "production");
