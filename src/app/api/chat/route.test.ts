@@ -156,11 +156,6 @@ describe("POST /api/chat", () => {
   });
 
   it("should return 400 when message is missing", async () => {
-    vi.mocked(validateChatRequest).mockReturnValue({
-      valid: false,
-      error: "Message is required",
-    });
-
     const request = new NextRequest("http://localhost:3000/api/chat", {
       method: "POST",
       body: JSON.stringify({}),
@@ -170,15 +165,12 @@ describe("POST /api/chat", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Message is required");
+    // Zod catches missing message before validateChatRequest
+    expect(data.error).toBe("Invalid request");
+    expect(data.details).toBeDefined();
   });
 
   it("should return 400 when message is not a string", async () => {
-    vi.mocked(validateChatRequest).mockReturnValue({
-      valid: false,
-      error: "Message must be a string",
-    });
-
     const request = new NextRequest("http://localhost:3000/api/chat", {
       method: "POST",
       body: JSON.stringify({ message: 123 }),
@@ -188,7 +180,9 @@ describe("POST /api/chat", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Message must be a string");
+    // Zod catches non-string message before validateChatRequest
+    expect(data.error).toBe("Invalid request");
+    expect(data.details).toBeDefined();
   });
 
   it("should return 500 on internal error", async () => {
@@ -239,11 +233,6 @@ describe("POST /api/chat", () => {
   });
 
   it("should return 400 for empty message (after trim)", async () => {
-    vi.mocked(validateChatRequest).mockReturnValue({
-      valid: false,
-      error: "Message cannot be empty",
-    });
-
     const request = new NextRequest("http://localhost:3000/api/chat", {
       method: "POST",
       body: JSON.stringify({ message: "" }),
@@ -253,10 +242,13 @@ describe("POST /api/chat", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Message cannot be empty");
+    // Zod catches empty message (min(1)) before validateChatRequest
+    expect(data.error).toBe("Invalid request");
+    expect(data.details).toBeDefined();
   });
 
-  it("should return 400 for whitespace-only message", async () => {
+  it("should return 400 for whitespace-only message (passes Zod min, caught by validateChatRequest)", async () => {
+    // "   " has length 3, so it passes Zod min(1). validateChatRequest then catches it.
     vi.mocked(validateChatRequest).mockReturnValue({
       valid: false,
       error: "Message cannot be empty",
@@ -274,12 +266,7 @@ describe("POST /api/chat", () => {
     expect(data.error).toBe("Message cannot be empty");
   });
 
-  it("should return 400 for message exceeding 500 chars", async () => {
-    vi.mocked(validateChatRequest).mockReturnValue({
-      valid: false,
-      error: "Message exceeds maximum length of 500 characters",
-    });
-
+  it("should return 400 for message exceeding 500 chars (Zod)", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat", {
       method: "POST",
       body: JSON.stringify({ message: "a".repeat(501) }),
@@ -289,15 +276,12 @@ describe("POST /api/chat", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Message exceeds maximum length of 500 characters");
+    // Zod catches this before validateChatRequest
+    expect(data.error).toBe("Invalid request");
+    expect(data.details).toBeDefined();
   });
 
-  it("should return 400 for non-string context", async () => {
-    vi.mocked(validateChatRequest).mockReturnValue({
-      valid: false,
-      error: "Context must be a string",
-    });
-
+  it("should return 400 for non-string context (Zod)", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat", {
       method: "POST",
       body: JSON.stringify({ message: "hello", context: 42 }),
@@ -307,15 +291,12 @@ describe("POST /api/chat", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Context must be a string");
+    // Zod catches non-string context before validateChatRequest
+    expect(data.error).toBe("Invalid request");
+    expect(data.details).toBeDefined();
   });
 
-  it("should return 400 for context exceeding 600 chars", async () => {
-    vi.mocked(validateChatRequest).mockReturnValue({
-      valid: false,
-      error: "Context exceeds maximum length of 600 characters",
-    });
-
+  it("should return 400 for context exceeding 600 chars (Zod)", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat", {
       method: "POST",
       body: JSON.stringify({ message: "hello", context: "b".repeat(601) }),
@@ -325,7 +306,9 @@ describe("POST /api/chat", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Context exceeds maximum length of 600 characters");
+    // Zod catches context length before validateChatRequest
+    expect(data.error).toBe("Invalid request");
+    expect(data.details).toBeDefined();
   });
 
   it("should return 429 when rate limited with correct headers", async () => {
@@ -485,16 +468,38 @@ describe("POST /api/chat", () => {
       expect(data.topicRelevance).toBeDefined();
     });
 
-    it("should return flagged response when message exceeds MAX_INPUT_LENGTH", async () => {
+    it("should return 400 (Zod) for message exceeding 500 chars (before MAX_INPUT_LENGTH check)", async () => {
+      // Zod max(500) fires before the MAX_INPUT_LENGTH security check.
+      // A message of 2001 chars is rejected by Zod with status 400.
+      const request = new NextRequest("http://localhost:3000/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "a".repeat(2001) }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request");
+      expect(data.details).toBeDefined();
+      expect(generateChatResponse).not.toHaveBeenCalled();
+    });
+
+    it("should return flagged response when message exceeds MAX_INPUT_LENGTH (post-Zod)", async () => {
+      // A message between 501 and 2000 chars passes Zod (max 500 would catch it).
+      // To test the security path, we stub validateChatRequest to return a sanitized
+      // message > MAX_INPUT_LENGTH (2000) since Zod only allows ≤500 on the wire.
+      // The security branch is tested by mocking validateChatRequest to return a long message.
       vi.mocked(validateChatRequest).mockReturnValue({
         valid: true,
         sanitizedMessage: "a".repeat(2001), // exceeds MAX_INPUT_LENGTH of 2000
         sanitizedContext: undefined,
       });
 
+      // Bypass Zod by sending a valid short body, then mock validation returns long message
       const request = new NextRequest("http://localhost:3000/api/chat", {
         method: "POST",
-        body: JSON.stringify({ message: "a".repeat(2001) }),
+        body: JSON.stringify({ message: "short" }),
       });
 
       const response = await POST(request);
@@ -847,5 +852,72 @@ describe("POST /api/chat", () => {
       false,
       undefined
     );
+  });
+
+  describe("Zod runtime validation", () => {
+    it("should return 400 with Zod details for invalid JSON body", async () => {
+      const request = new NextRequest("http://localhost:3000/api/chat", {
+        method: "POST",
+        body: "not-json",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request");
+      expect(data.details).toBeDefined();
+    });
+
+    it("should return 400 with details when message is null", async () => {
+      const request = new NextRequest("http://localhost:3000/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: null }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request");
+      expect(data.details).toBeDefined();
+    });
+
+    it("should return 400 with details when messageIndex is negative", async () => {
+      const request = new NextRequest("http://localhost:3000/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "hello", messageIndex: -1 }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request");
+      expect(data.details).toBeDefined();
+    });
+
+    it("should pass through valid requests with all optional fields", async () => {
+      vi.mocked(validateChatRequest).mockReturnValue({
+        valid: true,
+        sanitizedMessage: "hello",
+        sanitizedContext: "some context",
+        messageIndex: 2,
+      });
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+      vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+      vi.mocked(generateChatResponse).mockResolvedValue("Response");
+      vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+
+      const request = new NextRequest("http://localhost:3000/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "hello", context: "some context", messageIndex: 2 }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+    });
   });
 });

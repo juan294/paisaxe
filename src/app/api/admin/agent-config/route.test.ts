@@ -328,4 +328,32 @@ describe("PUT /api/admin/agent-config", () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to update agent config");
   });
+
+  describe("Zod validation", () => {
+    it("returns 400 for invalid JSON body", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/admin/agent-config",
+        { method: "PUT", body: "not-json" }
+      );
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request body");
+    });
+
+    it("returns 400 for empty object body", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      mockReadFile.mockResolvedValue(JSON.stringify(sampleConfig));
+
+      const request = makeRequest({});
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request body");
+    });
+  });
 });

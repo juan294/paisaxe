@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createDayPassCheckoutSession } from "@/lib/stripe";
 import { getSupabaseClient } from "@/lib/supabase-auth";
+import { checkoutBodySchema } from "@/lib/schemas";
 
 const ALLOWED_ORIGINS = [
   process.env.NEXT_PUBLIC_SITE_URL,
@@ -54,9 +55,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Parse optional returnTo slug from request body
     let returnTo: string | undefined;
     try {
-      const body = await request.json();
-      if (typeof body.returnTo === "string" && isValidSlug(body.returnTo)) {
-        returnTo = body.returnTo;
+      const rawBody = await request.json();
+      const bodyParsed = checkoutBodySchema.safeParse(rawBody);
+      if (bodyParsed.success && bodyParsed.data.returnTo && isValidSlug(bodyParsed.data.returnTo)) {
+        returnTo = bodyParsed.data.returnTo;
       }
     } catch {
       // No body or invalid JSON — that's fine, returnTo stays undefined

@@ -516,4 +516,49 @@ describe("/api/mcp/weather", () => {
       expect(fetchUrl).not.toContain("lat=");
     });
   });
+
+  describe("GET - Zod query parameter validation", () => {
+    it("should return 400 with 'City parameter is required' for empty city string", async () => {
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("City parameter is required");
+    });
+
+    it("should return 400 when city exceeds 200 characters", async () => {
+      const longCity = "a".repeat(201);
+      const request = new Request(
+        `http://localhost:3000/api/mcp/weather?city=${longCity}`,
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(400);
+    });
+
+    it("should pass through valid city parameter", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          name: "Oviedo",
+          main: { temp: 15, feels_like: 13, humidity: 75 },
+          weather: [{ description: "nublado", icon: "04d" }],
+          wind: { speed: 3.5 },
+        }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/weather?city=Oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+    });
+  });
 });

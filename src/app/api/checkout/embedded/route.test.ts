@@ -208,4 +208,40 @@ describe("POST /api/checkout/embedded", () => {
     expect(data.error).toBe("Failed to create checkout session");
     expect(data.details).toBe("Unknown error");
   });
+
+  describe("Zod validation for returnTo", () => {
+    it("should silently ignore returnTo that is not a valid slug (Zod regex)", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1", email: "u@e.com" } },
+        error: null,
+      });
+      vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_secret");
+
+      const request = createRequest({ origin: "https://paisaxe.es" }, { returnTo: "../../../etc/passwd" });
+      await POST(request);
+
+      expect(createEmbeddedCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          returnUrl: expect.not.stringContaining("returnTo"),
+        })
+      );
+    });
+
+    it("should accept a valid alphanumeric returnTo slug", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1", email: "u@e.com" } },
+        error: null,
+      });
+      vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_secret");
+
+      const request = createRequest({ origin: "https://paisaxe.es" }, { returnTo: "covadonga-lakes" });
+      await POST(request);
+
+      expect(createEmbeddedCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          returnUrl: expect.stringContaining("returnTo=covadonga-lakes"),
+        })
+      );
+    });
+  });
 });

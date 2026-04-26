@@ -3,6 +3,7 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 import { promises as fs } from "fs";
 import path from "path";
 import type { AgentConfigFile } from "@/types/agent-config";
+import { agentConfigMasterSchema, agentConfigEnableSchema } from "@/lib/schemas";
 
 const CONFIG_FILE = path.join(process.cwd(), "scripts", "agent-config.json");
 const DEFAULTS_FILE = path.join(
@@ -77,12 +78,34 @@ export async function PUT(request: NextRequest) {
   if (!auth.valid) return auth.error;
 
   try {
-    const body = await request.json();
+    const rawBody = await request.json().catch(() => null);
+
+    // Validate body shape before reading/writing config to avoid unnecessary I/O
+    const masterParsed = agentConfigMasterSchema.safeParse(rawBody);
+    const hasKey = rawBody !== null && typeof rawBody === "object" && "key" in (rawBody as object);
+    const agentParsed = hasKey ? agentConfigEnableSchema.safeParse(rawBody) : null;
+
+    if (!masterParsed.success && (!agentParsed || !agentParsed.success || !hasKey)) {
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400 },
+      );
+    }
+
     const config = await readConfig();
 
-    if ("master_enabled" in body && typeof body.master_enabled === "boolean") {
-      config.master_enabled = body.master_enabled;
-    } else if ("key" in body && typeof body.key === "string") {
+    if (masterParsed.success) {
+      config.master_enabled = masterParsed.data.master_enabled;
+    } else {
+      // Per-agent update — agentParsed is guaranteed non-null and successful here
+      if (!agentParsed || !agentParsed.success) {
+        return NextResponse.json(
+          { error: "Invalid request body" },
+          { status: 400 },
+        );
+      }
+
+      const body = agentParsed.data;
       const agent = config.agents[body.key];
       if (!agent) {
         return NextResponse.json(
@@ -91,22 +114,13 @@ export async function PUT(request: NextRequest) {
         );
       }
 
-      if ("enabled" in body && typeof body.enabled === "boolean") {
+      if (body.enabled !== undefined) {
         agent.enabled = body.enabled;
       }
 
-      if (
-        "config_key" in body &&
-        typeof body.config_key === "string" &&
-        "value" in body
-      ) {
+      if (body.config_key !== undefined && "value" in body) {
         agent.config[body.config_key] = body.value;
       }
-    } else {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 },
-      );
     }
 
     await writeConfig(config);
