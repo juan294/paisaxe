@@ -129,8 +129,13 @@ export async function POST(request: NextRequest) {
 
     // === MAIN PROCESSING ===
 
-    // Generate embedding for the user's query
-    const queryEmbedding = await generateEmbedding(cleanMessage);
+    // Parallelize the embedding call with the feature flag lookup — they are
+    // independent and can be inflight simultaneously. The search step still
+    // has to wait for the embedding (data dependency), but the flag check does not.
+    const [queryEmbedding, asturianEnabled] = await Promise.all([
+      generateEmbedding(cleanMessage),
+      isFeatureFlagEnabled("asturianu_touches"),
+    ]);
 
     // Search for relevant content (with reranking via query text)
     const { chunks, images } = await search(queryEmbedding, 3, cleanMessage);
@@ -139,9 +144,6 @@ export async function POST(request: NextRequest) {
     const enrichedMessage = context
       ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
       : cleanMessage;
-
-    // Check if Asturianu touches feature is enabled (cached via isFeatureFlagEnabled)
-    const asturianEnabled = await isFeatureFlagEnabled("asturianu_touches");
 
     // Generate response using Claude with context
     const responseText = await generateChatResponse(
