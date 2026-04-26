@@ -51,6 +51,9 @@ jobs:
       - name: Check env vars documented
         run: npm run check-env
 
+      - name: Check migration numbering
+        run: npx tsx scripts/check-migrations.ts
+
   test:
     name: Test
     runs-on: ubuntu-latest
