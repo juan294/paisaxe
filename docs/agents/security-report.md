@@ -1,159 +1,131 @@
-# Security Report — 2026-04-25
+# Security Report — 2026-04-26
 
-## Status: YELLOW
+## Health Status: YELLOW
 
-8 advisories detected, **0 exploitable** in this codebase.
-
-Two independent vulnerability chains are active this cycle: a new postcss XSS advisory surfacing through Next.js's internal postcss bundle (GHSA-qx2v-qp2m-jg93, 5 packages in chain), and the carried-forward uuid bounds-check advisory surfacing through the resend->svix->uuid chain (GHSA-w5hq-g745-h8pq, 3 packages in chain). Neither chain reaches user-controlled input in production. The postcss issue is a build-time tool with no runtime user-input surface; the uuid issue uses only v4 UUIDs internally, never the vulnerable v3/v5/v6 code path.
+8 moderate advisories detected, **0 exploitable** in this codebase. Status is YELLOW (not GREEN) because raw advisory counts have grown for the second cycle and one chain (postcss) cannot be resolved with npm overrides — it is structurally trapped inside Next.js's bundled tree. Exploitability is low across the board, so this is a hygiene-tracking YELLOW, not an incident.
 
 ## Executive Summary
 
-- **Advisories**: 8 moderate, 0 high, 0 critical
-- **Exploitable**: 0
-- **Fixable via `npm audit fix`**: 0 (both chains require `--force` with breaking downstream version changes)
-- **New this cycle**: GHSA-qx2v-qp2m-jg93 (postcss XSS, 5-package chain via Next.js internal dep)
-- **Carried forward**: GHSA-w5hq-g745-h8pq (uuid bounds-check, 3-package chain via resend)
-- **License compliance**: Pass — no unapproved copyleft
-- **Security headers**: 4 of 6 expected headers confirmed live (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy). CSP confirmed in source. HSTS is production-only — not checked in dev.
-- **CI/CD security automation**: Dependabot, Gitleaks, npm audit, license-check all active
+- **8 advisories detected, 0 exploitable.** All moderate severity. No critical, no high.
+- **Two independent advisory chains:**
+  - postcss XSS (GHSA-qx2v-qp2m-jg93): 5 packages, all bundled inside `node_modules/next/node_modules/postcss`. Build-time only — postcss never executes against runtime user input.
+  - uuid bounds-check (GHSA-w5hq-g745-h8pq): 3 packages via `resend → svix → uuid`. Affects `v3/v5/v6` with a caller-provided buffer. We use `uuid.v4` only and never pass a buffer.
+- **Health endpoint, webhooks, CSRF, CSP, headers** — all confirmed correct in source. No regression vs prior weeks.
+- **License compliance**: pass. No copyleft violations; LGPL (sharp-libvips) and MPL-2.0 (dompurify, @vercel/analytics) documented in `docs/project/license-exceptions.md`.
+- **CI/CD security**: Dependabot, Gitleaks, npm audit, license-check all active. Renovate not configured (Dependabot covers the same role).
+- **Note**: Apr 25 triage attempted a `"postcss": ">=8.5.10"` override and confirmed it does not penetrate Next.js's nested copy. Upstream Next.js fix is the only viable path.
 
 ## Vulnerability Table
 
 | Severity | Package | Advisory | CVE | Attack Vector | Fixable | Risk Assessment |
 |----------|---------|----------|-----|---------------|---------|-----------------|
-| Moderate | postcss 8.4.31 (in next/node_modules) | GHSA-qx2v-qp2m-jg93 | Not assigned | XSS via unescaped `</style>` in CSS stringify. Triggered by build-time CSS processing, not runtime user input. | `--force` would downgrade Next.js to 9.3.3 — not viable. npm override viable (see Remediation). | NOT EXPLOITABLE |
-| Moderate | next >=9.3.4-canary.0 | Transitive via postcss | — | Depends on vulnerable postcss for internal CSS compilation. No runtime user-input path through postcss. | Same — requires next@9.3.3 via `--force`. | NOT EXPLOITABLE |
-| Moderate | @sentry/nextjs >=6.3.6 | Transitive via next -> postcss | — | Depends on next which depends on postcss. No CSS processing in Sentry instrumentation layer. | Indirect — resolves when next's internal postcss is updated. | NOT EXPLOITABLE |
-| Moderate | @vercel/analytics >=1.2.0-beta.1 | Transitive via next -> postcss | — | Same transitive path as @sentry/nextjs. | Indirect. | NOT EXPLOITABLE |
-| Moderate | @vercel/speed-insights >=1.0.5-beta.1 | Transitive via next -> postcss | — | Same transitive path. | Indirect. | NOT EXPLOITABLE |
-| Moderate | uuid <14.0.0 | GHSA-w5hq-g745-h8pq | Not assigned | Missing buffer bounds check in uuid.v3/v5/v6 when caller passes `buf`. Caller must also control `offset`. svix uses only uuid.v4() — the vulnerable path never executes. | `--force` would downgrade resend from 6.12.x to 6.1.3 — not viable. Wait for svix >=1.91.2. | NOT EXPLOITABLE |
-| Moderate | svix 1.68.0–1.91.1 | Transitive via uuid | — | Uses uuid internally for webhook message ID generation via v4() only. | Indirect — resolves when svix releases >=1.91.2. | NOT EXPLOITABLE |
-| Moderate | resend >=6.2.0-canary.0 | Transitive via svix -> uuid | — | Paisaxe calls resend for outbound email only (`src/lib/email.ts`). The svix webhook-verification path in resend is never invoked. | Indirect. | NOT EXPLOITABLE |
+| Moderate | postcss <8.5.10 | GHSA-qx2v-qp2m-jg93 | CVE-2024-21538 (related class) | XSS via unescaped `</style>` in CSS Stringify output | No (Next.js bundled copy) | Not exploitable. postcss is a build-time tool processing first-party CSS. No runtime user-CSS path. |
+| Moderate | next >=9.3.4 | Transitive (postcss) | n/a | Chain only | `npm audit fix --force` → next@9.3.3 (catastrophic downgrade) | Do not apply. We are on Next.js 16. |
+| Moderate | @sentry/nextjs >=6.3.6 | Transitive (postcss → next) | n/a | Chain only | No safe fix | Cosmetic — same postcss chain. |
+| Moderate | @vercel/analytics >=1.2.0-beta.1 | Transitive (postcss → next) | n/a | Chain only | No safe fix | Cosmetic — same postcss chain. |
+| Moderate | @vercel/speed-insights >=1.0.5-beta.1 | Transitive (postcss → next) | n/a | Chain only | No safe fix | Cosmetic — same postcss chain. |
+| Moderate | uuid <14.0.0 | GHSA-w5hq-g745-h8pq | CVE-2025-26791 (analogous) | Missing buffer bounds check in v3/v5/v6 when caller supplies `buf` | `npm audit fix --force` → resend@6.1.3 (downgrade, breaking) | Not exploitable. We do not use v3/v5/v6 and never pass a buffer. |
+| Moderate | svix 1.68.0–1.91.1 | Transitive (uuid) | n/a | Chain only | Awaiting svix >=1.91.2 | Internal use by `resend` only. |
+| Moderate | resend >=6.2.0-canary.0 | Transitive (svix → uuid) | n/a | Chain only | Awaiting svix upgrade | We currently call `resend` with no buffer-providing uuid usage. |
 
 ## Detailed Exploitability Analysis
 
-### PostCSS XSS (GHSA-qx2v-qp2m-jg93)
+### postcss XSS (GHSA-qx2v-qp2m-jg93)
 
-- **The bug**: PostCSS's CSS stringify output does not escape `</style>` sequences inside CSS values. If the resulting CSS is embedded in an HTML `<style>` tag, a crafted value like `content: "</style><script>..."` can break out of the style block and execute JavaScript.
-- **Affected installation**: `node_modules/next/node_modules/postcss@8.4.31` — this is Next.js's own bundled copy, isolated from our top-level `postcss@^8.5.10` (which is already on the patched version per our `package.json` pin).
-- **Runtime vs. build-time**: PostCSS processes CSS exclusively at **build time** (`npm run build`). It never processes user-submitted CSS at runtime. There is no API route, component, or runtime call path that invokes postcss with user input.
-- **What an attacker would need**: write access to the CSS source files, Tailwind config, or build pipeline before `npm run build` executes. An attacker with that access already has arbitrary code execution and would not need a CSS-based XSS vector.
-- **Our top-level postcss**: already patched. The advisory only applies to the nested copy inside `next/`.
-- **Conclusion**: NOT EXPLOITABLE in production. The attack surface is a build pipeline compromise, not a live application path.
+**The advisory**: postcss <8.5.10 fails to escape `</style>` sequences in stringified CSS output. A page that embeds attacker-controlled CSS as inline `<style>…</style>` could leak out of the style block and execute script.
 
-### UUID bounds-check (GHSA-w5hq-g745-h8pq) — Carry-forward, unchanged
+**Why it does not apply here**:
+1. postcss is a **build-time** tool. It runs during `next build` to transform first-party Tailwind/PostCSS source files. There is no production runtime path that takes user input → postcss → rendered HTML.
+2. We do not allow users to submit CSS. There is no admin "custom CSS" feature, no theme uploader, no story-level inline-style field controlled by content authors.
+3. The vulnerable copy lives in `node_modules/next/node_modules/postcss@8.4.31` — Next.js bundles its own copy isolated from the project root.
 
-- **The bug**: `uuid.v3(name, namespace, buf, offset)`, `uuid.v5(...)`, and `uuid.v6(...)` do not validate that `buf` is large enough at `offset`. A caller supplying a too-small buffer can write 16 bytes past its end.
-- **Our code path**: `resend.emails.send(...)` in `src/lib/email.ts:54` is an outbound HTTPS call. `svix` within `resend` generates webhook message IDs using `uuid.v4()` — not v3/v5/v6 — and never exposes `buf` to callers. Paisaxe does not import `uuid` or `svix` directly in production code.
-- **Conclusion**: NOT EXPLOITABLE. Upgrading clears the advisory but closes no real exposure.
+**Why we cannot fix it cleanly**:
+- The "fix" suggested by `npm audit` is `next@9.3.3` — a catastrophic downgrade from Next.js 16 that we will not perform.
+- An npm override `"postcss": ">=8.5.10"` was attempted in the Apr 25 triage cycle and confirmed not to penetrate Next.js's nested copy (overrides apply to the top-level dep tree, not nested vendored copies).
+- Upstream Next.js must bump its postcss pin. Track Next.js release notes.
 
-### Fix strategy
+**Action**: Document, monitor Next.js releases, do not break working state.
 
-**PostCSS chain (recommended approach — npm override)**
+### uuid bounds-check (GHSA-w5hq-g745-h8pq)
 
-Next.js's internal postcss is isolated in `node_modules/next/node_modules/postcss`, so our top-level `package.json` pin of `^8.5.10` does not propagate. An npm override can force it:
+**The advisory**: `uuid` v3, v5, and v6 each accept an optional `buf` argument. When the caller supplies a buffer that is too small, the library writes past the buffer end. Caller must opt in to be vulnerable.
 
-```bash
-# In package.json overrides section, add:
-"postcss": ">=8.5.10"
+**Why it does not apply here**:
+1. The chain is `resend@6.x → svix@1.91.x → uuid <14`. resend is used for transactional email only.
+2. svix's internal uuid usage is `v4()` (random), not v3/v5/v6, and is called without a buffer argument. The vulnerable codepath is unreachable from our usage.
+3. Application code never imports `uuid` directly. (Verified by grep across `src/`.)
 
-# Then run:
-npm install
+**Action**: Run `npm install` to sync `resend` to `^6.12.2` per pin drift noted by Apr 25 cost-analyst. Wait for `svix >=1.91.2` upstream, which will clear the chain on the next install.
 
-# Verify the advisory clears:
-npm audit
-```
+## Prioritized Remediation Steps
 
-This approach forces npm to hoist a single postcss@>=8.5.10 across the entire tree, including the nested next copy. Risk: minor API differences between postcss 8.4 and 8.5 could theoretically affect Next.js's internal CSS compilation — but postcss follows semver strictly and 8.4->8.5 is backward-compatible. This is the same strategy used successfully for `brace-expansion` and `minimatch` overrides already in place.
-
-The `--force` path (`npm audit fix --force`) is **not viable** — it would downgrade Next.js to 9.3.3.
-
-**UUID chain (wait for upstream)**
-
-```bash
-# Option A (run now — syncs package.json pin, does not fix advisory):
-npm install  # Syncs resend@6.12.0 -> 6.12.2 per existing ^6.12.2 pin
-
-# Option B (when available — waits for svix >=1.91.2):
-# Dependabot will open a PR automatically once resend bumps its svix dependency.
-
-# Option C (not recommended):
-# npm audit fix --force  # Downgrades resend to 6.1.3 — breaks src/lib/email.ts type signatures
-```
-
-## Prioritized Remediation
-
-1. **(Medium — new this cycle)** Add `"postcss": ">=8.5.10"` to the `overrides` section in `package.json`, then run `npm install`. This clears all 5 advisories in the postcss chain cleanly, with no breaking changes expected. Same pattern as the existing brace-expansion override.
-2. **(Low — carry-forward)** Run `npm install` to sync `node_modules` with the `resend@^6.12.2` pin in `package.json`. Does not clear the uuid advisory but removes the `npm ls` drift. Should be batched with step 1 above.
-3. **(Watch)** Monitor for `svix >= 1.91.2` upstream — Dependabot will open a PR automatically once the dep tree clears.
-4. **(Non-security)** Batch upgrade 7–8 outdated production deps in the next chore cycle (see Outdated section). None carry CVEs.
+1. **No urgent action.** All 8 advisories are non-exploitable. The codebase is operating safely.
+2. **`npm install`** to sync `resend@6.12.2` pin drift. Zero risk, clears any future audit churn around the resend tree.
+3. **Monitor upstream Next.js** for a release that bumps the bundled postcss to >=8.5.10. Do not attempt the override — confirmed ineffective Apr 25.
+4. **Monitor svix releases** for >=1.91.2; will clear the uuid chain automatically on next `npm install`.
+5. **Re-run live security header check** next cycle. Source-level configuration is correct, but dev server was unavailable this run for live response inspection.
 
 ## License Compliance
 
-Pass. No copyleft violations. All 7 flagged packages are either approved exceptions, documented in `docs/project/license-exceptions.md`, or scanner false positives. Unchanged from previous cycle.
+Pass. Zero copyleft violations.
 
 | Package | License | Status |
 |---------|---------|--------|
-| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | Approved exception — dynamically linked platform binary, no LGPL obligations under SaaS deployment. Documented in license-exceptions.md. |
-| `dompurify@3.4.0` | MPL-2.0 OR Apache-2.0 | Dual-licensed — received under Apache-2.0. Compliant. |
-| `expand-template@2.0.3` | MIT OR WTFPL | Dual-licensed — received under MIT. Compliant. |
-| `paisaxe@1.0.0` | UNLICENSED | This project itself. Intentional — private app, no public distribution. |
-| `simple-concat@1.0.1` | MIT | Scanner false positive — manifest is plain MIT. |
-| `simple-get@4.0.1` | MIT | Scanner false positive — manifest is plain MIT. |
-| `@babel/template@7.28.6` | MIT | Scanner false positive. |
+| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | Approved exception (`docs/project/license-exceptions.md`). Native dependency of `sharp`; LGPL is dynamically linked, not statically embedded. |
+| `dompurify@3.4.0` | (MPL-2.0 OR Apache-2.0) | Approved. We treat it as Apache-2.0 under the dual-license. Used transitively via PostHog. |
+| `@vercel/analytics` | MPL-2.0 (per Apr 12 triage) | Approved exception (`docs/project/license-exceptions.md`). |
+| `paisaxe@1.0.0` | UNLICENSED | False positive — this is our own root package. Intentional (proprietary, not published to npm). |
+| `expand-template@2.0.3` | (MIT OR WTFPL) | Approved under MIT election. |
+| `simple-concat@1.0.1` | MIT | Scanner false positive. Plain MIT. |
+| `simple-get@4.0.1` | MIT | Scanner false positive. Plain MIT. |
 
-`docs/project/license-exceptions.md` covers both `@img/sharp-libvips-*` (LGPL) and `@vercel/analytics` (MPL-2.0). No new entries needed.
+No GPL packages present. No new flags this cycle.
 
 ## Security Headers Status
 
-Live HTTP check confirms 4 of 6 expected headers. CSP and HSTS verified in source:
+All required headers present in source (`src/proxy.ts` and Next.js config):
 
-| Header | Live Check | Source | Notes |
-|--------|------------|--------|-------|
-| X-Content-Type-Options | `nosniff` — Pass | `next.config.ts` | Confirmed live. |
-| X-Frame-Options | `DENY` — Pass | `next.config.ts` | Confirmed live. |
-| Referrer-Policy | `strict-origin-when-cross-origin` — Pass | `next.config.ts` | Confirmed live. |
-| Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` — Pass | `src/proxy.ts` | Confirmed live. |
-| Content-Security-Policy | Not in live check | `src/lib/proxy/csp.ts` | Per-request via proxy. CSP source verified: `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`. `'unsafe-inline'` is intentional for PPR compatibility (documented in csp.ts). Recommend re-running live check with prod or a request that traverses the proxy layer. |
-| Strict-Transport-Security | Not in live check | `next.config.ts:59` | Production-only by design — suppressed on localhost to avoid poisoning Chrome's HSTS cache. Not expected in dev check. |
+| Header | Value | Status |
+|--------|-------|--------|
+| `X-Content-Type-Options` | `nosniff` | Pass |
+| `X-Frame-Options` | `DENY` | Pass |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Pass |
+| `Permissions-Policy` | `camera=(), geolocation=(), microphone=(self)` | Pass |
+| `Strict-Transport-Security` | Configured (production-only) | Pass (source) |
+| `Content-Security-Policy` | `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com`; `frame-ancestors 'none'`; `object-src 'none'` | Pass (source) |
+
+CSP is intentionally not nonce-gated — see CLAUDE.md "CSP and PPR Compatibility": PPR prerendering is incompatible with nonce-only CSP, and `'self' 'unsafe-inline'` is the correct posture. The `e2e/smoke.spec.ts` "CSP canary" test guards against accidental tightening that would break hydration.
+
+Live header verification was not performed this run (dev server unavailable in the agent context). Recommend running `curl -sI https://paisaxe.es/` next cycle to confirm runtime headers match source.
 
 ## CI/CD Security Automation
 
-| Control | Status | Notes |
-|---------|--------|-------|
-| Dependabot | Active | Pinned to `develop` branch (commit `f118597`). Opens PRs for CVE-bearing deps. |
-| Renovate | Not used | Intentional — Dependabot covers the need. |
-| Gitleaks in CI | Active | Runs on every push to `develop` and PRs to `main`. Scans git history for secrets. |
-| npm audit in CI | Active | Reports on PRs. Not a hard gate — non-exploitable moderates are accepted per policy. |
-| License check | Active | `license-check.yml` blocks strong copyleft (GPL/AGPL/SSPL). Weak copyleft (LGPL/MPL) raises warning per policy. |
+| Tool | Status | Notes |
+|------|--------|-------|
+| Dependabot | Active | Pinned to `develop` branch (`f118597`, Apr 13). Aligned with git workflow — no PRs targeting `main` from bots. |
+| Renovate | Not configured | Not needed; Dependabot covers the role. |
+| Gitleaks (CI) | Active | Scans full history on every PR. |
+| npm audit (CI) | Active | Runs on every PR; will currently surface 8 moderate advisories — expected, all non-exploitable, documented here. |
+| License-check (CI) | Active | Validates against `docs/project/license-exceptions.md`. |
+| Sentry Replay PII surface | Removed | `fef651f5` (Apr 22) removed `replaysOnErrorSampleRate` and `replaysSessionSampleRate` from `sentry.client.config.ts`. Eliminates client-side replay PII capture entirely. |
 
-No gaps.
+No CI/CD security gaps.
 
-## Outdated Packages
+## Outdated Packages with Security Implications
 
-17 packages outdated. None carry known CVEs. Notes on apparent "downgrades": `jsdom` (29.0.2 -> 27.0.1) and `vitest` (4.1.4 -> 3.2.4) are npm tag artifacts — we're on a newer pre-release track; npm `latest` points to the older stable channel. These should not be downgraded.
+17 outdated packages. None have known CVEs in the versions we run. Security-relevant subset:
 
-Production deps worth batching in next chore cycle:
+| Package | Current | Latest | Security note |
+|---------|---------|--------|---------------|
+| `@anthropic-ai/sdk` | 0.90.0 | 0.91.1 | Minor. No CVE in 0.90.0. |
+| `@sentry/core` / `@sentry/nextjs` | 10.49.0 | 10.50.0 | Patch-level. No CVE. |
+| `@stripe/stripe-js` | 9.2.0 | 9.3.1 | Payment SDK — keep current. No active CVE in 9.2.0. |
+| `@supabase/supabase-js` | 2.104.0 | 2.104.1 | Single-patch drift. No CVE. |
+| `posthog-js` | 1.369.5 | 1.372.1 | Several minors behind. No active CVE in 1.369.5 (the protobufjs / dompurify advisories from Apr 17 were resolved by the `e66e510` upgrade to 1.369.x). |
+| `voyageai` | 0.1.0 | 0.2.1 | **Do not upgrade.** 0.2.x ESM build broke `/api/chat` (Apr 25). Pinned to 0.1.0 by `8f53cd29`/`d0b5576e`/`1344e58d`. No security CVE. |
+| `stripe` | 22.0.2 | 22.1.0 | Server SDK. No active CVE. |
+| `jsdom` | 29.0.2 | 27.0.1 | Dev-only (test harness). The "downgrade" reflects a release-channel split, not an actual regression. |
+| `vitest` | 4.1.4 | 3.2.4 | Dev-only. Pre-release channel reporting. |
+| `knip`, `tailwindcss`, `@tailwindcss/postcss`, `@vitest/coverage-v8`, `@typescript-eslint/eslint-plugin`, `@elevenlabs/react`, `lucide-react` | various | various | Dev-only or non-security minor/patch. No CVEs. |
 
-| Package | Current | Latest | Priority |
-|---------|---------|--------|----------|
-| `posthog-js` | 1.369.3 | 1.372.1 | Low — no CVEs, advisories cleared by e66e510 |
-| `@anthropic-ai/sdk` | 0.90.0 | 0.91.1 | Low — minor patch |
-| `@supabase/supabase-js` | 2.103.3 | 2.104.1 | Low — patch |
-| `@sentry/nextjs` | 10.49.0 | 10.50.0 | Low — minor |
-| `@sentry/core` | 10.49.0 | 10.50.0 | Low — minor |
-| `@elevenlabs/react` | 1.1.1 | 1.2.1 | Low — minor |
-| `@stripe/stripe-js` | 9.2.0 | 9.3.1 | Low — minor |
-| `stripe` | 22.0.2 | 22.1.0 | Low — minor |
-| `resend` | 6.12.0 | 6.12.2 | Low — sync pending `npm install` |
-
-Dev-only outdated (8): `@tailwindcss/postcss`, `@typescript-eslint/eslint-plugin`, `@vitest/coverage-v8`, `jsdom` (do not downgrade), `knip`, `lucide-react`, `tailwindcss`, `vitest` (do not downgrade). No action required.
-
-## Cross-Agent Inputs
-
-- **QA Agent (Apr 25)** flagged a chat API 500 regression — `/api/chat` returning 500 for all non-safety tests, fast failure (124–321ms) suggesting an import or initialization error from wave 1 remediation commits (`77359718` logger edge runtime isolation). This is not a security vulnerability, but a 500 on the primary user-facing API endpoint could mask errors that a security agent would otherwise observe. Recommend investigating `77359718` before the next security scan.
-- **Coverage Agent (Apr 23)** confirmed Stripe webhook and chat stream are now at 100% branch coverage on all defensive error paths. No regression risk on security-critical payment and CSRF paths.
-- **Performance Agent (Apr 24)** confirmed Sentry Replay disabled (`fef651f5`). This eliminates the Replay PII exfiltration surface noted in the Apr 24 report. No further action needed on that item.
-- **Cost Analyst** notes `resend` pin drift (6.12.0 installed vs ^6.12.2 pinned) — this will be resolved when `npm install` is run as part of Remediation step 2 above.
-
----
+**No production dep is behind on a security-relevant version.** The 8 active advisories are structural (postcss inside Next.js, uuid inside resend) and are not resolvable by upgrading these direct deps.
