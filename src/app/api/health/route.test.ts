@@ -108,39 +108,40 @@ describe("GET /api/health", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
   });
 
-  it("returns HTTP 503 with the same minimal payload when Supabase is unavailable", async () => {
+  // DO-H1 regression: HTTP status must be 200 even when degraded
+  it("DO-H1: returns HTTP 200 (not 503) with degraded status when Supabase is unavailable", async () => {
     mockSupabaseProbeError("Connection refused");
     mockDatabaseSize(129394278);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data).toEqual({
       status: "degraded",
       timestamp: expect.any(String),
     });
   });
 
-  it("returns HTTP 503 when no approved stories are available", async () => {
+  it("DO-H1: returns HTTP 200 (not 503) when no approved stories are available", async () => {
     mockStoryCount(0, null);
     mockDatabaseSize(129394278);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
   });
 
-  it("returns HTTP 503 when database usage reaches the warning threshold", async () => {
+  it("DO-H1: returns HTTP 200 (not 503) when database usage reaches the warning threshold", async () => {
     mockHealthySupabase();
     mockDatabaseSize(6871954637);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
   });
 
@@ -179,7 +180,8 @@ describe("GET /api/health", () => {
     const elapsed = Date.now() - start;
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    // DO-H1: degraded is 200, never 503
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(elapsed).toBeLessThan(PROBE_TIMEOUTS_MS.supabase + 400);
   }, 10000);
@@ -228,7 +230,22 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    // DO-H1: degraded is 200 now
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
     expect(Object.keys(data)).toEqual(["status", "timestamp"]);
+  });
+
+  // PE-H3 regression: preview-smoke.yml requires HTTP 200 + status=healthy
+  it("PE-H3: returns HTTP 200 so preview-smoke.yml gate can inspect body status", async () => {
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    // The smoke test gates on: HTTP 200 AND body.status === "healthy"
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
   });
 });

@@ -110,13 +110,18 @@ function withTimeout<T>(
 function buildHealthResponse(
   status: HealthStatus
 ): NextResponse<PublicHealthResponse> {
+  // DO-H1 / PE-H3: Always return HTTP 200.
+  // Degraded state is signalled via the JSON body only.
+  // This keeps Upptime happy and allows preview-smoke.yml to gate on body content.
+  // The dedicated liveness probe (/api/health/live) is a no-probe always-200 endpoint
+  // for monitors that cannot parse JSON.
   return NextResponse.json(
     {
       status,
       timestamp: new Date().toISOString(),
     },
     {
-      status: status === "healthy" ? 200 : 503,
+      status: 200,
       headers: {
         "Cache-Control": "no-store, max-age=0",
         "Content-Type": "application/json",
