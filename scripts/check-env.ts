@@ -3,9 +3,10 @@ import { join, extname } from "path";
 
 const ROOT = process.cwd();
 const SRC_DIR = join(ROOT, "src");
+const SCRIPTS_DIR = join(ROOT, "scripts");
 const ENV_EXAMPLE = join(ROOT, ".env.example");
 
-// Variables that are set by Node.js, Next.js, or the OS — not user-configured
+// Variables that are set by Node.js, Next.js, the OS, or test runners — not user-configured
 const PLATFORM_VARS = new Set([
   "NODE_ENV",
   "HOME",
@@ -16,6 +17,11 @@ const PLATFORM_VARS = new Set([
   "VERCEL",
   "VERCEL_ENV",
   "CI",
+  // Test runner flags (set automatically by Vitest/Jest — never in .env)
+  "VITEST",
+  // Script-specific runtime flags (set inline by calling code, not .env)
+  "PLAYWRIGHT_PORT",
+  "PLAYWRIGHT_REUSE_SERVER",
 ]);
 
 function getEnvExampleKeys(): Set<string> {
@@ -41,48 +47,65 @@ function getEnvExampleKeys(): Set<string> {
   return keys;
 }
 
-function walkTs(dir: string): string[] {
+function walkTs(dir: string, exclude?: string[]): string[] {
   const files: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) {
-      files.push(...walkTs(full));
+      files.push(...walkTs(full, exclude));
     } else if ([".ts", ".tsx"].includes(extname(entry)) && !entry.includes(".test.")) {
-      files.push(full);
+      if (!exclude?.includes(full)) {
+        files.push(full);
+      }
     }
   }
   return files;
 }
 
 function getUsedEnvKeys(files: string[]): Map<string, string[]> {
-  const pattern = /process\.env\.([A-Z][A-Z0-9_]*)/g;
+  // Matches process.env.KEY and process.env["KEY"] / process.env['KEY']
+  const patterns = [
+    /process\.env\.([A-Z][A-Z0-9_]*)/g,
+    /process\.env\[["']([A-Z][A-Z0-9_]*)["']\]/g,
+  ];
   const usage = new Map<string, string[]>();
   for (const file of files) {
     const content = readFileSync(file, "utf-8");
-    let match;
-    while ((match = pattern.exec(content)) !== null) {
-      const key = match[1];
-      const relative = file.replace(ROOT + "/", "");
-      if (!usage.has(key)) usage.set(key, []);
-      usage.get(key)!.push(relative);
+    for (const pattern of patterns) {
+      pattern.lastIndex = 0;
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        const key = match[1];
+        const relative = file.replace(ROOT + "/", "");
+        if (!usage.has(key)) usage.set(key, []);
+        usage.get(key)!.push(relative);
+      }
     }
   }
   return usage;
 }
 
 const exampleKeys = getEnvExampleKeys();
-const usedKeys = getUsedEnvKeys(walkTs(SRC_DIR));
+
+// Scan both src/ and scripts/ for process.env usage.
+// Exclude check-env.ts itself to avoid false positives from its own pattern strings.
+const selfPath = join(SCRIPTS_DIR, "check-env.ts");
+const srcFiles = walkTs(SRC_DIR);
+const scriptFiles = walkTs(SCRIPTS_DIR, [selfPath]);
+const allFiles = [...srcFiles, ...scriptFiles];
+
+const usedKeys = getUsedEnvKeys(allFiles);
 
 const missing = [...usedKeys.entries()].filter(
   ([key]) => !exampleKeys.has(key) && !PLATFORM_VARS.has(key)
 );
 
 if (missing.length === 0) {
-  console.log("✓ All process.env vars in src/ are documented in .env.example");
+  console.log("✓ All process.env vars in src/ and scripts/ are documented in .env.example");
   process.exit(0);
 } else {
-  console.error(`✗ ${missing.length} env var(s) used in src/ but missing from .env.example:\n`);
+  console.error(`✗ ${missing.length} env var(s) used in src/ or scripts/ but missing from .env.example:\n`);
   for (const [key, files] of missing) {
     console.error(`  ${key}`);
     for (const f of [...new Set(files)].slice(0, 3)) {
