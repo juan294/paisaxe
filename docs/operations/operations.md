@@ -4,7 +4,7 @@ Detailed documentation for database maintenance, monitoring, webhooks, and autom
 
 ## Health Check Endpoint
 
-`GET /api/health` — returns service status, uptime, Supabase connectivity with latency, and database storage usage (size in MB, percentage of 8 GB Pro tier limit). Reports "degraded" if Supabase connection fails or database usage exceeds 80%. Always returns HTTP 200. Used by Upptime for uptime monitoring.
+`GET /api/health` — returns a minimal public payload: `{ "status": "healthy" | "degraded", "timestamp": "..." }`. Returns HTTP 200 only when the app is healthy. Returns HTTP 503 when Supabase connectivity fails, approved stories are unavailable, or database usage reaches the 80% warning threshold. Used by preview smoke and Upptime as the machine health gate. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
 
 ## Pre-Launch Checklist
 
@@ -22,7 +22,7 @@ npm run build          # Production build succeeds
 ```
 
 **Expected results:**
-- Tests: All passing (currently ~2000 tests)
+- Tests: All passing (currently ~6,000 tests)
 - TypeScript: Exit code 0, no output
 - Lint: Exit code 0, no output
 - Build: "Generating static pages" completes successfully
@@ -30,14 +30,13 @@ npm run build          # Production build succeeds
 ### 2. Health Endpoint
 
 ```bash
-curl -s https://paisaxe.es/api/health | jq
+curl -sS https://paisaxe.es/api/health -o /tmp/paisaxe-health.json -w "%{http_code}\n"
+cat /tmp/paisaxe-health.json | jq
 ```
 
 **Verify:**
-- `status`: "healthy"
-- `services.supabase.status`: "connected"
-- `services.supabase.latency_ms`: < 1000ms
-- `services.database.usage_percent`: < 80%
+- HTTP status: `200`
+- `status`: `"healthy"`
 
 ### 3. Core Endpoints
 
@@ -107,7 +106,7 @@ Check critical flags at https://paisaxe.es/api/feature-flags:
 | Types | `npm run typecheck` | No errors |
 | Lint | `npm run lint` | No errors |
 | Build | `npm run build` | Completes |
-| Health | `curl .../api/health` | status: healthy |
+| Health | `curl .../api/health` | HTTP 200 and `status: healthy` |
 | Site | `curl -w "%{http_code}" .../` | 200 (after launch) |
 
 ## Upptime Status Page
@@ -115,12 +114,23 @@ Check critical flags at https://paisaxe.es/api/feature-flags:
 - **Repo**: https://github.com/juan294/paisaxe-upptime
 - **Status page**: https://juan294.github.io/paisaxe-upptime/
 - **Monitors**: `paisaxe.es` and `paisaxe.es/api/health` every 5 minutes
+- **Machine gate behavior**: `/api/health` returns HTTP 503 on degraded state, so Upptime opens an incident instead of masking a bad backend with a 200
 - Opens GitHub Issues automatically on detected downtime
 - Reference config kept in `.github/upptime/.upptimerc.yml`
 
 ## Vercel Speed Insights
 
 Real User Monitoring (RUM) for Core Web Vitals in production. View data in the Vercel Dashboard under Speed Insights.
+
+## Function Region Verification
+
+Verified on **2026-04-23**:
+
+- Vercel function region: `fra1` (Frankfurt) via `vercel.json`
+- Linked Supabase project: `asturias`
+- Supabase region: `Central Europe (Zurich)` via `supabase projects list`
+
+Vercel's current public region list does not expose a Zurich function region, so `fra1` is the nearest supported region and replaces the previous `cdg1` setting.
 
 ## Database Maintenance (pg_cron)
 
@@ -133,6 +143,10 @@ Automated maintenance jobs run on Supabase via pg_cron:
 | `cleanup-cron-history` | Sundays 5:00 AM UTC | 011 | Delete cron history older than 30 days |
 | `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Database activity safeguard |
 | `edge-keep-alive` | Every 3 days 12:00 PM UTC | 014 | Call keep-alive Edge Function via pg_net |
+| `content-discovery` | Weekly Monday 3:00 AM UTC | Vercel Cron | Discovers new Asturias places via Google Places API |
+| `fail-stale-translations` | Daily 6:00 AM UTC | Vercel Cron | Mark stories stuck in `translating` state as failed |
+| `github-traffic-sync` | Daily 1:00 AM UTC | Vercel Cron | Sync GitHub traffic stats to admin dashboard |
+| `subscription-optimizer` | Weekly Monday 4:00 AM UTC | Vercel Cron | Analyze service costs and spending |
 
 Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
 
@@ -260,13 +274,17 @@ Automated quality checks run on every push and pull request to `develop` and `ma
 
 | Job | Description |
 |-----|-------------|
-| **lint-and-typecheck** | Runs `npm run typecheck` and `npm run lint` |
+| **lint-and-typecheck** | Runs `npm run typecheck`, `npm run lint`, `npm run check-env`, and migration numbering check (`npx tsx scripts/check-migrations.ts`) |
 | **test** | Runs `npm run test` |
 | **build** | Verifies production build with `npm run build` |
 
 ### E2E Tests (`e2e.yml`)
 
 Playwright E2E tests run against a built app on push/PR to `develop` and `main`.
+
+### Preview Smoke Test (`preview-smoke.yml`)
+
+On PRs targeting `main`, waits for the Vercel preview deployment and hits `/api/health` and the homepage against real env vars. This is a **required status check** — `Smoke test Vercel preview` must pass before any merge to `main`. It catches runtime failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js 16.2.1 incident).
 
 ### Quality & Security Workflows
 
@@ -337,9 +355,19 @@ Revenue analytics are available in the admin panel under Analytics → Revenue t
 
 **Caching** — All analytics API routes (`/api/admin/analytics`, `/api/admin/elevenlabs-analytics`, `/api/admin/stripe-analytics`, `/api/admin/costs-analytics`) return `Cache-Control: private, max-age=120, stale-while-revalidate=300`. The client-side `AnalyticsCacheProvider` maintains an in-memory cache with a 2-minute stale time. Cache is invalidated on manual refresh or after CRUD mutations (costs panel).
 
+## Proxy Architecture
+
+Request interception uses `src/proxy.ts` (Next.js 16 replacement for `middleware.ts`). The middleware chain order is: canonical-domain → maintenance → CORS → CSP → CSRF → auth-refresh → request-id → story-rewrite.
+
+See [proxy-architecture.md](./proxy-architecture.md) for the full module map.
+
+---
+
 ## ElevenLabs Voice Agents
 
-Voice agents for the Paisaxe experience, configured in `src/config/elevenlabs-agents.ts`.
+Voice agents for the Paisaxe experience. Configs are tracked in git via the ElevenLabs CLI — see [elevenlabs-agents-as-code.md](./elevenlabs-agents-as-code.md) for the workflow.
+
+Configured in `src/config/elevenlabs-agents.ts`.
 
 ### Agents
 

@@ -16,7 +16,7 @@ For operations (monitoring, pg_cron, webhooks, agents), see @docs/operations/ope
 | Styling | Tailwind CSS + shadcn/ui |
 | Database | Supabase (PostgreSQL + pgvector) |
 | AI Chat | Claude API (Anthropic) |
-| Embeddings | Voyage AI (voyage-3, 512 dims) |
+| Embeddings | Voyage AI (voyage-3.5, 512 dims) |
 | Reranking | Voyage AI (rerank-2.5) |
 | Voice | ElevenLabs Conversational AI |
 | Payments | Stripe |
@@ -70,7 +70,7 @@ develop   # Active development (DEFAULT)
 **This is a user-initiated process. Agents prepare, users authorize.**
 
 `main` is protected with branch protection rules:
-- **Required status checks**: `lint-and-typecheck`, `test`, `build`, `e2e` must all pass
+- **Required status checks**: `lint-and-typecheck`, `test`, `build`, `e2e`, `Smoke test Vercel preview` must all pass
 - **Force pushes blocked**, **deletion blocked**
 - **PRs required** (0 approvals — solo dev can self-merge after CI passes)
 
@@ -101,7 +101,7 @@ Present the summary to the user:
 # Create the PR
 gh pr create --base main --head develop --title "Release: description of changes"
 
-# Wait for all 4 status checks to pass
+# Wait for all 5 status checks to pass
 gh pr checks
 ```
 
@@ -114,8 +114,8 @@ gh pr merge --merge
 **Step 5: Verify deployment** (agent can do this autonomously after merge):
 ```bash
 vercel ls --limit 5
-# Check /api/health on production
-curl -s https://paisaxe.es/api/health
+# Check /api/health on production (must return HTTP 200 with status=healthy)
+curl -sS https://paisaxe.es/api/health
 ```
 
 **Never bypass branch protection.** If CI fails on the PR, fix on `develop` first, push, and let the PR update.
@@ -231,7 +231,7 @@ All env vars are documented in `.env.local`. Key groups: Anthropic, Voyage AI, E
 ## Architecture Decisions
 
 ### Embeddings & Search
-- Model: `voyage-3` with 512 dimensions (Matryoshka)
+- Model: `voyage-3.5` with 512 dimensions (Matryoshka)
 - Hybrid search: vector similarity + keyword matching
 - Two-stage retrieval: fetch 10 candidates, rerank to top 3 via `rerank-2.5`
 
@@ -341,7 +341,7 @@ All significant changes go through four phases:
 - Each RPI phase should be its own conversation. Don't run research + plan + implement in one session.
 - Use `/clear` between unrelated tasks. Use `/compact` when context is heavy but the task continues.
 - Subagents are context control mechanisms — they search/read in their window and return only distilled results.
-- Research and planning happen on the default branch. Implementation happens in worktrees or feature branches.
+- Research and planning happen against the integration branch. Implementation happens in worktrees or temporary branches.
 - If research comes back wrong, throw it out and restart with more specific steering.
 
 ### Rules for All Phases

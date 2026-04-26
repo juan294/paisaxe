@@ -1,10 +1,25 @@
 name: CI
 
+# NOTE: This workflow builds/tests with dummy env vars.
+# It catches compile errors, unit-test failures, and type regressions.
+# It does NOT exercise the real Vercel runtime or real backend services.
+#
+# For PRs targeting main, a SEPARATE required check runs:
+#   .github/workflows/preview-smoke.yml  — "Smoke test Vercel preview"
+# That workflow waits for the Vercel preview deployment and hits
+# /api/health + homepage against real env vars, catching runtime failures
+# that dummy-key builds cannot detect (see incident: Next.js 16.2.1).
+# The health probe fails on non-200 or JSON status != "healthy".
+
 on:
   push:
     branches: [develop, main]
   pull_request:
     branches: [develop, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint-and-typecheck:
@@ -32,6 +47,12 @@ jobs:
 
       - name: Run lint
         run: npm run lint
+
+      - name: Check env vars documented
+        run: npm run check-env
+
+      - name: Check migration numbering
+        run: npx tsx scripts/check-migrations.ts
 
   test:
     name: Test

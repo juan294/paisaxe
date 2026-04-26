@@ -1,13 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { verifyWebhookSignature, calculateExpiryDate } from "@/lib/stripe";
+import { logger } from "@/lib/logger";
 import type Stripe from "stripe";
+
+type StripeUnrecoverableReason = "missing_user_id" | "missing_payment_intent";
+
+function unrecoverableResponse(eventId: string, reason: StripeUnrecoverableReason) {
+  logger.error("[STRIPE_UNRECOVERABLE]", {
+    eventId,
+    reason,
+  });
+  return NextResponse.json(
+    { status: "unrecoverable", reason },
+    { status: 200 }
+  );
+}
 
 /**
  * POST /api/webhooks/stripe
  *
  * Handles Stripe webhook events:
- * - checkout.session.completed: Creates voice purchase record
+ * - checkout.session.completed: Creates voice purchase record atomically
+ *
+ * Idempotency and grant creation are wrapped in a single Postgres RPC so the
+ * webhook never records the dedup row without also granting access.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -18,7 +35,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const signature = request.headers.get("stripe-signature");
 
     if (!signature) {
-      console.warn("[stripe-webhook] Missing signature header");
+      logger.warn("[STRIPE_WEBHOOK_INVALID_REQUEST]", {
+        reason: "missing_signature",
+      });
       return NextResponse.json({ error: "Missing signature" }, { status: 401 });
     }
 
@@ -27,7 +46,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       event = verifyWebhookSignature(rawBody, signature);
     } catch (err) {
-      console.warn("[stripe-webhook] Invalid signature:", err);
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.warn("[STRIPE_WEBHOOK_INVALID_REQUEST]", {
+        reason: "invalid_signature",
+        error: error.message,
+      });
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
@@ -36,58 +59,51 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ received: true });
     }
 
+    const supabase = createAdminClient();
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.user_id;
 
-    // Use payment_intent if available, otherwise fall back to session ID
-    const paymentProviderId =
-      (session.payment_intent as string) || session.id;
-
-    // Validate user_id
     if (!userId) {
-      console.error("[stripe-webhook] Missing user_id in metadata");
-      return NextResponse.json({ error: "Missing user_id" }, { status: 400 });
+      return unrecoverableResponse(event.id, "missing_user_id");
     }
 
-    // Calculate expiry
+    const paymentProviderId = session.payment_intent as string | null;
+    if (!paymentProviderId) {
+      return unrecoverableResponse(event.id, "missing_payment_intent");
+    }
+
     const expiresAt = calculateExpiryDate("day_pass");
+    const amountPaid = session.amount_total ?? 0;
+    const { data, error } = await supabase.rpc("grant_day_pass_idempotent", {
+      p_event_id: event.id,
+      p_user_id: userId,
+      p_payment_provider_id: paymentProviderId,
+      p_expires_at: expiresAt.toISOString(),
+      p_amount_paid: amountPaid,
+    });
 
-    // Insert purchase record
-    const supabase = createAdminClient();
-
-    const { error: insertError } = await supabase
-      .from("voice_purchases")
-      .insert({
-        user_id: userId,
-        purchase_type: "day_pass",
-        payment_provider_id: paymentProviderId,
-        expires_at: expiresAt.toISOString(),
+    if (error) {
+      logger.error("[STRIPE_RPC_FAILURE]", {
+        eventId: event.id,
+        error: error.message,
       });
-
-    if (insertError) {
-      // Handle duplicate order (idempotency)
-      if (insertError.code === "23505") {
-        return NextResponse.json({ success: true, duplicate: true });
-      }
-
-      console.error("[stripe-webhook] Failed to insert purchase:", insertError);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
-    console.info("[stripe-webhook] Purchase created", {
-      userId,
+    logger.info("[STRIPE_WEBHOOK_PROCESSED]", {
+      eventId: event.id,
+      status: data,
       paymentProviderId,
-      purchaseType: "day_pass",
       expiresAt: expiresAt.toISOString(),
+      amountPaid,
     });
 
-    return NextResponse.json({
-      success: true,
-      purchaseType: "day_pass",
-      expiresAt: expiresAt.toISOString(),
-    });
+    return NextResponse.json({ status: data }, { status: 200 });
   } catch (error) {
-    console.error("[stripe-webhook] Error:", error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error("[STRIPE_WEBHOOK_FAILURE]", {
+      error: err.message,
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

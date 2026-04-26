@@ -6,8 +6,12 @@ on:
   pull_request:
     branches: [develop, main]
   schedule:
-    # Run weekly on Mondays at 8:00 UTC
-    - cron: '0 8 * * 1'
+    # Run daily at 8:00 UTC (was weekly — CVE detection latency reduced from ~6 days to <24h)
+    - cron: '0 8 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   gitleaks:
@@ -55,3 +59,37 @@ jobs:
       - name: Report all vulnerabilities (informational)
         if: always()
         run: npm audit || true
+
+  vercel-env-safety:
+    name: Vercel env safety
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+
+    steps:
+      # `.vercel/project.json` is gitignored, so project/org IDs must come
+      # from repository variables instead of a checked-in metadata file.
+      # Configure `VERCEL_PROJECT_ID` and `VERCEL_ORG_ID` under
+      # Settings → Secrets and variables → Actions → Variables.
+      - name: Skip when Vercel credentials are unavailable
+        if: ${{ env.VERCEL_TOKEN == '' || env.VERCEL_PROJECT_ID == '' || env.VERCEL_ORG_ID == '' }}
+        run: |
+          echo "Vercel env safety check requires VERCEL_TOKEN (secret) plus"
+          echo "VERCEL_PROJECT_ID and VERCEL_ORG_ID (repo variables). Skipping."
+
+      - name: Assert legacy agent override is absent from Vercel env
+        if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_PROJECT_ID != '' && env.VERCEL_ORG_ID != '' }}
+        run: |
+          legacy_key="$(printf '%s_%s_%s\n' ALLOW AGENT RUN)"
+          response="$(curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID&limit=100")"
+
+          echo "$response" | jq -r '.envs[]?.key' > env-keys.txt
+
+          if grep -Fxq "$legacy_key" env-keys.txt; then
+            echo "::error::Legacy agent runner override is still configured in Vercel. Remove it before deploy."
+            exit 1
+          fi

@@ -32,7 +32,7 @@ test.describe("Chat panel", () => {
 
   test("opens chat panel when Ask button is clicked", async ({ page }) => {
     // Find and click the "ask about" button
-    const askButton = page.locator('[data-testid="ask-button"]');
+    const askButton = page.locator('[data-testid="ask-button"]').first();
     await askButton.click();
 
     // Chat panel should appear (it's a fixed overlay with z-50)
@@ -42,7 +42,7 @@ test.describe("Chat panel", () => {
 
   test("sends a message and receives a mocked response", async ({ page }) => {
     // Open chat
-    const askButton = page.locator('[data-testid="ask-button"]');
+    const askButton = page.locator('[data-testid="ask-button"]').first();
     await askButton.click();
 
     // Wait for chat panel
@@ -74,7 +74,7 @@ test.describe("Chat panel", () => {
 
   test("closes chat panel via close button", async ({ page }) => {
     // Open chat
-    const askButton = page.locator('[data-testid="ask-button"]');
+    const askButton = page.locator('[data-testid="ask-button"]').first();
     await askButton.click();
 
     const chatPanel = page.locator(".fixed.inset-0.z-50");
@@ -86,5 +86,39 @@ test.describe("Chat panel", () => {
 
     // Chat panel should be gone
     await expect(chatPanel).not.toBeVisible();
+  });
+
+  test("shows generic error UI when SSE stream returns error event", async ({ page }) => {
+    // Override the beforeEach route to return an SSE error event
+    await page.route("**/api/chat/stream", (route) => {
+      const errorEvent = `data: ${JSON.stringify({ type: "error", message: "Internal server error" })}\n\n`;
+      return route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: errorEvent,
+      });
+    });
+
+    const askButton = page.locator('[data-testid="ask-button"]').first();
+    await askButton.click();
+
+    const chatPanel = page.locator(".fixed.inset-0.z-50");
+    await expect(chatPanel).toBeVisible();
+
+    const privacyButton = chatPanel.locator("button").filter({ hasText: /entend|understood|ok/i });
+    if (await privacyButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await privacyButton.click();
+    }
+
+    const input = chatPanel.locator("input");
+    await input.fill("Test question");
+
+    const sendButton = chatPanel.locator('button[type="submit"]');
+    await sendButton.click();
+
+    // Error copy should appear in the assistant message
+    await expect(
+      chatPanel.getByText(/Lo siento|error|sorry/i)
+    ).toBeVisible({ timeout: 5000 });
   });
 });

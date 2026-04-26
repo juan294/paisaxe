@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
+import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
+import { logger } from "@/lib/logger";
 import {
   sendSMS,
   buildConfirmationSMS,
@@ -68,6 +70,46 @@ const NO_ANSWER_PATTERNS = [
 
 // 30-minute tolerance for timestamp validation (matches ElevenLabs SDK)
 const TIMESTAMP_TOLERANCE_SECONDS = 30 * 60;
+const SMS_JOB_LEASE_SECONDS = 15 * 60;
+
+/**
+ * Zod schema for the ElevenLabs post_call_transcription payload.
+ * The analysis field has two possible nesting paths:
+ *   1. Top-level: { analysis: { call_successful, transcript_summary } }
+ *   2. Nested in data: { data: { analysis: { call_successful, transcript_summary } } }
+ */
+const TranscriptEntrySchema = z
+  .object({
+    role: z.enum(["user", "agent"]),
+    message: z.string().optional(),
+    time_in_call_secs: z.number().optional(),
+  })
+  .strict();
+
+const AnalysisSchema = z
+  .object({
+    call_successful: z.union([z.string(), z.boolean()]).optional(),
+    transcript_summary: z.string().optional(),
+  })
+  .strict();
+
+const ElevenLabsWebhookSchema = z
+  .object({
+    conversation_id: z.string().optional(),
+    event_type: z.string().optional(),
+    type: z.string().optional(),
+    transcript: z.union([z.array(TranscriptEntrySchema), z.string()]).optional(),
+    analysis: AnalysisSchema.optional(),
+    data: z
+      .object({
+        conversation_id: z.string().optional(),
+        transcript: z.union([z.array(TranscriptEntrySchema), z.string()]).optional(),
+        analysis: AnalysisSchema.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * Parse ElevenLabs signature header format: "t=timestamp,v0=signature"
@@ -106,7 +148,7 @@ function verifySignature(
   const secret = process.env.ELEVENLABS_WEBHOOK_SECRET?.trim();
 
   if (!secret) {
-    console.error("[elevenlabs-webhook] ELEVENLABS_WEBHOOK_SECRET not configured");
+    logger.error("[ELEVENLABS_WEBHOOK_SECRET_MISSING]");
     return "missing_secret";
   }
 
@@ -151,6 +193,13 @@ interface TranscriptEntry {
   time_in_call_secs?: number;
 }
 
+interface ClaimedSMSJob {
+  booking_id: string;
+  event_key: string;
+  to_phone: string;
+  message: string;
+}
+
 /**
  * Extract plain text from ElevenLabs transcript array.
  * Transcript is an array of {role, message} objects, not a plain string.
@@ -171,6 +220,27 @@ function extractTranscriptText(
 }
 
 /**
+ * Normalize the call_successful field from ElevenLabs webhook analysis.
+ *
+ * ElevenLabs has delivered this field in multiple formats across API versions:
+ * - Boolean: true / false
+ * - String enum: "success" / "failure" / "unknown"
+ * - String boolean: "true" / "false"
+ * - Missing / null / undefined → treat as unsuccessful
+ *
+ * Returns:
+ *  "success"  → call connected and succeeded
+ *  "failure"  → call explicitly failed (no answer, network error, etc.)
+ *  "unknown"  → ambiguous — fall through to transcript keyword analysis
+ */
+export function isCallSuccessful(value: unknown): "success" | "failure" | "unknown" {
+  if (value === true || value === "success" || value === "true") return "success";
+  if (value === false || value === "failure" || value === "false") return "failure";
+  // null, undefined, "unknown", or any other value → unknown
+  return "unknown";
+}
+
+/**
  * Analyze call transcript/analysis to determine booking outcome.
  *
  * ElevenLabs payload format:
@@ -187,12 +257,16 @@ function analyzeOutcome(webhookData: {
 }): BookingOutcome {
   const { analysis, transcript } = webhookData;
 
-  // If call wasn't successful at all, it's a no_answer or failed
-  // ElevenLabs uses string enum: "success" | "failure" | "unknown"
-  if (
-    analysis?.call_successful === "failure" ||
-    analysis?.call_successful === false
-  ) {
+  // Normalize call_successful to handle all field variants
+  const callResult = isCallSuccessful(analysis?.call_successful);
+
+  // Explicit failure → no_answer (call didn't connect)
+  if (callResult === "failure") {
+    return "no_answer";
+  }
+
+  // null/undefined/missing also means no successful call → no_answer
+  if (callResult === "unknown" && analysis?.call_successful == null) {
     return "no_answer";
   }
 
@@ -247,6 +321,10 @@ function getSMSMessage(booking: PendingBooking, outcome: BookingOutcome): string
   }
 }
 
+function buildElevenLabsEventKey(conversationId: string) {
+  return `post_call_transcription:${conversationId}`;
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Get raw body for signature verification
@@ -256,7 +334,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const sigHeader = request.headers.get("elevenlabs-signature");
 
     if (!sigHeader) {
-      console.warn("[elevenlabs-webhook] Missing signature header");
+      logger.warn("[ELEVENLABS_WEBHOOK_SIGNATURE_MISSING]");
       return NextResponse.json(
         { error: "Missing signature" },
         { status: 401 }
@@ -267,7 +345,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const verifyResult = verifySignature(rawBody, sigHeader);
 
     if (verifyResult === "expired") {
-      console.warn("[elevenlabs-webhook] Signature timestamp expired");
+      logger.warn("[ELEVENLABS_WEBHOOK_SIGNATURE_EXPIRED]");
       return NextResponse.json(
         { error: "Signature expired" },
         { status: 401 }
@@ -275,7 +353,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     if (verifyResult !== "valid") {
-      console.warn(`[elevenlabs-webhook] Invalid signature: ${verifyResult}`);
+      logger.warn("[ELEVENLABS_WEBHOOK_SIGNATURE_INVALID]", {
+        verify_result: verifyResult,
+      });
       return NextResponse.json(
         { error: "Invalid signature" },
         { status: 401 }
@@ -284,6 +364,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Parse payload
     const body = JSON.parse(rawBody);
+
+    // Zod schema validation — warn on unexpected/missing fields
+    const parseResult = ElevenLabsWebhookSchema.safeParse(body);
+    if (!parseResult.success) {
+      const unknownFields = parseResult.error.issues.flatMap((i) =>
+        "keys" in i && Array.isArray(i.keys)
+          ? (i.keys as string[])
+          : i.path.length > 0
+          ? [i.path.join(".")]
+          : []
+      );
+      logger.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "elevenlabs", fields: unknownFields });
+    }
 
     // ElevenLabs sends different event types - only handle post_call_transcription
     const eventType = body.event_type || body.type;
@@ -295,7 +388,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const conversationId = body.conversation_id || body.data?.conversation_id;
 
     if (!conversationId) {
-      console.error("[elevenlabs-webhook] Missing conversation_id in payload");
+      logger.error("[ELEVENLABS_WEBHOOK_CONVERSATION_ID_MISSING]");
       return NextResponse.json(
         { error: "Missing conversation_id" },
         { status: 400 }
@@ -305,16 +398,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Look up pending booking
     const supabase = createAdminClient();
 
+    // maybeSingle() returns {data: null, error: null} when no row is found
     const { data: booking, error: fetchError } = await supabase
       .from("pending_bookings")
       .select("*")
       .eq("conversation_id", conversationId)
-      .single();
+      .maybeSingle();
 
-    if (fetchError || !booking) {
-      console.warn(
-        `[elevenlabs-webhook] No pending booking found for conversation: ${conversationId}`
-      );
+    if (fetchError) {
+      logger.error("[ELEVENLABS_WEBHOOK_FETCH_BOOKING_FAILED]", {
+        conversation_id: conversationId,
+        error: fetchError,
+      });
+    }
+
+    if (!booking) {
+      logger.warn("[ELEVENLABS_WEBHOOK_BOOKING_NOT_FOUND]", {
+        conversation_id: conversationId,
+      });
       // Return 200 to acknowledge receipt - this might be a call we didn't initiate
       return NextResponse.json({
         success: true,
@@ -323,9 +424,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    // Check if SMS confirmation feature is enabled
-    const smsEnabled = await isFeatureFlagEnabled("sms_booking_confirmation");
-
     // Analyze call outcome
     // ElevenLabs may send transcript/analysis at top level or nested in data
     const outcome = analyzeOutcome({
@@ -333,52 +431,201 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       transcript: body.transcript ?? body.data?.transcript,
     });
 
-    // Build SMS message
+    const eventKey = buildElevenLabsEventKey(conversationId);
+
+    // Check if SMS confirmation feature is enabled before calling the RPC so we
+    // can pass the phone + message atomically.  This means the SMS outbox row is
+    // inserted in the same transaction as the booking status update, eliminating
+    // the window where booking state is committed but no outbox row exists yet.
+    const smsEnabled = await isFeatureFlagEnabled("sms_booking_confirmation");
     const smsMessage = getSMSMessage(booking as PendingBooking, outcome);
+
+    const { data: rpcStatus, error: rpcError } = await supabase.rpc(
+      "process_elevenlabs_event_idempotent",
+      {
+        p_event_key: eventKey,
+        p_booking_id: booking.id,
+        p_outcome: outcome,
+        // Pass SMS data so the outbox row is enqueued atomically with the
+        // booking state update.  NULL values are safe — the function skips
+        // the INSERT when either parameter is absent.
+        p_to_phone: smsEnabled ? booking.customer_phone : null,
+        p_sms_message: smsEnabled ? smsMessage : null,
+      }
+    );
+
+    if (rpcError) {
+      logger.error("[ELEVENLABS_WEBHOOK_RPC_FAILURE]", {
+        booking_id: booking.id,
+        conversation_id: conversationId,
+        error: rpcError.message,
+      });
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
+
+    if (rpcStatus === "booking_missing") {
+      logger.warn("[ELEVENLABS_WEBHOOK_BOOKING_MISSING_AT_RPC]", {
+        booking_id: booking.id,
+        conversation_id: conversationId,
+      });
+      return NextResponse.json(
+        {
+          success: true,
+          ignored: true,
+          reason: "Booking missing during processing",
+        },
+        { status: 200 }
+      );
+    }
 
     // Send SMS if feature is enabled
     let smsSent = false;
     let smsError: string | undefined;
 
     if (smsEnabled) {
-      const smsResult = await sendSMS(booking.customer_phone, smsMessage);
-      smsSent = smsResult.success;
-      smsError = smsResult.error;
-
-      if (!smsResult.success) {
-        console.error(
-          `[elevenlabs-webhook] Failed to send SMS for booking ${booking.id}:`,
-          smsResult.error
-        );
-      }
-    }
-
-    // Update booking status in database
-    const { error: updateError } = await supabase
-      .from("pending_bookings")
-      .update({
-        status: outcome,
-        outcome_message: smsEnabled && smsSent ? smsMessage : null,
-      })
-      .eq("id", booking.id);
-
-    if (updateError) {
-      console.error(
-        `[elevenlabs-webhook] Failed to update booking ${booking.id}:`,
-        updateError
+      // enqueue_booking_sms_job is now an idempotent upsert — for freshly
+      // processed events the row was already inserted atomically above;
+      // this call is a no-op for those rows.  For duplicate events it
+      // re-queues a previously failed job so the webhook can retry it.
+      const { error: enqueueError } = await supabase.rpc(
+        "enqueue_booking_sms_job",
+        {
+          p_event_key: eventKey,
+          p_booking_id: booking.id,
+          p_to_phone: booking.customer_phone,
+          p_message: smsMessage,
+        }
       );
-      // Don't return error - SMS was already sent
+
+      if (enqueueError) {
+        logger.error("[ELEVENLABS_WEBHOOK_SMS_ENQUEUE_FAILED]", {
+          booking_id: booking.id,
+          event_key: eventKey,
+          error: enqueueError.message,
+        });
+        return NextResponse.json({ error: "Database error" }, { status: 500 });
+      }
+
+      const { data: claimedSMSJob, error: claimSMSError } = await supabase.rpc(
+        "claim_booking_sms_job",
+        {
+          p_event_key: eventKey,
+          p_lease_seconds: SMS_JOB_LEASE_SECONDS,
+        }
+      );
+
+      if (claimSMSError) {
+        logger.error("[ELEVENLABS_WEBHOOK_SMS_CLAIM_FAILED]", {
+          booking_id: booking.id,
+          event_key: eventKey,
+          error: claimSMSError.message,
+        });
+        return NextResponse.json({ error: "Database error" }, { status: 500 });
+      }
+
+      const smsJob = claimedSMSJob as ClaimedSMSJob | null;
+
+      if (smsJob) {
+        // Attempt SMS send outside the transaction. If it fails the durable
+        // booking_sms_jobs row (sms_outbox) persists with status=failed and can
+        // be retried by a cron job or re-attempted on the next webhook event for
+        // the same booking. We must NOT return 500 here — the booking state was
+        // already committed transactionally by process_elevenlabs_event_idempotent.
+        let smsResult: Awaited<ReturnType<typeof sendSMS>>;
+        try {
+          smsResult = await sendSMS(smsJob.to_phone, smsJob.message);
+        } catch (sendError) {
+          const errMsg =
+            sendError instanceof Error ? sendError.message : "SMS send threw unexpectedly";
+          logger.error("[ELEVENLABS_WEBHOOK_SMS_THREW]", {
+            booking_id: booking.id,
+            error: errMsg,
+          });
+          smsResult = { success: false, error: errMsg };
+        }
+
+        smsSent = smsResult.success;
+        smsError = smsResult.error;
+
+        if (!smsResult.success) {
+          logger.error("[ELEVENLABS_WEBHOOK_SMS_FAILED]", {
+            booking_id: booking.id,
+            error: smsResult.error,
+          });
+
+          const { error: failSMSError } = await supabase.rpc(
+            "fail_booking_sms_job",
+            {
+              p_event_key: eventKey,
+              p_error: smsResult.error ?? "SMS delivery failed",
+            }
+          );
+
+          if (failSMSError) {
+            logger.error("[ELEVENLABS_WEBHOOK_SMS_FAIL_MARK_FAILED]", {
+              booking_id: booking.id,
+              event_key: eventKey,
+              error: failSMSError.message,
+            });
+          }
+
+          // Booking state was committed — return 200. The sms_outbox row is
+          // persisted with status=failed and will be retried asynchronously.
+          return NextResponse.json(
+            {
+              success: true,
+              status: rpcStatus,
+              bookingId: booking.id,
+              outcome,
+              smsSent: false,
+              smsError,
+            },
+            { status: 200 }
+          );
+        }
+
+        const { error: completeSMSError } = await supabase.rpc(
+          "complete_booking_sms_job",
+          {
+            p_event_key: eventKey,
+            p_provider_sid: smsResult.sid ?? null,
+          }
+        );
+
+        if (completeSMSError) {
+          logger.error("[ELEVENLABS_WEBHOOK_SMS_COMPLETE_FAILED]", {
+            booking_id: booking.id,
+            event_key: eventKey,
+            error: completeSMSError.message,
+          });
+        }
+
+        const { error: outcomeMessageError } = await supabase
+          .from("pending_bookings")
+          .update({
+            outcome_message: smsMessage,
+          })
+          .eq("id", booking.id);
+
+        if (outcomeMessageError) {
+          logger.error("[ELEVENLABS_WEBHOOK_OUTCOME_MESSAGE_UPDATE_FAILED]", {
+            booking_id: booking.id,
+            error: outcomeMessageError,
+          });
+        }
+      }
     }
 
     return NextResponse.json({
       success: true,
+      status: rpcStatus,
       bookingId: booking.id,
       outcome,
       smsSent,
       smsError,
     });
   } catch (error) {
-    console.error("[elevenlabs-webhook] Error:", error);
+    logger.error("[ELEVENLABS_WEBHOOK_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

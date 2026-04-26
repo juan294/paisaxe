@@ -56,6 +56,7 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+e2e/storage-state.json
 
 # Coverage agent logs
 logs/

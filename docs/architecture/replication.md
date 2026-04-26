@@ -26,7 +26,7 @@ Paisaxe is designed with replicability in mind. Location-specific content is mar
 
 ### Local Development Setup
 
-1. Node.js 18+ installed
+1. Node.js 24+ installed
 2. Git installed
 3. A code editor (VS Code recommended)
 

@@ -51,48 +51,75 @@ describe("GET /api/admin/analytics (PostHog)", () => {
     expect(data.error).toBe("Analytics configuration missing");
   });
 
+  /**
+   * PE-H1: Admin analytics fires no more than 6 PostHog queries per dashboard load.
+   * Was 18 sequential/parallel queries — must be ≤ 6 consolidated queries.
+   */
+  it("should fire no more than 6 PostHog fetch calls per dashboard load (#282)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ results: [] }),
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/analytics");
+    await GET(request);
+
+    expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(6);
+  });
+
   it("should return comprehensive analytics data from PostHog", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-    // Track call order to return different responses for all 17 queries
+    // New consolidated query structure (5 queries total):
+    //  Q1: summary — [pageviews, visitors, sessions, single_page_sessions, total_sessions_bounce, new_visitors, returning_visitors]
+    //  Q2: timeSeries — [[date, pageviews, visitors], ...]
+    //  Q3: categorical 2-col breakdowns (type, key1, count) — pages, referrers, countries, devices, browsers, os, entryPages, exitPages
+    //  Q4: categorical 3-col breakdowns (type, key1, key2, count) — cities, screen sizes
+    //  Q5: UTM campaigns — [[source, medium, campaign, count], ...]
+
     let callIndex = 0;
     const responses = [
-      // 1. Total pageviews
-      { results: [[1234]] },
-      // 2. Unique visitors
-      { results: [[567]] },
-      // 3. Total sessions
-      { results: [[89]] },
-      // 4. Avg pages per session (pageviews / sessions)
-      { results: [[1234, 89]] },
-      // 5. Bounce rate (single-page sessions)
-      { results: [[40, 89]] },
-      // 6. Time series
+      // Q1: summary scalars + bounce + new vs returning
+      { results: [[1234, 567, 89, 40, 89, 400, 167]] },
+      // Q2: time series
       { results: [["2025-01-28", 400, 150], ["2025-01-29", 450, 180], ["2025-01-30", 384, 237]] },
-      // 7. Top pages
-      { results: [["https://paisaxe.es/", 500], ["https://paisaxe.es/immersive", 300]] },
-      // 8. Top referrers
-      { results: [["https://google.com", 200], ["https://twitter.com", 50]] },
-      // 9. Countries
-      { results: [["Spain", 400], ["United States", 100]] },
-      // 10. Cities
-      { results: [["Madrid", "Spain", 150], ["Barcelona", "Spain", 80]] },
-      // 11. Devices
-      { results: [["Desktop", 600], ["Mobile", 400]] },
-      // 12. Browsers
-      { results: [["Chrome", 450], ["Safari", 300], ["Firefox", 100]] },
-      // 13. Operating systems
-      { results: [["Windows", 300], ["macOS", 250], ["iOS", 200]] },
-      // 14. Screen sizes
-      { results: [[1920, 1080, 200], [1440, 900, 150], [375, 667, 100]] },
-      // 15. Entry pages
-      { results: [["/immersive", 400], ["/", 200]] },
-      // 16. Exit pages
-      { results: [["/immersive", 350], ["/", 150]] },
-      // 17. UTM campaigns
+      // Q3: 2-col categorical breakdowns (type, key, count)
+      {
+        results: [
+          ["browsers", "Chrome", 450],
+          ["browsers", "Safari", 300],
+          ["browsers", "Firefox", 100],
+          ["countries", "Spain", 400],
+          ["countries", "United States", 100],
+          ["devices", "Desktop", 600],
+          ["devices", "Mobile", 400],
+          ["entryPages", "/immersive", 400],
+          ["entryPages", "/", 200],
+          ["exitPages", "/immersive", 350],
+          ["exitPages", "/", 150],
+          ["os", "Windows", 300],
+          ["os", "macOS", 250],
+          ["os", "iOS", 200],
+          ["referrers", "https://google.com", 200],
+          ["referrers", "https://twitter.com", 50],
+          ["topPages", "https://paisaxe.es/", 500],
+          ["topPages", "https://paisaxe.es/immersive", 300],
+        ],
+      },
+      // Q4: 3-col categorical breakdowns (type, key1, key2, count)
+      {
+        results: [
+          ["cities", "Madrid", "Spain", 150],
+          ["cities", "Barcelona", "Spain", 80],
+          ["screenSizes", 1920, 1080, 200],
+          ["screenSizes", 1440, 900, 150],
+          ["screenSizes", 375, 667, 100],
+        ],
+      },
+      // Q5: UTM campaigns
       { results: [["google", "cpc", "spring2025", 150], ["twitter", "social", "launch", 50]] },
-      // 18. New vs returning
-      { results: [[400, 167]] },
     ];
 
     mockFetch.mockImplementation(() => {
@@ -110,6 +137,9 @@ describe("GET /api/admin/analytics (PostHog)", () => {
 
     expect(response.status).toBe(200);
 
+    // Exactly 5 fetch calls (≤ 6 target)
+    expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(6);
+
     // Summary stats
     expect(data.data.summary.totalPageviews).toBe(1234);
     expect(data.data.summary.uniqueVisitors).toBe(567);
@@ -121,14 +151,14 @@ describe("GET /api/admin/analytics (PostHog)", () => {
     expect(data.data.timeSeries).toHaveLength(3);
     expect(data.data.timeSeries[0]).toEqual({ date: "2025-01-28", pageviews: 400, visitors: 150 });
 
-    // Existing breakdowns
+    // Breakdowns
     expect(data.data.topPages).toHaveLength(2);
     expect(data.data.topPages[0].url).toBe("https://paisaxe.es/");
     expect(data.data.topReferrers).toHaveLength(2);
     expect(data.data.countries).toHaveLength(2);
     expect(data.data.devices).toHaveLength(2);
 
-    // New breakdowns: cities
+    // Cities
     expect(data.data.cities).toHaveLength(2);
     expect(data.data.cities[0]).toEqual({ city: "Madrid", country: "Spain", count: 150 });
 
@@ -300,25 +330,16 @@ describe("GET /api/admin/analytics (PostHog)", () => {
 
     let callIndex = 0;
     const responses = [
-      { results: [[100]] }, // pageviews
-      { results: [[50]] }, // visitors
-      { results: [[10]] }, // sessions
-      { results: [[100, 10]] }, // avg pages
-      { results: [[2, 10]] }, // bounce rate
-      { results: [] }, // time series
-      { results: [] }, // pages
-      { results: [] }, // referrers
-      { results: [] }, // countries
-      { results: [] }, // cities
-      { results: [] }, // devices
-      { results: [] }, // browsers
-      { results: [] }, // os
-      { results: [] }, // screens
-      { results: [] }, // entry
-      { results: [] }, // exit
-      // UTM with null values
+      // Q1: summary
+      { results: [[100, 50, 10, 2, 10, 30, 20]] },
+      // Q2: time series
+      { results: [] },
+      // Q3: 2-col breakdowns
+      { results: [] },
+      // Q4: 3-col breakdowns
+      { results: [] },
+      // Q5: UTM with null values
       { results: [[null, "social", "campaign1", 50], ["google", null, null, 30]] },
-      { results: [[30, 20]] }, // new vs returning
     ];
 
     mockFetch.mockImplementation(() => {

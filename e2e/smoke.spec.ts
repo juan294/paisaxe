@@ -39,7 +39,6 @@ test.describe("Smoke tests", () => {
 
     const body = await response.json();
     expect(body).toHaveProperty("status");
-    expect(body).toHaveProperty("version");
     expect(body).toHaveProperty("timestamp");
     expect(["healthy", "degraded"]).toContain(body.status);
   });

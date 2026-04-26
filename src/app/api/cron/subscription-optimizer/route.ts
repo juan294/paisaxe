@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import pathModule from "path";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { createAdminClient } from "@/lib/supabase";
 import { SERVICE_REGISTRY } from "@/config/service-registry";
 import {
   analyzeSubscriptions,
@@ -10,6 +11,9 @@ import {
   type UsageMetricsInput,
 } from "@/lib/subscription-optimizer";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
+
+/** Postgres advisory lock ID — unique per cron route. */
+const LOCK_ID = 1002;
 
 /**
  * Default usage metrics when none are provided.
@@ -28,6 +32,20 @@ const DEFAULT_USAGE_METRICS: UsageMetricsInput = {
 
 /** Core analysis logic shared by GET (Vercel Cron) and POST (pg_cron/admin). */
 async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextResponse> {
+  const supabase = createAdminClient();
+
+  // Acquire advisory lock to prevent concurrent runs
+  const { data: locked, error: lockError } = await supabase.rpc(
+    "pg_try_advisory_lock",
+    { lockid: LOCK_ID }
+  );
+  if (lockError || !locked) {
+    return NextResponse.json(
+      { status: "skipped", reason: "concurrent run in progress" },
+      { status: 409 }
+    );
+  }
+
   try {
     const result = analyzeSubscriptions({
       services: SERVICE_REGISTRY,
@@ -100,6 +118,8 @@ async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextRespon
       },
       { status: 500 }
     );
+  } finally {
+    await supabase.rpc("pg_advisory_unlock", { lockid: LOCK_ID });
   }
 }
 

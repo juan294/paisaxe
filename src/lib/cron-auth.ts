@@ -1,6 +1,21 @@
 import { NextRequest } from "next/server";
 import { timingSafeEqual } from "crypto";
 
+// Module-level flag: warn once per process start if cron secrets are missing in production.
+let _cronAuthWarningEmitted = false;
+
+if (
+  process.env.NODE_ENV === "production" &&
+  !process.env.CRON_SECRET?.trim() &&
+  !process.env.WEBHOOK_SECRET?.trim() &&
+  !_cronAuthWarningEmitted
+) {
+  _cronAuthWarningEmitted = true;
+  console.error(
+    "[CRON_AUTH_MISSING] No CRON_SECRET or WEBHOOK_SECRET configured — all cron jobs will return 401"
+  );
+}
+
 /**
  * Verify that a request comes from Vercel Cron.
  *

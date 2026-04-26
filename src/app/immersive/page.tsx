@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { StoryCardSkeleton } from "@/components/immersive/skeleton-story-card";
 import { ImmersivePageContent } from "./immersive-page-content";
-import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
+import { getAllFeatureFlagsServer } from "@/lib/feature-flags-server";
 import { getStoriesServer } from "@/lib/stories-server";
 import { connection } from "next/server";
 
@@ -29,12 +29,16 @@ export async function ImmersiveDataLoader() {
   // Required because Math.random() can't be used in cached components.
   await connection();
 
-  const [isRandomEnabled, serverStories] = await Promise.all([
-    isFeatureFlagEnabled("randomized_order"),
+  // Fetch all flags and stories in parallel.
+  // getAllFeatureFlagsServer replaces the individual isFeatureFlagEnabled call:
+  // the randomized_order check is now derived from the bulk result, and all flags
+  // are passed as initialFlags so the client hook is ready on first paint.
+  const [initialFlags, serverStories] = await Promise.all([
+    getAllFeatureFlagsServer(),
     getStoriesServer(),
   ]);
 
-  const serverShuffleSeed = isRandomEnabled
+  const serverShuffleSeed = initialFlags.randomized_order === true
     ? Math.floor(Math.random() * 2147483647)
     : null;
 
@@ -42,6 +46,7 @@ export async function ImmersiveDataLoader() {
     <ImmersivePageContent
       serverShuffleSeed={serverShuffleSeed}
       initialStories={serverStories}
+      initialFlags={initialFlags}
     />
   );
 }

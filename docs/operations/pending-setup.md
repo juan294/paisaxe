@@ -15,10 +15,10 @@ Tasks to complete once the domain (paisaxe.com / paisaxe.es) is fully configured
 | 3 | Configure Supabase Edge Function Settings | REMOVED (not needed on Pro tier) |
 | 4 | Deploy Edge Functions | COMPLETED (2026-01-31) |
 | 5 | Verify Database Migrations | COMPLETED |
-| 6 | Update NEXT_PUBLIC_SITE_URL on Vercel | COMPLETED (24h ago) |
+| 6 | Update NEXT_PUBLIC_SITE_URL on Vercel | COMPLETED (2026-01-31) |
 | 7 | Add ELEVENLABS_API_KEY to Vercel | COMPLETED (2026-01-31) |
-| 8 | Trigger redeployment | PENDING |
-| 9 | Verify Everything Works | PENDING |
+| 8 | Trigger redeployment | COMPLETED (site live since 2026-01-31) |
+| 9 | Verify Everything Works | COMPLETED (site live and monitored by Upptime) |
 
 ---
 
@@ -95,26 +95,13 @@ supabase functions list
 
 ## 8. Trigger Redeployment
 
-**PENDING** - After adding new environment variables, trigger a redeployment:
-
-```bash
-vercel --prod
-```
-
-Or push any commit to `main` to trigger automatic deployment.
+**COMPLETED** — Site has been live since 2026-01-31. All environment variables were in place at initial deployment. Redeployments happen automatically on every push to `main` via Vercel's GitHub integration.
 
 ---
 
 ## 9. Verify Everything Works
 
-After completing all steps above:
-
-1. **Health check**: Visit `https://paisaxe.es/api/health` - should show `"healthy"` with database size info
-2. **Webhooks**: Toggle a feature flag in the admin panel, then check if the cache is invalidated (the flag change should reflect immediately)
-3. **Realtime**: Open two browser tabs on the immersive page. Toggle a feature flag in the admin panel. Both tabs should reflect the change without refreshing
-4. **Voice agents**: Test the voice chat feature (requires `visitor_voice_agent` feature flag enabled)
-5. **Edge Functions**: Check the Supabase Dashboard > Edge Functions to see invocation logs
-6. **Cron jobs**: Wait 3 days and verify the keep-alive job ran: `SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;`
+**COMPLETED** — Site has been live and verified since 2026-01-31. Ongoing health monitoring is handled by Upptime (pings `/api/health` every 5 minutes). For a re-verification checklist, see the Pre-Launch Checklist in [operations.md](./operations.md).
 
 ---
 
@@ -131,4 +118,4 @@ After completing all steps above:
 
 ---
 
-*This file can be archived once all tasks are verified as working.*
+*All tasks completed. This file is retained as a historical record of the initial launch setup.*

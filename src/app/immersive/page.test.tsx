@@ -57,6 +57,7 @@ Object.defineProperty(window, "matchMedia", {
 
 // Mock feature flags - all disabled by default
 vi.mock("@/hooks/use-feature-flags", () => ({
+  FeatureFlagsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useFeatureFlags: () => ({
     flags: [],
     isLoading: false,
@@ -277,7 +278,7 @@ describe("ImmersivePageContent", () => {
 // ImmersivePage (async server component) — page.tsx default export
 // ---------------------------------------------------------------------------
 describe("ImmersivePage (server component)", () => {
-  let mockIsFeatureFlagEnabled: ReturnType<typeof vi.fn>;
+  let mockGetAllFeatureFlagsServer: ReturnType<typeof vi.fn>;
   let mockGetStoriesServer: ReturnType<typeof vi.fn>;
 
   const mockServerStories = [
@@ -286,13 +287,14 @@ describe("ImmersivePage (server component)", () => {
 
   beforeEach(() => {
     vi.resetModules();
-    mockIsFeatureFlagEnabled = vi.fn().mockResolvedValue(false);
+    // Default: no flags enabled
+    mockGetAllFeatureFlagsServer = vi.fn().mockResolvedValue({});
     mockGetStoriesServer = vi.fn().mockResolvedValue(mockServerStories);
   });
 
   function setupPageMocks(connectionFn: () => Promise<void> = vi.fn().mockResolvedValue(undefined)) {
     vi.doMock("next/server", () => ({ connection: connectionFn }));
-    vi.doMock("@/lib/feature-flags-server", () => ({ isFeatureFlagEnabled: mockIsFeatureFlagEnabled }));
+    vi.doMock("@/lib/feature-flags-server", () => ({ getAllFeatureFlagsServer: mockGetAllFeatureFlagsServer }));
     vi.doMock("@/lib/stories-server", () => ({ getStoriesServer: mockGetStoriesServer }));
   }
 
@@ -314,7 +316,7 @@ describe("ImmersivePage (server component)", () => {
 
   it("should render StoryCardSkeleton as Suspense fallback", async () => {
     // Make everything never resolve so Suspense shows the fallback
-    mockIsFeatureFlagEnabled.mockReturnValue(new Promise(() => {}));
+    mockGetAllFeatureFlagsServer.mockReturnValue(new Promise(() => {}));
     mockGetStoriesServer.mockReturnValue(new Promise(() => {}));
 
     setupPageMocks(() => new Promise(() => {}));
@@ -334,16 +336,16 @@ describe("ImmersivePage (server component)", () => {
   });
 
   it("should render with null seed when randomized_order is disabled", async () => {
-    mockIsFeatureFlagEnabled.mockResolvedValue(false);
+    mockGetAllFeatureFlagsServer.mockResolvedValue({});
     await importAndRenderDataLoader();
 
     const content = screen.getByTestId("immersive-content");
     expect(content).toHaveAttribute("data-seed", "null");
-    expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith("randomized_order");
+    expect(mockGetAllFeatureFlagsServer).toHaveBeenCalledTimes(1);
   });
 
   it("should render with numeric seed when randomized_order is enabled", async () => {
-    mockIsFeatureFlagEnabled.mockResolvedValue(true);
+    mockGetAllFeatureFlagsServer.mockResolvedValue({ randomized_order: true });
     await importAndRenderDataLoader();
 
     const content = screen.getByTestId("immersive-content");
@@ -366,7 +368,7 @@ describe("ImmersivePage (server component)", () => {
   it("should fetch stories and flags in parallel", async () => {
     await importAndRenderDataLoader();
 
-    expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith("randomized_order");
+    expect(mockGetAllFeatureFlagsServer).toHaveBeenCalledTimes(1);
     expect(mockGetStoriesServer).toHaveBeenCalledTimes(1);
   });
 

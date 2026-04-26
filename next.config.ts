@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import bundleAnalyzer from "@next/bundle-analyzer";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
@@ -7,7 +8,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@anthropic-ai/sdk", "sharp", "voyageai"],
+  serverExternalPackages: ["@anthropic-ai/sdk", "sharp"],
   // Disable dev indicators (Dev Tools badge, ISR status, build activity) to prevent
   // the <nextjs-portal> overlay from intercepting pointer events in E2E tests.
   devIndicators: false,
@@ -32,6 +33,10 @@ const nextConfig: NextConfig = {
       "./e2e/**",
       "./marketing/**",
     ],
+  },
+  outputFileTracingIncludes: {
+    // Next 16.2.4's Vercel launcher loads this console extension at runtime.
+    "/*": ["./node_modules/next/dist/server/dev/browser-logs/file-logger.js"],
   },
   // Root redirect (/ → /immersive) is handled in proxy.ts, NOT here.
   // next.config.ts redirects run at CDN level before proxy.ts,
@@ -60,8 +65,8 @@ const nextConfig: NextConfig = {
         { key: "X-Frame-Options", value: "DENY" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" },
-        // CSP is set dynamically per-request in proxy.ts with a nonce.
-        // See buildCspHeader() in src/proxy.ts.
+        // CSP is set per-request by proxy.ts. See src/lib/proxy/csp.ts
+        // for the `unsafe-inline` rationale (PPR compatibility).
       ],
     },
     {
@@ -93,4 +98,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withBundleAnalyzer(nextConfig);
+export default withSentryConfig(withBundleAnalyzer(nextConfig), {
+  silent: true,
+  // sourcemaps are uploaded by default (not disabled); no need to set hideSourceMaps
+});

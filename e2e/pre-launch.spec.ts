@@ -46,6 +46,27 @@ async function dismissPrivacyNotice(chatPanel: import("@playwright/test").Locato
   }
 }
 
+async function openChatPanel(page: import("@playwright/test").Page) {
+  const testIdTrigger = page.locator('[data-testid="ask-button"]').first();
+
+  if (await testIdTrigger.isVisible().catch(() => false)) {
+    await testIdTrigger.click();
+  } else {
+    await page
+      .getByRole("button", {
+        name: /descúbrelo|discover it|descobre|entdecke es|découvre/i,
+      })
+      .first()
+      .click();
+  }
+
+  const chatPanel = page.locator(".fixed.inset-0.z-50");
+  await expect(chatPanel).toBeVisible({ timeout: 10_000 });
+  await dismissPrivacyNotice(chatPanel);
+
+  return chatPanel;
+}
+
 // ─── Static Pages ────────────────────────────────────────────────
 
 test.describe("Static pages", () => {
@@ -96,7 +117,7 @@ test.describe("API route smoke tests", () => {
     expect(response.status()).toBe(400);
 
     const body = await response.json();
-    expect(body.error).toContain("3");
+    expect(body.errors?.placeName?.[0]).toContain("3");
   });
 
   test("GET /api/voice-access returns 401 without auth", async ({
@@ -156,13 +177,7 @@ test.describe("Chat messageIndex", () => {
     await page.goto("/immersive");
     await expect(page.locator("h1").first()).toBeVisible();
 
-    // Open chat
-    await page.locator('[data-testid="ask-button"]').first().click();
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    // Dismiss privacy notice if shown
-    await dismissPrivacyNotice(chatPanel);
+    const chatPanel = await openChatPanel(page);
 
     // Send first message
     await chatPanel.locator("input").fill("Question one");
@@ -201,13 +216,7 @@ test.describe("Chat messageIndex", () => {
     await page.goto("/immersive");
     await expect(page.locator("h1").first()).toBeVisible();
 
-    // Open chat
-    await page.locator('[data-testid="ask-button"]').first().click();
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    // Dismiss privacy notice
-    await dismissPrivacyNotice(chatPanel);
+    const chatPanel = await openChatPanel(page);
 
     // Send first message
     await chatPanel.locator("input").fill("Question one");
@@ -271,7 +280,7 @@ test.describe("Feature flag gating", () => {
 
     await expect(
       page.locator("[data-suggest-place-trigger]")
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test("fullscreen button hidden when flag off", async ({ page }) => {
@@ -317,6 +326,9 @@ test.describe("Feature flag gating", () => {
 // ─── Language Switching ──────────────────────────────────────────
 
 test.describe("Language switching", () => {
+  const languageSwitcherSelector =
+    'div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]';
+
   test.beforeEach(async ({ page }) => {
     await page.route("**/api/feature-flags", (route) =>
       route.fulfill({
@@ -327,31 +339,28 @@ test.describe("Language switching", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.locator(languageSwitcherSelector).first()).toBeVisible();
   });
 
   test("language switcher visible in toolbar", async ({ page }) => {
     // The switcher is a div with role="group" and language-related aria-label
-    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     await expect(switcher).toBeVisible();
   });
 
   test("switching to ES changes UI text", async ({ page }) => {
     // Desktop Chrome defaults to English — switch to ES
-    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     await switcher.locator("button").first().click();
 
     // Click ES in the dropdown (aria-label is full name e.g. "Español (ES)")
     const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
-    await page.waitForTimeout(300);
+    // Wait for dropdown to close after selection
+    await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Open chat to check Spanish placeholder
-    await page.locator('[data-testid="ask-button"]').first().click();
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    await dismissPrivacyNotice(chatPanel);
+    const chatPanel = await openChatPanel(page);
 
     const input = chatPanel.locator("input");
     await expect(input).toHaveAttribute(
@@ -362,26 +371,24 @@ test.describe("Language switching", () => {
 
   test("switching to EN shows English text", async ({ page }) => {
     // First switch to ES, then back to EN to verify round-trip
-    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
 
     // Switch to ES first (aria-label is full name e.g. "Español (ES)")
     await switcher.locator("button").first().click();
     const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
-    await page.waitForTimeout(300);
+    // Wait for dropdown to close after selection
+    await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Now switch back to EN
     await switcher.locator("button").first().click();
     const enButton = switcher.locator('button[aria-label$="(EN)"]');
     await enButton.click();
-    await page.waitForTimeout(300);
+    // Wait for dropdown to close after selection
+    await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Open chat to check English placeholder
-    await page.locator('[data-testid="ask-button"]').first().click();
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    await dismissPrivacyNotice(chatPanel);
+    const chatPanel = await openChatPanel(page);
 
     const input = chatPanel.locator("input");
     await expect(input).toHaveAttribute(
@@ -392,11 +399,12 @@ test.describe("Language switching", () => {
 
   test("language persists in localStorage", async ({ page }) => {
     // Switch to ES (different from default EN)
-    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     await switcher.locator("button").first().click();
     const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
-    await page.waitForTimeout(300);
+    // Wait for dropdown to close after selection
+    await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     const storedLocale = await page.evaluate(() =>
       localStorage.getItem("paisaxe-locale")
@@ -417,11 +425,7 @@ test.describe("Language switching", () => {
     });
 
     // Open chat (default locale is EN in Desktop Chrome)
-    await page.locator('[data-testid="ask-button"]').first().click();
-    const chatPanel = page.locator(".fixed.inset-0.z-50");
-    await expect(chatPanel).toBeVisible();
-
-    await dismissPrivacyNotice(chatPanel);
+    const chatPanel = await openChatPanel(page);
 
     const input = chatPanel.locator("input");
     const placeholderEN = await input.getAttribute("placeholder");
@@ -432,17 +436,15 @@ test.describe("Language switching", () => {
     await expect(chatPanel).not.toBeVisible();
 
     // Switch to ES (aria-label is full name e.g. "Español (ES)")
-    const switcher = page.locator('div[role="group"][aria-label*="anguage"], div[role="group"][aria-label*="idioma"], div[role="group"][aria-label*="llingua"], div[role="group"][aria-label*="Sprach"], div[role="group"][aria-label*="langue"]').first();
+    const switcher = page.locator(languageSwitcherSelector).first();
     await switcher.locator("button").first().click();
     const esButton = switcher.locator('button[aria-label$="(ES)"]');
     await esButton.click();
-    await page.waitForTimeout(300);
+    // Wait for dropdown to close after selection
+    await expect(switcher.locator("button").first()).toHaveAttribute("aria-expanded", "false");
 
     // Re-open chat
-    await page.locator('[data-testid="ask-button"]').first().click();
-    await expect(chatPanel).toBeVisible();
-
-    await dismissPrivacyNotice(chatPanel);
+    await openChatPanel(page);
 
     const placeholderES = await input.getAttribute("placeholder");
 

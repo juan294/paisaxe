@@ -37,6 +37,12 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
+// Mock Supabase client (for advisory lock)
+const mockRpc = vi.fn();
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: () => ({ rpc: mockRpc }),
+}));
+
 // Mock the subscription optimizer module
 const mockAnalyze = vi.fn();
 const mockGenerateReport = vi.fn();
@@ -59,6 +65,8 @@ describe("POST /api/cron/subscription-optimizer", () => {
       ...originalEnv,
       WEBHOOK_SECRET,
       CRON_SECRET,
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_SERVICE_KEY: "test-service-key",
     };
     mockAnalyze.mockReset();
     mockGenerateReport.mockReset();
@@ -68,6 +76,13 @@ describe("POST /api/cron/subscription-optimizer", () => {
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
+    mockRpc.mockReset();
+    // Default: advisory lock succeeds
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
   });
 
   afterEach(() => {
@@ -488,6 +503,8 @@ describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
       ...originalEnv,
       WEBHOOK_SECRET: "test-webhook-secret-123",
       CRON_SECRET,
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_SERVICE_KEY: "test-service-key",
     };
     mockAnalyze.mockReset();
     mockGenerateReport.mockReset();
@@ -497,6 +514,12 @@ describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
+    mockRpc.mockReset();
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
   });
 
   afterEach(() => {
@@ -551,5 +574,132 @@ describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
         totalMonthlySpend: 50,
       })
     );
+  });
+});
+
+describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
+  const originalEnv = process.env;
+  const WEBHOOK_SECRET = "test-webhook-secret-123";
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = {
+      ...originalEnv,
+      WEBHOOK_SECRET,
+      CRON_SECRET: "test-cron-secret-456",
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_SERVICE_KEY: "test-service-key",
+    };
+    mockAnalyze.mockReset();
+    mockGenerateReport.mockReset();
+    mockGenerateSharedContextEntry.mockReset();
+    mockWriteFile.mockReset();
+    mockReadFile.mockReset();
+    mockWriteFile.mockResolvedValue(undefined);
+    mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
+    mockRpc.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("returns 409 when advisory lock is already held (concurrent run)", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: false, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(409);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((response as any).body).toEqual(
+      expect.objectContaining({ status: "skipped", reason: expect.stringContaining("concurrent") })
+    );
+  });
+
+  it("returns 409 when pg_try_advisory_lock returns an error", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock")
+        return Promise.resolve({ data: null, error: { message: "DB error" } });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(409);
+  });
+
+  it("executes optimizer and calls pg_advisory_unlock when lock is acquired", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+
+    const unlockCalls = mockRpc.mock.calls.filter(
+      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+    );
+    expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("calls pg_advisory_unlock in finally block even when optimizer throws", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    mockAnalyze.mockImplementation(() => {
+      throw new Error("Analysis crashed");
+    });
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(500);
+
+    const unlockCalls = mockRpc.mock.calls.filter(
+      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+    );
+    expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
+
+    consoleSpy.mockRestore();
   });
 });

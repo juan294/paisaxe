@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { encryptJson, isEncryptionConfigured } from "@/lib/encryption";
+import { logger } from "@/lib/logger";
 import {
   rowToMarketingAccountPublic,
   type MarketingAccountRow,
@@ -30,7 +31,7 @@ export async function GET() {
       .order("platform");
 
     if (error) {
-      console.error("Error fetching marketing accounts:", error);
+      logger.error("[MARKETING_ACCOUNTS_FETCH_FAILED]", { error });
       return NextResponse.json(
         { error: "Failed to fetch accounts" },
         { status: 500 }
@@ -44,7 +45,7 @@ export async function GET() {
 
     return NextResponse.json({ data: accounts });
   } catch (error) {
-    console.error("Marketing accounts API error:", error);
+    logger.error("[MARKETING_ACCOUNTS_GET_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     // Verify encryption is configured
     if (!isEncryptionConfigured()) {
-      console.error("Encryption not configured - CREDENTIALS_ENCRYPTION_KEY missing");
+      logger.error("[MARKETING_ACCOUNTS_ENCRYPTION_KEY_MISSING]");
       return NextResponse.json(
         { error: "Server encryption not configured. Contact administrator." },
         { status: 500 }
@@ -122,7 +123,10 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Error saving marketing account:", error);
+      logger.error("[MARKETING_ACCOUNTS_SAVE_FAILED]", {
+        platform: body.platform,
+        error,
+      });
       return NextResponse.json(
         { error: "Failed to save account" },
         { status: 500 }
@@ -134,7 +138,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: account }, { status: 201 });
   } catch (error) {
-    console.error("Marketing accounts POST error:", error);
+    logger.error("[MARKETING_ACCOUNTS_POST_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -181,7 +185,7 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Error toggling marketing account:", error);
+      logger.error("[MARKETING_ACCOUNTS_TOGGLE_FAILED]", { platform, error });
       return NextResponse.json(
         { error: "Failed to update account" },
         { status: 500 }
@@ -191,7 +195,7 @@ export async function PATCH(request: NextRequest) {
     const account = rowToMarketingAccountPublic(data as MarketingAccountRow);
     return NextResponse.json({ data: account });
   } catch (error) {
-    console.error("Marketing accounts PATCH error:", error);
+    logger.error("[MARKETING_ACCOUNTS_PATCH_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -232,7 +236,7 @@ export async function DELETE(request: NextRequest) {
       .eq("platform", platform);
 
     if (error) {
-      console.error("Error disconnecting marketing account:", error);
+      logger.error("[MARKETING_ACCOUNTS_DISCONNECT_FAILED]", { platform, error });
       return NextResponse.json(
         { error: "Failed to disconnect account" },
         { status: 500 }
@@ -241,7 +245,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Marketing accounts DELETE error:", error);
+    logger.error("[MARKETING_ACCOUNTS_DELETE_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -1,12 +1,22 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const isCI = !!process.env.CI;
+const useDevServer = process.env.PLAYWRIGHT_USE_DEV_SERVER === "true";
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === "true";
+const e2ePort = process.env.PLAYWRIGHT_PORT ?? "3100";
+const baseURL = `http://localhost:${e2ePort}`;
+
+function getWebServerCommand() {
+  if (isCI) return `npm run start -- --port ${e2ePort}`;
+  if (useDevServer) return `npm run dev -- --port ${e2ePort}`;
+  return `npm run build && npm run start -- --port ${e2ePort}`;
+}
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: isCI ? 1 : 0,
+  retries: isCI ? 2 : 0,
   workers: isCI ? 2 : undefined,
   reporter: isCI ? [["html"], ["github"]] : [["html"]],
   timeout: isCI ? 15_000 : 30_000,
@@ -20,7 +30,7 @@ export default defineConfig({
   },
 
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: isCI ? "off" : "retain-on-failure",
@@ -31,18 +41,32 @@ export default defineConfig({
     {
       name: "desktop",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: ["**/qa-journey.spec.ts", "**/visual-regression.spec.ts"],
+      testIgnore: [
+        "**/qa-journey.spec.ts",
+        "**/visual-regression.spec.ts",
+        "**/stripe-real-checkout.spec.ts",
+      ],
     },
     {
       name: "mobile",
       use: { ...devices["Pixel 7"] },
-      testIgnore: ["**/qa-journey.spec.ts", "**/visual-regression.spec.ts"],
+      testIgnore: [
+        "**/qa-journey.spec.ts",
+        "**/visual-regression.spec.ts",
+        "**/stripe-real-checkout.spec.ts",
+      ],
     },
     {
       name: "qa-journey",
       use: { ...devices["Desktop Chrome"] },
       testMatch: "qa-journey.spec.ts",
       timeout: 30_000,
+    },
+    {
+      name: "stripe-integration",
+      use: { ...devices["Desktop Chrome"], locale: "en-US" },
+      testMatch: "stripe-real-checkout.spec.ts",
+      timeout: 120_000,
     },
     {
       name: "visual-desktop",
@@ -57,9 +81,11 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: isCI ? "npm run start" : "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !isCI,
+    command: getWebServerCommand(),
+    url: baseURL,
+    // Default local runs to an isolated production-style server because next dev's
+    // issues overlay can intercept mobile clicks and hide real regressions.
+    reuseExistingServer,
     timeout: 120_000,
     // Wait for server to be fully ready before running tests (reduces flaky visual regression)
     ...(isCI && { stdout: "pipe" }),

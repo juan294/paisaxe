@@ -1,123 +1,131 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import packageJson from "../../../../package.json";
 
-const APP_VERSION: string = packageJson.version;
+type HealthStatus = "healthy" | "degraded";
 
-interface SupabaseServiceStatus {
-  status: "connected" | "error";
-  latency_ms: number;
-  error?: string;
-}
-
-interface StoriesStatus {
-  status: "ok" | "fallback";
-  count?: number;
-  error?: string;
-}
-
-interface DatabaseSizeStatus {
-  size_mb: number;
-  limit_mb: number;
-  usage_percent: number;
-  error?: string;
-}
-
-interface DatabaseSizeErrorStatus {
-  error: string;
-}
-
-interface HealthResponse {
-  status: "healthy" | "degraded";
+interface PublicHealthResponse {
+  status: HealthStatus;
   timestamp: string;
-  version: string;
-  uptime: number;
-  services: {
-    supabase: SupabaseServiceStatus;
-    stories: StoriesStatus;
-    database: DatabaseSizeStatus | DatabaseSizeErrorStatus;
-  };
 }
 
-async function checkSupabase(): Promise<SupabaseServiceStatus> {
-  const start = performance.now();
-  try {
-    const { error } = await supabase.from("chunks").select("id").limit(1);
-    const latency_ms = Math.round(performance.now() - start);
-
-    if (error) {
-      return { status: "error", latency_ms, error: error.message };
-    }
-
-    return { status: "connected", latency_ms };
-  } catch (err) {
-    const latency_ms = Math.round(performance.now() - start);
-    return {
-      status: "error",
-      latency_ms,
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
-  }
+interface SupabaseProbeResult {
+  status: "connected" | "error";
 }
 
-async function checkStories(): Promise<StoriesStatus> {
-  try {
-    const { data, error } = await supabase
-      .from("stories")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true)
-      .eq("curation_status", "approved");
-
-    if (error) {
-      return { status: "fallback", error: error.message };
-    }
-
-    const count = data?.length ?? 0;
-    // If zero approved stories, the immersive page will serve fallback content
-    if (count === 0) {
-      return { status: "fallback", count: 0, error: "No approved stories — fallback images will be served" };
-    }
-
-    return { status: "ok", count };
-  } catch (err) {
-    return {
-      status: "fallback",
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
-  }
+interface StoriesProbeResult {
+  status: "ok" | "fallback";
 }
+
+interface DatabaseProbeResult {
+  usage_percent: number | null;
+}
+
+export const PROBE_TIMEOUTS_MS = {
+  supabase: 2_000,
+  stories: 2_000,
+  database: 2_000,
+} as const;
 
 const STORAGE_LIMIT_MB = 8192; // Supabase Pro tier: 8 GB
 const STORAGE_WARNING_THRESHOLD = 0.8; // 80%
 
-async function checkDatabaseSize(): Promise<
-  DatabaseSizeStatus | DatabaseSizeErrorStatus
-> {
-  try {
-    const { data, error } = await supabase.rpc("get_database_size");
-
-    if (error) {
-      return { error: error.message };
-    }
-
-    const sizeBytes = data as number;
-    const size_mb = Math.round((sizeBytes / (1024 * 1024)) * 10) / 10;
-    const usage_percent =
-      Math.round((size_mb / STORAGE_LIMIT_MB) * 1000) / 10;
-
-    return {
-      size_mb,
-      limit_mb: STORAGE_LIMIT_MB,
-      usage_percent,
-    };
-  } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
-  }
+async function checkSupabase(): Promise<SupabaseProbeResult> {
+  return withTimeout(
+    (async (): Promise<SupabaseProbeResult> => {
+      try {
+        const { error } = await supabase.from("chunks").select("id").limit(1);
+        return error ? { status: "error" } : { status: "connected" };
+      } catch {
+        return { status: "error" };
+      }
+    })(),
+    PROBE_TIMEOUTS_MS.supabase,
+    (): SupabaseProbeResult => ({ status: "error" })
+  );
 }
 
-export async function GET(): Promise<NextResponse<HealthResponse>> {
+async function checkStories(): Promise<StoriesProbeResult> {
+  return withTimeout(
+    (async (): Promise<StoriesProbeResult> => {
+      try {
+        const { count, error } = await supabase
+          .from("stories")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true)
+          .eq("curation_status", "approved");
+
+        if (error) {
+          return { status: "fallback" };
+        }
+
+        return (count ?? 0) > 0 ? { status: "ok" } : { status: "fallback" };
+      } catch {
+        return { status: "fallback" };
+      }
+    })(),
+    PROBE_TIMEOUTS_MS.stories,
+    (): StoriesProbeResult => ({ status: "fallback" })
+  );
+}
+
+async function checkDatabaseSize(): Promise<DatabaseProbeResult> {
+  return withTimeout(
+    (async (): Promise<DatabaseProbeResult> => {
+      try {
+        const { data, error } = await supabase.rpc("get_database_size");
+
+        if (error) {
+          return { usage_percent: null };
+        }
+
+        const sizeBytes = data as number;
+        const size_mb = Math.round((sizeBytes / (1024 * 1024)) * 10) / 10;
+        const usage_percent =
+          Math.round((size_mb / STORAGE_LIMIT_MB) * 1000) / 10;
+
+        return { usage_percent };
+      } catch {
+        return { usage_percent: null };
+      }
+    })(),
+    PROBE_TIMEOUTS_MS.database,
+    (): DatabaseProbeResult => ({ usage_percent: null })
+  );
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  onTimeout: () => T
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(onTimeout()), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
+function buildHealthResponse(
+  status: HealthStatus
+): NextResponse<PublicHealthResponse> {
+  return NextResponse.json(
+    {
+      status,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      status: status === "healthy" ? 200 : 503,
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+        "Content-Type": "application/json",
+      },
+    }
+  );
+}
+
+export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
   try {
     const [supabaseStatus, storiesStatus, databaseStatus] = await Promise.all([
       checkSupabase(),
@@ -128,7 +136,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     const isSupabaseError = supabaseStatus.status !== "connected";
     const isStoriesFallback = storiesStatus.status !== "ok";
     const isDatabaseOverThreshold =
-      "usage_percent" in databaseStatus &&
+      databaseStatus.usage_percent !== null &&
       databaseStatus.usage_percent >= STORAGE_WARNING_THRESHOLD * 100;
 
     const overallStatus =
@@ -136,55 +144,8 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
         ? "degraded"
         : "healthy";
 
-    const body: HealthResponse = {
-      status: overallStatus,
-      timestamp: new Date().toISOString(),
-      version: APP_VERSION,
-      uptime: process.uptime(),
-      services: {
-        supabase: supabaseStatus,
-        stories: storiesStatus,
-        database: databaseStatus,
-      },
-    };
-
-    const httpStatus = overallStatus === "healthy" ? 200 : 503;
-
-    return NextResponse.json(body, {
-      status: httpStatus,
-      headers: {
-        "Cache-Control": "no-store, max-age=0",
-        "Content-Type": "application/json",
-      },
-    });
-  } catch (err) {
-    const body: HealthResponse = {
-      status: "degraded",
-      timestamp: new Date().toISOString(),
-      version: APP_VERSION,
-      uptime: process.uptime(),
-      services: {
-        supabase: {
-          status: "error",
-          latency_ms: 0,
-          error: err instanceof Error ? err.message : "Unknown error",
-        },
-        stories: {
-          status: "fallback",
-          error: err instanceof Error ? err.message : "Unknown error",
-        },
-        database: {
-          error: err instanceof Error ? err.message : "Unknown error",
-        },
-      },
-    };
-
-    return NextResponse.json(body, {
-      status: 503,
-      headers: {
-        "Cache-Control": "no-store, max-age=0",
-        "Content-Type": "application/json",
-      },
-    });
+    return buildHealthResponse(overallStatus);
+  } catch {
+    return buildHealthResponse("degraded");
   }
 }

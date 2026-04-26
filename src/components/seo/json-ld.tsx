@@ -9,6 +9,16 @@
 import type { Story, StoryLocation } from "@/types/immersive";
 import { LOCATION_CONFIG, getRegionCoordinates } from "@/config/location";
 
+/** Safe serialization for JSON-LD inside <script> tags — prevents </script>-injection XSS. */
+function safeJsonLd(data: unknown): string {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
 interface JsonLdProps {
   type: "website" | "tourist-destination";
 }
@@ -25,7 +35,7 @@ export function JsonLd({ type }: JsonLdProps) {
     <script
       type="application/ld+json"
       suppressHydrationWarning
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={{ __html: safeJsonLd(data) }}
     />
   );
 }
@@ -125,7 +135,7 @@ export function StoryJsonLd({ story }: StoryJsonLdProps) {
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: safeJsonLd({
             ...baseData,
             // LOCATION-SPECIFIC: Cuisine style
             servesCuisine: LOCATION_CONFIG.categories.cuisineStyle,
@@ -142,7 +152,7 @@ export function StoryJsonLd({ story }: StoryJsonLdProps) {
       type="application/ld+json"
       suppressHydrationWarning
       dangerouslySetInnerHTML={{
-        __html: JSON.stringify({
+        __html: safeJsonLd({
           ...baseData,
           touristType: getTouristTypeForCategory(story.category),
         }),
@@ -196,7 +206,7 @@ export function BreadcrumbJsonLd({ items }: BreadcrumbJsonLdProps) {
     <script
       type="application/ld+json"
       suppressHydrationWarning
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={{ __html: safeJsonLd(data) }}
     />
   );
 }
@@ -232,7 +242,7 @@ export function FAQJsonLd({ questions }: FAQJsonLdProps) {
     <script
       type="application/ld+json"
       suppressHydrationWarning
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={{ __html: safeJsonLd(data) }}
     />
   );
 }

@@ -69,10 +69,21 @@ describe("search", () => {
       });
     });
 
-    it("should return empty array on error", async () => {
+    it("should throw on RPC error instead of returning empty array", async () => {
+      const dbError = { message: "Database connection failed", code: "500" };
       vi.mocked(supabase.rpc).mockResolvedValueOnce({
         data: null,
-        error: { message: "Database error" },
+        error: dbError,
+      } as never);
+
+      const embedding = new Array(512).fill(0.1);
+      await expect(searchChunks(embedding)).rejects.toThrow();
+    });
+
+    it("should return empty array for legitimate no-results (no error, empty data)", async () => {
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        data: [],
+        error: null,
       } as never);
 
       const embedding = new Array(512).fill(0.1);

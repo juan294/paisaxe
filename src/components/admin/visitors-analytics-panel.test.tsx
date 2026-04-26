@@ -514,13 +514,13 @@ describe("VisitorsAnalyticsPanel", () => {
 
     render(<VisitorsAnalyticsPanel />, { wrapper });
 
+    // Wait for "No data available" directly — it only appears after the
+    // component finishes loading (not during the skeleton state which also
+    // renders "01 — Top Pages" headings and could cause a false-positive wait).
     await waitFor(() => {
-      expect(screen.getByText("01 — Top Pages")).toBeInTheDocument();
+      const noDataMessages = screen.getAllByText("No data available");
+      expect(noDataMessages.length).toBeGreaterThanOrEqual(1);
     });
-
-    // Empty DataTable renders "No data available"
-    const noDataMessages = screen.getAllByText("No data available");
-    expect(noDataMessages.length).toBeGreaterThanOrEqual(1);
   });
 
   it("initializes dev toggle from localStorage on mount", async () => {

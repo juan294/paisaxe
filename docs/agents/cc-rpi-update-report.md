@@ -1,1 +1,3 @@
-cc-rpi sync: already up to date as of v1.15.0.
+No changes in cc-rpi since the last sync. The project is already up to date.
+
+cc-rpi sync: already up to date as of v1.17.2.

@@ -2,9 +2,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import EventEmitter from "events";
 
+const { logger } = vi.hoisted(() => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+  },
+}));
+
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger,
 }));
 
 // Mock child_process.spawn
@@ -20,6 +32,30 @@ vi.mock("child_process", async (importOriginal) => {
 
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { POST, GET, DELETE } from "./route";
+
+const LEGACY_RUNNER_OVERRIDE = ["ALLOW", "AGENT", "RUN"].join("_");
+const originalVercelEnv = process.env.VERCEL_ENV;
+const originalLegacyOverride = process.env[LEGACY_RUNNER_OVERRIDE];
+
+function restoreAgentRunnerEnv() {
+  if (originalVercelEnv === undefined) {
+    delete process.env.VERCEL_ENV;
+  } else {
+    process.env.VERCEL_ENV = originalVercelEnv;
+  }
+
+  if (originalLegacyOverride === undefined) {
+    delete process.env[LEGACY_RUNNER_OVERRIDE];
+  } else {
+    process.env[LEGACY_RUNNER_OVERRIDE] = originalLegacyOverride;
+  }
+}
+
+function resetToLocalRuntime() {
+  restoreAgentRunnerEnv();
+  delete process.env.VERCEL_ENV;
+  delete process.env[LEGACY_RUNNER_OVERRIDE];
+}
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost:3000/api/admin/agents/run", {
@@ -62,19 +98,14 @@ function createMockChild(pid: number) {
 }
 
 describe("POST /api/admin/agents/run", () => {
-  const originalEnv = process.env.NODE_ENV;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    // Allow agent runs in test
-    process.env.ALLOW_AGENT_RUN = "true";
+    resetToLocalRuntime();
   });
 
   afterEach(() => {
-    delete process.env.ALLOW_AGENT_RUN;
-    Object.defineProperty(process, "env", {
-      value: { ...process.env, NODE_ENV: originalEnv },
-    });
+    restoreAgentRunnerEnv();
+    vi.useRealTimers();
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -175,21 +206,71 @@ describe("POST /api/admin/agents/run", () => {
     expect(data.error).toBe("Failed to start agent process");
   });
 
-  it("returns 403 when not in development and ALLOW_AGENT_RUN is not set", async () => {
+  it("returns 403 when VERCEL_ENV is set for a preview deployment", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,
       userId: "user-1",
     });
 
-    delete process.env.ALLOW_AGENT_RUN;
-    // NODE_ENV is 'test' in vitest, which is != 'development', so this should trigger the 403
+    process.env.VERCEL_ENV = "preview";
 
     const response = await POST(
       makeRequest({ agentKey: "qa_agent_enabled" })
     );
     expect(response.status).toBe(403);
     const data = await response.json();
-    expect(data.error).toContain("only allowed in development");
+    expect(data.error).toContain("only allowed in local development");
+    expect(logger.warn).toHaveBeenCalledWith(
+      "[AGENT_RUNNER]",
+      expect.objectContaining({ vercelEnv: "preview" })
+    );
+  });
+
+  it("returns 403 when VERCEL_ENV is set for production", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    process.env.VERCEL_ENV = "production";
+
+    const response = await POST(
+      makeRequest({ agentKey: "coverage_agent_enabled" })
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it("ignores the legacy runner override in deployed environments", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    process.env.VERCEL_ENV = "production";
+    process.env[LEGACY_RUNNER_OVERRIDE] = "1";
+
+    const response = await POST(
+      makeRequest({ agentKey: "documentation_agent_enabled" })
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it("allows agent runs when VERCEL_ENV is unset", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    delete process.env.VERCEL_ENV;
+
+    const mockChild = createMockChild(12000);
+    mockSpawn.mockReturnValue(mockChild);
+
+    const response = await POST(
+      makeRequest({ agentKey: "performance_agent_enabled" })
+    );
+
+    expect(response.status).toBe(200);
   });
 
   it("has correct response structure on success", async () => {
@@ -481,16 +562,52 @@ describe("POST /api/admin/agents/run", () => {
     const data = await response.json();
     expect(data.started).toBe(true);
   });
+
+  it("purges finished agent entries older than one hour on exit", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-22T10:00:00Z"));
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const staleChild = createMockChild(99101);
+    const freshChild = createMockChild(99102);
+    mockSpawn.mockReturnValueOnce(staleChild).mockReturnValueOnce(freshChild);
+
+    await POST(makeRequest({ agentKey: "coverage_agent_enabled" }));
+    (staleChild as EventEmitter).emit("exit", 0);
+
+    vi.setSystemTime(new Date("2026-04-22T11:01:00Z"));
+
+    await POST(makeRequest({ agentKey: "security_agent_enabled" }));
+    (freshChild as EventEmitter).emit("exit", 0);
+
+    const staleResponse = await GET(
+      makeGetRequest({ agentKey: "coverage_agent_enabled" })
+    );
+    const staleData = await staleResponse.json();
+
+    const freshResponse = await GET(
+      makeGetRequest({ agentKey: "security_agent_enabled" })
+    );
+    const freshData = await freshResponse.json();
+
+    expect(staleData.offset).toBe(0);
+    expect(staleData.logs).toEqual([]);
+    expect(freshData.offset).toBe(1);
+    expect(freshData.logs[0].text).toBe("Process exited with code 0");
+  });
 });
 
 describe("GET /api/admin/agents/run", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.ALLOW_AGENT_RUN = "true";
+    resetToLocalRuntime();
   });
 
   afterEach(() => {
-    delete process.env.ALLOW_AGENT_RUN;
+    restoreAgentRunnerEnv();
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -503,6 +620,18 @@ describe("GET /api/admin/agents/run", () => {
 
     const response = await GET(makeGetRequest());
     expect(response.status).toBe(401);
+  });
+
+  it("returns 403 when running outside local development", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    process.env.VERCEL_ENV = "preview";
+
+    const response = await GET(makeGetRequest());
+    expect(response.status).toBe(403);
   });
 
   it("returns running status when authenticated", async () => {
@@ -625,11 +754,11 @@ describe("GET /api/admin/agents/run", () => {
 describe("DELETE /api/admin/agents/run", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.ALLOW_AGENT_RUN = "true";
+    resetToLocalRuntime();
   });
 
   afterEach(() => {
-    delete process.env.ALLOW_AGENT_RUN;
+    restoreAgentRunnerEnv();
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -644,6 +773,20 @@ describe("DELETE /api/admin/agents/run", () => {
       makeDeleteRequest({ agentKey: "qa_agent_enabled" })
     );
     expect(response.status).toBe(401);
+  });
+
+  it("returns 403 when running outside local development", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    process.env.VERCEL_ENV = "production";
+
+    const response = await DELETE(
+      makeDeleteRequest({ agentKey: "qa_agent_enabled" })
+    );
+    expect(response.status).toBe(403);
   });
 
   it("returns 400 for invalid JSON body", async () => {

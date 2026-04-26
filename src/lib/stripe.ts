@@ -1,5 +1,10 @@
 import "server-only";
 import Stripe from "stripe";
+import {
+  getStripeDayPassPriceId,
+  getStripeSecretKey,
+  getStripeWebhookSecret,
+} from "@/lib/env";
 
 /**
  * Stripe integration for voice pass purchases.
@@ -14,7 +19,7 @@ import Stripe from "stripe";
  * Only use in API routes - never on client side.
  */
 export function getStripeClient(): Stripe {
-  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+  const secretKey = getStripeSecretKey();
   if (!secretKey) {
     throw new Error("STRIPE_SECRET_KEY not configured");
   }
@@ -42,7 +47,7 @@ export async function createDayPassCheckoutSession(
   options: StripeCheckoutOptions
 ): Promise<string> {
   const stripe = getStripeClient();
-  const priceId = process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
+  const priceId = getStripeDayPassPriceId();
 
   if (!priceId) {
     throw new Error("STRIPE_DAY_PASS_PRICE_ID not configured");
@@ -84,7 +89,7 @@ export async function createEmbeddedCheckoutSession(
   options: StripeEmbeddedCheckoutOptions
 ): Promise<string> {
   const stripe = getStripeClient();
-  const priceId = process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
+  const priceId = getStripeDayPassPriceId();
 
   if (!priceId) {
     throw new Error("STRIPE_DAY_PASS_PRICE_ID not configured");
@@ -118,7 +123,7 @@ export function verifyWebhookSignature(
   signature: string
 ): Stripe.Event {
   const stripe = getStripeClient();
-  const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+  const secret = getStripeWebhookSecret();
 
   if (!secret) {
     throw new Error("STRIPE_WEBHOOK_SECRET not configured");
@@ -131,9 +136,7 @@ export function verifyWebhookSignature(
  * Check if Stripe is configured with all required environment variables.
  */
 export function isStripeConfigured(): boolean {
-  return !!(
-    process.env.STRIPE_SECRET_KEY?.trim() && process.env.STRIPE_DAY_PASS_PRICE_ID?.trim()
-  );
+  return !!(getStripeSecretKey() && getStripeDayPassPriceId());
 }
 
 /**

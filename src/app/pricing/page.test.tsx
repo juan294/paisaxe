@@ -114,6 +114,12 @@ describe("PricingPage", () => {
   });
 
   it("should show disabled button with spinner during loading", () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: "user-123", email: "test@example.com" },
+      session: { access_token: "token" },
+      signInWithGoogle: mockSignInWithGoogle,
+      isLoading: false,
+    });
     mockUseVoiceAccess.mockReturnValue({
       hasAccess: false,
       isWhitelisted: false,
@@ -134,6 +140,27 @@ describe("PricingPage", () => {
     expect(button).toBeDisabled();
     const spinner = button.querySelector(".animate-spin");
     expect(spinner).toBeInTheDocument();
+  });
+
+  it("keeps the anonymous sign-in CTA usable while access checks are still resolving", () => {
+    mockUseVoiceAccess.mockReturnValue({
+      hasAccess: false,
+      isWhitelisted: false,
+      canUseVoice: false,
+      needsSignIn: true,
+      needsPurchase: false,
+      expiresAt: null,
+      hoursUntilExpiry: null,
+      agentId: "",
+      isLoading: true,
+      refresh: mockRefresh,
+    });
+
+    render(<PricingPage />);
+
+    const button = screen.getByRole("button", { name: "premium.sign_in_to_purchase" });
+    expect(button).not.toBeDisabled();
+    expect(button.querySelector(".animate-spin")).not.toBeInTheDocument();
   });
 
   it("should not show access banner during loading", () => {
@@ -347,6 +374,12 @@ describe("PricingPage", () => {
     });
 
     it("should have accessible loading state in CTA button during loading", () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-123", email: "test@example.com" },
+        session: { access_token: "token" },
+        signInWithGoogle: mockSignInWithGoogle,
+        isLoading: false,
+      });
       mockUseVoiceAccess.mockReturnValue({
         hasAccess: false,
         isWhitelisted: false,
@@ -368,6 +401,51 @@ describe("PricingPage", () => {
       // Spinner should be inside the button
       const spinner = button.querySelector(".animate-spin");
       expect(spinner).toBeInTheDocument();
+    });
+  });
+
+  describe("UX-M4: responsive heading type scale", () => {
+    it("should apply responsive text scale classes to the h1 heading", () => {
+      render(<PricingPage />);
+
+      const heading = screen.getByRole("heading", { level: 1 });
+      expect(heading.className).toContain("md:text-3xl");
+      expect(heading.className).toContain("lg:text-4xl");
+    });
+  });
+
+  describe("UX-L4: accessible disabled button state", () => {
+    it("should apply gray gradient classes to the checkout button when disabled", () => {
+      mockUseVoiceAccess.mockReturnValue({
+        hasAccess: false,
+        isWhitelisted: false,
+        canUseVoice: false,
+        needsSignIn: false,
+        needsPurchase: true,
+        expiresAt: null,
+        hoursUntilExpiry: null,
+        agentId: "test-agent",
+        isLoading: true,
+        refresh: mockRefresh,
+      });
+
+      render(<PricingPage />);
+
+      const button = screen.getByRole("button");
+      // disabled:from-gray-500 desaturates the gradient, disabled:to-gray-600 and
+      // disabled:opacity-75 ensure WCAG AA contrast even under glare on mobile
+      expect(button.className).toContain("disabled:from-gray-500");
+      expect(button.className).toContain("disabled:to-gray-600");
+      expect(button.className).toContain("disabled:opacity-75");
+    });
+
+    it("should not use only opacity-50 as the sole disabled visual cue", () => {
+      render(<PricingPage />);
+
+      const button = screen.getByRole("button");
+      // opacity-50 alone is insufficient for WCAG AA; the button must use
+      // the gray gradient instead of (or in addition to replacing) opacity-50
+      expect(button.className).not.toContain("disabled:opacity-50");
     });
   });
 });

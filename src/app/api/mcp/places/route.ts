@@ -240,6 +240,7 @@ async function searchPlaces(
       "X-Goog-FieldMask": fieldMask,
     },
     body: JSON.stringify(requestBody),
+    signal: AbortSignal.timeout(8_000),
   });
 
   if (!response.ok) {

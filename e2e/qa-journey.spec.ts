@@ -53,9 +53,10 @@ test.describe("QA Journey: Anonymous User", () => {
   }) => {
     // Step 1: Navigate to immersive view
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    const title = page.getByTestId("story-title").first();
+    await expect(title).toContainText(/\S+/);
 
-    const firstTitle = await page.locator("h1").first().textContent();
+    const firstTitle = await title.textContent();
     expect(firstTitle).toBeTruthy();
 
     // Step 2: Navigate to next story via arrow
@@ -64,21 +65,26 @@ test.describe("QA Journey: Anonymous User", () => {
     await expect(nextButton).toBeVisible();
     await nextButton.click();
 
-    // Wait for transition
-    await page.waitForTimeout(500);
+    // Wait for the title to change (story transition)
+    await expect(title).not.toHaveText(firstTitle!, {
+      timeout: 3000,
+    });
 
     // Step 3: Verify story changed
-    const secondTitle = await page.locator("h1").first().textContent();
+    const secondTitle = await title.textContent();
     expect(secondTitle).not.toBe(firstTitle);
 
     // Step 4: Navigate back with previous arrow
     const prevButton = page.getByTestId("prev-story-button").first();
     await prevButton.click();
 
-    await page.waitForTimeout(500);
+    // Wait for the title to change back
+    await expect(title).not.toHaveText(secondTitle!, {
+      timeout: 3000,
+    });
 
     // Step 5: Verify we're back to first story
-    const returnedTitle = await page.locator("h1").first().textContent();
+    const returnedTitle = await title.textContent();
     expect(returnedTitle).toBe(firstTitle);
   });
 
@@ -86,22 +92,27 @@ test.describe("QA Journey: Anonymous User", () => {
     page,
   }) => {
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    const title = page.getByTestId("story-title").first();
+    await expect(title).toContainText(/\S+/);
 
-    const firstTitle = await page.locator("h1").first().textContent();
+    const firstTitle = await title.textContent();
 
     // Navigate with right arrow key
     await page.keyboard.press("ArrowRight");
-    await page.waitForTimeout(500);
+    await expect(title).not.toHaveText(firstTitle!, {
+      timeout: 3000,
+    });
 
-    const secondTitle = await page.locator("h1").first().textContent();
+    const secondTitle = await title.textContent();
     expect(secondTitle).not.toBe(firstTitle);
 
     // Navigate with left arrow key
     await page.keyboard.press("ArrowLeft");
-    await page.waitForTimeout(500);
+    await expect(title).not.toHaveText(secondTitle!, {
+      timeout: 3000,
+    });
 
-    const returnedTitle = await page.locator("h1").first().textContent();
+    const returnedTitle = await title.textContent();
     expect(returnedTitle).toBe(firstTitle);
   });
 
@@ -109,7 +120,7 @@ test.describe("QA Journey: Anonymous User", () => {
     page,
   }) => {
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
 
     // Step 1: Open chat panel
     const askButton = page.locator('[data-testid="ask-button"]').first();
@@ -150,7 +161,7 @@ test.describe("QA Journey: Anonymous User", () => {
     await closeButton.click();
 
     await expect(chatPanel).not.toBeVisible();
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
   });
 
   test("Journey 4: Favorites page shows sign-in prompt for anonymous users", async ({
@@ -173,54 +184,44 @@ test.describe("QA Journey: Anonymous User", () => {
     page,
   }) => {
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
 
     // Info is visible by default
-    await expect(page.locator("h1").first()).toHaveCSS("opacity", "1");
+    const bottomPanel = page.getByTestId("story-info-panel").first();
+    await expect(bottomPanel).toHaveClass(/opacity-100/);
 
     // Press 'i' to hide info
     await page.keyboard.press("i");
-    await page.waitForTimeout(600);
 
-    // Bottom panel should be hidden
-    const bottomPanel = page.locator(".absolute.bottom-0.left-0.right-0");
-    await expect(bottomPanel).toHaveCSS("opacity", "0", { timeout: 5000 });
+    // Bottom panel should be hidden (wait for CSS transition to complete)
+    await expect(bottomPanel).toHaveClass(/opacity-0/, { timeout: 5000 });
 
     // Press 'i' again to show info
     await page.keyboard.press("i");
-    await page.waitForTimeout(600);
 
     // Bottom panel should be visible again
-    await expect(bottomPanel).toHaveCSS("opacity", "1");
+    await expect(bottomPanel).toHaveClass(/opacity-100/, { timeout: 5000 });
   });
 
   test("Journey 6: Navigate between stories and verify unique content", async ({
     page,
   }) => {
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    const title = page.getByTestId("story-title").first();
+    await expect(title).toContainText(/\S+/);
 
     // Collect titles from multiple stories
     const titles: string[] = [];
-    const titleText = await page.locator("h1").first().textContent();
+    const titleText = await title.textContent();
     if (titleText) titles.push(titleText);
 
     // Navigate through 3 more stories, waiting for title to actually change
     for (let i = 0; i < 3; i++) {
       const prevTitle = titles[titles.length - 1];
       await page.keyboard.press("ArrowRight");
-      // Wait for the h1 text to change (300ms transition + React re-render)
-      // instead of a fixed timeout — much more reliable on slow CI runners
-      await page.waitForFunction(
-        (prev) => {
-          const h1 = document.querySelector("h1");
-          return h1 && h1.textContent !== prev;
-        },
-        prevTitle,
-        { timeout: 5000 }
-      );
-      const title = await page.locator("h1").first().textContent();
-      if (title) titles.push(title);
+      await expect(title).not.toHaveText(prevTitle!, { timeout: 5000 });
+      const currentTitle = await title.textContent();
+      if (currentTitle) titles.push(currentTitle);
     }
 
     // Verify we got 4 titles and at least 3 are unique
@@ -257,7 +258,7 @@ test.describe("QA Journey: Error Handling", () => {
     );
 
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
 
     // Open chat
     const askButton = page.locator('[data-testid="ask-button"]').first();
@@ -281,9 +282,10 @@ test.describe("QA Journey: Error Handling", () => {
     const sendButton = chatPanel.locator('button[type="submit"]');
     await sendButton.click();
 
-    // Should show error message (not crash)
+    // Should show error message (not crash) — wait for the chat panel to remain
+    // visible and stable after the API call completes (mocked as instant 500)
     // The app should handle errors gracefully
-    await page.waitForTimeout(2000);
+    await expect(chatPanel).toBeVisible({ timeout: 5000 });
 
     // Chat panel should still be functional (not broken)
     await expect(chatPanel).toBeVisible();
@@ -296,7 +298,7 @@ test.describe("QA Journey: Error Handling", () => {
 
     const body = await response.json();
     expect(body).toHaveProperty("status");
-    expect(body).toHaveProperty("version");
+    expect(body).toHaveProperty("timestamp");
     expect(["healthy", "degraded"]).toContain(body.status);
   });
 });
@@ -390,7 +392,7 @@ test.describe("QA Journey: New Features", () => {
 
     // Step 1: Navigate to immersive
     await page.goto("/immersive");
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
 
     // Step 2: Open chat
     await page.locator('[data-testid="ask-button"]').first().click();
@@ -440,7 +442,7 @@ test.describe("QA Journey: New Features", () => {
     await closeButton.click();
 
     await expect(chatPanel).not.toBeVisible();
-    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page.getByTestId("story-title").first()).toContainText(/\S+/);
   });
 });
 
@@ -490,9 +492,10 @@ authTest.describe("QA Journey: Authenticated User", () => {
 
       // First, get the first story ID from the stories API
       await page.goto("/immersive");
-      await authExpect(page.locator("h1").first()).toBeVisible({ timeout: 10000 });
+      const title = page.getByTestId("story-title").first();
+      await authExpect(title).toContainText(/\S+/, { timeout: 10000 });
 
-      const storyTitle = await page.locator("h1").first().textContent();
+      const storyTitle = await title.textContent();
       authExpect(storyTitle).toBeTruthy();
 
       // Get a story ID - we'll use a known fallback story ID
@@ -510,16 +513,13 @@ authTest.describe("QA Journey: Authenticated User", () => {
         }
       }, testStoryId);
 
-      // Navigate to favorites page
+      // Navigate to favorites page and wait for it to load
       await page.goto("/favorites");
-
-      // Wait for page to load
-      await page.waitForTimeout(1000);
+      const mainContent = page.locator("main");
+      await authExpect(mainContent).toBeVisible({ timeout: 5000 });
 
       // Should see content (not just empty state)
       // The favorites page should show the saved story
-      const mainContent = page.locator("main");
-      await authExpect(mainContent).toBeVisible();
 
       // Check we're not seeing just the empty state
       const hasContent = await page
@@ -548,7 +548,7 @@ authTest.describe("QA Journey: Authenticated User", () => {
       const testStoryId = "test-story-persistence";
 
       await page.goto("/immersive");
-      await authExpect(page.locator("h1").first()).toBeVisible({ timeout: 10000 });
+      await authExpect(page.getByTestId("story-title").first()).toContainText(/\S+/, { timeout: 10000 });
 
       // Add favorite via localStorage
       await page.evaluate((storyId) => {
@@ -561,11 +561,11 @@ authTest.describe("QA Journey: Authenticated User", () => {
         }
       }, testStoryId);
 
-      // Navigate away and back
+      // Navigate away and back — wait for each page to be fully loaded
       await page.goto("/favorites");
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle");
       await page.goto("/immersive");
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle");
 
       // Verify localStorage persisted across navigation
       const favorites = await page.evaluate(() => {
@@ -602,7 +602,7 @@ authTest.describe("QA Journey: Authenticated User", () => {
 
       // Should be on immersive page
       await page.waitForURL("**/immersive");
-      await authExpect(page.locator("h1").first()).toBeVisible({ timeout: 10000 });
+      await authExpect(page.getByTestId("story-title").first()).toContainText(/\S+/, { timeout: 10000 });
     }
   );
 });

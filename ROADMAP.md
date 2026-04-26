@@ -3,7 +3,7 @@
 A living document tracking implemented features and future development plans.
 
 **Domain**: paisaxe.es
-**Last Updated**: February 1, 2026
+**Last Updated**: April 24, 2026
 
 ---
 
@@ -72,8 +72,8 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Vector Search | :white_check_mark: | Supabase pgvector (1024 dims) |
-| Voyage AI Embeddings | :white_check_mark: | voyage-3 model |
+| Vector Search | :white_check_mark: | Supabase pgvector (512 dims, Matryoshka) |
+| Voyage AI Embeddings | :white_check_mark: | voyage-3.5 model |
 | Claude Integration | :white_check_mark: | Claude Sonnet for responses |
 | Hybrid Search | :white_check_mark: | Vector similarity + keyword matching for place names |
 
@@ -94,7 +94,7 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Supabase PostgreSQL | :white_check_mark: | With pgvector extension |
 | shadcn/ui Components | :white_check_mark: | Button, Card, Dialog, Input |
 | Tailwind CSS Styling | :white_check_mark: | Custom Paisaxe theme |
-| Vitest Testing | :white_check_mark: | 1247 tests passing (102 files) |
+| Vitest Testing | :white_check_mark: | ~6,000 tests passing (324 files) |
 | GitHub Actions CI | :white_check_mark: | Lint, typecheck, test, build |
 | Git Hooks (Husky) | :white_check_mark: | Pre-commit quality checks |
 | Coverage Automation | :white_check_mark: | Nightly scheduled updates via `scripts/coverage-agent.sh` |
@@ -321,7 +321,7 @@ Automated agents and scheduled workflows to guarantee code quality, security, an
 - [x] Database migration: Stories table exists in Supabase
 - [x] Story seeding: 20 stories seeded via `npm run seed-db:stories`
 - [x] Image replacement: 7 stories use PDF images, 13 use Unsplash fallback
-- [x] Tests: `npm run test` - 1247 tests pass (102 files)
+- [x] Tests: `npm run test` - ~6,000 tests pass (324 files)
 - [x] Build: `npm run build` - no errors
 - [x] Auth: Google SSO working with Supabase SSR
 - [x] Favorites: Cloud sync + local storage fallback
@@ -367,19 +367,71 @@ Premium voice conversations with Pelayo (ElevenLabs). Currently configured with 
 | Language Detection | :white_check_mark: | Auto-detect visitor language |
 | Visitor Access Control | :white_check_mark: | Feature flag + email whitelist gating |
 
-### Future: MCP Tool Integrations :calendar:
+### MCP Tool Integrations :white_check_mark:
 
-Extend Pelayo's capabilities with real-time data via MCP (Model Context Protocol) servers.
+Pelayo's real-time capabilities via custom webhook tools (at `/api/mcp/*`):
 
-| Tool | Value Add | Priority |
-|------|-----------|----------|
-| Weather API | "It's raining in Oviedo today - perfect for the museums" | High |
-| Events/Calendar | "There's a sidra festival this weekend in Gijón" | High |
-| Real-time Hours | Check if attractions are currently open | Medium |
-| Booking Integration | Help reserve tours or restaurants | Medium |
-| Maps/Directions | Provide routing between locations | Low |
+| Tool | Status | Notes |
+|------|--------|-------|
+| Weather API | :white_check_mark: | `get_weather` — current weather for Asturian cities |
+| Places Search | :white_check_mark: | `search_places` — restaurants, attractions, hotels via Google Places API |
+| Booking Integration | :white_check_mark: | `make_booking` — outbound calls via ElevenLabs + Twilio (gated by `booking_system` flag) |
+| SMS Confirmation | :white_check_mark: | `sms_booking_confirmation` — post-call SMS via Twilio webhook |
+| Events/Calendar | :calendar: | Not yet implemented |
+| Maps/Directions | :calendar: | Not yet implemented |
 
-These integrations would differentiate Pelayo from generic AI assistants and add significant value to the paid voice feature.
+Agents are tracked in git via ElevenLabs CLI (`agents.json`, `agent_configs/*.json`).
+
+---
+
+---
+
+## Phase 10: Payments & Monetization :white_check_mark:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Stripe Embedded Checkout | :white_check_mark: | Day Pass (€1.99/24h) via embedded checkout, not hosted |
+| Stripe Webhook Handler | :white_check_mark: | `grant_day_pass_idempotent` RPC for atomic idempotent grants |
+| Revenue Analytics | :white_check_mark: | Admin → Analytics → Revenue tab with Stripe data |
+| Return to Story After Payment | :white_check_mark: | User lands back on original story after checkout |
+| Checkout Health Endpoint | :white_check_mark: | `/api/checkout/health` (admin-auth required) |
+
+Lemon Squeezy fully removed. All payment processing via Stripe only.
+
+---
+
+## Phase 11: Security Hardening (Audit Remediation) :white_check_mark:
+
+Engineering audit (Phases 1–10, April 2026). Key remediations:
+
+| Area | Change |
+|------|--------|
+| Stripe webhook | Atomic `grant_day_pass_idempotent` Supabase RPC |
+| CSRF protection | Double-submit cookie (`src/lib/csrf.ts`, `src/lib/csrf-client.ts`) |
+| Request correlation | Propagated correlation IDs (`src/lib/proxy/request-id.ts`) |
+| Distributed rate limiting | Upstash Redis with in-memory fallback (`src/lib/rate-limit.ts`) |
+| Env validation | Centralized `src/lib/env.ts` with `.trim()` enforcement |
+| Admin auth | `withAdmin` HOF replacing per-route checks (`src/lib/admin-auth.ts`) |
+| XSS | `dangerouslySetInnerHTML` replaced with `SafeMarkdown` everywhere |
+| Proxy decomposition | `proxy.ts` split into `src/lib/proxy/` modules |
+| Sentry | Error tracking across client, server, and edge runtimes |
+| Structured logging | Pino with PII sanitization (`src/lib/logger.ts`, `src/lib/logger-sanitize.ts`) |
+| SSE abort | Chat stream cancellation propagated to Claude API |
+| Zod validation | Runtime validation across full API surface |
+
+---
+
+## Phase 12: Content & Story Pipeline :white_check_mark:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Automatic Story Translations | :white_check_mark: | `/api/webhooks/translate` + `cron/fail-stale-translations` |
+| Content Discovery Agent | :white_check_mark: | Weekly cron discovers new Asturias places via Google Places API |
+| WebP Image Migration | :white_check_mark: | All story images converted from PNG (~14 MB → ~6 MB) |
+| Author Attribution Pill | :white_check_mark: | Typewriter animation with story author credit |
+| About / Privacy / Terms Pages | :white_check_mark: | Localized to all 6 languages |
+| Site Footer | :white_check_mark: | Legal links and content attribution |
+| Mobile Tap Zones | :white_check_mark: | Instagram-style 30/70 left/right split |
 
 ---
 
@@ -408,4 +460,8 @@ These integrations would differentiate Pelayo from generic AI assistants and add
 | v0.8.0 | Jan 2026 | Automation & quality agents (security, performance, availability, AI review) |
 | v0.9.0 | Jan 2026 | Polish (skeleton UI, a11y, SEO, error boundaries) |
 | v0.10.0 | Feb 2026 | Voice agent (ElevenLabs Pelayo with RAG knowledge base) |
-| v1.0.0 | - | Production release |
+| v1.0.0 | Feb 2026 | Production release |
+| v1.1.0 | Feb 2026 | Stripe payments + voice booking + admin dashboard expansion |
+| v1.2.0 | Feb 2026 | Asturian language support + UI improvements |
+| v1.3.0 | Apr 2026 | Security hardening (audit remediation phases 1-10) + content pipeline |
+| v1.4.0 | Apr 2026 | Pre-launch remediation: booking persistence, E2E reliability, admin hardening, DevOps automation |

@@ -46,8 +46,13 @@ async function stabilizePage(page: Page): Promise<void> {
     );
   });
 
-  // Allow layout to settle
-  await page.waitForTimeout(300);
+  // Allow a pair of paint cycles for layout to settle without a fixed sleep.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
+  );
 }
 
 test.describe("Visual regression — public pages", () => {

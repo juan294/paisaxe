@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { logger } from "@/lib/logger";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 
 export interface VoiceAccessResponse {
@@ -25,7 +26,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const supabase = await getSupabaseClient();
 
-  // Query for active voice purchase
+  // Query for active voice purchase — maybeSingle() returns {data: null, error: null}
+  // when no row is found (no PGRST116 needed)
   const { data, error } = await supabase
     .from("voice_purchases")
     .select("id, purchase_type, expires_at")
@@ -33,11 +35,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .gt("expires_at", new Date().toISOString())
     .order("expires_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (error && error.code !== "PGRST116") {
-    // PGRST116 = no rows returned
-    console.error("[voice-access] Error fetching access:", error);
+  if (error) {
+    logger.error("[VOICE_ACCESS_FETCH_FAILED]", { user_id: user.id, error });
     return NextResponse.json(
       { error: "Failed to check access" },
       { status: 500 }

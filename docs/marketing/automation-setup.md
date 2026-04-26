@@ -45,11 +45,13 @@ Before connecting any platform, you need:
 
 ### 3. API Tier
 
-- **Free tier**: Write-only access — 1,500 posts/month, no read access (can't fetch engagement or user info)
-- **Basic tier ($200/month)**: 50,000 posts + 15,000 reads/month
+- **Free tier**: Read access only (v2.me verified) — **posting returns `CreditsDepleted` (402)**. We have zero write credits on the free tier despite "Read and Write" app permissions being set correctly. This is a billing issue, not a permissions issue.
+- **Basic tier ($200/month)**: 50,000 posts + 15,000 reads/month — required for automated posting
 - **Pro tier ($5,000/month)**: 300,000 posts + 1,000,000 reads/month
 
-**Note:** The free tier supports posting via API (up to 1,500 tweets/month). Read operations (engagement metrics, user lookup) require Basic tier. Ensure app permissions are set to "Read and Write" in the X Developer Portal, and regenerate tokens after changing permissions.
+> ⚠️ **Current status (as of April 2026):** Posting to X (@elpaisaxe) from the API is not available on the free tier. Attempts return HTTP 402 with `CreditsDepleted`. A pay-per-use model exists but is in closed beta. Until Basic tier is purchased ($200/month) or pay-per-use opens, **Xander drafts content that must be copy-pasted manually** into X. Do not attempt to automate posting — it will fail.
+
+**App permissions**: Correctly set to "Read and Write" in the X Developer Portal. Regenerate tokens after any permission change.
 
 ### 4. Save Credentials
 

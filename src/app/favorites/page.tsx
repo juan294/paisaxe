@@ -5,8 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useStories } from "@/hooks/use-stories";
-import { useAuth } from "@/hooks/use-auth";
-import { Bookmark, ArrowLeft, Trash2, RefreshCw, Cloud } from "lucide-react";
+import { Bookmark, ArrowLeft, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import type { Story } from "@/types/immersive";
@@ -14,16 +13,19 @@ import type { Story } from "@/types/immersive";
 const ITEMS_PER_PAGE = 20;
 
 export default function FavoritesPage() {
-  const { favorites, toggleFavorite, isLoading: favoritesLoading } = useFavorites();
+  const { favorites, toggleFavorite, isLoading: favoritesLoading, requiresAuth } = useFavorites();
   const { stories: allStories, isLoading } = useStories();
-  const { user, signInWithGoogle } = useAuth();
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
 
+  // requiresAuth is true for anonymous users — they can never have saved favorites.
+  const canWaitForStories = !requiresAuth || favorites.length > 0;
+  const stories = canWaitForStories ? allStories : [];
+
   // Filter to only favorited stories
-  const favoriteStories = allStories.filter((story) =>
+  const favoriteStories = stories.filter((story) =>
     favorites.includes(story.id)
   );
 
@@ -76,7 +78,7 @@ export default function FavoritesPage() {
     }
   }, [favoriteStories.length, displayCount]);
 
-  if (isLoading || favoritesLoading) {
+  if (favoritesLoading || (canWaitForStories && isLoading)) {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center">
         <RefreshCw className="h-5 w-5 animate-spin text-neutral-400" />
@@ -114,29 +116,6 @@ export default function FavoritesPage() {
         </div>
       </header>
 
-      {/* Sync banner for non-logged-in users with favorites */}
-      {!user && favoriteStories.length > 0 && (
-        <div className="border-b border-amber-500/20 bg-amber-500/10">
-          <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-            <Cloud className="h-5 w-5 shrink-0 text-amber-400" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-amber-200">
-                {t("favorites.local_only")}
-              </p>
-              <p className="text-xs text-amber-200/60">
-                {t("favorites.local_only_description")}
-              </p>
-            </div>
-            <button
-              onClick={() => signInWithGoogle()}
-              className="shrink-0 rounded-full bg-white/10 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
-            >
-              {t("favorites.sync_with_google")}
-            </button>
-          </div>
-        </div>
-      )}
-
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {favoriteStories.length === 0 ? (
           <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
@@ -144,9 +123,15 @@ export default function FavoritesPage() {
             <h2 className="text-lg font-medium text-white mb-2">
               {t("favorites.empty_title")}
             </h2>
-            <p className="text-neutral-500 mb-6 max-w-sm text-sm">
-              {t("favorites.empty_description")}
-            </p>
+            {requiresAuth ? (
+              <p className="text-neutral-500 mb-6 max-w-sm text-sm">
+                {t("favorites.sign_in_to_save")}
+              </p>
+            ) : (
+              <p className="text-neutral-500 mb-6 max-w-sm text-sm">
+                {t("favorites.empty_description")}
+              </p>
+            )}
             <Link
               href="/immersive"
               className="px-5 py-2.5 bg-white text-neutral-900 rounded-full text-sm font-medium transition-all hover:bg-neutral-200"

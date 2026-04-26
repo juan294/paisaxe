@@ -22,25 +22,37 @@ import dynamic from "next/dynamic";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
 import { usePostHog } from "posthog-js/react";
 
+/**
+ * Loading skeleton shown while the VoiceChatElevenLabs chunk is being fetched.
+ * Defined as a proper React component so it can use the useTranslation hook
+ * for i18n — the loading text is localised via voice.loading.
+ */
+function VoiceLoadingFallback() {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-testid="voice-loading-fallback"
+      role="status"
+      aria-label={t("voice.loading")}
+      className="h-64 md:h-96 lg:h-[28rem] flex items-center justify-center"
+    >
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-20 w-20 rounded-full bg-white/10 animate-pulse" />
+        <div className="animate-pulse text-white/50 text-sm">
+          {t("voice.loading")}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Dynamically import VoiceChatElevenLabs to defer the ~471KB LiveKit/ElevenLabs chunk.
 // This code only loads when voice mode is active (user has access + agent configured).
 const VoiceChatElevenLabs = dynamic(
   () => import("./voice-chat-elevenlabs").then((mod) => mod.VoiceChatElevenLabs),
   {
     ssr: false,
-    loading: () => (
-      <div
-        data-testid="voice-loading-fallback"
-        className="h-64 md:h-96 lg:h-[28rem] flex items-center justify-center"
-      >
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-20 w-20 rounded-full bg-white/10 animate-pulse" />
-          <div className="animate-pulse text-white/50 text-sm">
-            Cargando asistente de voz...
-          </div>
-        </div>
-      </div>
-    ),
+    loading: () => <VoiceLoadingFallback />,
   }
 );
 
@@ -49,13 +61,14 @@ interface VoiceChatProps {
   open: boolean;
   onClose: () => void;
   initialMessage?: string;
+  triggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
-export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatProps) {
+export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: VoiceChatProps) {
   const [inputValue, setInputValue] = useState("");
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const [useElevenLabs, setUseElevenLabs] = useState(false);
-  const [hasSetDefaultMode, setHasSetDefaultMode] = useState(false);
+  const [lastMessage, setLastMessage] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const { t, locale } = useTranslation();
@@ -63,6 +76,11 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const posthog = usePostHog();
   const stableOnClose = useMemo(() => onClose, [onClose]);
   useFocusTrap(dialogRef, open, stableOnClose);
+
+  const handleClose = useCallback(() => {
+    triggerRef?.current?.focus();
+    onClose();
+  }, [onClose, triggerRef]);
 
   // Check for voice access (whitelisted OR paid)
   const {
@@ -78,23 +96,21 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
   const {
     messages,
     isStreaming: isLoading,
+    error: chatError,
     sendMessage,
     resetMessages,
     dismissUpsell: handleUpsellDismiss,
   } = useStreamChat({ canUseVoice });
 
-  // Set voice mode as default when user has access (only on first load)
+  // Sync voice mode whenever access status resolves or changes (e.g., mid-session purchase)
   useEffect(() => {
-    if (!isVoiceAccessLoading && !hasSetDefaultMode) {
-      if (canUseVoice && agentId) {
-        setUseElevenLabs(true);
-      }
-      setHasSetDefaultMode(true);
+    if (!isVoiceAccessLoading && canUseVoice && agentId) {
+      setUseElevenLabs(true);
     }
-  }, [isVoiceAccessLoading, canUseVoice, agentId, hasSetDefaultMode]);
+  }, [isVoiceAccessLoading, canUseVoice, agentId]);
 
   // Don't render content until we've determined the default mode
-  const isInitializing = isVoiceAccessLoading || !hasSetDefaultMode;
+  const isInitializing = isVoiceAccessLoading;
 
   // Reset messages when story changes
   useEffect(() => {
@@ -138,6 +154,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     const userMessage = inputValue.trim();
     const isFirstMessage = messages.length === 0;
     setInputValue("");
+    setLastMessage(userMessage);
 
     // Track chat events in PostHog
     if (isFirstMessage) {
@@ -155,19 +172,28 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
     });
   };
 
+  const handleRetry = useCallback(async () => {
+    if (!lastMessage || isLoading) return;
+    await sendMessage(lastMessage, {
+      context: `The user is viewing: ${localizedStory.title} (${localizedStory.subtitle}). ${localizedStory.description}. Source: ${story.sourcePdf}.`,
+      locale,
+      messageIndex: messages.filter((m) => m.role === "user").length,
+    });
+  }, [lastMessage, isLoading, sendMessage, localizedStory, story, locale, messages]);
+
   if (!open) return null;
 
   return (
     <div
       ref={dialogRef}
-      className="fixed inset-0 z-50 flex items-end justify-center p-4 md:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] md:items-center"
       role="dialog"
       aria-label={t("accessibility.chat_dialog").replace("{title}", localizedStory.title)}
     >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Chat panel */}
@@ -212,7 +238,7 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
             <Button
               variant="ghost"
               size="icon"
-              onClick={onClose}
+              onClick={handleClose}
               aria-label={t("accessibility.close_chat")}
               className="text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             >
@@ -339,6 +365,24 @@ export function VoiceChat({ story, open, onClose, initialMessage }: VoiceChatPro
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Error banner for chat API failures */}
+            {chatError && (
+              <div
+                role="alert"
+                className="mx-4 mb-3 flex items-center justify-between gap-3 rounded-lg bg-red-500/10 px-4 py-3 border border-red-500/20"
+              >
+                <p className="text-sm text-red-200">{chatError}</p>
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  disabled={isLoading}
+                  className="shrink-0 text-xs font-medium text-red-300 hover:text-red-100 underline disabled:opacity-50"
+                >
+                  {t("chat.retry")}
+                </button>
+              </div>
+            )}
 
             {/* Context-aware action buttons */}
             <ChatActions messages={messages} isLoading={isLoading} />

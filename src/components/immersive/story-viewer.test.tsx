@@ -260,11 +260,37 @@ describe("StoryViewer", () => {
       expect(screen.getByText(/navegar/)).toBeInTheDocument();
     });
 
+    it("uses a first-class mobile suggest action instead of querying a hidden desktop trigger", async () => {
+      mockIsEnabled.mockImplementation((flag?: string) => flag === "user_story_suggestions");
+      const querySelectorSpy = vi.spyOn(document, "querySelector");
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Más opciones" }));
+      fireEvent.click(screen.getByRole("menuitem"));
+
+      expect(querySelectorSpy).not.toHaveBeenCalled();
+    });
+
     it("should render story image with blur placeholder", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const img = screen.getByAltText("Lagos de Covadonga");
       expect(img).toHaveAttribute("data-placeholder", "blur");
+    });
+
+    it("PE-M2: should set priority=true only on the first story (index 0)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 0 })} />);
+
+      const img = screen.getByAltText("Lagos de Covadonga");
+      expect(img).toHaveAttribute("data-priority", "true");
+    });
+
+    it("PE-M2: should set priority=false for stories after index 0", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+
+      const img = screen.getByAltText("Oviedo Cathedral");
+      expect(img).toHaveAttribute("data-priority", "false");
     });
 
     it("should use darkPlaceholder fallback when story has no blurDataUrl", async () => {
@@ -1261,17 +1287,11 @@ describe("StoryViewer", () => {
   });
 
   describe("mobile overflow suggest place", () => {
-    it("should click the suggest-place trigger when suggest place item is clicked", async () => {
+    it("should render a first-class suggest place action without a DOM trigger lookup", async () => {
       mockIsEnabled.mockImplementation(
         (flag: string) => flag === "user_story_suggestions"
       );
-
-      // Create a mock trigger button in the DOM
-      const triggerButton = document.createElement("button");
-      triggerButton.setAttribute("data-suggest-place-trigger", "");
-      const clickSpy = vi.fn();
-      triggerButton.addEventListener("click", clickSpy);
-      document.body.appendChild(triggerButton);
+      const querySelectorSpy = vi.spyOn(document, "querySelector");
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
@@ -1281,10 +1301,7 @@ describe("StoryViewer", () => {
       const suggestItem = screen.getByText("suggestions.suggest_short");
       fireEvent.click(suggestItem);
 
-      expect(clickSpy).toHaveBeenCalled();
-
-      // Clean up
-      document.body.removeChild(triggerButton);
+      expect(querySelectorSpy).not.toHaveBeenCalled();
       mockIsEnabled.mockReturnValue(false);
     });
   });
@@ -1554,6 +1571,47 @@ describe("StoryViewer", () => {
     });
   });
 
+  describe("FE-M1: timer cancellation on rapid navigation", () => {
+    it("should cancel pending transition timer when navigating rapidly (no stacking)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const nextButton = screen.getAllByRole("button").find(
+        (btn) => btn.classList.contains("right-0")
+      );
+      expect(nextButton).toBeDefined();
+
+      // Rapid double-click: second click cancels the first timer
+      fireEvent.click(nextButton!);
+      fireEvent.click(nextButton!);
+
+      // Only advance once — should call onIndexChange exactly once (second call wins)
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      // onIndexChange called once, not twice (timers don't stack)
+      expect(onIndexChange).toHaveBeenCalledTimes(1);
+    }, 30000);
+
+    it("should clear transition timer on unmount", async () => {
+      const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+      const { unmount } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const nextButton = screen.getAllByRole("button").find(
+        (btn) => btn.classList.contains("right-0")
+      );
+      fireEvent.click(nextButton!);
+
+      // Unmount before timer fires
+      unmount();
+
+      // clearTimeout should have been called to clean up the transition timer
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    }, 30000);
+  });
+
   describe("reduced motion navigation (lines 113-115, 127-128)", () => {
     it("should call onIndexChange immediately without transition on goToNext when prefers-reduced-motion (lines 113-115)", async () => {
       // Override useReducedMotion to return true
@@ -1611,10 +1669,9 @@ describe("StoryViewer", () => {
       // The SuggestPlaceButton is rendered inside a hidden md:block div
       // Verify the feature flag was checked and the component rendered
       expect(mockIsEnabled).toHaveBeenCalledWith("user_story_suggestions");
-
-      // The suggest-place trigger button should exist in the DOM
-      const suggestTrigger = document.querySelector('[data-suggest-place-trigger]');
-      expect(suggestTrigger).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "suggestions.suggest_place" })
+      ).toBeInTheDocument();
 
       mockIsEnabled.mockReturnValue(false);
     });

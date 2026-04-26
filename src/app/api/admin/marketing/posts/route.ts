@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { logger } from "@/lib/logger";
 import {
   createDraft,
   getDrafts,
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query.limit(50);
 
     if (error) {
-      console.error("Error fetching posts:", error);
+      logger.error("[MARKETING_POSTS_FETCH_FAILED]", { error });
       return NextResponse.json(
         { error: "Failed to fetch posts" },
         { status: 500 }
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: data || [] });
   } catch (error) {
-    console.error("Marketing posts API error:", error);
+    logger.error("[MARKETING_POSTS_GET_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: result.post }, { status: 201 });
   } catch (error) {
-    console.error("Create draft error:", error);
+    logger.error("[MARKETING_POSTS_CREATE_DRAFT_FAILED]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -178,7 +179,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Update post error:", error);
+    logger.error("[MARKETING_POSTS_UPDATE_FAILED]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -218,7 +219,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete post error:", error);
+    logger.error("[MARKETING_POSTS_DELETE_FAILED]", { error });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
