@@ -90,7 +90,7 @@ gh run list --branch develop --limit 5
 gh pr create --base main --head develop --title "Revert: <description of what was reverted>"
 ```
 
-Wait for all 4 required checks (`lint-and-typecheck`, `test`, `build`, `e2e`) to pass, then the user merges.
+Wait for all 5 required checks (`lint-and-typecheck`, `test`, `build`, `e2e`, `Smoke test Vercel preview`) to pass, then the user merges.
 
 ### Reverting a Dependency Upgrade
 
