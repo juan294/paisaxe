@@ -47,7 +47,7 @@ Using Claude 4.5 Sonnet (balanced cost/performance):
 ### Voyage AI
 - **Free Tier**: 200M tokens for embeddings, 200M tokens for reranking
 - **After Free Tier**:
-  - Embeddings (voyage-3): ~$0.12 per million tokens
+  - Embeddings (voyage-3.5): ~$0.12 per million tokens
   - Reranking (rerank-2.5): ~$0.15 per million tokens
 
 ### ElevenLabs (Conversational AI)
