@@ -56,7 +56,8 @@ test.describe("XSS canary", () => {
     await expect(messageLog.locator("img")).toHaveCount(0);
     await expect(messageLog.locator("[onerror]")).toHaveCount(0);
 
-    await page.waitForTimeout(500);
+    // Wait for any pending async XSS payloads to fire before asserting no canary hit
+    await page.waitForLoadState("networkidle");
     expect(canaryHit).toBe(false);
   });
 });
