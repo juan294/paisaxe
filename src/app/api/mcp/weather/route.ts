@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { getClientIp } from "@/lib/request-utils";
+import { weatherQuerySchema } from "@/lib/schemas";
 
 /**
  * MCP-compatible Weather API endpoint for ElevenLabs voice agents.
@@ -145,14 +146,18 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const { searchParams } = new URL(request.url);
-  const city = searchParams.get("city");
-
-  if (!city) {
+  // Normalise: absent params become empty string so Zod min(1) fires with
+  // our custom message instead of "expected string, received undefined".
+  const rawParams = { city: searchParams.get("city") ?? "" };
+  const queryParsed = weatherQuerySchema.safeParse(rawParams);
+  if (!queryParsed.success) {
+    const firstIssue = queryParsed.error.issues[0];
     return NextResponse.json(
-      { error: "City parameter is required" },
+      { error: firstIssue?.message ?? "Invalid query parameters" },
       { status: 400 }
     );
   }
+  const { city } = queryParsed.data;
 
   if (!process.env.OPENWEATHERMAP_API_KEY) {
     return NextResponse.json(
