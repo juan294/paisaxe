@@ -10,6 +10,7 @@
 
 import type { StoryCategory } from "@/types/immersive";
 import { getPlaceholderForStory } from "@/lib/unsplash-placeholders";
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -214,6 +215,7 @@ export async function searchPlaces(
           },
         },
       }),
+      signal: AbortSignal.timeout(8_000),
     }
   );
 
@@ -267,6 +269,7 @@ export async function generateDescription(
           },
         ],
       }),
+      signal: AbortSignal.timeout(8_000),
     });
 
     if (!response.ok) {
@@ -277,7 +280,7 @@ export async function generateDescription(
     const text = data.content?.[0]?.text;
     if (text) return text.trim();
   } catch (error) {
-    console.warn(`Failed to generate description for ${placeName}:`, error);
+    logger.error("[TABLE_FALLBACK]", { table: "content_discovery_description", error: error instanceof Error ? error.message : String(error) });
   }
 
   // Fallback description

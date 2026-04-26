@@ -56,6 +56,7 @@ export async function fetchTwilioCosts(
         headers: {
           Authorization: `Basic ${credentials}`,
         },
+        signal: AbortSignal.timeout(8_000),
       }
     );
 
@@ -123,6 +124,7 @@ export async function fetchTwilioCostsByDay(
         headers: {
           Authorization: `Basic ${credentials}`,
         },
+        signal: AbortSignal.timeout(8_000),
       }
     );
 
