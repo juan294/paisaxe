@@ -464,3 +464,4 @@ Engineering audit (Phases 1–10, April 2026). Key remediations:
 | v1.1.0 | Feb 2026 | Stripe payments + voice booking + admin dashboard expansion |
 | v1.2.0 | Feb 2026 | Asturian language support + UI improvements |
 | v1.3.0 | Apr 2026 | Security hardening (audit remediation phases 1-10) + content pipeline |
+| v1.4.0 | Apr 2026 | Pre-launch remediation: booking persistence, E2E reliability, admin hardening, DevOps automation |
