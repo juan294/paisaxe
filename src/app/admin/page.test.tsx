@@ -3,6 +3,19 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import AdminPage from "./page";
 import type { AdminStory } from "@/types/admin";
 
+// Mock next/navigation for URL-backed tab state.
+// Return a stable searchParams object so the sync useEffect doesn't re-fire
+// on every render and reset the active tab back to "analytics".
+const stableSearchParams = { get: (_key: string) => null as string | null };
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => stableSearchParams,
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+}));
+
 // Mock matchMedia for next-themes
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {

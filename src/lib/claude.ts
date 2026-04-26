@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Chunk, ImageResult, Source } from "@/types";
+import { CHAT_MODEL } from "@/lib/models";
 
 interface AnthropicMessage {
   role: "user" | "assistant";
@@ -451,7 +452,7 @@ export async function generateChatResponse(
   const response = await callAnthropicAPI(
     systemPrompt,
     [{ role: "user", content: userContent }],
-    "claude-sonnet-4-20250514",
+    CHAT_MODEL,
     1024
   );
 
@@ -488,7 +489,7 @@ export async function* streamChatResponse(
   yield* streamAnthropicAPI(
     systemPrompt,
     [{ role: "user", content: userContent }],
-    "claude-sonnet-4-20250514",
+    CHAT_MODEL,
     1024,
     options
   );
