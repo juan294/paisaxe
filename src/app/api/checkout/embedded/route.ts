@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createEmbeddedCheckoutSession } from "@/lib/stripe";
 import { getSupabaseClient } from "@/lib/supabase-auth";
 
+const ALLOWED_ORIGINS = [
+  process.env.NEXT_PUBLIC_SITE_URL,
+  "https://paisaxe.es",
+  "https://paisaxe.com",
+  "https://www.paisaxe.es",
+  "https://www.paisaxe.com",
+  process.env.NODE_ENV === "development" ? "http://localhost:3000" : null,
+].filter(Boolean) as string[];
+
 /** Validate returnTo slug: only allow alphanumeric, hyphens, underscores */
 function isValidSlug(value: string): boolean {
   return /^[a-z0-9][a-z0-9_-]*$/i.test(value) && value.length <= 100;
@@ -40,8 +49,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const rawOrigin = request.headers.get("origin");
+    if (rawOrigin && !ALLOWED_ORIGINS.includes(rawOrigin)) {
+      return NextResponse.json({ error: "Invalid origin" }, { status: 400 });
+    }
     const origin =
-      request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL;
+      rawOrigin && ALLOWED_ORIGINS.includes(rawOrigin)
+        ? rawOrigin
+        : (process.env.NEXT_PUBLIC_SITE_URL ?? "https://paisaxe.es");
 
     // Parse optional returnTo slug from request body
     let returnTo: string | undefined;

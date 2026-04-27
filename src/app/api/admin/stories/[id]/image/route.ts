@@ -13,6 +13,43 @@ interface RouteParams {
 
 // Increase size limit since we're optimizing on server (10MB max)
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_REMOTE_SIZE = 10 * 1024 * 1024; // 10MB cap for fetched remote images
+const FETCH_TIMEOUT_MS = 8_000;
+
+/** Block private/loopback hostnames and IP ranges to prevent SSRF. */
+function isPrivateHostname(hostname: string): boolean {
+  // Strip IPv6 brackets: [::1] → ::1
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+
+  // Loopback names
+  if (host === "localhost") return true;
+
+  // IPv6 loopback
+  if (host === "::1" || host === "0:0:0:0:0:0:0:1") return true;
+
+  // IPv4: parse octets
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [, a, b, c] = ipv4.map(Number);
+    if (a === 127) return true;                               // 127.x.x.x loopback
+    if (a === 10) return true;                                // 10.x.x.x private
+    if (a === 172 && b >= 16 && b <= 31) return true;        // 172.16–31.x.x private
+    if (a === 192 && b === 168) return true;                  // 192.168.x.x private
+    if (a === 169 && b === 254) return true;                  // 169.254.x.x link-local
+    if (a === 0) return true;                                 // 0.0.0.0/8 reserved
+    if (a === 100 && b >= 64 && b <= 127) return true;       // 100.64–127.x CGNAT
+    if (a === 198 && (b === 18 || b === 19)) return true;    // 198.18–19.x benchmarking
+    if (a === 203 && b === 0 && c === 113) return true;      // 203.0.113.x documentation
+    if (a === 240) return true;                               // 240.x.x.x reserved
+    if (a === 255) return true;                               // 255.255.255.255 broadcast
+  }
+
+  // IPv6 private/reserved prefixes
+  if (host.startsWith("fc") || host.startsWith("fd")) return true; // ULA fc00::/7
+  if (host.startsWith("fe80")) return true;                         // link-local fe80::/10
+
+  return false;
+}
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   // Validate admin auth
@@ -136,11 +173,28 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
 
       // Basic URL validation
+      let parsedUrl: URL;
       try {
-        new URL(imageUrl);
+        parsedUrl = new URL(imageUrl);
       } catch {
         return NextResponse.json(
           { error: "Invalid URL format" },
+          { status: 400 }
+        );
+      }
+
+      // SSRF hardening: only allow https:// scheme
+      if (parsedUrl.protocol !== "https:") {
+        return NextResponse.json(
+          { error: "Only https:// URLs are allowed" },
+          { status: 400 }
+        );
+      }
+
+      // SSRF hardening: block private/loopback IPs
+      if (isPrivateHostname(parsedUrl.hostname)) {
+        return NextResponse.json(
+          { error: "Private or reserved IP addresses are not allowed" },
           { status: 400 }
         );
       }
@@ -154,7 +208,18 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       try {
         const response = await fetch(imageUrl, {
           headers: { Accept: "image/*" },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
+
+        if (response.ok) {
+          const contentLength = response.headers.get("content-length");
+          if (contentLength && parseInt(contentLength, 10) > MAX_REMOTE_SIZE) {
+            return NextResponse.json(
+              { error: "Image too large (max 10MB)" },
+              { status: 400 }
+            );
+          }
+        }
 
         if (response.ok) {
           const arrayBuffer = await response.arrayBuffer();
