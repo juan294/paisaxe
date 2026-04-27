@@ -12,7 +12,7 @@ describe("RootLoading", () => {
   it("has a dark background", () => {
     const { container } = render(<RootLoading />);
     const wrapper = container.firstChild as HTMLElement;
-    expect(wrapper.className).toContain("bg-black");
+    expect(wrapper.className).toContain("bg-neutral-950");
   });
 
   it("renders the spinner as a div element", () => {
