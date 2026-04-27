@@ -96,6 +96,7 @@ export const mockTranslations: Record<string, string> = {
   "auth.sign_in": "Entrar",
   "auth.sign_out": "Cerrar sesion",
   "auth.user": "Usuario",
+  "auth.user_avatar": "Avatar del usuario",
   "auth.sync_favorites_title": "Sincroniza tus favoritos",
   "auth.sync_favorites_description": "Inicia sesion para guardar tus favoritos en la nube y acceder desde cualquier dispositivo.",
   "auth.continue_with_google": "Continuar con Google",
