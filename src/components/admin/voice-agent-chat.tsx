@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useConversation } from "@elevenlabs/react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import {
   Mic,
   MicOff,
@@ -16,6 +17,7 @@ import { csrfHeaders } from "@/lib/csrf-client";
 import type { MarketingPlatform } from "@/types/marketing";
 
 interface Message {
+  id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
@@ -104,25 +106,24 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
   const { status, isSpeaking } = conversation;
   const isConnected = status === "connected";
 
+  const prefersReducedMotion = useReducedMotion();
+
   const addMessage = useCallback((role: "user" | "assistant", content: string) => {
-    setMessages((prev) => [...prev, { role, content, timestamp: new Date() }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), role, content, timestamp: new Date() },
+    ]);
   }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }, [prefersReducedMotion]);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
-
-  // Check microphone permission
-  useEffect(() => {
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then(() => setHasPermission(true))
-      .catch(() => setHasPermission(false));
-  }, []);
+  }, [messages, scrollToBottom]);
 
   const handleAgentChange = async (agent: Agent) => {
     // End current conversation if active
@@ -143,6 +144,16 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
 
     try {
       setError(null);
+
+      // Request mic permission on click — not on mount (UX-H1)
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        setHasPermission(true);
+      } catch {
+        setHasPermission(false);
+        return;
+      }
+
       await conversation.startSession({
         agentId: selectedAgent.elevenLabsAgentId,
         connectionType: "websocket",
@@ -387,9 +398,9 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
           </div>
         ) : (
           <div className="space-y-3">
-            {messages.map((message, index) => (
+            {messages.map((message) => (
               <div
-                key={index}
+                key={message.id}
                 className={cn(
                   "flex gap-3",
                   message.role === "user" ? "flex-row-reverse" : ""

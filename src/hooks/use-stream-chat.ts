@@ -16,6 +16,7 @@ import { csrfHeaders } from "@/lib/csrf-client";
 import { parseSseEvent } from "@/types/sse";
 
 interface StreamChatMessage {
+  id: string;
   role: "user" | "assistant";
   content: string;
   images?: ImageResult[];
@@ -82,8 +83,8 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
       setMessages((prev) => {
         const updated: StreamChatMessage[] = [
           ...prev,
-          { role: "user", content: userMessage },
-          { role: "assistant", content: "" },
+          { id: crypto.randomUUID(), role: "user", content: userMessage },
+          { id: crypto.randomUUID(), role: "assistant", content: "" },
         ];
         assistantIndex = updated.length - 1;
         return updated;
@@ -115,6 +116,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           setMessages((prev) => {
             const updated = [...prev];
             updated[assistantIndex] = {
+              ...updated[assistantIndex],
               role: "assistant",
               content: data.message || t("chat.error_processing"),
               images: data.images,
@@ -176,6 +178,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
               const current = updated[assistantIndex];
 
               updated[assistantIndex] = {
+                ...current,
                 role: "assistant",
                 content: t("chat.error_generic"),
                 images: current?.images,
@@ -213,11 +216,13 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           const updated = [...prev];
           if (updated[assistantIndex]) {
             updated[assistantIndex] = {
+              ...updated[assistantIndex],
               role: "assistant",
               content: t("chat.error_generic"),
             };
           } else {
             updated.push({
+              id: crypto.randomUUID(),
               role: "assistant",
               content: t("chat.error_generic"),
             });
