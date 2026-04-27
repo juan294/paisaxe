@@ -4,6 +4,7 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 import type { StorySuggestionRow, UpdateSuggestionRequest } from "@/types/suggestions";
 import { rowToStorySuggestion } from "@/types/suggestions";
 import { updateSuggestionSchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -78,7 +79,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (error) {
-      console.error("Error updating suggestion:", error);
+      logger.error("Error updating suggestion:", { error: error.message });
       if (error.code === "PGRST116") {
         return NextResponse.json(
           { error: "Suggestion not found" },
@@ -94,7 +95,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const suggestion = rowToStorySuggestion(data as StorySuggestionRow);
     return NextResponse.json({ data: suggestion });
   } catch (error) {
-    console.error("Admin suggestion update error:", error);
+    logger.error("Admin suggestion update error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -128,7 +129,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .eq("id", id);
 
     if (error) {
-      console.error("Error deleting suggestion:", error);
+      logger.error("Error deleting suggestion:", { error: error.message });
       return NextResponse.json(
         { error: "Failed to delete suggestion" },
         { status: 500 }
@@ -137,7 +138,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: { id, deleted: true } });
   } catch (error) {
-    console.error("Admin suggestion delete error:", error);
+    logger.error("Admin suggestion delete error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

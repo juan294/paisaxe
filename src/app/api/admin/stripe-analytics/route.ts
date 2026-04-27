@@ -8,6 +8,7 @@ import type {
   StripeProductBreakdown,
 } from "@/types/stripe-analytics";
 import type Stripe from "stripe";
+import { logger } from "@/lib/logger";
 
 function formatCurrency(amount: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
@@ -274,7 +275,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Stripe analytics API error:", error);
+    logger.error("Stripe analytics API error:", { error: error instanceof Error ? error.message : String(error) });
 
     // Return empty data on error
     const url = new URL(request.url);

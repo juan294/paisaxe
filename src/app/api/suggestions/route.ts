@@ -6,6 +6,7 @@ import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 import { getClientIp } from "@/lib/request-utils";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createSuggestionSchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 const SUGGESTION_RATE_LIMIT = {
   windowMs: 60_000,     // 1 minute
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching suggestions:", error);
+    logger.error("Error fetching suggestions:", { error: error.message });
     return NextResponse.json(
       { error: "Failed to fetch suggestions" },
       { status: 500 }
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) {
-    console.error("Error creating suggestion:", error);
+    logger.error("Error creating suggestion:", { error: error.message });
     return NextResponse.json(
       { error: "Failed to create suggestion" },
       { status: 500 }

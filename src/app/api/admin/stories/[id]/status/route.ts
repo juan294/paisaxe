@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import type { CurationStatus } from "@/types/admin";
+import { logger } from "@/lib/logger";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -47,7 +48,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (error) {
-      console.error("Update error:", error);
+      logger.error("Update error:", { error: error.message });
       return NextResponse.json(
         { error: "Failed to update story status" },
         { status: 500 }
@@ -68,7 +69,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       data: { id: data.id, curationStatus: status },
     });
   } catch (error) {
-    console.error("Admin status API error:", error);
+    logger.error("Admin status API error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

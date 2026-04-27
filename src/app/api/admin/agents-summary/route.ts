@@ -9,6 +9,7 @@ import type {
   AgentActivityItem,
   AgentsDashboardData,
 } from "@/types/agents-dashboard";
+import { logger } from "@/lib/logger";
 
 /** Directory where all agent reports live (relative to project root). */
 const REPORTS_DIR = "docs/agents";
@@ -245,7 +246,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Error building agents summary:", error);
+    logger.error("Error building agents summary:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Failed to build agents summary" },
       { status: 500 }

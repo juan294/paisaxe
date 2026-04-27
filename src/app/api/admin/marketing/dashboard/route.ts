@@ -14,6 +14,7 @@ import {
   type PlatformStats,
   type PostEngagement,
 } from "@/types/marketing";
+import { logger } from "@/lib/logger";
 
 /**
  * GET /api/admin/marketing/dashboard
@@ -47,7 +48,7 @@ export async function GET() {
     ]);
 
     if (accountsResult.error) {
-      console.error("Error fetching accounts:", accountsResult.error);
+      logger.error("Error fetching accounts:", { error: accountsResult.error.message });
       return NextResponse.json(
         { error: "Failed to fetch accounts" },
         { status: 500 }
@@ -55,7 +56,7 @@ export async function GET() {
     }
 
     if (postsResult.error) {
-      console.error("Error fetching posts:", postsResult.error);
+      logger.error("Error fetching posts:", { error: postsResult.error.message });
       return NextResponse.json(
         { error: "Failed to fetch posts" },
         { status: 500 }
@@ -63,7 +64,7 @@ export async function GET() {
     }
 
     if (schedulesResult.error) {
-      console.error("Error fetching schedules:", schedulesResult.error);
+      logger.error("Error fetching schedules:", { error: schedulesResult.error.message });
       return NextResponse.json(
         { error: "Failed to fetch schedules" },
         { status: 500 }
@@ -117,7 +118,7 @@ export async function GET() {
 
     return NextResponse.json({ data: summary });
   } catch (error) {
-    console.error("Marketing dashboard API error:", error);
+    logger.error("Marketing dashboard API error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

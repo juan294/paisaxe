@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { logger } from "@/lib/logger";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -45,7 +46,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (error) {
-      console.error("Update error:", error);
+      logger.error("Update error:", { error: error.message });
       return NextResponse.json(
         { error: "Failed to update image source" },
         { status: 500 }
@@ -66,7 +67,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       },
     });
   } catch (error) {
-    console.error("Admin image source API error:", error);
+    logger.error("Admin image source API error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
