@@ -89,7 +89,7 @@ export function useAnalyticsData<T>(
   const fetchFnRef = useRef(fetchFn);
   fetchFnRef.current = fetchFn;
 
-  // Counter to force effect re-run when staleness is detected during render
+  // Counter to force main effect re-run when staleness is detected
   const [revalidationTrigger, setRevalidationTrigger] = useState(0);
 
   const doFetch = useCallback(
@@ -134,17 +134,19 @@ export function useAnalyticsData<T>(
     [cache, inflight]
   );
 
-  // Render-time staleness check: if cached data exists but is stale,
-  // bump the trigger to force the effect to re-run and start background revalidation.
-  // This handles same-key re-renders (e.g., tab switch back to a panel).
-  if (enabled && cached && !inflight.has(cacheKey)) {
-    const isStale = Date.now() - cached.timestamp > staleTime;
+  // FE-H6: staleness check moved to useEffect — no render-phase side effects.
+  // Runs when cacheKey or enabled changes. When cached data is stale and no request
+  // is inflight, bumps revalidationTrigger to cause the fetch effect to re-run.
+  useEffect(() => {
+    if (!enabled) return;
+    const entry = cache.get(cacheKey) as CacheEntry<T> | undefined;
+    if (!entry || inflight.has(cacheKey)) return;
+    const isStale = Date.now() - entry.timestamp > staleTime;
     if (isStale) {
-      // Schedule a state update to trigger the effect on next render
-      // Using queueMicrotask to avoid setState-during-render warnings
-      queueMicrotask(() => setRevalidationTrigger((n) => n + 1));
+      setRevalidationTrigger((n) => n + 1);
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey, enabled]);
 
   // Fetch on mount / params change / revalidation trigger
   useEffect(() => {

@@ -2,21 +2,13 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { AdminShell } from "./admin-shell";
 
-// Mock next/navigation for URL-backed tab state.
-// The component uses useState for immediate UI updates and router.push() for
-// URL sync. useSearchParams() must return a stable reference so the
-// sync useEffect doesn't re-fire on every render and override tab state.
-const mockPush = vi.fn();
-// Stable object — same reference across renders, so useEffect([searchParams]) doesn't re-run.
-const stableSearchParams = { get: (_key: string) => null as string | null };
+// Mock next/navigation (used after FE-H5 fix)
+const mockRouterPush = vi.fn();
+const mockSearchParamsGet = vi.fn();
 
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => stableSearchParams,
-  useRouter: () => ({
-    push: mockPush,
-    replace: vi.fn(),
-    back: vi.fn(),
-  }),
+  useRouter: () => ({ push: mockRouterPush }),
+  useSearchParams: () => ({ get: mockSearchParamsGet }),
 }));
 
 // Mock matchMedia for next-themes
@@ -197,6 +189,8 @@ describe("AdminShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetchStories.mockResolvedValue({ data: [] });
+    // Default: no tab param in URL → defaults to "analytics"
+    mockSearchParamsGet.mockReturnValue(null);
   });
 
   describe("Auth gating", () => {
@@ -415,12 +409,25 @@ describe("AdminShell", () => {
     });
   });
 
-  describe("FE-S1: URL-backed tab state", () => {
+  describe("FE-H5: activeTab derived from searchParams, tab change only calls router.push", () => {
     beforeEach(() => {
       setupAdminAuth();
     });
 
-    it("defaults to analytics tab when no tab param in URL", async () => {
+    it("derives activeTab from searchParams.get('tab')", async () => {
+      mockSearchParamsGet.mockReturnValue("stories");
+
+      render(<AdminShell />);
+
+      // The stories panel content should be active (no analytics dashboard)
+      await waitFor(() => {
+        expect(screen.queryByTestId("analytics-dashboard")).not.toBeInTheDocument();
+      });
+    });
+
+    it("defaults to 'analytics' tab when searchParams has no tab param", async () => {
+      mockSearchParamsGet.mockReturnValue(null);
+
       render(<AdminShell />);
 
       await waitFor(() => {
@@ -428,17 +435,9 @@ describe("AdminShell", () => {
       });
     });
 
-    it("calls router.push with ?tab= when tab changes", async () => {
-      render(<AdminShell />);
+    it("calls router.push (not double setState) when a tab is clicked", async () => {
+      mockSearchParamsGet.mockReturnValue(null); // start on analytics
 
-      await act(async () => {
-        fireEvent.click(screen.getByText("Marketing"));
-      });
-
-      expect(mockPush).toHaveBeenCalledWith("?tab=marketing", { scroll: false });
-    });
-
-    it("switches the active tab immediately via useState (not waiting for URL)", async () => {
       render(<AdminShell />);
 
       await waitFor(() => {
@@ -449,10 +448,22 @@ describe("AdminShell", () => {
         fireEvent.click(screen.getByText("Features"));
       });
 
+      // router.push must be called with the new tab in the URL
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.stringContaining("tab=features")
+      );
+    });
+
+    it("does not call router.push on initial render", async () => {
+      mockSearchParamsGet.mockReturnValue(null);
+
+      render(<AdminShell />);
+
       await waitFor(() => {
-        expect(screen.getByTestId("feature-toggles-panel")).toBeInTheDocument();
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
       });
-      expect(screen.queryByTestId("analytics-dashboard")).not.toBeInTheDocument();
+
+      expect(mockRouterPush).not.toHaveBeenCalled();
     });
   });
 });

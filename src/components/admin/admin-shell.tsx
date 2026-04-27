@@ -13,8 +13,8 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdminRole } from "@/hooks/use-admin-role";
 import { StoryGrid } from "@/components/admin/story-grid";
@@ -132,21 +132,11 @@ export function AdminShell() {
     signOut,
   } = useAuth();
   const { isAdmin, isLoading: isRoleLoading } = useAdminRole();
-
-  // URL-backed tab state (FE-S1): persists tab across refresh and enables
-  // direct linking to a specific admin tab via ?tab=stories etc.
-  // useState drives the immediate UI update; useEffect syncs it to the URL.
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<AdminTab>(
-    () => (searchParams.get("tab") as AdminTab | null) ?? "analytics"
-  );
+  const searchParams = useSearchParams();
 
-  // Sync from URL → state (handles back/forward navigation and initial load)
-  useEffect(() => {
-    const tabFromUrl = (searchParams.get("tab") as AdminTab | null) ?? "analytics";
-    setActiveTab(tabFromUrl);
-  }, [searchParams]);
+  // FE-H5: derive activeTab from URL — single source of truth, no ping-pong
+  const activeTab = (searchParams.get("tab") ?? "analytics") as AdminTab;
 
   const [allStories, setAllStories] = useState<AdminStory[]>([]);
   const [filter, setFilter] = useState<FilterType>("needs_curation");
@@ -162,7 +152,6 @@ export function AdminShell() {
 
   const handleTabChange = useCallback(
     (tab: AdminTab) => {
-      setActiveTab(tab);
       router.push(`?tab=${tab}`, { scroll: false });
     },
     [router]
