@@ -191,12 +191,6 @@ export const agentConfigEnableSchema = z.object({
   value: z.unknown().optional(),
 });
 
-/** Union: either a master toggle or a per-agent update. */
-export const agentConfigUpdateSchema = z.union([
-  agentConfigMasterSchema,
-  agentConfigEnableSchema,
-]);
-
 // ---------------------------------------------------------------------------
 // admin/suggestions/[id] PUT
 // ---------------------------------------------------------------------------
