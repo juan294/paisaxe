@@ -30,6 +30,28 @@ describe("search", () => {
   });
 
   describe("searchChunks", () => {
+    it("should not pass ef_search as a client-side parameter (HNSW sets it via SET LOCAL inside match_chunks SQL function)", async () => {
+      // Regression test for PE-H1: hnsw.ef_search = 40 is set via SET LOCAL
+      // inside the match_chunks plpgsql function (migration 084), NOT as a
+      // client-supplied RPC argument. This verifies the RPC call shape is clean.
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        data: [],
+        error: null,
+      } as never);
+
+      const embedding = new Array(512).fill(0.1);
+      await searchChunks(embedding, 5);
+
+      const rpcCall = vi.mocked(supabase.rpc).mock.calls[0];
+      expect(rpcCall[0]).toBe("match_chunks");
+      // Only these three parameters should be passed — no ef_search, no probes
+      expect(Object.keys(rpcCall[1] as object)).toEqual(
+        expect.arrayContaining(["query_embedding", "match_threshold", "match_count"])
+      );
+      expect(rpcCall[1]).not.toHaveProperty("ef_search");
+      expect(rpcCall[1]).not.toHaveProperty("probes");
+    });
+
     it("should search chunks with vector embedding", async () => {
       const mockData = [
         {
