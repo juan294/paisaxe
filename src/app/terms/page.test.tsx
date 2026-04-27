@@ -1,17 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import TermsPage from './page';
 
-const mockT = vi.fn((key: string) => key);
-vi.mock('@/lib/i18n', () => ({
-  useTranslation: () => ({ t: mockT, locale: 'en', setLocale: vi.fn() }),
+// TermsPage is a server component — no "use client", no hooks, no LanguageProvider needed.
+// Mock the i18n modules so the page resolves translation keys as themselves (fast test setup).
+vi.mock('@/lib/i18n/es', () => ({ es: {} }));
+vi.mock('@/lib/i18n/resolve', () => ({
+  resolveTranslation: (_key: string, _translations: unknown) => _key,
 }));
 
 describe('TermsPage', () => {
-  beforeEach(() => {
-    mockT.mockImplementation((key: string) => key);
-  });
-
   it('renders the page heading', () => {
     render(<TermsPage />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('terms.title');
