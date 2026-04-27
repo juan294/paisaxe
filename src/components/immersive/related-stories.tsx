@@ -46,9 +46,9 @@ export const RelatedStories = memo(function RelatedStories({
       >
         <span>{t("stories.related")}</span>
         {isExpanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
           <ChevronUp className="h-4 w-4" />
+        ) : (
+          <ChevronDown className="h-4 w-4" />
         )}
       </button>
 

@@ -17,17 +17,14 @@ export function AuthorTypewriter({ prefersReducedMotion, t, visible = true }: Au
     if (!textRef.current) return;
 
     const messages = [
-      "</> JG",
+      "JG",
       t("author_pill.made_with_love"),
       t("author_pill.fueled_by_sidra"),
-      "npm run explore",
       t("author_pill.buen_camino"),
       t("author_pill.probably_hiking"),
       t("author_pill.out_cycling"),
       t("author_pill.scaling_rocks"),
       t("author_pill.sleep_not_found"),
-      t("author_pill.works_on_my_machine"),
-      t("author_pill.bug_free"),
     ];
     const HOME = messages[0];
     const CHAR_DELAY = 80;
@@ -177,7 +174,7 @@ export function AuthorTypewriter({ prefersReducedMotion, t, visible = true }: Au
         aria-label="Made by Juan González"
       >
         <span className="text-[10px] font-mono text-white/45 group-hover:text-white/60 transition-colors duration-300 select-none whitespace-nowrap">
-          <span ref={textRef}>{`</> JG`}</span>
+          <span ref={textRef}>{`JG`}</span>
           <span
             className={cn(
               "text-white/30 ml-px",
