@@ -47,6 +47,10 @@ export async function register() {
 
   const { logger } = await import("@/lib/logger");
 
+  if (!process.env.NEXT_PUBLIC_SENTRY_DSN?.trim()) {
+    logger.warn("[SENTRY_UNCONFIGURED] NEXT_PUBLIC_SENTRY_DSN is not set — error reporting is disabled");
+  }
+
   globalThis.__paisaxeOriginalConsole = {
     error: console.error.bind(console),
     info: console.info.bind(console),
