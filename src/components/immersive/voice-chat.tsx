@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import ReactMarkdown from "react-markdown";
 import { Story } from "@/types/immersive";
 import { cn } from "@/lib/utils";
 import { X, Send, AudioLines, Keyboard } from "lucide-react";
@@ -21,6 +20,9 @@ import { useStreamChat } from "@/hooks/use-stream-chat";
 import dynamic from "next/dynamic";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
 import { usePostHog } from "posthog-js/react";
+
+// #334: dynamic import defers react-markdown (~50KB) until VoiceChat is mounted
+const ReactMarkdown = dynamic(() => import("react-markdown"), { ssr: false });
 
 /**
  * Loading skeleton shown while the VoiceChatElevenLabs chunk is being fetched.
@@ -125,13 +127,17 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
     }
   }, []);
 
-  // Auto-send initial message
+  // Auto-send initial message — one-shot on mount.
+  // Capture prop in a ref so the effect never re-runs when the prop changes later.
+  // messages.length and isLoading are always 0/false at mount, so not needed in deps.
+  const initialMessageRef = useRef(initialMessage);
   useEffect(() => {
-    if (initialMessage && messages.length === 0 && !isLoading) {
-      setInputValue(initialMessage);
+    if (initialMessageRef.current) {
+      setInputValue(initialMessageRef.current);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialMessage]);
+    // Intentionally empty — one-shot on mount. (#330: replaced eslint-disable with ref guard)
+     
+  }, []);
 
   // Auto-scroll
   useEffect(() => {
@@ -188,6 +194,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
       ref={dialogRef}
       className="fixed inset-0 z-50 flex items-end justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] md:items-center"
       role="dialog"
+      aria-modal="true"
       aria-label={t("accessibility.chat_dialog").replace("{title}", localizedStory.title)}
     >
       {/* Backdrop */}

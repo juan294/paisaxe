@@ -74,11 +74,8 @@ async function signInTestUser(page: Page): Promise<{ userId: string }> {
     { key: storageKey, session: data.session }
   );
 
-  // Reload page to pick up the session
-  await page.reload();
-
-  // Wait for auth state to settle (flakiness mitigation)
-  await page.waitForTimeout(500);
+  // Reload page to pick up the session and wait for it to fully load
+  await page.reload({ waitUntil: "domcontentloaded" });
 
   return { userId: data.user.id };
 }

@@ -95,6 +95,7 @@ export async function isMaintenanceModeEnabled(): Promise<boolean> {
           apikey: supabaseKey,
           Authorization: `Bearer ${supabaseKey}`,
         },
+        signal: AbortSignal.timeout(8_000),
         ...(isDev
           ? { cache: "no-store" as const }
           : { next: { revalidate: 30 } }

@@ -40,7 +40,7 @@ export function AuthButton({ className }: AuthButtonProps) {
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={user.avatarUrl}
-              alt={user.name || "User avatar"}
+              alt={user.name || t("auth.user_avatar")}
               className="h-full w-full object-cover"
               referrerPolicy="no-referrer"
             />

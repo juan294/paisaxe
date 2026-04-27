@@ -173,7 +173,7 @@ export function VoiceChatElevenLabs({
 
   const startConversation = async () => {
     if (!agentId) {
-      setError("Voice agent not configured");
+      setError(t("voice.error_not_configured"));
       onFallbackToText();
       return;
     }

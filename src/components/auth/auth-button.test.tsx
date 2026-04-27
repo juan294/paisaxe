@@ -231,7 +231,7 @@ describe("AuthButton", () => {
       render(<AuthButton />);
 
       // Open dropdown
-      const avatar = screen.getByAltText("User avatar");
+      const avatar = screen.getByAltText("Avatar del usuario");
       fireEvent.click(avatar);
 
       expect(screen.getByText(mockT("auth.user"))).toBeInTheDocument();

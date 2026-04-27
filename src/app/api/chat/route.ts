@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ChatResponse } from "@/types";
+import { chatRequestSchema } from "@/lib/schemas";
 
 // --- Lightweight imports: no heavy deps (Anthropic, Voyage, Supabase).
 // Static here so they are resolved once at module load, not on every request.
@@ -49,8 +50,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Input validation
-    const body = await request.json();
+    // Input validation — Zod runtime schema check first
+    const body = await request.json().catch(() => null);
+    const zodResult = chatRequestSchema.safeParse(body);
+    if (!zodResult.success) {
+      return NextResponse.json(
+        { error: "Invalid request", details: zodResult.error.flatten() },
+        { status: 400 }
+      );
+    }
+
     const validation = validateChatRequest(body);
 
     if (!validation.valid) {
@@ -129,8 +138,13 @@ export async function POST(request: NextRequest) {
 
     // === MAIN PROCESSING ===
 
-    // Generate embedding for the user's query
-    const queryEmbedding = await generateEmbedding(cleanMessage);
+    // Parallelize the embedding call with the feature flag lookup — they are
+    // independent and can be inflight simultaneously. The search step still
+    // has to wait for the embedding (data dependency), but the flag check does not.
+    const [queryEmbedding, asturianEnabled] = await Promise.all([
+      generateEmbedding(cleanMessage),
+      isFeatureFlagEnabled("asturianu_touches"),
+    ]);
 
     // Search for relevant content (with reranking via query text)
     const { chunks, images } = await search(queryEmbedding, 3, cleanMessage);
@@ -139,9 +153,6 @@ export async function POST(request: NextRequest) {
     const enrichedMessage = context
       ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
       : cleanMessage;
-
-    // Check if Asturianu touches feature is enabled (cached via isFeatureFlagEnabled)
-    const asturianEnabled = await isFeatureFlagEnabled("asturianu_touches");
 
     // Generate response using Claude with context
     const responseText = await generateChatResponse(

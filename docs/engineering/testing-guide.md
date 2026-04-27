@@ -11,7 +11,7 @@ Paisaxe uses a two-layer testing strategy:
 
 | Layer | Tool | Scope | Files | Tests |
 |-------|------|-------|-------|-------|
-| **Unit & Component** | Vitest + React Testing Library | Functions, components, hooks, API routes | 324 | ~6,000 |
+| **Unit & Component** | Vitest + React Testing Library | Functions, components, hooks, API routes | 332 | 6,059 |
 | **End-to-End** | Playwright | Full browser journeys across pages | 16 | 32 (16 desktop + 16 mobile) |
 
 Both layers run in CI on every push and pull request to `develop` and `main`.
@@ -127,7 +127,7 @@ The helper provides 115+ Spanish translation strings covering all UI areas: comm
 
 ### Unit Test File Inventory
 
-**324 files, ~6,000 tests** organized by area (representative sample — the inventory below covers the original core files; the full test suite has grown significantly as new features were added):
+**332 files, 6,059 tests** organized by area (representative sample — the inventory below covers the original core files; the full test suite has grown significantly as new features were added):
 
 #### Pages & Layouts (15 files)
 
@@ -544,7 +544,7 @@ Every `git commit` runs these checks sequentially:
 ```
 1. npm run typecheck    → TypeScript compilation
 2. npm run lint         → ESLint
-3. npm run test         → Full Vitest suite (~6,000 tests)
+3. npm run test         → Full Vitest suite (~6,059 tests)
 ```
 
 If any step fails, the commit is rejected. This ensures no broken code reaches the repository.

@@ -19,6 +19,7 @@ import { SurpriseMeButton } from "./surprise-me-button";
 import { ShareButton } from "./share-button";
 import { LanguageSwitcher } from "./language-switcher";
 import { SuggestPlaceButton } from "./suggest-place-button";
+import { SuggestPlaceDialog } from "./suggest-place-dialog";
 import { ToolbarOverflowMenu, ToolbarOverflowItem } from "./toolbar-overflow-menu";
 import { FullscreenButton } from "./fullscreen-button";
 import { useTranslation } from "@/lib/i18n";
@@ -29,6 +30,7 @@ import { StoryProgressBar } from "./story-progress-bar";
 import { StoryToolbar } from "./story-toolbar";
 import { StoryInfoPanel } from "./story-info-panel";
 import { useStoryKeyboardNav } from "@/hooks/use-story-keyboard-nav";
+import { useIsFinePointer } from "@/hooks/use-media-query";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -75,9 +77,13 @@ export function StoryViewer({
   const [showInfo, setShowInfo] = useState(true);
   const [autoPlay, setAutoPlay] = useState(false);
   const [ambientMode, setAmbientMode] = useState(false);
+  // #328: lifted suggest-dialog state — avoids DOM coupling in overflow menu
+  const [isSuggestDialogOpen, setIsSuggestDialogOpen] = useState(false);
   const { isEnabled } = useFeatureFlags();
   const { t, locale } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
+  // #329: cache matchMedia result instead of calling on every click
+  const isFinePointer = useIsFinePointer();
 
   const { requiresAuth, isFavorite, toggleFavorite } = useFavorites();
 
@@ -222,9 +228,13 @@ export function StoryViewer({
   return (
     <main
       className="relative h-dvh w-screen overflow-hidden bg-black cursor-pointer"
+      // UX-B4: hide background carousel from assistive tech while the chat dialog
+      // is open so screen readers can't navigate behind the modal. Pairs with
+      // aria-modal="true" on the VoiceChat dialog.
+      aria-hidden={chatOpen ? "true" : undefined}
       onClick={() => {
         // Only toggle info on desktop (pointer: fine) — on mobile, tap zones handle navigation
-        if (window.matchMedia("(pointer: fine)").matches) {
+        if (isFinePointer) {
           setShowInfo((prev) => !prev);
         }
       }}
@@ -392,7 +402,7 @@ export function StoryViewer({
         {/* Suggest Place button - hidden on mobile */}
         {isEnabled("user_story_suggestions") && (
           <div className="hidden md:block">
-            <SuggestPlaceButton />
+            <SuggestPlaceButton onOpen={() => setIsSuggestDialogOpen(true)} />
           </div>
         )}
 
@@ -438,7 +448,9 @@ export function StoryViewer({
               icon={<Share2 className="h-4 w-4" />}
               label={t("share.share")}
               onClick={() => {
-                const shareUrl = `${window.location.origin}/stories/${story.id}`;
+                // UX-B1: route is `/story/[slug]` (singular, by slug) — using the
+                // plural `/stories/<id>` path would 404. Mirrors share-button.tsx.
+                const shareUrl = `${window.location.origin}/story/${story.slug || story.id}`;
                 if (navigator.share) {
                   navigator.share({
                     title: localizedStory.title,
@@ -452,7 +464,10 @@ export function StoryViewer({
             />
           )}
           {isEnabled("user_story_suggestions") && (
-            <SuggestPlaceButton variant="menu" />
+            <SuggestPlaceButton
+              variant="menu"
+              onOpen={() => setIsSuggestDialogOpen(true)}
+            />
           )}
         </ToolbarOverflowMenu>
 
@@ -485,6 +500,12 @@ export function StoryViewer({
 
       {/* First-visit navigation hint for mobile users */}
       <NavigationHint />
+
+      {/* Suggest Place dialog — state lifted here (#328: no DOM coupling) */}
+      <SuggestPlaceDialog
+        isOpen={isSuggestDialogOpen}
+        onClose={() => setIsSuggestDialogOpen(false)}
+      />
     </main>
   );
 }

@@ -21,12 +21,14 @@ const nextConfig: NextConfig = {
   // Routes using fs + process.cwd() (agents-summary, agents/run) cause
   // Next.js to trace the entire project root, pulling in content/images
   // and blowing past Vercel's 250MB unzipped function size limit.
+  // Note: ./docs/** was previously listed here but is no longer needed — the
+  // agent-reports route now returns early in production, eliminating the
+  // filesystem trace that pulled in docs/agents/ (#324).
   outputFileTracingExcludes: {
     "*": [
       "./content/**",
       "./coverage/**",
       "./public/**",
-      "./docs/**",
       "./logs/**",
       "./scripts/**",
       "./supabase/**",

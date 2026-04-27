@@ -1,6 +1,7 @@
 import type { Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
 import { rowToStory } from "@/types/immersive";
 import { supabase } from "./supabase";
+import { logger } from "@/lib/logger";
 
 // LOCATION-SPECIFIC: Import fallback stories from content directory
 // When replicating, replace content/fallback-stories.json with location-specific stories
@@ -40,7 +41,7 @@ export async function getStoriesFromDB(): Promise<Story[]> {
 
     if (error) {
       if (!isBuildPhase()) {
-        console.warn("Failed to fetch stories from DB, using fallback:", error.message);
+        logger.error("[TABLE_FALLBACK]", { table: "stories", error: error.message });
       }
       return FALLBACK_STORIES;
     }
@@ -52,7 +53,7 @@ export async function getStoriesFromDB(): Promise<Story[]> {
     return (data as StoryRow[]).map(rowToStory);
   } catch (error) {
     if (!isBuildPhase()) {
-      console.warn("Error fetching stories:", error);
+      logger.error("[TABLE_FALLBACK]", { table: "stories", error: error instanceof Error ? error.message : String(error) });
     }
     return FALLBACK_STORIES;
   }
@@ -77,7 +78,7 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
 
     if (error) {
       if (!isBuildPhase()) {
-        console.warn("Failed to fetch stories by category, using fallback:", error.message);
+        logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "category", error: error.message });
       }
       return FALLBACK_STORIES.filter(s => s.category === category);
     }
@@ -89,7 +90,7 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
     return (data as StoryRow[]).map(rowToStory);
   } catch (error) {
     if (!isBuildPhase()) {
-      console.warn("Error fetching stories by category:", error);
+      logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "category", error: error instanceof Error ? error.message : String(error) });
     }
     return FALLBACK_STORIES.filter(s => s.category === category);
   }
@@ -110,7 +111,7 @@ export async function getStoriesByLocationFromDB(location: StoryLocation): Promi
 
     if (error) {
       if (!isBuildPhase()) {
-        console.warn("Failed to fetch stories by location, using fallback:", error.message);
+        logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "location", error: error.message });
       }
       return FALLBACK_STORIES.filter(s => s.location === location);
     }
@@ -122,7 +123,7 @@ export async function getStoriesByLocationFromDB(location: StoryLocation): Promi
     return (data as StoryRow[]).map(rowToStory);
   } catch (error) {
     if (!isBuildPhase()) {
-      console.warn("Error fetching stories by location:", error);
+      logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "location", error: error instanceof Error ? error.message : String(error) });
     }
     return FALLBACK_STORIES.filter(s => s.location === location);
   }
@@ -143,7 +144,7 @@ export async function getStoriesByDurationFromDB(duration: StoryDuration): Promi
 
     if (error) {
       if (!isBuildPhase()) {
-        console.warn("Failed to fetch stories by duration, using fallback:", error.message);
+        logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "duration", error: error.message });
       }
       return FALLBACK_STORIES.filter(s => s.duration === duration);
     }
@@ -155,7 +156,7 @@ export async function getStoriesByDurationFromDB(duration: StoryDuration): Promi
     return (data as StoryRow[]).map(rowToStory);
   } catch (error) {
     if (!isBuildPhase()) {
-      console.warn("Error fetching stories by duration:", error);
+      logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "duration", error: error instanceof Error ? error.message : String(error) });
     }
     return FALLBACK_STORIES.filter(s => s.duration === duration);
   }
@@ -176,7 +177,7 @@ export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> 
 
     if (error) {
       if (!isBuildPhase()) {
-        console.warn("Failed to fetch story by slug:", error.message);
+        logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "slug", error: error.message });
       }
       return FALLBACK_STORIES.find(s => s.slug === slug || s.id === slug) || null;
     }
@@ -184,7 +185,7 @@ export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> 
     return data ? rowToStory(data as StoryRow) : null;
   } catch (error) {
     if (!isBuildPhase()) {
-      console.warn("Error fetching story:", error);
+      logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "slug", error: error instanceof Error ? error.message : String(error) });
     }
     return FALLBACK_STORIES.find(s => s.slug === slug || s.id === slug) || null;
   }

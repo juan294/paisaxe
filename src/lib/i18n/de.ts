@@ -39,6 +39,7 @@ export const de: Translations = {
     directions: 'Wegbeschreibung',
     copy_conversation: 'Gespräch kopieren',
     copied: 'Kopiert',
+    assistant_label: 'Paisaxe',
   },
 
   stories: {
@@ -156,6 +157,7 @@ export const de: Translations = {
 
   auth: {
     user: 'Benutzer',
+    user_avatar: 'Benutzer-Avatar',
     sign_out: 'Abmelden',
     sign_in: 'Anmelden',
     sync_favorites_title: 'Synchronisieren Sie Ihre Favoriten',
@@ -197,6 +199,7 @@ export const de: Translations = {
     mute: 'Stummschalten',
     unmute: 'Ton aktivieren',
     error: 'Verbindungsfehler',
+    error_not_configured: 'Sprachassistent nicht konfiguriert',
     no_permission: 'Mikrofonzugriff benötigt',
     you: 'Du',
     loading: 'Sprachassistent wird geladen...',
@@ -248,6 +251,8 @@ export const de: Translations = {
   },
 
   premium: {
+    premium_access: 'Premium-Zugang',
+    voice_pass_label: 'Sprachpass · 24h',
     voice_locked: 'Sprachchat ist eine Premium-Funktion',
     get_day_pass: 'Tagespass Holen',
     voice_title: 'Sprich mit Deinem Guide',
@@ -290,6 +295,7 @@ export const de: Translations = {
   },
 
   errors: {
+    unknown: 'Etwas ist schiefgelaufen, bitte versuche es erneut',
     generic_title: 'Etwas ist schiefgelaufen',
     generic_description: 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
     retry: 'Erneut versuchen',
