@@ -294,6 +294,13 @@ describe("VoiceChat", () => {
       );
       expect(submitButton).toBeInTheDocument();
     });
+
+    it("UX-B4: should set aria-modal=\"true\" on the dialog element", () => {
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toHaveAttribute("aria-modal", "true");
+    });
   });
 
   describe("close functionality", () => {
