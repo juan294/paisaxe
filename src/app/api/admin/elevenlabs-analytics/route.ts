@@ -9,6 +9,7 @@ import type {
   ElevenLabsConversation,
 } from "@/types/elevenlabs-analytics";
 import { ELEVENLABS_AGENT_IDS, ELEVENLABS_API_BASE } from "@/config/elevenlabs-agents";
+import { logger } from "@/lib/logger";
 
 interface ElevenLabsConversationResponse {
   conversations: Array<{
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
   const apiKey = getEnv("ELEVENLABS_API_KEY");
 
   if (!apiKey) {
-    console.error("Missing ELEVENLABS_API_KEY");
+    logger.error("Missing ELEVENLABS_API_KEY");
     return NextResponse.json(
       { error: "ElevenLabs configuration missing" },
       { status: 500 }
@@ -246,7 +247,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("ElevenLabs analytics API error:", error);
+    logger.error("ElevenLabs analytics API error:", { error: error instanceof Error ? error.message : String(error) });
 
     // Return empty data on error
     const url = new URL(request.url);

@@ -6,6 +6,7 @@ import {
   deleteManualCost,
 } from "@/lib/costs";
 import type { UpdateManualCostRequest } from "@/types/costs-analytics";
+import { logger } from "@/lib/logger";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: entry });
   } catch (error) {
-    console.error("Get manual cost error:", error);
+    logger.error("Get manual cost error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Failed to fetch cost entry" },
       { status: 500 }
@@ -69,7 +70,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: entry });
   } catch (error) {
-    console.error("Update manual cost error:", error);
+    logger.error("Update manual cost error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Failed to update cost entry" },
       { status: 500 }
@@ -101,7 +102,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: { id, deleted: true } });
   } catch (error) {
-    console.error("Delete manual cost error:", error);
+    logger.error("Delete manual cost error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Failed to delete cost entry" },
       { status: 500 }

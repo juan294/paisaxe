@@ -9,6 +9,7 @@ import {
   type AgentConfig,
 } from "@/agents";
 import { supabase } from "@/lib/supabase";
+import { logger } from "@/lib/logger";
 
 // Agent chat request body
 interface AgentChatRequest {
@@ -188,7 +189,7 @@ export async function POST(
       },
     });
   } catch (error) {
-    console.error("Agent chat error:", error);
+    logger.error("Agent chat error:", { error: error instanceof Error ? error.message : String(error) });
 
     if (error instanceof Error && error.message.includes("Could not read")) {
       return NextResponse.json(

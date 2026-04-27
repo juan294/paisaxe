@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 import { favoritesPostSchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 // GET /api/favorites - Get user's favorites
 export async function GET(request: NextRequest) {
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching favorites:", error);
+    logger.error("Error fetching favorites:", { error: error.message });
     return NextResponse.json(
       { error: "Failed to fetch favorites" },
       { status: 500 }
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
     .upsert(rows, { onConflict: "user_id,story_id" });
 
   if (error) {
-    console.error("Error adding favorites:", error);
+    logger.error("Error adding favorites:", { error: error.message });
     return NextResponse.json(
       { error: "Failed to add favorites" },
       { status: 500 }
@@ -109,7 +110,7 @@ export async function DELETE(request: NextRequest) {
     .eq("story_id", storyId);
 
   if (error) {
-    console.error("Error removing favorite:", error);
+    logger.error("Error removing favorite:", { error: error.message });
     return NextResponse.json(
       { error: "Failed to remove favorite" },
       { status: 500 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createEmbeddedCheckoutSession } from "@/lib/stripe";
 import { getSupabaseClient } from "@/lib/supabase-auth";
 import { checkoutBodySchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 /** Validate returnTo slug: only allow alphanumeric, hyphens, underscores */
 function isValidSlug(value: string): boolean {
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const hasPriceId = !!process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
 
   if (!hasSecretKey || !hasPriceId) {
-    console.error("[checkout/embedded] Missing env vars:", { hasSecretKey, hasPriceId });
+    logger.error("[checkout/embedded] Missing env vars:", { hasSecretKey, hasPriceId });
     return NextResponse.json(
       { error: "Stripe not configured", hasSecretKey, hasPriceId },
       { status: 500 }
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ clientSecret });
   } catch (error) {
-    console.error("[checkout/embedded] Error:", error);
+    logger.error("[checkout/embedded] Error:", { error: error instanceof Error ? error.message : String(error) });
     const body: { error: string; details?: string } = {
       error: "Failed to create checkout session",
     };

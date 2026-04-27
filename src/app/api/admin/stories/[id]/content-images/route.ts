@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { logger } from "@/lib/logger";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (storyError) {
-      console.error("Error fetching story:", storyError);
+      logger.error("Error fetching story:", { error: storyError.message });
       return NextResponse.json(
         { error: "Failed to fetch story" },
         { status: 500 }
@@ -100,7 +101,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .ilike("content", `%${story.title}%`);
 
     if (chunksError) {
-      console.error("Error searching chunks:", chunksError);
+      logger.error("Error searching chunks:", { error: chunksError.message });
       return NextResponse.json(
         { error: "Failed to search chunks" },
         { status: 500 }
@@ -132,7 +133,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .in("page_number", Array.from(relevantPages));
 
     if (imagesError) {
-      console.error("Error fetching images:", imagesError);
+      logger.error("Error fetching images:", { error: imagesError.message });
       return NextResponse.json(
         { error: "Failed to fetch images" },
         { status: 500 }
@@ -169,7 +170,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     });
   } catch (error) {
-    console.error("Content images API error:", error);
+    logger.error("Content images API error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -4,6 +4,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { AgentConfigFile } from "@/types/agent-config";
 import { agentConfigMasterSchema, agentConfigEnableSchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 const CONFIG_FILE = path.join(process.cwd(), "scripts", "agent-config.json");
 const DEFAULTS_FILE = path.join(
@@ -51,7 +52,7 @@ export async function GET() {
     const config = await readConfig();
     return NextResponse.json({ data: config });
   } catch (error) {
-    console.error("Failed to read agent config:", error);
+    logger.error("Failed to read agent config:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Failed to read agent config" },
       { status: 500 },
@@ -126,7 +127,7 @@ export async function PUT(request: NextRequest) {
     await writeConfig(config);
     return NextResponse.json({ data: config });
   } catch (error) {
-    console.error("Failed to update agent config:", error);
+    logger.error("Failed to update agent config:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Failed to update agent config" },
       { status: 500 },
