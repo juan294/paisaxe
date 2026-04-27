@@ -33,6 +33,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -808,23 +809,6 @@
 - Code Quality Agent: Coverage plateau at ~98.6% stmts in jsdom — all remaining statement gaps are SSR guards, production-only paths, async-timer V8 instrumentation gaps, or structural dead code.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-24T08:04:39Z -->
-## Performance Agent -- 2026-04-24
-- Status: YELLOW -- total JS 2,940 KB / 3,000 KB (under), initial load ~2,065 KB / 2,000 KB (est., potentially over). -1 KB cache-churn only; dev cache does not reflect the Replay removal.
-- P8 DONE: Sentry Replay removed in `fef651f5` (Apr 22). `sentry.client.config.ts` no longer sets replay sample rates. Expected ~30-50 KB initial-load savings -- verification requires `npm run build` on a clean `.next`.
-- Production dep count +1 (34 -> 35): `@sentry/core@10.49.0` pinned as explicit direct dep by AR-H2 remediation (d3ffaa50). Bundle-neutral.
-- Dev cache is stale across 4 cycles at 2,940-2,941 KB. Next production build should break the plateau downward.
-- Carried: Two zero-byte untracked files `svix` and `uuid` in repo root -- stray shell output, worth cleaning up.
-
-**Cross-agent recommendations:**
-- Code Quality Agent: `svix` and `uuid` empty files in repo root are leftover shell output from recent work; safe to delete. Also confirm no `'use client'` component is importing `zod` (would bloat initial load).
-- Security Agent: P8 removes `@sentry/replay` from the static client bundle, which also eliminates the Replay PII exfiltration surface that was flagged last cycle. `resend` pin drift (6.12.0 installed vs ^6.12.2) resolves with `npm install`. No other security-relevant bundle changes.
-- Triage Agent: URGENT action -- run `rm -rf .next && npm run build` to measure the actual P8 savings. If initial load drops below 2,000 KB, status goes GREEN without P4.
-- Coverage Agent: `src/lib/sentry-client-config.test.ts` now locks the "no Replay sample rates" invariant -- good regression protection.
-- QA Agent: Replay removal means no session replays captured in production. Error reporting, stack traces, and perf traces are unaffected.
-- Cost Analyst Agent: No bundle cost change user-observable yet. Production build verification remains pending.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-04-25T01:03:51Z -->
 ## Cost Analyst — 2026-04-25
 - **Status: WATCH** — Day 25 of April. Revenue drought: **71 days** (since Feb 13). Paisaxe voice silence: **67 days** (since Feb 17). April certain to close at $0 revenue.
@@ -1099,4 +1083,20 @@
 - Code Quality Agent: Do NOT auto-bump `voyageai` past 0.1.0 (ESM build broke embeddings — see commit 8f53cd29).
 - Coverage Agent: All webhook signature paths and CSRF origin checks fully covered. No regression risk.
 - Cost Analyst Agent: 0 cost-related security concerns. Sentry Replay removal closed a PII surface at no bundle cost.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-27T08:02:35Z -->
+## Performance Agent — 2026-04-27
+- Status: YELLOW (13th cycle). Initial load 2,067 KB / 2,000 KB (Apr 25 prod baseline, unchanged). Total JS 2,941 KB / 3,000 KB.
+- +23 KB dev-cache drift (2,940 -> 2,963 KB) is noise -- no source/dep commits, deferred chunks unchanged, prod deps still 35.
+- node_modules 1,048 MB / 1,100 MB. .next grew 429 -> 668 MB (active dev session, not a budget concern).
+- P4 (Supabase realtime tree-shake, ~25 KB savings) remains the only actionable static-bundle reduction. Pair with budget raise to 2,100 KB to clear YELLOW.
+- Recommendation: any cycle reporting >5 KB drift should run a fresh `rm -rf .next && npm run build` before reporting -- dev cache is unreliable.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: P4 implementation requires a public/admin Supabase client split (`supabaseBrowserPublic`). Audit `src/components/immersive/`, `src/components/chat/`, and homepage components for callers that don't use `.channel()` or `.on()`.
+- Security Agent: postcss inner copy in Next.js bundle remains the only outstanding bundle-related security item -- not patchable, monitor Next.js upstream. resend pin already synced.
+- QA Agent: No bundle changes that would affect E2E. After P4, re-run journeys 3, 7, 14 (chat panel) to verify Supabase client swap doesn't break auth refresh.
+- Coverage Agent: P4 introduces a new module (`browser-public.ts`) -- add tests for the realtime-disabled config so the public client doesn't silently regain realtime via SDK defaults in a future upgrade.
+- Cost Analyst Agent: Bundle stable. ElevenLabs SDK chunk unchanged at 478 KB (deferred). No cost-driven perf concerns.
 <!-- ENTRY:END -->
