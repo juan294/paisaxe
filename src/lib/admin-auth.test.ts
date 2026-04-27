@@ -33,10 +33,14 @@ type CookieConfig = {
 };
 
 let capturedCookieConfig: CookieConfig | null = null;
+let capturedUrl: string | null = null;
+let capturedAnonKey: string | null = null;
 
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: (_url: string, _key: string, config: CookieConfig) => {
+  createServerClient: (url: string, key: string, config: CookieConfig) => {
     capturedCookieConfig = config;
+    capturedUrl = url;
+    capturedAnonKey = key;
     return {
       auth: {
         getUser: mockGetUser,
@@ -53,10 +57,50 @@ function setupProfileMock(data: { role: string } | null, error: unknown = null) 
   mockFrom.mockReturnValue({ select: mockSelect });
 }
 
+// ─── DO-M1 regression: admin-auth must trim Supabase env vars ──────────────
+describe("DO-M1: validateAdminAuth trims Supabase env vars", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedCookieConfig = null;
+    capturedUrl = null;
+    capturedAnonKey = null;
+    mockGetAll.mockReturnValue([]);
+  });
+
+  it("strips trailing newline from SUPABASE_URL before passing to createServerClient", async () => {
+    const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co\n";
+
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await validateAdminAuth();
+
+    expect(capturedUrl).toBe("https://test.supabase.co");
+    expect(capturedUrl).not.toMatch(/\n/);
+
+    process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
+  });
+
+  it("strips whitespace from SUPABASE_ANON_KEY before passing to createServerClient", async () => {
+    const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "  test-anon-key  ";
+
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await validateAdminAuth();
+
+    expect(capturedAnonKey).toBe("test-anon-key");
+
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
+  });
+});
+
 describe("validateAdminAuth", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedCookieConfig = null;
+    capturedUrl = null;
+    capturedAnonKey = null;
     mockGetAll.mockReturnValue([]);
   });
 
