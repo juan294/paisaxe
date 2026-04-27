@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import * as Sentry from "@sentry/nextjs";
 import { LanguageProvider } from "@/lib/i18n";
 import ImmersiveError from "./error";
+
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+}));
 
 // Mock next/link to render a plain anchor
 vi.mock("next/link", () => ({
@@ -31,8 +36,11 @@ describe("ImmersiveError", () => {
     .spyOn(console, "error")
     .mockImplementation(() => {});
 
+  const captureSpy = vi.mocked(Sentry.captureException);
+
   afterEach(() => {
     consoleSpy.mockClear();
+    captureSpy.mockClear();
   });
 
   const defaultProps = {
@@ -74,6 +82,12 @@ describe("ImmersiveError", () => {
     const error = new Error("Immersive error for logging");
     renderWithI18n(<ImmersiveError error={error} reset={vi.fn()} />);
     expect(consoleSpy).toHaveBeenCalledWith(error);
+  });
+
+  it("captures the error to Sentry", () => {
+    const error = new Error("Immersive error for Sentry");
+    renderWithI18n(<ImmersiveError error={error} reset={vi.fn()} />);
+    expect(captureSpy).toHaveBeenCalledWith(error);
   });
 
   it("has fixed full-screen dark background", () => {
