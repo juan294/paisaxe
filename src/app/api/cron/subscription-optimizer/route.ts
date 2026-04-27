@@ -11,6 +11,7 @@ import {
   type UsageMetricsInput,
 } from "@/lib/subscription-optimizer";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
+import { logger } from "@/lib/logger";
 
 /** Postgres advisory lock ID — unique per cron route. */
 const LOCK_ID = 1002;
@@ -110,7 +111,7 @@ async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextRespon
       report: markdownReport,
     });
   } catch (error) {
-    console.error("Subscription optimizer error:", error);
+    logger.error("Subscription optimizer error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       {
         error: "Analysis failed",

@@ -7,6 +7,7 @@ import type {
   GitHubTrafficPath,
   GitHubTrafficSummary,
 } from "@/types/github-analytics";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   const auth = await validateAdminAuth();
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     if (dailyError) {
-      console.error("Failed to fetch daily traffic:", dailyError);
+      logger.error("Failed to fetch daily traffic:", { error: dailyError.message });
     }
 
     const daily: GitHubTrafficDaily[] = (dailyData || []).map((row) => ({
@@ -130,7 +131,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("GitHub analytics API error:", error);
+    logger.error("GitHub analytics API error:", { error: error instanceof Error ? error.message : String(error) });
 
     return NextResponse.json({
       data: {

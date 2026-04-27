@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { timingSafeEqual } from "crypto";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 interface WebhookPayload {
   table_name: string;
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           ? [i.path.join(".")]
           : []
       );
-      console.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "supabase", fields: unknownFields });
+      logger.warn("[WEBHOOK_UNKNOWN_SHAPE]", { webhook: "supabase", fields: unknownFields });
     }
 
     const { table_name } = body;
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 200 }
     );
   } catch (error) {
-    console.error("[webhook] Error processing webhook:", error);
+    logger.error("[webhook] Error processing webhook:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

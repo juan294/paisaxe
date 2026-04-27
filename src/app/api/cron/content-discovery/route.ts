@@ -14,6 +14,7 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 import { createAdminClient } from "@/lib/supabase";
 import { runDiscovery, type DiscoverySupabaseClient } from "@/lib/content-discovery";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
+import { logger } from "@/lib/logger";
 
 /** Postgres advisory lock ID — unique per cron route. */
 const LOCK_ID = 1003;
@@ -65,7 +66,7 @@ async function discoverContent(): Promise<NextResponse> {
       ...result,
     });
   } catch (error) {
-    console.error("Content discovery error:", error);
+    logger.error("Content discovery error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       {
         error: "Discovery failed",
