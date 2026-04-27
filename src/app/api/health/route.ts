@@ -3,6 +3,11 @@ import { supabase } from "@/lib/supabase";
 import { getEnv } from "@/lib/env";
 
 type HealthStatus = "healthy" | "degraded";
+type SentryStatus = "configured" | "unconfigured";
+
+interface SentryProbeResult {
+  status: SentryStatus;
+}
 
 type CronAuthStatus =
   | { status: "ok" }
@@ -12,6 +17,7 @@ interface PublicHealthResponse {
   status: HealthStatus;
   timestamp: string;
   cron_auth: CronAuthStatus;
+  sentry: SentryProbeResult;
 }
 
 interface SupabaseProbeResult {
@@ -31,6 +37,11 @@ export const PROBE_TIMEOUTS_MS = {
   stories: 2_000,
   database: 2_000,
 } as const;
+
+function checkSentry(): SentryProbeResult {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim();
+  return { status: dsn ? "configured" : "unconfigured" };
+}
 
 const STORAGE_LIMIT_MB = 8192; // Supabase Pro tier: 8 GB
 const STORAGE_WARNING_THRESHOLD = 0.8; // 80%
@@ -129,7 +140,8 @@ function checkCronAuthConfigured(): CronAuthStatus {
 
 function buildHealthResponse(
   status: HealthStatus,
-  cronAuth: CronAuthStatus
+  cronAuth: CronAuthStatus,
+  sentry: SentryProbeResult
 ): NextResponse<PublicHealthResponse> {
   // DO-H1 / PE-H3: Always return HTTP 200.
   // Degraded state is signalled via the JSON body only.
@@ -141,6 +153,7 @@ function buildHealthResponse(
       status,
       timestamp: new Date().toISOString(),
       cron_auth: cronAuth,
+      sentry,
     },
     {
       status: 200,
@@ -154,6 +167,7 @@ function buildHealthResponse(
 
 export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
   const cronAuth = checkCronAuthConfigured();
+  const sentryStatus = checkSentry();
 
   try {
     const [supabaseStatus, storiesStatus, databaseStatus] = await Promise.all([
@@ -173,8 +187,8 @@ export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
         ? "degraded"
         : "healthy";
 
-    return buildHealthResponse(overallStatus, cronAuth);
+    return buildHealthResponse(overallStatus, cronAuth, sentryStatus);
   } catch {
-    return buildHealthResponse("degraded", cronAuth);
+    return buildHealthResponse("degraded", cronAuth, sentryStatus);
   }
 }
