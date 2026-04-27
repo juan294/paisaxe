@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
+import React from "react";
 import type { FeatureFlag } from "@/types/feature-flags";
 
 const mockFetch = vi.fn();
@@ -33,8 +34,10 @@ describe("useFeatureFlags", () => {
     // Never-resolving fetch so we can observe the loading state
     mockFetch.mockReturnValue(new Promise(() => {}));
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     expect(result.current.flags).toEqual([]);
     expect(result.current.isReady).toBe(false);
@@ -47,8 +50,10 @@ describe("useFeatureFlags", () => {
       json: async () => ({ data: flags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -68,8 +73,10 @@ describe("useFeatureFlags", () => {
       json: async () => ({ data: flags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -88,8 +95,10 @@ describe("useFeatureFlags", () => {
       json: async () => ({ data: flags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -105,8 +114,10 @@ describe("useFeatureFlags", () => {
       json: async () => ({ data: flags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -118,8 +129,10 @@ describe("useFeatureFlags", () => {
   it("should default all flags to false on fetch error", async () => {
     mockFetch.mockRejectedValue(new Error("Network error"));
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -136,8 +149,10 @@ describe("useFeatureFlags", () => {
       status: 500,
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -157,8 +172,10 @@ describe("useFeatureFlags isReady state", () => {
   it("should set isReady to false initially when no cache", async () => {
     mockFetch.mockReturnValue(new Promise(() => {}));
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     expect(result.current.isReady).toBe(false);
   });
@@ -170,8 +187,10 @@ describe("useFeatureFlags isReady state", () => {
       json: async () => ({ data: flags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -181,8 +200,10 @@ describe("useFeatureFlags isReady state", () => {
   it("should set isReady to true even after fetch error", async () => {
     mockFetch.mockRejectedValue(new Error("Network error"));
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -200,8 +221,10 @@ describe("useFeatureFlags isEnabledWithDefault", () => {
     // Never-resolving fetch to stay in loading state
     mockFetch.mockReturnValue(new Promise(() => {}));
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     // While loading, should return the default value
     expect(result.current.isEnabledWithDefault("contextual_prompts", true)).toBe(true);
@@ -219,8 +242,10 @@ describe("useFeatureFlags isEnabledWithDefault", () => {
       json: async () => ({ data: flags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -238,8 +263,10 @@ describe("useFeatureFlags isEnabledWithDefault", () => {
       json: async () => ({ data: flags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -263,10 +290,10 @@ describe("useFeatureFlags initialFlags", () => {
     // fetch should never be called — never-resolving to confirm
     mockFetch.mockReturnValue(new Promise(() => {}));
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() =>
-      useFeatureFlags({ contextual_prompts: true })
-    );
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, { initialFlags: { contextual_prompts: true } }, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     // isReady must be true synchronously — no async wait
     expect(result.current.isReady).toBe(true);
@@ -275,8 +302,10 @@ describe("useFeatureFlags initialFlags", () => {
   it("should NOT call fetch on mount when initialFlags provided", async () => {
     mockFetch.mockReturnValue(new Promise(() => {}));
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    renderHook(() => useFeatureFlags({ contextual_prompts: true }));
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, { initialFlags: { contextual_prompts: true } }, children);
+    renderHook(() => useFeatureFlags(), { wrapper });
 
     // Flush microtasks
     await new Promise((r) => setTimeout(r, 20));
@@ -287,10 +316,10 @@ describe("useFeatureFlags initialFlags", () => {
   it("should return correct isEnabled from initialFlags before fetch", async () => {
     mockFetch.mockReturnValue(new Promise(() => {}));
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() =>
-      useFeatureFlags({ contextual_prompts: true, related_stories: false })
-    );
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, { initialFlags: { contextual_prompts: true, related_stories: false } }, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     expect(result.current.isEnabled("contextual_prompts")).toBe(true);
     expect(result.current.isEnabled("related_stories")).toBe(false);
@@ -309,8 +338,10 @@ describe("useFeatureFlags initialFlags", () => {
       json: async () => ({ data: freshFlags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags(initialFlagsArg));
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, { initialFlags: initialFlagsArg }, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     // Immediately ready with initial value — no fetch yet
     expect(result.current.isReady).toBe(true);
@@ -338,8 +369,10 @@ describe("useFeatureFlags initialFlags", () => {
       json: async () => ({ data: flags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     // Initially not ready
     expect(result.current.isReady).toBe(false);
@@ -367,10 +400,12 @@ describe("useFeatureFlags cache behavior", () => {
     });
 
     // Import the module once — cache will be shared across renders
-    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
 
     // First render: populates the cache
-    const { result: result1, unmount } = renderHook(() => useFeatureFlags());
+    const { result: result1, unmount } = renderHook(() => useFeatureFlags(), { wrapper });
     await waitFor(() => {
       expect(result1.current.isReady).toBe(true);
     });
@@ -378,7 +413,7 @@ describe("useFeatureFlags cache behavior", () => {
     unmount();
 
     // Second render: same module, cache is still fresh (within 60s TTL)
-    const { result: result2 } = renderHook(() => useFeatureFlags());
+    const { result: result2 } = renderHook(() => useFeatureFlags(), { wrapper });
 
     // Should be immediately ready from cache (isReady starts true because cache.data exists)
     expect(result2.current.isReady).toBe(true);
@@ -397,14 +432,16 @@ describe("useFeatureFlags cache behavior", () => {
     );
 
     // Import the module once — cache will be shared
-    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
 
     // First render: starts a fetch that hangs
-    const { result: result1 } = renderHook(() => useFeatureFlags());
+    const { result: result1 } = renderHook(() => useFeatureFlags(), { wrapper });
     expect(result1.current.isReady).toBe(false);
 
     // Second render: while first fetch is still pending
-    const { result: result2 } = renderHook(() => useFeatureFlags());
+    const { result: result2 } = renderHook(() => useFeatureFlags(), { wrapper });
     expect(result2.current.isReady).toBe(false);
 
     // fetch should only have been called ONCE — second render joined the existing promise
@@ -439,10 +476,12 @@ describe("useFeatureFlags cache behavior", () => {
     });
 
     // Import the module once — cache will be shared
-    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
 
     // First render: populates the cache successfully
-    const { result: result1, unmount } = renderHook(() => useFeatureFlags());
+    const { result: result1, unmount } = renderHook(() => useFeatureFlags(), { wrapper });
     await waitFor(() => {
       expect(result1.current.isReady).toBe(true);
     });
@@ -458,7 +497,7 @@ describe("useFeatureFlags cache behavior", () => {
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
     // Second render: cache is stale, fetch will fail, should fall back to cached data
-    const { result: result2 } = renderHook(() => useFeatureFlags());
+    const { result: result2 } = renderHook(() => useFeatureFlags(), { wrapper });
     await waitFor(() => {
       expect(result2.current.isReady).toBe(true);
     });
@@ -487,6 +526,8 @@ describe("useFeatureFlags cache behavior", () => {
 
     // Import fresh module
     const mod = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(mod.FeatureFlagsProvider, null, children);
 
     // Spy on the hook's internal behavior by making fetch throw in a way
     // that causes the load() promise chain to reject.
@@ -496,7 +537,7 @@ describe("useFeatureFlags cache behavior", () => {
       throw new Error("Date.now exploded");
     });
 
-    const { result } = renderHook(() => mod.useFeatureFlags());
+    const { result } = renderHook(() => mod.useFeatureFlags(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -517,13 +558,15 @@ describe("useFeatureFlags cache behavior", () => {
     // The inner .catch() in fetchFlags handles fetch rejections by resolving.
     // We force fetchFlags to throw by making Date.now() throw synchronously.
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
 
     const dateNowSpy = vi.spyOn(Date, "now").mockImplementation(() => {
       throw new Error("Date.now exploded");
     });
 
-    const { result, unmount } = renderHook(() => useFeatureFlags());
+    const { result, unmount } = renderHook(() => useFeatureFlags(), { wrapper });
 
     // Hook starts loading — fetchFlags will throw synchronously due to Date.now
     // but the error is caught asynchronously in load(). Unmount before the
@@ -553,8 +596,10 @@ describe("useFeatureFlags cache behavior", () => {
       })
     );
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result, unmount } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result, unmount } = renderHook(() => useFeatureFlags(), { wrapper });
 
     // Hook is loading — fetch is pending
     expect(result.current.isReady).toBe(false);

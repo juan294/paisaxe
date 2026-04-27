@@ -208,10 +208,10 @@ export function FeatureFlagsProvider({
   return createElement(FeatureFlagsContext.Provider, { value }, children);
 }
 
-export function useFeatureFlags(
-  initialFlags?: Partial<Record<FeatureFlagKey, boolean>>
-): UseFeatureFlagsResult {
+export function useFeatureFlags(): UseFeatureFlagsResult {
   const context = useContext(FeatureFlagsContext);
-  const fallback = useFeatureFlagsState(initialFlags, !context);
-  return context ?? fallback;
+  if (!context) {
+    throw new Error("useFeatureFlags must be used within a FeatureFlagsProvider");
+  }
+  return context;
 }

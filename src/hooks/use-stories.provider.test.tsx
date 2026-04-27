@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, renderHook, screen } from "@testing-library/react";
 import type { Story } from "@/types/immersive";
 import { StoriesProvider, useStories } from "./use-stories";
 
@@ -43,5 +43,11 @@ describe("StoriesProvider", () => {
 
     expect(screen.getAllByText("Seeded story")).toHaveLength(2);
     expect(mockGetStoriesFromDB).not.toHaveBeenCalled();
+  });
+
+  it("throws when useStories is called outside a StoriesProvider", () => {
+    expect(() => renderHook(() => useStories())).toThrow(
+      "useStories must be used within a StoriesProvider"
+    );
   });
 });

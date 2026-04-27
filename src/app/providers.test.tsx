@@ -38,6 +38,18 @@ vi.mock("@/components/posthog-provider", () => ({
   ),
 }));
 
+vi.mock("@/hooks/use-feature-flags", () => ({
+  FeatureFlagsProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="feature-flags-provider">{children}</div>
+  ),
+  useFeatureFlags: vi.fn(() => ({
+    flags: [],
+    isReady: true,
+    isEnabled: () => false,
+    isEnabledWithDefault: () => false,
+  })),
+}));
+
 describe("Providers", () => {
   it("renders children correctly", () => {
     const { container } = render(
