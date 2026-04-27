@@ -2,10 +2,16 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
 type HealthStatus = "healthy" | "degraded";
+type SentryStatus = "configured" | "unconfigured";
+
+interface SentryProbeResult {
+  status: SentryStatus;
+}
 
 interface PublicHealthResponse {
   status: HealthStatus;
   timestamp: string;
+  sentry: SentryProbeResult;
 }
 
 interface SupabaseProbeResult {
@@ -25,6 +31,11 @@ export const PROBE_TIMEOUTS_MS = {
   stories: 2_000,
   database: 2_000,
 } as const;
+
+function checkSentry(): SentryProbeResult {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim();
+  return { status: dsn ? "configured" : "unconfigured" };
+}
 
 const STORAGE_LIMIT_MB = 8192; // Supabase Pro tier: 8 GB
 const STORAGE_WARNING_THRESHOLD = 0.8; // 80%
@@ -108,12 +119,14 @@ function withTimeout<T>(
 }
 
 function buildHealthResponse(
-  status: HealthStatus
+  status: HealthStatus,
+  sentry: SentryProbeResult
 ): NextResponse<PublicHealthResponse> {
   return NextResponse.json(
     {
       status,
       timestamp: new Date().toISOString(),
+      sentry,
     },
     {
       status: status === "healthy" ? 200 : 503,
@@ -126,6 +139,8 @@ function buildHealthResponse(
 }
 
 export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
+  const sentryStatus = checkSentry();
+
   try {
     const [supabaseStatus, storiesStatus, databaseStatus] = await Promise.all([
       checkSupabase(),
@@ -144,8 +159,8 @@ export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
         ? "degraded"
         : "healthy";
 
-    return buildHealthResponse(overallStatus);
+    return buildHealthResponse(overallStatus, sentryStatus);
   } catch {
-    return buildHealthResponse("degraded");
+    return buildHealthResponse("degraded", sentryStatus);
   }
 }

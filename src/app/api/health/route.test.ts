@@ -91,21 +91,29 @@ describe("GET /api/health", () => {
   });
 
   it("returns HTTP 200 with a minimal public payload when healthy", async () => {
-    mockHealthySupabase();
-    mockDatabaseSize(129394278);
+    const savedDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    delete process.env.NEXT_PUBLIC_SENTRY_DSN;
 
-    const response = await GET();
-    const data = await response.json();
+    try {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
 
-    expect(response.status).toBe(200);
-    expect(data).toEqual({
-      status: "healthy",
-      timestamp: expect.any(String),
-    });
-    expect(data).not.toHaveProperty("services");
-    expect(data).not.toHaveProperty("uptime");
-    expect(data).not.toHaveProperty("version");
-    expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("healthy");
+      expect(data.timestamp).toEqual(expect.any(String));
+      expect(data.sentry).toEqual({ status: "unconfigured" });
+      expect(data).not.toHaveProperty("services");
+      expect(data).not.toHaveProperty("uptime");
+      expect(data).not.toHaveProperty("version");
+      expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
+    } finally {
+      if (savedDsn !== undefined) {
+        process.env.NEXT_PUBLIC_SENTRY_DSN = savedDsn;
+      }
+    }
   });
 
   it("returns HTTP 503 with the same minimal payload when Supabase is unavailable", async () => {
@@ -116,10 +124,8 @@ describe("GET /api/health", () => {
     const data = await response.json();
 
     expect(response.status).toBe(503);
-    expect(data).toEqual({
-      status: "degraded",
-      timestamp: expect.any(String),
-    });
+    expect(data.status).toBe("degraded");
+    expect(data.timestamp).toEqual(expect.any(String));
   });
 
   it("returns HTTP 503 when no approved stories are available", async () => {
@@ -194,15 +200,18 @@ describe("GET /api/health", () => {
   });
 
   // SE-M1 regression: public endpoint must never leak operational recon data
-  it("SE-M1: public response contains only status and timestamp — no recon fields", async () => {
+  it("SE-M1: public response contains only status, timestamp, and sentry — no recon fields", async () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
     const response = await GET();
     const data = await response.json();
 
-    // Only two fields allowed on the public tier
-    expect(Object.keys(data)).toEqual(["status", "timestamp"]);
+    // Allowed fields on the public tier
+    const allowedKeys = new Set(["status", "timestamp", "sentry"]);
+    for (const key of Object.keys(data)) {
+      expect(allowedKeys).toContain(key);
+    }
 
     // Explicit deny-list of fields that must never appear unauthenticated
     const sensitiveFields = [
@@ -229,6 +238,52 @@ describe("GET /api/health", () => {
     const data = await response.json();
 
     expect(response.status).toBe(503);
-    expect(Object.keys(data)).toEqual(["status", "timestamp"]);
+    const allowedKeys = new Set(["status", "timestamp", "sentry"]);
+    for (const key of Object.keys(data)) {
+      expect(allowedKeys).toContain(key);
+    }
+  });
+
+  // DO-H2 regression: Sentry unconfigured state must be visible in health response
+  it("DO-H2: health response includes sentry.status=unconfigured when DSN is not set", async () => {
+    const savedDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+
+    try {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.sentry).toEqual({ status: "unconfigured" });
+    } finally {
+      if (savedDsn !== undefined) {
+        process.env.NEXT_PUBLIC_SENTRY_DSN = savedDsn;
+      }
+    }
+  });
+
+  it("DO-H2: health response includes sentry.status=configured when DSN is set", async () => {
+    const savedDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    process.env.NEXT_PUBLIC_SENTRY_DSN = "https://test@o123.ingest.sentry.io/456";
+
+    try {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.sentry).toEqual({ status: "configured" });
+    } finally {
+      if (savedDsn !== undefined) {
+        process.env.NEXT_PUBLIC_SENTRY_DSN = savedDsn;
+      } else {
+        delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+      }
+    }
   });
 });
