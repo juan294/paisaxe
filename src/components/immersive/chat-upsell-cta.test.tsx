@@ -126,10 +126,28 @@ describe("ChatUpsellCTA", () => {
 
     // Must have a visible focus ring
     expect(purchaseButton.className).toMatch(/focus-visible:ring-2/);
-    expect(purchaseButton.className).toMatch(/focus-visible:ring-amber-200/);
+    expect(purchaseButton.className).toMatch(/focus-visible:ring-green-200/);
     expect(purchaseButton.className).toMatch(/focus-visible:ring-offset-2/);
 
     // Must NOT suppress focus outline without a ring fallback
     expect(purchaseButton.className).not.toMatch(/focus-visible:outline-none/);
+  });
+
+  describe("UX-B3: visual identity (green, no amber/yellow)", () => {
+    it("uses green palette on the purchase button (not amber/yellow)", () => {
+      render(<ChatUpsellCTA {...defaultProps} />);
+
+      const purchaseButton = screen.getByRole("button", { name: /€1\.99/ });
+      expect(purchaseButton.className).toMatch(/from-green-/);
+      expect(purchaseButton.className).not.toMatch(/amber-|yellow-/);
+    });
+
+    it("uses green palette on the container background (not amber/yellow)", () => {
+      const { container } = render(<ChatUpsellCTA {...defaultProps} />);
+
+      const root = container.firstChild as HTMLElement;
+      expect(root.className).toMatch(/from-green-/);
+      expect(root.className).not.toMatch(/amber-|yellow-/);
+    });
   });
 });

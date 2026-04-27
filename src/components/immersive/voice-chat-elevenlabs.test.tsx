@@ -57,6 +57,7 @@ vi.mock("@/lib/i18n", () => ({
         "voice.mute": "Silenciar",
         "voice.unmute": "Activar sonido",
         "voice.error": "Error de conexión",
+        "voice.error_not_configured": "Agente de voz no configurado",
         "voice.no_permission": "Necesito acceso al micrófono",
         "voice.you": "Tú",
         "voice.welcome_message": "Bienvenido a {title}",
@@ -455,7 +456,7 @@ describe("VoiceChatElevenLabs", () => {
       fireEvent.click(orbButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Voice agent not configured")).toBeInTheDocument();
+        expect(screen.getByText("Agente de voz no configurado")).toBeInTheDocument();
       });
 
       expect(onFallbackToText).toHaveBeenCalledTimes(1);
