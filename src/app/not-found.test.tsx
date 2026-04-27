@@ -58,7 +58,7 @@ describe("NotFound", () => {
   it("has a dark background", () => {
     const { container } = renderWithI18n(<NotFound />);
     const wrapper = container.firstChild as HTMLElement;
-    expect(wrapper.className).toContain("bg-black");
+    expect(wrapper.className).toContain("bg-neutral-950");
   });
 
   it("uses min-h-screen for full page coverage", () => {

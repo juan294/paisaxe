@@ -77,7 +77,7 @@ describe("RootError", () => {
   it("has a dark background", () => {
     const { container } = renderWithI18n(<RootError {...defaultProps} />);
     const wrapper = container.firstChild as HTMLElement;
-    expect(wrapper.className).toContain("bg-black");
+    expect(wrapper.className).toContain("bg-neutral-950");
   });
 
   it("renders a home link", () => {

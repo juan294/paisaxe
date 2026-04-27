@@ -30,7 +30,7 @@ const title = `${LOCATION_CONFIG.siteName} | Descubre ${LOCATION_CONFIG.name}`;
 const description = LOCATION_CONFIG.seo.description;
 
 export const viewport: Viewport = {
-  themeColor: "#0a0f1a",
+  themeColor: "#0a0a0a",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
