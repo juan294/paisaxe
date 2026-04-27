@@ -81,7 +81,7 @@ describe("ImmersiveError", () => {
     const wrapper = container.firstChild as HTMLElement;
     expect(wrapper.className).toContain("fixed");
     expect(wrapper.className).toContain("inset-0");
-    expect(wrapper.className).toContain("bg-black");
+    expect(wrapper.className).toContain("bg-neutral-950");
   });
 
   it("renders a home link", () => {

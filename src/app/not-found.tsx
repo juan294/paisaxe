@@ -7,7 +7,7 @@ export default function NotFound() {
   const { t } = useTranslation();
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-black px-4 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-950 px-4 text-center">
       <h1 className="text-6xl font-bold text-white">404</h1>
       <h2 className="mt-4 text-2xl font-semibold text-white">
         {t("errors.not_found_title")}
