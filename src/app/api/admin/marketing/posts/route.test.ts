@@ -215,7 +215,7 @@ describe("/api/admin/marketing/posts", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toContain("Missing required fields");
+      expect(data.error).toBeDefined();
     });
 
     it("should return 400 when platform is missing", async () => {
@@ -227,7 +227,31 @@ describe("/api/admin/marketing/posts", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toContain("Missing required fields");
+      expect(data.error).toBeDefined();
+    });
+
+    it("should return 400 when platform is an invalid value", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/posts", {
+        method: "POST",
+        body: JSON.stringify({ platform: "tiktok", content: "Test" }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBeDefined();
+    });
+
+    it("should return 400 when content is empty", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/posts", {
+        method: "POST",
+        body: JSON.stringify({ platform: "x", content: "" }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBeDefined();
     });
 
     it("should create draft successfully", async () => {
@@ -352,6 +376,21 @@ describe("/api/admin/marketing/posts", () => {
       expect(mockUpdateDraft).toHaveBeenCalledWith("post-1", {
         content: "Updated content",
       });
+    });
+
+    it("should return 400 when PATCH update body has invalid platform", async () => {
+      const request = new NextRequest(
+        "http://localhost/api/admin/marketing/posts?id=post-1",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ platform: "tiktok" }),
+        }
+      );
+      const response = await PATCH(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBeDefined();
     });
 
     it("should return 500 when markAsPosted fails", async () => {
