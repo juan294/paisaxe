@@ -17,6 +17,7 @@ import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useStreamChat } from "@/hooks/use-stream-chat";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import dynamic from "next/dynamic";
 import { VoicePurchaseCTA } from "@/components/premium/voice-purchase-cta";
 import { usePostHog } from "posthog-js/react";
@@ -76,6 +77,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
   const { t, locale } = useTranslation();
   const localizedStory = getLocalizedStory(story, locale);
   const posthog = usePostHog();
+  const prefersReducedMotion = useReducedMotion();
   const stableOnClose = useMemo(() => onClose, [onClose]);
   useFocusTrap(dialogRef, open, stableOnClose);
 
@@ -139,10 +141,12 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
      
   }, []);
 
-  // Auto-scroll
+  // Auto-scroll — respects prefers-reduced-motion
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }, [messages, prefersReducedMotion]);
 
   const handlePrivacyDismiss = useCallback(() => {
     setPrivacyAcknowledged(true);
@@ -302,8 +306,8 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
                   <p>{t("chat.empty_state")}</p>
                 </div>
               )}
-              {messages.map((msg, i) => (
-                <div key={i}>
+              {messages.map((msg) => (
+                <div key={msg.id}>
                   <div
                     className={cn(
                       "max-w-[85%] p-3 rounded-2xl",
@@ -361,7 +365,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
                   {msg.upsellReason && !msg.upsellDismissed && (
                     <ChatUpsellCTA
                       reason={msg.upsellReason}
-                      onDismiss={() => handleUpsellDismiss(i)}
+                      onDismiss={() => handleUpsellDismiss(messages.indexOf(msg))}
                       className="mt-3"
                     />
                   )}

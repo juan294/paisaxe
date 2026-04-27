@@ -138,10 +138,12 @@ describe("useStreamChat", () => {
     });
 
     expect(result.current.messages).toHaveLength(2);
-    expect(result.current.messages[0]).toEqual({
-      role: "user",
-      content: "Hello",
-    });
+    expect(result.current.messages[0]).toEqual(
+      expect.objectContaining({
+        role: "user",
+        content: "Hello",
+      })
+    );
     expect(result.current.messages[1].role).toBe("assistant");
     expect(result.current.messages[1].content).toBe("Hello from AI");
   });
@@ -823,10 +825,12 @@ describe("useStreamChat", () => {
 
     // The else branch should have pushed an error message
     expect(result.current.messages).toHaveLength(1);
-    expect(result.current.messages[0]).toEqual({
-      role: "assistant",
-      content: "Lo siento, hubo un error. Intenta de nuevo.",
-    });
+    expect(result.current.messages[0]).toEqual(
+      expect.objectContaining({
+        role: "assistant",
+        content: "Lo siento, hubo un error. Intenta de nuevo.",
+      })
+    );
     expect(result.current.isStreaming).toBe(false);
   });
 
