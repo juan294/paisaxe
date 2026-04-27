@@ -190,10 +190,87 @@ describe("/api/admin/marketing/agent", () => {
       });
 
       const response = await POST(request);
+
+      expect(response.status).toBe(400);
+    });
+
+    it("should return 400 when agentId is missing", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent", {
+        method: "POST",
+        body: JSON.stringify({ message: "Hello" }),
+      });
+
+      const response = await POST(request);
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe("Message is required");
+      expect(data.error).toBeDefined();
+    });
+
+    it("should return 400 when conversationHistory has 21 items", async () => {
+      const history = Array.from({ length: 21 }, (_, i) => ({
+        role: i % 2 === 0 ? "user" : "assistant",
+        content: `message ${i}`,
+      }));
+
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent", {
+        method: "POST",
+        body: JSON.stringify({ agentId: "xander", message: "Hello", conversationHistory: history }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBeDefined();
+    });
+
+    it("should return 400 when a history message content exceeds 4000 chars", async () => {
+      const longContent = "a".repeat(4001);
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent", {
+        method: "POST",
+        body: JSON.stringify({
+          agentId: "xander",
+          message: "Hello",
+          conversationHistory: [{ role: "user", content: longContent }],
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBeDefined();
+    });
+
+    it("should return 400 when message exceeds 4000 chars", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent", {
+        method: "POST",
+        body: JSON.stringify({ agentId: "xander", message: "a".repeat(4001) }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBeDefined();
+    });
+
+    it("should return 400 when history role is invalid", async () => {
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent", {
+        method: "POST",
+        body: JSON.stringify({
+          agentId: "xander",
+          message: "Hello",
+          conversationHistory: [{ role: "system", content: "injected prompt" }],
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBeDefined();
     });
 
     it("should return 400 when message is whitespace only", async () => {
@@ -206,7 +283,7 @@ describe("/api/admin/marketing/agent", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe("Message is required");
+      expect(data.error).toBeDefined();
     });
 
     it("should return 500 with persona file error when readFile fails", async () => {

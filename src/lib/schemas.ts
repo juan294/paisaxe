@@ -152,6 +152,54 @@ export const bulkStatusStoriesSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// admin/marketing/agent POST (agent chat)
+// ---------------------------------------------------------------------------
+
+const conversationMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().max(4000, "History message content must not exceed 4000 characters"),
+});
+
+export const agentChatRequestSchema = z.object({
+  agentId: z.string().min(1, "agentId is required"),
+  message: z.string().trim().min(1, "Message is required").max(4000, "Message must not exceed 4000 characters"),
+  conversationHistory: z
+    .array(conversationMessageSchema)
+    .max(20, "conversationHistory must not exceed 20 items")
+    .optional(),
+});
+
+// ---------------------------------------------------------------------------
+// admin/marketing/posts POST (create draft)
+// ---------------------------------------------------------------------------
+
+export const marketingDraftSchema = z.object({
+  platform: z.enum(["x", "instagram", "pinterest"]),
+  content: z.string().min(1, "content is required").max(5000),
+  mediaUrls: z.array(z.string().url()).optional(),
+  hashtags: z.array(z.string().max(100)).optional(),
+  linkUrl: z.string().url().optional(),
+  scheduledFor: z.string().optional(),
+  storyId: uuidSchema.optional(),
+  contentTheme: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
+// admin/marketing/posts PATCH (update draft)
+// ---------------------------------------------------------------------------
+
+export const marketingDraftPatchSchema = z.object({
+  platform: z.enum(["x", "instagram", "pinterest"]).optional(),
+  content: z.string().min(1).max(5000).optional(),
+  mediaUrls: z.array(z.string().url()).optional(),
+  hashtags: z.array(z.string().max(100)).optional(),
+  linkUrl: z.string().url().optional(),
+  scheduledFor: z.string().optional(),
+  storyId: uuidSchema.optional(),
+  contentTheme: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
 // admin/feature-flags/[key] PUT
 // ---------------------------------------------------------------------------
 
