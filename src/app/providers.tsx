@@ -5,6 +5,7 @@ import { AuthProvider } from '@/components/auth/auth-provider';
 import { SkipLink } from '@/components/a11y/skip-link';
 import { LangSync } from '@/components/a11y/lang-sync';
 import { PostHogProviderWrapper } from '@/components/posthog-provider';
+import { FeatureFlagsProvider } from '@/hooks/use-feature-flags';
 import { usePathname } from "next/navigation";
 
 interface ProvidersProps {
@@ -28,19 +29,21 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <PostHogProviderWrapper>
       <LanguageProvider>
-        {isStaticPath ? (
-          <>
-            <SkipLink />
-            <LangSync />
-            {children}
-          </>
-        ) : (
-          <AuthProvider deferInitialAuth={deferInitialAuth}>
-            <SkipLink />
-            <LangSync />
-            {children}
-          </AuthProvider>
-        )}
+        <FeatureFlagsProvider>
+          {isStaticPath ? (
+            <>
+              <SkipLink />
+              <LangSync />
+              {children}
+            </>
+          ) : (
+            <AuthProvider deferInitialAuth={deferInitialAuth}>
+              <SkipLink />
+              <LangSync />
+              {children}
+            </AuthProvider>
+          )}
+        </FeatureFlagsProvider>
       </LanguageProvider>
     </PostHogProviderWrapper>
   );

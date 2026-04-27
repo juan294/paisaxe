@@ -58,7 +58,8 @@ Object.defineProperty(window, "localStorage", {
   writable: true,
 });
 
-import { useStories, clearStoriesCache } from "./use-stories";
+import React from "react";
+import { useStories, clearStoriesCache, StoriesProvider } from "./use-stories";
 
 const cachedStories = [
   {
@@ -148,6 +149,9 @@ describe("FE-M1: useStories initial render uses initialStories or FALLBACK_STORI
     let capturedInitialStories: unknown;
     let capturedInitialLoading: unknown;
 
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(StoriesProvider, null, children);
+
     // Render without wrapping in act (to capture pre-effect state)
     // renderHook always wraps in act, so we intercept the first render using
     // a wrapper that captures state during the first render pass.
@@ -159,7 +163,7 @@ describe("FE-M1: useStories initial render uses initialStories or FALLBACK_STORI
         capturedInitialLoading = hookResult.isLoading;
       }
       return hookResult;
-    });
+    }, { wrapper });
 
     // With fake timers, useEffect callbacks are deferred (they require timer advancement).
     // So `capturedInitialStories` reflects the state from the RENDER phase only.
@@ -178,6 +182,9 @@ describe("FE-M1: useStories initial render uses initialStories or FALLBACK_STORI
     let capturedStories: unknown;
     let capturedLoading: unknown;
 
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(StoriesProvider, null, children);
+
     renderHook(() => {
       const hookResult = useStories();
       if (capturedStories === undefined) {
@@ -185,7 +192,7 @@ describe("FE-M1: useStories initial render uses initialStories or FALLBACK_STORI
         capturedLoading = hookResult.isLoading;
       }
       return hookResult;
-    });
+    }, { wrapper });
 
     // No localStorage, no initialStories → must start with fallback + loading
     expect(capturedStories).toEqual([fallbackStory]);
@@ -200,14 +207,17 @@ describe("FE-M1: useStories initial render uses initialStories or FALLBACK_STORI
     let capturedStories: unknown;
     let capturedLoading: unknown;
 
+    const wrapperWithInitial = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(StoriesProvider, { initialStories: serverStories }, children);
+
     renderHook(() => {
-      const hookResult = useStories(serverStories);
+      const hookResult = useStories();
       if (capturedStories === undefined) {
         capturedStories = hookResult.stories;
         capturedLoading = hookResult.isLoading;
       }
       return hookResult;
-    });
+    }, { wrapper: wrapperWithInitial });
 
     // Server-provided stories must be used immediately
     expect(capturedStories).toEqual(serverStories);
@@ -227,7 +237,9 @@ describe("FE-M1: useStories initial render uses initialStories or FALLBACK_STORI
       (key: string) => (key === "paisaxe-stories-cache" ? JSON.stringify(storedCache) : null)
     );
 
-    const { result } = renderHook(() => useStories());
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(StoriesProvider, null, children);
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     // After effects run (waitFor flushes them), the cached stories should be in state
     await waitFor(() => {
@@ -252,7 +264,9 @@ describe("FE-M1: useStories initial render uses initialStories or FALLBACK_STORI
     );
     localStorageMock.getItem.mockClear();
 
-    const { result } = renderHook(() => useStories(serverStories));
+    const wrapperWithInitial = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(StoriesProvider, { initialStories: serverStories }, children);
+    const { result } = renderHook(() => useStories(), { wrapper: wrapperWithInitial });
 
     // Initial render: server stories, not loading
     expect(result.current.stories).toEqual(serverStories);
@@ -269,7 +283,9 @@ describe("FE-M1: useStories initial render uses initialStories or FALLBACK_STORI
     // Fast fetch for this test
     mockGetStoriesFromDB.mockResolvedValue(cachedStories);
 
-    const { result } = renderHook(() => useStories());
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(StoriesProvider, null, children);
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
