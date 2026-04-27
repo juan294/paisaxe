@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-04-26 06:00:05
+> Auto-generated on 2026-04-27 06:00:03
 
 ## CLAUDE.md Status
 
@@ -12,6 +12,13 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
+src/app/admin/admin-page-lazy-mount.test.tsx
+src/app/admin/page.test.tsx
+src/app/api/admin/agent-config/route.test.ts
+src/app/api/admin/agent-config/route.ts
+src/app/api/admin/agent-reports/route.ts
+src/app/api/admin/costs-analytics/route.ts
+src/app/api/admin/elevenlabs-analytics/route.ts
 src/app/api/admin/feature-flags/[key]/route.test.ts
 src/app/api/admin/feature-flags/[key]/route.ts
 src/app/api/admin/stories/[id]/route.test.ts
@@ -22,16 +29,30 @@ src/app/api/admin/stories/bulk-delete/route.test.ts
 src/app/api/admin/stories/bulk-delete/route.ts
 src/app/api/admin/stories/bulk-status/route.test.ts
 src/app/api/admin/stories/bulk-status/route.ts
+src/app/api/admin/suggestions/[id]/route.test.ts
+src/app/api/admin/suggestions/[id]/route.ts
+src/app/api/chat/route.test.ts
+src/app/api/chat/route.ts
 src/app/api/chat/stream/route.test.ts
 src/app/api/chat/stream/route.ts
+src/app/api/checkout/day-pass/route.test.ts
+src/app/api/checkout/day-pass/route.ts
+src/app/api/checkout/embedded/route.test.ts
+src/app/api/checkout/embedded/route.ts
 src/app/api/cron/fail-stale-translations/route.test.ts
 src/app/api/cron/fail-stale-translations/route.ts
 src/app/api/feature-flags/route.se-h1.test.ts
 src/app/api/feature-flags/route.ts
+src/app/api/health/live/route.test.ts
+src/app/api/health/live/route.ts
 src/app/api/health/route.test.ts
 src/app/api/health/route.ts
 src/app/api/mcp/make-booking/route.test.ts
 src/app/api/mcp/make-booking/route.ts
+src/app/api/mcp/places/route.test.ts
+src/app/api/mcp/places/route.ts
+src/app/api/mcp/weather/route.test.ts
+src/app/api/mcp/weather/route.ts
 src/app/api/voice-access/route.test.ts
 src/app/api/voice-access/route.ts
 src/app/api/webhooks/elevenlabs/route.test.ts
@@ -53,6 +74,8 @@ src/app/pricing/page.test.tsx
 src/app/pricing/page.tsx
 src/app/providers.test.tsx
 src/app/providers.tsx
+src/components/admin/admin-shell.test.tsx
+src/components/admin/admin-shell.tsx
 src/components/admin/agents-dashboard/cross-agent-insights.tsx
 src/components/admin/agents-dashboard/markdown.test.ts
 src/components/admin/agents-dashboard/optimizer-report-dialog.tsx
@@ -64,12 +87,15 @@ src/components/immersive/story-viewer.test.tsx
 src/components/immersive/story-viewer.tsx
 src/components/immersive/suggest-place-button.tsx
 src/components/immersive/suggest-place-button.ux-h1.test.tsx
+src/components/immersive/voice-chat.tsx
 src/config/next-externals.test.ts
 src/hooks/use-favorites.anonymous.test.ts
 src/hooks/use-favorites.test.ts
 src/hooks/use-favorites.ts
 src/hooks/use-feature-flags.provider.test.tsx
 src/hooks/use-feature-flags.ts
+src/hooks/use-media-query.test.ts
+src/hooks/use-media-query.ts
 src/hooks/use-stories.hydration.test.ts
 src/hooks/use-stories.provider.test.tsx
 src/hooks/use-stories.test.ts
@@ -82,21 +108,41 @@ src/hooks/use-voice-access.test.ts
 src/hooks/use-voice-access.ts
 src/instrumentation.test.ts
 src/instrumentation.ts
+src/lib/claude.ts
+src/lib/content-discovery.test.ts
+src/lib/content-discovery.ts
+src/lib/costs/elevenlabs-costs.test.ts
+src/lib/costs/elevenlabs-costs.ts
+src/lib/costs/twilio-costs.test.ts
+src/lib/costs/twilio-costs.ts
 src/lib/env.ts
 src/lib/logger-sanitize.ts
 src/lib/logger.test.ts
 src/lib/logger.ts
 src/lib/mcp-auth.ts
+src/lib/models.test.ts
+src/lib/models.ts
 src/lib/proxy/cors.ts
 src/lib/proxy/csp.ts
+src/lib/proxy/maintenance.ts
+src/lib/rate-limit.test.ts
+src/lib/rate-limit.ts
 src/lib/request-context.ts
+src/lib/request-utils.test.ts
+src/lib/request-utils.ts
 src/lib/schemas.ts
+src/lib/search.test.ts
+src/lib/search.ts
 src/lib/security-headers.test.ts
 src/lib/sentry-before-send.test.ts
+src/lib/stories-data.test.ts
+src/lib/stories-data.ts
+src/lib/stories-server.test.ts
 src/lib/stories-server.ts
 src/lib/stripe.ts
 src/lib/supabase.test.ts
 src/lib/supabase.ts
+src/lib/twilio-sms.ts
 src/types/index.ts
 src/types/sse.test.ts
 src/types/sse.ts
@@ -117,6 +163,8 @@ supabase/migrations/083_sms_outbox_atomic_enqueue.sql
 ### Scripts
 
 ```
+scripts/check-env.ts
+scripts/check-migrations.ts
 scripts/performance-agent.sh
 scripts/run-stripe-e2e.ts
 ```
@@ -169,6 +217,7 @@ cron/subscription-optimizer
 favorites
 feature-flags
 health/db
+health/live
 mcp/make-booking
 mcp/make-booking/status
 mcp/places
@@ -188,23 +237,24 @@ webhooks/translate
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-04-24 |
-| README.md | 2026-04-24 |
+| README.md | 2026-04-26 |
 
 ## Changes Made This Run
 
-Date: 2026-04-26
+**Status: GREEN** — No documentation gaps requiring updates. Twentieth consecutive clean run.
 
-Status: GREEN — No documentation changes required. Twentieth consecutive clean run.
-
-- Feature flags: `UNDOCUMENTED_FEATURE_FLAGS` section in gaps file is empty. All flags already documented in `docs/project/features.md` (Feature Flags Reference table).
-- API routes: 51 flagged routes reviewed against the "internal vs external" rule. All are internal:
-  - `admin/*` — admin-only dashboard endpoints (auth-gated via Supabase + `user_profiles.role = 'admin'`)
-  - `cron/*` — scheduled jobs invoked by Vercel Cron (CRON_SECRET protected)
-  - `webhooks/*` — third-party callbacks (Stripe, ElevenLabs, Supabase, translate) protected by HMAC signature verification
-  - `mcp/*` — voice-agent tool endpoints called only by ElevenLabs Pelayo agent
-  - `chat`, `chat/stream`, `favorites`, `feature-flags`, `health/db`, `voice-access`, `suggestions`, `checkout/*` — internal application APIs consumed only by the Paisaxe frontend
-- No new user-facing features, flags, or external endpoints introduced since last run.
-- No edits made to `CLAUDE.md` or `docs/project/features.md`.
+- **Feature flags**: Zero undocumented flags. The `UNDOCUMENTED_FEATURE_FLAGS` section in `.docs-gaps.tmp` is empty. No additions to the Feature Flags Reference table in `docs/project/features.md`.
+- **API routes**: All 51 flagged routes reviewed. Every route is internal:
+  - `admin/*` — admin dashboard backend (gated by `validateAdminAuth()`)
+  - `cron/*` — Vercel Cron webhooks (HMAC-protected internal jobs)
+  - `webhooks/*` — third-party webhook receivers (Stripe, ElevenLabs, Supabase, translate)
+  - `mcp/*` — voice-agent tool endpoints (called by ElevenLabs agents only)
+  - `health/*` — monitoring/probe endpoints (operational, not user-facing API)
+  - `checkout/*`, `chat`, `chat/stream`, `favorites`, `feature-flags`, `suggestions`, `voice-access` — frontend-only consumption, fully described by feature documentation in `docs/project/features.md`
+  - No external-consumption routes detected.
+- **CLAUDE.md**: Current (last modified 2026-04-24). No structural or rule changes needed.
+- **features.md**: Complete. No additions needed.
+- **No source files written** this run.
 
 ---
 
