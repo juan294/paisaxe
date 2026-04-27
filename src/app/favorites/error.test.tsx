@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import * as Sentry from "@sentry/nextjs";
 import { LanguageProvider } from "@/lib/i18n";
 import FavoritesError from "./error";
+
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+}));
 
 function renderWithI18n(ui: React.ReactElement, locale: "es" | "en" = "es") {
   return render(
@@ -14,8 +19,11 @@ describe("FavoritesError", () => {
     .spyOn(console, "error")
     .mockImplementation(() => {});
 
+  const captureSpy = vi.mocked(Sentry.captureException);
+
   afterEach(() => {
     consoleSpy.mockClear();
+    captureSpy.mockClear();
   });
 
   const defaultProps = {
@@ -70,6 +78,12 @@ describe("FavoritesError", () => {
     const error = new Error("Favorites error for logging");
     renderWithI18n(<FavoritesError error={error} reset={vi.fn()} />);
     expect(consoleSpy).toHaveBeenCalledWith(error);
+  });
+
+  it("captures the error to Sentry", () => {
+    const error = new Error("Favorites error for Sentry");
+    renderWithI18n(<FavoritesError error={error} reset={vi.fn()} />);
+    expect(captureSpy).toHaveBeenCalledWith(error);
   });
 
   it("has neutral-950 background", () => {
