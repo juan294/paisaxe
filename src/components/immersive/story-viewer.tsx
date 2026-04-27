@@ -85,33 +85,10 @@ export function StoryViewer({
   const router = useRouter();
 
   const story = stories[currentIndex];
-  const prefetchedUrls = useRef<Set<string>>(new Set());
   const ambientStartRef = useRef<number | null>(null);
   // FE-M1: Single ref to track the pending transition timer so rapid navigation
   // cancels any in-flight timer before setting a new one, preventing stacking.
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Prefetch adjacent images for smoother navigation
-  useEffect(() => {
-    const prefetchImage = (url: string) => {
-      if (!url || prefetchedUrls.current.has(url)) return;
-
-      const img = new window.Image();
-      img.src = url;
-      prefetchedUrls.current.add(url);
-    };
-
-    if (stories.length === 0) return;
-    // Prefetch next image (wraps to first)
-    const nextIdx = (currentIndex + 1) % stories.length;
-    prefetchImage(stories[nextIdx].image);
-    // Prefetch previous image (wraps to last)
-    const prevIdx = (currentIndex - 1 + stories.length) % stories.length;
-    prefetchImage(stories[prevIdx].image);
-    // Prefetch 2 ahead (for faster auto-play)
-    const next2Idx = (currentIndex + 2) % stories.length;
-    prefetchImage(stories[next2Idx].image);
-  }, [currentIndex, stories]);
 
   const goToNext = useCallback(() => {
     const nextIndex = currentIndex < stories.length - 1 ? currentIndex + 1 : 0;
@@ -221,13 +198,7 @@ export function StoryViewer({
 
   return (
     <main
-      className="relative h-dvh w-screen overflow-hidden bg-black cursor-pointer"
-      onClick={() => {
-        // Only toggle info on desktop (pointer: fine) — on mobile, tap zones handle navigation
-        if (window.matchMedia("(pointer: fine)").matches) {
-          setShowInfo((prev) => !prev);
-        }
-      }}
+      className="relative h-dvh w-screen overflow-hidden bg-black"
     >
       {/* Screen reader announcement for story changes */}
       <div
@@ -239,6 +210,21 @@ export function StoryViewer({
           .replace("{current}", String(currentIndex + 1))
           .replace("{total}", String(stories.length))}: {localizedStory.title} — {localizedStory.subtitle}
       </div>
+
+      {/* Transparent overlay button for toggling info — desktop (pointer:fine) only.
+          Placed on a dedicated <button> so keyboard users can activate it (UX-H7).
+          z-[5]: above the background image (z-0) but below all interactive UI (z-10+). */}
+      <button
+        className="desktop-pointer-only absolute inset-0 z-[5] w-full h-full cursor-pointer bg-transparent"
+        aria-label={showInfo ? t("accessibility.hide_info") : t("accessibility.show_info")}
+        aria-expanded={showInfo}
+        onClick={() => {
+          // Only toggle info on desktop (pointer: fine) — on mobile, tap zones handle navigation
+          if (window.matchMedia("(pointer: fine)").matches) {
+            setShowInfo((prev) => !prev);
+          }
+        }}
+      />
 
       {/* Background Image with Ken Burns effect */}
       <div
@@ -256,7 +242,7 @@ export function StoryViewer({
           priority={currentIndex === 0}
           placeholder="blur"
           blurDataURL={story.blurDataUrl || darkPlaceholder}
-          key={`${story.id}-${isAmbient ? "ambient" : autoPlay ? "auto" : "static"}`}
+          key={story.id}
         />
         {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />

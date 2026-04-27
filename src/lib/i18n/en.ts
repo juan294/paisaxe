@@ -152,6 +152,8 @@ export const en: Translations = {
     go_back: 'Go back',
     loading: 'Loading',
     go_to_story: 'Go to story {current} of {total}',
+    show_info: 'Show story information',
+    hide_info: 'Hide story information',
   },
 
   auth: {
