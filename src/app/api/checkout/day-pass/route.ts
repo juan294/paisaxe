@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createDayPassCheckoutSession } from "@/lib/stripe";
 import { getSupabaseClient } from "@/lib/supabase-auth";
 import { checkoutBodySchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 const ALLOWED_ORIGINS = [
   process.env.NEXT_PUBLIC_SITE_URL,
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const hasPriceId = !!process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
 
     if (!hasSecretKey || !hasPriceId) {
-      console.error("[checkout/day-pass] Missing Stripe env vars");
+      logger.error("[checkout/day-pass] Missing Stripe env vars");
       return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
     }
 
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ url: checkoutUrl });
   } catch (error) {
-    console.error("[checkout/day-pass] Error:", error);
+    logger.error("[checkout/day-pass] Error:", { error: error instanceof Error ? error.message : String(error) });
     const body: { error: string; details?: string } = {
       error: "Failed to create checkout session",
     };

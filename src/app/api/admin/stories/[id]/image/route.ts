@@ -6,6 +6,7 @@ import {
   optimizeSingleImage,
   validateImageBuffer,
 } from "@/lib/image-optimization";
+import { logger } from "@/lib/logger";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -146,7 +147,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         });
 
       if (uploadError) {
-        console.error("Upload error:", uploadError);
+        logger.error("Upload error:", { error: uploadError.message });
         return NextResponse.json(
           { error: "Failed to upload image" },
           { status: 500 }
@@ -236,10 +237,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         }
       } catch (fetchError) {
         // Non-fatal - just log and continue without blur placeholder
-        console.warn(
-          "Could not fetch external image for blur generation:",
-          fetchError
-        );
+        logger.warn("Could not fetch external image for blur generation:", {
+          error: fetchError instanceof Error ? fetchError.message : String(fetchError),
+        });
       }
     }
 
@@ -268,7 +268,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (error) {
-      console.error("Update error:", error);
+      logger.error("Update error:", { error: error.message });
       return NextResponse.json(
         { error: "Failed to update story image" },
         { status: 500 }
@@ -291,7 +291,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       },
     });
   } catch (error) {
-    console.error("Admin image API error:", error);
+    logger.error("Admin image API error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

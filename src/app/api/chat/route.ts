@@ -16,6 +16,7 @@ import {
   MAX_INPUT_LENGTH,
 } from "@/lib/chat-safety";
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
+import { logger } from "@/lib/logger";
 
 /**
  * Extended response type with security metadata
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     // Detect injection attempts
     if (message && detectInjectionAttempt(message)) {
-      console.warn("[CHAT_SECURITY] Injection attempt detected", {
+      logger.warn("[CHAT_SECURITY] Injection attempt detected", {
         timestamp: new Date().toISOString(),
         ip,
         inputPreview: message.slice(0, 100),
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
 
     // Check for prompt leakage in output
     if (detectPromptLeakage(responseText)) {
-      console.error("[CHAT_SECURITY] Prompt leakage detected in output", {
+      logger.error("[CHAT_SECURITY] Prompt leakage detected in output", {
         timestamp: new Date().toISOString(),
         outputPreview: responseText.slice(0, 200),
       });
@@ -206,7 +207,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Chat API error:", error);
+    logger.error("Chat API error:", { error: error instanceof Error ? error.message : String(error) });
 
     // In development, return detailed error for debugging
     if (process.env.NODE_ENV === "development") {

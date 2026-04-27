@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import type { StorySuggestionRow, SuggestionStatus } from "@/types/suggestions";
 import { rowToAdminStorySuggestion } from "@/types/suggestions";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   // Validate admin auth
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("Error fetching suggestions:", error);
+      logger.error("Error fetching suggestions:", { error: error.message });
       return NextResponse.json(
         { error: "Failed to fetch suggestions" },
         { status: 500 }
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: adminSuggestions });
   } catch (error) {
-    console.error("Admin suggestions API error:", error);
+    logger.error("Admin suggestions API error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
