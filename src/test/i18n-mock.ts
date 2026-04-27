@@ -174,6 +174,8 @@ export const mockTranslations: Record<string, string> = {
   "accessibility.story_progress": "Progreso de historias",
   "accessibility.more_options": "Más opciones",
   "accessibility.story_controls": "Controles de historias",
+  "accessibility.show_info": "Mostrar información de la historia",
+  "accessibility.hide_info": "Ocultar información de la historia",
 };
 
 export function createMockT() {
