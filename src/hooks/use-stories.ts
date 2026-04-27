@@ -304,10 +304,12 @@ export function StoriesProvider({ children, initialStories }: StoriesProviderPro
   return createElement(StoriesContext.Provider, { value }, children);
 }
 
-export function useStories(initialStories?: Story[]) {
+export function useStories() {
   const context = useContext(StoriesContext);
-  const fallback = useStoriesState(initialStories, !context);
-  return context ?? fallback;
+  if (!context) {
+    throw new Error("useStories must be used within a StoriesProvider");
+  }
+  return context;
 }
 
 /**

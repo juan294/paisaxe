@@ -12,6 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
+import React from "react";
 import type { FeatureFlag, FeatureFlagKey } from "@/types/feature-flags";
 
 // ---------------------------------------------------------------------------
@@ -50,8 +51,10 @@ describe("Feature flag: mood_discovery", () => {
       json: async () => ({ data: [] }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
@@ -64,8 +67,10 @@ describe("Feature flag: mood_discovery", () => {
       json: async () => ({ data: [makeFlag("mood_discovery", true)] }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
@@ -78,8 +83,10 @@ describe("Feature flag: mood_discovery", () => {
       json: async () => ({ data: [makeFlag("mood_discovery", false)] }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
@@ -102,8 +109,10 @@ describe("Feature flag: asturianu_touches", () => {
       json: async () => ({ data: [] }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
@@ -116,8 +125,10 @@ describe("Feature flag: asturianu_touches", () => {
       json: async () => ({ data: [makeFlag("asturianu_touches", true)] }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
@@ -165,8 +176,10 @@ describe("Feature flag: story_freshness", () => {
       json: async () => ({ data: [] }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
@@ -179,8 +192,10 @@ describe("Feature flag: story_freshness", () => {
       json: async () => ({ data: [makeFlag("story_freshness", true)] }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
@@ -193,8 +208,10 @@ describe("Feature flag: story_freshness", () => {
       json: async () => ({ data: [makeFlag("story_freshness", false)] }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
@@ -223,8 +240,10 @@ describe("Feature flags: combined behavior", () => {
       json: async () => ({ data: allFlags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
@@ -245,8 +264,10 @@ describe("Feature flags: combined behavior", () => {
       json: async () => ({ data: allFlags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
@@ -267,8 +288,10 @@ describe("Feature flags: combined behavior", () => {
       json: async () => ({ data: mixedFlags }),
     });
 
-    const { useFeatureFlags } = await import("./use-feature-flags");
-    const { result } = renderHook(() => useFeatureFlags());
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, null, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 

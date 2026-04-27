@@ -1,6 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import FavoritesLayout, { metadata } from "./layout";
+
+vi.mock("@/lib/stories-data", () => ({
+  FALLBACK_STORIES: [],
+  getStoriesFromDB: vi.fn().mockResolvedValue([]),
+}));
 
 describe("FavoritesLayout", () => {
   it("renders children", () => {

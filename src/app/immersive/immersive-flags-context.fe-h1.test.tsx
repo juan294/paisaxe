@@ -116,20 +116,19 @@ describe("FE-H1 + PE-H2: ImmersiveFlagsContext (FeatureFlagsProvider) hydration"
     expect(capturedIsReady).toBe(true);
   });
 
-  it("fallback hook (outside provider) still fetches independently", () => {
+  it("throws when useFeatureFlags is called outside a FeatureFlagsProvider", () => {
     // When useFeatureFlags is called outside of a FeatureFlagsProvider,
-    // it should trigger its own fetch (existing standalone behavior).
-    mockFetch.mockReturnValue(new Promise(() => {})); // never resolves
-
+    // it must throw a descriptive error to prevent silent stale data issues.
     function StandaloneConsumer() {
       const { isReady } = useFeatureFlags();
       return <div data-testid="standalone" data-ready={String(isReady)} />;
     }
 
-    render(<StandaloneConsumer />);
-
-    // Without a provider, the hook starts in loading state and triggers fetch
-    expect(screen.getByTestId("standalone")).toHaveAttribute("data-ready", "false");
-    expect(mockFetch).toHaveBeenCalledWith("/api/feature-flags");
+    // Suppress React's error boundary console output during this test
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => render(<StandaloneConsumer />)).toThrow(
+      "useFeatureFlags must be used within a FeatureFlagsProvider"
+    );
+    consoleSpy.mockRestore();
   });
 });

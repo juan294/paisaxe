@@ -67,7 +67,11 @@ Object.defineProperty(window, "localStorage", {
 
 // Single static import — no vi.resetModules() anywhere in this file
 // so v8 coverage maps execution back to the original source file.
-import { useStories, clearStoriesCache } from "./use-stories";
+import React from "react";
+import { useStories, clearStoriesCache, StoriesProvider } from "./use-stories";
+
+const wrapper = ({ children }: { children: React.ReactNode }) =>
+  React.createElement(StoriesProvider, null, children);
 
 describe("useStories fetchStories cache-hit (line 142)", () => {
   beforeEach(() => {
@@ -87,7 +91,7 @@ describe("useStories fetchStories cache-hit (line 142)", () => {
 
   it("returns cached data without fetching when cache is fresh (cache-hit at line 142)", async () => {
     // Step 1: Populate the singleton cache via an initial fetch
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
