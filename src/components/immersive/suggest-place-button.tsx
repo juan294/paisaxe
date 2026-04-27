@@ -10,14 +10,23 @@ import { useTranslation } from "@/lib/i18n";
 interface SuggestPlaceButtonProps {
   className?: string;
   variant?: "icon" | "menu";
+  /**
+   * Optional callback invoked when the button is clicked.
+   * When provided, the button delegates state management to the parent
+   * (lifted-state pattern) and does NOT open the built-in dialog.
+   * When omitted, the button manages dialog open/close internally.
+   */
+  onOpen?: () => void;
 }
 
 export function SuggestPlaceButton({
   className,
   variant = "icon",
+  onOpen,
 }: SuggestPlaceButtonProps) {
   const { isEnabled } = useFeatureFlags();
   const { t } = useTranslation();
+  // Internal dialog state — only used when onOpen is not provided
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Don't render if feature flag is disabled (also returns false while loading)
@@ -27,7 +36,12 @@ export function SuggestPlaceButton({
 
   const handleOpen = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    setIsDialogOpen(true);
+    if (onOpen) {
+      // #328: delegate to parent — no DOM coupling
+      onOpen();
+    } else {
+      setIsDialogOpen(true);
+    }
   };
 
   return (
@@ -62,10 +76,13 @@ export function SuggestPlaceButton({
         </button>
       )}
 
-      <SuggestPlaceDialog
-        isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-      />
+      {/* Only render the built-in dialog when not delegating to parent (#328) */}
+      {!onOpen && (
+        <SuggestPlaceDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+        />
+      )}
     </>
   );
 }

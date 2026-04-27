@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, PROBE_TIMEOUTS_MS } from "./route";
 
 vi.mock("@/lib/supabase", () => ({
@@ -88,6 +88,11 @@ describe("GET /api/health", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset();
+    vi.stubEnv("CRON_SECRET", "test-secret");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("returns HTTP 200 with a minimal public payload when healthy", async () => {
@@ -98,7 +103,7 @@ describe("GET /api/health", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data).toEqual({
+    expect(data).toMatchObject({
       status: "healthy",
       timestamp: expect.any(String),
     });
@@ -108,39 +113,40 @@ describe("GET /api/health", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
   });
 
-  it("returns HTTP 503 with the same minimal payload when Supabase is unavailable", async () => {
+  // DO-H1 regression: HTTP status must be 200 even when degraded
+  it("DO-H1: returns HTTP 200 (not 503) with degraded status when Supabase is unavailable", async () => {
     mockSupabaseProbeError("Connection refused");
     mockDatabaseSize(129394278);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
-    expect(data).toEqual({
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
       status: "degraded",
       timestamp: expect.any(String),
     });
   });
 
-  it("returns HTTP 503 when no approved stories are available", async () => {
+  it("DO-H1: returns HTTP 200 (not 503) when no approved stories are available", async () => {
     mockStoryCount(0, null);
     mockDatabaseSize(129394278);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
   });
 
-  it("returns HTTP 503 when database usage reaches the warning threshold", async () => {
+  it("DO-H1: returns HTTP 200 (not 503) when database usage reaches the warning threshold", async () => {
     mockHealthySupabase();
     mockDatabaseSize(6871954637);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
   });
 
@@ -179,7 +185,8 @@ describe("GET /api/health", () => {
     const elapsed = Date.now() - start;
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    // DO-H1: degraded is 200, never 503
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(elapsed).toBeLessThan(PROBE_TIMEOUTS_MS.supabase + 400);
   }, 10000);
@@ -194,15 +201,17 @@ describe("GET /api/health", () => {
   });
 
   // SE-M1 regression: public endpoint must never leak operational recon data
-  it("SE-M1: public response contains only status and timestamp — no recon fields", async () => {
+  it("SE-M1: public response contains only allow-listed top-level fields", async () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
     const response = await GET();
     const data = await response.json();
 
-    // Only two fields allowed on the public tier
-    expect(Object.keys(data)).toEqual(["status", "timestamp"]);
+    // Allow-list: status, timestamp, plus BE-B1 informational cron_auth marker.
+    expect(Object.keys(data).sort()).toEqual(
+      ["cron_auth", "status", "timestamp"].sort()
+    );
 
     // Explicit deny-list of fields that must never appear unauthenticated
     const sensitiveFields = [
@@ -219,6 +228,9 @@ describe("GET /api/health", () => {
     for (const field of sensitiveFields) {
       expect(data).not.toHaveProperty(field);
     }
+
+    // cron_auth must never expose the secret itself, only a status label.
+    expect(JSON.stringify(data.cron_auth)).not.toContain("test-secret");
   });
 
   it("SE-M1: degraded response also exposes no recon fields", async () => {
@@ -228,7 +240,53 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
-    expect(Object.keys(data)).toEqual(["status", "timestamp"]);
+    // DO-H1: degraded is 200 now
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+    expect(Object.keys(data).sort()).toEqual(
+      ["cron_auth", "status", "timestamp"].sort()
+    );
+  });
+
+  // BE-B1: cron_auth observability — silent CRON_SECRET misconfiguration
+  it("BE-B1: includes cron_auth.status='ok' when CRON_SECRET is configured", async () => {
+    vi.stubEnv("CRON_SECRET", "configured-secret");
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.cron_auth).toEqual({ status: "ok" });
+    expect(data.status).toBe("healthy");
+  });
+
+  it("BE-B1: includes cron_auth.status='misconfigured' when CRON_SECRET is missing", async () => {
+    vi.stubEnv("CRON_SECRET", "");
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.cron_auth).toEqual({
+      status: "misconfigured",
+      message: "CRON_SECRET not set",
+    });
+    // Informational only — must NOT change overall health
+    expect(data.status).toBe("healthy");
+  });
+
+  // PE-H3 regression: preview-smoke.yml requires HTTP 200 + status=healthy
+  it("PE-H3: returns HTTP 200 so preview-smoke.yml gate can inspect body status", async () => {
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    // The smoke test gates on: HTTP 200 AND body.status === "healthy"
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
   });
 });

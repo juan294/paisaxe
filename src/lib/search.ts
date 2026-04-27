@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { rerankChunks } from "./rerank";
 import type { Chunk, ImageResult, SearchResult } from "@/types";
+import { logger } from "@/lib/logger";
 
 /** Number of candidates to retrieve from vector search before reranking */
 const RERANK_CANDIDATE_COUNT = 10;
@@ -49,7 +50,7 @@ export async function getRelatedImages(
     .in("path", imageRefs);
 
   if (error) {
-    console.error("Image fetch error:", error);
+    logger.error("[TABLE_FALLBACK]", { table: "images", error: error.message ?? String(error) });
     return [];
   }
 
@@ -101,7 +102,7 @@ export async function keywordSearch(query: string, limit: number = 5): Promise<C
     .limit(limit);
 
   if (error) {
-    console.error("Keyword search error:", error);
+    logger.error("[TABLE_FALLBACK]", { table: "chunks", error: error.message ?? String(error) });
     return [];
   }
 

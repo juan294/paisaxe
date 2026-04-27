@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdminRole } from "@/hooks/use-admin-role";
 import { StoryGrid } from "@/components/admin/story-grid";
@@ -132,22 +133,40 @@ export function AdminShell() {
   } = useAuth();
   const { isAdmin, isLoading: isRoleLoading } = useAdminRole();
 
+  // URL-backed tab state (FE-S1): persists tab across refresh and enables
+  // direct linking to a specific admin tab via ?tab=stories etc.
+  // useState drives the immediate UI update; useEffect syncs it to the URL.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<AdminTab>(
+    () => (searchParams.get("tab") as AdminTab | null) ?? "analytics"
+  );
+
+  // Sync from URL → state (handles back/forward navigation and initial load)
+  useEffect(() => {
+    const tabFromUrl = (searchParams.get("tab") as AdminTab | null) ?? "analytics";
+    setActiveTab(tabFromUrl);
+  }, [searchParams]);
+
   const [allStories, setAllStories] = useState<AdminStory[]>([]);
   const [filter, setFilter] = useState<FilterType>("needs_curation");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [editingStory, setEditingStory] = useState<AdminStory | null>(null);
-  const [activeTab, setActiveTab] = useState<AdminTab>("analytics");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isApproveAllConfirmOpen, setIsApproveAllConfirmOpen] = useState(false);
   const [isApprovingAll, setIsApprovingAll] = useState(false);
 
-  const handleTabChange = useCallback((tab: AdminTab) => {
-    setActiveTab(tab);
-  }, []);
+  const handleTabChange = useCallback(
+    (tab: AdminTab) => {
+      setActiveTab(tab);
+      router.push(`?tab=${tab}`, { scroll: false });
+    },
+    [router]
+  );
 
   // Always fetch ALL stories — filter client-side for display
   const loadStories = useCallback(async () => {

@@ -163,3 +163,81 @@ export const updateFeatureFlagSchema = z
   .refine((data) => data.enabled !== undefined || data.config !== undefined, {
     message: "Must provide enabled (boolean) or config (object)",
   });
+
+// ---------------------------------------------------------------------------
+// chat POST (shared by /api/chat and /api/chat/stream)
+// ---------------------------------------------------------------------------
+
+export const chatRequestSchema = z.object({
+  message: z.string().min(1, "Message is required").max(500, "Message exceeds maximum length of 500 characters"),
+  context: z.string().max(600, "Context exceeds maximum length of 600 characters").optional(),
+  messageIndex: z.number().int().min(0).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// admin/agent-config PUT
+// ---------------------------------------------------------------------------
+
+/** Toggle master switch. */
+export const agentConfigMasterSchema = z.object({
+  master_enabled: z.boolean(),
+});
+
+/** Enable/disable an individual agent. */
+export const agentConfigEnableSchema = z.object({
+  key: z.string().min(1).max(200),
+  enabled: z.boolean().optional(),
+  config_key: z.string().min(1).max(200).optional(),
+  value: z.unknown().optional(),
+});
+
+/** Union: either a master toggle or a per-agent update. */
+export const agentConfigUpdateSchema = z.union([
+  agentConfigMasterSchema,
+  agentConfigEnableSchema,
+]);
+
+// ---------------------------------------------------------------------------
+// admin/suggestions/[id] PUT
+// ---------------------------------------------------------------------------
+
+export const updateSuggestionSchema = z.object({
+  status: z.enum(["pending", "reviewed", "converted", "rejected"]).optional(),
+  adminNotes: z.string().max(2000).optional(),
+}).refine((data) => data.status !== undefined || data.adminNotes !== undefined, {
+  message: "No updates provided",
+});
+
+// ---------------------------------------------------------------------------
+// checkout (day-pass and embedded) POST
+// ---------------------------------------------------------------------------
+
+export const checkoutBodySchema = z.object({
+  returnTo: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/i).max(100).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// mcp/places GET query params
+// ---------------------------------------------------------------------------
+
+export const placesQuerySchema = z.object({
+  query: z
+    .string()
+    .min(1, "Query parameter is required")
+    .max(200)
+    .describe("query"),
+  type: z.string().max(100).optional(),
+  city: z.string().max(200).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// mcp/weather GET query params
+// ---------------------------------------------------------------------------
+
+export const weatherQuerySchema = z.object({
+  city: z
+    .string()
+    .min(1, "City parameter is required")
+    .max(200)
+    .describe("city"),
+});

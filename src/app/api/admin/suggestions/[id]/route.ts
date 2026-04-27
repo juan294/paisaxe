@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
-import type { StorySuggestionRow, SuggestionStatus, UpdateSuggestionRequest } from "@/types/suggestions";
+import type { StorySuggestionRow, UpdateSuggestionRequest } from "@/types/suggestions";
 import { rowToStorySuggestion } from "@/types/suggestions";
+import { updateSuggestionSchema } from "@/lib/schemas";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -25,24 +26,37 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  let body: UpdateSuggestionRequest;
-  try {
-    body = await request.json();
-  } catch {
+  const rawBody = await request.json().catch(() => null);
+  if (rawBody === null) {
     return NextResponse.json(
       { error: "Invalid request body" },
       { status: 400 }
     );
   }
 
-  // Validate status if provided
-  const validStatuses: SuggestionStatus[] = ["pending", "reviewed", "converted", "rejected"];
-  if (body.status && !validStatuses.includes(body.status)) {
+  const parsed = updateSuggestionSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    const issues = parsed.error.issues;
+    // Surface the refine message ("No updates provided") as a top-level error
+    const noUpdates = issues.find((i) => i.message === "No updates provided");
+    if (noUpdates) {
+      return NextResponse.json({ error: "No updates provided" }, { status: 400 });
+    }
+    // Status enum error
+    const statusIssue = issues.find((i) => i.path[0] === "status");
+    if (statusIssue) {
+      return NextResponse.json(
+        { error: "Invalid status. Must be pending, reviewed, converted, or rejected." },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: "Invalid status. Must be pending, reviewed, converted, or rejected." },
+      { error: "Invalid request", details: parsed.error.flatten() },
       { status: 400 }
     );
   }
+
+  const body = parsed.data as UpdateSuggestionRequest;
 
   // Build update object
   const updates: Record<string, unknown> = {};
@@ -51,13 +65,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
   if (body.adminNotes !== undefined) {
     updates.admin_notes = body.adminNotes;
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json(
-      { error: "No updates provided" },
-      { status: 400 }
-    );
   }
 
   try {

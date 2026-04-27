@@ -8,9 +8,10 @@
   },
   "scripts": {
     "dev": "NODE_OPTIONS='--disable-warning=ExperimentalWarning' next dev",
-    "build": "NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build",
+    "build": "next build",
+    "analyze": "ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build",
     "build:analyze": "ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build",
-    "start": "NODE_OPTIONS='--disable-warning=ExperimentalWarning' next start",
+    "start": "next start",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json",
     "check-env": "tsx scripts/check-env.ts",

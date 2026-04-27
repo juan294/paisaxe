@@ -259,6 +259,39 @@ describe("/api/admin/suggestions/[id]", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
     });
+
+    describe("Zod validation", () => {
+      it("should return 400 for invalid status value (Zod catches it)", async () => {
+        const request = createRequest({ status: "invalid-status-value" });
+
+        const response = await PUT(request, { params });
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.error).toContain("Invalid status");
+      });
+
+      it("should return 400 with Zod details for adminNotes exceeding max length", async () => {
+        const request = createRequest({ adminNotes: "x".repeat(2001) });
+
+        const response = await PUT(request, { params });
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.error).toBe("Invalid request");
+        expect(data.details).toBeDefined();
+      });
+
+      it("should return 400 when body is empty object (no updates)", async () => {
+        const request = createRequest({});
+
+        const response = await PUT(request, { params });
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.error).toBe("No updates provided");
+      });
+    });
   });
 
   describe("DELETE", () => {

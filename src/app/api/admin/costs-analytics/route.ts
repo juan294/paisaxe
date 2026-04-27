@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { getEnv } from "@/lib/env";
 import {
   fetchAnthropicCosts,
   fetchAnthropicCostsByDay,
@@ -188,9 +189,9 @@ async function fetchUsageMetrics(
   to: string
 ): Promise<UsageMetrics | undefined> {
   try {
-    const projectId = process.env.POSTHOG_PROJECT_ID?.trim();
-    const posthogKey = process.env.POSTHOG_PERSONAL_API_KEY?.trim();
-    const elevenLabsKey = process.env.ELEVENLABS_API_KEY?.trim();
+    const projectId = getEnv("POSTHOG_PROJECT_ID");
+    const posthogKey = getEnv("POSTHOG_PERSONAL_API_KEY");
+    const elevenLabsKey = getEnv("ELEVENLABS_API_KEY");
 
     const periodDays = Math.max(
       1,

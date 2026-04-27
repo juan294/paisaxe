@@ -332,4 +332,61 @@ describe("POST /api/checkout/day-pass", () => {
     expect(data.error).toBe("Failed to create checkout session");
     expect(data.details).toBe("Unknown error");
   });
+
+  describe("Zod validation for returnTo", () => {
+    it("should accept a valid returnTo slug via Zod schema", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1", email: "user@example.com" } },
+        error: null,
+      });
+      vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+        "https://checkout.stripe.com/abc"
+      );
+
+      const request = createRequest({ origin: "https://paisaxe.es" }, { returnTo: "oviedo-tour" });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.url).toBeDefined();
+    });
+
+    it("should silently ignore returnTo that fails Zod regex (path traversal)", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1", email: "user@example.com" } },
+        error: null,
+      });
+      vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+        "https://checkout.stripe.com/abc"
+      );
+
+      // Fails Zod regex: starts with digit but contains path segment separator
+      const request = createRequest(
+        { origin: "https://paisaxe.es" },
+        { returnTo: "../../admin" }
+      );
+      await POST(request);
+
+      expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({ successUrl: "https://paisaxe.es/pricing/success" })
+      );
+    });
+
+    it("should silently ignore non-string returnTo", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1", email: "user@example.com" } },
+        error: null,
+      });
+      vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+        "https://checkout.stripe.com/abc"
+      );
+
+      const request = createRequest({ origin: "https://paisaxe.es" }, { returnTo: 42 as unknown as string });
+      await POST(request);
+
+      expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({ successUrl: "https://paisaxe.es/pricing/success" })
+      );
+    });
+  });
 });
