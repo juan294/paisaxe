@@ -344,6 +344,101 @@ describe("POST /api/webhooks/stripe", () => {
     });
   });
 
+  describe("grant_day_pass_idempotent atomicity (BE-B2 regression)", () => {
+    it("does not lock user out on retry when first grant attempt fails atomically", async () => {
+      // BE-B2 regression: if the dedup row insert is committed but the
+      // voice_purchases insert fails, the next retry would return 'duplicate'
+      // forever — the user pays but never receives access.
+      //
+      // The atomic RPC must roll back BOTH inserts on failure, so a retry of
+      // the same Stripe event can succeed by re-running the entire RPC.
+      //
+      // We simulate this by:
+      //   1. First call: RPC raises (atomicity rolls back the dedup row).
+      //   2. Second call (Stripe retry): RPC successfully grants access
+      //      because no dedup row exists from the failed attempt.
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent(
+          "user-atomic",
+          "pi_atomic",
+          "evt_atomic_retry"
+        )
+      );
+      mockRpc
+        .mockResolvedValueOnce({
+          data: null,
+          error: { message: "voice_purchases insert failed" },
+        })
+        .mockResolvedValueOnce({
+          data: "granted",
+          error: null,
+        });
+
+      // First webhook delivery: RPC fails, route returns 500 so Stripe retries.
+      const firstResponse = await POST(
+        createRequest(JSON.stringify({}), {
+          "stripe-signature": "valid-signature",
+        })
+      );
+      expect(firstResponse.status).toBe(500);
+      expect(await firstResponse.json()).toEqual({ error: "Database error" });
+
+      // Stripe retries the same event — must succeed (NOT return 'duplicate').
+      const retryResponse = await POST(
+        createRequest(JSON.stringify({}), {
+          "stripe-signature": "valid-signature",
+        })
+      );
+      const retryData = await retryResponse.json();
+      expect(retryResponse.status).toBe(200);
+      expect(retryData).toEqual({ status: "granted" });
+      expect(retryData.status).not.toBe("duplicate");
+
+      // Both calls hit the RPC with identical idempotency parameters.
+      expect(mockRpc).toHaveBeenCalledTimes(2);
+      const expectedArgs = {
+        p_event_id: "evt_atomic_retry",
+        p_user_id: "user-atomic",
+        p_payment_provider_id: "pi_atomic",
+        p_expires_at: "2024-01-02T00:00:00.000Z",
+        p_amount_paid: 199,
+      };
+      expect(mockRpc).toHaveBeenNthCalledWith(
+        1,
+        "grant_day_pass_idempotent",
+        expectedArgs
+      );
+      expect(mockRpc).toHaveBeenNthCalledWith(
+        2,
+        "grant_day_pass_idempotent",
+        expectedArgs
+      );
+    });
+
+    it("returns non-200 (not 200 'duplicate') when the RPC reports an error so Stripe retries", async () => {
+      // Defensive guard: the route must propagate RPC failures as non-200
+      // so Stripe's retry machinery kicks in. If we ever returned 200 with
+      // an error payload, Stripe would treat the event as delivered and
+      // never retry — leaving the user paid but without access.
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent("user-x", "pi_x", "evt_atomic_failure")
+      );
+      mockRpc.mockResolvedValue({
+        data: null,
+        error: { message: "atomic rollback: voice_purchases insert failed" },
+      });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), {
+          "stripe-signature": "valid-signature",
+        })
+      );
+
+      expect(response.status).not.toBe(200);
+      expect(response.status).toBe(500);
+    });
+  });
+
   it("returns 500 and stringifies non-Error throws from the outer handler", async () => {
     vi.mocked(verifyWebhookSignature).mockReturnValue(
       createCheckoutSessionEvent("user-123", "pi_nonerror", "evt_nonerror")
