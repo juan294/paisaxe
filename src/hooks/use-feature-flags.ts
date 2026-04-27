@@ -195,7 +195,7 @@ function useFeatureFlagsState(
 }
 
 interface FeatureFlagsProviderProps {
-  children: ReactNode;
+  children?: ReactNode;
   initialFlags?: Partial<Record<FeatureFlagKey, boolean>>;
 }
 

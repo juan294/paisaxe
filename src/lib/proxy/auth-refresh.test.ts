@@ -1,21 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
-// Capture the cookies config passed to createServerClient
-let capturedCookiesConfig: {
-  getAll: () => { name: string; value: string }[];
-  setAll?: (cookies: { name: string; value: string; options: Record<string, unknown> }[]) => void;
-} | null = null;
-
 const mockGetUser = vi.fn().mockResolvedValue({ data: { user: null }, error: null });
 
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: vi.fn(
-    (_url: string, _key: string, options: { cookies: typeof capturedCookiesConfig }) => {
-      capturedCookiesConfig = options.cookies;
-      return { auth: { getUser: mockGetUser } };
-    }
-  ),
+  createServerClient: vi.fn((_url: string, _key: string, _options: unknown) => {
+    return { auth: { getUser: mockGetUser } };
+  }),
 }));
 
 import {
@@ -140,7 +131,6 @@ describe("refreshAuthSession", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", supabaseKey);
     mockGetUser.mockReset();
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
-    capturedCookiesConfig = null;
   });
 
   afterEach(() => {

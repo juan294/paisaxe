@@ -294,7 +294,7 @@ function useStoriesState(
 }
 
 interface StoriesProviderProps {
-  children: ReactNode;
+  children?: ReactNode;
   initialStories?: Story[];
 }
 

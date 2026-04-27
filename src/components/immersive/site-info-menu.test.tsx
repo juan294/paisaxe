@@ -1,3 +1,4 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { SiteInfoMenu } from "./site-info-menu";
@@ -18,7 +19,7 @@ vi.mock("next/image", () => ({
     width?: number;
     height?: number;
     className?: string;
-    referrerPolicy?: string;
+    referrerPolicy?: React.HTMLAttributeReferrerPolicy;
   }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img

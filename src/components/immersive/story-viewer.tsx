@@ -30,7 +30,6 @@ import { StoryProgressBar } from "./story-progress-bar";
 import { StoryToolbar } from "./story-toolbar";
 import { StoryInfoPanel } from "./story-info-panel";
 import { useStoryKeyboardNav } from "@/hooks/use-story-keyboard-nav";
-import { useIsFinePointer } from "@/hooks/use-media-query";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -82,8 +81,6 @@ export function StoryViewer({
   const { isEnabled } = useFeatureFlags();
   const { t, locale } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
-  // #329: cache matchMedia result instead of calling on every click
-  const isFinePointer = useIsFinePointer();
 
   const { requiresAuth, isFavorite, toggleFavorite } = useFavorites();
 
