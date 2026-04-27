@@ -131,8 +131,8 @@ describe("translate webhook", () => {
     });
     expect(mockRpc).toHaveBeenCalledWith("claim_next_translate_webhook_event", {
       p_event_key: `${VALID_STORY_ID}:default:all`,
-      p_lease_seconds: 600,
-      p_batch_size: 10,
+      p_lease_seconds: 180, // BE-H6: reduced from 600 to 180 (3 minutes)
+      p_batch_size: 3, // BE-H6: reduced from 10 to 3 jobs per batch
     });
     expect(mockRpc).toHaveBeenCalledWith("complete_translate_webhook_event", {
       p_event_key: `${VALID_STORY_ID}:default:all`,
@@ -550,6 +550,67 @@ describe("translate webhook", () => {
       const response = await POST(createRequest({ storyId: 123 }));
 
       expect(response.status).toBe(400);
+    });
+  });
+
+  describe("BE-H6: batch size and lease timeout", () => {
+    it("BE-H6: claims at most 3 jobs per invocation (batch size <= 3)", async () => {
+      // The effective batch size must be <= 3 to stay within Vercel's 60s timeout
+      // (each job takes ~5-15s, so 3 * 15s = 45s leaves margin)
+      const claimArgs: Record<string, unknown>[] = [];
+
+      mockRpc.mockImplementation((fn: string, args?: Record<string, unknown>) => {
+        if (fn === "enqueue_translate_webhook_event") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "pg_try_advisory_lock") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        if (fn === "claim_next_translate_webhook_event") {
+          if (args) claimArgs.push(args);
+          return Promise.resolve({ data: [], error: null });
+        }
+        if (fn === "pg_advisory_unlock") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      await POST(createRequest({ storyId: VALID_STORY_ID }));
+
+      expect(claimArgs.length).toBeGreaterThan(0);
+      for (const args of claimArgs) {
+        expect(args.p_batch_size).toBeLessThanOrEqual(3);
+      }
+    });
+
+    it("BE-H6: lease timeout must be <= 3 minutes (180 seconds)", async () => {
+      const claimArgs: Record<string, unknown>[] = [];
+
+      mockRpc.mockImplementation((fn: string, args?: Record<string, unknown>) => {
+        if (fn === "enqueue_translate_webhook_event") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "pg_try_advisory_lock") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        if (fn === "claim_next_translate_webhook_event") {
+          if (args) claimArgs.push(args);
+          return Promise.resolve({ data: [], error: null });
+        }
+        if (fn === "pg_advisory_unlock") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      await POST(createRequest({ storyId: VALID_STORY_ID }));
+
+      expect(claimArgs.length).toBeGreaterThan(0);
+      for (const args of claimArgs) {
+        // Lease should be <= 180 seconds (3 minutes) to recover faster from crashes
+        expect(args.p_lease_seconds).toBeLessThanOrEqual(180);
+      }
     });
   });
 });
