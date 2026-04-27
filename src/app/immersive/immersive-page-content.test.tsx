@@ -67,6 +67,16 @@ vi.mock("@/components/ui/component-error-boundary", () => ({
     <>{children}</>
   ),
 }));
+// Mock voice-chat module directly to prevent EnvironmentTeardownError — the dynamic
+// import resolver can still trigger module loading after environment teardown unless
+// the underlying module is mocked before it is ever resolved.
+vi.mock("@/components/immersive/voice-chat", () => ({
+  VoiceChat: (props: Record<string, unknown>) => (
+    <div data-testid="voice-chat" data-open={String(props.open)}>
+      <button data-testid="voice-chat-close" onClick={() => (props.onClose as () => void)()} />
+    </div>
+  ),
+}));
 // Mock dynamic import for VoiceChat — renders a div so we can detect it
 vi.mock("next/dynamic", () => ({
   default: () => (props: Record<string, unknown>) => (
