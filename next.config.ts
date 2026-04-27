@@ -69,12 +69,6 @@ const nextConfig: NextConfig = {
         // for the `unsafe-inline` rationale (PPR compatibility).
       ],
     },
-    {
-      source: "/api/:path*",
-      headers: [
-        { key: "Cache-Control", value: "no-store, max-age=0" },
-      ],
-    },
   ],
   images: {
     // Prefer modern formats for better compression
@@ -91,6 +85,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
       },
     ],
     // Increase cache duration for images (default is 60 seconds)
