@@ -187,7 +187,7 @@ describe("PricingPage", () => {
 
     expect(screen.getByText("premium.pricing_title")).toBeInTheDocument();
     expect(screen.getByText("€1.99")).toBeInTheDocument();
-    expect(screen.getByText(/Voice Pass/)).toBeInTheDocument();
+    expect(screen.getByText("premium.voice_pass_label")).toBeInTheDocument();
     // Ensure no raw unicode escape sequences are rendered
     expect(screen.queryByText(/\\u[0-9a-f]{4}/i)).not.toBeInTheDocument();
   });
@@ -262,7 +262,7 @@ describe("PricingPage", () => {
 
     render(<PricingPage />);
 
-    expect(screen.getByText("Premium Access")).toBeInTheDocument();
+    expect(screen.getByText("premium.premium_access")).toBeInTheDocument();
   });
 
   it("should render back link to immersive page", () => {
@@ -359,7 +359,7 @@ describe("PricingPage", () => {
     render(<PricingPage />);
 
     // Should show "Premium Access" instead of success_subtitle
-    expect(screen.getByText("Premium Access")).toBeInTheDocument();
+    expect(screen.getByText("premium.premium_access")).toBeInTheDocument();
     // Should NOT show expiration date
     expect(screen.queryByText(/premium.success_expires/)).not.toBeInTheDocument();
   });
@@ -411,6 +411,54 @@ describe("PricingPage", () => {
       const heading = screen.getByRole("heading", { level: 1 });
       expect(heading.className).toContain("md:text-3xl");
       expect(heading.className).toContain("lg:text-4xl");
+    });
+  });
+
+  describe("UX-B2: Spanish localisation (no hardcoded English)", () => {
+    it("does not render the hardcoded English 'Premium Access' string for whitelisted users", () => {
+      mockUseVoiceAccess.mockReturnValue({
+        hasAccess: false,
+        isWhitelisted: true,
+        canUseVoice: true,
+        needsSignIn: false,
+        needsPurchase: false,
+        expiresAt: null,
+        hoursUntilExpiry: null,
+        agentId: "test-agent",
+        isLoading: false,
+        refresh: mockRefresh,
+      });
+
+      render(<PricingPage />);
+
+      // Hardcoded English must not appear; the i18n key must be used
+      expect(screen.queryByText("Premium Access")).not.toBeInTheDocument();
+      expect(screen.getByText("premium.premium_access")).toBeInTheDocument();
+    });
+
+    it("does not render the hardcoded English 'Voice Pass · 24h' label", () => {
+      render(<PricingPage />);
+
+      // Raw English label must not appear; the translation key must be used
+      expect(screen.queryByText("Voice Pass · 24h")).not.toBeInTheDocument();
+      expect(screen.getByText("premium.voice_pass_label")).toBeInTheDocument();
+    });
+  });
+
+  describe("UX-B3: green palette (no amber/yellow)", () => {
+    it("uses green (not amber/yellow) gradient on the primary CTA when authenticated", () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: "user-123", email: "test@example.com" },
+        session: { access_token: "token" },
+        signInWithGoogle: mockSignInWithGoogle,
+        isLoading: false,
+      });
+
+      render(<PricingPage />);
+
+      const button = screen.getByRole("button", { name: "premium.pricing_cta" });
+      expect(button.className).toMatch(/from-green-/);
+      expect(button.className).not.toMatch(/amber-|yellow-/);
     });
   });
 

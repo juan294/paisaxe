@@ -39,6 +39,7 @@ export const fr: Translations = {
     directions: 'Itinéraire',
     copy_conversation: 'Copier la conversation',
     copied: 'Copié',
+    assistant_label: 'Paisaxe',
   },
 
   stories: {
@@ -156,6 +157,7 @@ export const fr: Translations = {
 
   auth: {
     user: 'Utilisateur',
+    user_avatar: 'Avatar de l\'utilisateur',
     sign_out: 'Se déconnecter',
     sign_in: 'Se connecter',
     sync_favorites_title: 'Synchronisez vos favoris',
@@ -197,6 +199,7 @@ export const fr: Translations = {
     mute: 'Couper le son',
     unmute: 'Activer le son',
     error: 'Erreur de connexion',
+    error_not_configured: 'Agent vocal non configuré',
     no_permission: 'Accès au micro requis',
     you: 'Vous',
     loading: "Chargement de l'assistant vocal...",
@@ -248,6 +251,8 @@ export const fr: Translations = {
   },
 
   premium: {
+    premium_access: 'Accès Premium',
+    voice_pass_label: 'Pass Vocal · 24h',
     voice_locked: 'Le chat vocal est une fonction premium',
     get_day_pass: 'Obtenir un Pass Jour',
     voice_title: 'Parlez à Votre Guide',
@@ -290,6 +295,7 @@ export const fr: Translations = {
   },
 
   errors: {
+    unknown: 'Une erreur est survenue, veuillez réessayer',
     generic_title: 'Une erreur est survenue',
     generic_description: 'Une erreur inattendue est survenue. Veuillez réessayer.',
     retry: 'Réessayer',

@@ -154,4 +154,30 @@ describe("VoicePurchaseCTA", () => {
       expect(container.firstChild).toHaveClass("custom-class");
     });
   });
+
+  describe("UX-B3: visual identity (green, no amber/yellow)", () => {
+    it("uses green palette on the full CTA button (not amber/yellow)", () => {
+      render(<VoicePurchaseCTA />);
+      const button = screen.getByRole("button", { name: /Get Day Pass/ });
+      expect(button.className).toMatch(/from-green-/);
+      expect(button.className).not.toMatch(/amber-|yellow-/);
+    });
+
+    it("uses green palette on the compact CTA button (not amber/yellow)", () => {
+      render(<VoicePurchaseCTA compact />);
+      const button = screen.getByRole("button", { name: /Get Day Pass/ });
+      expect(button.className).toMatch(/from-green-/);
+      expect(button.className).not.toMatch(/amber-|yellow-/);
+    });
+
+    it("does not use amber/yellow anywhere in the rendered DOM (full view)", () => {
+      const { container } = render(<VoicePurchaseCTA />);
+      // No element should reference amber/yellow Tailwind classes after the
+      // visual-identity unification (UX-B3). Search the rendered HTML for any
+      // class names containing 'amber-' or 'yellow-'.
+      const html = container.innerHTML;
+      expect(html).not.toMatch(/amber-\d{2,3}/);
+      expect(html).not.toMatch(/yellow-\d{2,3}/);
+    });
+  });
 });
