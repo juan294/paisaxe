@@ -9,6 +9,9 @@ export async function searchChunks(
   queryEmbedding: number[],
   limit: number = 5
 ): Promise<Chunk[]> {
+  // The match_chunks RPC uses an HNSW index (migration 084).
+  // hnsw.ef_search = 40 is set via SET LOCAL inside the SQL function body,
+  // so no client-side session variable setup is needed here.
   const { data, error } = await supabase.rpc("match_chunks", {
     query_embedding: queryEmbedding,
     match_threshold: 0.5,  // Lowered from 0.7 to get more results
