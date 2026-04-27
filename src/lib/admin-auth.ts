@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "./supabase";
+import { getSupabaseUrl, getSupabaseAnonKey } from "@/lib/env";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type AuthResult =
@@ -17,8 +18,8 @@ export async function validateAdminAuth(): Promise<AuthResult> {
     const cookieStore = await cookies();
 
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      getSupabaseUrl() ?? "",
+      getSupabaseAnonKey() ?? "",
       {
         cookies: {
           getAll() {
