@@ -134,10 +134,12 @@ export const test = base.extend<AuthFixtures>({
 
   // Authenticated browser context
   authenticatedContext: async ({ browser }, use) => {
-    // Skip if credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD not set)
+    // Fail loudly if credentials are not configured — silent skips hide CI misconfigurations.
+    // Ensure QA_TEST_USER_EMAIL and QA_TEST_USER_PASSWORD are set in the workflow env.
     if (!hasAuthCredentials()) {
-      test.skip(true, "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD)");
-      return;
+      throw new Error(
+        "QA test user credentials not configured. Set QA_TEST_USER_EMAIL and QA_TEST_USER_PASSWORD in the CI environment."
+      );
     }
 
     const context = await browser.newContext();
@@ -147,10 +149,12 @@ export const test = base.extend<AuthFixtures>({
 
   // Authenticated page with session injected
   authenticatedPage: async ({ authenticatedContext }, use) => {
-    // Skip if credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD not set)
+    // Fail loudly if credentials are not configured — silent skips hide CI misconfigurations.
+    // Ensure QA_TEST_USER_EMAIL and QA_TEST_USER_PASSWORD are set in the workflow env.
     if (!hasAuthCredentials()) {
-      test.skip(true, "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD)");
-      return;
+      throw new Error(
+        "QA test user credentials not configured. Set QA_TEST_USER_EMAIL and QA_TEST_USER_PASSWORD in the CI environment."
+      );
     }
 
     // Clean up before test (isolation)
