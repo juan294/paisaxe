@@ -20,7 +20,7 @@ export default function RootError({
   const { t } = useTranslation();
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-black px-4 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-950 px-4 text-center">
       <h1 className="text-2xl font-bold text-white">{t("errors.generic_title")}</h1>
       <p className="mt-4 max-w-md text-white/70">
         {t("errors.generic_description")}
