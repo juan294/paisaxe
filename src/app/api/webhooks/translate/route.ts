@@ -8,10 +8,13 @@ import { translateStory } from "@/lib/translate-story";
 import type { StoryLocale } from "@/types/immersive";
 
 const TRANSLATE_WORKER_LOCK_ID = 1007;
-// BE-H3: 10-minute lease matches migration 082 DB default — crashed handlers
-// release faster so the cron recovery path picks up stranded jobs sooner.
-const TRANSLATE_JOB_LEASE_SECONDS = 10 * 60;
-const TRANSLATE_JOB_BATCH_SIZE = 10;
+// BE-H6: Reduced lease to 3 minutes (180s). Each job takes ~5-15s so a
+// 3-job batch fits in ~45s, well within Vercel's 60s function timeout.
+// Shorter lease means crashed handlers are reclaimed faster than the old 10min.
+const TRANSLATE_JOB_LEASE_SECONDS = 3 * 60; // 180 seconds
+// BE-H6: Reduced from 10 to 3. Three jobs at up to 15s each = 45s max,
+// leaving 15s margin before Vercel's 60s function timeout.
+const TRANSLATE_JOB_BATCH_SIZE = 3;
 
 const StrictTranslateWebhookSchema = z
   .object({
