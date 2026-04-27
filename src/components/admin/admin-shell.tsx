@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdminRole } from "@/hooks/use-admin-role";
@@ -131,6 +132,11 @@ export function AdminShell() {
     signOut,
   } = useAuth();
   const { isAdmin, isLoading: isRoleLoading } = useAdminRole();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // FE-H5: derive activeTab from URL — single source of truth, no ping-pong
+  const activeTab = (searchParams.get("tab") ?? "analytics") as AdminTab;
 
   const [allStories, setAllStories] = useState<AdminStory[]>([]);
   const [filter, setFilter] = useState<FilterType>("needs_curation");
@@ -138,16 +144,18 @@ export function AdminShell() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [editingStory, setEditingStory] = useState<AdminStory | null>(null);
-  const [activeTab, setActiveTab] = useState<AdminTab>("analytics");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isApproveAllConfirmOpen, setIsApproveAllConfirmOpen] = useState(false);
   const [isApprovingAll, setIsApprovingAll] = useState(false);
 
-  const handleTabChange = useCallback((tab: AdminTab) => {
-    setActiveTab(tab);
-  }, []);
+  const handleTabChange = useCallback(
+    (tab: AdminTab) => {
+      router.push(`/admin?tab=${tab}`);
+    },
+    [router]
+  );
 
   // Always fetch ALL stories — filter client-side for display
   const loadStories = useCallback(async () => {

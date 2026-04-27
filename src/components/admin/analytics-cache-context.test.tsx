@@ -438,6 +438,53 @@ describe("useAnalyticsData", () => {
     await waitFor(() => expect(result.current.data).toBe("data-A"));
   });
 
+  it("FE-H6: staleness check does not call queueMicrotask during render phase", async () => {
+    // After the fix, the staleness check must be inside a useEffect, not at render time.
+    // We verify queueMicrotask is never called synchronously during render.
+    const queueMicrotaskSpy = vi.spyOn(globalThis, "queueMicrotask");
+
+    const realDateNow = Date.now;
+    let mockNow = realDateNow();
+    vi.spyOn(Date, "now").mockImplementation(() => mockNow);
+
+    const fetchFn = vi
+      .fn<() => Promise<AdminApiResponse<string>>>()
+      .mockResolvedValueOnce({ data: "initial" })
+      .mockResolvedValue({ data: "revalidated" });
+
+    const wrapper = createWrapper();
+
+    const { result, rerender } = renderHook(
+      () =>
+        useAnalyticsData("fe-h6-stale", fetchFn, '{"key":"a"}', {
+          staleTime: 100,
+        }),
+      { wrapper }
+    );
+
+    // Initial fetch completes
+    await waitFor(() => expect(result.current.data).toBe("initial"));
+
+    // Clear spy to only observe calls during the upcoming re-render
+    queueMicrotaskSpy.mockClear();
+
+    // Advance time past staleTime so staleness check is triggered
+    mockNow += 200;
+
+    // Synchronously rerender — queueMicrotask must NOT be called during render
+    // (it would indicate the staleness check is still in the render phase)
+    rerender();
+
+    // queueMicrotask should NOT have been called synchronously during render
+    expect(queueMicrotaskSpy).not.toHaveBeenCalled();
+
+    // But the data should still revalidate (via the useEffect path)
+    await waitFor(() => expect(result.current.data).toBe("revalidated"));
+
+    queueMicrotaskSpy.mockRestore();
+    vi.spyOn(Date, "now").mockRestore();
+  });
+
   it("switching back to previously cached params uses cache", async () => {
     let callCount = 0;
     const fetchFn = vi
