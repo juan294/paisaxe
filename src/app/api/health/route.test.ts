@@ -108,6 +108,7 @@ describe("GET /api/health", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
   });
 
+  // DO-H1 / BE-H5 regression: degraded status must return HTTP 503, not 200
   it("returns HTTP 503 with the same minimal payload when Supabase is unavailable", async () => {
     mockSupabaseProbeError("Connection refused");
     mockDatabaseSize(129394278);
