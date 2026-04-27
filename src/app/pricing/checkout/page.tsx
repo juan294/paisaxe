@@ -46,10 +46,10 @@ export default function CheckoutPage() {
       const { clientSecret } = await response.json();
       return clientSecret;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError(err instanceof Error ? err.message : t("errors.unknown"));
       throw err;
     }
-  }, [returnTo]);
+  }, [returnTo, t]);
 
   // Show sign-in prompt if not authenticated
   if (!user || !session) {

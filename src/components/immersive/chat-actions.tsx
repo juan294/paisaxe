@@ -52,9 +52,11 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
 
   const handleCopy = async () => {
     // Format conversation for clipboard
+    const userLabel = t("voice.you");
+    const assistantLabel = t("chat.assistant_label");
     const conversationText = messages
       .map((msg) => {
-        const label = msg.role === "user" ? "You" : "Paisaxe";
+        const label = msg.role === "user" ? userLabel : assistantLabel;
         return `${label}: ${msg.content}`;
       })
       .join("\n\n");

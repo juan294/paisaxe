@@ -39,6 +39,7 @@ export const es: Translations = {
     directions: 'Cómo llegar',
     copy_conversation: 'Copiar conversación',
     copied: 'Copiado',
+    assistant_label: 'Paisaxe',
   },
 
   stories: {
@@ -156,6 +157,7 @@ export const es: Translations = {
 
   auth: {
     user: 'Usuario',
+    user_avatar: 'Avatar del usuario',
     sign_out: 'Cerrar sesión',
     sign_in: 'Entrar',
     sync_favorites_title: 'Sincroniza tus favoritos',
@@ -197,6 +199,7 @@ export const es: Translations = {
     mute: 'Silenciar',
     unmute: 'Activar sonido',
     error: 'Error de conexion',
+    error_not_configured: 'Agente de voz no configurado',
     no_permission: 'Necesito acceso al microfono',
     you: 'Tu',
     loading: 'Cargando asistente de voz...',
@@ -248,6 +251,8 @@ export const es: Translations = {
   },
 
   premium: {
+    premium_access: 'Acceso Premium',
+    voice_pass_label: 'Pase de Voz · 24h',
     voice_locked: 'El chat de voz es una funcion premium',
     get_day_pass: 'Obtener Pase Diario',
     voice_title: 'Habla con Tu Guia',
@@ -290,6 +295,7 @@ export const es: Translations = {
   },
 
   errors: {
+    unknown: 'Algo salió mal, intenta de nuevo',
     generic_title: 'Algo salió mal',
     generic_description: 'Ha ocurrido un error inesperado. Por favor, inténtalo de nuevo.',
     retry: 'Reintentar',

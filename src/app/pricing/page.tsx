@@ -79,7 +79,7 @@ export default function PricingPage() {
               </div>
               <div>
                 <p className="font-medium text-green-500">
-                  {isWhitelisted ? "Premium Access" : t("premium.success_subtitle")}
+                  {isWhitelisted ? t("premium.premium_access") : t("premium.success_subtitle")}
                 </p>
                 {expiresAt && (
                   <p className="text-xs text-green-500/60">
@@ -103,7 +103,7 @@ export default function PricingPage() {
             {/* Price */}
             <div className="p-6 text-center border-b border-neutral-800">
               <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-3">
-                Voice Pass · 24h
+                {t("premium.voice_pass_label")}
               </p>
               <div className="flex items-baseline justify-center gap-1">
                 <span className="text-4xl font-semibold text-white">€1.99</span>
