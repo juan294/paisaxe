@@ -228,6 +228,10 @@ export function StoryViewer({
   return (
     <main
       className="relative h-dvh w-screen overflow-hidden bg-black cursor-pointer"
+      // UX-B4: hide background carousel from assistive tech while the chat dialog
+      // is open so screen readers can't navigate behind the modal. Pairs with
+      // aria-modal="true" on the VoiceChat dialog.
+      aria-hidden={chatOpen ? "true" : undefined}
       onClick={() => {
         // Only toggle info on desktop (pointer: fine) — on mobile, tap zones handle navigation
         if (isFinePointer) {
@@ -444,7 +448,9 @@ export function StoryViewer({
               icon={<Share2 className="h-4 w-4" />}
               label={t("share.share")}
               onClick={() => {
-                const shareUrl = `${window.location.origin}/stories/${story.id}`;
+                // UX-B1: route is `/story/[slug]` (singular, by slug) — using the
+                // plural `/stories/<id>` path would 404. Mirrors share-button.tsx.
+                const shareUrl = `${window.location.origin}/story/${story.slug || story.id}`;
                 if (navigator.share) {
                   navigator.share({
                     title: localizedStory.title,
