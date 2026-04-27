@@ -137,7 +137,7 @@ describe("SurpriseMeButton", () => {
       />
     );
     const button = screen.getByRole("button");
-    expect(button).toHaveClass("p-2");
+    expect(button).toHaveClass("p-3");
     expect(button).toHaveClass("rounded-full");
     expect(button).toHaveClass("bg-white/10");
   });
