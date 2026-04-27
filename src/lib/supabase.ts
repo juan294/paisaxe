@@ -5,6 +5,11 @@ import {
   getSupabaseServiceRoleKey,
   getSupabaseUrl,
 } from "@/lib/env";
+// AR-H1: Database types defined in @/types/database.types.
+// The typed factory (createClient<Database>) is available via createTypedSupabaseClient()
+// below. The singleton `supabase` and `createAdminClient()` stay untyped until the
+// Database skeleton is regenerated from the live schema with `supabase gen types`.
+import type { Database } from "@/types/database.types";
 
 function getRequiredSupabaseUrl() {
   const supabaseUrl = getSupabaseUrl();
@@ -38,6 +43,17 @@ function getPublicClient() {
   }
 
   return publicClient;
+}
+
+/**
+ * AR-H1: Typed Supabase client factory.
+ * Use this when you need full type-safety against the Database schema.
+ * Once `supabase gen types` is run against the live project, replace the
+ * singleton `supabase` and `createAdminClient` exports to use this type.
+ */
+export function createTypedSupabaseClient(): SupabaseClient<Database> {
+  const { supabaseUrl, supabaseAnonKey } = getPublicSupabaseConfig();
+  return createClient<Database>(supabaseUrl, supabaseAnonKey);
 }
 
 export const supabase = new Proxy({} as PublicSupabaseClient, {
