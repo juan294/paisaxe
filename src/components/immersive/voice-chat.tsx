@@ -194,6 +194,7 @@ export function VoiceChat({ story, open, onClose, initialMessage, triggerRef }: 
       ref={dialogRef}
       className="fixed inset-0 z-50 flex items-end justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] md:items-center"
       role="dialog"
+      aria-modal="true"
       aria-label={t("accessibility.chat_dialog").replace("{title}", localizedStory.title)}
     >
       {/* Backdrop */}

@@ -1128,8 +1128,87 @@ describe("StoryViewer", () => {
       const shareItem = screen.getByText("Compartir");
       fireEvent.click(shareItem);
 
+      // UX-B1: must use singular `/story/<slug>` to match the actual route,
+      // never the plural `/stories/<id>` (which produces a 404).
       expect(mockWriteText).toHaveBeenCalledWith(
-        expect.stringContaining("/stories/story-1")
+        expect.stringMatching(/\/story\/(story-1-slug|story-1)$/)
+      );
+      expect(mockWriteText).not.toHaveBeenCalledWith(
+        expect.stringContaining("/stories/")
+      );
+    });
+
+    it("UX-B1: should build share URL using slug (not id) when slug is available", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "story_sharing"
+      );
+
+      const mockWriteText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: mockWriteText },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(navigator, "share", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+
+      const storiesWithSlugs: Story[] = [
+        { ...mockStories[0], slug: "lagos-de-covadonga" },
+        ...mockStories.slice(1),
+      ];
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            stories: storiesWithSlugs,
+            allStories: storiesWithSlugs,
+          })}
+        />
+      );
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      const shareItem = screen.getByText("Compartir");
+      fireEvent.click(shareItem);
+
+      expect(mockWriteText).toHaveBeenCalledWith(
+        expect.stringContaining("/story/lagos-de-covadonga")
+      );
+    });
+
+    it("UX-B1: should fall back to story id when slug is missing", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "story_sharing"
+      );
+
+      const mockWriteText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: mockWriteText },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(navigator, "share", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+
+      // Stories without slugs (default mockStories have no slug field)
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      const shareItem = screen.getByText("Compartir");
+      fireEvent.click(shareItem);
+
+      // Falls back to id under the singular `/story/` path
+      expect(mockWriteText).toHaveBeenCalledWith(
+        expect.stringContaining("/story/story-1")
       );
     });
   });
@@ -1215,6 +1294,26 @@ describe("StoryViewer", () => {
     });
   });
 
+  describe("UX-B4: aria-hidden on background carousel when chat is open", () => {
+    it("should set aria-hidden=\"true\" on <main> when chatOpen is true", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ chatOpen: true })} />
+      );
+
+      const mainEl = screen.getByRole("main", { hidden: true });
+      expect(mainEl).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("should NOT set aria-hidden on <main> when chatOpen is false", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ chatOpen: false })} />
+      );
+
+      const mainEl = screen.getByRole("main");
+      expect(mainEl).not.toHaveAttribute("aria-hidden");
+    });
+  });
+
   describe("auto-play when chat is open", () => {
     beforeEach(() => {
       mockIsEnabled.mockImplementation((flag: string) => flag === "autoplay_button");
@@ -1230,7 +1329,9 @@ describe("StoryViewer", () => {
       );
 
       // Try to enable autoplay even though chat is open
-      const autoPlayButton = screen.getAllByRole("button").find(
+      // UX-B4: when chatOpen, <main> is aria-hidden, so we must opt in to
+      // hidden elements when querying inside the carousel for this test.
+      const autoPlayButton = screen.getAllByRole("button", { hidden: true }).find(
         (btn) => btn.querySelector(".lucide-play")
       );
       if (autoPlayButton) {
@@ -1270,9 +1371,15 @@ describe("StoryViewer", () => {
       const shareItem = screen.getByText("Compartir");
       fireEvent.click(shareItem);
 
+      // UX-B1: must use singular `/story/<slug-or-id>`, not plural `/stories/<id>`
       expect(mockShare).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: expect.stringContaining("/stories/story-1"),
+          url: expect.stringContaining("/story/story-1"),
+        })
+      );
+      expect(mockShare).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringContaining("/stories/"),
         })
       );
 
