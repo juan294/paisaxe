@@ -4,6 +4,7 @@ import {
   validateCsrfToken,
   validateOrigin,
   isExemptFromCsrf,
+  isSecureRuntime,
   csrfCookieOptions,
   CSRF_COOKIE_NAME,
 } from "@/lib/csrf";
@@ -60,6 +61,5 @@ export function setCsrfCookie(request: NextRequest, response: NextResponse): voi
   if (existingToken?.value) return;
 
   const token = generateCsrfToken();
-  const isProduction = process.env.NODE_ENV === "production";
-  response.cookies.set(CSRF_COOKIE_NAME, token, csrfCookieOptions(isProduction));
+  response.cookies.set(CSRF_COOKIE_NAME, token, csrfCookieOptions(isSecureRuntime()));
 }

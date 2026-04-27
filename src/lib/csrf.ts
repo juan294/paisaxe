@@ -4,6 +4,27 @@ export const CSRF_COOKIE_NAME = "__csrf";
 export const CSRF_HEADER_NAME = "x-csrf-token";
 
 /**
+ * HTTP methods that change server state and require a present Origin header (SE-M2).
+ */
+const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * Returns true when the runtime environment should use secure cookies (SE-M5).
+ *
+ * Covers:
+ * - `NODE_ENV === "production"` — standard Node.js production flag
+ * - `VERCEL_ENV === "production"` — Vercel production deployment
+ * - `VERCEL_ENV === "preview"` — Vercel preview deployments (HTTPS, secure cookies required)
+ */
+export function isSecureRuntime(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production" ||
+    process.env.VERCEL_ENV === "preview"
+  );
+}
+
+/**
  * Generate a cryptographically random CSRF token (32 bytes, hex-encoded).
  */
 export function generateCsrfToken(): string {
@@ -64,15 +85,18 @@ function parseCookieValue(
 /**
  * Validate the Origin (or Referer fallback) header against a list of allowed origins.
  *
- * Defense-in-depth layer for CSRF (SE-L2): if an Origin header is present and
- * doesn't match the allowed list, the request is rejected regardless of the
- * HMAC/double-submit token. Referer is used as a fallback only when Origin is
- * absent — non-browser clients (curl, mobile, server-to-server) omit Origin
- * and should pass through unchallenged.
+ * Defense-in-depth layer for CSRF (SE-L2 / SE-M2):
+ * - If an Origin header is present: must match the allowed list.
+ * - If Origin is absent on a state-changing method (POST/PUT/PATCH/DELETE):
+ *   reject — browsers always send Origin for cross-origin state-changing requests,
+ *   so absence on these methods indicates a potential bypass attempt.
+ * - If Origin is absent on GET/HEAD: check Referer as a weaker fallback.
+ *   Non-browser clients (curl, mobile, server-to-server) may omit both headers
+ *   on safe methods and should pass through unchallenged.
  *
- * @param request     The incoming request
- * @param allowedOrigins  List of fully-qualified origin strings (e.g. ["https://paisaxe.es"])
- * @returns true if origin is allowed (or absent without Referer), false if rejected
+ * @param request        The incoming request
+ * @param allowedOrigins List of fully-qualified origin strings (e.g. ["https://paisaxe.es"])
+ * @returns true if origin check passes, false if rejected
  */
 export function validateOrigin(request: Request, allowedOrigins: string[]): boolean {
   const origin = request.headers.get("origin");
@@ -81,7 +105,12 @@ export function validateOrigin(request: Request, allowedOrigins: string[]): bool
     return allowedOrigins.includes(origin);
   }
 
-  // No Origin header — check Referer as a weaker fallback
+  // No Origin header — on state-changing methods this is not allowed (SE-M2)
+  if (STATE_CHANGING_METHODS.has(request.method.toUpperCase())) {
+    return false;
+  }
+
+  // Safe method without Origin header — check Referer as a weaker fallback
   const referer = request.headers.get("referer");
   if (referer) {
     try {
@@ -92,7 +121,7 @@ export function validateOrigin(request: Request, allowedOrigins: string[]): bool
     }
   }
 
-  // Neither Origin nor Referer present — allow (non-browser/server-to-server)
+  // Neither Origin nor Referer present on a safe method — allow (non-browser/server-to-server)
   return true;
 }
 
