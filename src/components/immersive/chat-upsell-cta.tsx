@@ -58,7 +58,7 @@ export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAPro
       <div className="flex items-start gap-3 p-3">
         {/* Icon */}
         <div className="flex-shrink-0 w-9 h-9 rounded-full bg-green-500/20 flex items-center justify-center">
-          <Icon className="h-4.5 w-4.5 text-green-400" />
+          <Icon className="h-4 w-4 text-green-400" />
         </div>
 
         {/* Content */}

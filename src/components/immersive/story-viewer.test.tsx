@@ -864,10 +864,10 @@ describe("StoryViewer", () => {
   });
 
   describe("author pill", () => {
-    it("should render the pill with initial '</> JG' text", async () => {
+    it("should render the pill with initial 'JG' text", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+      expect(screen.getByText(/JG/)).toBeInTheDocument();
     });
 
     it("should render the pill with aria-label for accessibility", async () => {
@@ -979,8 +979,8 @@ describe("StoryViewer", () => {
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // With reduced motion, typewriter stays at initial "</> JG" — no animation
-      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+      // With reduced motion, typewriter stays at initial "JG" — no animation
+      expect(screen.getByText(/JG/)).toBeInTheDocument();
 
       // Advance time — should NOT cycle
       await act(async () => {
@@ -988,7 +988,7 @@ describe("StoryViewer", () => {
       });
 
       // Still shows initial text
-      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+      expect(screen.getByText(/JG/)).toBeInTheDocument();
 
       // Restore
       vi.restoreAllMocks();
