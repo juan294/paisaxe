@@ -707,9 +707,11 @@ describe("POST /api/webhooks/elevenlabs", () => {
         p_sms_message: "Confirmation SMS",
       }
     );
-    expect(mockUpdate).toHaveBeenCalledWith({
-      outcome_message: "Confirmation SMS",
-    });
+    // BE-M6: outcome_message is now passed atomically to complete_booking_sms_job RPC
+    // instead of a separate pending_bookings UPDATE (which could fail silently).
+    expect(mockRpc).toHaveBeenCalledWith("complete_booking_sms_job", expect.objectContaining({
+      p_outcome_message: "Confirmation SMS",
+    }));
   });
 
   // BE-H2: SMS failure must NOT return 500 — booking state was already persisted
@@ -868,6 +870,7 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(mockRpc).toHaveBeenCalledWith("complete_booking_sms_job", {
       p_event_key: "post_call_transcription:conv_456",
       p_provider_sid: "SM123",
+      p_outcome_message: "Confirmation SMS", // BE-M6: atomic outcome_message update
     });
   });
 
@@ -1161,5 +1164,57 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(response.status).toBe(200);
     // The last entry has "confirmado" which matches CONFIRMED_PATTERNS
     expect(data.outcome).toBe("confirmed");
+  });
+
+  // === BE-M6: atomic outcome_message update in complete_booking_sms_job ===
+
+  describe("BE-M6: atomic outcome_message update", () => {
+    it("BE-M6: complete_booking_sms_job RPC must be called with p_outcome_message parameter", async () => {
+      // The outcome_message must be passed to the RPC for atomic persistence.
+      // A separate pending_bookings UPDATE must NOT be made after the RPC call,
+      // as it could be lost if it fails (idempotency key prevents re-attempt).
+
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: buildTranscript(
+          { role: "user", message: "Confirmado, le esperamos." }
+        ),
+        analysis: { call_successful: "success" },
+      });
+
+      await POST(request);
+
+      expect(mockRpc).toHaveBeenCalledWith("complete_booking_sms_job", expect.objectContaining({
+        p_event_key: "post_call_transcription:conv_456",
+        p_provider_sid: "SM123",
+        p_outcome_message: "Confirmation SMS",
+      }));
+    });
+
+    it("BE-M6: separate pending_bookings.update(outcome_message) must NOT be called after complete_booking_sms_job", async () => {
+      // The outcome_message update must be atomic within the RPC, not a separate
+      // UPDATE statement. If the separate UPDATE fails, outcome_message is lost forever
+      // because idempotency prevents re-attempt.
+
+      const request = createSignedRequest({
+        conversation_id: "conv_456",
+        transcript: buildTranscript(
+          { role: "user", message: "Confirmado, le esperamos." }
+        ),
+        analysis: { call_successful: "success" },
+      });
+
+      await POST(request);
+
+      // The separate pending_bookings update({ outcome_message }) must not be called
+      // since the outcome_message is now part of the complete_booking_sms_job RPC
+      const outcomeMessageUpdates = (mockUpdate.mock.calls as unknown[][]).filter(
+        (call) => {
+          const updateArg = call[0] as Record<string, unknown>;
+          return "outcome_message" in updateArg;
+        }
+      );
+      expect(outcomeMessageUpdates).toHaveLength(0);
+    });
   });
 });

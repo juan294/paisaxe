@@ -584,11 +584,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           );
         }
 
+        // BE-M6: outcome_message is passed to the RPC for a single atomic operation.
+        // A separate pending_bookings UPDATE after this point would risk being lost
+        // forever — the idempotency key prevents re-attempt, so a failure here
+        // leaves outcome_message NULL with no recovery path.
         const { error: completeSMSError } = await supabase.rpc(
           "complete_booking_sms_job",
           {
             p_event_key: eventKey,
             p_provider_sid: smsResult.sid ?? null,
+            p_outcome_message: smsMessage,
           }
         );
 
@@ -597,20 +602,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             booking_id: booking.id,
             event_key: eventKey,
             error: completeSMSError.message,
-          });
-        }
-
-        const { error: outcomeMessageError } = await supabase
-          .from("pending_bookings")
-          .update({
-            outcome_message: smsMessage,
-          })
-          .eq("id", booking.id);
-
-        if (outcomeMessageError) {
-          logger.error("[ELEVENLABS_WEBHOOK_OUTCOME_MESSAGE_UPDATE_FAILED]", {
-            booking_id: booking.id,
-            error: outcomeMessageError,
           });
         }
       }

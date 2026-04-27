@@ -1935,5 +1935,79 @@ describe("/api/mcp/make-booking", () => {
       expect(data.success).toBe(false);
       expect(data.errors).toBeDefined();
     });
+
+    // === BE-H4: AbortSignal.timeout on ElevenLabs fetch ===
+
+    it("BE-H4: should pass AbortSignal.timeout(15000) to the ElevenLabs fetch call", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_timeout_test" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "be-h4-test-key",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34985887797",
+          party_size: 2,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Test User",
+          customer_phone: "612345678",
+        }),
+      });
+
+      await POST(request);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [, options] = mockFetch.mock.calls[0];
+      // The fetch must include a signal for timeout
+      expect(options.signal).toBeDefined();
+      expect(options.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it("BE-H4: should return 500 with failed status when ElevenLabs fetch times out (AbortError)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // Simulate a timeout by throwing a DOMException with name "TimeoutError"
+      const abortError = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      mockFetch.mockRejectedValueOnce(abortError);
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "be-h4-timeout-key",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34985887797",
+          party_size: 2,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Test User",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("failed");
+    });
   });
 });
