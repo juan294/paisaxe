@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { getEnv } from "@/lib/env";
 
 type HealthStatus = "healthy" | "degraded";
+
+type CronAuthStatus =
+  | { status: "ok" }
+  | { status: "misconfigured"; message: string };
 
 interface PublicHealthResponse {
   status: HealthStatus;
   timestamp: string;
+  cron_auth: CronAuthStatus;
 }
 
 interface SupabaseProbeResult {
@@ -107,8 +113,23 @@ function withTimeout<T>(
   });
 }
 
+/**
+ * BE-B1: surface CRON_SECRET configuration in the public health body so that
+ * monitoring can detect silent cron-auth misconfigurations. Informational only —
+ * does not affect overall health status. The secret value itself is never
+ * included; only "ok" / "misconfigured".
+ */
+function checkCronAuthConfigured(): CronAuthStatus {
+  const cronSecret = getEnv("CRON_SECRET");
+  if (!cronSecret) {
+    return { status: "misconfigured", message: "CRON_SECRET not set" };
+  }
+  return { status: "ok" };
+}
+
 function buildHealthResponse(
-  status: HealthStatus
+  status: HealthStatus,
+  cronAuth: CronAuthStatus
 ): NextResponse<PublicHealthResponse> {
   // DO-H1 / PE-H3: Always return HTTP 200.
   // Degraded state is signalled via the JSON body only.
@@ -119,6 +140,7 @@ function buildHealthResponse(
     {
       status,
       timestamp: new Date().toISOString(),
+      cron_auth: cronAuth,
     },
     {
       status: 200,
@@ -131,6 +153,8 @@ function buildHealthResponse(
 }
 
 export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
+  const cronAuth = checkCronAuthConfigured();
+
   try {
     const [supabaseStatus, storiesStatus, databaseStatus] = await Promise.all([
       checkSupabase(),
@@ -149,8 +173,8 @@ export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
         ? "degraded"
         : "healthy";
 
-    return buildHealthResponse(overallStatus);
+    return buildHealthResponse(overallStatus, cronAuth);
   } catch {
-    return buildHealthResponse("degraded");
+    return buildHealthResponse("degraded", cronAuth);
   }
 }
