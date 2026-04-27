@@ -96,6 +96,59 @@ describe("POST /api/checkout/embedded", () => {
     );
   });
 
+  it("SE-H2: should reject an Origin not in ALLOWED_ORIGINS with 400", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_test_secret_123");
+    const request = createRequest({ origin: "https://evil.example.com" });
+    const response = await POST(request);
+    const data = await response.json();
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Invalid origin");
+    expect(createEmbeddedCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("SE-H2: should use fallback origin (NEXT_PUBLIC_SITE_URL) when no Origin header", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_test_secret_123");
+    const request = createRequest({}); // no origin header
+    const response = await POST(request);
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.clientSecret).toBe("cs_test_secret_123");
+    expect(createEmbeddedCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        returnUrl: expect.stringContaining("https://paisaxe.es/pricing/checkout/return"),
+      })
+    );
+  });
+
+  it("SE-H2: should accept all configured allowed origins", async () => {
+    const allowedOrigins = [
+      "https://paisaxe.es",
+      "https://paisaxe.com",
+      "https://www.paisaxe.es",
+      "https://www.paisaxe.com",
+    ];
+
+    for (const origin of allowedOrigins) {
+      vi.clearAllMocks();
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+      vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_test_secret_123");
+      const request = createRequest({ origin });
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+    }
+  });
+
   it("should return 500 when checkout session creation fails", async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: "user-123", email: "test@example.com" } },
