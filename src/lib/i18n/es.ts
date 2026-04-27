@@ -153,6 +153,8 @@ export const es: Translations = {
     go_back: 'Volver',
     loading: 'Cargando',
     go_to_story: 'Ir a la historia {current} de {total}',
+    show_info: 'Mostrar información de la historia',
+    hide_info: 'Ocultar información de la historia',
   },
 
   auth: {

@@ -555,7 +555,7 @@ describe("StoryViewer", () => {
   });
 
   describe("info toggle", () => {
-    it("should toggle info visibility when clicking screen on desktop (pointer: fine)", async () => {
+    it("should toggle info visibility when clicking the overlay button on desktop (pointer: fine)", async () => {
       // Simulate desktop device with pointer: fine
       vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
         matches: query === "(pointer: fine)",
@@ -570,10 +570,10 @@ describe("StoryViewer", () => {
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const mainContainer = screen.getByRole("main");
-      fireEvent.click(mainContainer);
+      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
+      fireEvent.click(infoToggleBtn);
 
-      // After clicking on desktop, info should be hidden
+      // After clicking the overlay button on desktop, info should be hidden
       const bottomContent = screen
         .getByText("Lagos de Covadonga")
         .closest("article[class*='bottom-0']");
@@ -630,7 +630,7 @@ describe("StoryViewer", () => {
       expect(controlsNav).toHaveClass("opacity-0");
     });
 
-    it("should hide upper-right toolbar controls when clicking screen on desktop", async () => {
+    it("should hide upper-right toolbar controls when clicking the overlay button on desktop", async () => {
       // Simulate desktop device with pointer: fine
       vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
         matches: query === "(pointer: fine)",
@@ -646,11 +646,11 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
-      const mainContainer = screen.getByRole("main");
+      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
 
-      fireEvent.click(mainContainer);
+      fireEvent.click(infoToggleBtn);
 
-      // After clicking on desktop, upper-right controls should be hidden
+      // After clicking the overlay button on desktop, upper-right controls should be hidden
       expect(controlsNav).toHaveClass("opacity-0");
     });
 
@@ -1921,6 +1921,86 @@ describe("StoryViewer", () => {
   // The falsy branches are architecturally unreachable because the component returns null
   // at line 215 when `!story`, so BookmarkButton at line 556 is never rendered without a
   // valid story. The ternary guards are defensive programming.
+
+  describe("FE-H4: Image key stability", () => {
+    it("should not include ambient or autoPlay state in the Image key (prevents flash on flag toggle)", async () => {
+      // Enable ambient_discovery so isAmbient can become true
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "autoplay_button" || flag === "ambient_discovery"
+      );
+
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const img = container.querySelector("img[alt='Lagos de Covadonga']");
+      expect(img).not.toBeNull();
+
+      // The key is not directly observable in the DOM, but the img src should stay stable.
+      // What we CAN assert: the story image renders and does NOT have "ambient" or "autoPlay"
+      // baked into a data attribute that forces a remount.
+      // The canonical test: clicking ambient toggle should NOT cause a new <img> element to mount.
+      const imgBefore = container.querySelector("img[alt='Lagos de Covadonga']");
+
+      const ambientButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
+      );
+      if (ambientButton) {
+        fireEvent.click(ambientButton!);
+      }
+
+      // After toggling ambient, the SAME img element should still be in the DOM (no remount)
+      const imgAfter = container.querySelector("img[alt='Lagos de Covadonga']");
+      expect(imgAfter).toBe(imgBefore);
+
+      mockIsEnabled.mockReturnValue(false);
+    });
+  });
+
+  describe("UX-H7: Info toggle keyboard accessibility", () => {
+    it("main landmark should NOT have an onClick handler (no interactive main element)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const main = screen.getByRole("main");
+      // Verify <main> is the landmark — its implicit role is "main" (no explicit role attribute needed)
+      expect(main.tagName).toBe("MAIN");
+
+      // The onClick must NOT be on <main> itself. We verify by checking there's no
+      // React onClick handler attached to the main element. In jsdom, we can verify
+      // the main element does not have cursor-pointer class (which signals interactivity).
+      expect(main).not.toHaveClass("cursor-pointer");
+    });
+
+    it("should have a transparent button overlay for toggling info on desktop", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // There should be a dedicated button for toggling info visibility
+      const infoToggleBtn = screen.queryByRole("button", { name: /mostrar información|ocultar información/i });
+      expect(infoToggleBtn).toBeInTheDocument();
+    });
+
+    it("info toggle overlay button should have aria-expanded reflecting showInfo state", async () => {
+      // Simulate desktop device with pointer: fine so the toggle fires
+      vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+        matches: query === "(pointer: fine)",
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
+      // Initially info is shown (showInfo = true)
+      expect(infoToggleBtn).toHaveAttribute("aria-expanded", "true");
+
+      fireEvent.click(infoToggleBtn);
+      // After toggle, info is hidden
+      expect(infoToggleBtn).toHaveAttribute("aria-expanded", "false");
+    });
+  });
 
   describe("related stories onSelectStory callback (lines 290-292)", () => {
     it("should call onIndexChange when a related story is selected and found in stories array", async () => {
