@@ -18,6 +18,7 @@ import {
   type CreateDraftInput,
 } from "@/lib/posting-service";
 import type { MarketingPlatform } from "@/types/marketing";
+import { marketingDraftSchema, marketingDraftPatchSchema } from "@/lib/schemas";
 
 /**
  * GET /api/admin/marketing/posts
@@ -90,17 +91,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body: CreateDraftInput = await request.json();
-
-    // Validate required fields
-    if (!body.platform || !body.content) {
+    const rawBody: unknown = await request.json();
+    const parsed = marketingDraftSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
       return NextResponse.json(
-        { error: "Missing required fields: platform, content" },
+        { error: firstIssue?.message ?? "Invalid request body" },
         { status: 400 }
       );
     }
 
-    const result = await createDraft(body);
+    const result = await createDraft(parsed.data as CreateDraftInput);
 
     if (!result.success) {
       return NextResponse.json(
@@ -167,8 +168,16 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Regular update
-    const body: Partial<CreateDraftInput> = await request.json();
-    const result = await updateDraft(postId, body);
+    const rawPatch: unknown = await request.json();
+    const parsedPatch = marketingDraftPatchSchema.safeParse(rawPatch);
+    if (!parsedPatch.success) {
+      const firstIssue = parsedPatch.error.issues[0];
+      return NextResponse.json(
+        { error: firstIssue?.message ?? "Invalid request body" },
+        { status: 400 }
+      );
+    }
+    const result = await updateDraft(postId, parsedPatch.data as Partial<CreateDraftInput>);
 
     if (!result.success) {
       return NextResponse.json(
