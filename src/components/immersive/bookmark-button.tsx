@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 
 interface BookmarkButtonProps {
   /** Whether this navigates to /favorites (true) or toggles favorite status (false) */
@@ -65,9 +66,9 @@ export function BookmarkButton({
 
   return (
     <div className="relative">
-      <button
+      <Button
+        variant="glassIcon"
         onClick={handleClick}
-        className="p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
         aria-label={label}
         title={label}
       >
@@ -77,7 +78,7 @@ export function BookmarkButton({
             !isNavigationMode && isFavorite && "fill-white"
           )}
         />
-      </button>
+      </Button>
 
       {/* Toast - only show in toggle mode */}
       {!isNavigationMode && (

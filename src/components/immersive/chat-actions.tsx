@@ -5,6 +5,7 @@ import { Phone, MapPin, Copy, Check } from "lucide-react";
 import { detectChatActions } from "@/lib/chat-action-detection";
 import { useTranslation } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -76,14 +77,10 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
     }
   };
 
-  // Icon-only button style
+  // Icon-only button style — uses glass variant base + animation + smaller p-2 padding
   const iconButtonClass = cn(
-    "p-2 rounded-full",
-    "bg-white/10 hover:bg-white/20 backdrop-blur-sm",
-    "text-white",
-    "transition-all duration-200 motion-reduce:transition-none",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
-    // Smooth fade-in animation
+    buttonVariants({ variant: "glassIcon" }),
+    "p-2",
     "animate-in fade-in slide-in-from-bottom-2 duration-300"
   );
 
@@ -133,10 +130,11 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
         {/* Copy conversation button - always visible when messages exist */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
+            <Button
+              variant="glassIcon"
               onClick={handleCopy}
               aria-label={t("chat.copy_conversation")}
-              className={iconButtonClass}
+              className="p-2 animate-in fade-in slide-in-from-bottom-2 duration-300"
               style={{ animationDelay: `${(actions.phones.length + (actions.addresses.length > 0 ? 1 : 0)) * 50}ms` }}
             >
               {copied ? (
@@ -144,7 +142,7 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
               ) : (
                 <Copy className="h-4 w-4" />
               )}
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>
             {copied

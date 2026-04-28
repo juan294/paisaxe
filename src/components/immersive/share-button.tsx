@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Share2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 import type { Story } from "@/types/immersive";
 
 interface ShareButtonProps {
@@ -61,9 +62,9 @@ export function ShareButton({ story }: ShareButtonProps) {
 
   return (
     <div className="relative">
-      <button
+      <Button
+        variant="glassIcon"
         onClick={handleShare}
-        className="p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
         aria-label={t("share.share")}
         title={t("share.share")}
       >
@@ -72,7 +73,7 @@ export function ShareButton({ story }: ShareButtonProps) {
         ) : (
           <Share2 className="h-5 w-5 text-white" />
         )}
-      </button>
+      </Button>
 
       {/* Toast */}
       <div
