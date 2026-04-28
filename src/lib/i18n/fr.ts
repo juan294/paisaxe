@@ -39,6 +39,7 @@ export const fr: Translations = {
     directions: 'Itinéraire',
     copy_conversation: 'Copier la conversation',
     copied: 'Copié',
+    copy_error: 'Impossible de copier',
     assistant_label: 'Paisaxe',
   },
 
@@ -102,6 +103,7 @@ export const fr: Translations = {
   share: {
     share: 'Partager',
     link_copied: 'Lien copié',
+    copy_error: 'Impossible de copier',
   },
 
   favorites: {

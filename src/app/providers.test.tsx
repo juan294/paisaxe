@@ -115,7 +115,7 @@ describe("Providers", () => {
   });
 
   it.each(["/about", "/privacy", "/terms"])(
-    "skips AuthProvider entirely on static route %s",
+    "defers auth (but still mounts AuthProvider) on static route %s",
     (path) => {
       mockUsePathname.mockReturnValue(path);
       const { container } = render(
@@ -124,9 +124,10 @@ describe("Providers", () => {
         </Providers>
       );
 
-      // AuthProvider must NOT be in the tree — no auth bootstrap occurs
-      expect(container.querySelector("[data-testid='auth-provider']")).toBeNull();
-      // But children must still render
+      // FE-M4: AuthProvider MUST be in the tree — always mounted for stable tree.
+      // On static routes it defers init (deferInitialAuth=true) to avoid auth round-trips.
+      expect(container.querySelector("[data-testid='auth-provider']")).not.toBeNull();
+      // Children must still render
       expect(container.querySelector("p[data-testid='page-content']")).not.toBeNull();
     }
   );
@@ -140,5 +141,53 @@ describe("Providers", () => {
     );
 
     expect(container.querySelector("[data-testid='auth-provider']")).not.toBeNull();
+  });
+
+  // FE-M4 (#496): AuthProvider must always be mounted — never conditionally removed —
+  // so that navigating between pathnames does NOT remount it (which resets auth state).
+  it("FE-M4: AuthProvider is always in the tree regardless of pathname", () => {
+    // Static path — AuthProvider must still be rendered (just with deferInitialAuth=true)
+    // so the provider tree is stable across navigations.
+    mockUsePathname.mockReturnValue("/about");
+    const { container } = render(
+      <Providers>
+        <p>Content</p>
+      </Providers>
+    );
+    expect(container.querySelector("[data-testid='auth-provider']")).not.toBeNull();
+  });
+
+  it("FE-M4: AuthProvider is always in the tree on /privacy", () => {
+    mockUsePathname.mockReturnValue("/privacy");
+    const { container } = render(
+      <Providers>
+        <p>Content</p>
+      </Providers>
+    );
+    expect(container.querySelector("[data-testid='auth-provider']")).not.toBeNull();
+  });
+
+  it("FE-M4: AuthProvider is always in the tree on /terms", () => {
+    mockUsePathname.mockReturnValue("/terms");
+    const { container } = render(
+      <Providers>
+        <p>Content</p>
+      </Providers>
+    );
+    expect(container.querySelector("[data-testid='auth-provider']")).not.toBeNull();
+  });
+
+  it("FE-M4: on static routes AuthProvider receives deferInitialAuth=true to avoid auth round-trip", () => {
+    mockUsePathname.mockReturnValue("/about");
+    const { container } = render(
+      <Providers>
+        <p>Content</p>
+      </Providers>
+    );
+    // Provider must exist…
+    const authProvider = container.querySelector("[data-testid='auth-provider']");
+    expect(authProvider).not.toBeNull();
+    // …and defers auth bootstrap (no Supabase round-trip on static pages)
+    expect(authProvider).toHaveAttribute("data-defer-initial-auth", "true");
   });
 });

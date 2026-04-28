@@ -25,6 +25,7 @@ interface ChatActionsProps {
 export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Find the last assistant message
@@ -65,9 +66,13 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
       await navigator.clipboard.writeText(conversationText);
       if (timerRef.current) clearTimeout(timerRef.current);
       setCopied(true);
+      setCopyError(false);
       timerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Silently ignore clipboard errors
+      // UX-L3 (#523): Show brief error feedback instead of silently ignoring
+      if (timerRef.current) clearTimeout(timerRef.current);
+      setCopyError(true);
+      timerRef.current = setTimeout(() => setCopyError(false), 2000);
     }
   };
 
@@ -142,9 +147,19 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
             </button>
           </TooltipTrigger>
           <TooltipContent>
-            {copied ? t("chat.copied") : t("chat.copy_conversation")}
+            {copied
+              ? t("chat.copied")
+              : copyError
+                ? t("chat.copy_error")
+                : t("chat.copy_conversation")}
           </TooltipContent>
         </Tooltip>
+        {/* UX-L3: Inline error message when clipboard fails (visible without hover) */}
+        {copyError && (
+          <span role="alert" className="text-xs text-white/70 px-1">
+            {t("chat.copy_error")}
+          </span>
+        )}
       </div>
     </TooltipProvider>
   );

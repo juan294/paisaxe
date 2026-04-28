@@ -39,6 +39,7 @@ export const pt: Translations = {
     directions: 'Como chegar',
     copy_conversation: 'Copiar conversa',
     copied: 'Copiado',
+    copy_error: 'Não foi possível copiar',
     assistant_label: 'Paisaxe',
   },
 
@@ -102,6 +103,7 @@ export const pt: Translations = {
   share: {
     share: 'Partilhar',
     link_copied: 'Link copiado',
+    copy_error: 'Não foi possível copiar',
   },
 
   favorites: {
