@@ -2,12 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { logger } from "@/lib/logger";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
+import type { VoiceAccessResponse } from "@/types/voice-access";
 
-export interface VoiceAccessResponse {
-  hasAccess: boolean;
-  expiresAt: string | null;
-  purchaseType: string | null;
-}
+export type { VoiceAccessResponse };
 
 /**
  * GET /api/voice-access

@@ -79,6 +79,22 @@ Add new keys here when introducing new diagnostic log points.
 
 ## Vercel Log Drain Setup (BetterStack / Logtail)
 
+> **Status: NOT CONFIRMED — action required.**
+>
+> As of 2026-04-28, no log drain has been verified as active. Vercel Pro plan retention
+> can be as short as 1 hour for function logs. Without a drain, logs from incidents may
+> be irrecoverably lost before you can investigate.
+>
+> **Recommended action:** Configure BetterStack Starter (free) or Axiom (free tier) as a
+> Vercel log drain — see the step-by-step below.
+>
+> **How to verify:** Vercel dashboard → Project → Settings → Log Drains. If the list is
+> empty, no drain is active.
+>
+> **Impact of not doing it:** All runtime logs (errors, payment events, auth failures) are
+> lost after Vercel's retention window. Stripe dispute resolution requires payment audit
+> trails — this is a compliance risk.
+
 Vercel supports [log drains](https://vercel.com/docs/observability/log-drains/log-drains-reference)
 that forward all function logs to an external service in real time.
 
