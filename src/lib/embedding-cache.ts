@@ -1,70 +1,56 @@
 import { createHash } from "crypto";
+import { Redis } from "@upstash/redis";
+import { logger } from "./logger";
 
-interface CacheEntry {
-  embedding: number[];
-  timestamp: number;
+const KEY_PREFIX = "embed:";
+const TTL_SECONDS = 86400; // 24 hours
+
+const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
+const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+
+// Lazily-created singleton so construction is deferred until first use.
+// This allows the module to be imported in environments where the env vars
+// are not yet set (e.g. during Next.js build-time module evaluation).
+let _redis: Redis | null = null;
+
+function getRedis(): Redis {
+  if (!_redis) {
+    _redis = new Redis({ url: upstashUrl!, token: upstashToken! });
+  }
+  return _redis;
 }
 
-const DEFAULT_MAX_SIZE = 100;
-const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
 export class EmbeddingCache {
-  private cache = new Map<string, CacheEntry>();
-  private maxSize: number;
-  private ttlMs: number;
-
-  constructor(maxSize = DEFAULT_MAX_SIZE, ttlMs = DEFAULT_TTL_MS) {
-    this.maxSize = maxSize;
-    this.ttlMs = ttlMs;
-  }
-
   private hashKey(text: string): string {
-    return createHash("sha256").update(text).digest("hex");
+    return KEY_PREFIX + createHash("sha256").update(text).digest("hex");
   }
 
-  get(text: string): number[] | null {
+  async get(text: string): Promise<number[] | null> {
     const key = this.hashKey(text);
-    const entry = this.cache.get(key);
-
-    if (!entry) return null;
-
-    // Check TTL
-    if (Date.now() - entry.timestamp > this.ttlMs) {
-      this.cache.delete(key);
+    try {
+      const raw = await getRedis().get<string>(key);
+      if (raw === null || raw === undefined) return null;
+      // Upstash may auto-parse JSON; handle both string and already-parsed array.
+      if (Array.isArray(raw)) return raw as number[];
+      return JSON.parse(raw) as number[];
+    } catch (err) {
+      logger.warn("[EMBEDDING_CACHE_MISS]", {
+        reason: err instanceof Error ? err.message : String(err),
+      });
       return null;
     }
-
-    // Move to end (most recently used) - delete and re-add
-    this.cache.delete(key);
-    this.cache.set(key, entry);
-
-    return entry.embedding;
   }
 
-  set(text: string, embedding: number[]): void {
+  async set(text: string, embedding: number[]): Promise<void> {
     const key = this.hashKey(text);
-
-    // If key exists, delete it first (to update position)
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
+    try {
+      await getRedis().set(key, JSON.stringify(embedding), { ex: TTL_SECONDS });
+    } catch (err) {
+      // Fire-and-forget: a write failure is non-fatal. The embedding was
+      // already computed; the worst outcome is a cache miss next time.
+      logger.warn("[EMBEDDING_CACHE_SET_FAILED]", {
+        reason: err instanceof Error ? err.message : String(err),
+      });
     }
-
-    // Evict LRU entry if at capacity
-    if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey !== undefined) {
-        this.cache.delete(firstKey);
-      }
-    }
-
-    this.cache.set(key, { embedding, timestamp: Date.now() });
-  }
-
-  get size(): number {
-    return this.cache.size;
-  }
-
-  clear(): void {
-    this.cache.clear();
   }
 }
