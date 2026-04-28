@@ -122,6 +122,28 @@ describe("GET /api/feature-flags", () => {
     expect(data.error).toBe("Failed to fetch feature flags");
   });
 
+  // ─── BE-M4: Vary: Host header ─────────────────────────────────────────────
+  it("should include Vary: Host header on success to prevent CDN cross-subdomain poisoning", async () => {
+    const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null });
+    const mockEq = vi.fn().mockReturnValue({ order: mockOrder });
+    const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    vi.mocked(supabase.from).mockImplementation(mockFrom);
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("vary")).toContain("Host");
+  });
+
+  it("should include Vary: Host header even with dummy credentials (CI/E2E)", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "dummy_key_for_e2e";
+
+    const response = await GET();
+
+    expect(response.headers.get("vary")).toContain("Host");
+  });
+
   it("should include Cache-Control header on success", async () => {
     const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null });
     const mockEq = vi.fn().mockReturnValue({ order: mockOrder });
