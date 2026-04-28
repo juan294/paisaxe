@@ -1122,6 +1122,8 @@ describe("CSRF protection", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        // Use production origin so SE-M2 origin check passes; CSRF token is still missing
+        origin: "https://paisaxe.es",
       },
       body: JSON.stringify({ title: "test" }),
     });
@@ -1175,6 +1177,8 @@ describe("CSRF protection", () => {
         "Content-Type": "application/json",
         "x-csrf-token": token,
         cookie: `__csrf=${token}`,
+        // Origin required (SE-M2) — use production origin (always in ALLOWED_ORIGINS)
+        origin: "https://paisaxe.es",
       },
       body: JSON.stringify({ message: "hello" }),
     });

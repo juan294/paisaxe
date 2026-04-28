@@ -450,7 +450,8 @@ describe("AdminShell", () => {
 
       // router.push must be called with the new tab in the URL
       expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.stringContaining("tab=features")
+        expect.stringContaining("tab=features"),
+        expect.anything()
       );
     });
 

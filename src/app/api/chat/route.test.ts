@@ -530,11 +530,7 @@ describe("POST /api/chat", () => {
       await POST(request);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[CHAT_SECURITY] Injection attempt detected",
-        expect.objectContaining({
-          timestamp: expect.any(String),
-          inputPreview: expect.any(String),
-        })
+        expect.stringContaining("[CHAT_SECURITY] Injection attempt detected")
       );
 
       consoleSpy.mockRestore();

@@ -135,8 +135,13 @@ export function AdminShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // FE-H5: derive activeTab from URL — single source of truth, no ping-pong
-  const activeTab = (searchParams.get("tab") ?? "analytics") as AdminTab;
+  // FE-H5: URL is the canonical source of truth; local state for instant responsiveness
+  const urlTab = (searchParams.get("tab") ?? "analytics") as AdminTab;
+  const [activeTab, setActiveTab] = useState<AdminTab>(urlTab);
+
+  useEffect(() => {
+    setActiveTab(urlTab);
+  }, [urlTab]);
 
   const [allStories, setAllStories] = useState<AdminStory[]>([]);
   const [filter, setFilter] = useState<FilterType>("needs_curation");
@@ -152,6 +157,7 @@ export function AdminShell() {
 
   const handleTabChange = useCallback(
     (tab: AdminTab) => {
+      setActiveTab(tab);
       router.push(`?tab=${tab}`, { scroll: false });
     },
     [router]

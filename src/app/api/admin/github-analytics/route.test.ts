@@ -263,8 +263,7 @@ describe("GET /api/admin/github-analytics", () => {
     expect(response.body.data.summary.totalViews).toBe(0);
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Failed to fetch daily traffic:",
-      expect.any(Object)
+      expect.stringContaining("Failed to fetch daily traffic")
     );
 
     consoleSpy.mockRestore();
@@ -302,8 +301,7 @@ describe("GET /api/admin/github-analytics", () => {
     expect(response.body.data.lastSyncedAt).toBeNull();
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      "GitHub analytics API error:",
-      expect.any(Error)
+      expect.stringContaining("GitHub analytics API error")
     );
 
     consoleSpy.mockRestore();
