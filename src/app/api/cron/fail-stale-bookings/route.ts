@@ -19,6 +19,7 @@ import { createAdminClient } from "@/lib/supabase";
 const STALE_INITIATING_MINUTES = 5;
 
 async function failStaleBookings(): Promise<NextResponse> {
+  const start = Date.now();
   const supabase = createAdminClient();
 
   const { data, error } = await supabase.rpc(
@@ -27,6 +28,7 @@ async function failStaleBookings(): Promise<NextResponse> {
   );
 
   if (error) {
+    logger.error("[CRON_FAILURE]", { job: "fail-stale-bookings", error: error.message });
     logger.error("[CRON_FAIL_STALE_BOOKINGS_FAILED]", {
       stale_minutes: STALE_INITIATING_MINUTES,
       error: error.message,
@@ -46,6 +48,7 @@ async function failStaleBookings(): Promise<NextResponse> {
     });
   }
 
+  logger.info("[CRON_SUCCESS]", { job: "fail-stale-bookings", duration_ms: Date.now() - start });
   return NextResponse.json({
     status: "ok",
     failed_count,

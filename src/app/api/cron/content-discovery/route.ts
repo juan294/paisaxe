@@ -21,6 +21,7 @@ const LOCK_ID = 1003;
 
 /** Core discovery logic shared by GET (Vercel Cron) and POST (pg_cron/admin). */
 async function discoverContent(): Promise<NextResponse> {
+  const start = Date.now();
   const googleApiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
   if (!googleApiKey) {
     return NextResponse.json(
@@ -60,12 +61,14 @@ async function discoverContent(): Promise<NextResponse> {
       anthropicApiKey,
     });
 
+    logger.info("[CRON_SUCCESS]", { job: "content-discovery", duration_ms: Date.now() - start });
     return NextResponse.json({
       success: true,
       discoveredAt: new Date().toISOString(),
       ...result,
     });
   } catch (error) {
+    logger.error("[CRON_FAILURE]", { job: "content-discovery", error: error instanceof Error ? error.message : "Unknown error" });
     logger.error("Content discovery error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       {
