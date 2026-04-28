@@ -37,8 +37,13 @@ export function ShareButton({ story }: ShareButtonProps) {
       if (isTouchDevice && navigator.share && navigator.canShare?.(shareData)) {
         await navigator.share(shareData);
       } else {
-        await navigator.clipboard.writeText(shareUrl);
-        showToast(t("share.link_copied"));
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          showToast(t("share.link_copied"));
+        } catch {
+          // UX-L3 (#523): Show error feedback when clipboard fails on desktop
+          showToast(t("share.copy_error"));
+        }
       }
     } catch (err) {
       // User cancelled share or clipboard failed - try clipboard as fallback
@@ -47,7 +52,8 @@ export function ShareButton({ story }: ShareButtonProps) {
           await navigator.clipboard.writeText(shareUrl);
           showToast(t("share.link_copied"));
         } catch {
-          // Silently ignore
+          // UX-L3 (#523): Show error feedback instead of silently ignoring
+          showToast(t("share.copy_error"));
         }
       }
     }

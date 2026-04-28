@@ -29,7 +29,6 @@ export const RelatedStories = memo(function RelatedStories({
   return (
     <section
       aria-label={t("accessibility.related_stories")}
-      role="region"
       className="absolute bottom-24 left-0 right-0 z-20 px-6"
     >
       {/* Toggle Button */}
@@ -73,7 +72,7 @@ export const RelatedStories = memo(function RelatedStories({
             <div className="absolute inset-0">
               <Image
                 src={story.image}
-                alt={story.title}
+                alt=""
                 fill
                 className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
                 sizes="(max-width: 768px) 50vw, 33vw"
