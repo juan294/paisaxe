@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import fs from "fs";
 
 export default defineConfig({
   plugins: [react()],
@@ -32,6 +33,13 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@content": path.resolve(__dirname, "./content"),
+      // content/processed/ is gitignored; use main repo copy when available,
+      // otherwise fall back to a test stub so pipeline script tests don't fail.
+      "../content/processed/extracted-stories": fs.existsSync(
+        path.resolve(__dirname, "./content/processed/extracted-stories.ts")
+      )
+        ? path.resolve(__dirname, "./content/processed/extracted-stories.ts")
+        : path.resolve(__dirname, "./scripts/tests/__stubs__/extracted-stories.ts"),
     },
   },
 });
