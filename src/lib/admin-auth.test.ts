@@ -183,18 +183,19 @@ describe("validateAdminAuth", () => {
     }
   });
 
-  it("should return 403 when profile query returns error", async () => {
+  it("should return 500 when profile query returns a non-PGRST116 error (BE-M2)", async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: "user-000", email: "error@example.com" } },
       error: null,
     });
+    // Error without code — treated as unexpected DB failure → 500, not 403
     setupProfileMock(null, { message: "Query failed" });
 
     const result = await validateAdminAuth();
 
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.error.status).toBe(403);
+      expect(result.error.status).toBe(500);
     }
   });
 
@@ -280,6 +281,79 @@ describe("validateAdminAuth", () => {
       // capturedClient is whatever createAdminClient() returned (may be undefined
       // or throw if key missing — the call itself is what we verify)
       expect(capturedClient).toBeDefined();
+    });
+  });
+
+  // ─── BE-M2: 30-second in-process LRU cache for user_id → role ───────────
+  describe("BE-M2: role cache", () => {
+    it("should skip the DB profile lookup on a second call within 30s for the same user", async () => {
+      // First call — populates the cache
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "cached-user", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      await validateAdminAuth();
+      expect(mockFrom).toHaveBeenCalledTimes(1);
+
+      vi.clearAllMocks();
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "cached-user", email: "admin@example.com" } },
+        error: null,
+      });
+
+      // Second call — must NOT hit DB again
+      const result = await validateAdminAuth();
+      expect(result.valid).toBe(true);
+      expect(mockFrom).not.toHaveBeenCalled();
+    });
+
+    it("should re-fetch after the 30s TTL expires", async () => {
+      vi.useFakeTimers();
+
+      // Populate cache
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "expiry-user2", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      await validateAdminAuth();
+      expect(mockFrom).toHaveBeenCalledTimes(1);
+
+      // Advance time past TTL (31s)
+      vi.advanceTimersByTime(31_000);
+
+      vi.clearAllMocks();
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "expiry-user2", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      // Should re-fetch after TTL expiry
+      const result = await validateAdminAuth();
+      expect(result.valid).toBe(true);
+      expect(mockFrom).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
+
+    it("should return 500 (not 403) when a non-PGRST116 DB error occurs on profile lookup", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "error-user", email: "fail@example.com" } },
+        error: null,
+      });
+      // Non-PGRST116 error
+      setupProfileMock(null, { code: "42P01", message: "table does not exist" });
+
+      const result = await validateAdminAuth();
+
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error.status).toBe(500);
+      }
     });
   });
 
