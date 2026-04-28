@@ -310,9 +310,13 @@ describe("GitHubAnalyticsPanel", () => {
       expect(screen.getByText("Daily Traffic")).toBeInTheDocument();
     });
 
-    // The chart SVG uses preserveAspectRatio="none" to distinguish from icon SVGs
-    const chartSvg = container.querySelector('svg[preserveAspectRatio="none"]');
-    expect(chartSvg).not.toBeNull();
+    // The chart SVG uses preserveAspectRatio="none" to distinguish from icon SVGs.
+    // Wait separately: the SVG may render in a subsequent React paint after the text.
+    let chartSvg: Element | null = null;
+    await waitFor(() => {
+      chartSvg = container.querySelector('svg[preserveAspectRatio="none"]');
+      expect(chartSvg).not.toBeNull();
+    });
     expect(chartSvg!.getAttribute("viewBox")).toBe("0 0 600 160");
 
     // Views line (blue) and Clones line (emerald)
