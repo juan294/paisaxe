@@ -71,7 +71,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { placeName, comment: rawComment, location: rawLocation, attribution: rawAttribution } = parsed.data;
+  const { placeName, comment: rawComment, location: rawLocation, attribution: rawAttribution, website } = parsed.data;
+
+  // Honeypot check: bots fill hidden fields, humans never see them.
+  // Return a fake 200 success to avoid revealing the honeypot mechanism.
+  // TODO: Add Turnstile/hCaptcha token verification (#492) when CAPTCHA_SECRET_KEY env var is available
+  if (website && website.trim().length > 0) {
+    logger.warn("[HONEYPOT_TRIGGERED] Bot submission detected and silently rejected", {
+      ip: getClientIp(request),
+      placeName,
+    });
+    return NextResponse.json({ success: true });
+  }
+
   const comment = rawComment?.trim() || null;
   const location = rawLocation ?? null;
   const attribution = rawAttribution?.trim() || null;

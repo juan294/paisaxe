@@ -97,6 +97,8 @@ export const createSuggestionSchema = z.object({
   comment: boundedString(500).optional(),
   location: z.enum(["eastern", "central", "western"]).optional(),
   attribution: boundedString(100).optional(),
+  /** Honeypot field: bots fill this, humans never see it (display:none in form). */
+  website: z.string().optional(),
 });
 
 // ---------------------------------------------------------------------------
