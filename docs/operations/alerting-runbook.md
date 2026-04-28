@@ -43,21 +43,46 @@
 
 ## Cron Job Failure
 
-**Trigger:** A Vercel Cron job (pg_cron, webhook dispatch) fails or does not fire.
+**Trigger:** A Vercel Cron job (pg_cron, webhook dispatch) fails or does not fire. Observable via `[CRON_FAILURE]` log events or absence of `[CRON_SUCCESS]` log events.
+
+### Structured Telemetry Log Events
+
+All cron handlers emit structured log events on every run:
+
+| Event | Level | Fields | Meaning |
+|-------|-------|--------|---------|
+| `[CRON_SUCCESS]` | `info` | `job`, `duration_ms` | Job completed successfully |
+| `[CRON_FAILURE]` | `error` | `job`, `error` | Job failed with an error message |
+
+**Job names** (match `vercel.json` paths):
+
+| Job name | Route | Schedule |
+|----------|-------|----------|
+| `github-traffic-sync` | `/api/cron/github-traffic-sync` | Every 6 hours |
+| `content-discovery` | `/api/cron/content-discovery` | Weekly Mon 3 AM |
+| `subscription-optimizer` | `/api/cron/subscription-optimizer` | Weekly Mon 4 AM |
+| `fail-stale-translations` | `/api/cron/fail-stale-translations` | Every 15 min |
+| `fail-stale-bookings` | `/api/cron/fail-stale-bookings` | Every 5 min |
+
+**Example log drain query** (filter by structured field in Vercel / log aggregator):
+```
+msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
+```
 
 **Steps:**
 
 1. Check Vercel Cron logs: Vercel dashboard → Project → Deployments → Functions → Cron Logs
-2. Identify which cron route failed (see `vercel.json` for the schedule definitions).
-3. Test the route manually:
+2. Search for `[CRON_FAILURE]` events — the `job` and `error` fields identify the failing handler.
+3. Identify which cron route failed (see `vercel.json` for the schedule definitions).
+4. Test the route manually:
    ```bash
    curl -X POST https://paisaxe.es/api/cron/<route> \
      -H "Authorization: Bearer $CRON_SECRET"
    ```
-4. Check for dependency issues: Supabase connectivity, external API rate limits (PostHog, ElevenLabs, etc.)
-5. If the job is idempotent, trigger it manually once the root cause is resolved.
-6. If it cannot be recovered, log the missed run and resume on the next scheduled interval.
-7. For recurring failures: add monitoring to detect the failure earlier (PostHog custom event on cron success).
+5. Check for dependency issues: Supabase connectivity, external API rate limits (PostHog, ElevenLabs, etc.)
+6. If the job is idempotent, trigger it manually once the root cause is resolved.
+7. If it cannot be recovered, log the missed run and resume on the next scheduled interval.
+8. For recurring failures: set up a log drain alert on `[CRON_FAILURE]` events in your log aggregator.
 
 ---
 

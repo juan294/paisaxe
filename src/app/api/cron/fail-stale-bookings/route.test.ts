@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, POST } from "./route";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(),
 }));
@@ -140,5 +148,53 @@ describe("POST /api/cron/fail-stale-bookings", () => {
 
     const response = await POST(request);
     expect(response.status).toBe(401);
+  });
+});
+
+describe("CRON_SUCCESS/CRON_FAILURE telemetry — fail-stale-bookings", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(createAdminClient).mockReturnValue({
+      rpc: mockRpc,
+    } as unknown as ReturnType<typeof createAdminClient>);
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+  });
+
+  it("emits [CRON_SUCCESS] with job name and duration_ms on success", async () => {
+    mockRpc.mockResolvedValue({ data: 0, error: null });
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-bookings", {
+      method: "GET",
+    });
+
+    const response = await GET(request);
+    expect(response.status).toBe(200);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "[CRON_SUCCESS]",
+      expect.objectContaining({
+        job: "fail-stale-bookings",
+        duration_ms: expect.any(Number),
+      })
+    );
+  });
+
+  it("emits [CRON_FAILURE] with job name and error message when RPC fails", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "DB connection lost" } });
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-bookings", {
+      method: "GET",
+    });
+
+    const response = await GET(request);
+    expect(response.status).toBe(500);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CRON_FAILURE]",
+      expect.objectContaining({
+        job: "fail-stale-bookings",
+        error: expect.stringContaining("DB connection lost"),
+      })
+    );
   });
 });
