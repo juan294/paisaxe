@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(),
 }));
@@ -159,6 +167,75 @@ describe("fail stale translations cron", () => {
     expect(mockRpc).not.toHaveBeenCalledWith(
       "pg_advisory_unlock",
       expect.anything()
+    );
+  });
+});
+
+describe("CRON_SUCCESS/CRON_FAILURE telemetry — fail-stale-translations", () => {
+  const mockRpc2 = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-23T12:00:00.000Z"));
+    vi.stubEnv("CRON_SECRET", "cron-secret");
+    vi.stubEnv("WEBHOOK_SECRET", "webhook-secret");
+
+    vi.mocked(createAdminClient).mockReturnValue({
+      rpc: mockRpc2,
+    } as unknown as ReturnType<typeof createAdminClient>);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it("emits [CRON_SUCCESS] with job name and duration_ms on success", async () => {
+    mockRpc2.mockImplementation((fn: string) => {
+      if (fn === "fail_stale_story_translations_locked") {
+        return Promise.resolve({ data: 3, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
+      headers: { authorization: "Bearer cron-secret" },
+    });
+
+    const response = await GET(request);
+    expect(response.status).toBe(200);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "[CRON_SUCCESS]",
+      expect.objectContaining({
+        job: "fail-stale-translations",
+        duration_ms: expect.any(Number),
+      })
+    );
+  });
+
+  it("emits [CRON_FAILURE] with job name and error message when RPC fails", async () => {
+    mockRpc2.mockImplementation((fn: string) => {
+      if (fn === "fail_stale_story_translations_locked") {
+        return Promise.resolve({ data: null, error: { message: "DB error" } });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
+      headers: { authorization: "Bearer cron-secret" },
+    });
+
+    const response = await GET(request);
+    expect(response.status).toBe(500);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CRON_FAILURE]",
+      expect.objectContaining({
+        job: "fail-stale-translations",
+        error: expect.stringContaining("DB error"),
+      })
     );
   });
 });
