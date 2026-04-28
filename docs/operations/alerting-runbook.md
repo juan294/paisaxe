@@ -94,6 +94,24 @@
 
 ---
 
+## Develop Smoke Check Failure (DO-M5)
+
+**Trigger:** The `Develop smoke check` job fails in CI on a direct `develop` push.
+
+This job uses `continue-on-error: true` so it never blocks the push, but a failure indicates a runtime regression in the Vercel preview that was not caught by unit tests or the dummy-key build (e.g. a missing env var, a broken API route, or a Dependabot dependency bump with a breaking change).
+
+**Steps:**
+
+1. Check which step failed: `gh run list --branch develop --limit 3`, then `gh run view <run-id> --log-failed`
+2. Identify the failing probe:
+   - `Smoke check - liveness endpoint` (`/api/health/live`) — the process is not serving requests (startup crash, build error, or Vercel config issue)
+   - `Smoke check - health endpoint` (`/api/health`) — the app started but a backend dependency (Supabase, Anthropic, etc.) is unreachable or returning `status != "healthy"`
+3. Check the Vercel preview URL from the workflow output and hit it manually to confirm the failure.
+4. Fix on `develop`, push, and verify the next smoke run passes before creating a release PR to `main`.
+5. If the failure is from a Dependabot dependency bump: check the dep changelog for breaking changes, then pin or revert as needed.
+
+---
+
 ## Stripe Webhook Failure
 
 **Trigger:** Stripe dashboard shows failed webhook deliveries.
