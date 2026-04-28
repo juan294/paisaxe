@@ -35,22 +35,26 @@ function generateSlug(title: string): string {
 export async function GET(request: NextRequest) {
   return withAdmin(async (supabase) => {
     try {
-      // Get optional filter from query params
+      // Get optional filter and pagination params from query params
       const { searchParams } = new URL(request.url);
       const filter = searchParams.get("filter") as CurationStatus | null;
+      const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+      const pageSize = Math.max(1, Math.min(100, parseInt(searchParams.get("pageSize") ?? "20", 10) || 20));
+      const offset = (page - 1) * pageSize;
 
-      // Build query
+      // Build query with exact count for pagination metadata
       let query = supabase
         .from("stories")
-        .select("*")
-        .order("display_order", { ascending: true });
+        .select("*", { count: "exact" })
+        .order("display_order", { ascending: true })
+        .range(offset, offset + pageSize - 1);
 
       // Apply filter if provided
       if (filter === "needs_curation" || filter === "approved") {
         query = query.eq("curation_status", filter);
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
 
       if (error) {
         logger.error("[ADMIN_STORIES_FETCH_FAILED]", { error });
@@ -62,8 +66,9 @@ export async function GET(request: NextRequest) {
 
       // Convert to admin stories
       const stories = (data as AdminStoryRow[]).map(rowToAdminStory);
+      const total = count ?? 0;
 
-      return NextResponse.json({ data: stories });
+      return NextResponse.json({ data: { stories, total, page, pageSize } });
     } catch (error) {
       logger.error("[ADMIN_STORIES_GET_UNHANDLED_ERROR]", { error });
       return NextResponse.json(
