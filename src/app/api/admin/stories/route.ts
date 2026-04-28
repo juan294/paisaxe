@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAdmin } from "@/lib/admin-auth";
+import { withAdmin, withAdminRead } from "@/lib/admin-auth";
 import {
   rowToAdminStory,
   type AdminStoryRow,
@@ -33,7 +33,7 @@ function generateSlug(title: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  return withAdmin(async (supabase) => {
+  return withAdminRead(async (supabase) => {
     try {
       // Get optional filter from query params
       const { searchParams } = new URL(request.url);
