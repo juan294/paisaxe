@@ -30,6 +30,7 @@ import { StoryProgressBar } from "./story-progress-bar";
 import { StoryToolbar } from "./story-toolbar";
 import { StoryInfoPanel } from "./story-info-panel";
 import { useStoryKeyboardNav } from "@/hooks/use-story-keyboard-nav";
+import { Button } from "@/components/ui/button";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -324,13 +325,14 @@ export function StoryViewer({
         {/* Ambient / Auto-play toggle - hidden on mobile */}
         {isEnabled("autoplay_button") && (
           isEnabled("ambient_discovery") ? (
-            <button
+            <Button
+              variant="glassIcon"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleAmbient();
               }}
               className={cn(
-                "hidden md:flex p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+                "hidden md:flex p-2",
                 ambientMode && "ring-1 ring-white/30"
               )}
               aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
@@ -341,22 +343,23 @@ export function StoryViewer({
               ) : (
                 <Play className="h-5 w-5 text-white" />
               )}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              variant="glassIcon"
               onClick={(e) => {
                 e.stopPropagation();
                 setAutoPlay((prev) => !prev);
               }}
               aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
-              className="hidden md:flex p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              className="hidden md:flex p-2"
             >
               {autoPlay ? (
                 <Pause className="h-5 w-5 text-white" />
               ) : (
                 <Play className="h-5 w-5 text-white" />
               )}
-            </button>
+            </Button>
           )
         )}
 

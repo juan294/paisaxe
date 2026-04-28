@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { Button } from "@/components/ui/button";
 import type { Mood } from "@/lib/mood-mapping";
 
 interface MoodOverlayProps {
@@ -41,13 +42,14 @@ export function MoodOverlay({ onSelectMood, onDismiss }: MoodOverlayProps) {
       {/* Content */}
       <div ref={dialogRef} className="relative max-w-md w-full text-center rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-300 motion-reduce:animate-none" role="dialog" aria-modal="true" aria-label={t("mood.title")}>
         {/* Dismiss button */}
-        <button
+        <Button
+          variant="glassIcon"
           onClick={handleDismiss}
           aria-label={t("common.close")}
-          className="absolute -top-2 -right-2 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white transition-all motion-reduce:transition-none z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          className="absolute -top-2 -right-2 text-white/60 hover:text-white z-10"
         >
           <X className="h-5 w-5" />
-        </button>
+        </Button>
 
         <h2 className="text-2xl font-bold text-white mb-2">
           {t("mood.title")}
