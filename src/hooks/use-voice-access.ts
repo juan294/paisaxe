@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVisitorVoiceAccess } from "@/hooks/use-visitor-voice-access";
 import { ELEVENLABS_AGENT_IDS } from "@/config/elevenlabs-agents";
-import type { VoiceAccessResponse } from "@/app/api/voice-access/route";
+import type { VoiceAccessResponse } from "@/types/voice-access";
 
 interface UseVoiceAccessResult {
   /** User has active paid voice access */

@@ -99,20 +99,37 @@ The region is set in `vercel.json:3`:
 
 ## Regional Outage Incident Response
 
+### Status Pages to Monitor
+
+| Service | Status URL |
+|---------|-----------|
+| Vercel | https://www.vercel-status.com/ |
+| Supabase | https://status.supabase.com/ |
+| Anthropic (Claude API) | https://status.anthropic.com/ |
+| AWS eu-central-1 (underlying Vercel fra1 infra) | https://health.aws.amazon.com/health/status |
+
+### Escalation
+
+Sole operator: **Juan Gonzalez** (juan294@gmail.com). Communication channel: GitHub Issues — Upptime automatically opens one when `paisaxe.es` becomes unreachable.
+
 ### If Vercel fra1 is down
 
-The entire site goes down — there is no secondary region failover.
+The entire site goes down — there is no automatic secondary region failover for a single-region deployment.
 
 **Immediate steps:**
 
 1. **Confirm the outage is Vercel, not the application.**
    - Check [https://www.vercel-status.com/](https://www.vercel-status.com/)
-   - Check [https://aws.amazon.com/premiumsupport/technology/pes/](https://aws.amazon.com/premiumsupport/technology/pes/) for `eu-central-1` status
+   - Check [https://health.aws.amazon.com/health/status](https://health.aws.amazon.com/health/status) for `eu-central-1` status
 2. **Post a status update** if the outage is confirmed external:
    - Upptime will automatically open a GitHub Issue when `paisaxe.es` is unreachable.
    - Add a comment to the Upptime issue with "Confirmed Vercel fra1 outage — monitoring."
-3. **Wait for Vercel recovery.** Vercel's SLA for regional incidents is typically 15–60 minutes. Do not attempt to redeploy during an active platform outage.
-4. **After recovery:** Verify the health endpoint and confirm site is back.
+3. **Manual recovery option (if outage is prolonged > 1 hour):**
+   - Edit `vercel.json` and change `"regions": ["fra1"]` to a nearby fallback such as `"cdg1"` (Paris) or `"lhr1"` (London).
+   - Commit and push to `develop`, then create a PR to `main` and merge to trigger a redeployment in the new region.
+   - Revert the region change once Vercel fra1 is restored.
+4. **Wait for Vercel recovery.** Vercel's SLA for regional incidents is typically 15–60 minutes. Do not attempt to redeploy during an active platform outage unless using the manual recovery option above.
+5. **After recovery:** Verify the health endpoint and confirm site is back.
 
 ```bash
 curl -s https://paisaxe.es/api/health | jq '.status'
