@@ -215,8 +215,7 @@ describe("/api/admin/suggestions", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Failed to fetch suggestions");
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Error fetching suggestions:",
-        expect.objectContaining({ message: "Database error" })
+        expect.stringContaining("Error fetching suggestions")
       );
 
       consoleSpy.mockRestore();
@@ -238,8 +237,7 @@ describe("/api/admin/suggestions", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Admin suggestions API error:",
-        expect.any(Error)
+        expect.stringContaining("Admin suggestions API error")
       );
 
       consoleSpy.mockRestore();

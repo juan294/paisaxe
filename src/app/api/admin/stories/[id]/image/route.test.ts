@@ -532,8 +532,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
       expect(response.status).toBe(200);
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Could not fetch external image for blur generation:",
-        expect.any(Error)
+        expect.stringContaining("Could not fetch external image for blur generation")
       );
 
       // Should NOT include blur_data_url in update since fetch failed

@@ -412,23 +412,24 @@ describe("GET /api/admin/agents-summary", () => {
     // We need to cause an error in the outer try block, not the per-agent try block
     // Override process.cwd to throw
     const originalCwd = process.cwd;
-    process.cwd = () => { throw new Error("cwd failed"); };
-
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const response = await GET();
-    const data = await response.json();
+    try {
+      process.cwd = () => { throw new Error("cwd failed"); };
 
-    expect(response.status).toBe(500);
-    expect(data.error).toBe("Failed to build agents summary");
+      const response = await GET();
+      const data = await response.json();
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "Error building agents summary:",
-      expect.any(Error)
-    );
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Failed to build agents summary");
 
-    process.cwd = originalCwd;
-    consoleSpy.mockRestore();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Error building agents summary")
+      );
+    } finally {
+      process.cwd = originalCwd;
+      consoleSpy.mockRestore();
+    }
   });
 
   it("should parse 'Status: HEALTHY' as green health (Pattern 2)", async () => {

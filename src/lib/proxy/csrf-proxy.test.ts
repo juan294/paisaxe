@@ -138,7 +138,7 @@ describe("handleCsrfValidation", () => {
     expect(handleCsrfValidation(req)).toBeNull();
   });
 
-  it("returns null for request with no Origin and no Referer (server-to-server)", () => {
+  it("returns 403 for POST with no Origin (SE-M2: origin required for state-changing requests)", () => {
     const token = generateCsrfToken();
     const req = new NextRequest("https://paisaxe.es/api/chat", {
       method: "POST",
@@ -148,7 +148,9 @@ describe("handleCsrfValidation", () => {
       },
     });
     req.cookies.set(CSRF_COOKIE_NAME, token);
-    expect(handleCsrfValidation(req)).toBeNull();
+    const result = handleCsrfValidation(req);
+    expect(result).not.toBeNull();
+    expect(result?.status).toBe(403);
   });
 });
 
