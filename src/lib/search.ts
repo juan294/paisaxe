@@ -84,16 +84,31 @@ export async function search(
   const candidateCount = queryText ? RERANK_CANDIDATE_COUNT : limit;
   const candidates = await searchChunks(queryEmbedding, candidateCount);
 
-  // Rerank candidates if query text is available
-  const chunks = queryText
-    ? await rerankChunks(queryText, candidates, limit)
-    : candidates;
+  // PE-H3: fire getRelatedImages concurrently with rerankChunks.
+  // getRelatedImages only needs the candidate list (not the reranked order),
+  // so we can start it immediately using ALL candidate refs. After rerank
+  // completes we filter the already-fetched images down to the top-k refs.
+  if (!queryText) {
+    const allImageRefs = candidates.flatMap((chunk) => chunk.imageRefs || []);
+    const uniqueImageRefs = [...new Set(allImageRefs)];
+    const images = await getRelatedImages(uniqueImageRefs);
+    return { chunks: candidates, images };
+  }
 
-  const allImageRefs = chunks.flatMap((chunk) => chunk.imageRefs || []);
-  const uniqueImageRefs = [...new Set(allImageRefs)];
-  const images = await getRelatedImages(uniqueImageRefs);
+  const allCandidateRefs = candidates.flatMap((chunk) => chunk.imageRefs || []);
+  const uniqueCandidateRefs = [...new Set(allCandidateRefs)];
 
-  return { chunks, images };
+  // Start both in parallel — neither depends on the other's result yet.
+  const [rerankedChunks, allImages] = await Promise.all([
+    rerankChunks(queryText, candidates, limit),
+    getRelatedImages(uniqueCandidateRefs),
+  ]);
+
+  // Filter images to only those referenced by the reranked top-k chunks.
+  const topKRefs = new Set(rerankedChunks.flatMap((chunk) => chunk.imageRefs || []));
+  const images = allImages.filter((img) => topKRefs.has(img.path));
+
+  return { chunks: rerankedChunks, images };
 }
 
 // Keyword-based fallback search for specific place names
