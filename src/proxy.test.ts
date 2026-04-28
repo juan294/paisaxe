@@ -21,7 +21,9 @@ vi.mock("@supabase/ssr", () => ({
   }),
 }));
 
-import { proxy, shouldBypassMaintenanceMode, AUTH_REFRESH_TIMEOUT_MS, hasSupabaseAuthCookies, isTokenNearExpiry } from "./proxy";
+import { proxy } from "./proxy";
+import { shouldBypassMaintenanceMode } from "@/lib/proxy/maintenance";
+import { AUTH_REFRESH_TIMEOUT_MS, hasSupabaseAuthCookies, isTokenNearExpiry } from "@/lib/proxy/auth-refresh";
 
 // Mock global fetch for database checks
 const mockFetch = vi.fn();

@@ -3,10 +3,22 @@ import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
+import vitestPlugin from "@vitest/eslint-plugin";
 
 export default [
   {
     ignores: [".next/**", "node_modules/**"],
+  },
+  {
+    // Warn on skipped tests so they don't accumulate silently.
+    // Using "warn" (not "error") so pre-existing skips don't break CI.
+    files: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    plugins: {
+      vitest: vitestPlugin,
+    },
+    rules: {
+      "vitest/no-disabled-tests": "warn",
+    },
   },
   {
     files: ["**/*.{ts,tsx}"],

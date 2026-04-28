@@ -9,13 +9,6 @@ import { buildCspHeader } from "@/lib/proxy/csp";
 import { refreshAuthSession } from "@/lib/proxy/auth-refresh";
 import { getOrCreateRequestId, getRequestIdHeaderName } from "@/lib/proxy/request-id";
 
-// Re-export symbols that other modules depend on (backwards compatibility)
-export {
-  shouldBypassMaintenanceMode,
-  isMaintenanceModeEnabled,
-} from "@/lib/proxy/maintenance";
-export { buildCspHeader } from "@/lib/proxy/csp";
-export { hasSupabaseAuthCookies, AUTH_REFRESH_TIMEOUT_MS, isTokenNearExpiry } from "@/lib/proxy/auth-refresh";
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const requestIdHeader = getRequestIdHeaderName();
