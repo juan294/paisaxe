@@ -8,10 +8,10 @@ const logger = vi.hoisted(() => ({
 
 vi.mock("@/lib/logger", () => ({ logger }));
 
-// Mock admin auth
-const mockValidateAdminAuth = vi.fn();
+// Mock withAdminRead — SE-M3: GET routes use cookie-scoped client
+const mockWithAdminRead = vi.fn();
 vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: () => mockValidateAdminAuth(),
+  withAdminRead: (...args: unknown[]) => mockWithAdminRead(...args),
 }));
 
 // Mock NextResponse to return plain objects for easy testing
@@ -118,10 +118,6 @@ const mockFrom = vi.fn((table: string) => {
   return buildChain([]);
 });
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: () => ({ from: mockFrom }),
-}));
-
 describe("GET /api/admin/github-analytics", () => {
   const originalEnv = process.env;
 
@@ -131,16 +127,18 @@ describe("GET /api/admin/github-analytics", () => {
       ...originalEnv,
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
-      SUPABASE_SERVICE_KEY: "test-service-key",
     };
-    mockValidateAdminAuth.mockReset();
+    mockWithAdminRead.mockReset();
+    // Default: authorized — call handler with mock supabase client
+    mockWithAdminRead.mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      async (handler: (client: any) => Promise<unknown>) =>
+        handler({ from: mockFrom })
+    );
   });
 
   it("rejects unauthenticated requests", async () => {
-    mockValidateAdminAuth.mockResolvedValue({
-      valid: false,
-      error: { status: 401 },
-    });
+    mockWithAdminRead.mockResolvedValue({ status: 401 });
 
     const { GET } = await import("./route");
     const request = new (await import("next/server")).NextRequest(
@@ -152,11 +150,6 @@ describe("GET /api/admin/github-analytics", () => {
   });
 
   it("returns analytics data for authenticated admins", async () => {
-    mockValidateAdminAuth.mockResolvedValue({
-      valid: true,
-      userId: "test-user-id",
-    });
-
     const { GET } = await import("./route");
     const request = new (await import("next/server")).NextRequest(
       "https://paisaxe.es/api/admin/github-analytics?from=2026-02-01&to=2026-02-07"
@@ -175,11 +168,6 @@ describe("GET /api/admin/github-analytics", () => {
   });
 
   it("calculates summary totals correctly", async () => {
-    mockValidateAdminAuth.mockResolvedValue({
-      valid: true,
-      userId: "test-user-id",
-    });
-
     const { GET } = await import("./route");
     const request = new (await import("next/server")).NextRequest(
       "https://paisaxe.es/api/admin/github-analytics?from=2026-02-01&to=2026-02-07"
@@ -199,10 +187,6 @@ describe("GET /api/admin/github-analytics", () => {
   });
 
   it("logs error when daily query fails but continues", async () => {
-    mockValidateAdminAuth.mockResolvedValue({
-      valid: true,
-      userId: "test-user-id",
-    });
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     // Route uses pino logger.error, not console.error;
@@ -281,10 +265,6 @@ describe("GET /api/admin/github-analytics", () => {
   });
 
   it("returns empty data on unexpected exception", async () => {
-    mockValidateAdminAuth.mockResolvedValue({
-      valid: true,
-      userId: "test-user-id",
-    });
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -317,10 +297,6 @@ describe("GET /api/admin/github-analytics", () => {
   });
 
   it("uses default date range when from/to params are missing", async () => {
-    mockValidateAdminAuth.mockResolvedValue({
-      valid: true,
-      userId: "test-user-id",
-    });
 
     const { GET } = await import("./route");
     const request = new (await import("next/server")).NextRequest(
@@ -348,10 +324,6 @@ describe("GET /api/admin/github-analytics", () => {
   });
 
   it("handles null referrer, path, and lastSync data gracefully", async () => {
-    mockValidateAdminAuth.mockResolvedValue({
-      valid: true,
-      userId: "test-user-id",
-    });
 
     // Override all queries to return null data arrays
     const originalImpl = mockFrom.getMockImplementation();
@@ -422,10 +394,6 @@ describe("GET /api/admin/github-analytics", () => {
   });
 
   it("catch block falls back to empty strings when URL has no from/to params", async () => {
-    mockValidateAdminAuth.mockResolvedValue({
-      valid: true,
-      userId: "test-user-id",
-    });
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -454,10 +422,6 @@ describe("GET /api/admin/github-analytics", () => {
   });
 
   it("includes cache-control headers", async () => {
-    mockValidateAdminAuth.mockResolvedValue({
-      valid: true,
-      userId: "test-user-id",
-    });
 
     const { GET } = await import("./route");
     const request = new (await import("next/server")).NextRequest(
@@ -478,10 +442,6 @@ describe("GET /api/admin/github-analytics", () => {
    * Strategy: inject a 40 ms delay per query and assert total elapsed < 4 * 40 ms.
    */
   it("PE-L1: fetches all four Supabase tables concurrently (#307)", async () => {
-    mockValidateAdminAuth.mockResolvedValue({
-      valid: true,
-      userId: "test-user-id",
-    });
 
     const DELAY_MS = 40;
 
@@ -560,7 +520,7 @@ describe("GET /api/admin/github-analytics", () => {
   // -----------------------------------------------------------------------
 
   it("should use logger.error (not console.error) when supabase query fails", async () => {
-    mockValidateAdminAuth.mockResolvedValue({ valid: true, userId: "user-1" });
+    // beforeEach sets mockWithAdminRead to authorized by default
 
     // Make mockFrom throw to trigger catch block
     const originalImpl = mockFrom.getMockImplementation();

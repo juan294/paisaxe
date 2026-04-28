@@ -3,28 +3,32 @@ import { NextRequest } from "next/server";
 import { GET, POST } from "./route";
 import { logger } from "@/lib/logger";
 
-// Mock withAdmin so tests control auth + client injection independently.
-// When withAdmin resolves as unauthorized, return a 401 response directly.
-// When withAdmin resolves as authorized, call the handler with a mock supabase client.
+// Mock withAdmin (mutations) and withAdminRead (GET reads) independently.
+// Both helpers set up whichever HOF the caller cares about.
 vi.mock("@/lib/admin-auth", () => ({
   withAdmin: vi.fn(),
+  withAdminRead: vi.fn(),
 }));
 
-import { withAdmin } from "@/lib/admin-auth";
+import { withAdmin, withAdminRead } from "@/lib/admin-auth";
 
-// Helper: make withAdmin call through to the real handler with a mock supabase client.
+// Helper: authorize both HOFs so GET (withAdminRead) and POST (withAdmin) both work.
 function mockWithAdminAuthorized(mockSupabase: unknown) {
-  vi.mocked(withAdmin).mockImplementation(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async (handler: (client: any) => Promise<unknown>) => handler(mockSupabase)
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const callThrough = async (handler: (client: any) => Promise<unknown>) =>
+    handler(mockSupabase);
+  vi.mocked(withAdmin).mockImplementation(callThrough);
+  vi.mocked(withAdminRead).mockImplementation(callThrough);
 }
 
-// Helper: make withAdmin return a 401 without calling the handler.
+// Helper: reject both HOFs with an error response (default 401).
 function mockWithAdminUnauthorized(status = 401) {
-  vi.mocked(withAdmin).mockResolvedValue(
-    new Response(JSON.stringify({ error: "Unauthorized" }), { status }) as never
-  );
+  const errResponse = new Response(
+    JSON.stringify({ error: "Unauthorized" }),
+    { status }
+  ) as never;
+  vi.mocked(withAdmin).mockResolvedValue(errResponse);
+  vi.mocked(withAdminRead).mockResolvedValue(errResponse);
 }
 
 describe("GET /api/admin/stories", () => {
