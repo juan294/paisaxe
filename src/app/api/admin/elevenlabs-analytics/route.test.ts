@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "./route";
 import { NextRequest } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn().mockResolvedValue({ valid: true }),
@@ -1091,5 +1099,27 @@ describe("ElevenLabs Analytics API Route", () => {
     // Active calls should be AGENT_COUNT * 1 = 3
     const data = await response.json();
     expect(data.data.activeCalls).toBe(AGENT_COUNT);
+  });
+
+  // -----------------------------------------------------------------------
+  // SE-M3 / DO-H3: logger migration — uses structured logger, not console
+  // -----------------------------------------------------------------------
+
+  it("should use logger.error (not console.error) on API error", async () => {
+    vi.stubEnv("ELEVENLABS_API_KEY", "test-key");
+
+    global.fetch = vi.fn().mockRejectedValue(new Error("Network failure"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+
+    // Route returns empty data on error (graceful fallback)
+    expect(response.status).toBe(200);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 });

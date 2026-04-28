@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock dependencies
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
@@ -412,7 +420,6 @@ describe("GET /api/admin/agents-summary", () => {
     // We need to cause an error in the outer try block, not the per-agent try block
     // Override process.cwd to throw
     const originalCwd = process.cwd;
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
       process.cwd = () => { throw new Error("cwd failed"); };
@@ -423,12 +430,12 @@ describe("GET /api/admin/agents-summary", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Failed to build agents summary");
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Error building agents summary")
+      expect(logger.error).toHaveBeenCalledWith(
+        "Error building agents summary:",
+        expect.anything()
       );
     } finally {
       process.cwd = originalCwd;
-      consoleSpy.mockRestore();
     }
   });
 
@@ -744,5 +751,28 @@ describe("GET /api/admin/agents-summary", () => {
     expect(data.data.sharedContext).toHaveLength(1);
     expect(data.data.sharedContext[0].agentName).toBe("Coverage");
     expect(data.data.sharedContext[0].content).toBe("Valid coverage entry with content.");
+  });
+
+  // -----------------------------------------------------------------------
+  // SE-M3 / DO-H3: logger migration — uses structured logger, not console
+  // -----------------------------------------------------------------------
+
+  it("should use logger.error (not console.error) on unexpected error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    // Force an error by making stat throw an unexpected error
+    mockStat.mockRejectedValue(new Error("Unexpected filesystem error"));
+    mockReadFile.mockRejectedValue(new Error("Unexpected filesystem error"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await GET();
+    // Route handles errors gracefully — unknown agents still return data
+    expect(response.status).toBe(200);
+
+    // Must not bubble through console.error
+    expect(consoleSpy).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 });

@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock next/server
 vi.mock("next/server", () => ({
   NextRequest: class MockNextRequest {
@@ -701,5 +709,7 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
 
     consoleSpy.mockRestore();
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

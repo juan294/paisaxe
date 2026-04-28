@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, POST, DELETE } from "./route";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock Supabase SSR
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(() => ({

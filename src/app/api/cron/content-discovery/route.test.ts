@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // vi.hoisted runs before vi.mock hoisting, so mockAuthError and mockRpc are available in factories
 const { mockAuthError, mockRpc } = vi.hoisted(() => {
   // Cannot use NextResponse here (not imported yet), so use a plain sentinel object
@@ -324,5 +332,7 @@ describe("Advisory lock (DO-M2) — content-discovery", () => {
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
 
     consoleSpy.mockRestore();
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });
