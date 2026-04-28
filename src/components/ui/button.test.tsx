@@ -134,6 +134,78 @@ describe("Button", () => {
     });
   });
 
+  describe("glass variant", () => {
+    it("should render with glass variant classes", () => {
+      render(<Button variant="glass">Glass</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("bg-white/10");
+      expect(button).toHaveClass("rounded-full");
+      expect(button).toHaveClass("backdrop-blur-sm");
+    });
+
+    it("should have hover glass style", () => {
+      render(<Button variant="glass">Glass</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("hover:bg-white/20");
+    });
+
+    it("should have focus-visible ring for accessibility", () => {
+      render(<Button variant="glass">Glass</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("focus-visible:ring-white/70");
+    });
+
+    it("buttonVariants should return glass classes", () => {
+      const classes = buttonVariants({ variant: "glass" });
+      expect(classes).toContain("bg-white/10");
+      expect(classes).toContain("rounded-full");
+      expect(classes).toContain("backdrop-blur-sm");
+    });
+  });
+
+  describe("glassIcon variant", () => {
+    it("should render with glassIcon variant classes", () => {
+      render(<Button variant="glassIcon" aria-label="icon">X</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("bg-white/10");
+      expect(button).toHaveClass("rounded-full");
+      expect(button).toHaveClass("backdrop-blur-sm");
+    });
+
+    it("should have icon-appropriate padding", () => {
+      render(<Button variant="glassIcon" aria-label="icon">X</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("p-3");
+    });
+
+    it("should have hover glass style", () => {
+      render(<Button variant="glassIcon" aria-label="icon">X</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("hover:bg-white/20");
+    });
+
+    it("should have focus-visible ring with offset for accessibility", () => {
+      render(<Button variant="glassIcon" aria-label="icon">X</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("focus-visible:ring-white/70");
+      expect(button).toHaveClass("focus-visible:ring-offset-black");
+    });
+
+    it("should respect motion-reduce preference", () => {
+      render(<Button variant="glassIcon" aria-label="icon">X</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("motion-reduce:transition-none");
+    });
+
+    it("buttonVariants should return glassIcon classes", () => {
+      const classes = buttonVariants({ variant: "glassIcon" });
+      expect(classes).toContain("p-3");
+      expect(classes).toContain("rounded-full");
+      expect(classes).toContain("bg-white/10");
+      expect(classes).toContain("backdrop-blur-sm");
+    });
+  });
+
   describe("ref forwarding", () => {
     it("should forward ref to button element", () => {
       const ref = vi.fn();
