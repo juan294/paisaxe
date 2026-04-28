@@ -577,6 +577,120 @@ describe("Suggestions API", () => {
       // After trim, placeName is empty/too short — Zod should reject it
       expect(response.status).toBe(400);
     });
+
+    // -----------------------------------------------------------------------
+    // Honeypot tests (BE-M7, issue #492)
+    // -----------------------------------------------------------------------
+
+    it("should silently return 200 when honeypot 'website' field is non-empty (bot detected)", async () => {
+      const request = createRequest("POST", {
+        body: { placeName: "Bot Place", website: "http://spam.example.com" },
+      });
+      const response = await POST(request);
+
+      // Must return 200 with fake success — never reveal honeypot to bots
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json.success).toBe(true);
+    });
+
+    it("should log [HONEYPOT_TRIGGERED] with structured logger when honeypot fires", async () => {
+      const request = createRequest("POST", {
+        body: { placeName: "Bot Place", website: "spambot" },
+      });
+      await POST(request);
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("[HONEYPOT_TRIGGERED]"),
+        expect.any(Object)
+      );
+    });
+
+    it("should NOT call checkRateLimit when honeypot is triggered", async () => {
+      const request = createRequest("POST", {
+        body: { placeName: "Bot Place", website: "http://spam.example.com" },
+      });
+      await POST(request);
+
+      expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    });
+
+    it("should accept normal submission with empty 'website' field (human with website in body)", async () => {
+      const createdSuggestion = {
+        id: "sug-human",
+        user_id: null,
+        place_name: "Human Place",
+        comment: null,
+        location: null,
+        attribution: null,
+        status: "pending",
+        admin_notes: null,
+        converted_story_id: null,
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+      };
+
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+        },
+        from: vi.fn(() => ({
+          insert: vi.fn(() => ({
+            select: vi.fn(() => ({
+              single: vi.fn(() =>
+                Promise.resolve({ data: createdSuggestion, error: null })
+              ),
+            })),
+          })),
+        })),
+      } as never);
+
+      // Empty string for website — human accidentally included it; treat as no honeypot
+      const request = createRequest("POST", {
+        body: { placeName: "Human Place", website: "" },
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+    });
+
+    it("should accept normal submission when 'website' field is absent", async () => {
+      const createdSuggestion = {
+        id: "sug-no-website",
+        user_id: null,
+        place_name: "Normal Place",
+        comment: null,
+        location: null,
+        attribution: null,
+        status: "pending",
+        admin_notes: null,
+        converted_story_id: null,
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+      };
+
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+        },
+        from: vi.fn(() => ({
+          insert: vi.fn(() => ({
+            select: vi.fn(() => ({
+              single: vi.fn(() =>
+                Promise.resolve({ data: createdSuggestion, error: null })
+              ),
+            })),
+          })),
+        })),
+      } as never);
+
+      const request = createRequest("POST", {
+        body: { placeName: "Normal Place" },
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+    });
   });
 
   it("should use logger.error (not console.error) on database error", async () => {
