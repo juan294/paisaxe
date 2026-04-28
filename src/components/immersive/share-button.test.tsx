@@ -321,4 +321,72 @@ describe("ShareButton", () => {
     });
     expect(screen.getByRole("status")).toHaveTextContent("Enlace copiado");
   });
+
+  // UX-L3 (#523): Show error feedback when ALL clipboard paths fail.
+  // Note: userEvent.setup() intercepts clipboard by default; we use
+  // fireEvent to click the button so our navigator.clipboard mock is used.
+  it("UX-L3: shows error toast when both share and clipboard fail", async () => {
+    // Simulate both native share and clipboard failing
+    const shareError = new Error("Share failed");
+    Object.defineProperty(navigator, "share", {
+      value: vi.fn().mockRejectedValue(shareError),
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      value: () => true,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(window, "matchMedia", {
+      value: (query: string) => ({
+        matches: query === "(pointer: coarse)",
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      }),
+      writable: true,
+      configurable: true,
+    });
+    // Clipboard also fails — set directly on navigator.clipboard so our mock is used
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockRejectedValue(new Error("Clipboard denied")) },
+      writable: true,
+      configurable: true,
+    });
+
+    const { fireEvent: fe } = await import("@testing-library/react");
+    render(<ShareButton story={mockStory} />);
+    fe.click(screen.getByTitle("Compartir"));
+
+    // Error feedback must be shown
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveClass("opacity-100");
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("No se pudo copiar");
+  });
+
+  it("UX-L3: shows error toast when clipboard fails on desktop (no native share)", async () => {
+    // Desktop: no native share, clipboard fails
+    // Set directly on navigator.clipboard to bypass userEvent clipboard intercept
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockRejectedValue(new Error("Clipboard API not available")) },
+      writable: true,
+      configurable: true,
+    });
+
+    const { fireEvent: fe } = await import("@testing-library/react");
+    render(<ShareButton story={mockStory} />);
+    fe.click(screen.getByTitle("Compartir"));
+
+    // Error feedback must be shown
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveClass("opacity-100");
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("No se pudo copiar");
+  });
 });

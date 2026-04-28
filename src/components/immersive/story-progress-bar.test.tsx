@@ -390,7 +390,27 @@ describe("StoryProgressBar", () => {
       expect(segments[2].getAttribute("aria-label")).toContain("Sidra House");
     });
 
-    it("current segment has aria-current='true'", () => {
+    // UX-M10 (#520): Touch affordance — segments must be at least h-1.5, contrast bg-white/40
+  it("UX-M10: segments use h-1.5 default height for better touch affordance", () => {
+    render(<StoryProgressBar {...defaultProps} />);
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    // All segments must have h-1.5 (not the old h-1)
+    segments.forEach((segment) => {
+      expect(segment.className).toContain("h-1.5");
+    });
+  });
+
+  it("UX-M10: segments use bg-white/40 inactive contrast (not bg-white/30)", () => {
+    render(<StoryProgressBar {...defaultProps} />);
+    const progressbar = screen.getByRole("progressbar");
+    const segments = progressbar.querySelectorAll('[role="button"]');
+    segments.forEach((segment) => {
+      expect(segment.className).toContain("bg-white/40");
+    });
+  });
+
+  it("current segment has aria-current='true'", () => {
       render(<StoryProgressBar {...arrowNavProps} />);
       const progressbar = screen.getByRole("progressbar");
       const segments = progressbar.querySelectorAll('[role="button"]');

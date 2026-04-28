@@ -239,7 +239,7 @@ export function StoryViewer({
       >
         <Image
           src={story.image}
-          alt={story.title}
+          alt=""
           fill
           sizes="100vw"
           className={cn("object-cover", zoomClass)}

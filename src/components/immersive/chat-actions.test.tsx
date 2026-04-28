@@ -412,5 +412,31 @@ describe("ChatActions", () => {
       // Restore
       mockClipboard.writeText = originalWriteText;
     });
+
+    // UX-L3 (#523): Show Spanish error feedback when clipboard write fails.
+    it("UX-L3: shows error toast text when clipboard write fails", async () => {
+      const originalWriteText = mockClipboard.writeText;
+      mockClipboard.writeText = vi.fn().mockRejectedValue(new Error("Clipboard denied"));
+
+      const messages: Message[] = [
+        { role: "assistant", content: "Hello Asturias!" },
+      ];
+
+      render(<ChatActions messages={messages} />);
+
+      const copyButton = screen.getByRole("button", {
+        name: /copiar conversación/i,
+      });
+
+      fireEvent.click(copyButton);
+
+      // Error feedback must appear after clipboard rejection
+      await waitFor(() => {
+        expect(screen.getByText(/no se pudo copiar/i)).toBeInTheDocument();
+      });
+
+      // Restore
+      mockClipboard.writeText = originalWriteText;
+    });
   });
 });
