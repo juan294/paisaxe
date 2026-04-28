@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { validateAdminAuth, withAdmin } from "./admin-auth";
+import { validateAdminAuth, withAdmin, withAdminRead } from "./admin-auth";
 
 // Mock createAdminClient so withAdmin tests don't need SUPABASE_SERVICE_KEY
 const mockAdminClient = { from: vi.fn() };
@@ -416,6 +416,71 @@ describe("validateAdminAuth", () => {
           { name: "sb-token", value: "val", options: {} },
         ]);
       }).not.toThrow();
+    });
+  });
+
+  // ─── SE-M3: withAdminRead HOF — cookie-scoped client (respects RLS) ───────
+  describe("withAdminRead HOF", () => {
+    it("should return 401 response when auth fails", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: null },
+        error: null,
+      });
+
+      const handler = vi.fn().mockResolvedValue({ ok: true });
+      const result = await withAdminRead(handler) as Response;
+
+      expect(result.status).toBe(401);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("should return 403 response when user is not admin", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-456", email: "user@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "user" });
+
+      const handler = vi.fn().mockResolvedValue({ ok: true });
+      const result = await withAdminRead(handler) as Response;
+
+      expect(result.status).toBe(403);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("should call handler with cookie-scoped client (not service-role)", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      let capturedClient: unknown = undefined;
+      const handler = vi.fn().mockImplementation((client: unknown) => {
+        capturedClient = client;
+        return Promise.resolve("done");
+      });
+
+      await withAdminRead(handler);
+
+      expect(handler).toHaveBeenCalledOnce();
+      // Cookie-scoped client (from createServerClient) has `auth` property.
+      // Admin client (from createAdminClient) only has `from` — no `auth`.
+      expect(capturedClient).toHaveProperty("auth");
+      expect(capturedClient).not.toBe(mockAdminClient);
+    });
+
+    it("should return the handler result on success", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      const handlerResult = { message: "read success" };
+      const result = await withAdminRead(vi.fn().mockResolvedValue(handlerResult));
+
+      expect(result).toBe(handlerResult);
     });
   });
 });

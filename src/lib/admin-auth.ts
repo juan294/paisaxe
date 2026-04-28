@@ -153,11 +153,7 @@ export async function validateAdminAuth(): Promise<AuthResult> {
  * error response immediately — the handler is never invoked. If auth succeeds,
  * calls handler with a service-key Supabase client (createAdminClient()).
  *
- * Usage:
- *   return withAdmin(async (supabase) => {
- *     const { data } = await supabase.from("stories").select("*");
- *     return NextResponse.json({ data });
- *   });
+ * Use for mutations (INSERT/UPDATE/DELETE) that need to bypass RLS.
  */
 export async function withAdmin<T>(
   handler: (supabase: SupabaseClient) => Promise<T>
@@ -167,4 +163,43 @@ export async function withAdmin<T>(
     return auth.error;
   }
   return handler(createAdminClient());
+}
+
+/**
+ * Like withAdmin but passes a cookie-scoped Supabase client that respects RLS.
+ *
+ * Use for read-only admin operations — the authenticated admin user's session
+ * is subject to Row-Level Security policies, limiting blast radius if the
+ * account is compromised. Mutations that need cross-user access should use
+ * withAdmin (service-role) instead.
+ */
+export async function withAdminRead<T>(
+  handler: (supabase: SupabaseClient) => Promise<T>
+): Promise<T | NextResponse> {
+  const auth = await validateAdminAuth();
+  if (!auth.valid) {
+    return auth.error;
+  }
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    getSupabaseUrl() ?? "",
+    getSupabaseAnonKey() ?? "",
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Server Component context — can be ignored
+          }
+        },
+      },
+    }
+  );
+  return handler(supabase);
 }
