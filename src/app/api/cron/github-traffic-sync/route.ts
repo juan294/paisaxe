@@ -55,6 +55,7 @@ async function fetchGitHub<T>(endpoint: string, token: string): Promise<T> {
 
 /** Core sync logic shared by GET (Vercel Cron) and POST (pg_cron/admin). */
 async function syncGitHubTraffic(): Promise<NextResponse> {
+  const start = Date.now();
   const githubToken = process.env.GITHUB_TOKEN?.trim();
   if (!githubToken) {
     return NextResponse.json(
@@ -192,6 +193,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
     await supabase.from("github_traffic_referrers").delete().lte("fetched_at", cutoff);
     await supabase.from("github_traffic_paths").delete().lte("fetched_at", cutoff);
 
+    logger.info("[CRON_SUCCESS]", { job: "github-traffic-sync", duration_ms: Date.now() - start });
     return NextResponse.json({
       synced: true,
       syncedAt: now,
@@ -200,6 +202,7 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
       paths: pathCount,
     });
   } catch (error) {
+    logger.error("[CRON_FAILURE]", { job: "github-traffic-sync", error: error instanceof Error ? error.message : "Unknown error" });
     logger.error("[GITHUB_TRAFFIC_SYNC_UNHANDLED_ERROR]", { error });
     return NextResponse.json(
       { error: "Sync failed", details: error instanceof Error ? error.message : "Unknown error" },

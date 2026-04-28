@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock next/server
 vi.mock("next/server", () => ({
   NextRequest: class MockNextRequest {
@@ -68,6 +76,9 @@ describe("POST /api/cron/github-traffic-sync", () => {
     mockInsert.mockClear();
     mockFrom.mockClear();
     mockRpc.mockReset();
+    logger.info.mockClear();
+    logger.error.mockClear();
+    logger.warn.mockClear();
     // Default: advisory lock succeeds (lock acquired, unlock succeeds)
     mockRpc.mockImplementation((fn: string) => {
       if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
@@ -717,5 +728,84 @@ describe("Advisory lock (DO-M2) — github-traffic-sync", () => {
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
 
     consoleSpy.mockRestore();
+  });
+});
+
+describe("CRON_SUCCESS/CRON_FAILURE telemetry — github-traffic-sync", () => {
+  const originalEnv = process.env;
+  const WEBHOOK_SECRET = "test-webhook-secret-123";
+  const GITHUB_TOKEN = "ghp_test_token_123";
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = {
+      ...originalEnv,
+      WEBHOOK_SECRET,
+      CRON_SECRET: "test-cron-secret-456",
+      GITHUB_TOKEN,
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_SERVICE_KEY: "test-service-key",
+    };
+    global.fetch = mockFetch;
+    mockFetch.mockReset();
+    mockRpc.mockReset();
+    logger.info.mockClear();
+    logger.error.mockClear();
+    logger.warn.mockClear();
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("emits [CRON_SUCCESS] with job name and duration_ms on successful sync", async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ count: 0, uniques: 0, views: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ count: 0, uniques: 0, clones: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "[CRON_SUCCESS]",
+      expect.objectContaining({
+        job: "github-traffic-sync",
+        duration_ms: expect.any(Number),
+      })
+    );
+  });
+
+  it("emits [CRON_FAILURE] with job name and error message when sync throws", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("Network timeout"));
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(500);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CRON_FAILURE]",
+      expect.objectContaining({
+        job: "github-traffic-sync",
+        error: expect.stringContaining("Network timeout"),
+      })
+    );
   });
 });
