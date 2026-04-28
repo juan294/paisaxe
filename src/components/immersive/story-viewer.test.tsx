@@ -272,44 +272,52 @@ describe("StoryViewer", () => {
       expect(querySelectorSpy).not.toHaveBeenCalled();
     });
 
+    // UX-L2 (#522): Hero images are decorative (title announced by adjacent <h1>)
+    // so alt="" — query by src or the specific img within the background div instead.
     it("should render story image with blur placeholder", async () => {
-      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const img = screen.getByAltText("Lagos de Covadonga");
+      // Hero image is decorative (alt=""), find it by src
+      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-placeholder", "blur");
     });
 
     it("PE-M2: should set priority=true only on the first story (index 0)", async () => {
-      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 0 })} />);
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 0 })} />);
 
-      const img = screen.getByAltText("Lagos de Covadonga");
+      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-priority", "true");
     });
 
     it("PE-M2: should set priority=false for stories after index 0", async () => {
-      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
-      const img = screen.getByAltText("Oviedo Cathedral");
+      const img = container.querySelector(`img[src="${mockStories[1].image}"]`);
+      expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-priority", "false");
     });
 
     it("should use darkPlaceholder fallback when story has no blurDataUrl", async () => {
-      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const img = screen.getByAltText("Lagos de Covadonga");
+      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      expect(img).not.toBeNull();
       // Should use the dark SVG placeholder as fallback
-      expect(img.getAttribute("data-blur-data-url")).toMatch(/^data:image\/svg\+xml/);
+      expect(img!.getAttribute("data-blur-data-url")).toMatch(/^data:image\/svg\+xml/);
     });
 
     it("should use story blurDataUrl when available", async () => {
       const storiesWithBlur = mockStories.map((s, i) =>
         i === 0 ? { ...s, blurDataUrl: "data:image/webp;base64,mockblur" } : s
       );
-      await renderWithAuth(
+      const { container } = await renderWithAuth(
         <StoryViewer {...getDefaultProps({ stories: storiesWithBlur })} />
       );
 
-      const img = screen.getByAltText("Lagos de Covadonga");
+      const img = container.querySelector(`img[src="${storiesWithBlur[0].image}"]`);
+      expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-blur-data-url", "data:image/webp;base64,mockblur");
     });
   });
@@ -1931,14 +1939,16 @@ describe("StoryViewer", () => {
 
       const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const img = container.querySelector("img[alt='Lagos de Covadonga']");
+      // UX-L2: Hero image is decorative (alt=""), query by src
+      const heroSrc = mockStories[0].image;
+      const img = container.querySelector(`img[src="${heroSrc}"]`);
       expect(img).not.toBeNull();
 
       // The key is not directly observable in the DOM, but the img src should stay stable.
       // What we CAN assert: the story image renders and does NOT have "ambient" or "autoPlay"
       // baked into a data attribute that forces a remount.
       // The canonical test: clicking ambient toggle should NOT cause a new <img> element to mount.
-      const imgBefore = container.querySelector("img[alt='Lagos de Covadonga']");
+      const imgBefore = container.querySelector(`img[src="${heroSrc}"]`);
 
       const ambientButton = screen.getAllByRole("button").find(
         (btn) => btn.querySelector(".lucide-play")
@@ -1948,7 +1958,7 @@ describe("StoryViewer", () => {
       }
 
       // After toggling ambient, the SAME img element should still be in the DOM (no remount)
-      const imgAfter = container.querySelector("img[alt='Lagos de Covadonga']");
+      const imgAfter = container.querySelector(`img[src="${heroSrc}"]`);
       expect(imgAfter).toBe(imgBefore);
 
       mockIsEnabled.mockReturnValue(false);

@@ -24,6 +24,7 @@ export const mockTranslations: Record<string, string> = {
   "chat.directions": "Cómo llegar",
   "chat.copy_conversation": "Copiar conversación",
   "chat.copied": "Copiado",
+  "chat.copy_error": "No se pudo copiar",
 
   // Stories
   "stories.new_badge": "Nuevo",
@@ -114,6 +115,7 @@ export const mockTranslations: Record<string, string> = {
   // Share
   "share.share": "Compartir",
   "share.link_copied": "Enlace copiado",
+  "share.copy_error": "No se pudo copiar",
 
   // Favorites toast
   "favorites.removed": "Eliminado de favoritos",

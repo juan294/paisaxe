@@ -212,6 +212,61 @@ describe("getUserFromRequest", () => {
     expect(mockGetUser).toHaveBeenCalledWith("my-api-token");
   });
 
+  // SE-L2 (#511): Explicit precedence test — bearer token wins when BOTH
+  // Authorization header AND a session cookie are present.
+  it("SE-L2 (a): bearer token takes precedence when both Authorization header AND session cookie are present", async () => {
+    const bearerUser = { id: "bearer-user-999", email: "bearer@example.com" };
+    const mockGetUser = vi.fn().mockResolvedValue({
+      data: { user: bearerUser },
+      error: null,
+    });
+    mockCreateServerClient.mockReturnValue({
+      auth: { getUser: mockGetUser },
+      from: vi.fn(),
+    } as never);
+
+    // Simulate having a session cookie by putting something in the mock cookie store
+    mockCookieStore.getAll.mockReturnValue([
+      { name: "sb-access-token", value: "cookie-session-token" },
+    ] as never);
+
+    // Request has BOTH a Bearer header and a session cookie
+    const request = createRequest({ Authorization: "Bearer explicit-bearer-token" });
+    const user = await getUserFromRequest(request);
+
+    expect(user).toEqual(bearerUser);
+    // Bearer path: getUser called WITH the token (not the cookie-based no-arg call)
+    expect(mockGetUser).toHaveBeenCalledWith("explicit-bearer-token");
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
+  // SE-L2 (#511) (b): Only a session cookie — cookie session is used.
+  it("SE-L2 (b): uses cookie session when no Authorization header present (even with cookies set)", async () => {
+    const cookieUser = { id: "cookie-user-777", email: "cookie@example.com" };
+    const mockGetUser = vi.fn().mockResolvedValue({
+      data: { user: cookieUser },
+      error: null,
+    });
+    mockCreateServerClient.mockReturnValue({
+      auth: { getUser: mockGetUser },
+      from: vi.fn(),
+    } as never);
+
+    // Simulate cookies being set
+    mockCookieStore.getAll.mockReturnValue([
+      { name: "sb-access-token", value: "cookie-session-token" },
+    ] as never);
+
+    // No Authorization header — only cookie session
+    const request = createRequest();
+    const user = await getUserFromRequest(request);
+
+    expect(user).toEqual(cookieUser);
+    // Cookie path: getUser called with NO argument
+    expect(mockGetUser).toHaveBeenCalledWith();
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
   it("should return null when Authorization header does not start with Bearer (cookie session also empty)", async () => {
     // Non-Bearer auth header → falls through to cookie session; cookie session also null
     mockCreateServerClient.mockReturnValue({
