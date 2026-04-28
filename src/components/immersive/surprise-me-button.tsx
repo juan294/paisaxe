@@ -2,6 +2,7 @@
 
 import { Shuffle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 
 interface SurpriseMeButtonProps {
   totalStories: number;
@@ -42,13 +43,13 @@ export function SurpriseMeButton({
   };
 
   return (
-    <button
+    <Button
+      variant="glassIcon"
       onClick={handleClick}
-      className="p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
       aria-label={t("stories.surprise")}
       title={t("stories.surprise")}
     >
       <Shuffle className="h-5 w-5 text-white" />
-    </button>
+    </Button>
   );
 }
