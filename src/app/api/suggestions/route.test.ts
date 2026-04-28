@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, POST } from "./route";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock rate limiter
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn(),
@@ -569,5 +577,34 @@ describe("Suggestions API", () => {
       // After trim, placeName is empty/too short — Zod should reject it
       expect(response.status).toBe(400);
     });
+  });
+
+  it("should use logger.error (not console.error) on database error", async () => {
+    mockCreateServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "user-1" } },
+          error: null,
+        }),
+      },
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            order: vi.fn(() => Promise.resolve({ data: null, error: { message: "DB error" } })),
+          })),
+        })),
+      })),
+    } as never);
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = createRequest("GET", {
+      headers: { Authorization: "Bearer valid-token" },
+    });
+    const response = await GET(request);
+    consoleSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

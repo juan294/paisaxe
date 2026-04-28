@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Create mock functions object to track calls
 const mocks = {
   anthropicCreate: vi.fn(),
@@ -428,5 +436,24 @@ describe("/api/admin/marketing/agent", () => {
 
       vi.restoreAllMocks();
     });
+  });
+
+  it("should use logger.error (not console.error) on unhandled POST error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "test-user" });
+    mocks.anthropicCreate.mockRejectedValue(new Error("Anthropic API unavailable"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = new NextRequest("http://localhost/api/admin/marketing/agent", {
+      method: "POST",
+      body: JSON.stringify({ agentId: "xander", message: "hello" }),
+      headers: { "content-type": "application/json" },
+    });
+
+    const response = await POST(request);
+    consoleSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

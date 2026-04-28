@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type { StorySuggestionRow } from "@/types/suggestions";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
@@ -370,5 +378,20 @@ describe("/api/admin/suggestions/[id]", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
     });
+  });
+
+  it("should use logger.error (not console.error) on unhandled DELETE error", async () => {
+    mockCreateAdminClientThrows = true;
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = new NextRequest("http://localhost/api/admin/suggestions/suggestion-1", {
+      method: "DELETE",
+    });
+
+    await DELETE(request, { params: Promise.resolve({ id: "suggestion-1" }) });
+    consoleSpy.mockRestore();
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

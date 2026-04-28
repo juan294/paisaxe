@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "./route";
 import { NextRequest } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock the dependencies
 vi.mock("@/lib/claude", () => ({
   generateChatResponse: vi.fn(),
@@ -203,6 +211,27 @@ describe("POST /api/chat", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("Internal server error");
+  });
+
+  it("should use logger.error (not console.error) on internal error", async () => {
+    vi.mocked(validateChatRequest).mockReturnValue({
+      valid: true,
+      sanitizedMessage: "Test",
+      sanitizedContext: undefined,
+    });
+    vi.mocked(generateEmbedding).mockRejectedValue(new Error("API Error"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = new NextRequest("http://localhost:3000/api/chat", {
+      method: "POST",
+      body: JSON.stringify({ message: "Test" }),
+    });
+
+    await POST(request);
+    consoleSpy.mockRestore();
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 
   it("should return debug info in development mode on error", async () => {
@@ -529,8 +558,11 @@ describe("POST /api/chat", () => {
 
       await POST(request);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[CHAT_SECURITY] Injection attempt detected")
+      // Route uses pino logger.warn (not console.warn)
+      expect(consoleSpy).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledWith(
+        "[CHAT_SECURITY] Injection attempt detected",
+        expect.anything()
       );
 
       consoleSpy.mockRestore();

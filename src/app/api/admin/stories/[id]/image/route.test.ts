@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { PUT } from "./route";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock dependencies
 vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(),
@@ -531,8 +539,11 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       const response = await PUT(request, mockParams);
 
       expect(response.status).toBe(200);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Could not fetch external image for blur generation")
+      // Route uses pino logger.warn (not console.warn)
+      expect(consoleSpy).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Could not fetch external image for blur generation"),
+        expect.anything()
       );
 
       // Should NOT include blur_data_url in update since fetch failed
@@ -902,5 +913,25 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
     });
+  });
+
+  it("should use logger.error (not console.error) on unhandled PUT error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin-1" });
+    vi.mocked(createAdminClient).mockImplementation(() => {
+      throw new Error("Unexpected DB failure");
+    });
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+    });
+    const response = await PUT(request, { params: Promise.resolve({ id: "story-123" }) });
+    consoleSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock admin auth
 const mockValidateAdminAuth = vi.fn();
 vi.mock("@/lib/admin-auth", () => ({
@@ -197,6 +205,7 @@ describe("GET /api/admin/github-analytics", () => {
     });
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Route uses pino logger.error, not console.error;
 
     // Override the daily query to return an error
     const originalFrom = mockFrom.getMockImplementation();
@@ -262,9 +271,8 @@ describe("GET /api/admin/github-analytics", () => {
     expect(response.body.data.daily).toEqual([]);
     expect(response.body.data.summary.totalViews).toBe(0);
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to fetch daily traffic")
-    );
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith("Failed to fetch daily traffic:", expect.anything());
 
     consoleSpy.mockRestore();
     if (originalFrom) {
@@ -300,9 +308,8 @@ describe("GET /api/admin/github-analytics", () => {
     expect(response.body.data.popularPaths).toEqual([]);
     expect(response.body.data.lastSyncedAt).toBeNull();
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("GitHub analytics API error")
-    );
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith("GitHub analytics API error:", expect.anything());
 
     consoleSpy.mockRestore();
     // Restore original mock implementation
@@ -546,5 +553,35 @@ describe("GET /api/admin/github-analytics", () => {
     // We give a generous 3× budget to tolerate slow CI environments.
     expect(elapsed).toBeLessThan(3 * DELAY_MS);
     expect(response.body.data.summary.totalViews).toBe(110);
+  });
+
+  // -----------------------------------------------------------------------
+  // SE-M3 / DO-H3: logger migration — uses structured logger, not console
+  // -----------------------------------------------------------------------
+
+  it("should use logger.error (not console.error) when supabase query fails", async () => {
+    mockValidateAdminAuth.mockResolvedValue({ valid: true, userId: "user-1" });
+
+    // Make mockFrom throw to trigger catch block
+    const originalImpl = mockFrom.getMockImplementation();
+    mockFrom.mockImplementation(() => {
+      throw new Error("DB connection lost");
+    });
+
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/admin/github-analytics?from=2026-02-01&to=2026-02-07"
+    );
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await GET(request as never) as any;
+    consoleSpy.mockRestore();
+
+    expect(response.status).toBe(200);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith("GitHub analytics API error:", expect.anything());
+
+    if (originalImpl) mockFrom.mockImplementation(originalImpl);
   });
 });

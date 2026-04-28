@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "./route";
 import { NextRequest, NextResponse } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn().mockResolvedValue({ valid: true }),
@@ -105,6 +113,19 @@ describe("Stripe Analytics API Route", () => {
     expect(data.error).toBe("Failed to fetch Stripe data");
     expect(data.data.summary.totalOrders).toBe(0);
     expect(data.data.recentOrders).toEqual([]);
+  });
+
+  it("should use logger.error (not console.error) on API error", async () => {
+    vi.mocked(isStripeConfigured).mockReturnValue(true);
+    mockPaymentIntentsList.mockRejectedValue(new Error("Stripe API error"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = new NextRequest("http://localhost/api/admin/stripe-analytics");
+    await GET(request);
+    consoleSpy.mockRestore();
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 
   it("calculates summary statistics correctly", async () => {
