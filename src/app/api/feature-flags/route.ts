@@ -36,6 +36,8 @@ export async function GET() {
     return NextResponse.json({ data: [] }, {
       headers: {
         "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
+        // BE-M4: Vary: Host prevents CDN from serving wrong flags across deployments/subdomains.
+        "Vary": "Host",
       },
     });
   }
@@ -62,6 +64,8 @@ export async function GET() {
     return NextResponse.json({ data: flags }, {
       headers: {
         "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
+        // BE-M4: Vary: Host prevents CDN from serving wrong flags across deployments/subdomains.
+        "Vary": "Host",
       },
     });
   } catch (error) {

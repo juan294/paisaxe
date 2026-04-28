@@ -75,3 +75,18 @@ export function createAdminClient() {
   }
   return createClient(supabaseUrl, serviceKey);
 }
+
+/** BE-M3: Singleton admin client — lazy-initialised, reused across requests. */
+let _adminClient: ReturnType<typeof createAdminClient> | null = null;
+
+/**
+ * Returns a singleton Supabase admin (service-role) client.
+ * Constructs the client on first call and reuses it on subsequent calls,
+ * avoiding repeated construction overhead on hot paths.
+ */
+export function getAdminClient(): ReturnType<typeof createAdminClient> {
+  if (!_adminClient) {
+    _adminClient = createAdminClient();
+  }
+  return _adminClient;
+}
