@@ -16,7 +16,7 @@ import { csrfHeaders } from "@/lib/csrf-client";
 import { parseSseEvent } from "@/types/sse";
 import { readSseStream } from "./use-sse-stream";
 
-interface StreamChatMessage {
+export interface StreamChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
