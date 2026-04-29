@@ -16,6 +16,12 @@ if (process.env.NODE_ENV === "development") {
   ALLOWED_ORIGINS.push("http://localhost:3000");
 }
 
+// Allow the E2E test server origin (set in playwright.config.ts webServer.env).
+// This is never set in production or preview deployments.
+if (process.env.PLAYWRIGHT_TEST_ORIGIN) {
+  ALLOWED_ORIGINS.push(process.env.PLAYWRIGHT_TEST_ORIGIN);
+}
+
 export { ALLOWED_ORIGINS };
 
 const CORS_HEADERS = {
