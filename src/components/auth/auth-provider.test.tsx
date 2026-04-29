@@ -12,16 +12,18 @@ const mockOnAuthStateChange = vi.fn();
 const mockSignInWithOAuth = vi.fn();
 const mockSignOut = vi.fn();
 
+const mockCreateSupabaseBrowserClient = vi.fn(() => ({
+  auth: {
+    getSession: mockGetSession,
+    getUser: mockGetUser,
+    onAuthStateChange: mockOnAuthStateChange,
+    signInWithOAuth: mockSignInWithOAuth,
+    signOut: mockSignOut,
+  },
+}));
+
 vi.mock("@/lib/supabase-browser", () => ({
-  createSupabaseBrowserClient: () => ({
-    auth: {
-      getSession: mockGetSession,
-      getUser: mockGetUser,
-      onAuthStateChange: mockOnAuthStateChange,
-      signInWithOAuth: mockSignInWithOAuth,
-      signOut: mockSignOut,
-    },
-  }),
+  createSupabaseBrowserClient: () => mockCreateSupabaseBrowserClient(),
 }));
 
 // --- Test consumer component ---
@@ -77,10 +79,51 @@ function wrapper({ children }: { children: ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>;
 }
 
+describe("AuthProvider — null supabase client (FE-M4 regression)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateSupabaseBrowserClient.mockReturnValue(null as unknown as ReturnType<typeof mockCreateSupabaseBrowserClient>);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "");
+  });
+
+  it("renders children without throwing when supabase client is null", () => {
+    expect(() =>
+      render(
+        <AuthProvider>
+          <span>child</span>
+        </AuthProvider>
+      )
+    ).not.toThrow();
+    expect(screen.getByText("child")).toBeInTheDocument();
+  });
+
+  it("resolves isLoading to false when supabase client is null", async () => {
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("false");
+    });
+    expect(screen.getByTestId("user").textContent).toBe("none");
+  });
+});
+
 describe("AuthProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupDefaultMocks();
+    mockCreateSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getSession: mockGetSession,
+        getUser: mockGetUser,
+        onAuthStateChange: mockOnAuthStateChange,
+        signInWithOAuth: mockSignInWithOAuth,
+        signOut: mockSignOut,
+      },
+    });
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
   });
 
@@ -501,6 +544,15 @@ describe("useAuthContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupDefaultMocks();
+    mockCreateSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getSession: mockGetSession,
+        getUser: mockGetUser,
+        onAuthStateChange: mockOnAuthStateChange,
+        signInWithOAuth: mockSignInWithOAuth,
+        signOut: mockSignOut,
+      },
+    });
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
   });
 

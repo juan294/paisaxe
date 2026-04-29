@@ -10,11 +10,11 @@ let browserClient: ReturnType<typeof createBrowserClient> | null = null;
 export function createSupabaseBrowserClient() {
   if (browserClient) return browserClient;
 
-  browserClient = createBrowserClient(
-    getSupabaseUrl() ?? "",
-    getSupabaseAnonKey() ?? ""
-  );
+  const url = getSupabaseUrl();
+  const anonKey = getSupabaseAnonKey();
+  if (!url || !anonKey) return null;
 
+  browserClient = createBrowserClient(url, anonKey);
   return browserClient;
 }
 
