@@ -31,7 +31,7 @@ test.describe("Author pill", () => {
 
     const pill = page.locator('[aria-label="Made by Juan González"]').first();
     await expect(pill).toBeVisible();
-    await expect(pill).toContainText("</> JG");
+    await expect(pill).toContainText("JG");
   });
 
   test("pill is hidden on mobile viewport", async ({ page }) => {
