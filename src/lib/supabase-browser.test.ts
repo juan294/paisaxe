@@ -8,9 +8,26 @@ vi.mock("@supabase/ssr", () => ({
   })),
 }));
 
+// Closure variables let us override env getters per-test without breaking
+// the DO-M1 tests that verify real trimming behavior via process.env.
+let _urlOverride: (() => string | undefined) | null = null;
+let _anonKeyOverride: (() => string | undefined) | null = null;
+
+vi.mock("@/lib/env", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/env")>();
+  return {
+    ...actual,
+    getSupabaseUrl: () => (_urlOverride ? _urlOverride() : actual.getSupabaseUrl()),
+    getSupabaseAnonKey: () => (_anonKeyOverride ? _anonKeyOverride() : actual.getSupabaseAnonKey()),
+  };
+});
+
 describe("supabase-browser", () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.clearAllMocks();
+    _urlOverride = null;
+    _anonKeyOverride = null;
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
   });
@@ -69,5 +86,44 @@ describe("supabase-browser", () => {
     expect(first).toBe(second);
     // createBrowserClient should only be invoked once — singleton guard
     expect(vi.mocked(createBrowserClient)).toHaveBeenCalledTimes(1);
+  });
+
+  // ─── FE-M4 regression: missing env vars must not throw ──────────────────────
+
+  it("returns null when getSupabaseUrl returns undefined (no throw)", async () => {
+    _urlOverride = () => undefined;
+
+    const { createBrowserClient } = await import("@supabase/ssr");
+    const { createSupabaseBrowserClient } = await import("./supabase-browser");
+
+    const client = createSupabaseBrowserClient();
+
+    expect(client).toBeNull();
+    expect(vi.mocked(createBrowserClient)).not.toHaveBeenCalled();
+  });
+
+  it("returns null when getSupabaseAnonKey returns undefined (no throw)", async () => {
+    _anonKeyOverride = () => undefined;
+
+    const { createBrowserClient } = await import("@supabase/ssr");
+    const { createSupabaseBrowserClient } = await import("./supabase-browser");
+
+    const client = createSupabaseBrowserClient();
+
+    expect(client).toBeNull();
+    expect(vi.mocked(createBrowserClient)).not.toHaveBeenCalled();
+  });
+
+  it("returns null when both env getters return undefined (no throw)", async () => {
+    _urlOverride = () => undefined;
+    _anonKeyOverride = () => undefined;
+
+    const { createBrowserClient } = await import("@supabase/ssr");
+    const { createSupabaseBrowserClient } = await import("./supabase-browser");
+
+    const client = createSupabaseBrowserClient();
+
+    expect(client).toBeNull();
+    expect(vi.mocked(createBrowserClient)).not.toHaveBeenCalled();
   });
 });
