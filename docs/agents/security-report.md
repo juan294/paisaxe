@@ -1,100 +1,98 @@
-# Security Report — 2026-04-27
+# Security Report — 2026-04-30
 
-## Health Status: YELLOW
+## Health Status: GREEN
 
-8 moderate advisories detected. **0 exploitable** in this codebase. Two independent transitive-dependency chains carry the advisories — one is build-time only (postcss), the other is unreachable through our usage pattern (uuid). YELLOW reflects the audit count; operational risk is low.
+1 advisory detected. **0 exploitable.** The single moderate advisory affects the Anthropic SDK's Local Filesystem Memory Tool — a feature architecturally irrelevant in this Vercel serverless deployment. Vulnerability posture is clean. CSRF enforcement confirmed working; QA RED is a test harness gap (missing Origin header), not a security flaw.
 
 ## Executive Summary
 
-- **8 advisories detected, 0 exploitable.** All moderate, all transitive, all blocked from real exploitation by either build-time isolation or unused code paths.
+- **1 advisory detected, 0 exploitable.** One moderate advisory in `@anthropic-ai/sdk` (GHSA-p7fg-763f-g4gf) — insecure file permissions in the Local Filesystem Memory Tool. This tool is not used in this codebase and has no exploit path on Vercel's ephemeral serverless filesystem.
 - **0 critical, 0 high.** No remote code execution, auth bypass, or data-exfiltration vectors.
-- **0 fixable via `npm audit fix`.** Both fix paths require breaking-change downgrades (`next@9.3.3`, `resend@6.1.3`) — both nonsensical against our installed versions (we are on `next@16.x` and `resend@6.12.x`).
-- **License compliance: Pass.** Three flagged licenses (LGPL, MPL, UNLICENSED) are all approved exceptions documented in `docs/project/license-exceptions.md`.
-- **CI/CD security automation: Solid.** Dependabot, Gitleaks, npm audit, and license-check all run in CI.
-- **Security headers: Pass.** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy all configured in source. Live verification skipped this cycle (no running server).
-- **Status change vs Apr 25**: YELLOW (stable). Same 8 advisories, same exploitability conclusion.
+- **CSRF enforcement confirmed correct.** QA agent (Apr 30) identified the Chat API 403 as a test harness gap — Node.js fetch omits the Origin header required by SE-M2 hardening. Adding `'Origin': API_URL` to the QA harness headers fixes it. The CSRF gate itself is working as designed.
+- **Safety tests blocked (2nd cycle).** LLM safety, prompt-injection, and PII-extraction tests remain unconfirmed while the QA harness bug is unfixed. Journeys and integration health recovered to 10/10 and 3/3.
+- **19 outdated packages.** One has an advisory (@anthropic-ai/sdk). The rest have zero CVEs. Batch-upgrade candidate for next triage cycle.
+- **License compliance: Pass.** Three flagged licenses (LGPL, MPL, UNLICENSED) remain documented approved exceptions. Four scanner false positives unchanged.
+- **Security headers: Partial live verification.** 4 of 6 expected headers confirmed in live check. CSP and HSTS absent from live output — HSTS is production-only (expected); CSP requires production endpoint confirmation.
+- **CI/CD security automation: Solid.** Dependabot, Gitleaks, npm audit, license-check all active.
 
 ## Vulnerability Table
 
-| Severity | Package | Advisory | Attack Vector | Fixable | Risk |
-|----------|---------|----------|---------------|---------|------|
-| Moderate | postcss <8.5.10 | GHSA-qx2v-qp2m-jg93 (PostCSS Stringify XSS via unescaped `</style>`) | XSS via attacker-controlled CSS string parsed at build time. Requires writing malicious CSS into the build pipeline. | No — Next.js bundles `postcss@8.4.31` internally; npm overrides don't penetrate `node_modules/next/node_modules/`. | Not exploitable. Build-time only; no user-supplied CSS path. |
-| Moderate | next (transitive of postcss) | Same (GHSA-qx2v-qp2m-jg93) | Inherited from bundled postcss. | No. | Not exploitable — same build-time isolation. |
-| Moderate | @sentry/nextjs (transitive of next) | Same | Inherited. | No. | Not exploitable. |
-| Moderate | @vercel/analytics (transitive of next) | Same | Inherited. | No. | Not exploitable. |
-| Moderate | @vercel/speed-insights (transitive of next) | Same | Inherited. | No. | Not exploitable. |
-| Moderate | uuid <14.0.0 | GHSA-w5hq-g745-h8pq (uuid: missing buffer bounds check in v3/v5/v6 when `buf` is provided) | Buffer overflow if caller passes a too-small `buf` argument to `uuid.v3/v5/v6`. | Indirectly via `npm install` after svix releases >=1.91.2 upstream. | Not exploitable. Our code never imports `uuid` directly (grep confirms 0 matches in `src/`). svix uses `uuid.v4` (unaffected). |
-| Moderate | svix (transitive of uuid via resend) | Same | Inherited. | No (await upstream). | Not exploitable. |
-| Moderate | resend (transitive of svix) | Same | Inherited. | No. | Not exploitable. |
+| Severity | Package | Advisory | CVE | Attack Vector | Fixable | Risk Assessment |
+|----------|---------|----------|-----|---------------|---------|-----------------|
+| Moderate | `@anthropic-ai/sdk@0.90.0` | GHSA-p7fg-763f-g4gf | Pending assignment | Local filesystem — requires use of Memory Tool feature | Yes (breaking change: 0.91.1) | NOT EXPLOITABLE — feature not used; Vercel filesystem is ephemeral |
 
 ## Detailed Exploitability Analysis
 
-### Chain 1: postcss XSS (5 advisories)
+### GHSA-p7fg-763f-g4gf — @anthropic-ai/sdk Local Filesystem Memory Tool (Moderate)
 
-**Advisory**: `GHSA-qx2v-qp2m-jg93` — PostCSS Stringify can output unescaped `</style>` sequences when serializing CSS that contains attacker-controlled content. Could allow CSS-injection-to-HTML-injection if the resulting CSS is inlined into a `<style>` tag at runtime with attacker input.
+**Advisory summary**: The Anthropic SDK's Local Filesystem Memory Tool creates files with world-readable default permissions (0o644) instead of user-only permissions (0o600). On a multi-user system, other local users could read sensitive agent memory files.
 
-**Reachability in this codebase**:
-1. We use postcss only via `@tailwindcss/postcss` at **build time** (`postcss.config.mjs`). It runs once during `next build`, processing authored Tailwind classes and project CSS — not user input.
-2. The vulnerable copy is the one Next.js bundles internally (`node_modules/next/node_modules/postcss@8.4.31`), not the top-level `postcss@8.5.10` we depend on directly.
-3. No runtime path takes user input and passes it through `postcss.stringify()`. CSS is shipped as static `*.css` assets — no runtime stringification of user data.
+**Attack requirements**:
+1. Application must actively use the Local Filesystem Memory Tool feature of the SDK
+2. Application must be deployed on a shared, multi-user system where other principals can read the filesystem
+3. The tool must write sensitive data to disk
 
-**Why npm overrides don't fix this**: Next.js 16.x ships with its own pinned `postcss@8.4.31` inside `node_modules/next/node_modules/postcss`. We confirmed Apr 25 that adding `"postcss": ">=8.5.10"` to `package.json` overrides does not penetrate Next's nested copy. The only durable fix is upstream — Next.js must release a version that bumps the inner postcss to >=8.5.10.
+**Why this is NOT exploitable here**:
 
-**Status**: Track Next.js releases. No code action available.
+1. **Feature not used.** The Local Filesystem Memory Tool is a developer/agent workflow feature for persistent memory across Claude sessions. This codebase uses `@anthropic-ai/sdk` exclusively for the streaming chat completions API (`/api/chat/route.ts`) — the Memory Tool is never instantiated or called.
 
-### Chain 2: uuid bounds-check (3 advisories)
+2. **Vercel serverless filesystem is ephemeral.** Even if the tool were accidentally used in a route handler, Vercel Lambda functions run in isolated ephemeral containers. No persistent filesystem exists between invocations. No other process can access the transient `/tmp` space of a different Lambda invocation.
 
-**Advisory**: `GHSA-w5hq-g745-h8pq` — `uuid.v3()`, `uuid.v5()`, `uuid.v6()` accept an optional `buf` parameter. If the caller provides a buffer smaller than 16 bytes, the library writes past the buffer end. Requires the caller to (a) use the affected versions, (b) explicitly pass a too-small buffer.
+3. **No multi-user server context.** The vulnerability requires local filesystem access from a second principal. This is a traditional server concern, not applicable to a stateless serverless architecture.
 
-**Reachability in this codebase**:
-1. `grep -r 'from "uuid"'` in `src/`: **zero matches**. We do not import `uuid` directly anywhere.
-2. The advisory reaches us through `resend → svix → uuid`. svix uses `uuid.v4()`, which does **not** accept a `buf` argument and is unaffected by the advisory.
-3. No remote path, attacker, or input flow can trigger the bounds-check failure through our code.
+**Fix available but breaking**: `npm audit fix --force` installs `@anthropic-ai/sdk@0.91.1`. This is a major semver bump within the 0.x range that may include API-incompatible changes. Evaluate the 0.91.x changelog before upgrading — the chat streaming API surface used by this project may or may not be affected.
 
-**Status**: Wait for svix >=1.91.2 (will pull uuid >=14.0.0). `npm install` is already current. No action required.
+**Recommended action**: Schedule the upgrade as part of the next routine batch dep upgrade. No urgency — the advisory is not exploitable in this deployment.
+
+### CSRF Hardening (SE-M2) — Confirmed Working
+
+**QA agent (Apr 30)** identified the Chat API 403 root cause: the QA harness `sendChatMessage()` in `src/tests/qa/llm-quality.test.ts:43` omits the `Origin` header. SE-M2 enforces Origin validation on all POST requests; Node.js `fetch()` does not auto-inject Origin when called from a Node process (not a browser).
+
+**Security assessment**: The CSRF gate is functioning correctly. The 403 is the expected response when Origin is missing. One-line fix: add `'Origin': API_URL` to the harness request headers. This does not weaken CSRF protection — the double-submit token check still applies, and the Origin check remains in force for all production requests.
+
+**Safety tests**: Once the harness is fixed, next cycle should recover to 12/12 LLM tests. Safety guardrails are presumed intact based on (a) correct CSRF enforcement and (b) no code changes to the system prompt or safety logic since the last confirmed GREEN (Apr 26).
 
 ## Prioritized Remediation Steps
 
-1. **No urgent action required.** Both advisory chains are non-exploitable in this codebase.
-2. **Monitor Next.js releases** for an inner-postcss bump (clears 5 advisories in one shot).
-3. **Monitor svix upstream** for >=1.91.2 (clears 3 advisories).
-4. **Live header verification** — re-run `curl -I https://paisaxe.es` next cycle to confirm CSP/HSTS over the wire (skipped this cycle, no running server).
-5. **Batch production minor/patch bumps** in the next triage cycle (Stripe, Supabase, Sentry, Anthropic SDK). None are urgent.
+1. **Fix QA harness Origin header** — `src/tests/qa/llm-quality.test.ts:43`: add `'Origin': process.env.API_URL ?? 'http://localhost:3000'` to the fetch headers. One-line change. Unblocks LLM safety confirmation next cycle. Priority: HIGH.
+2. **Evaluate @anthropic-ai/sdk 0.91.1 upgrade** — Review changelog for breaking changes affecting streaming chat completions API. If safe, upgrade in next batch cycle. The vulnerability is non-exploitable here but keeping the SDK current is good hygiene. Priority: MEDIUM.
+3. **Live CSP production verification** — `curl -sI https://paisaxe.es | grep -i 'content-security-policy'` to confirm CSP is served from production. Priority: LOW (source-verified correct).
+4. **Batch production minor/patch upgrades** — All other 18 outdated production packages (excluding `voyageai`, which is intentionally pinned at 0.1.0). Zero CVEs. Routine maintenance. Priority: LOW.
 
 ## License Compliance
 
-**Status: Pass.** Exactly 3 non-permissive licenses appear in the dep tree, all approved:
+**Status: Pass.** Three non-permissive licenses appear in the dep tree, all approved exceptions:
 
 | Package | License | Status |
 |---------|---------|--------|
-| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | Approved exception. Documented in `docs/project/license-exceptions.md`. Native shared library used dynamically by `sharp`; LGPL allows linking against proprietary code via dynamic linking. |
-| `dompurify@3.4.0` | MPL-2.0 OR Apache-2.0 | Approved exception. We elect Apache-2.0 under the dual license. Pulled in transitively by `@vercel/analytics`. |
-| `paisaxe@1.0.0` | UNLICENSED | This is our own package — intentionally not open-sourced. Not a violation. |
+| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | Approved exception. Documented in `docs/project/license-exceptions.md`. Native shared library dynamically linked by `sharp`; LGPL dynamic-linking exemption applies. No modifications. SaaS deployment — no distribution obligations. |
+| `dompurify@3.4.0` | MPL-2.0 OR Apache-2.0 | Approved exception. Apache-2.0 elected under dual license. Transitively pulled by `@vercel/analytics`. Documented in `docs/project/license-exceptions.md`. No MPL-covered file modifications. |
+| `paisaxe@1.4.0` | UNLICENSED | The project itself — intentionally closed-source. Not a dependency violation. |
 
-**Scanner false positives** (these are actually MIT, scanner mis-grouped):
+**Scanner false positives** (plain MIT, mis-grouped by scanner):
 - `simple-concat@1.0.1` — MIT
 - `simple-get@4.0.1` — MIT
-- `expand-template@2.0.3` (MIT OR WTFPL — we elect MIT)
-- `@babel/template@7.28.6` — MIT (appears in flagged list as a grouping artifact)
+- `expand-template@2.0.3` — MIT OR WTFPL (MIT elected)
+- `@babel/template@7.28.6` — MIT (grouping artifact)
 
-**No copyleft violations** (no GPL, no AGPL, no SSPL).
+**No copyleft violations.** No GPL, AGPL, or SSPL in the dependency tree.
 
 ## Security Headers Status
 
-Verified in source (`src/proxy.ts` and `next.config.ts`):
+Live header check captured 4 of 6 expected headers. CSP and HSTS absent from live output (HSTS expected absent on dev server — production-only; CSP requires production verification).
 
-| Header | Value | Status |
-|--------|-------|--------|
-| Content-Security-Policy | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com; ...` | Pass — PPR-compatible (no `'strict-dynamic'`, no nonces). |
-| Strict-Transport-Security | `max-age=63072000; includeSubDomains; preload` (production only) | Pass |
-| X-Frame-Options | `DENY` | Pass |
-| X-Content-Type-Options | `nosniff` | Pass |
-| Referrer-Policy | `strict-origin-when-cross-origin` | Pass |
-| Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` | Pass — microphone scoped to self for ElevenLabs voice. |
-| frame-ancestors (in CSP) | `'none'` | Pass |
-| object-src (in CSP) | `'none'` | Pass |
+| Header | Live Check | Source Verified | Status |
+|--------|-----------|----------------|--------|
+| Content-Security-Policy | Not captured | Yes (`src/proxy.ts`) | Verify via production curl |
+| Strict-Transport-Security | Not captured | Yes (`src/proxy.ts`, prod-only) | Expected absent on dev; production-only |
+| X-Frame-Options | DENY | Yes | Pass |
+| X-Content-Type-Options | nosniff | Yes | Pass |
+| Referrer-Policy | strict-origin-when-cross-origin | Yes | Pass |
+| Permissions-Policy | camera=(), geolocation=(), microphone=(self) | Yes | Pass |
+| frame-ancestors (CSP) | Not captured (see CSP row) | Yes (`'none'`) | Verify via production curl |
+| object-src (CSP) | Not captured (see CSP row) | Yes (`'none'`) | Verify via production curl |
 
-**Live verification**: Skipped this cycle (no running server). Source-level configuration is correct.
+**Recommended verification**: `curl -sI https://paisaxe.es | grep -iE 'content-security|strict-transport'`
 
 ## CI/CD Security Automation Status
 
@@ -103,38 +101,43 @@ Verified in source (`src/proxy.ts` and `next.config.ts`):
 | Dependabot | Configured | Pinned to `develop` branch (commit `f118597`). Weekly schedule. |
 | Renovate | Not configured | Intentional — Dependabot covers the same surface. |
 | Gitleaks in CI | Configured | Runs on every push; blocks merge on findings. |
-| npm audit in CI | Configured | Runs in `lint-and-typecheck` and security-scan jobs. |
+| npm audit in CI | Configured | Runs in security-scan and lint-and-typecheck jobs. |
 | License check in CI | Configured | Validates against allowlist; blocks merge on copyleft introductions. |
-| CSRF protection | Configured | `sendChatMessage()` and all mutation endpoints validated. Stable since Mar 23. |
-| Webhook signature validation | Configured | All 4 endpoints use `crypto.timingSafeEqual` (7 call sites verified). |
+| CSRF protection | Configured | SE-M2 Origin + double-submit token enforcement confirmed working (QA 403 = correct gate behavior). |
+| Webhook signature validation | Configured | All 4 endpoints use `crypto.timingSafeEqual` (7 call sites). Unchanged. |
 | Pre-commit hooks | Configured | Push accountability + dirty-pull guard. |
 
 **No CI/CD automation gaps.**
 
 ## Outdated Packages with Security Implications
 
-18 outdated packages reported. None have known CVEs. Production security-relevant items:
+19 outdated packages. 1 has an advisory (non-exploitable). Notable items:
 
-| Package | Current | Latest | Security note |
+| Package | Current | Latest | Security Note |
 |---------|---------|--------|---------------|
-| `@sentry/core` | 10.49.0 | 10.50.0 | Minor — error reporting library. Low priority. |
-| `@sentry/nextjs` | 10.49.0 | 10.50.0 | Minor — same. |
-| `@stripe/stripe-js` | 9.2.0 | 9.3.1 | Patch + minor — payment SDK. Verify changelog before bump. |
-| `@supabase/supabase-js` | 2.104.0 | 2.104.1 | Patch — auth + database client. Safe to bump. |
-| `stripe` (server) | 22.0.2 | 22.1.0 | Minor — server-side Stripe. Verify changelog. |
-| `@anthropic-ai/sdk` | 0.90.0 | 0.91.1 | Minor — Claude API client. |
-| `posthog-js` | 1.369.5 | 1.372.1 | Minor — analytics. |
-| `postcss` (top-level) | 8.5.10 | 8.5.12 | Patch — already past advisory floor; only the Next-bundled inner copy is the concern. |
-| `vitest` | 4.1.4 | 3.2.4 | **Downgrade reported** — scanner artifact (we are on a pre-release channel). Ignore. |
-| `jsdom` | 29.0.2 | 27.0.1 | Same — pre-release channel. Ignore. |
+| `@anthropic-ai/sdk` | 0.90.0 | 0.91.1 | **Advisory GHSA-p7fg-763f-g4gf** — not exploitable here. Evaluate changelog before upgrading (breaking change). |
+| `@supabase/supabase-js` | 2.104.0 | 2.105.1 | Minor — auth + database client. Check changelog for auth-related fixes. |
+| `@stripe/stripe-js` | 9.2.0 | 9.3.1 | Patch + minor — client-side payment SDK. |
+| `@stripe/react-stripe-js` | 6.2.0 | 6.3.0 | Minor — React wrapper for Stripe. Safe to batch. |
+| `stripe` | 22.0.2 | 22.1.0 | Minor — server-side Stripe. No CVEs. |
+| `@elevenlabs/react` | 1.1.1 | 1.3.0 | Minor — voice SDK. |
+| `posthog-js` | 1.369.5 | 1.372.5 | Minor — analytics. Previously carried advisories (now clean). |
+| `@sentry/core` | 10.49.0 | 10.51.0 | Minor — error reporting. |
+| `@sentry/nextjs` | 10.49.0 | 10.51.0 | Minor — same. |
+| `pdfjs-dist` | 5.6.205 | 5.7.284 | Minor — PDF processing. Content-handling dep worth keeping current. |
+| `voyageai` | 0.1.0 | 0.2.1 | **Do not upgrade.** Intentionally pinned — 0.2.x ESM build breaks `@/lib/embeddings` (commit 8f53cd29). |
+| `jsdom` | 29.0.2 | 27.0.1 | Scanner artifact — on pre-release channel; current version > "latest". Ignore. |
+| `vitest` | 4.1.5 | 3.2.4 | Same pre-release channel artifact. Ignore. |
 
-**Dev-only outdated** (no production impact): `@typescript-eslint/eslint-plugin`, `@vitest/coverage-v8`, `knip`, `@tailwindcss/postcss`, `tailwindcss`, `lucide-react`, `voyageai` (intentionally pinned to `0.1.0` per `8f53cd29` — voyageai 0.2.x ESM build broke `@/lib/embeddings`; do **not** auto-bump).
-
-**Recommendation**: Batch the production minor/patch bumps in the next triage cycle. None are urgent. Avoid auto-bumping `voyageai`.
+**Dev-only outdated** (no production security impact): `@typescript-eslint/eslint-plugin`, `@tailwindcss/postcss`, `tailwindcss`, `knip`, `lucide-react`.
 
 ## Cross-Agent Findings
 
-- **Performance Agent** (Apr 26): Sentry Replay removal (`fef651f5`) eliminated the Replay PII exfiltration surface. Confirmed not loaded as integration — saved 0 bundle KB but closed a privacy attack vector.
-- **QA Agent** (Apr 27): All safety, prompt-injection, and PII-extraction tests pass. CSRF stable since Mar 23. No security-test regressions.
-- **Coverage Agent** (Apr 23): Stripe webhook at 100% branch coverage including all error paths (signature failure, non-Error throws, null `amount_total`). CSRF origin-not-allowed branch covered.
-- **Cost Analyst Agent** (Apr 27): No cost-related security concerns. Twilio $0.24 anomaly (Apr 3-4) is operational, not a security event.
+- **QA Agent** (Apr 30 RED): LLM tests 0/12 — 403 regression root cause confirmed as harness missing Origin header (not a CSRF bypass). Browser journeys recovered 10/10. CSRF enforcement is correct. One-line fix to `src/tests/qa/llm-quality.test.ts:43` restores safety test coverage next cycle.
+- **Coverage Agent** (Apr 23): Stripe webhook at 100% branch coverage including all error paths. CSRF origin-not-allowed branch covered (from Apr 20). All webhook and auth paths verified at code level.
+- **Localization Agent** (Apr 30): 405 UI keys per locale (up from 404), 0 PII or tokens in translation files. Security-neutral.
+- **Performance Agent** (Apr 29): Bundle headroom critical at 14 KB total. P4 (Supabase realtime tree-shake) urgently needed before wave-3. No security implications from headroom pressure.
+- **Cost Analyst Agent** (Apr 30): 76-day revenue drought, 72-day voice silence. Twilio $0.24 anomaly (Apr 3-4) now 27 days unresolved — operational concern, not a security event.
+- **Documentation Agent** (Apr 30): CLAUDE.md current (2026-04-29). No security documentation gaps.
+
+---

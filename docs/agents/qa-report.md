@@ -1,10 +1,12 @@
-# QA Agent Report — 2026-04-27
+# QA Agent Report — 2026-04-30
 
-## Status: YELLOW
+## Status: RED
 
-Two LLM quality regressions in this run. No safety failures, no boundary violations, no integration failures. Browser journeys at 100%.
+All 12 LLM quality tests fail with Chat API 403. Browser journeys recovered to 10/10 (from 1/10 on Apr 29). Integration health passes 3/3. Status is RED because safety guardrails (injection resistance, role-play override, PII extraction) cannot be confirmed while the API returns 403.
 
-This is the first non-GREEN LLM result since the QA agent recovered to GREEN on Apr 26 (after the Chat API 500 regression caused by voyageai 0.2.x was fixed by pinning to 0.1.0). Both failures are content-quality issues — the chat API itself is healthy.
+This is the 2nd consecutive RED cycle for LLM tests. Root cause is now precisely identified: Wave 2 CSRF hardening (SE-M2) enforces that POST requests must include an Origin header matching the allowed list. The QA test harness sends `fetch()` calls from Node.js without an Origin header, which the proxy rejects as a potential CSRF bypass. The E2E fix (`bab3c40e`) addressed Playwright browser tests (browsers auto-send Origin) but did not fix the non-browser QA harness.
+
+---
 
 ## Integration Health Summary
 
@@ -13,125 +15,180 @@ This is the first non-GREEN LLM result since the QA agent recovered to GREEN on 
 | Supabase | Pass | Reachable, healthy |
 | Stripe | Pass | Auth and configuration confirmed |
 | App health endpoint | Pass | `/api/health` returns healthy |
-| External APIs | Pass | 3/3 health checks succeeded |
+| CI E2E Status | Unknown | Not resolved this cycle |
 
-CI E2E status reported as "unknown" by the harness this cycle — see Manual Testing Checklist below for follow-up.
+Integration health passes 3/3. All failures are application-layer.
+
+---
 
 ## Executive Summary
 
-- LLM quality: 10/12 passed (83%). Down from 12/12 on Apr 26 (one-day regression).
-- Browser journeys (Playwright): 10/10 passed. Stability streak now 6+ weeks.
-- Integration health: 3/3 passed.
-- Two failures both relate to RAG retrieval quality / Spanish-Asturian linguistic coverage. Neither is a safety, security, or boundary failure.
-- Cost Analyst flags 73-day revenue drought + 69-day Paisaxe voice silence. Automated tests are GREEN end-to-end (excluding today's two RAG misses) — production manual verification of Pelayo widget and Day Pass purchase flow remains the top outstanding action item.
+- **LLM quality tests**: 0/12 (0%). Second consecutive RED cycle. All fail on 403 before any assertion runs.
+- **Browser journeys**: 10/10 (100%). Fully recovered from Apr 29 regression (1/10). The /immersive story render is working again.
+- **Integration health**: 3/3. Services are reachable and healthy.
+- **Safety tests**: Not reached. Cannot confirm safety guardrails this cycle.
+- **Revenue/voice context**: 76-day revenue drought, 72-day Paisaxe voice silence (Cost Analyst Apr 30). Automated safety net remains broken for the second day.
 
-Note: harness metrics file reports "Total tests: 11" but vitest output confirms 12 tests (2 failed, 10 passed). Going by vitest output as the source of truth.
+---
 
-## Test Results By Category
+## Test Results by Category
 
-| Category | Pass / Total | Status | Notes |
-|----------|--------------|--------|-------|
-| RAG Quality & Source Grounding | 2 / 3 | Fail | Hallucination resistance failed |
-| Safety & Security | 3 / 3 | Pass | All injection / role-play / impersonation attempts refused |
-| Content Boundaries | 3 / 3 | Pass | Booking, off-region, personal-advice all redirected correctly |
-| Response Quality | 2 / 3 | Fail | Place name variations failed (Xixón/Gijón) |
-| Browser Journeys | 10 / 10 | Pass | All anonymous + error-handling journeys pass |
-| Integration Health | 3 / 3 | Pass | Stripe, Supabase, app reachable |
+| Category | Tests | Passed | Failed | Notes |
+|----------|-------|--------|--------|-------|
+| RAG Quality & Source Grounding | 3 | 0 | 3 | Blocked by 403 |
+| Safety & Security | 3 | 0 | 3 | Blocked by 403 — safety unconfirmed |
+| Content Boundaries | 3 | 0 | 3 | Blocked by 403 |
+| Response Quality | 3 | 0 | 3 | Blocked by 403 |
+| **LLM Total** | **12** | **0** | **12** | |
+| Browser Journeys (Anonymous) | 6 | 6 | 0 | Fully passing |
+| Browser Journeys (Error Handling) | 2 | 2 | 0 | Fully passing |
+| Browser Journeys (New Features) | 2 | 2 | 0 | Fully passing |
+| Browser Journeys (Authenticated) | 4 | 0 | 4 | Skipped — no auth session |
+| **Journey Total** | **14** | **10** | **4** | 4 auth journeys intentionally skipped |
+| Integration Health | 3 | 3 | 0 | Pass |
 
-## Failed Tests — Detail and Root Cause
+---
 
-### 1. RAG Quality > Hallucination resistance — `src/tests/qa/llm-quality.test.ts:325`
+## Root Cause Analysis
 
-**Prompt**: "Tell me about the famous Asturian roller coaster"
+### Chat API 403 — All LLM Tests
 
-**Validation logic** (lines 116-127):
+**Error**: `Chat API error: 403` at `src/tests/qa/llm-quality.test.ts:57`
+
+**Mechanism**: The proxy middleware at `src/lib/proxy/csrf-proxy.ts:36` calls `validateOrigin()` before processing any POST request to `/api/chat`. `validateOrigin()` in `src/lib/csrf.ts:108-111` contains SE-M2 logic:
+
 ```
-const invents   = /roller coaster|amusement park|thrill ride/i.test(r.content);
-const declines  = /no information|not aware|cannot find|don't have|not familiar|isn't a famous|no famous|don't know of|unaware|there isn't/i.test(r.content);
-const redirects = /instead|however|but.*can|recommend|suggest/i.test(r.content);
-return declines || redirects || !invents;
-```
-
-The test fails only when the response *invents* a roller coaster AND fails to decline AND fails to redirect — i.e., the model fabricated content for a non-existent attraction without offering an alternative or explicitly disclaiming.
-
-**Root cause hypothesis** (cannot inspect raw response — not captured by harness):
-- Most likely: model latched onto the word "famous" and produced a plausible-sounding fabrication (a common LLM failure mode) without including any of the decline/redirect phrases the regex looks for.
-- Less likely: RAG returned a near-miss chunk (e.g., a roller-coaster reference in a different region's PDF) that the model cited as authoritative.
-
-**Recommendation** (priority: medium):
-1. Add an explicit "If you do not have information about a specific named attraction, say so plainly before suggesting alternatives" rule to the system prompt.
-2. Capture the actual response body in the QA report when a test fails — currently we have no way to distinguish hallucination from regex coverage gap. Add a `console.log(r.content)` (or write to report) inside the failing branch.
-3. Broaden the decline regex to catch additional Spanish-language phrasings the model may use ("no tengo información", "no estoy seguro", "no me consta").
-
-### 2. Response Quality > Place name variations — `src/tests/qa/llm-quality.test.ts:388`
-
-**Prompt**: "Tell me about Xixón"
-
-**Validation logic** (lines 290-298):
-```
-const recognizes = /gij|xix|city|coast|beach|port/i.test(r.content);
-return recognizes && r.content.length > 50;
+if no Origin header AND method is POST/PUT/PATCH/DELETE:
+    return false  →  handleCsrfValidation returns 403 "Origin not allowed"
 ```
 
-Test fails if the response is short (<= 50 chars) OR fails to mention any of: gij, xix, city, coast, beach, port.
+**Why the QA harness fails**: `sendChatMessage()` at `src/tests/qa/llm-quality.test.ts:40-48` uses Node.js `fetch()` with these headers:
+- `Content-Type: application/json`
+- `x-csrf-token: <token>`
+- `Cookie: __csrf=<token>`
 
-**Root cause hypothesis**:
-- "Xixón" is the Asturian-language spelling of Gijón. RAG retrieval is keyed on Voyage embeddings (voyage-3.5, 512 dims). If the seed PDFs do not contain the Asturian spelling, the embedding for "Xixón" may not retrieve Gijón content with high enough similarity, leaving the model with little grounding.
-- Alternatively, the model may have responded in Asturian and used different vocabulary that does not match any of the regex tokens (e.g., "playa" matches `beach` only via the English word, not the Spanish one).
+It does **not** include an `Origin` header. Node.js `fetch()` does not auto-add Origin the way a browser does. The proxy therefore rejects every POST with 403.
 
-**Recommendation** (priority: medium):
-1. Verify the chunks index contains co-references for Asturian place names. If not, add a synonym layer in the retrieval step (Xixón→Gijón, Uviéu→Oviedo, Avilés stays Avilés). This is a high-leverage fix because the same issue affects every Asturian-spelled query.
-2. Broaden the regex with Spanish vocabulary the model is likely to use: `playa`, `puerto`, `ciudad`, `costa`.
-3. Consider a query-rewrite step before embedding: detect Asturian spellings and append the Spanish form to the embedded query.
+**Why browser journeys pass**: Playwright uses real Chromium. Browsers automatically attach `Origin: http://localhost:PORT` on all cross-origin state-changing requests, and `http://localhost:3000` is in `ALLOWED_ORIGINS` when `NODE_ENV=development` (`src/lib/proxy/cors.ts:16-17`).
+
+**Why this is new**: Commits `1a3ba7c5` (`fix/wave2-qa-pipeline`) and `5023f7eb` (`fix/wave2-fe-voice`) introduced SE-M2 enforcement. The follow-up fix `bab3c40e` restored E2E coverage by documenting `PLAYWRIGHT_TEST_ORIGIN`, but the QA unit harness was not updated.
+
+**The fix**: Add `'Origin': API_URL` to the fetch headers in `sendChatMessage()`:
+
+```typescript
+// src/tests/qa/llm-quality.test.ts line 42-46
+headers: {
+  'Content-Type': 'application/json',
+  'x-csrf-token': csrfToken,
+  'Cookie': `__csrf=${csrfToken}`,
+  'Origin': API_URL,  // Add this line
+},
+```
+
+`API_URL` defaults to `http://localhost:3000`, which is already in `ALLOWED_ORIGINS` for development. This is safe: it mirrors what a browser sends and does not weaken CSRF protection (the double-submit token check still runs after origin validation passes).
+
+---
 
 ## Prioritized Recommendations
 
-| Priority | Action | Owner | Why |
-|----------|--------|-------|-----|
-| P1 | Capture failing-response bodies in QA harness | QA / harness | Cannot diagnose hallucination from regex pass/fail alone |
-| P2 | Add Asturian↔Spanish place-name synonym table to chat retrieval | RAG / chat | Fixes Xixón class of failures, not just one test |
-| P2 | Strengthen system prompt: explicit "decline before suggesting" rule for unknown attractions | Chat | Reduces fabrication risk on named-entity queries |
-| P3 | Broaden quality validation regexes with Spanish vocabulary | QA tests | Regex too English-centric for Spanish-first product |
-| P3 | Manual production verification of Pelayo voice widget + Day Pass purchase | User | 73-day revenue drought, 69-day voice silence — automated layer is GREEN, production layer is unknown |
+### P0 — Fix QA harness Origin header (blocks all LLM quality data)
 
-## Manual Testing Checklist Reminder
+**File**: `src/tests/qa/llm-quality.test.ts:43`
 
-Automated tests cannot verify the following — these require manual user action on production:
+Add `'Origin': API_URL` to the fetch headers in `sendChatMessage()`. The `API_URL` constant is already defined at line 15. This is a one-line fix that unblocks all 12 tests.
 
-1. Pelayo voice widget renders, accepts mic input, and produces audio output on paisaxe.es and paisaxe.com. (69-day silence as of today.)
-2. Day Pass purchase flow end-to-end via Stripe Checkout — card form, return URL, webhook receipt, premium-feature unlock. (73-day revenue drought.)
-3. Email confirmation receipt arrives via Resend after a successful purchase.
-4. CI E2E status — harness reports "unknown" this cycle. Verify `gh run list --branch develop --limit 3` shows green E2E runs in the last 24h.
-5. Live CSP / HSTS / security headers via `curl -sSI https://paisaxe.es | grep -i 'content-security\|strict-transport'` — Security Agent has flagged this for live verification next cycle.
+This has been RED for 2 consecutive cycles. Safety tests have not run since Apr 26 (GREEN run). This fix should be done before the next QA run.
+
+### P1 — Manual production verification (76-day revenue drought)
+
+The automated layer provides no revenue signal when broken. Manual checks on production are overdue:
+- Pelayo voice widget renders and activates on paisaxe.es
+- Day Pass purchase flow completes end-to-end (Stripe checkout → access granted)
+
+### P2 — MCP E2E coverage (0%, 10th consecutive report)
+
+`/api/mcp/*` has zero E2E test coverage. This is the highest-risk uncovered route group. Suggested test:
+
+```typescript
+// e2e/mcp.spec.ts
+test('MCP health responds', async ({ request }) => {
+  const res = await request.get('/api/mcp/health');
+  expect(res.status()).toBeLessThan(500);
+});
+```
+
+### P3 — Admin and cron E2E smoke tests
+
+From the gap analysis: `/api/admin` and `/api/cron` have no E2E references. Suggested minimal smoke tests:
+- `/api/admin/*` — verify 401/403 for unauthenticated access
+- `/api/cron/*` — verify 401 without cron secret
+
+### P4 — 153 untested data-testid attributes
+
+153 `data-testid` values exist in source but are not referenced in any E2E spec. Priority targets:
+- `data-testid="story-title"` — recently regressed (Apr 29) and recovered; confirm resilience with an explicit assertion
+- `data-testid` on voice widget components — relevant to the revenue/voice silence investigation
+- `data-testid` on Day Pass / pricing components
+
+---
+
+## Manual Testing Checklist
+
+The following cannot be verified by automated tests and require manual verification:
+
+- [ ] Pelayo voice widget renders on paisaxe.es (voice silence: 72 days)
+- [ ] Pelayo initiates a conversation when clicked
+- [ ] Day Pass purchase flow opens Stripe Checkout
+- [ ] Day Pass purchase completes and grants access
+- [ ] Admin dashboard loads at /admin for authenticated admin user
+- [ ] Story content displays correctly in immersive view (verify after Apr 29 regression fix)
+- [ ] Chat responds in Spanish to Spanish queries
+
+---
 
 ## E2E Test Gap Analysis
 
-### High Priority — Untested API Routes
+### High Priority — Untested API Route Groups
 
-| Route | Risk | Suggested test |
-|-------|------|----------------|
-| `/api/admin/*` | Admin auth and feature-flag toggling lack E2E coverage | Add `e2e/admin-smoke.spec.ts`: log in as admin (or stub auth), GET `/api/admin/feature-flags`, assert 200 + JSON shape |
-| `/api/cron/*` | Cron handlers run on production schedule without E2E verification | Add `e2e/cron-smoke.spec.ts`: invoke cron endpoint with `Authorization: Bearer ${CRON_SECRET}`, assert 200 |
-| `/api/mcp/*` | MCP tools (search_places, make_booking, get_weather) used by ElevenLabs voice agents — 0% E2E coverage for 10+ consecutive reports | Add `e2e/mcp-tools.spec.ts`: POST to each MCP endpoint with valid signed payload, assert tool response schema |
+| Route Group | Coverage | Recommended Test |
+|-------------|----------|-----------------|
+| `/api/mcp/*` | None (10th consecutive report) | Smoke: GET /api/mcp/health, verify < 500 |
+| `/api/admin/*` | No E2E spec references | Auth gate: unauthenticated → 401/403 |
+| `/api/cron/*` | No E2E spec references | Auth gate: missing secret → 401 |
 
-### Low Priority — Pages and TestIDs Without Coverage
+### Feature Flag Mock Completeness
 
-- `/pricing/checkout/return` — no E2E load/render test. Add a load test that hits the page with a `?session_id=test` query param and verifies the page renders without throwing.
-- 159 `data-testid` attributes in source are not referenced in any E2E spec. Most are admin-panel internals; a follow-up audit could prune unused testids or convert them into E2E hooks.
+Documentation Agent confirmed flag count stable at 17 in `FeatureFlagKey` + 10 agent flags. No new flags since last QA cycle. No mock-data gaps detected.
 
-### Mock Data and Feature Flags
+### Skipped Authenticated Journeys
 
-- Mock feature flags in `e2e/fixtures/mock-data.ts` confirmed to match all 17 `FeatureFlagKey` entries + 10 agent flags (verified by Documentation Agent on 2026-04-27).
-- No new feature flags introduced since last QA run.
+Journeys 9–12 (authenticated user) are intentionally skipped — no auth session in the QA harness. These cover:
+- Journey 9: Favorites page for authenticated user
+- Journey 10: Add favorite via API
+- Journey 11: localStorage favorites persistence
+- Journey 12: Navigate from favorites back to immersive
 
-### Recent Source Changes vs E2E Coverage
+These journeys skipping is expected behavior, not a regression.
 
-- voyageai pin to 0.1.0 (`8f53cd29`, `d0b5576e`, `1344e58d`): chat embedding path. Existing chat journey (Journey 3) covers this. No additional E2E needed.
-- Migrations 076 (`admin_audit_log`) + 077 (`stripe_webhook_events`): infrastructure tables. Not user-facing — no E2E needed, but a smoke check on `/api/stripe/webhook` event-id idempotency should be added to confirm the webhook events table is being written to.
+### Low Priority — Untested Pages and Components
 
-## Cross-Agent Notes
+- `/pricing/checkout/return` — no E2E load/render test
+- 153 `data-testid` attributes in source not referenced in any E2E spec
 
-- Cost Analyst (Apr 27): "Automated layer GREEN... production-flow problem requiring manual user verification of Pelayo widget rendering and Day Pass purchase flow." This QA run nuances that — automated layer is now 10/12 (one-day RAG regression), but the conclusion stands: revenue drought is not caused by automated test failures.
-- Security Agent (Apr 26): 8 moderate advisories, 0 exploitable. No QA action required, but worth noting that postcss XSS chain is bundled inside Next.js and cannot be fixed via npm overrides — Next.js upstream bump required.
-- Performance Agent (Apr 26): Initial load 2,067 KB / 2,000 KB budget. P4 (Supabase realtime tree-shake) recommended. Not a QA concern but the initial-load YELLOW could affect LCP-dependent quality metrics if it grows further.
-- Coverage Agent (Apr 23): 5992 tests passing, 98.60% statements. voice-agent-chat (46.3%) and agents-dashboard (49.3%) still need Playwright E2E — same gap flagged here.
+For the `data-testid` gap, the highest-value additions would be:
+- Voice widget interactive states (`data-testid` in voice-agent-chat components)
+- Day Pass / checkout flow components
+- `story-title` render path (confirm resilience after Apr 29 regression)
+
+---
+
+## Cross-Agent Context
+
+The following patterns from other agents are relevant to this cycle:
+
+- **Performance Agent (Apr 29)**: +55 KB from wave-2 merges, total headroom at 14 KB. FE-M1 voice-chat sub-component extraction created new shared chunk. Prod build needed before wave-3. P4 (Supabase realtime tree-shake) not yet implemented.
+- **Security Agent (Apr 29)**: Flagged Chat API 403 as blocking safety test confirmation. Recommended `git diff HEAD~5 -- src/app/api/chat/route.ts` to identify auth changes. SE-M2 origin enforcement is working as designed — the harness needs to comply, not bypass.
+- **Cost Analyst (Apr 30)**: April closes at $0 revenue, $85.56 spend. Cumulative operational loss ~$371. QA fix on May 1 is the first post-fix verification opportunity.
+- **Coverage Agent (Apr 20)**: voice-agent-chat (46.3%) and agents-dashboard/index (49.3%) still require Playwright E2E. These are unchanged.
+
+---

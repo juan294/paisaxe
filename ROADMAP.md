@@ -3,7 +3,7 @@
 A living document tracking implemented features and future development plans.
 
 **Domain**: paisaxe.es
-**Last Updated**: April 24, 2026
+**Last Updated**: April 29, 2026
 
 ---
 
@@ -94,7 +94,7 @@ A personal passion project showcasing Asturias, Spain through immersive visual s
 | Supabase PostgreSQL | :white_check_mark: | With pgvector extension |
 | shadcn/ui Components | :white_check_mark: | Button, Card, Dialog, Input |
 | Tailwind CSS Styling | :white_check_mark: | Custom Paisaxe theme |
-| Vitest Testing | :white_check_mark: | ~6,000 tests passing (324 files) |
+| Vitest Testing | :white_check_mark: | 6,347 tests passing (341 files) |
 | GitHub Actions CI | :white_check_mark: | Lint, typecheck, test, build |
 | Git Hooks (Husky) | :white_check_mark: | Pre-commit quality checks |
 | Coverage Automation | :white_check_mark: | Nightly scheduled updates via `scripts/coverage-agent.sh` |
@@ -321,7 +321,7 @@ Automated agents and scheduled workflows to guarantee code quality, security, an
 - [x] Database migration: Stories table exists in Supabase
 - [x] Story seeding: 20 stories seeded via `npm run seed-db:stories`
 - [x] Image replacement: 7 stories use PDF images, 13 use Unsplash fallback
-- [x] Tests: `npm run test` - ~6,000 tests pass (324 files)
+- [x] Tests: `npm run test` - 6,347 tests pass (341 files)
 - [x] Build: `npm run build` - no errors
 - [x] Auth: Google SSO working with Supabase SSR
 - [x] Favorites: Cloud sync + local storage fallback
@@ -465,3 +465,4 @@ Engineering audit (Phases 1–10, April 2026). Key remediations:
 | v1.2.0 | Feb 2026 | Asturian language support + UI improvements |
 | v1.3.0 | Apr 2026 | Security hardening (audit remediation phases 1-10) + content pipeline |
 | v1.4.0 | Apr 2026 | Pre-launch remediation: booking persistence, E2E reliability, admin hardening, DevOps automation |
+| v1.5.0 | Apr 2026 | Wave 1+2 audit remediation: health split, Redis cache, HNSW index, RLS-aware admin auth, Pino logger, CRON telemetry, develop-smoke CI |

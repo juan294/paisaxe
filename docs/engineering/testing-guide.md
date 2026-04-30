@@ -127,7 +127,7 @@ The helper provides 115+ Spanish translation strings covering all UI areas: comm
 
 ### Unit Test File Inventory
 
-**332 files, 6,059 tests** organized by area (representative sample — the inventory below covers the original core files; the full test suite has grown significantly as new features were added):
+**341 files, 6,347 tests** organized by area (representative sample — the inventory below covers the original core files; the full test suite has grown significantly as new features were added):
 
 #### Pages & Layouts (15 files)
 
@@ -217,7 +217,8 @@ The helper provides 115+ Spanish translation strings covering all UI areas: comm
 | `csrf.test.ts` | — | CSRF token generation, double-submit cookie validation |
 | `request-context.test.ts` | — | Request correlation ID propagation |
 | `rate-limit.test.ts` | — | Sliding window rate limiting (Upstash Redis + fallback) |
-| `admin-auth.test.ts` | — | `withAdmin` HOF, session cookie validation, timing-safe comparison |
+| `admin-auth.test.ts` | — | `withAdmin` and `withAdminRead` HOFs, session cookie validation, timing-safe comparison, LRU role cache TTL |
+| `use-sse-stream.test.ts` | — | `readSseStream` buffer parsing, `onEvent` / `onDone` / `onError` callbacks, partial-chunk handling |
 | `logger.test.ts` | — | Structured log output, PII sanitization |
 | `env.test.ts` | — | Centralized env validation, `.trim()` enforcement |
 | `admin-api/*.test.ts` | — | Modular admin API (stories, costs, agents, optimizer, etc.) |
@@ -278,6 +279,28 @@ vi.mock("@/lib/supabase", () => ({
     eq: vi.fn().mockResolvedValue({ data: [], error: null }),
   },
 }));
+```
+
+**Admin route testing (`withAdmin` / `withAdminRead`):** Admin routes are wrapped by HOFs that handle auth. Tests mock both HOFs simultaneously so GET and POST tests work without per-test setup changes:
+
+```typescript
+const mockWithAdmin = vi.fn();
+const mockWithAdminRead = vi.fn();
+
+vi.mock("@/lib/admin-auth", () => ({
+  withAdmin: (...args: Parameters<typeof mockWithAdmin>) => mockWithAdmin(...args),
+  withAdminRead: (...args: Parameters<typeof mockWithAdminRead>) => mockWithAdminRead(...args),
+}));
+
+// Authorize both HOFs to call through with a mock supabase client
+beforeEach(() => {
+  mockWithAdmin.mockImplementation(async (handler) => handler(mockSupabase));
+  mockWithAdminRead.mockImplementation(async (handler) => handler(mockSupabase));
+});
+
+// To simulate unauthorized:
+mockWithAdmin.mockResolvedValue(new NextResponse(null, { status: 401 }));
+mockWithAdminRead.mockResolvedValue(new NextResponse(null, { status: 401 }));
 ```
 
 **API route testing:** Routes are tested by importing the handler function directly and passing a `NextRequest`:
@@ -499,13 +522,15 @@ const logoutButton = page.locator("button").filter({
 Runs on every push and PR to `develop` and `main`:
 
 ```
-┌──────────────────┐   ┌──────────┐   ┌──────────┐
-│ Lint & Typecheck  │   │   Test   │   │  Build   │
-│ tsc --noEmit      │   │ vitest   │   │ next     │
-│ eslint src/       │   │ run      │   │ build    │
-└──────────────────┘   └──────────┘   └──────────┘
-         All three must pass to merge
+┌──────────────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌───────────────┐
+│ Lint & Typecheck  │   │   Test   │   │  Build   │   │   E2E    │   │ develop-smoke │
+│ tsc --noEmit      │   │ vitest   │   │ next     │   │Playwright│   │ (develop only,│
+│ eslint src/       │   │ run      │   │ build    │   │  suite   │   │ continue-on-  │
+└──────────────────┘   └──────────┘   └──────────┘   └──────────┘   │  error: true) │
+         All five must pass to merge to main              └───────────────┘
 ```
+
+The `develop-smoke` job runs only on direct pushes to `develop` (not on PRs) and probes `/api/health/live` + `/api/health` on the Vercel preview. It uses `continue-on-error: true` so it never blocks the push, but a failure signals a runtime regression not caught by unit or E2E tests.
 
 ### E2E CI (`e2e.yml`)
 
@@ -544,7 +569,7 @@ Every `git commit` runs these checks sequentially:
 ```
 1. npm run typecheck    → TypeScript compilation
 2. npm run lint         → ESLint
-3. npm run test         → Full Vitest suite (~6,059 tests)
+3. npm run test         → Full Vitest suite (~6,347 tests)
 ```
 
 If any step fails, the commit is rejected. This ensures no broken code reaches the repository.
