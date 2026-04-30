@@ -86,7 +86,7 @@
     "sharp": "^0.34.5",
     "stripe": "^22.1.0",
     "tailwind-merge": "^3.5.0",
-    "voyageai": "0.1.0",
+    "voyageai": "0.2.1",
     "zod": "^4.4.1"
   },
   "devDependencies": {
@@ -111,7 +111,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
-    "knip": "^6.5.0",
+    "knip": "^6.9.0",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.7.284",
     "postcss": "^8.5.10",
