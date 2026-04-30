@@ -56,7 +56,7 @@ makes the codebase production-ready.
 - CSRF double-submit and allowlist validation strengthened
 - Honeypot on public suggestion endpoint
 - ESLint `console.*` ignore-list fully removed — all 25 previously-exempted API routes now enforced
-- Stripe `apiVersion` pinned to `2026-03-25.dahlia` — future SDK bumps won't silently change API behavior
+- Stripe `apiVersion` pinned to `2026-04-22.dahlia` — future SDK bumps won't silently change API behavior
 - Bearer-over-session-cookie precedence covered by test
 
 ### Performance
