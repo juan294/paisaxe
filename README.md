@@ -43,6 +43,8 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 | Testing | Vitest + React Testing Library + Playwright |
 | Deployment | Vercel |
 | Monitoring | Upptime + Vercel Speed Insights |
+| Logging | Pino (structured JSON) + Sentry (error tracking) |
+| Cache | Upstash Redis (embedding cache, rate limiting) |
 
 ## Getting Started
 
@@ -102,7 +104,7 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 5. Set up the database:
    - Create a Supabase project
    - Enable the pgvector extension
-   - Run the migrations in `supabase/migrations/` (17 migration files)
+   - Run the migrations in `supabase/migrations/` (83 migration files)
 
 6. Seed the database with tourism content:
    ```bash
@@ -195,7 +197,7 @@ paisaxe/
 ├── scripts/                    # Data processing & automation
 ├── supabase/
 │   ├── functions/              # Edge Functions (Deno)
-│   └── migrations/             # Database schema (17 migrations)
+│   └── migrations/             # Database schema (83 migrations)
 ├── docs/                       # Project documentation
 └── .github/
     └── workflows/              # CI/CD (9 workflows)

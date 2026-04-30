@@ -1,63 +1,91 @@
 # Documentation Update Report
-> Generated on 2026-04-25 | Branch: develop | Changes since v1.3.0 (Wave 2 remediation)
+> Generated on 2026-04-29 | Branch: `develop` | Changes since `v1.4.0`
 
 ## Summary
 
-- **4 documents updated**
-- **0 diagrams refreshed** (architecture diagram updated separately in commit `904ed260`)
-- **7 version/count references corrected**
-- **0 inline doc blocks updated**
-- **0 items flagged [NEEDS REVIEW]**
-
----
+- **12 documents updated**
+- **1 diagram updated** (ASCII CI flow in testing-guide.md)
+- **9 version references corrected** (test counts, migration count, dates, Last Updated)
+- **0 inline doc blocks updated** (project has no JSDoc/docstrings in scope)
+- **1 item flagged [NEEDS REVIEW]** — `docs/paisaxe-architecture.drawio`
 
 ## Changes by File
 
+### `CHANGELOG.md`
+- Added `[1.5.0] - 2026-04-29` section covering all 99 post-v1.4.0 commits (Wave 1 + Wave 2 remediation): Added, Fixed, Security, Performance, Changed, Removed, Testing subsections
+- Fixed 4 date placeholders: `[1.3.0] 2026-04-20`, `[1.2.0] 2026-02-03`, `[1.1.0] 2026-01-31`, `[1.0.0] 2026-01-31`
+
+### `ROADMAP.md`
+- Updated `Last Updated` from April 24 → April 29, 2026
+- Updated test count `~6,000 (324 files)` → `6,347 (341 files)` in two places
+- Added `v1.5.0` row to release history table
+
 ### `README.md`
+- Fixed migration count `17 migrations` → `83 migrations` in two places (setup instructions + directory tree)
+- Added `Pino (structured JSON) + Sentry` and `Upstash Redis` rows to tech stack table
 
-**Reason**: Two references to `voyage-3` remained from before the `voyage-3.5` upgrade. Both were stale against `src/lib/embeddings.ts` and CLAUDE.md.
+### `CLAUDE.md`
+- Added `Pino (structured JSON) + Sentry` and `Upstash Redis` rows to tech stack table
 
-**Changes:**
-- Line 39 — Tech stack table Embeddings row: `voyage-3, 512 dims` → `voyage-3.5, 512 dims`
-- Line 227 — Chat Pipeline architecture step 2: `` `voyage-3` `` → `` `voyage-3.5` ``
+### `docs/operations/operations.md`
+- Replaced single "Health Check Endpoint" section with two-endpoint description (`/api/health/live` + `/api/health`)
+- Updated test count `~6,000` → `~6,347`
+- Updated pre-launch checklist "Health Endpoint" step to probe both endpoints
 
----
+### `docs/operations/logging.md`
+- Added 8 new event codes to the Key Conventions table:
+  - `[RATE_LIMIT_DEGRADED]` — Redis fallback warning
+  - `[CRON_SUCCESS]` — cron job completion with `job` + `duration_ms`
+  - `[CRON_FAILURE]` — cron job error with `job` + `error`
+  - `[CRON_AUTH_REJECTED]` — cron secret verification failure with `reason`
+  - `[HONEYPOT_TRIGGERED]` — bot-triggered suggestion field
+  - `[ADMIN_AUDIT]` — admin write action audit log
+  - `[ADMIN_PROFILE_LOOKUP_FAILED]` — non-PGRST116 admin role lookup error
 
-### `docs/marketing/cost-forecast.md`
+### `docs/operations/alerting-runbook.md`
+- Added "Cron Auth Rejected" section with steps for `[CRON_AUTH_REJECTED]` events
+- Added "Honeypot Triggered" section for `[HONEYPOT_TRIGGERED]` events
 
-**Reason**: Voyage AI pricing section still listed `voyage-3` as the embedding model name. Pricing rate is unchanged ($0.12/M tokens) — only the model name needed correction.
-
-**Changes:**
-- Line 50 — Voyage AI pricing: `Embeddings (voyage-3)` → `Embeddings (voyage-3.5)`
-
----
+### `docs/operations/database-backup.md`
+- Added HNSW index note to post-restore checklist: migration 086 dropped IVFFlat for HNSW and must be re-run if restoring to a pre-086 point
 
 ### `docs/engineering/testing-guide.md`
+- Updated test counts: `332 files / 6,059 tests` → `341 files / 6,347 tests` in two places
+- Updated CI flow ASCII diagram: added `E2E` and `develop-smoke` boxes; updated "All three must pass" → "All five must pass"
+- Added `withAdminRead` HOF mock pattern code example
+- Added `admin-auth.test.ts` and `use-sse-stream.test.ts` to test file inventory
 
-**Reason**: Wave 2 remediation added 8 new test files (providers, admin routes with Zod schemas, rate-limit fallback, use-stories, use-favorites, check-migrations, schemas). Coverage report now shows 6,059 tests across 332 files. Three locations in the guide still showed the pre-Wave-2 count of 324 files / ~6,000 tests.
+### `docs/project/features.md`
+- Updated Infrastructure health check entry to document both `/api/health/live` and `/api/health`
+- Added `withAdminRead` / `withAdmin` + LRU role cache description to Admin Access section
 
-**Changes:**
-- Line 14 — Overview table Unit & Component row: `324 | ~6,000` → `332 | 6,059`
-- Line 130 — Unit test inventory header: `**324 files, ~6,000 tests**` → `**332 files, 6,059 tests**`
-- Line 547 — Pre-commit hook section: `~6,000 tests` → `~6,059 tests`
+### `docs/project/markdown-render-sinks.md`
+- Updated react-markdown sink path: `voice-chat.tsx` → `voice-chat/chat-message-list.tsx` (FE-M1 monolith split)
 
----
+### `docs/decisions/0015-service-layer.md`
+- Updated consequences note: `src/services/.gitkeep` was removed during AR-M2; ADR remains Proposed
 
 ## Flagged for Review
 
-None. The architecture diagram flag from the 2026-04-24 report was resolved: the `/drawio` skill updated `docs/paisaxe-architecture.drawio.png` in commit `904ed260` with all 5 required changes (proxy layer, Pelayo split, /api/agent-run, webhook rename, CSRF+request-ID).
+### `docs/paisaxe-architecture.drawio` — [NEEDS REVIEW]
 
----
+The DrawIO XML diagram has 7 stale elements that cannot be confidently auto-updated from text edits:
 
-## Verification
+1. `/api/health` node — needs split into `/api/health` (diagnostics) and `/api/health/live` (liveness)
+2. `lib-embed` → `ext-upstash` edge — embedding cache now Upstash Redis (not in-process LRU)
+3. Parallel `feature-flags ‖ embedding` annotation on `api-chat` path
+4. Admin path — add `withAdminRead` distinction (GET vs mutation)
+5. Observability layer — Pino + Sentry + `x-request-id` correlation
+6. ElevenLabs lane — Agents-as-Code workflow (`agent_configs/` in git)
+7. Proxy lane — add `Canonical Domain Redirect` and `Story URL Rewrite` nodes
 
-- ESLint (`npm run lint`): **PASS** — no errors in `src/`
-- Markdownlint on changed files: no new violations introduced; pre-existing MD013/MD060/MD032 violations are present throughout the docs tree but are out of scope for a refresh-only pass
-- All 7 targeted edits applied and confirmed
+**Action:** Open `docs/paisaxe-architecture.drawio` in draw.io, apply changes, re-export PNG.
 
----
+## What Was Not Updated
 
-## Next Steps
-
-- Run `/pre-launch` before the next release to catch issues `/update-docs` does not cover (security, performance, accessibility, E2E).
-- Run `/release` when ready to cut the next version.
+- `AGENTS.md` — Codex compatibility guide, no tech stack table
+- `docs/operations/branch-protection.md` — Already correct; develop-smoke is not a required check for main merges
+- Historical snapshots: `docs/research/`, `docs/plans/`, `docs/operations/pre-launch-audit.md` (immutable)
+- `docs/agents/*-report.md` — Gitignored operational history (Rule #70)
+- `content/prompts/` — No prompt changes since v1.4.0
+- ADR-0016 (claude.ts modularization) — Still correctly Proposed

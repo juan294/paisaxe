@@ -2,9 +2,13 @@
 
 Detailed documentation for database maintenance, monitoring, webhooks, and automated agents.
 
-## Health Check Endpoint
+## Health Check Endpoints
 
-`GET /api/health` — returns a minimal public payload: `{ "status": "healthy" | "degraded", "timestamp": "..." }`. Returns HTTP 200 only when the app is healthy. Returns HTTP 503 when Supabase connectivity fails, approved stories are unavailable, or database usage reaches the 80% warning threshold. Used by preview smoke and Upptime as the machine health gate. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
+Two endpoints serve different consumers:
+
+**`GET /api/health/live`** — liveness probe. Always returns HTTP 200 with `{ "status": "ok" }`. No Supabase or external checks. Used by Upptime and the develop-smoke CI job. Safe to call in tight loops.
+
+**`GET /api/health`** — diagnostics endpoint. Returns `{ "status": "healthy" | "degraded", "timestamp": "...", "cron_auth": "..." }`. Returns HTTP 200 when healthy, HTTP 503 when Supabase connectivity fails, approved stories are unavailable, or database usage reaches the 80% warning threshold. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
 
 ## Pre-Launch Checklist
 
@@ -22,21 +26,25 @@ npm run build          # Production build succeeds
 ```
 
 **Expected results:**
-- Tests: All passing (currently ~6,000 tests)
+- Tests: All passing (currently ~6,347 tests)
 - TypeScript: Exit code 0, no output
 - Lint: Exit code 0, no output
 - Build: "Generating static pages" completes successfully
 
-### 2. Health Endpoint
+### 2. Health Endpoints
 
 ```bash
+# Liveness probe — should always return 200
+curl -sS https://paisaxe.es/api/health/live -w " %{http_code}\n"
+
+# Diagnostics — returns 200 (healthy) or 503 (degraded)
 curl -sS https://paisaxe.es/api/health -o /tmp/paisaxe-health.json -w "%{http_code}\n"
 cat /tmp/paisaxe-health.json | jq
 ```
 
 **Verify:**
-- HTTP status: `200`
-- `status`: `"healthy"`
+- `/api/health/live`: HTTP `200`
+- `/api/health`: HTTP `200` and `status`: `"healthy"`
 
 ### 3. Core Endpoints
 

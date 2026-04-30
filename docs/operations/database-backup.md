@@ -128,6 +128,8 @@ After any restore (PITR or daily snapshot), complete this checklist before consi
 
 - [ ] **Pending migrations re-applied** — if the restore point predates any migrations that were previously applied, re-run them via `supabase db push`. Review `supabase/migrations/` to identify what needs to be re-applied relative to the restore timestamp.
 
+  > **HNSW index note (migration 086):** Migration `086_switch_to_hnsw_index.sql` drops the IVFFlat index and creates an HNSW index on `chunks.embedding`. If restoring to a point before this migration, vector search will use the older IVFFlat index (still functional but slower). Re-run migration 086 after the restore to restore HNSW performance.
+
 - [ ] **Chat functionality verified** — send a test message to confirm vector search and Claude API are working end-to-end.
 
 - [ ] **Admin panel accessible** — log in to https://paisaxe.es/admin and confirm feature flag management works.

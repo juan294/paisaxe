@@ -69,9 +69,16 @@ alert on.
 | `[RERANK_FAILURE]` | error | Voyage reranking step failed; results returned unranked |
 | `[CSRF_VALIDATION_FAILURE]` | warn | CSRF double-submit cookie mismatch on a state-mutating request |
 | `[RATE_LIMIT_EXCEEDED]` | warn | Per-IP rate limit hit; includes `ip` and `route` in meta |
+| `[RATE_LIMIT_DEGRADED]` | warn | Rate limiter fell back to in-memory (Redis unavailable) |
 | `[STRIPE_WEBHOOK_INVALID_SIG]` | error | Stripe webhook signature verification failed |
 | `[TRANSLATION_STALE]` | warn | Story stuck in `translating` state past timeout; marked failed |
 | `[ELEVENLABS_WEBHOOK_FAILURE]` | error | Post-call ElevenLabs webhook could not parse transcript |
+| `[CRON_SUCCESS]` | info | Cron job completed; includes `job` (name) and `duration_ms` |
+| `[CRON_FAILURE]` | error | Cron job threw; includes `job` (name) and `error` (message) |
+| `[CRON_AUTH_REJECTED]` | warn | Vercel cron secret verification failed; includes `reason` (`missing_secret` \| `header_missing` \| `mismatch`) |
+| `[HONEYPOT_TRIGGERED]` | warn | Suggestion POST honeypot field was non-empty; request silently discarded |
+| `[ADMIN_AUDIT]` | info | Admin write action; includes `route`, `action`, and `user_id` |
+| `[ADMIN_PROFILE_LOOKUP_FAILED]` | error | Non-PGRST116 error during admin role lookup; indicates DB connectivity issue |
 
 Add new keys here when introducing new diagnostic log points.
 

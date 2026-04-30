@@ -86,6 +86,39 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
 
 ---
 
+## Cron Auth Rejected
+
+**Trigger:** `[CRON_AUTH_REJECTED]` log events — cron route handler rejected the incoming request before executing the job.
+
+**Fields:** `reason` — one of `missing_secret` (no `CRON_SECRET` env var configured), `header_missing` (request had no `Authorization` header), or `mismatch` (header value didn't match secret).
+
+**Steps:**
+
+1. Check the `cron_auth` field in `/api/health` — it surfaces the current cron secret validation state.
+2. For `missing_secret`: verify `CRON_SECRET` is set in Vercel environment variables → Settings → Environment Variables.
+3. For `header_missing` or `mismatch`: verify the Vercel cron configuration (`vercel.json`) is sending the correct Authorization header, or that the secret wasn't rotated without updating all call sites.
+4. Once the secret is correctly configured, trigger the affected cron manually to confirm:
+   ```bash
+   curl -X POST https://paisaxe.es/api/cron/<route> \
+     -H "Authorization: Bearer $CRON_SECRET"
+   ```
+
+---
+
+## Honeypot Triggered
+
+**Trigger:** `[HONEYPOT_TRIGGERED]` log events on `POST /api/suggestions` — a bot submitted the hidden `website` field.
+
+This is informational only — the request was silently discarded with a fake 200 response. No action required unless the volume is high enough to indicate an active campaign.
+
+**Steps:**
+
+1. If volume is high, check `ip` and `user_agent` in the log meta.
+2. Consider adding Cloudflare rate limiting at the CDN level for the `/api/suggestions` route.
+3. If the honeypot field is being triggered by a legitimate browser extension that autofills hidden fields, investigate whether to adjust the field name.
+
+---
+
 ## Error Rate Spike
 
 **Trigger:** PostHog alert — error event rate exceeds baseline by 2× or more.

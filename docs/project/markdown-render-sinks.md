@@ -11,12 +11,13 @@ Registry of every `react-markdown` usage in the Paisaxe codebase.
 
 ## Registered Sinks
 
-### `src/components/immersive/voice-chat.tsx`
+### `src/components/immersive/voice-chat/chat-message-list.tsx`
 
 - Purpose: render assistant chat responses in the immersive chat panel.
 - Defense shape: explicit `components` overrides for `p`, `strong`, `ul`, `ol`, `li`, and `a`.
 - Raw HTML: not enabled.
 - Dangerous HTML prop: not used.
+- Note: Previously in `src/components/immersive/voice-chat.tsx`; extracted during FE-M1 monolith split.
 
 ### `src/components/admin/agents-dashboard/safe-markdown.tsx`
 

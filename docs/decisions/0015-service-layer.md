@@ -69,7 +69,7 @@ Services are plain async functions/classes with no Next.js imports. They can be 
 - **Positive:** Business logic becomes independently testable; duplication decreases; route files stay under 100 LOC.
 - **Positive:** A service can swap its backing store (e.g., agent-reports moving from filesystem to Supabase Storage) without touching route files.
 - **Negative:** Migration cost — existing routes must be refactored incrementally.
-- **Neutral:** `src/services/.gitkeep` is added now as a placeholder; no functional code changes yet.
+- **Neutral:** `src/services/.gitkeep` was added as a placeholder but subsequently removed during AR-M2 dead-code cleanup. No service layer code has been written yet; this ADR remains Proposed.
 
 ---
 
