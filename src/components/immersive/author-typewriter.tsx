@@ -3,43 +3,48 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
+const HOME_TEXT = "JG";
+
+const MESSAGES = [
+  HOME_TEXT,
+  "hecho con ♥ en Asturias",
+  "a base de sidra",
+  "¡buen Camino!",
+  "seguramente 🏔️ rn",
+  "seguramente 🚴 rn",
+  "escalando alguna pared",
+  "404: sueño no encontrado",
+];
+
+const CHAR_DELAY = 80;
+const EMPTY_PAUSE = 300;
+const HOME_HOLD = 30_000;
+const MSG_HOLD = 4_000;
+
 interface AuthorTypewriterProps {
-  prefersReducedMotion: boolean;
-  t: (key: string) => string;
   visible?: boolean;
 }
 
-export function AuthorTypewriter({ prefersReducedMotion, t, visible = true }: AuthorTypewriterProps) {
+export function AuthorTypewriter({ visible = true }: AuthorTypewriterProps) {
   const textRef = useRef<HTMLSpanElement>(null);
+  const prefersReducedMotion = useRef(false);
 
   useEffect(() => {
-    if (prefersReducedMotion) return;
+    prefersReducedMotion.current = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+  }, []);
+
+  useEffect(() => {
+    if (prefersReducedMotion.current) return;
     if (!textRef.current) return;
 
-    const messages = [
-      "JG",
-      t("author_pill.made_with_love"),
-      t("author_pill.fueled_by_sidra"),
-      t("author_pill.buen_camino"),
-      t("author_pill.probably_hiking"),
-      t("author_pill.out_cycling"),
-      t("author_pill.scaling_rocks"),
-      t("author_pill.sleep_not_found"),
-    ];
-    const HOME = messages[0];
-    const CHAR_DELAY = 80;
-    const EMPTY_PAUSE = 300;
-    const HOME_HOLD = 30_000;
-    const MSG_HOLD = 4000;
-
-    let messageIndex = 0;
     let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let messageIndex = 0;
 
     const setText = (text: string) => {
-      if (textRef.current) {
-        textRef.current.textContent = text;
-      }
+      if (textRef.current) textRef.current.textContent = text;
     };
 
     const wait = (ms: number) =>
@@ -66,16 +71,16 @@ export function AuthorTypewriter({ prefersReducedMotion, t, visible = true }: Au
     };
 
     const cycle = async () => {
-      setText(HOME);
+      setText(HOME_TEXT);
       await wait(HOME_HOLD);
 
       while (!cancelled) {
-        messageIndex = (messageIndex + 1) % messages.length;
+        messageIndex = (messageIndex + 1) % MESSAGES.length;
         if (messageIndex === 0) messageIndex = 1;
 
-        const nextMsg = messages[messageIndex];
+        const nextMsg = MESSAGES[messageIndex];
 
-        await eraseText(HOME);
+        await eraseText(HOME_TEXT);
         if (cancelled) return;
         await wait(EMPTY_PAUSE);
         if (cancelled) return;
@@ -87,7 +92,7 @@ export function AuthorTypewriter({ prefersReducedMotion, t, visible = true }: Au
         if (cancelled) return;
         await wait(EMPTY_PAUSE);
         if (cancelled) return;
-        await typeText(HOME);
+        await typeText(HOME_TEXT);
         if (cancelled) return;
         await wait(HOME_HOLD);
       }
@@ -99,7 +104,7 @@ export function AuthorTypewriter({ prefersReducedMotion, t, visible = true }: Au
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [prefersReducedMotion, t]);
+  }, []);
 
   return (
     <div
@@ -174,12 +179,9 @@ export function AuthorTypewriter({ prefersReducedMotion, t, visible = true }: Au
         aria-label="Made by Juan González"
       >
         <span className="text-[10px] font-mono text-white/45 group-hover:text-white/60 transition-colors duration-300 select-none whitespace-nowrap">
-          <span ref={textRef}>{`JG`}</span>
+          <span ref={textRef}>{HOME_TEXT}</span>
           <span
-            className={cn(
-              "text-white/30 ml-px",
-              !prefersReducedMotion && "animate-cursor-blink"
-            )}
+            className="text-white/30 ml-px animate-cursor-blink motion-reduce:hidden"
             aria-hidden="true"
           >
             &#9612;

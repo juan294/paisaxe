@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-05-01
+
+Single-bug-fix patch release. Restores the author-pill typewriter animation
+on the immersive page.
+
+### Fixed
+
+- Author-pill typewriter cycle no longer resets on every parent re-render. The
+  `useEffect` previously listed `t` (the i18n function) as a dependency, but
+  `t` was a fresh function reference on every parent render — so the 30-second
+  HOME_HOLD timer was being cancelled and restarted before it ever finished.
+  The pill effectively stuck on "JG" forever and the rotating Spanish messages
+  never appeared. Component now uses an empty deps array, hardcoded Spanish
+  messages, and reads `prefers-reduced-motion` directly via `window.matchMedia`
+  into a `useRef` (matches the chapa project's pattern).
+
 ## [1.5.0] - 2026-05-01
 
 Pre-launch audit remediation (Wave 1 + Wave 2). Security hardening, performance improvements,
