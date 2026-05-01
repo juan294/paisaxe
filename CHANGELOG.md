@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.5.0] - 2026-04-29
+## [1.5.0] - 2026-05-01
 
 Pre-launch audit remediation (Wave 1 + Wave 2). Security hardening, performance improvements,
 observability, and refactoring across all layers. No new user-facing features — this release

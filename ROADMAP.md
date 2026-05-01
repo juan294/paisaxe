@@ -3,7 +3,7 @@
 A living document tracking implemented features and future development plans.
 
 **Domain**: paisaxe.es
-**Last Updated**: April 29, 2026
+**Last Updated**: May 1, 2026
 
 ---
 
