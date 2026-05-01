@@ -66,14 +66,14 @@ export async function updateStory(
   }
 }
 
-export interface StoriesPage {
+interface StoriesPage {
   stories: AdminStory[];
   total: number;
   page: number;
   pageSize: number;
 }
 
-export interface FetchStoriesOptions {
+interface FetchStoriesOptions {
   filter?: CurationStatus;
   page?: number;
   pageSize?: number;
