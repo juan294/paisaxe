@@ -39,10 +39,11 @@ export function requireEnv(key: string): string {
 // crash. Use requireEnv() inside functions that truly need the value at
 // call-time, or reference these helpers directly.
 //
-// IMPORTANT (#556): NEXT_PUBLIC_* getters MUST use static `process.env.NAME`
-// access, not the dynamic `getEnv("NAME")` helper. Next.js / Turbopack only
-// inlines NEXT_PUBLIC vars into the client bundle when accessed by literal
-// name — `process.env[key]` is left as a runtime lookup against the empty
+// IMPORTANT (#556): NEXT_PUBLIC_* getters MUST use literal property access
+// (`process.env` followed by the variable name), not the dynamic
+// `getEnv("...")` helper. Next.js / Turbopack only inlines NEXT_PUBLIC vars
+// into the client bundle when accessed by literal name — `process.env[key]`
+// is left as a runtime lookup against the empty
 // browser polyfill, returning undefined and silently breaking client features
 // (e.g. the Supabase browser client falls back to null and sign-in becomes
 // a dead button). Server-only vars can use either form because Node has a
