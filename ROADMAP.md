@@ -465,4 +465,5 @@ Engineering audit (Phases 1–10, April 2026). Key remediations:
 | v1.2.0 | Feb 2026 | Asturian language support + UI improvements |
 | v1.3.0 | Apr 2026 | Security hardening (audit remediation phases 1-10) + content pipeline |
 | v1.4.0 | Apr 2026 | Pre-launch remediation: booking persistence, E2E reliability, admin hardening, DevOps automation |
-| v1.5.0 | Apr 2026 | Wave 1+2 audit remediation: health split, Redis cache, HNSW index, RLS-aware admin auth, Pino logger, CRON telemetry, develop-smoke CI |
+| v1.5.0 | May 2026 | Wave 1+2 audit remediation: health split, Redis cache, HNSW index, RLS-aware admin auth, Pino logger, CRON telemetry, develop-smoke CI |
+| v1.5.1 | May 2026 | Patch: restore author-pill typewriter animation (effect-deps regression) |
