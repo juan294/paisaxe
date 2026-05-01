@@ -119,4 +119,33 @@ describe("env module", () => {
       expect(getPostHogKey()).toBe("phc_testkey");
     });
   });
+
+  // #556: NEXT_PUBLIC getters must use STATIC process.env.NAME access so
+  // Next.js / Turbopack inlines them into the client bundle. Dynamic
+  // process.env[key] access works server-side but resolves to undefined in
+  // the browser polyfill, which silently breaks the Supabase client and
+  // makes auth-dependent UI (e.g. the bookmark sign-in flow) a dead button.
+  describe("static NEXT_PUBLIC access (regression for #556)", () => {
+    it("source uses literal process.env.NEXT_PUBLIC_* access, not dynamic getEnv", async () => {
+      const { readFile } = await import("node:fs/promises");
+      const path = await import("node:path");
+      const source = await readFile(
+        path.join(process.cwd(), "src/lib/env.ts"),
+        "utf8",
+      );
+      const publicVars = [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SITE_URL",
+        "NEXT_PUBLIC_POSTHOG_KEY",
+        "NEXT_PUBLIC_POSTHOG_HOST",
+      ];
+      for (const name of publicVars) {
+        expect(
+          source,
+          `${name} must be accessed as process.env.${name} for client-side inlining`,
+        ).toContain(`process.env.${name}`);
+      }
+    });
+  });
 });
