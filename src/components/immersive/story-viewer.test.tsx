@@ -893,20 +893,15 @@ describe("StoryViewer", () => {
       expect(cursorSpan).toBeInTheDocument();
     });
 
-    it("should not animate cursor when prefers-reduced-motion is enabled", async () => {
-      // Override useReducedMotion mock
-      const reducedMotionModule = await import("@/hooks/use-reduced-motion");
-      vi.spyOn(reducedMotionModule, "useReducedMotion").mockReturnValue(true);
-
+    it("should hide cursor blink under prefers-reduced-motion (CSS motion-reduce:hidden)", async () => {
+      // The cursor span carries the motion-reduce:hidden Tailwind class so the
+      // browser hides it via media query. We assert the class is present on the
+      // rendered cursor element; CSS handles the visibility at runtime.
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
-
       const pillContainer = screen.getByLabelText("Made by Juan González");
-      // When reduced motion is preferred, cursor should NOT have animation class
       const cursorSpan = pillContainer.querySelector(".animate-cursor-blink");
-      expect(cursorSpan).toBeNull();
-
-      // Restore
-      vi.restoreAllMocks();
+      expect(cursorSpan).toBeInTheDocument();
+      expect(cursorSpan).toHaveClass("motion-reduce:hidden");
     });
 
     it("should render social links in the popover", async () => {
@@ -981,25 +976,35 @@ describe("StoryViewer", () => {
     });
 
     it("should show static text when prefers-reduced-motion is enabled", async () => {
-      // The module is already mocked at top level — override the return value
-      const reducedMotionModule = await import("@/hooks/use-reduced-motion");
-      vi.spyOn(reducedMotionModule, "useReducedMotion").mockReturnValue(true);
+      // AuthorTypewriter reads window.matchMedia("(prefers-reduced-motion: reduce)").
+      // Override the existing matchMedia mock to return matches: true for that query.
+      const original = window.matchMedia;
+      vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+        matches: query.includes("prefers-reduced-motion: reduce"),
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
 
-      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+      try {
+        await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // With reduced motion, typewriter stays at initial "JG" — no animation
-      expect(screen.getByText(/JG/)).toBeInTheDocument();
+        expect(screen.getByText(/JG/)).toBeInTheDocument();
 
-      // Advance time — should NOT cycle
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(35_000);
-      });
+        // Advance time — should NOT cycle
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(35_000);
+        });
 
-      // Still shows initial text
-      expect(screen.getByText(/JG/)).toBeInTheDocument();
-
-      // Restore
-      vi.restoreAllMocks();
+        expect(screen.getByText(/JG/)).toBeInTheDocument();
+      } finally {
+        // Restore so subsequent tests get the default matchMedia mock back
+        window.matchMedia = original;
+      }
     });
 
     it("should be hidden on mobile (has md:block and hidden classes)", async () => {

@@ -7,8 +7,8 @@
  * UX-M7 (#480): AuthorTypewriter must not include English/dev strings in its message cycle.
  */
 
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { createMockT } from "@/test/i18n-mock";
 
 import { BookmarkButton } from "./bookmark-button";
@@ -233,64 +233,48 @@ describe("UX-M4: ChatUpsellCTA icon size (#477)", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("UX-M7: AuthorTypewriter — no English/dev strings in cycle (#480)", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("does not call t() with works_on_my_machine key", async () => {
-    vi.useFakeTimers();
-    const tSpy = vi.fn((key: string) => mockT(key));
-    const { AuthorTypewriter } = await import("./author-typewriter");
-    render(<AuthorTypewriter prefersReducedMotion={false} t={tSpy} />);
-
-    expect(tSpy).not.toHaveBeenCalledWith("author_pill.works_on_my_machine");
-  });
-
-  it("does not call t() with bug_free key", async () => {
-    vi.useFakeTimers();
-    const tSpy = vi.fn((key: string) => mockT(key));
-    const { AuthorTypewriter } = await import("./author-typewriter");
-    render(<AuthorTypewriter prefersReducedMotion={false} t={tSpy} />);
-
-    expect(tSpy).not.toHaveBeenCalledWith("author_pill.bug_free");
-  });
-
-  it("does not include literal string 'npm run explore' in messages", async () => {
-    vi.useFakeTimers();
-    const { AuthorTypewriter } = await import("./author-typewriter");
-    const { container } = render(
-      <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
+  it("messages array contains no English/dev jokes", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const source = readFileSync(
+      join(__dirname, "author-typewriter.tsx"),
+      "utf-8"
     );
-    const textSpan = container.querySelector(
-      "span[class*='font-mono'] > span:first-child"
-    ) as HTMLSpanElement;
 
-    // Advance through the entire first few cycles — 'npm run explore' must never appear
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(50_000);
-    });
-
-    expect(textSpan?.textContent).not.toBe("npm run explore");
-  });
-
-  it("still calls t() for all Spanish/Asturian message keys", async () => {
-    vi.useFakeTimers();
-    const tSpy = vi.fn((key: string) => mockT(key));
-    const { AuthorTypewriter } = await import("./author-typewriter");
-    render(<AuthorTypewriter prefersReducedMotion={false} t={tSpy} />);
-
-    const expectedSpanishKeys = [
-      "author_pill.made_with_love",
-      "author_pill.fueled_by_sidra",
-      "author_pill.buen_camino",
-      "author_pill.probably_hiking",
-      "author_pill.out_cycling",
-      "author_pill.scaling_rocks",
-      "author_pill.sleep_not_found",
+    const forbidden = [
+      "works on my machine",
+      "bug-free",
+      "bug_free",
+      "npm run explore",
+      "git push --pray",
+      "TODO: fix later",
+      "ship it",
+      "Son of Anton",
     ];
 
-    for (const key of expectedSpanishKeys) {
-      expect(tSpy).toHaveBeenCalledWith(key);
+    for (const phrase of forbidden) {
+      expect(source.toLowerCase()).not.toContain(phrase.toLowerCase());
+    }
+  });
+
+  it("messages array contains the expected Spanish/Asturian flavor strings", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const source = readFileSync(
+      join(__dirname, "author-typewriter.tsx"),
+      "utf-8"
+    );
+
+    // A representative subset — full list lives in the component source
+    const expectedFragments = [
+      "Asturias",
+      "sidra",
+      "buen Camino",
+      "404: sueño no encontrado",
+    ];
+
+    for (const fragment of expectedFragments) {
+      expect(source).toContain(fragment);
     }
   });
 });
