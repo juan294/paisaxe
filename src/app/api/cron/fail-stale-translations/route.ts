@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase";
 const STALE_TRANSLATION_WINDOW_MS = 30 * 60 * 1000;
 
 async function failStaleTranslations(): Promise<NextResponse> {
+  const start = Date.now();
   const supabase = createAdminClient();
   const cutoff = new Date(
     Date.now() - STALE_TRANSLATION_WINDOW_MS
@@ -18,6 +19,7 @@ async function failStaleTranslations(): Promise<NextResponse> {
   );
 
   if (error) {
+    logger.error("[CRON_FAILURE]", { job: "fail-stale-translations", error: error.message });
     logger.error("[CRON_FAIL_STALE_TRANSLATIONS_FAILED]", {
       cutoff,
       error: error.message,
@@ -48,6 +50,7 @@ async function failStaleTranslations(): Promise<NextResponse> {
     failed_count,
   });
 
+  logger.info("[CRON_SUCCESS]", { job: "fail-stale-translations", duration_ms: Date.now() - start });
   return NextResponse.json({
     status: "ok",
     failed_count,

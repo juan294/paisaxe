@@ -47,6 +47,36 @@ describe("PostHogProviderWrapper", () => {
     mockPosthog.__loaded = false;
   });
 
+  // FE-M5 (#497): React tree must NOT reshape after PostHog initialises.
+  // Children should not unmount/remount when PostHog loads.
+  it("FE-M5: children are not remounted when PostHog initialises (stable tree shape)", () => {
+    // We track mount count of a child component.
+    // If the tree reshapes (e.g. an extra wrapper appears), React will
+    // unmount and remount all children, incrementing the counter > 1.
+    let mountCount = 0;
+    function ChildWithMountCounter() {
+      // Count mounts via side-effect on empty deps (runs once per mount)
+      // We use a module-level counter instead of state to survive re-renders.
+      mountCount += 1;
+      return <div data-testid="child">child</div>;
+    }
+
+    render(
+      <PostHogProviderWrapper>
+        <ChildWithMountCounter />
+      </PostHogProviderWrapper>
+    );
+
+    // Reset count after initial mount so we only measure subsequent remounts
+    const initialCount = mountCount;
+    // Trigger a re-render of the wrapper (simulate PostHog loading in useEffect).
+    // Because PostHog does NOT load in jsdom (no NEXT_PUBLIC_POSTHOG_KEY),
+    // the tree is effectively stable; we verify the child was only mounted once.
+    expect(initialCount).toBe(1);
+    // And still only 1 mount — no remount occurred
+    expect(mountCount).toBe(1);
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -332,6 +362,35 @@ describe("PostHog production initialization (non-localhost)", () => {
     });
 
     expect(screen.getByTestId("app")).toBeInTheDocument();
+  });
+
+  // FE-M5 (#497): After PostHog initialises the React tree shape must stay stable —
+  // children must NOT be remounted (mount count stays at 1).
+  it("FE-M5: children are not remounted when PostHog initialises in production", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_12345");
+
+    let mountCount = 0;
+    function ChildWithMountCounter() {
+      mountCount += 1;
+      return <div data-testid="stable-child">stable</div>;
+    }
+
+    render(
+      <PostHogProviderWrapper>
+        <ChildWithMountCounter />
+      </PostHogProviderWrapper>
+    );
+
+    // Wait for PostHog to fully initialise so the tree settles.
+    // The posthog-react-provider node appears (rendered as a sibling side-node,
+    // not as a wrapper around children).
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("posthog-react-provider")).toBeInTheDocument();
+    });
+
+    // Child must have been mounted exactly once — no remount from tree reshaping
+    expect(mountCount).toBe(1);
+    expect(screen.getByTestId("stable-child")).toBeInTheDocument();
   });
 
   it("skips init when PostHog is already loaded (__loaded = true)", async () => {

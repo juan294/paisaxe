@@ -5,6 +5,7 @@ import { AuthProvider } from '@/components/auth/auth-provider';
 import { SkipLink } from '@/components/a11y/skip-link';
 import { LangSync } from '@/components/a11y/lang-sync';
 import { PostHogProviderWrapper } from '@/components/posthog-provider';
+import { FeatureFlagsProvider } from '@/hooks/use-feature-flags';
 import { usePathname } from "next/navigation";
 
 interface ProvidersProps {
@@ -13,8 +14,11 @@ interface ProvidersProps {
 
 const DEFERRED_AUTH_PATHS = new Set(["/immersive", "/pricing", "/favorites"]);
 
-// Static routes that never need auth context — skip AuthProvider entirely
-// to avoid a Supabase getUser() round-trip on pages with no interactive auth.
+// Static routes that don't need an active auth session — defer the Supabase
+// getUser() round-trip by passing deferInitialAuth=true, but still mount
+// AuthProvider so the React tree shape is stable across navigations.
+// FE-M4: AuthProvider must ALWAYS be rendered; conditional removal causes a full
+// remount (and auth state reset) when the user navigates between pathnames.
 const STATIC_PATHS = new Set(["/about", "/privacy", "/terms"]);
 
 // Providers wraps only client-context concerns (PostHog, i18n, Auth).
@@ -22,25 +26,22 @@ const STATIC_PATHS = new Set(["/about", "/privacy", "/terms"]);
 // so that server-rendered children are NOT pulled into the client hydration boundary.
 export function Providers({ children }: ProvidersProps) {
   const pathname = usePathname();
-  const isStaticPath = pathname ? STATIC_PATHS.has(pathname) : false;
-  const deferInitialAuth = pathname ? DEFERRED_AUTH_PATHS.has(pathname) : false;
+  // On static paths we defer auth init (no Supabase round-trip) but still
+  // keep AuthProvider in the tree so the component identity never changes.
+  const deferInitialAuth = pathname
+    ? STATIC_PATHS.has(pathname) || DEFERRED_AUTH_PATHS.has(pathname)
+    : false;
 
   return (
     <PostHogProviderWrapper>
       <LanguageProvider>
-        {isStaticPath ? (
-          <>
-            <SkipLink />
-            <LangSync />
-            {children}
-          </>
-        ) : (
+        <FeatureFlagsProvider>
           <AuthProvider deferInitialAuth={deferInitialAuth}>
             <SkipLink />
             <LangSync />
             {children}
           </AuthProvider>
-        )}
+        </FeatureFlagsProvider>
       </LanguageProvider>
     </PostHogProviderWrapper>
   );

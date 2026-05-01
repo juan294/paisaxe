@@ -30,6 +30,8 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
   const [placeName, setPlaceName] = useState("");
   const [comment, setComment] = useState("");
   const [attribution, setAttribution] = useState("");
+  // Honeypot field: bots fill this, humans never see it (display:none)
+  const [website, setWebsite] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -54,6 +56,8 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
           placeName: trimmedPlaceName,
           comment: comment.trim() || undefined,
           attribution: attribution.trim() || undefined,
+          // Honeypot: only bots fill this — always sent so server can check
+          website: website || undefined,
         }),
       });
 
@@ -74,6 +78,7 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
         setPlaceName("");
         setComment("");
         setAttribution("");
+        setWebsite("");
         setSubmitState("idle");
         onClose();
       }, 2000);
@@ -184,6 +189,18 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
                 {t("suggestions.attribution_hint")}
               </p>
             </div>
+
+            {/* Honeypot field — hidden from humans, bots fill it automatically */}
+            <input
+              type="text"
+              name="website"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              style={{ display: "none" }}
+              tabIndex={-1}
+              aria-hidden={true}
+              autoComplete="off"
+            />
 
             {/* Error Message */}
             {submitState === "error" && errorMessage && (

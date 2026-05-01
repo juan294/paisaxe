@@ -6,6 +6,7 @@ import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 import { getClientIp } from "@/lib/request-utils";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createSuggestionSchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 const SUGGESTION_RATE_LIMIT = {
   windowMs: 60_000,     // 1 minute
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching suggestions:", error);
+    logger.error("Error fetching suggestions:", { error: error.message });
     return NextResponse.json(
       { error: "Failed to fetch suggestions" },
       { status: 500 }
@@ -70,7 +71,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { placeName, comment: rawComment, location: rawLocation, attribution: rawAttribution } = parsed.data;
+  const { placeName, comment: rawComment, location: rawLocation, attribution: rawAttribution, website } = parsed.data;
+
+  // Honeypot check: bots fill hidden fields, humans never see them.
+  // Return a fake 200 success to avoid revealing the honeypot mechanism.
+  // TODO: Add Turnstile/hCaptcha token verification (#492) when CAPTCHA_SECRET_KEY env var is available
+  if (website && website.trim().length > 0) {
+    logger.warn("[HONEYPOT_TRIGGERED] Bot submission detected and silently rejected", {
+      ip: getClientIp(request),
+      placeName,
+    });
+    return NextResponse.json({ success: true });
+  }
+
   const comment = rawComment?.trim() || null;
   const location = rawLocation ?? null;
   const attribution = rawAttribution?.trim() || null;
@@ -101,7 +114,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) {
-    console.error("Error creating suggestion:", error);
+    logger.error("Error creating suggestion:", { error: error.message });
     return NextResponse.json(
       { error: "Failed to create suggestion" },
       { status: 500 }

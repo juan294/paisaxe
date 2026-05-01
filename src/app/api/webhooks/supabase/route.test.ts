@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock next/cache before importing the route handler
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -178,8 +186,6 @@ describe("POST /api/webhooks/supabase", () => {
 
   describe("Zod schema validation", () => {
     it("should warn on unexpected payload shape and still process", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
       // Payload that passes isValidPayload but has unknown extra fields
       const request = createRequest(
         {
@@ -193,13 +199,11 @@ describe("POST /api/webhooks/supabase", () => {
 
       const response = await POST(request);
       expect(response.status).toBe(200);
-
-      consoleSpy.mockRestore();
+      // Route calls logger.warn for unknown shape
+      expect(logger.warn).toHaveBeenCalledWith("[WEBHOOK_UNKNOWN_SHAPE]", expect.anything());
     });
 
     it("should emit WEBHOOK_UNKNOWN_SHAPE warn when payload is missing operation field", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
       // This payload passes our legacy isValidPayload check but fails Zod
       // We'll test that Zod validation catches the missing operation field
       // by providing a body that isValidPayload accepts but Zod finds incomplete
@@ -212,8 +216,34 @@ describe("POST /api/webhooks/supabase", () => {
       const response = await POST(request);
       // isValidPayload requires table_name + operation + timestamp, so 400
       expect(response.status).toBe(400);
-
-      consoleSpy.mockRestore();
     });
+  });
+
+  // -----------------------------------------------------------------------
+  // SE-M3 / DO-H3: logger migration — uses structured logger, not console
+  // -----------------------------------------------------------------------
+
+  it("should use logger.error (not console.error) on unexpected error", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Force an unexpected error by providing invalid JSON that bypasses our null check
+    const request = new NextRequest(
+      "http://localhost:3000/api/webhooks/supabase",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-webhook-secret": "test-webhook-secret",
+        },
+        body: "invalid-json",
+      }
+    );
+
+    const response = await POST(request);
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 });

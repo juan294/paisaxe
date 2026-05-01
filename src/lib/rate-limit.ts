@@ -144,6 +144,20 @@ async function checkUpstash(
   };
 }
 
+// --- Degradation tracking (BE-M1) ---
+
+// Module-level flag set when Upstash is configured but unreachable.
+// Allows health checks and monitoring to surface the degradation state.
+let _rateLimitDegraded = false;
+
+/**
+ * Returns true if Upstash is configured but currently unavailable.
+ * Used by health checks to surface the degraded rate-limiting state.
+ */
+export function isRateLimitDegraded(): boolean {
+  return _rateLimitDegraded;
+}
+
 // --- Public API ---
 
 export async function checkRateLimit(
@@ -152,13 +166,20 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   if (useUpstash) {
     try {
-      return await checkUpstash(identifier, config);
+      const result = await checkUpstash(identifier, config);
+      // Clear degraded flag on successful Upstash call
+      _rateLimitDegraded = false;
+      return result;
     } catch (err) {
       const isProduction = process.env.NODE_ENV === "production";
+      _rateLimitDegraded = true;
       console.error("[RATE_LIMIT_FALLBACK]", {
         identifier,
         error: err instanceof Error ? err.message : String(err),
       });
+      // BE-M1: warn on every fallback request so monitoring can detect degradation,
+      // regardless of environment. Production fails closed; dev/test uses in-memory.
+      logger.warn("[RATE_LIMIT_DEGRADED]", { reason: "upstash_unavailable" });
       if (isProduction) {
         // Fail closed in production: deny the request so Upstash failure doesn't bypass limits
         return {
@@ -169,8 +190,7 @@ export async function checkRateLimit(
           retryAfter: Math.ceil(config.windowMs / 1000),
         };
       }
-      // Dev/test: fall through to in-memory — emit a warning so degradation is visible in logs
-      logger.warn("[RATE_LIMIT_DEGRADED]", { reason: "Redis unavailable" });
+      // Dev/test: fall through to in-memory
       return checkInMemory(identifier, config);
     }
   }
@@ -180,6 +200,7 @@ export async function checkRateLimit(
 
 export function resetRateLimit(): void {
   store.clear();
+  _rateLimitDegraded = false;
 }
 
 export function getRateLimitStore(): Map<string, RateLimitEntry> {

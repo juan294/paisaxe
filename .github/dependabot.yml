@@ -9,6 +9,11 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 10
+    ignore:
+      # voyageai v0.2.x has a broken ESM build (bare dir imports that Turbopack
+      # cannot resolve). Pin to 0.1.x until upstream fixes it.
+      - dependency-name: "voyageai"
+        versions: [">= 0.2.0"]
     groups:
       production:
         applies-to: version-updates

@@ -23,18 +23,27 @@
 
 
 
-<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-02-06T16:30:00Z -->
-## Documentation Agent — 2026-02-06
-- **Coverage**: 100% of feature flags documented in features.md (24 flags across 5 categories)
-- **MCP tools**: Added documentation for Pelayo's 4 custom tools (search_places, get_weather, make_booking, check_booking_status)
-- **Webhooks**: Expanded webhook documentation to table format listing all 4 endpoints with purposes
-- **API routes**: 43 routes flagged by scanner, but all are internal admin endpoints or implementation details of documented features
 
-**Cross-agent recommendations:**
-- Coverage Agent: MCP tool endpoints (`/api/mcp/*`) have 0% test coverage - these are external-facing APIs used by ElevenLabs and need tests
-- Security Agent: Webhook endpoints handle external input and use signature verification - verify HMAC implementations are timing-safe
-- QA Agent: Booking system uses outbound calls and SMS - test the full booking flow end-to-end, including failure modes
-<!-- ENTRY:END -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
@@ -85,41 +94,6 @@
 - **Total spend**: $59.41/mo across 11 services
 - **Review recommended** (4): Anthropic Claude, Stripe, PostHog, Google AI Pro
 - **Healthy** (7): ElevenLabs, Supabase, GitHub Pro, Vercel, AWS Domains, Voyage AI, Twilio
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-03-16T06:00:00Z -->
-## Documentation Agent — 2026-03-16
-- **Status: GREEN** — All documentation complete. No gaps found.
-- **Feature flags**: All 16 flags flagged by scanner are already documented in `docs/project/features.md` (Feature Flags Reference, 5 categories). Scanner false positive — it only checked CLAUDE.md, not features.md.
-- **API routes**: 44 routes flagged by scanner. All are either internal admin routes (no external docs needed) or already documented in features.md (webhooks, MCP tools, health endpoint).
-- **Modified files**: 5 files changed since last CLAUDE.md update — all test-only changes, no documentation impact.
-- **No changes made** to features.md or CLAUDE.md — documentation is current.
-
-**Cross-agent recommendations:**
-- Coverage Agent: No documentation-related coverage gaps.
-- Security Agent: No documentation changes needed this cycle.
-- QA Agent: No documentation changes needed this cycle.
-- Code Quality Agent: Gap detection script should also check `docs/project/features.md` (not just CLAUDE.md) to reduce false positives in future runs.
-- Cost Analyst Agent: No cost-related documentation concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent timestamp=2026-03-21T09:00:00Z -->
-## QA Agent — 2026-03-21
-- **Status: YELLOW** — LLM tests 0/12 (CSRF blocker, **9th consecutive run**), browser journeys **10/10 (100% — RECOVERED)**
-- **CSRF blocker**: Unfixed since 2026-02-15. **Over 8 weeks without LLM quality data.** Escalation critically overdue.
-- **Journey recovery**: 60% → **100%**. All 3 persistent chat panel failures (Journeys 3, 7, 14) resolved after 7 weeks. Journey 1 also recovered. Best score since Feb 15.
-- **Integration health**: App healthy (Supabase 93ms, DB 0.5%). Health check scripts still stale (10th consecutive report).
-- **E2E gap**: `/api/mcp/*` still at 0% E2E coverage (7th consecutive report). 25/35 API routes lack E2E tests.
-- **Feature flag mocks**: Complete — all 27 flags verified present in source.
-- **Revenue/voice concern**: Cost Analyst flags 36-day revenue drought + 32-day voice silence. With journeys now passing, manual production verification of voice and payment flows is the top priority.
-
-**Cross-agent recommendations:**
-- Coverage Agent: Chat panel journey tests now pass — explore adding more chat interaction coverage. MCP routes still at 0% — highest risk gap. 25 API routes lack E2E tests. Branch coverage now 94.05% (excellent).
-- Performance Agent: Chat panel load time appears improved (journeys passing). Verify ElevenLabs chunk preload is working in production. Continue monitoring bundle size vs 2,500 KB budget.
-- Security Agent: CSRF protection working correctly. No action needed. Gitleaks CI gap flagged for 17th week.
-- Code Quality Agent: Fix health check script expectations (10th week stale). Investigate what fixed the chat panel E2E failures — document the fix pattern for other dynamic imports.
-- Localization Agent: No locale-related issues this cycle.
-- Cost Analyst Agent: Journey tests confirm chat panel now loads correctly in E2E. Manual verification of Pelayo voice widget and Day Pass on production is now the priority to explain 32-day voice silence and 36-day revenue drought.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-03-22T09:00:00Z -->
@@ -178,18 +152,6 @@
 - Performance Agent: No documentation-impacting changes.
 - Cost Analyst Agent: No cost-related documentation concerns.
 - Localization Agent: No locale-related documentation concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-04-11T10:30:00Z -->
-## Triage — 2026-04-11
-- **Reports processed**: 4 (cc-rpi-update, cost-analyst, documentation, localization)
-- **Agent failures**: 0
-- **Action items resolved**: 0
-- **Summary**: All 4 reports GREEN or WATCH (business concern only). Cost analyst WATCH — 57-day revenue drought, 53-day voice silence, no code action needed. Localization 100% / documentation 14th clean run / cc-rpi up to date at v1.14.5. No code changes this cycle.
-**Cross-agent recommendations:**
-- Cost Analyst Agent: Two manual checks outstanding: (1) Anthropic billing at console.anthropic.com — daily agent activity may push usage above $10/mo estimate; (2) Twilio $0.24 anomaly (Apr 3-4) unresolved — verify in Twilio console; if confirmed recurring regulatory surcharge, update recurring-costs.ts to ~$1.39/mo.
-- QA Agent: Revenue and voice drought at 57 and 53 days respectively — manual verification of Pelayo voice widget and Day Pass purchase flow on production remains the top outstanding action item.
-- All agents: No code changes this cycle. All automated systems healthy.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-04-12T02:00:00Z -->
@@ -736,23 +698,6 @@
 - Cost Analyst Agent: No cost-related coverage gaps.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-04-20T01:05:50Z -->
-## Cost Analyst — 2026-04-20
-- **Status: WATCH** — Day 20 of April. Revenue drought: **66 days** (since Feb 13). Voice silence: **62 days** (since Feb 17).
-- **ElevenLabs**: Creator tier, **13,734 / 270,783 chars (5.07%)** — unchanged for 4 consecutive days. Zero activity since Apr 16 18:44 UTC (all agents silent, not just Paisaxe). Daily cycle average dropped to ~1,099/day. Projected cycle-end: 5–12%.
-- **Twilio**: Balance **$14.0646** (stable for 13th consecutive day). Zero non-zero usage records. ~12.2 months of runway.
-- **Fixed operational burn**: $84.41/mo / $2.81/day. Variable Apr MTD: $1.15 (phone rental Apr 7). Total MTD: $85.56.
-- **Security**: posthog-js advisories (protobufjs Critical + dompurify Moderate) pending upgrade — not exploitable, fix available (posthog-js 1.369.2+).
-- **April certain to close at $0 revenue.** Cumulative operational loss since Feb 2026: ~$343.
-
-**Cross-agent recommendations:**
-- Security Agent: posthog-js upgrade to 1.369.2+ is the priority dep action this cycle — resolves 2 advisories. Batch with 17 other outdated packages in next triage.
-- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 66-day revenue drought and 62-day voice silence still unexplained. Journey tests pass E2E but production flows unverified.
-- Code Quality Agent: Twilio $0.24 regulatory fee anomaly (Apr 3-4) now 17 days unresolved — check Twilio billing console. If confirmed recurring, update `src/config/recurring-costs.ts` Twilio cost from $1.15 to ~$1.39/mo.
-- Triage Agent: Two outstanding code actions — (1) posthog-js upgrade batch, (2) Twilio recurring-costs.ts update if anomaly confirmed. Manual check: Anthropic billing at console.anthropic.com.
-- Performance Agent: ElevenLabs SDK chunk (487 KB, deferred) unchanged. posthog-js upgrade (179 KB deferred chunk) may slightly change PostHog bundle size after upgrade.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-04-20T06:00:00Z -->
 ## Documentation Agent — 2026-04-20
 - **Status: GREEN** — No documentation gaps found. Nineteenth consecutive clean run.
@@ -811,83 +756,6 @@
 - Performance Agent: Zero source changes, zero bundle impact.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-04-21T01:04:38Z -->
-## Cost Analyst — 2026-04-21
-- **Status: WATCH** — Day 21 of April. Revenue drought: **67 days** (since Feb 13). Voice silence: **63 days** (since Feb 17).
-- **ElevenLabs**: Creator tier, **13,734 / 270,783 chars (5.07%)** — unchanged for 5 consecutive days. Zero activity since Apr 16 18:44 UTC. Cycle-avg daily rate decayed to ~1,017/day. Projected cycle-end: 5–11% by May 7.
-- **Twilio**: Balance **$14.0646** (stable for 14th consecutive day). Zero non-zero usage records. ~12.2 months of runway.
-- **Fixed operational burn**: $84.41/mo / $2.81/day. Variable Apr MTD: $1.15 (phone rental Apr 7). Total MTD: $85.56.
-- **Security advisories RESOLVED**: posthog-js transitive deps (protobufjs Critical + dompurify Moderate) cleared by commit e66e510 (`npm audit fix`). 0 vulnerabilities remaining.
-- **April certain to close at $0 revenue.** Cumulative operational loss since Feb 2026: ~$346.
-
-**Cross-agent recommendations:**
-- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains urgent — 67-day revenue drought and 63-day voice silence still unexplained. Journey tests pass E2E but production flows unverified.
-- Code Quality Agent: Twilio $0.24 regulatory fee anomaly (Apr 3-4) now 18 days unresolved — check Twilio billing console. If confirmed recurring, update `src/config/recurring-costs.ts` Twilio cost from $1.15 to ~$1.39/mo.
-- Triage Agent: One outstanding code action — Twilio `recurring-costs.ts` update if anomaly confirmed. Manual check: Anthropic billing at console.anthropic.com.
-- Security Agent: 0 advisories — GREEN streak maintained after e66e510.
-- Performance Agent: ElevenLabs SDK chunk (487 KB, deferred) unchanged. PostHog chunk size should be re-verified after posthog-js upgrade in e66e510.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-04-22T04:06:17Z -->
-## Documentation Agent — 2026-04-22
-- Status: GREEN — twentieth consecutive clean run. No documentation changes needed.
-- Zero undocumented feature flags. All 17 feature flags + 10 agent flags in `docs/project/features.md` aligned with source.
-- All 51 flagged API routes confirmed internal (admin, cron, webhooks, MCP voice-agent, checkout/health). None require user-facing documentation.
-- Migrations 076 (admin_audit_log) + 077 (stripe_webhook_events) are internal infrastructure — no docs needed.
-- CLAUDE.md current as of 2026-04-19.
-
-**Cross-agent recommendations:**
-- All agents: No documentation-impacting changes this cycle. Feature flag count stable. QA mock sets do not need updating.
-- Triage Agent: No code actions from documentation agent this cycle.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-04-22T05:07:03Z -->
-## Localization Agent — 2026-04-22
-- Coverage: 100% complete across 6 locales (es, en, fr, de, pt, ast).
-- UI strings: 395 leaf keys per locale, 0 missing, 0 orphans. Grew from 392 to 395 since last run (locales stayed in sync).
-- Story translations: 100 stories × 5 locales = 500 entries, all complete (title + subtitle + description). Grew from 95 to 100 since last run.
-- Type safety: Pass — `npx tsc --noEmit` reports zero i18n errors.
-- Changes this run: None. All translations stable and in sync.
-
-**Cross-agent recommendations:**
-- Performance Agent: Locale bundle sizes stable; es+en static, fr/de/pt/ast dynamic. 5 new stories and 3 new UI keys add negligible bytes. No optimization needed.
-- Code Quality Agent: No dead translations found. All 395 keys actively referenced.
-- Security Agent: No sensitive data in translation files (no API keys, tokens, or PII).
-- Coverage Agent: No locale-related coverage concerns.
-- QA Agent: No locale-related issues. Journeys with localized content remain testable against all 6 locales.
-- Cost Analyst Agent: No cost-related localization concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-22T07:01:46Z -->
-## Security Agent — 2026-04-22
-- Status: GREEN. 0 advisories, 0 exploitable. Third consecutive GREEN since e66e510 (Apr 20).
-- 10 outdated packages, all minor/patch, zero CVEs. 3 production patches available (@supabase/supabase-js 2.104.0, posthog-js 1.369.5, resend 6.12.2) — batch in next triage.
-- All security headers, 4 webhook timingSafeEqual sites, CSRF + auth gates verified in source. License check clean.
-- No source-code security regressions this cycle.
-
-**Cross-agent recommendations:**
-- Performance Agent: Sentry session replay is enabled at 1.0 on-error / 0.01 baseline — before any sample-rate increase, verify PII masking in `sentry.client.config.ts`. Disabling replay is safe security-wise.
-- Code Quality Agent: Only dev-tooling majors remain (typescript v6, knip v6, @vitejs/plugin-react v6) — no CVEs, low urgency.
-- Triage Agent: No code actions required this cycle. GitHub Dependabot alerts may lag local audit (0 vulns locally) — local is authoritative.
-- QA Agent: CSRF, webhook, and auth paths fully test-covered. No security-driven test changes needed.
-- Coverage Agent: Maintenance-mode cross-tenant invalidation path now covered — the prior highest-risk uncovered security path is closed.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-22T08:02:59Z -->
-## Performance Agent — 2026-04-22
-- Status: YELLOW (carried from Apr 20). Total JS 2,941 KB / 3,000 KB under budget (+59 KB headroom). Initial load ~2,066 KB / 2,000 KB potentially over — needs production build to confirm.
-- 0 KB change for 2nd consecutive cycle. Zero commits between Apr 21 and Apr 22 runs. Bundle byte-identical to Apr 21.
-- P8 (disable Sentry session replay) still unimplemented — `sentry.client.config.ts:11-12` still sets `replaysOnErrorSampleRate: 1.0` and `replaysSessionSampleRate: 0.01`. Highest-ROI fix available: ~30-50 KB savings, 3-line edit, zero functional risk.
-- node_modules at 1,047 MB (47 MB over 1,000 MB budget) driven by @sentry/nextjs at 67 MB — consider raising budget to 1,100 MB.
-
-**Cross-agent recommendations:**
-- Code Quality Agent: P8 is a 3-line edit to `sentry.client.config.ts` — remove `replaysOnErrorSampleRate` and `replaysSessionSampleRate`. Replay has only 48 hours of production time and no proven value yet.
-- Security Agent: Agreed with Apr 22 note about verifying PII masking before *increasing* replay sampling. *Disabling* replay (P8) is strictly safer from a PII perspective.
-- QA Agent: After P8 lands, re-verify Sentry error capture still works in staging — tracesSampleRate and source-mapped stacks are unaffected.
-- Triage Agent: Consider running `npm run build` + `npm run build:analyze` this cycle to produce real production numbers and settle whether YELLOW can be cleared without P8.
-- Coverage Agent: No source changes this cycle. Zero coverage impact.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-04-23T00:38:29Z -->
 ## Coverage Agent — 2026-04-23
 - Test suite: 5992 passing (+4 tests this run), 0 failures
@@ -902,137 +770,6 @@
 - QA Agent: No suite regressions. Full suite clean at 5992 tests. voice-agent-chat and agents-dashboard still need Playwright E2E.
 - Performance Agent: 4 test-only additions. Zero bundle impact.
 - Code Quality Agent: Coverage plateau at ~98.6% stmts in jsdom — all remaining statement gaps are SSR guards, production-only paths, async-timer V8 instrumentation gaps, or structural dead code.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-04-24T05:02:35Z -->
-## Localization Agent — 2026-04-24
-- Coverage: 100% complete across 6 locales (es, en, fr, de, pt, ast). 40 consecutive days at full parity.
-- UI strings: 395 leaf keys per locale (+3 since 2026-04-17). 0 missing, 0 orphans.
-- Story translations: 100 stories x 5 locales = 500 (+25 since last report — 5 new stories added fully translated).
-- Type safety: npx tsc --noEmit passes clean.
-
-**Cross-agent recommendations:**
-- Performance Agent: Locale bundle strategy unchanged (es+en static, fr/de/pt/ast dynamic). 3 new UI keys and 5 new story translations are negligible (< 2 KB per locale). No action.
-- Code Quality Agent: No dead translations. All 395 keys actively referenced. No orphaned keys across any locale.
-- Security Agent: No sensitive data in translation files.
-- Coverage Agent: No locale-related coverage concerns.
-- QA Agent: 40-day stability streak. Translations are not a contributor to any test regression risk.
-- Cost Analyst Agent: No cost-related localization concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-24T07:03:45Z -->
-## Security Agent — 2026-04-24
-- Status: YELLOW — 3 moderate advisories (uuid <14 via resend -> svix -> uuid chain), 0 exploitable. svix only uses uuid.v4 internally; bounds-check bug affects v3/v5/v6 with caller-provided `buf`, which Paisaxe never passes.
-- No `npm audit fix` without `--force` (would downgrade resend 6.12.x -> 6.1.3, breaking).
-- Recommendation: run `npm install` to sync `resend@6.12.0 -> 6.12.2` (package.json pin drift), then wait for svix >=1.91.2 upstream.
-- License compliance clean. All 7 flagged packages approved or MIT false positives.
-- All security headers confirmed in source; live HTTP check skipped (no dev server).
-
-**Cross-agent recommendations:**
-- Code Quality Agent: `node_modules` drifted from `package.json` (resend 6.12.0 vs ^6.12.2 pin). Run `npm install` on develop to resync lockfile — non-breaking, no CVE impact.
-- Performance Agent: P8 (disable Sentry Replay) is also a security win. If Replay stays enabled, verify `maskAllInputs: true` + `blockAllMedia: true` in `sentry.client.config.ts` to prevent PII exfiltration.
-- QA Agent: No security action items. CSRF + webhook HMAC paths remain covered.
-- Cost Analyst Agent: No cost-related security concerns this cycle.
-- Triage Agent: Non-urgent code action — `npm install` to sync resend pin. Advisory stays open until svix upstream fix regardless.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-24T08:04:39Z -->
-## Performance Agent -- 2026-04-24
-- Status: YELLOW -- total JS 2,940 KB / 3,000 KB (under), initial load ~2,065 KB / 2,000 KB (est., potentially over). -1 KB cache-churn only; dev cache does not reflect the Replay removal.
-- P8 DONE: Sentry Replay removed in `fef651f5` (Apr 22). `sentry.client.config.ts` no longer sets replay sample rates. Expected ~30-50 KB initial-load savings -- verification requires `npm run build` on a clean `.next`.
-- Production dep count +1 (34 -> 35): `@sentry/core@10.49.0` pinned as explicit direct dep by AR-H2 remediation (d3ffaa50). Bundle-neutral.
-- Dev cache is stale across 4 cycles at 2,940-2,941 KB. Next production build should break the plateau downward.
-- Carried: Two zero-byte untracked files `svix` and `uuid` in repo root -- stray shell output, worth cleaning up.
-
-**Cross-agent recommendations:**
-- Code Quality Agent: `svix` and `uuid` empty files in repo root are leftover shell output from recent work; safe to delete. Also confirm no `'use client'` component is importing `zod` (would bloat initial load).
-- Security Agent: P8 removes `@sentry/replay` from the static client bundle, which also eliminates the Replay PII exfiltration surface that was flagged last cycle. `resend` pin drift (6.12.0 installed vs ^6.12.2) resolves with `npm install`. No other security-relevant bundle changes.
-- Triage Agent: URGENT action -- run `rm -rf .next && npm run build` to measure the actual P8 savings. If initial load drops below 2,000 KB, status goes GREEN without P4.
-- Coverage Agent: `src/lib/sentry-client-config.test.ts` now locks the "no Replay sample rates" invariant -- good regression protection.
-- QA Agent: Replay removal means no session replays captured in production. Error reporting, stack traces, and perf traces are unaffected.
-- Cost Analyst Agent: No bundle cost change user-observable yet. Production build verification remains pending.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-04-25T01:03:51Z -->
-## Cost Analyst — 2026-04-25
-- **Status: WATCH** — Day 25 of April. Revenue drought: **71 days** (since Feb 13). Paisaxe voice silence: **67 days** (since Feb 17). April certain to close at $0 revenue.
-- **ElevenLabs/Twilio APIs unavailable** (env vars not present in execution context). Last known: 13,734/270,783 chars (5.07%, Apr 20), Twilio balance $14.0646, all usage at $0.
-- **Fixed operational burn**: $84.41/mo / $2.81/day. Variable Apr MTD: $1.15 (phone rental Apr 7 only). Total Apr MTD: $85.56.
-- **uuid moderate advisory** (WATCH): 3 moderate advisories via resend→svix→uuid chain — not exploitable. Fix: `npm install` to sync resend@6.12.2, await svix >=1.91.2.
-- **P8 complete** (Sentry Replay removed Apr 22, fef651f5): production build needed to confirm ~30-50 KB initial-load savings.
-- **Cumulative operational loss (Feb–Apr 25)**: ~$357.
-
-**Cross-agent recommendations:**
-- Security Agent: uuid chain advisory non-urgent (not exploitable), but `npm install` to sync resend@6.12.2 pin drift is the right fix. The Twilio $0.24 anomaly (22 days unresolved) warrants a Twilio console check.
-- Performance Agent: `rm -rf .next && npm run build` is needed to confirm P8 savings from Sentry Replay removal. If initial load drops below 2,000 KB the YELLOW status clears without P4.
-- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains the top priority — 71-day revenue drought and 67-day voice silence still unexplained by automated tests.
-- Triage Agent: Outstanding code actions — (1) `npm install` to sync resend pin, (2) delete stray `svix`/`uuid` files in repo root, (3) production build to confirm P8. Non-code: Anthropic billing check, Twilio anomaly check, revenue drought investigation.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-04-25T06:04:43Z -->
-## QA Agent — 2026-04-25
-- **Status: YELLOW** — LLM tests 3/12 (25%), regression from 12/12 on Mar 23. Browser journeys 10/10 stable (5th week). Integration 3/3 GREEN.
-- **Chat API 500 regression**: `/api/chat` returns 500 for all non-safety tests. Root cause likely the wave 1 chat remediation commits (`9d85d8d8`, `3f0826f4`, `77359718`). Fast failure (124-321ms) suggests an import or initialization error, not an external API timeout.
-- **Safety tests PASSED**: Prompt injection, indirect injection, and role-play override — safety guardrails are intact.
-- **HTTP 429 on 2 tests**: Rate limiting secondary to 500 errors; will resolve when 500s are fixed.
-- **MCP E2E gap flagged for 10th consecutive run**: `/api/mcp/*` at 0% E2E coverage.
-- **Revenue/voice drought**: 71-day revenue drought + 67-day voice silence — manual production verification remains urgent.
-
-**Cross-agent recommendations:**
-- Code Quality Agent: Investigate `77359718` (logger edge runtime isolation) — fast 500s on `/api/chat` in dev context suggest an import-time or initialization failure introduced by the logger changes.
-- Security Agent: No security-related action items from this QA run. Chat 500s are not a security concern.
-- Coverage Agent: voice-agent-chat and agents-dashboard still need Playwright E2E. No new coverage regressions detected.
-- Cost Analyst Agent: 71-day revenue drought + 67-day voice silence still unexplained — manual production check of Day Pass and Pelayo is the top priority.
-- Performance Agent: No performance-related action items from this QA run.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-04-25T07:00:00Z -->
-## Localization Agent — 2026-04-25
-- Coverage: 100% complete across 6 locales (es, en, fr, de, pt, ast). 41 consecutive days at full parity.
-- UI strings: 395 leaf keys per locale, 0 missing, 0 orphans.
-- Story translations: 100 stories x 5 locales = 500 entries, all complete (title + subtitle + description).
-- Type safety: Pass — `npx tsc --noEmit` exits clean (0 errors).
-- Changes this run: None. All translations stable.
-
-**Cross-agent recommendations:**
-- Performance Agent: Locale bundle strategy unchanged (es+en static, fr/de/pt/ast dynamic). No optimization needed.
-- Code Quality Agent: No dead translations found. All 395 keys actively referenced.
-- Security Agent: No sensitive data in translation files.
-- Coverage Agent: No locale-related coverage concerns.
-- QA Agent: 41-day stability streak. No locale regression risk.
-- Cost Analyst Agent: No cost-related localization concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-25T07:04:08Z -->
-## Security Agent — 2026-04-25
-- **Status: YELLOW** — 8 moderate advisories, **0 exploitable.** Two independent chains: postcss XSS (GHSA-qx2v-qp2m-jg93, new, 5 packages, build-time only, not exploitable) and uuid bounds-check (GHSA-w5hq-g745-h8pq, carried, 3 packages, uuid.v4 path not affected).
-- **Recommended fix for postcss chain**: add `"postcss": ">=8.5.10"` to `package.json` overrides — same pattern as brace-expansion override. Clears 5 advisories cleanly.
-- **Recommended fix for uuid chain**: `npm install` to sync resend pin, then wait for svix >=1.91.2 upstream.
-- **License**: Pass — no new copyleft violations. All 7 flagged packages documented or false positives.
-- **CSP not confirmed in live header check** — source verified correct but live validation via proxy layer should be re-run next cycle.
-- **Sentry Replay PII surface eliminated** (fef651f5, Apr 22).
-
-**Cross-agent recommendations:**
-- Triage Agent: Two code actions available: (1) add `"postcss": ">=8.5.10"` override + `npm install` — clears 5 of 8 advisories; (2) `npm install` alone syncs resend pin. Both low-risk, can be batched.
-- Performance Agent: postcss override forces a single hoisted postcss version across the tree — should have zero bundle impact (postcss is a build-time dep, not client-side).
-- QA Agent: Chat API 500 regression (from `77359718`) should be investigated this cycle — fast 500s on the primary endpoint may mask security-relevant error behaviors in future LLM quality tests.
-- Coverage Agent: Stripe webhook and CSRF paths confirmed at 100% branch coverage. No regression risk.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-25T08:02:52Z -->
-## Performance Agent -- 2026-04-25
-- Status: YELLOW (unchanged). Total JS 2,940 KB / 3,000 KB budget (pass). Initial load ~2,065 KB / 2,000 KB budget (unverified -- dev cache stale for 5th consecutive cycle).
-- P8 (Sentry Replay removal, fef651f5) confirmed in source but still not reflected in any metric. Production build required to verify.
-- .next cache grew +604 MB (800 -> 1,404 MB) this cycle -- dev server PPR expansion, not a bundle concern.
-- Post-P8 initial load estimate: ~2,015-2,035 KB -- still over 2,000 KB budget; P4 (Supabase realtime tree-shake, ~20-30 KB) may be needed.
-- QA Agent reports Chat API 500 regression from logger edge-runtime changes -- no client bundle impact observed.
-- Security Agent postcss advisory: adding `"postcss": ">=8.5.10"` override clears 5 advisories; zero bundle impact (build-time dep).
-
-**Cross-agent recommendations:**
-- Triage Agent: CRITICAL outstanding action -- `rm -rf .next && npm run build` resolves YELLOW status. 5th consecutive cycle without it. Also: `npm install` for resend pin drift, postcss override for security advisories. All low-effort.
-- Security Agent: postcss override + `npm install` (resend pin sync) can be batched in one triage commit. Both are non-breaking.
-- QA Agent: Chat API 500 regression root-cause investigation (77359718 logger changes) should not introduce new client-side imports; verify after fix that no new bundle growth occurs.
-- Cost Analyst Agent: No ElevenLabs or voice-related bundle changes. SDK chunk stable at 478 KB (deferred).
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=security_agent timestamp=2026-04-25T09:00:00Z -->
@@ -1063,4 +800,329 @@
 - QA Agent: Chat API 500 root cause confirmed — voyageai v0.2.x ESM build broke dynamic import of `@/lib/embeddings`. Fixed by pinning voyageai to 0.1.0 (`8f53cd29`, `d0b5576e`, `1344e58d`). Re-run LLM quality tests next cycle to confirm GREEN.
 - Cost Analyst Agent: resend@6.12.2 already synced in prior commit. Pre-launch hard blockers (BE-B1 booking schema, QA-B1 E2E failures) need dedicated /remediate session before revenue-generating features can be validated.
 - All agents: Pre-launch audit (Apr 23) hard blockers not cleared this cycle. Revenue drought (71 days) + voice silence (67 days) require manual production verification by user.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-04-27T01:04:29Z -->
+## Cost Analyst — 2026-04-27
+- **Status: WATCH** — Day 27 of April. Revenue drought: **73 days** (since Feb 13). Voice silence: **69 days** (since Feb 17).
+- **ElevenLabs**: Creator tier, **13,734 / 270,783 chars (5.07%)** — unchanged for 7 consecutive days. Daily usage feed confirms **11 consecutive zero-character days (Apr 17–27)**. Most recent activity: Apr 16 18:44 UTC (Archy). Cycle-average rate falling to ~704/day. Projected cycle-end: 5–8%.
+- **Twilio**: Balance **$14.0646** (stable 20th day). Zero non-zero usage records. ~12.2 months runway.
+- **Fixed operational burn**: $84.41/mo / $2.81/day. Variable Apr MTD: $1.15 (phone rental Apr 7). Total MTD: $85.56.
+- **April certain to close at $0 revenue.** Cumulative operational loss since Feb 2026: ~$362.
+- **QA Agent recovered to GREEN (Apr 26)**: voyageai 0.1.0 pin fixed Chat API 500. Production-flow verification (Pelayo widget, Day Pass purchase) is now the sole remaining unknown explaining the 73-day revenue drought.
+
+**Cross-agent recommendations:**
+- QA Agent: Automated layer GREEN (12/12 LLM, 10/10 journeys, 3/3 integration). The 73-day revenue drought and 69-day voice silence are now exclusively a production-flow problem requiring manual user verification of Pelayo widget rendering and Day Pass purchase flow.
+- Code Quality Agent: Twilio $0.24 regulatory fee anomaly (Apr 3-4) now 24 days unresolved — check Twilio billing console. If confirmed recurring, update `src/config/recurring-costs.ts` Twilio from $1.15 → ~$1.39/mo.
+- Performance Agent: Zero new ElevenLabs activity in 11 consecutive days. SDK chunk (487 KB, deferred) and PostHog chunk (179 KB) unchanged. Triage recalibration of initial-load budget (2,000 → 2,100 KB) has no cost impact.
+- Security Agent: 8 moderate advisories steady. No cost-related security concerns.
+- Triage Agent: Outstanding manual checks: (1) Anthropic billing at console.anthropic.com (no API on personal account); (2) Twilio $0.24 anomaly. No code actions.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-04-27T04:00:53Z -->
+## Documentation Agent — 2026-04-27
+- Status: GREEN. Zero documentation gaps. Twentieth consecutive clean run.
+- Feature flags: 0 undocumented (gaps file empty). All 17 feature flags + 10 agent flags remain documented in `docs/project/features.md`.
+- API routes: All 51 flagged routes confirmed internal (admin, cron, webhooks, MCP, health, checkout, frontend-only). No external-consumption routes need documentation.
+- CLAUDE.md current (2026-04-24). features.md complete. No source changes this run.
+
+**Cross-agent recommendations:**
+- Coverage Agent: No documentation-driven coverage gaps.
+- Security Agent: No documentation changes needed this cycle.
+- QA Agent: No new flags to add to mock sets — count stable at 17 + 10 agent flags.
+- Code Quality Agent: No documentation-impacting code quality concerns.
+- Performance Agent: No documentation-impacting changes.
+- Cost Analyst Agent: No cost-related documentation concerns.
+- Localization Agent: No locale-related documentation concerns.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-04-27T05:02:01Z -->
+## Localization Agent — 2026-04-27
+- Status: GREEN. 100% coverage across 6 locales (es, en, fr, de, pt, ast).
+- UI strings: 395 leaf keys per locale, 0 missing, 0 orphans, all placeholders consistent.
+- Story translations: 100 stories x 5 target locales = 500 records, all title/subtitle/description fields populated. Story count grew from 95 to 100 with no translation backlog introduced.
+- Type safety: project-wide `npx tsc --noEmit` passes clean (0 errors).
+- No edits made this cycle.
+
+**Cross-agent recommendations:**
+- Performance Agent: i18n bundling unchanged. es+en static imports, fr/de/pt/ast dynamic. No optimization opportunity.
+- Code Quality Agent: All 395 UI keys remain actively referenced — no dead translations. Cosmetic `// LOCATION-SPECIFIC` reviewer hints still partially missing in fr/de/pt; non-functional.
+- Security Agent: No PII, tokens, or secrets in any locale file or story-translations file.
+- Coverage Agent: No locale-related coverage gaps. Story count is now 100, not 95 — update any internal expectations if they hard-coded the old number.
+- QA Agent: No locale-related issues. Translation layer is stable enough to be excluded from active monitoring until a content change lands.
+- Cost Analyst Agent: No cost-related localization concerns.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-04-27T06:05:20Z -->
+## QA Agent — 2026-04-27
+- Status: YELLOW. LLM quality 10/12 (one-day regression from 12/12 on Apr 26). Browser journeys 10/10. Integration 3/3.
+- Failures: (1) RAG hallucination resistance on "famous Asturian roller coaster" — model likely fabricated without disclaimer. (2) Response quality on "Tell me about Xixón" — Asturian spelling not retrieving Gijón content.
+- No safety, security, boundary, or integration failures. Chat API itself is healthy after voyageai 0.1.0 pin.
+- Both failures point to RAG layer: missing Asturian↔Spanish place-name synonyms and weak fabrication-resistance prompting.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: Capture failing-response bodies in QA harness so future failures can be diagnosed without re-running. Currently regex pass/fail leaves zero evidence trail.
+- Performance Agent: No QA-driven performance concerns this cycle. Initial-load 2,067 KB YELLOW unrelated to test failures.
+- Security Agent: All safety tests passed. No security regression.
+- Cost Analyst Agent: Revenue drought not explained by automated failures — manual production verification of Pelayo widget and Day Pass remains the priority.
+- Localization Agent: Asturian↔Spanish synonym mapping for place names (Xixón/Gijón, Uviéu/Oviedo) needed at the retrieval layer, not the translation layer — but worth coordinating since both deal with multi-spelling content.
+- Coverage Agent: `/api/mcp/*` still at 0% E2E coverage (10th consecutive report). Highest-risk gap — used by ElevenLabs voice agents in production.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-27T07:03:32Z -->
+## Security Agent — 2026-04-27
+- Status: YELLOW — 8 moderate advisories, **0 exploitable.** Two independent chains: postcss XSS (5 packages, build-time, Next bundles inner postcss@8.4.31, npm overrides confirmed ineffective Apr 25) and uuid bounds-check (3 packages via resend->svix; our code never imports uuid directly, svix uses unaffected v4).
+- 0 fixable via `npm audit fix` — both fix paths suggest breaking-change downgrades nonsensical against our installed versions.
+- Headers all configured in source (CSP PPR-compatible, HSTS prod-only, frame-ancestors none, etc). Live verification skipped — no running server.
+- License compliance Pass. Three flagged licenses (LGPL sharp-libvips, MPL/Apache dompurify, UNLICENSED paisaxe-itself) all approved in license-exceptions.md.
+- CI/CD security solid: Dependabot pinned to develop, Gitleaks, npm audit, license-check, webhook timing-safe checks all in place.
+
+**Cross-agent recommendations:**
+- Performance Agent: postcss override won't work (Next bundles inner copy) — confirmed Apr 25. No bundle action available. Wait for upstream Next.js release.
+- Triage Agent: No urgent code actions. Run `curl -I https://paisaxe.es` next cycle to verify headers over the wire. Batch production minor/patch bumps (Stripe, Supabase, Sentry, Anthropic SDK) — none CVE-driven, none urgent.
+- QA Agent: All safety tests still pass. No security action items. CSRF stable.
+- Code Quality Agent: Do NOT auto-bump `voyageai` past 0.1.0 (ESM build broke embeddings — see commit 8f53cd29).
+- Coverage Agent: All webhook signature paths and CSRF origin checks fully covered. No regression risk.
+- Cost Analyst Agent: 0 cost-related security concerns. Sentry Replay removal closed a PII surface at no bundle cost.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-27T08:02:35Z -->
+## Performance Agent — 2026-04-27
+- Status: YELLOW (13th cycle). Initial load 2,067 KB / 2,000 KB (Apr 25 prod baseline, unchanged). Total JS 2,941 KB / 3,000 KB.
+- +23 KB dev-cache drift (2,940 -> 2,963 KB) is noise -- no source/dep commits, deferred chunks unchanged, prod deps still 35.
+- node_modules 1,048 MB / 1,100 MB. .next grew 429 -> 668 MB (active dev session, not a budget concern).
+- P4 (Supabase realtime tree-shake, ~25 KB savings) remains the only actionable static-bundle reduction. Pair with budget raise to 2,100 KB to clear YELLOW.
+- Recommendation: any cycle reporting >5 KB drift should run a fresh `rm -rf .next && npm run build` before reporting -- dev cache is unreliable.
+
+**Cross-agent recommendations:**
+- Code Quality Agent: P4 implementation requires a public/admin Supabase client split (`supabaseBrowserPublic`). Audit `src/components/immersive/`, `src/components/chat/`, and homepage components for callers that don't use `.channel()` or `.on()`.
+- Security Agent: postcss inner copy in Next.js bundle remains the only outstanding bundle-related security item -- not patchable, monitor Next.js upstream. resend pin already synced.
+- QA Agent: No bundle changes that would affect E2E. After P4, re-run journeys 3, 7, 14 (chat panel) to verify Supabase client swap doesn't break auth refresh.
+- Coverage Agent: P4 introduces a new module (`browser-public.ts`) -- add tests for the realtime-disabled config so the public client doesn't silently regain realtime via SDK defaults in a future upgrade.
+- Cost Analyst Agent: Bundle stable. ElevenLabs SDK chunk unchanged at 478 KB (deferred). No cost-driven perf concerns.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-04-29T01:06:14Z -->
+## Cost Analyst — 2026-04-29
+- Status: WATCH. Day 29 of April. Revenue drought: **75 days**. Paisaxe voice silence: **71 days**. April closes tomorrow at $0 revenue — second consecutive full-zero month.
+- ElevenLabs: Creator tier, **13,734 / 270,783 chars (5.07%)** — confirmed unchanged for 13 consecutive days. Full account silence 12.3 days (since Apr 16 18:44 UTC). Character reset in 8.6 days (May 7).
+- Twilio: Balance **$14.0646** (stable 22 consecutive days). Zero variable usage. ~12.2 months runway.
+- Fixed operational burn: $84.41/mo / $2.81/day. Variable Apr MTD: $1.15 (phone rental Apr 7). Total MTD: $85.56. Cumulative operational loss: ~$368.
+- QA RAG failures (Apr 27): Asturian/Spanish place-name synonym gap (Xixón/Gijón) and hallucination without disclaimer — relevant to Anthropic token efficiency.
+
+**Cross-agent recommendations:**
+- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on production remains the top outstanding action — 75-day revenue drought unexplained despite automated layers being largely healthy.
+- Code Quality Agent: Twilio $0.24 regulatory fee anomaly (Apr 3-4) now 26 days unresolved — check Twilio billing console; if recurring, update `src/config/recurring-costs.ts` Twilio cost from $1.15 to ~$1.39/mo.
+- Performance Agent: P4 (Supabase realtime tree-shake) production build verification pending — run `npm run build` to confirm ~25 KB initial-load reduction. This clears the Performance YELLOW.
+- Security Agent: 0 cost-related security concerns. 8 moderate advisories stable, 0 exploitable. Both advisory chains await upstream fixes (Next.js postcss, svix >=1.91.2).
+- All agents: ElevenLabs character reset on May 7 — utilization will return to 0% and a fresh monthly cycle begins. Archy failure monitoring resumes when account activity returns.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-04-29T04:04:29Z -->
+## Documentation Agent — 2026-04-29
+- Status: YELLOW (documentation gap found and fixed). Twentieth run; first non-clean run since 2026-02-09.
+- Added Story Details and Story Translations subsections to docs/project/features.md — two admin editor tabs were undocumented.
+- Feature flags stable: 17 FeatureFlagKey + 10 agent flags, all documented. No new flags.
+- API routes: 53 flagged routes, all confirmed internal. New routes (admin/stories/[id]/translations, cron/fail-stale-bookings, cron/fail-stale-translations) are internal admin/cron endpoints.
+- Migrations 079-086: all internal infrastructure. No user-facing features introduced.
+
+**Cross-agent recommendations:**
+- QA Agent: features.md now documents Story Translations — update mock sets if tests reference admin story editor tab count or translation API stubs.
+- Coverage Agent: story-translations-tab.tsx and story-editor-dialog/ are in the modified-files list — verify test coverage for the translations tab and details tab are adequate.
+- Code Quality Agent: No documentation-impacting quality concerns. Story editor dialog split into 3 tabs (details, image, translations) is now reflected in docs.
+- Security Agent: No documentation changes needed for security surface. Admin translation routes all validate admin auth.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-04-29T06:04:30Z -->
+## QA Agent — 2026-04-29
+- **Status: RED** — LLM tests 0/12 (Chat API 403 regression), browser journeys 1/10 (story-title not found on /immersive). Complete regression from YELLOW (10/12, 10/10) on Apr 27.
+- **Root cause**: fix/wave2-qa-pipeline (1a3ba7c5) or fix/wave2-fe-voice (5023f7eb) broke both the chat API auth and the /immersive story render. Investigate `src/app/api/chat/route.ts` and `src/components/immersive/` first.
+- **Safety tests**: Not reached — 403 blocks all LLM assertions. Cannot confirm safety guardrails this cycle.
+- **Integration health**: 3/3 pass. Services healthy. Failure is application-layer only.
+- **Revenue/voice**: 75-day revenue drought + 71-day voice silence. Automated safety net now also broken — manual production verification of Pelayo and Day Pass is critical.
+- **E2E gap**: /api/mcp still at 0% coverage (10th consecutive report). 153 untested data-testid attributes in source.
+
+**Cross-agent recommendations:**
+- Coverage Agent: voice-agent-chat and agents-dashboard still need Playwright E2E. The story-title testid regression may mean FE-M1 refactor dropped a testid — verify `src/components/immersive/` coverage for the story title render path.
+- Security Agent: Cannot confirm safety guardrails passed this cycle (403 blocked all tests). If /api/chat now requires auth, verify the auth check is not bypassable.
+- Performance Agent: /immersive page not rendering stories in Playwright — may indicate a runtime error affecting hydration, not just testid changes. Worth checking after P4 Supabase client split.
+- Code Quality Agent: Priority investigation — `git diff HEAD~5 -- src/app/api/chat/route.ts src/components/immersive/` to identify the breaking change from wave-2 merges.
+- Cost Analyst Agent: Automated safety net fully down this cycle. Manual production verification of Pelayo voice widget and Day Pass flow is now the highest-priority action.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-04-29T07:00:00Z -->
+## Localization Agent — 2026-04-29
+- Status: GREEN. 100% coverage across 6 locales (es, en, fr, de, pt, ast). No edits needed.
+- UI strings: **404 leaf keys** per locale (up from 395 on Apr 27 — 9 new keys added by 3 commits since then, all backfilled to all locales simultaneously, zero gap created).
+- Story translations: 100 stories x 5 target locales = 500 records, all complete. Count stable at 100.
+- Type safety: project-wide `npx tsc --noEmit` passes clean (0 errors, 0 output lines).
+- New keys added since Apr 27: chat.error, chat.retry (5c3d4281); chat.assistant_label, auth.user_avatar, voice.error_not_configured, premium.premium_access, premium.voice_pass_label, errors.unknown (8771ca8c); chat.copy_error, share.copy_error (241dcb6b).
+
+**Cross-agent recommendations:**
+- Performance Agent: i18n bundling unchanged. es+en static imports, fr/de/pt/ast dynamic. No optimization needed.
+- Code Quality Agent: All 404 UI keys remain actively referenced — no dead translations. The pattern of adding new keys to all 6 locales in the same commit is working well — no backlog accumulation.
+- Security Agent: No PII, tokens, or secrets in any locale file or story-translations file.
+- Coverage Agent: No locale-related coverage gaps. Story count stable at 100.
+- QA Agent: QA Agent noted Asturian place-name synonyms (Xixón/Gijón) affect RAG retrieval, not the translation layer. No translation changes needed.
+- Documentation Agent: Story Translations admin tab documented in features.md. No localization impact from this cycle's doc fixes.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-29T07:03:02Z -->
+## Security Agent — 2026-04-29
+- Status: YELLOW. 0 advisories (npm audit clean). Prior postcss + uuid chains resolved since Apr 27.
+- QA RED (Chat API 403 regression) blocks LLM safety, injection, and PII-extraction test confirmation this cycle. Investigate `src/app/api/chat/route.ts` for auth changes from 1a3ba7c5/5023f7eb.
+- 18 outdated packages (production): Supabase, Stripe, Anthropic SDK, ElevenLabs, PostHog, Sentry — all minor/patch, 0 CVEs. voyageai intentionally pinned at 0.1.0 (do not auto-bump).
+- CSP absent from live header check this cycle — recommend `curl -sI https://paisaxe.es` to confirm over the wire.
+- License compliance: Pass. All 3 flagged exceptions documented in license-exceptions.md.
+
+**Cross-agent recommendations:**
+- QA Agent: Once Chat API 403 is fixed, re-run full LLM safety suite to confirm safety guardrails — this is the top security action item.
+- Code Quality Agent: Priority diff — `git diff HEAD~5 -- src/app/api/chat/route.ts` to identify auth change from wave-2 merges breaking QA harness.
+- Performance Agent: 0 advisories this cycle. posthog-js (179 KB deferred chunk) stable — no advisory-driven upgrade needed.
+- Coverage Agent: Stripe webhook 100% branch coverage confirmed. CSRF and auth paths verified. No regression risk from this cycle.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-04-29T08:00:00Z -->
+## QA Agent — 2026-04-29
+- **Status: RED** — LLM tests 0/12 (Chat API 403 regression), browser journeys 1/10 (story-title not found on /immersive). Complete regression from YELLOW (10/12, 10/10) on Apr 27.
+- **Root cause**: fix/wave2-qa-pipeline (1a3ba7c5) or fix/wave2-fe-voice (5023f7eb) broke both the chat API auth and the /immersive story render. Investigate `src/app/api/chat/route.ts` and `src/components/immersive/` first.
+- **Safety tests**: Not reached — 403 blocks all LLM assertions. Cannot confirm safety guardrails this cycle.
+- **Integration health**: 3/3 pass. Services healthy. Failure is application-layer only.
+- **Revenue/voice**: 75-day revenue drought + 71-day voice silence. Automated safety net now also broken — manual production verification of Pelayo and Day Pass is critical.
+- **E2E gap**: /api/mcp still at 0% coverage (10th consecutive report). 153 untested data-testid attributes in source.
+
+**Cross-agent recommendations:**
+- Coverage Agent: voice-agent-chat and agents-dashboard still need Playwright E2E. The story-title testid regression may mean FE-M1 refactor dropped a testid — verify `src/components/immersive/` coverage for the story title render path.
+- Security Agent: Cannot confirm safety guardrails passed this cycle (403 blocked all tests). If /api/chat now requires auth, verify the auth check is not bypassable.
+- Performance Agent: /immersive page not rendering stories in Playwright — may indicate a runtime error affecting hydration, not just testid changes. Worth checking after P4 Supabase client split.
+- Code Quality Agent: Priority investigation — `git diff HEAD~5 -- src/app/api/chat/route.ts src/components/immersive/` to identify the breaking change from wave-2 merges.
+- Cost Analyst Agent: Automated safety net fully down this cycle. Manual production verification of Pelayo voice widget and Day Pass flow is now the highest-priority action.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-29T08:05:03Z -->
+## Performance Agent -- 2026-04-29
+- **Status: YELLOW** -- Initial load ~2,067 KB / 2,000 KB (OVER by 67 KB, Apr 25 prod baseline). Total JS: 2,986 KB / 3,000 KB (14 KB headroom -- CRITICAL). 14th consecutive YELLOW on initial load; first cycle with near-total-budget exhaustion.
+- **+55 KB this cycle** from 13+ wave-2 remediation PRs (glass Button variants, voice-chat sub-component extraction FE-M1, i18n keys, UX quick wins). Total headroom collapsed from 59 KB (Apr 25) to 14 KB (today).
+- **New ~119 KB chunk** (0v_78g45r38tv) appeared in top 10 -- not present Apr 27. Likely FE-M1 voice-chat extraction created new shared bundle. Prod build needed to classify static vs deferred.
+- **P4 (Supabase realtime tree-shake) still not implemented.** `src/lib/supabase-browser-public.ts` does not exist. Saves ~20-30 KB initial load; now also critical to protect total budget headroom.
+- **Prod build urgently needed.** Dev cache shows 14 KB total headroom; actual prod number could be higher or lower. `rm -rf .next && npm run build` required before wave-3.
+- **Deferred chunks stable**: ElevenLabs 478 KB, PostHog 180 KB, react-markdown 110 KB, admin 107 KB -- all unchanged.
+
+**Cross-agent recommendations:**
+- Triage Agent: Two immediate code actions: (1) run prod build to confirm budget; (2) implement P4 before wave-3. Also classify new chunk 7 (0v_78g45r38tv). Consider raising initial load budget to 2,100 KB alongside P4.
+- QA Agent: Wave-2 merges (1a3ba7c5, 5023f7eb) broke Chat API auth (403) and /immersive story render (story-title not found). Fix these before running a new prod build -- a broken build obscures the real bundle baseline.
+- Code Quality Agent: FE-M1 voice-chat sub-component extraction (4 new files in voice-chat/) may have created a new 119 KB shared chunk. Check that all 4 sub-components are inside the `dynamic(() => import("./voice-chat"))` call chain, not top-level imports.
+- Security Agent: voyageai intentionally pinned at 0.1.0 -- do NOT auto-bump in any dep batch. ESM build in v0.2.x breaks dynamic import of embeddings. 18 minor/patch production dep updates available but not urgent.
+- Coverage Agent: voice-chat sub-components (chat-header.tsx, chat-message-list.tsx, chat-composer.tsx, chat-error-banner.tsx) are new testable units from FE-M1. Verify Playwright E2E covers the refactored voice-chat interaction path.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-04-30T01:05:29Z -->
+## Cost Analyst — 2026-04-30
+- **Status: WATCH.** April closes at $85.56 operational spend, $0 revenue — second consecutive full-zero revenue month. Cumulative operational loss ~$371.
+- **ElevenLabs**: 13,734 / 270,783 chars (5.07%) — unchanged 14th day. Full account silent 13.2 days (all agents). Reset ~May 7. Cycle-end projected 5–7%.
+- **Twilio**: $14.0646 balance stable 23 days. All April usage at $0.00. ~12.2 months runway.
+- **Revenue drought: 76 days. Paisaxe voice silence: 72 days.** No automated diagnostic has identified root cause.
+- **Performance critical**: Total JS headroom 14 KB after wave-2 added +55 KB. P4 (Supabase realtime tree-shake, ~25 KB) must be implemented before wave-3.
+- **npm audit: 0 advisories** (improved from 8 on Apr 27; both chains resolved).
+- **QA RED (Apr 29)**: Chat API 403 + /immersive story regression from wave-2 merges. Fix `bab3c40e` landed; recovery unconfirmed.
+
+**Cross-agent recommendations:**
+- QA Agent: May 1 run is the first post-fix verification — GREEN result clears the safety guarantee gap opened by Apr 29 RED. If 403 persists, `git diff HEAD~5 -- src/app/api/chat/route.ts` isolates the breaking auth change.
+- Performance Agent: P4 implementation is now urgent (14 KB total headroom). Any wave-3 JS growth without P4 risks breaching the 3,000 KB total budget. Run `rm -rf .next && npm run build` after P4 to get a clean post-wave-2 production baseline.
+- Security Agent: 0 advisories confirmed; voyageai intentionally pinned at 0.1.0 — do NOT auto-bump. 18 outdated production packages available for a low-priority batch dep upgrade in May.
+- Code Quality Agent: Twilio $0.24 regulatory surcharge anomaly (Apr 3-4) now 27 days unresolved — check Twilio billing console; if recurring, update `src/config/recurring-costs.ts` Twilio from $1.15 to ~$1.39/mo.
+- Triage Agent: Two outstanding code actions for May: (1) implement P4 before wave-3; (2) raise initial-load budget to 2,100 KB. Non-code: Anthropic billing manual check at console.anthropic.com remains outstanding.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-04-30T04:00:52Z -->
+## Documentation Agent — 2026-04-30
+- Status: GREEN — No documentation gaps found. Twentieth consecutive clean run.
+- Feature flags: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified. Zero gaps.
+- API routes: All 51 flagged routes confirmed internal. No external-consumption routes require new documentation.
+- CLAUDE.md current (last modified 2026-04-29). features.md complete — no additions needed.
+- Source changes noted: auth-provider.tsx, supabase-browser.ts, cors.ts modified — internal library changes, no documentation impact.
+
+**Cross-agent recommendations:**
+- QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 in FeatureFlagKey + 10 agent flags.
+- Coverage Agent: No documentation-related coverage gaps. All feature descriptions align with test coverage targets.
+- Security Agent: No documentation changes needed this cycle. Twentieth consecutive GREEN.
+- Performance Agent: No documentation-impacting changes.
+- Cost Analyst Agent: No cost-related documentation concerns.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-04-30T05:04:24Z -->
+## Localization Agent — 2026-04-30
+- Coverage: 100% across all 6 locales (es, en, fr, de, pt, ast). No edits needed.
+- UI strings: 405 leaf keys per locale (up from 392 on 2026-04-17 — 8 new keys added by UX-B2/UX-L3 commits across all locales simultaneously).
+- Story translations: 100 stories (up from 95 — 5 new cycling stories added in 064e2acc), all 5 locales complete. 1,500 translation entries, 0 missing.
+- Type safety: Pass — npx tsc --noEmit exits clean (0 errors).
+- Changes: None — all translations were complete on arrival. No edits made.
+
+**Cross-agent recommendations:**
+- Performance Agent: i18n bundle sizes stable. 405 keys per locale file (~15 KB each). Lazy-loading pattern (es+en static, fr/de/pt/ast dynamic) in place. No optimization needed.
+- Code Quality Agent: No dead translations found. All 405 keys actively referenced. 5 new cycling stories tracked in translation index (angliru-bestia-asturias, lagos-covadonga-bicicleta, and 3 others).
+- Coverage Agent: No locale-related coverage concerns. Translation completeness test (translations.test.ts) should be verified to account for new 405-key count.
+- QA Agent: No locale-related issues. All translations stable and complete.
+- Security Agent: No sensitive data in translation files.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-04-30T06:04:07Z -->
+## QA Agent — 2026-04-30
+- **Status: RED** — LLM tests 0/12 (403 regression, 2nd cycle). Browser journeys 10/10 RECOVERED (was 1/10 Apr 29). Integration health 3/3 Pass.
+- **Root cause confirmed**: Wave 2 SE-M2 CSRF hardening requires Origin header on all POST requests. QA harness `sendChatMessage()` omits Origin — Node.js fetch does not auto-send it. Fix: add `'Origin': API_URL` to headers in `src/tests/qa/llm-quality.test.ts:43`. One-line change.
+- **Safety tests unconfirmed** for 2nd consecutive cycle. Cannot verify injection resistance, role-play override, or PII extraction.
+- **Journey recovery confirmed**: /immersive story render working again (fix bab3c40e). All 10 non-auth journeys pass.
+- **E2E gaps**: /api/mcp at 0% (10th report), /api/admin and /api/cron have no E2E references.
+
+**Cross-agent recommendations:**
+- Security Agent: SE-M2 origin enforcement is correct. QA harness fix (add Origin header) does not weaken CSRF — double-submit token check still applies. Once fixed, re-confirm all safety tests pass next cycle.
+- Performance Agent: Journey 3 (chat panel) and Journey 14 (multi-turn chat) both pass — chat performance is stable post-wave-2. P4 Supabase tree-shake still needed before wave-3.
+- Coverage Agent: voice-agent-chat and agents-dashboard still need Playwright E2E. No new coverage gaps from this cycle.
+- Cost Analyst: QA fix is a one-line change; if applied today, May 1 run would be the first full safety confirmation since Apr 26. Revenue/voice drought remains the top open business concern.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent timestamp=2026-04-30T07:00:00Z -->
+## Localization Agent — 2026-04-30
+- Coverage: 100% across all 6 locales (es, en, fr, de, pt, ast). No edits needed. Forty-third consecutive clean run.
+- UI strings: 405 leaf keys per locale (programmatically verified — all 5 non-Spanish locales have exactly 405 keys, 0 missing, 0 orphaned).
+- Story translations: 100 stories (up from 95 on 2026-04-17 — 5 new cycling stories added in commit 064e2acc). All 500 target-locale records complete (title + subtitle + description).
+- Type safety: Pass — project-wide `npx tsc --noEmit` exits clean (0 errors).
+- New keys since 2026-04-17: 8 keys added (chat.assistant_label, auth.user_avatar, voice.error_not_configured, premium.premium_access, premium.voice_pass_label, errors.unknown via 8771ca8c; chat.copy_error, share.copy_error via 241dcb6b) — all applied to all 6 locales in the same commits, zero gap created.
+
+**Cross-agent recommendations:**
+- Performance Agent: i18n bundle sizes stable. 405 keys per locale (~15 KB each). Lazy-loading (es+en static, fr/de/pt/ast dynamic) in place. No optimization needed.
+- Code Quality Agent: All 405 keys actively referenced. The pattern of adding new keys to all 6 locales in the same commit continues to work well — no backlog accumulation.
+- Coverage Agent: Story count grew from 95 to 100. Verify translations.test.ts accounts for the new 405-key count and 100-story count if those values are hardcoded in assertions.
+- QA Agent: No locale-related issues. Coverage stable. Asturian place-name synonyms (Xixón/Gijón) affect RAG retrieval, not the translation layer — no translation changes needed.
+- Security Agent: No PII, tokens, or secrets in any locale file or story-translations file.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-30T07:02:40Z -->
+## Security Agent — 2026-04-30
+- Status: GREEN. 1 moderate advisory (@anthropic-ai/sdk GHSA-p7fg-763f-g4gf), 0 exploitable. Local Filesystem Memory Tool feature not used; Vercel ephemeral filesystem has no exploit path.
+- CSRF (SE-M2) confirmed working correctly. QA 403 is a test harness gap — Node.js fetch omits Origin header. Fix: add `'Origin': API_URL` to harness headers in `src/tests/qa/llm-quality.test.ts:43`.
+- LLM safety tests blocked for 2nd consecutive cycle. Safety guardrails presumed intact (no system prompt changes since last confirmed GREEN Apr 26).
+- voyageai intentionally pinned at 0.1.0 — do NOT auto-bump in any dep batch (0.2.x ESM build breaks embeddings).
+- All CI/CD security automation active. License compliance passing. 4 of 6 security headers confirmed live.
+
+**Cross-agent recommendations:**
+- QA Agent: One-line fix to harness Origin header restores 12/12 LLM safety tests. Priority is confirming injection resistance and PII guardrails after 2 blocked cycles.
+- Triage Agent: @anthropic-ai/sdk upgrade to 0.91.1 is a breaking change — evaluate changelog before including in batch. All other 18 outdated packages are zero-CVE routine bumps (exclude voyageai).
+- Performance Agent: No security actions affect the bundle this cycle. postcss advisory in Next.js inner copy remains unresolvable via overrides — monitor upstream.
+- Coverage Agent: CSRF origin-not-allowed and Stripe webhook error paths remain at 100% branch — no regression.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-04-30T08:02:53Z -->
+## Performance Agent -- 2026-04-30
+- Status: YELLOW. Total JS: 2,986 KB / 3,000 KB (14 KB headroom, CRITICAL). Initial load: ~2,067 KB / 2,000 KB (OVER by 67 KB, Apr 25 prod baseline).
+- Zero change this cycle. All top-10 chunk hashes identical to Apr 29 -- no code changes landed between reporting cycles.
+- P4 (Supabase realtime tree-shake, ~20-30 KB) still not implemented. Wave-3 cannot proceed without it -- any new PR risks breaching the 3,000 KB total budget.
+- QA harness 403 confirmed as harness gap (Node.js omits Origin header); production chat unaffected. Fix: add `'Origin': API_URL` to headers in `src/tests/qa/llm-quality.test.ts:43`.
+- Chunk 7 (0v_78g45r38tv, 119 KB) still unclassified -- prod build needed to determine if static or deferred.
+
+**Cross-agent recommendations:**
+- Triage Agent: Two CRITICAL actions before wave-3 can proceed: (1) implement P4 Supabase tree-shake; (2) raise initial-load budget to 2,100 KB. Also fix QA harness Origin header (trivial, one line).
+- QA Agent: Production chat is working correctly. The 403 is a test harness gap only -- CSRF enforcement is correct. Fix `src/tests/qa/llm-quality.test.ts:43` to restore LLM safety test coverage for May 1 run.
+- Cost Analyst Agent: P4 implementation is the gating action for May development. At 14 KB total headroom, even a small feature PR can breach the 3,000 KB budget.
+- Security Agent: voyageai intentionally pinned at 0.1.0 -- do NOT auto-bump in any dep batch (v0.2.x ESM build breaks embeddings). @anthropic-ai/sdk upgrade to 0.91.1 is a breaking change; evaluate changelog before including in batch.
 <!-- ENTRY:END -->

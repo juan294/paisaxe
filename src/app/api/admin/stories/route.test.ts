@@ -3,28 +3,32 @@ import { NextRequest } from "next/server";
 import { GET, POST } from "./route";
 import { logger } from "@/lib/logger";
 
-// Mock withAdmin so tests control auth + client injection independently.
-// When withAdmin resolves as unauthorized, return a 401 response directly.
-// When withAdmin resolves as authorized, call the handler with a mock supabase client.
+// Mock withAdmin (mutations) and withAdminRead (GET reads) independently.
+// Both helpers set up whichever HOF the caller cares about.
 vi.mock("@/lib/admin-auth", () => ({
   withAdmin: vi.fn(),
+  withAdminRead: vi.fn(),
 }));
 
-import { withAdmin } from "@/lib/admin-auth";
+import { withAdmin, withAdminRead } from "@/lib/admin-auth";
 
-// Helper: make withAdmin call through to the real handler with a mock supabase client.
+// Helper: authorize both HOFs so GET (withAdminRead) and POST (withAdmin) both work.
 function mockWithAdminAuthorized(mockSupabase: unknown) {
-  vi.mocked(withAdmin).mockImplementation(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async (handler: (client: any) => Promise<unknown>) => handler(mockSupabase)
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const callThrough = async (handler: (client: any) => Promise<unknown>) =>
+    handler(mockSupabase);
+  vi.mocked(withAdmin).mockImplementation(callThrough);
+  vi.mocked(withAdminRead).mockImplementation(callThrough);
 }
 
-// Helper: make withAdmin return a 401 without calling the handler.
+// Helper: reject both HOFs with an error response (default 401).
 function mockWithAdminUnauthorized(status = 401) {
-  vi.mocked(withAdmin).mockResolvedValue(
-    new Response(JSON.stringify({ error: "Unauthorized" }), { status }) as never
-  );
+  const errResponse = new Response(
+    JSON.stringify({ error: "Unauthorized" }),
+    { status }
+  ) as never;
+  vi.mocked(withAdmin).mockResolvedValue(errResponse);
+  vi.mocked(withAdminRead).mockResolvedValue(errResponse);
 }
 
 describe("GET /api/admin/stories", () => {
@@ -62,12 +66,33 @@ describe("GET /api/admin/stories", () => {
     expect(response.status).toBe(401);
   });
 
+  /**
+   * Build a mock Supabase chain for GET: select → order → [eq →] range
+   */
+  function buildGetMock(stories: unknown[], count = stories.length, error: unknown = null) {
+    const mockRange = vi.fn().mockResolvedValue({ data: stories, error, count });
+    const mockOrder = vi.fn().mockReturnValue({ range: mockRange });
+    const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    return { mockFrom, mockRange, mockOrder, mockSelect };
+  }
+
+  /**
+   * Build a mock that supports an optional .eq() after .range():
+   * select → order → range → eq (resolved)
+   * The eq() result is the final resolved promise.
+   */
+  function buildFilteredGetMock(stories: unknown[], count = stories.length) {
+    const mockEq = vi.fn().mockResolvedValue({ data: stories, error: null, count });
+    const mockRange = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockOrder = vi.fn().mockReturnValue({ range: mockRange });
+    const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    return { mockFrom, mockRange, mockOrder, mockEq };
+  }
+
   it("should return stories when auth is valid", async () => {
-    const mockFrom = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        order: vi.fn().mockResolvedValue({ data: mockStories, error: null }),
-      }),
-    });
+    const { mockFrom } = buildGetMock(mockStories, 2);
     mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories");
@@ -75,18 +100,28 @@ describe("GET /api/admin/stories", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.data).toHaveLength(2);
-    expect(data.data[0].id).toBe("story-1");
-    expect(data.data[0].curationStatus).toBe("needs_curation");
+    expect(data.data.stories).toHaveLength(2);
+    expect(data.data.total).toBe(2);
+    expect(data.data.page).toBe(1);
+    expect(data.data.pageSize).toBe(20);
+    expect(data.data.stories[0].id).toBe("story-1");
+    expect(data.data.stories[0].curationStatus).toBe("needs_curation");
+  });
+
+  it("should apply .range() for pagination", async () => {
+    const { mockFrom, mockRange } = buildGetMock(mockStories, 2);
+    mockWithAdminAuthorized({ from: mockFrom });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories?page=2&pageSize=10");
+    await GET(request);
+
+    // page=2, pageSize=10 → offset=10, end=19
+    expect(mockRange).toHaveBeenCalledWith(10, 19);
   });
 
   it("should filter by needs_curation status", async () => {
     const filteredStories = mockStories.filter(s => s.curation_status === "needs_curation");
-
-    const mockEq = vi.fn().mockResolvedValue({ data: filteredStories, error: null });
-    const mockOrder = vi.fn().mockReturnValue({ eq: mockEq });
-    const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
-    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    const { mockFrom, mockEq } = buildFilteredGetMock(filteredStories);
     mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories?filter=needs_curation");
@@ -96,10 +131,7 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should filter by approved status", async () => {
-    const mockEq = vi.fn().mockResolvedValue({ data: [], error: null });
-    const mockOrder = vi.fn().mockReturnValue({ eq: mockEq });
-    const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
-    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    const { mockFrom, mockEq } = buildFilteredGetMock([]);
     mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories?filter=approved");
@@ -109,9 +141,7 @@ describe("GET /api/admin/stories", () => {
   });
 
   it("should return 500 when database query fails", async () => {
-    const mockOrder = vi.fn().mockResolvedValue({ data: null, error: { message: "DB Error" } });
-    const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
-    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    const { mockFrom } = buildGetMock([], 0, { message: "DB Error" });
     mockWithAdminAuthorized({ from: mockFrom });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories");

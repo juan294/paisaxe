@@ -158,7 +158,10 @@ export const StoryProgressBar = memo(function StoryProgressBar({
             aria-label={getSegmentLabel(i, targetIndex)}
             aria-current={isCurrent ? "true" : undefined}
             className={cn(
-              "flex-1 h-1 rounded-full bg-white/30 overflow-hidden cursor-pointer transition-all duration-300 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+              // UX-M10 (#520): h-1.5 default (was h-1) for better touch affordance;
+              // hover/focus grows to h-2; inactive segments use bg-white/40 (was bg-white/30)
+              // for better contrast on touch (coarse pointer) devices.
+              "flex-1 h-1.5 hover:h-2 focus-visible:h-2 rounded-full bg-white/40 touch:bg-white/40 overflow-hidden cursor-pointer transition-all duration-300 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
               isCurrent && "ring-1 ring-white/50"
             )}
           >

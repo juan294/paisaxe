@@ -66,16 +66,42 @@ export async function updateStory(
   }
 }
 
+interface StoriesPage {
+  stories: AdminStory[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+interface FetchStoriesOptions {
+  filter?: CurationStatus;
+  page?: number;
+  pageSize?: number;
+}
+
 /**
- * Fetch all stories with optional filter
+ * Fetch a page of stories with optional filter and server-side pagination.
+ * Accepts either a legacy CurationStatus string or a FetchStoriesOptions object.
  */
 export async function fetchStories(
-  filter?: CurationStatus
-): Promise<AdminApiResponse<AdminStory[]>> {
+  filterOrOptions?: CurationStatus | FetchStoriesOptions
+): Promise<AdminApiResponse<StoriesPage>> {
   try {
+    // Accept both legacy string form and new options object
+    const opts: FetchStoriesOptions =
+      typeof filterOrOptions === "string"
+        ? { filter: filterOrOptions }
+        : filterOrOptions ?? {};
+
     const url = new URL(`${API_BASE}/stories`, window.location.origin);
-    if (filter) {
-      url.searchParams.set("filter", filter);
+    if (opts.filter) {
+      url.searchParams.set("filter", opts.filter);
+    }
+    if (opts.page != null) {
+      url.searchParams.set("page", String(opts.page));
+    }
+    if (opts.pageSize != null) {
+      url.searchParams.set("pageSize", String(opts.pageSize));
     }
 
     const response = await fetch(url.toString());

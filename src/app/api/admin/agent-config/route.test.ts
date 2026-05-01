@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Use vi.hoisted so mock fns are available inside hoisted vi.mock factories
 const { mockReadFile, mockWriteFile } = vi.hoisted(() => ({
   mockReadFile: vi.fn(),
@@ -327,5 +335,47 @@ describe("PUT /api/admin/agent-config", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to update agent config");
+  });
+
+  describe("Zod validation", () => {
+    it("returns 400 for invalid JSON body", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/admin/agent-config",
+        { method: "PUT", body: "not-json" }
+      );
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request body");
+    });
+
+    it("returns 400 for empty object body", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      mockReadFile.mockResolvedValue(JSON.stringify(sampleConfig));
+
+      const request = makeRequest({});
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request body");
+    });
+  });
+
+  it("should use logger.error (not console.error) on unhandled GET error", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    mockReadFile.mockRejectedValue(new Error("File system error"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await GET();
+    consoleSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

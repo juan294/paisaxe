@@ -3,6 +3,7 @@ import { rowToStory } from "@/types/immersive";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/env";
 import { FALLBACK_STORIES } from "@/lib/stories-data";
 import { getEnvironment } from "@/lib/environment";
+import { logger } from "@/lib/logger";
 
 /**
  * Log a warning when serving fallback stories.
@@ -45,6 +46,7 @@ export async function getStoriesServer(): Promise<Story[]> {
           apikey: supabaseKey,
           Authorization: `Bearer ${supabaseKey}`,
         },
+        signal: AbortSignal.timeout(8_000),
         ...(isDev
           ? { cache: "no-store" as const }
           : { next: { revalidate: 60 } }),
@@ -64,7 +66,8 @@ export async function getStoriesServer(): Promise<Story[]> {
 
     return data.map(rowToStory);
   } catch (error) {
-    logFallback(`Fetch error: ${error instanceof Error ? error.message : String(error)}`);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error("[TABLE_FALLBACK]", { table: "stories", error: message });
     return FALLBACK_STORIES;
   }
 }

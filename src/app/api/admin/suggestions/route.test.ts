@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type { StorySuggestionRow } from "@/types/suggestions";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
@@ -193,8 +201,6 @@ describe("/api/admin/suggestions", () => {
     });
 
     it("should return 500 when Supabase query returns an error", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
       mockCreateAdminClient.mockReturnValueOnce({
         from: () => ({
           select: () => ({
@@ -214,17 +220,13 @@ describe("/api/admin/suggestions", () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe("Failed to fetch suggestions");
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(logger.error).toHaveBeenCalledWith(
         "Error fetching suggestions:",
-        expect.objectContaining({ message: "Database error" })
+        expect.anything()
       );
-
-      consoleSpy.mockRestore();
     });
 
     it("should return 500 when an unexpected exception is thrown", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
       mockCreateAdminClient.mockReturnValueOnce({
         from: () => {
           throw new Error("Unexpected failure");
@@ -237,12 +239,10 @@ describe("/api/admin/suggestions", () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(logger.error).toHaveBeenCalledWith(
         "Admin suggestions API error:",
-        expect.any(Error)
+        expect.anything()
       );
-
-      consoleSpy.mockRestore();
     });
 
     it("should handle suggestions where getUserById returns no email (line 55-56 branch)", async () => {
@@ -330,5 +330,21 @@ describe("/api/admin/suggestions", () => {
       expect(response.status).toBe(200);
       expect(data.data).toHaveLength(1);
     });
+  });
+
+  it("should use logger.error (not console.error) on unhandled GET error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin-1" });
+    mockCreateAdminClient.mockImplementation(() => {
+      throw new Error("Unexpected DB failure");
+    });
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = new NextRequest("http://localhost/api/admin/suggestions");
+    const response = await GET(request);
+    consoleSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

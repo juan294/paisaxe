@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, renderHook, screen } from "@testing-library/react";
 import { FeatureFlagsProvider, useFeatureFlags } from "./use-feature-flags";
 
 const mockFetch = vi.fn();
@@ -26,5 +26,11 @@ describe("FeatureFlagsProvider", () => {
 
     expect(screen.getAllByText("enabled")).toHaveLength(2);
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("throws when useFeatureFlags is called outside a FeatureFlagsProvider", () => {
+    expect(() => renderHook(() => useFeatureFlags())).toThrow(
+      "useFeatureFlags must be used within a FeatureFlagsProvider"
+    );
   });
 });

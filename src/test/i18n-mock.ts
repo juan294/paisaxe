@@ -24,6 +24,7 @@ export const mockTranslations: Record<string, string> = {
   "chat.directions": "Cómo llegar",
   "chat.copy_conversation": "Copiar conversación",
   "chat.copied": "Copiado",
+  "chat.copy_error": "No se pudo copiar",
 
   // Stories
   "stories.new_badge": "Nuevo",
@@ -96,6 +97,7 @@ export const mockTranslations: Record<string, string> = {
   "auth.sign_in": "Entrar",
   "auth.sign_out": "Cerrar sesion",
   "auth.user": "Usuario",
+  "auth.user_avatar": "Avatar del usuario",
   "auth.sync_favorites_title": "Sincroniza tus favoritos",
   "auth.sync_favorites_description": "Inicia sesion para guardar tus favoritos en la nube y acceder desde cualquier dispositivo.",
   "auth.continue_with_google": "Continuar con Google",
@@ -113,6 +115,7 @@ export const mockTranslations: Record<string, string> = {
   // Share
   "share.share": "Compartir",
   "share.link_copied": "Enlace copiado",
+  "share.copy_error": "No se pudo copiar",
 
   // Favorites toast
   "favorites.removed": "Eliminado de favoritos",
@@ -173,6 +176,8 @@ export const mockTranslations: Record<string, string> = {
   "accessibility.story_progress": "Progreso de historias",
   "accessibility.more_options": "Más opciones",
   "accessibility.story_controls": "Controles de historias",
+  "accessibility.show_info": "Mostrar información de la historia",
+  "accessibility.hide_info": "Ocultar información de la historia",
 };
 
 export function createMockT() {

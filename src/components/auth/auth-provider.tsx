@@ -29,6 +29,11 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
   const siteUrl = getSiteUrl();
 
   useEffect(() => {
+    if (!supabase) {
+      setIsLoading(false);
+      return;
+    }
+
     // Get initial session using getUser() to validate with server
     // This ensures client and server auth state stay in sync
     const initializeAuth = async () => {

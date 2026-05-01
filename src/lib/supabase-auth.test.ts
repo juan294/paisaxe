@@ -27,6 +27,39 @@ const mockCreateServerClient = vi.mocked(createServerClient);
 
 import { getSupabaseClient, getUserFromRequest } from "./supabase-auth";
 
+// ─── DO-M1: env vars must pass through env.ts .trim() ──────────────────────
+describe("DO-M1: getSupabaseClient trims env vars (no bare process.env reads)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("strips trailing newline from NEXT_PUBLIC_SUPABASE_URL before passing to createServerClient", async () => {
+    // Save and inject a value with a trailing newline (typical Vercel CLI artifact)
+    const saved = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co\n";
+
+    await getSupabaseClient();
+
+    const [url] = mockCreateServerClient.mock.calls[0];
+    expect(url).toBe("https://test.supabase.co");
+    expect(url).not.toMatch(/\n/);
+
+    process.env.NEXT_PUBLIC_SUPABASE_URL = saved;
+  });
+
+  it("strips trailing whitespace from NEXT_PUBLIC_SUPABASE_ANON_KEY before passing to createServerClient", async () => {
+    const saved = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "  test-anon-key  ";
+
+    await getSupabaseClient();
+
+    const [, anonKey] = mockCreateServerClient.mock.calls[0];
+    expect(anonKey).toBe("test-anon-key");
+
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = saved;
+  });
+});
+
 describe("getSupabaseClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -123,13 +156,129 @@ describe("getUserFromRequest", () => {
     });
   };
 
-  it("should return null when Authorization header is missing", async () => {
+  // ─── BE-H2: cookie-session is tried first when no bearer token present ──────
+  it("BE-H2: returns user from cookie session when no Authorization header is present", async () => {
+    const mockUser = { id: "cookie-user-123", email: "cookie@example.com" };
+    const mockGetUser = vi.fn().mockResolvedValue({
+      data: { user: mockUser },
+      error: null,
+    });
+    mockCreateServerClient.mockReturnValue({
+      auth: { getUser: mockGetUser },
+      from: vi.fn(),
+    } as never);
+
+    // No Authorization header — browser user with session cookie
     const request = createRequest();
     const user = await getUserFromRequest(request);
+
+    expect(user).toEqual(mockUser);
+    // Cookie-based: getUser called with NO token argument
+    expect(mockGetUser).toHaveBeenCalledWith();
+  });
+
+  it("BE-H2: returns null when no Authorization header and cookie session is expired", async () => {
+    const mockGetUser = vi.fn().mockResolvedValue({
+      data: { user: null },
+      error: { message: "session not found" },
+    });
+    mockCreateServerClient.mockReturnValue({
+      auth: { getUser: mockGetUser },
+      from: vi.fn(),
+    } as never);
+
+    const request = createRequest();
+    const user = await getUserFromRequest(request);
+
     expect(user).toBeNull();
   });
 
-  it("should return null when Authorization header does not start with Bearer", async () => {
+  it("BE-H2: prefers bearer token when Authorization header is present", async () => {
+    const mockUser = { id: "bearer-user-456", email: "bearer@example.com" };
+    const mockGetUser = vi.fn().mockResolvedValue({
+      data: { user: mockUser },
+      error: null,
+    });
+    mockCreateServerClient.mockReturnValue({
+      auth: { getUser: mockGetUser },
+      from: vi.fn(),
+    } as never);
+
+    const request = createRequest({ Authorization: "Bearer my-api-token" });
+    const user = await getUserFromRequest(request);
+
+    expect(user).toEqual(mockUser);
+    // Bearer token path: getUser called WITH the token
+    expect(mockGetUser).toHaveBeenCalledWith("my-api-token");
+  });
+
+  // SE-L2 (#511): Explicit precedence test — bearer token wins when BOTH
+  // Authorization header AND a session cookie are present.
+  it("SE-L2 (a): bearer token takes precedence when both Authorization header AND session cookie are present", async () => {
+    const bearerUser = { id: "bearer-user-999", email: "bearer@example.com" };
+    const mockGetUser = vi.fn().mockResolvedValue({
+      data: { user: bearerUser },
+      error: null,
+    });
+    mockCreateServerClient.mockReturnValue({
+      auth: { getUser: mockGetUser },
+      from: vi.fn(),
+    } as never);
+
+    // Simulate having a session cookie by putting something in the mock cookie store
+    mockCookieStore.getAll.mockReturnValue([
+      { name: "sb-access-token", value: "cookie-session-token" },
+    ] as never);
+
+    // Request has BOTH a Bearer header and a session cookie
+    const request = createRequest({ Authorization: "Bearer explicit-bearer-token" });
+    const user = await getUserFromRequest(request);
+
+    expect(user).toEqual(bearerUser);
+    // Bearer path: getUser called WITH the token (not the cookie-based no-arg call)
+    expect(mockGetUser).toHaveBeenCalledWith("explicit-bearer-token");
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
+  // SE-L2 (#511) (b): Only a session cookie — cookie session is used.
+  it("SE-L2 (b): uses cookie session when no Authorization header present (even with cookies set)", async () => {
+    const cookieUser = { id: "cookie-user-777", email: "cookie@example.com" };
+    const mockGetUser = vi.fn().mockResolvedValue({
+      data: { user: cookieUser },
+      error: null,
+    });
+    mockCreateServerClient.mockReturnValue({
+      auth: { getUser: mockGetUser },
+      from: vi.fn(),
+    } as never);
+
+    // Simulate cookies being set
+    mockCookieStore.getAll.mockReturnValue([
+      { name: "sb-access-token", value: "cookie-session-token" },
+    ] as never);
+
+    // No Authorization header — only cookie session
+    const request = createRequest();
+    const user = await getUserFromRequest(request);
+
+    expect(user).toEqual(cookieUser);
+    // Cookie path: getUser called with NO argument
+    expect(mockGetUser).toHaveBeenCalledWith();
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("should return null when Authorization header does not start with Bearer (cookie session also empty)", async () => {
+    // Non-Bearer auth header → falls through to cookie session; cookie session also null
+    mockCreateServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+          error: null,
+        }),
+      },
+      from: vi.fn(),
+    } as never);
+
     const request = createRequest({ Authorization: "Basic some-token" });
     const user = await getUserFromRequest(request);
     expect(user).toBeNull();

@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createEmbeddedCheckoutSession } from "@/lib/stripe";
 import { getSupabaseClient } from "@/lib/supabase-auth";
+import { checkoutBodySchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
+
+const ALLOWED_ORIGINS = [
+  process.env.NEXT_PUBLIC_SITE_URL,
+  "https://paisaxe.es",
+  "https://paisaxe.com",
+  "https://www.paisaxe.es",
+  "https://www.paisaxe.com",
+  process.env.NODE_ENV === "development" ? "http://localhost:3000" : null,
+].filter(Boolean) as string[];
 
 /** Validate returnTo slug: only allow alphanumeric, hyphens, underscores */
 function isValidSlug(value: string): boolean {
@@ -22,7 +33,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const hasPriceId = !!process.env.STRIPE_DAY_PASS_PRICE_ID?.trim();
 
   if (!hasSecretKey || !hasPriceId) {
-    console.error("[checkout/embedded] Missing env vars:", { hasSecretKey, hasPriceId });
+    logger.error("[checkout/embedded] Missing env vars:", { hasSecretKey, hasPriceId });
     return NextResponse.json(
       { error: "Stripe not configured", hasSecretKey, hasPriceId },
       { status: 500 }
@@ -40,15 +51,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const rawOrigin = request.headers.get("origin");
+    if (rawOrigin && !ALLOWED_ORIGINS.includes(rawOrigin)) {
+      return NextResponse.json({ error: "Invalid origin" }, { status: 400 });
+    }
     const origin =
-      request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL;
+      rawOrigin && ALLOWED_ORIGINS.includes(rawOrigin)
+        ? rawOrigin
+        : (process.env.NEXT_PUBLIC_SITE_URL ?? "https://paisaxe.es");
 
     // Parse optional returnTo slug from request body
     let returnTo: string | undefined;
     try {
-      const body = await request.json();
-      if (typeof body.returnTo === "string" && isValidSlug(body.returnTo)) {
-        returnTo = body.returnTo;
+      const rawBody = await request.json();
+      const bodyParsed = checkoutBodySchema.safeParse(rawBody);
+      if (bodyParsed.success && bodyParsed.data.returnTo && isValidSlug(bodyParsed.data.returnTo)) {
+        returnTo = bodyParsed.data.returnTo;
       }
     } catch {
       // No body or invalid JSON — that's fine, returnTo stays undefined
@@ -66,7 +84,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ clientSecret });
   } catch (error) {
-    console.error("[checkout/embedded] Error:", error);
+    logger.error("[checkout/embedded] Error:", { error: error instanceof Error ? error.message : String(error) });
     const body: { error: string; details?: string } = {
       error: "Failed to create checkout session",
     };

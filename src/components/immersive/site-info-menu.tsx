@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { LogOut, LogIn, Info } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
@@ -42,10 +43,11 @@ export function SiteInfoMenu() {
       >
         {user ? (
           user.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={user.avatarUrl}
               alt={user.name || "Avatar"}
+              width={40}
+              height={40}
               className="h-full w-full object-cover"
               referrerPolicy="no-referrer"
             />
@@ -82,10 +84,11 @@ export function SiteInfoMenu() {
             {user ? (
               <div className="flex items-center gap-3">
                 {user.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={user.avatarUrl}
                     alt={user.name || "Avatar"}
+                    width={32}
+                    height={32}
                     className="h-8 w-8 rounded-full"
                     referrerPolicy="no-referrer"
                   />

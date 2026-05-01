@@ -364,7 +364,8 @@ describe("Accessibility: StoryViewer", () => {
         <StoryViewer {...getDefaultProps()} />
       );
 
-      const keyboardHints = container.querySelector(".desktop-pointer-only");
+      // The keyboard hints div is aria-hidden and contains navigation arrows
+      const keyboardHints = container.querySelector("[aria-hidden='true'].desktop-pointer-only");
       expect(keyboardHints).toBeInTheDocument();
       expect(keyboardHints?.textContent).toContain("←");
       expect(keyboardHints?.textContent).toContain("→");
@@ -375,7 +376,8 @@ describe("Accessibility: StoryViewer", () => {
         <StoryViewer {...getDefaultProps()} />
       );
 
-      const keyboardHints = container.querySelector(".desktop-pointer-only");
+      // The keyboard hints div is aria-hidden and contains navigation arrows
+      const keyboardHints = container.querySelector("[aria-hidden='true'].desktop-pointer-only");
       expect(keyboardHints).toBeInTheDocument();
       expect(keyboardHints?.className).toContain("hidden");
       expect(keyboardHints?.className).toContain("md:block");

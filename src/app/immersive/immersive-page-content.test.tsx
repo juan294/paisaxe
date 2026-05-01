@@ -67,6 +67,16 @@ vi.mock("@/components/ui/component-error-boundary", () => ({
     <>{children}</>
   ),
 }));
+// Mock voice-chat module directly to prevent EnvironmentTeardownError — the dynamic
+// import resolver can still trigger module loading after environment teardown unless
+// the underlying module is mocked before it is ever resolved.
+vi.mock("@/components/immersive/voice-chat", () => ({
+  VoiceChat: (props: Record<string, unknown>) => (
+    <div data-testid="voice-chat" data-open={String(props.open)}>
+      <button data-testid="voice-chat-close" onClick={() => (props.onClose as () => void)()} />
+    </div>
+  ),
+}));
 // Mock dynamic import for VoiceChat — renders a div so we can detect it
 vi.mock("next/dynamic", () => ({
   default: () => (props: Record<string, unknown>) => (
@@ -570,6 +580,13 @@ describe("ImmersivePageContent", () => {
     };
 
     setupDefaults();
+    // Enable visitor_voice_agent so the prefetch is allowed
+    vi.mocked(useFeatureFlags).mockReturnValue({
+      flags: [],
+      isReady: true,
+      isEnabled: (flag: string) => flag === "visitor_voice_agent",
+      isEnabledWithDefault: () => false,
+    });
 
     render(<ImmersivePageContent serverShuffleSeed={null} />);
 
@@ -579,6 +596,57 @@ describe("ImmersivePageContent", () => {
     expect(screen.getByTestId("story-viewer")).toBeInTheDocument();
 
     // Restore
+    window.requestIdleCallback = originalRIC;
+  });
+
+  // FE-M6 (#498): Voice-chat prefetch must be gated behind visitor_voice_agent flag.
+  it("FE-M6: does NOT call requestIdleCallback prefetch when visitor_voice_agent is disabled", () => {
+    const originalRIC = window.requestIdleCallback;
+    const mockRIC = vi.fn((cb: IdleRequestCallback) => {
+      cb({} as IdleDeadline);
+      return 0;
+    });
+    window.requestIdleCallback = mockRIC;
+
+    setupDefaults();
+    // Feature flag is disabled (default from setupDefaults)
+    vi.mocked(useFeatureFlags).mockReturnValue({
+      flags: [],
+      isReady: true,
+      isEnabled: () => false,
+      isEnabledWithDefault: () => false,
+    });
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // requestIdleCallback should NOT have been called for the prefetch
+    // because visitor_voice_agent is disabled
+    expect(mockRIC).not.toHaveBeenCalled();
+
+    window.requestIdleCallback = originalRIC;
+  });
+
+  it("FE-M6: calls requestIdleCallback prefetch when visitor_voice_agent is enabled", () => {
+    const originalRIC = window.requestIdleCallback;
+    const mockRIC = vi.fn((cb: IdleRequestCallback) => {
+      cb({} as IdleDeadline);
+      return 0;
+    });
+    window.requestIdleCallback = mockRIC;
+
+    setupDefaults();
+    vi.mocked(useFeatureFlags).mockReturnValue({
+      flags: [],
+      isReady: true,
+      isEnabled: (flag: string) => flag === "visitor_voice_agent",
+      isEnabledWithDefault: () => false,
+    });
+
+    render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    // requestIdleCallback SHOULD have been called because flag is enabled
+    expect(mockRIC).toHaveBeenCalled();
+
     window.requestIdleCallback = originalRIC;
   });
 });

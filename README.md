@@ -36,13 +36,15 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 | Styling | Tailwind CSS 4 + shadcn/ui |
 | Database | Supabase (PostgreSQL + pgvector) |
 | AI Chat | Claude API (Anthropic) |
-| Embeddings | Voyage AI (voyage-3, 512 dims) |
+| Embeddings | Voyage AI (voyage-3.5, 512 dims) |
 | Reranking | Voyage AI (rerank-2.5) |
 | Voice Agents | ElevenLabs Conversational AI |
 | Auth | Google OAuth via Supabase Auth |
 | Testing | Vitest + React Testing Library + Playwright |
 | Deployment | Vercel |
 | Monitoring | Upptime + Vercel Speed Insights |
+| Logging | Pino (structured JSON) + Sentry (error tracking) |
+| Cache | Upstash Redis (embedding cache, rate limiting) |
 
 ## Getting Started
 
@@ -102,7 +104,7 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 5. Set up the database:
    - Create a Supabase project
    - Enable the pgvector extension
-   - Run the migrations in `supabase/migrations/` (17 migration files)
+   - Run the migrations in `supabase/migrations/` (83 migration files)
 
 6. Seed the database with tourism content:
    ```bash
@@ -195,7 +197,7 @@ paisaxe/
 ├── scripts/                    # Data processing & automation
 ├── supabase/
 │   ├── functions/              # Edge Functions (Deno)
-│   └── migrations/             # Database schema (17 migrations)
+│   └── migrations/             # Database schema (83 migrations)
 ├── docs/                       # Project documentation
 └── .github/
     └── workflows/              # CI/CD (9 workflows)
@@ -224,7 +226,7 @@ Dependabot opens weekly PRs for dependency updates.
 ### Chat Pipeline
 
 1. User sends a question (text or voice)
-2. Generate embedding via Voyage AI (`voyage-3`, 512 dims)
+2. Generate embedding via Voyage AI (`voyage-3.5`, 512 dims)
 3. Find top-10 candidate chunks via pgvector similarity search
 4. Rerank candidates to top-3 via Voyage AI `rerank-2.5`
 5. Pass reranked context to Claude for response generation

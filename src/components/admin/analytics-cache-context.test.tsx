@@ -157,10 +157,12 @@ describe("useAnalyticsData", () => {
 
     const wrapper = createWrapper();
 
+    let enabled = true;
     const { result, rerender } = renderHook(
       () =>
         useAnalyticsData("visitors", fetchFn, '{"range":"a"}', {
           staleTime: 50, // 50ms for test speed
+          enabled,
         }),
       { wrapper }
     );
@@ -171,7 +173,11 @@ describe("useAnalyticsData", () => {
     // Wait past stale time
     await new Promise((r) => setTimeout(r, 100));
 
-    // Re-render triggers staleness check
+    // Simulate remount by toggling enabled — changes [cacheKey, enabled] deps,
+    // causing the staleness useEffect to fire and detect stale data
+    enabled = false;
+    rerender();
+    enabled = true;
     rerender();
 
     await waitFor(() => expect(result.current.data).toBe("revalidated"));
@@ -309,10 +315,11 @@ describe("useAnalyticsData", () => {
     expect(result.current.data).toBe("second-key-data");
   });
 
-  it("render-time staleness check triggers background revalidation via queueMicrotask", async () => {
-    // This test covers the render-time staleness detection at lines 140-146,
-    // where cached data exists but is stale and queueMicrotask triggers revalidation.
-    // We use a reasonable staleTime and manipulate Date.now to simulate staleness.
+  it("remount after staleTime triggers background revalidation via useEffect", async () => {
+    // This test covers the staleness-check useEffect at lines 140-149,
+    // which fires when [cacheKey, enabled] changes. When cached data is stale
+    // and no request is inflight, it bumps revalidationTrigger to re-run the fetch effect.
+    // We use Date.now spy to simulate time passing without a real wait.
     const realDateNow = Date.now;
     let mockNow = realDateNow();
     vi.spyOn(Date, "now").mockImplementation(() => mockNow);
@@ -324,10 +331,12 @@ describe("useAnalyticsData", () => {
 
     const wrapper = createWrapper();
 
+    let enabled = true;
     const { result, rerender } = renderHook(
       () =>
         useAnalyticsData("stale-check-qt", fetchFn, '{"key":"a"}', {
           staleTime: 100,
+          enabled,
         }),
       { wrapper }
     );
@@ -336,12 +345,15 @@ describe("useAnalyticsData", () => {
     await waitFor(() => expect(result.current.data).toBe("initial"));
     expect(fetchFn).toHaveBeenCalledTimes(1);
 
-    // Advance time past staleTime so the render-time check sees staleness
+    // Advance time past staleTime so the staleness check sees staleness
     mockNow += 200;
 
-    // Rerender — cache entry exists but is now stale.
-    // The render-time staleness check should detect this and trigger queueMicrotask
-    // to bump revalidationTrigger, which re-runs the effect with doFetch(true).
+    // Simulate remount by toggling enabled — changes [cacheKey, enabled] deps,
+    // causing the staleness useEffect to fire, detect stale data, and increment
+    // revalidationTrigger to re-run the fetch effect with doFetch(true).
+    enabled = false;
+    rerender();
+    enabled = true;
     rerender();
 
     await waitFor(() => expect(result.current.data).toBe("revalidated"));
@@ -436,6 +448,60 @@ describe("useAnalyticsData", () => {
     await act(async () => resolveA({ data: "data-A" }));
     await act(async () => resolveB({ data: "data-B" }));
     await waitFor(() => expect(result.current.data).toBe("data-A"));
+  });
+
+  it("FE-H6: staleness check does not call queueMicrotask during render phase", async () => {
+    // After the fix, the staleness check is inside a useEffect, not at render time.
+    // We verify queueMicrotask is never called synchronously during render,
+    // and that revalidation still happens via the useEffect path.
+    const queueMicrotaskSpy = vi.spyOn(globalThis, "queueMicrotask");
+
+    const realDateNow = Date.now;
+    let mockNow = realDateNow();
+    vi.spyOn(Date, "now").mockImplementation(() => mockNow);
+
+    const fetchFn = vi
+      .fn<() => Promise<AdminApiResponse<string>>>()
+      .mockResolvedValueOnce({ data: "initial" })
+      .mockResolvedValue({ data: "revalidated" });
+
+    const wrapper = createWrapper();
+
+    let enabled = true;
+    const { result, rerender } = renderHook(
+      () =>
+        useAnalyticsData("fe-h6-stale", fetchFn, '{"key":"a"}', {
+          staleTime: 100,
+          enabled,
+        }),
+      { wrapper }
+    );
+
+    // Initial fetch completes
+    await waitFor(() => expect(result.current.data).toBe("initial"));
+
+    // Clear spy to only observe calls during the upcoming re-renders
+    queueMicrotaskSpy.mockClear();
+
+    // Advance time past staleTime so staleness check is triggered
+    mockNow += 200;
+
+    // Simulate remount by toggling enabled — this triggers the staleness useEffect.
+    // Effects fire asynchronously (not during render), so queueMicrotask should
+    // not be called synchronously during the render phase.
+    enabled = false;
+    rerender();
+    enabled = true;
+    rerender();
+
+    // queueMicrotask should NOT have been called synchronously during render
+    expect(queueMicrotaskSpy).not.toHaveBeenCalled();
+
+    // But the data should still revalidate (via the useEffect path)
+    await waitFor(() => expect(result.current.data).toBe("revalidated"));
+
+    queueMicrotaskSpy.mockRestore();
+    vi.spyOn(Date, "now").mockRestore();
   });
 
   it("switching back to previously cached params uses cache", async () => {

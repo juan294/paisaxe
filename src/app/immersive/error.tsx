@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 import { useTranslation } from "@/lib/i18n";
 
 export default function ImmersiveError({
@@ -13,12 +14,13 @@ export default function ImmersiveError({
 }) {
   useEffect(() => {
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   const { t } = useTranslation();
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-black px-4 text-center">
+    <div className="fixed inset-0 flex flex-col items-center justify-center bg-neutral-950 px-4 text-center">
       <h1 className="text-2xl font-bold text-white">
         {t("errors.immersive_title")}
       </h1>

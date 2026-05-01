@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { getClientIp } from "@/lib/request-utils";
+import { placesQuerySchema } from "@/lib/schemas";
 
 /**
  * MCP-compatible Places API endpoint for ElevenLabs voice agents.
@@ -296,16 +297,22 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get("query");
-  const type = searchParams.get("type") || undefined;
-  const city = searchParams.get("city") || undefined;
-
-  if (!query) {
+  // Normalise: absent params become empty string so Zod min(1) fires with
+  // our custom message instead of "expected string, received undefined".
+  const rawParams = {
+    query: searchParams.get("query") ?? "",
+    type: searchParams.get("type") ?? undefined,
+    city: searchParams.get("city") ?? undefined,
+  };
+  const queryParsed = placesQuerySchema.safeParse(rawParams);
+  if (!queryParsed.success) {
+    const firstIssue = queryParsed.error.issues[0];
     return NextResponse.json(
-      { error: "Query parameter is required" },
+      { error: firstIssue?.message ?? "Invalid query parameters" },
       { status: 400 }
     );
   }
+  const { query, type, city } = queryParsed.data;
 
   if (!process.env.GOOGLE_PLACES_API_KEY) {
     return NextResponse.json(

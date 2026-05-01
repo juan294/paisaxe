@@ -79,7 +79,7 @@ export async function POST(_request: NextRequest) {
       .select("id");
 
     if (error) {
-      console.error("Approve all error:", error);
+      logger.error("Approve all error:", { error: error.message });
       return NextResponse.json(
         { error: "Failed to approve stories" },
         { status: 500 }
@@ -106,7 +106,7 @@ export async function POST(_request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Admin approve-all API error:", error);
+    logger.error("Admin approve-all API error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

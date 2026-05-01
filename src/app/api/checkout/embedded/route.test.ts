@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Set env vars before any imports that might use them
 vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
 vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
@@ -94,6 +102,59 @@ describe("POST /api/checkout/embedded", () => {
         returnUrl: "https://paisaxe.es/pricing/checkout/return?session_id={CHECKOUT_SESSION_ID}",
       })
     );
+  });
+
+  it("SE-H2: should reject an Origin not in ALLOWED_ORIGINS with 400", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_test_secret_123");
+    const request = createRequest({ origin: "https://evil.example.com" });
+    const response = await POST(request);
+    const data = await response.json();
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Invalid origin");
+    expect(createEmbeddedCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("SE-H2: should use fallback origin (NEXT_PUBLIC_SITE_URL) when no Origin header", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123", email: "test@example.com" } },
+      error: null,
+    });
+    vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_test_secret_123");
+    const request = createRequest({}); // no origin header
+    const response = await POST(request);
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.clientSecret).toBe("cs_test_secret_123");
+    expect(createEmbeddedCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        returnUrl: expect.stringContaining("https://paisaxe.es/pricing/checkout/return"),
+      })
+    );
+  });
+
+  it("SE-H2: should accept all configured allowed origins", async () => {
+    const allowedOrigins = [
+      "https://paisaxe.es",
+      "https://paisaxe.com",
+      "https://www.paisaxe.es",
+      "https://www.paisaxe.com",
+    ];
+
+    for (const origin of allowedOrigins) {
+      vi.clearAllMocks();
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "test@example.com" } },
+        error: null,
+      });
+      vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_test_secret_123");
+      const request = createRequest({ origin });
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+    }
   });
 
   it("should return 500 when checkout session creation fails", async () => {
@@ -207,5 +268,58 @@ describe("POST /api/checkout/embedded", () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to create checkout session");
     expect(data.details).toBe("Unknown error");
+  });
+
+  describe("Zod validation for returnTo", () => {
+    it("should silently ignore returnTo that is not a valid slug (Zod regex)", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1", email: "u@e.com" } },
+        error: null,
+      });
+      vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_secret");
+
+      const request = createRequest({ origin: "https://paisaxe.es" }, { returnTo: "../../../etc/passwd" });
+      await POST(request);
+
+      expect(createEmbeddedCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          returnUrl: expect.not.stringContaining("returnTo"),
+        })
+      );
+    });
+
+    it("should accept a valid alphanumeric returnTo slug", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1", email: "u@e.com" } },
+        error: null,
+      });
+      vi.mocked(createEmbeddedCheckoutSession).mockResolvedValue("cs_secret");
+
+      const request = createRequest({ origin: "https://paisaxe.es" }, { returnTo: "covadonga-lakes" });
+      await POST(request);
+
+      expect(createEmbeddedCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          returnUrl: expect.stringContaining("returnTo=covadonga-lakes"),
+        })
+      );
+    });
+  });
+
+  it("should use logger.error (not console.error) on unhandled POST error", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-1", email: "u@e.com" } },
+      error: null,
+    });
+    vi.mocked(createEmbeddedCheckoutSession).mockRejectedValue(new Error("Stripe unavailable"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = createRequest({ origin: "https://paisaxe.es" });
+    const response = await POST(request);
+    consoleSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

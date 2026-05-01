@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { rerankChunks } from "./rerank";
 import type { Chunk, ImageResult, SearchResult } from "@/types";
+import { logger } from "@/lib/logger";
 
 /** Number of candidates to retrieve from vector search before reranking */
 const RERANK_CANDIDATE_COUNT = 10;
@@ -9,6 +10,9 @@ export async function searchChunks(
   queryEmbedding: number[],
   limit: number = 5
 ): Promise<Chunk[]> {
+  // The match_chunks RPC uses an HNSW index (migration 084).
+  // hnsw.ef_search = 40 is set via SET LOCAL inside the SQL function body,
+  // so no client-side session variable setup is needed here.
   const { data, error } = await supabase.rpc("match_chunks", {
     query_embedding: queryEmbedding,
     match_threshold: 0.5,  // Lowered from 0.7 to get more results
@@ -49,7 +53,7 @@ export async function getRelatedImages(
     .in("path", imageRefs);
 
   if (error) {
-    console.error("Image fetch error:", error);
+    logger.error("[TABLE_FALLBACK]", { table: "images", error: error.message ?? String(error) });
     return [];
   }
 
@@ -80,16 +84,31 @@ export async function search(
   const candidateCount = queryText ? RERANK_CANDIDATE_COUNT : limit;
   const candidates = await searchChunks(queryEmbedding, candidateCount);
 
-  // Rerank candidates if query text is available
-  const chunks = queryText
-    ? await rerankChunks(queryText, candidates, limit)
-    : candidates;
+  // PE-H3: fire getRelatedImages concurrently with rerankChunks.
+  // getRelatedImages only needs the candidate list (not the reranked order),
+  // so we can start it immediately using ALL candidate refs. After rerank
+  // completes we filter the already-fetched images down to the top-k refs.
+  if (!queryText) {
+    const allImageRefs = candidates.flatMap((chunk) => chunk.imageRefs || []);
+    const uniqueImageRefs = [...new Set(allImageRefs)];
+    const images = await getRelatedImages(uniqueImageRefs);
+    return { chunks: candidates, images };
+  }
 
-  const allImageRefs = chunks.flatMap((chunk) => chunk.imageRefs || []);
-  const uniqueImageRefs = [...new Set(allImageRefs)];
-  const images = await getRelatedImages(uniqueImageRefs);
+  const allCandidateRefs = candidates.flatMap((chunk) => chunk.imageRefs || []);
+  const uniqueCandidateRefs = [...new Set(allCandidateRefs)];
 
-  return { chunks, images };
+  // Start both in parallel — neither depends on the other's result yet.
+  const [rerankedChunks, allImages] = await Promise.all([
+    rerankChunks(queryText, candidates, limit),
+    getRelatedImages(uniqueCandidateRefs),
+  ]);
+
+  // Filter images to only those referenced by the reranked top-k chunks.
+  const topKRefs = new Set(rerankedChunks.flatMap((chunk) => chunk.imageRefs || []));
+  const images = allImages.filter((img) => topKRefs.has(img.path));
+
+  return { chunks: rerankedChunks, images };
 }
 
 // Keyword-based fallback search for specific place names
@@ -101,7 +120,7 @@ export async function keywordSearch(query: string, limit: number = 5): Promise<C
     .limit(limit);
 
   if (error) {
-    console.error("Keyword search error:", error);
+    logger.error("[TABLE_FALLBACK]", { table: "chunks", error: error.message ?? String(error) });
     return [];
   }
 

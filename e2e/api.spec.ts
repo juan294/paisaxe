@@ -11,9 +11,11 @@ async function getCsrfHeaders(request: APIRequestContext) {
   const setCookie = pageResponse.headers()["set-cookie"] || "";
   const match = setCookie.match(/__csrf=([a-f0-9]+)/);
   const token = match?.[1] || "";
+  const origin = new URL(pageResponse.url()).origin;
   return {
     "x-csrf-token": token,
     Cookie: `__csrf=${token}`,
+    Origin: origin,
   };
 }
 

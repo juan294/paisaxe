@@ -25,7 +25,7 @@ interface BatchEmbeddingResult {
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   // Check cache first
-  const cached = embeddingCache.get(text);
+  const cached = await embeddingCache.get(text);
   if (cached) {
     return cached;
   }
@@ -49,7 +49,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 
   // Cache the result
-  embeddingCache.set(text, embedding);
+  await embeddingCache.set(text, embedding);
 
   return embedding;
 }

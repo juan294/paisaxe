@@ -4,20 +4,30 @@ import { useState, type MouseEvent } from "react";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { SuggestPlaceDialog } from "./suggest-place-dialog";
 import { useTranslation } from "@/lib/i18n";
 
 interface SuggestPlaceButtonProps {
   className?: string;
   variant?: "icon" | "menu";
+  /**
+   * Optional callback invoked when the button is clicked.
+   * When provided, the button delegates state management to the parent
+   * (lifted-state pattern) and does NOT open the built-in dialog.
+   * When omitted, the button manages dialog open/close internally.
+   */
+  onOpen?: () => void;
 }
 
 export function SuggestPlaceButton({
   className,
   variant = "icon",
+  onOpen,
 }: SuggestPlaceButtonProps) {
   const { isEnabled } = useFeatureFlags();
   const { t } = useTranslation();
+  // Internal dialog state — only used when onOpen is not provided
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Don't render if feature flag is disabled (also returns false while loading)
@@ -27,7 +37,12 @@ export function SuggestPlaceButton({
 
   const handleOpen = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    setIsDialogOpen(true);
+    if (onOpen) {
+      // #328: delegate to parent — no DOM coupling
+      onOpen();
+    } else {
+      setIsDialogOpen(true);
+    }
   };
 
   return (
@@ -48,24 +63,25 @@ export function SuggestPlaceButton({
           <span>{t("suggestions.suggest_short")}</span>
         </button>
       ) : (
-        <button
+        <Button
+          variant="glassIcon"
           data-suggest-place-trigger
           onClick={handleOpen}
-          className={cn(
-            "p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
-            className
-          )}
+          className={cn(className)}
           aria-label={t("suggestions.suggest_place")}
           title={t("suggestions.suggest_place")}
         >
           <Lightbulb className="h-5 w-5 text-white" />
-        </button>
+        </Button>
       )}
 
-      <SuggestPlaceDialog
-        isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-      />
+      {/* Only render the built-in dialog when not delegating to parent (#328) */}
+      {!onOpen && (
+        <SuggestPlaceDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+        />
+      )}
     </>
   );
 }

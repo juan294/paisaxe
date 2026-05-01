@@ -22,6 +22,8 @@ For operations (monitoring, pg_cron, webhooks, agents), see @docs/operations/ope
 | Payments | Stripe |
 | Testing | Vitest + Playwright |
 | Deployment | Vercel |
+| Logging | Pino (structured JSON) + Sentry (error tracking) |
+| Cache | Upstash Redis (embedding cache, rate limiting) |
 
 ## Git Workflow
 

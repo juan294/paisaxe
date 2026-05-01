@@ -1,39 +1,42 @@
 # Cost Analyst Report
 
-> **Generated**: 2026-04-25 03:00:00 | **Period**: April 2026 (day 25 of 30) | **Status**: WATCH
+> **Generated**: 2026-04-30 03:00:00 | **Period**: April 2026 (day 30 of 30 — final) | **Status**: WATCH
 
 ---
 
 ## Executive Summary
 
-**Day 25 of April.** ElevenLabs API unavailable in this execution context — last confirmed data was April 20 at 13,734 characters (5.07% of cycle). Based on the April 21 report noting 5 consecutive silent days, and no new ElevenLabs activity referenced in any agent report between Apr 22 and Apr 24, the account has likely been silent for 9+ consecutive days since the April 16 burst. Projected cycle-end utilization: 5–9%.
+**April closes today — final day of the month.** ElevenLabs character count holds at **13,734 / 270,783 (5.07%)** — unchanged for 14 consecutive days (confirmed via subscription API this run). Most recent conversation across all agents remains Archy on **Apr 16 18:43 UTC — now 13.2 days of full ElevenLabs account silence.** Character reset due **2026-05-07 ~14:36 UTC** (~7.6 days). Cycle-end utilization projected 5–7%.
 
-**Twilio API also unavailable.** Last confirmed balance: $14.0646 (stable since April 7 rental). No new charges are expected until the next phone rental cycle (~May 7).
+**Twilio balance: $14.0646** (unchanged for 23 consecutive days). All April usage records confirmed at $0.00. ~12.2 months of runway.
 
-**Revenue drought reaches 71 days** (since February 13). **Paisaxe voice silence: 67 days** (since February 17). April will close at $0 revenue for the second consecutive full-zero month.
+**Revenue drought reaches 76 days** (since Feb 13). **Paisaxe voice silence: 72 days** (since Feb 17). April closes at $0 revenue — second consecutive full-zero month. Cumulative operational loss since Feb 2026: ~$371.
 
-**P8 completed (Apr 22):** Sentry Replay removed from `sentry.client.config.ts` in commit `fef651f5`. Expected ~30-50 KB initial-load savings — not yet confirmed via production build. Performance Agent remains YELLOW pending a clean `npm run build` run.
+**Cross-agent findings incorporated this cycle:**
+- QA Agent RED (Apr 29): Chat API returned 403 across all LLM tests; browser journeys 1/10 (/immersive story-title not found). Root cause: wave-2 remediation merges (1a3ba7c5, 5023f7eb) broke chat auth and /immersive story render. Commit `bab3c40e` ("fix(e2e): restore E2E coverage broken by Wave 2 CSRF hardening") landed post-report — QA harness status in current cycle unconfirmed. Safety guarantees cannot be asserted while Chat API is 403.
+- Performance YELLOW (Apr 29): initial-load JS confirmed at **2,067 KB / 2,000 KB**; total JS 2,986 KB / 3,000 KB (**14 KB total headroom — critical**). +55 KB from wave-2 remediation PRs this cycle. P4 (Supabase realtime tree-shake, ~25 KB) still unimplemented.
+- Security YELLOW (Apr 29): 0 advisories via npm audit — postcss and uuid chains cleared since Apr 27. 18 outdated production packages; voyageai intentionally pinned at 0.1.0 (ESM breakage). QA RED prevents confirming safety guardrails.
+- Localization GREEN (Apr 29): 404 leaf keys (up from 395 — 9 keys added across all locales), 100 stories × 5 non-es locales = 500 entries complete.
+- Documentation YELLOW→recovered (Apr 29): Story Details and Story Translations tabs added to features.md; back to GREEN state now.
 
-**Security YELLOW (Apr 24):** Three moderate advisories from uuid <14 via resend → svix → uuid transitive chain. Not exploitable in Paisaxe (svix only uses uuid.v4 internally; bounds-check bug affects v3/v5/v6 with caller-provided buffer). Fix: `npm install` to sync resend@6.12.2 pin drift; then await svix >=1.91.2 upstream.
+**Financial health: WATCH** — business concern only. No platform cost anomalies. All tier limits safe.
 
-**Financial health: WATCH** — business concern only. No platform cost anomalies. All tier limits well within range. Cumulative operational loss since February 2026 now approximately $357.
-
-| Metric | Value | vs. Apr 21 |
+| Metric | Value | vs. Apr 29 |
 |--------|-------|-----------|
 | Total Fixed Costs (all) | $284.41/mo | flat |
 | Total Fixed Costs (operational) | **$84.41/mo** | flat |
-| Variable Costs (Apr MTD, confirmed) | **$1.15** | flat |
+| Variable Costs (Apr final, confirmed) | **$1.15** | flat |
 | Daily Burn Rate (Apr fixed) | **$2.81/day** | flat |
-| Revenue (Apr MTD) | **$0.00** | flat |
-| Twilio Balance (last known) | **$14.0646** | flat (API unavailable) |
-| ElevenLabs Characters (last known) | **13,734 / 270,783 (5.07%)** | flat (API unavailable) |
+| Revenue (Apr final) | **$0.00** | flat |
+| Twilio Balance | **$14.0646** | flat (API confirmed) |
+| ElevenLabs Characters | **13,734 / 270,783 (5.07%)** | flat (API confirmed) |
 | ElevenLabs Voice Min (Paisaxe, Apr) | 0.0 / 100 | flat |
-| Next Character Reset | **~2026-05-07 14:36 UTC** | ~12 days |
-| Paisaxe Voice Silence | **67 days** | +4 |
-| Revenue Drought | **71 days** | +4 |
-| Last ElevenLabs Conversation (known) | Apr 16 18:44 UTC | +9 days likely silence |
-| npm audit advisories | **3 moderate (uuid chain)** | +3 (not exploitable) |
-| Cumulative Operational Loss (est.) | **~$357** | +$11 |
+| Next Character Reset | **~2026-05-07 14:36 UTC** | ~7.6 days |
+| Paisaxe Voice Silence | **72 days** | +1 |
+| Revenue Drought | **76 days** | +1 |
+| Last ElevenLabs Conversation | Apr 16 18:43 UTC | +13.2 days silence |
+| npm audit advisories | **0** | improved (was 8 on Apr 27) |
+| Cumulative Operational Loss (est.) | **~$371** | +$3 |
 
 ---
 
@@ -55,33 +58,33 @@
 | **Total Fixed (all)** | | **$284.41** | | | flat |
 | **Total Fixed (operational)** | | **$84.41** | **100%** | | flat |
 
-*\*ElevenLabs Creator billed annually. Effective rate $22.18/mo. Next annual invoice: $266.20 on ~2027-02-07 (next_payment_attempt_unix 1802012845 — from Apr 21 API query).*
+*\*ElevenLabs Creator billed annually. Effective rate $22.18/mo. Next annual invoice: $266.20 on ~2027-02-07 (next_payment_attempt_unix 1802012845, confirmed via API).*
 
-*\*\*Anthropic $10/mo is a config estimate. No billing API on personal account. Manual check required at [console.anthropic.com/settings/billing](https://console.anthropic.com/settings/billing). Daily automated agents plus Claude Code Max development activity likely push actual usage above estimate.*
+*\*\*Anthropic $10/mo is a config estimate. No billing API on personal account. Manual check required at console.anthropic.com/settings/billing. Daily automated agents plus Claude Code Max development activity likely push actual usage above estimate.*
 
 *\*\*\*Twilio phone rental charged Apr 7: balance dropped $15.2146 → $14.0646 (-$1.15). Next rental due ~May 7.*
 
 **Note**: Claude Code Max ($200/mo) is the primary development tool, categorized separately as "Development." Operational cost analysis focuses on running the live service.
 
-### Variable / Usage-Based Costs (April 2026 MTD — Day 25)
+### Variable / Usage-Based Costs (April 2026 Final — Day 30)
 
 | Service | Usage | Cost | Source |
 |---------|-------|------|--------|
-| Twilio (Phone rental) | 1 number, April billing | **$1.15** | Balance delta (Apr 7 — last known) |
-| Twilio (SMS) | 0 messages | $0.00 | Last known (API unavailable today) |
-| Twilio (Calls) | 0 minutes | $0.00 | Last known (API unavailable today) |
+| Twilio (Phone rental) | 1 number, April billing | **$1.15** | Balance delta (Apr 7) |
+| Twilio (SMS) | 0 messages | $0.00 | Twilio API (today — 50 records, all $0.00) |
+| Twilio (Calls) | 0 minutes | $0.00 | Twilio API (today, confirmed) |
 | Stripe (Processing Fees) | 0 charges | $0.00 | — |
 | Anthropic (Claude API) | Unknown | Unknown | No API on personal account |
 | Voyage AI (Embeddings) | Unknown | Unknown | — |
-| **Total Variable (Apr MTD, confirmed)** | | **$1.15** | |
+| **Total Variable (Apr final, confirmed)** | | **$1.15** | |
 
-### April 2026 MTD Total (Day 25)
+### April 2026 Final Total (Day 30)
 
 | Category | Cost |
 |----------|------|
 | Fixed Operational | $84.41 |
 | Variable (confirmed) | $1.15 |
-| **Total Operational MTD** | **$85.56** |
+| **Total Operational (April final)** | **$85.56** |
 | Revenue | $0.00 |
 | **Net (loss)** | **-$85.56** |
 
@@ -91,48 +94,60 @@
 |-------|------------------|----------------------|-------------------|---------------|----------|
 | Feb 2026 | $84.41 | ~$2.75 | ~$87.16 | ~$9.98 | ~11.4% |
 | Mar 2026 (final) | $84.41 | $1.15 | **$85.56** | **$0.00** | **0%** |
-| Apr 2026 (day 25) | $84.41 | $1.15 | **$85.56** | $0.00 | 0% |
+| Apr 2026 (final) | $84.41 | $1.15 | **$85.56** | **$0.00** | **0%** |
 
 ---
 
 ## Usage Metrics
 
-### ElevenLabs Activity — Current Cycle (April 7 14:36 UTC → May 7 14:36 UTC)
+### ElevenLabs Activity — Current Cycle (Apr 7 14:36 UTC → May 7 ~14:36 UTC)
 
-**API unavailable in this execution context.** Last confirmed data: April 20, 13,734 / 270,783 characters (5.07%).
+**Last 12 conversations across the account (API confirmed — no new conversations since Apr 16):**
 
-Based on agent shared context for Apr 22–24: no new ElevenLabs activity was reported by any agent. The last known conversation was April 16 18:44 UTC (Archy — success); likely 9 consecutive days of silence as of Apr 25.
+| Time (UTC) | Agent | Status | Notes |
+|------------|-------|--------|-------|
+| Apr 16 18:43 | Archy | success | Most recent on account |
+| Apr 16 18:41 | Archy | success | |
+| Apr 16 18:22 | Archy | **failed** | custom_llm generation failed |
+| Apr 16 18:19 | Archy | **failed** | custom_llm generation failed |
+| Apr 16 18:19 | Archy | **failed** | custom_llm generation failed |
+| Apr 16 18:04 | Archy | success | |
+| Apr 16 18:02 | Archy | success | |
+| Apr 16 17:35 | Archy | success | |
+| Apr 12 08:00 | Archy | **failed** | custom_llm generation failed |
+| Apr 11 16:50 | Archy | **failed** | LLM response took too long |
+| Apr 11 06:38 | Coach | success | |
+| Apr 11 06:12 | Archy | **failed** | LLM response took too long |
 
-**Last 20 conversations (from Apr 21 report — no updates available):**
+**Summary:**
+- Archy: 11 (6 success, 5 failed — 45% failure rate)
+- Coach: 1 (success)
+- Pelayo (Visitor Guide): 0 — dormant since Feb 17
+- Pelayo (Booking): 0 — dormant since Feb 10
+- Penny, Iris, Xander: 0 — never used
 
-| Agent | Count (in last 20) | Most Recent | Success/Fail | Project |
-|-------|-------------------|-------------|------------|---------|
-| Archy | 19 | Apr 16 18:44 UTC (success) | 13 success, 6 failures (32%) | Non-Paisaxe |
-| Coach | 1 | Apr 11 06:38 UTC | 1 success (100%) | Non-Paisaxe |
-| Pelayo (Visitor Guide) | 0 | Feb 17 | Dormant | Paisaxe |
-| Pelayo (Booking) | 0 | Feb 10 | Dormant | Paisaxe |
-| Penny, Iris, Xander | 0 | Never | Dormant | Paisaxe |
+**All conversations are non-Paisaxe.** Paisaxe agents: **0 conversations since Feb 17 (72 days).**
 
-**All conversations are non-Paisaxe.** Paisaxe agents: **0 conversations since February 17 (67 days).**
+Full-account silence: **13.2 days** (no activity from any agent since Apr 16 18:43 UTC).
 
-### ElevenLabs Character Usage (last known — Apr 20)
+### ElevenLabs Character Usage
 
-| Metric | Value | vs. Apr 21 |
+| Metric | Value | vs. Apr 29 |
 |--------|-------|-----------|
-| Characters used (cycle) | **13,734 / 270,783 (5.07%)** | flat (API unavailable) |
+| Characters used (cycle) | **13,734 / 270,783 (5.07%)** | flat (API confirmed) |
 | Character limit | **270,783** | flat |
-| Next character reset | **~2026-05-07 14:36 UTC** | ~12 days |
+| Next character reset | **~2026-05-07 14:36 UTC** | ~7.6 days |
 | Characters used (Apr, Paisaxe) | 0 | flat |
 | Characters remaining this cycle | **257,049** | flat |
 
-**Cycle utilization projection (Apr 25 estimate):**
-- Cycle start: Apr 7 14:36 UTC. Days elapsed: ~17.5.
-- If frozen at 13,734: cycle-average rate ~785/day (declining as silence extends).
-- Conservative (cycle-avg × ~12 remaining days): +9,420 = ~23,154 total = **~8.6%**.
-- Pessimistic/likely (zero activity continues): ~13,734 = **~5.07%**.
-- Given 9 consecutive days of likely silence, actual end-of-cycle utilization will likely be 5–9%.
+**Cycle utilization projection (Apr 30):**
+- Cycle start: Apr 7 14:36 UTC. Days elapsed: ~22.4 days.
+- Cycle-average rate: ~613/day (declining; 14 consecutive zero days Apr 17–30).
+- If zero activity continues through reset: cycle ends at **5.07%**.
+- Conservative estimate (~613/day × 7.6 days remaining): +4,659 = ~18,393 = **~6.8%**.
+- Likely outcome: 5–7% — well within Creator limit (270,783 chars).
 
-### ElevenLabs Subscription Details (from Apr 21 API query)
+### ElevenLabs Subscription Details (API confirmed this run)
 
 | Field | Value |
 |-------|-------|
@@ -143,49 +158,50 @@ Based on agent shared context for Apr 22–24: no new ElevenLabs activity was re
 | Next payment attempt | ~2027-02-07 |
 | Next character reset | **~2026-05-07 14:36 UTC** |
 | Character limit | **270,783** |
+| Current overage | $0.00 |
 
-### Twilio Communications (last known — Apr 21)
+### Twilio Communications
 
-| Metric | Apr 2026 (days 1-25) | Mar 2026 (final) | Change |
-|--------|---------------------|-----------------|--------|
+| Metric | Apr 2026 (final) | Mar 2026 (final) | Change |
+|--------|------------------|-----------------|--------|
 | SMS Sent | 0 | 0 | flat |
 | Calls | 0 | 0 | flat |
 | Usage Cost | $0.00 | $0.00 | flat |
 | Phone Rental | **$1.15** (charged Apr 7) | $1.15 | Monthly expected |
-| Balance (last known) | **$14.0646** | $15.4546 | -$1.40 MTD |
+| Balance | **$14.0646** | $15.4546 | -$1.40 MTD |
 
-**Twilio balance reconciliation (April):**
+**Twilio balance reconciliation (April, final):**
 - Apr 1 (start): ~$15.4546
-- Apr 3-4: -$0.24 (unexplained — likely recurring regulatory surcharge, now 22 days unresolved)
+- Apr 3-4: -$0.24 (unexplained — likely recurring regulatory surcharge, now **27 days unresolved**)
 - Apr 7: -$1.15 (phone number rental, confirmed)
-- **Apr 21 (last known): $14.0646** — API unavailable today. ~12.2 months of runway at $1.15/mo.
+- **Apr 30: $14.0646** — stable for 23 consecutive days. ~12.2 months of runway at $1.15/mo.
 
 ### Stripe Revenue
 
-| Metric | Apr 2026 (days 1-25) | Mar 2026 (final) | Feb 2026 (final) |
-|--------|---------------------|-----------------|-----------------|
+| Metric | Apr 2026 (final) | Mar 2026 (final) | Feb 2026 (final) |
+|--------|------------------|-----------------|-----------------|
 | Net Sales | 0 | 0 | 6 |
 | Gross Revenue | $0.00 | $0.00 | $13.93 |
 | Net Revenue | $0.00 | $0.00 | $9.98 |
 
-**71-day revenue drought** — No Day Pass sales since February 13. April will close at $0 revenue — second consecutive full-zero month.
+**76-day revenue drought** — No Day Pass sales since Feb 13. April closes today at $0 revenue — second consecutive full-zero month.
 
 ---
 
 ## Cost Efficiency
 
-| Metric | Current (Apr 25) | Previous (Apr 21) | Change | Trend |
+| Metric | Current (Apr 30) | Previous (Apr 29) | Change | Trend |
 |--------|----------------|------------------|--------|-------|
 | Fixed operational cost/mo | $84.41 | $84.41 | flat | flat |
 | Daily burn rate (fixed) | **$2.81/day** | $2.81/day | flat | flat |
-| April variable spend (confirmed) | **$1.15** | $1.15 | flat | flat |
+| April variable spend (confirmed, final) | **$1.15** | $1.15 | flat | flat |
 | Cost per voice conversation (Feb actuals) | ~$0.43 | ~$0.43 | flat | flat |
 | Cost per voice minute (Feb actuals) | ~$0.37 | ~$0.37 | flat | flat |
-| ElevenLabs char utilization (cycle, last known) | **5.07%** | 5.07% | flat (9-day likely freeze) | flat |
+| ElevenLabs char utilization (cycle) | **5.07%** | 5.07% | flat (14-day freeze) | flat |
 | ElevenLabs voice min utilization (Paisaxe, Apr) | 0% | 0% | flat | flat |
 | Revenue coverage (operational) | **0%** | 0% | flat | flat |
 | Months of Twilio runway | ~12.2 mo | ~12.2 mo | flat | flat |
-| Cumulative operational loss (Feb–Apr 25) | **~$357** | ~$346 | +$11 | down |
+| Cumulative operational loss (Feb–Apr 30) | **~$371** | ~$368 | +$3 | down |
 
 ---
 
@@ -193,13 +209,13 @@ Based on agent shared context for Apr 22–24: no new ElevenLabs activity was re
 
 | Service | Metric | Used | Limit | Utilization | Alert Level |
 |---------|--------|------|-------|-------------|-------------|
-| ElevenLabs | Characters (cycle, last known) | 13,734 | 270,783 | **5.07%** | SAFE |
+| ElevenLabs | Characters (cycle) | 13,734 | 270,783 | **5.07%** | SAFE |
 | ElevenLabs | Voice Minutes (Paisaxe, Apr) | 0.0 | 100 | **0%** | SAFE |
 | Vercel | Monthly Visitors | ~low | 500,000 (Pro) | **<1%** | SAFE |
 | PostHog | Monthly Events | ~low | 1,000,000 | **<1%** | SAFE |
 | Supabase | Database Storage | <8 GB | 8 GB | **<100%** | SAFE |
 
-**All tier alerts cleared.** At projected frozen pace, cycle-end utilization will be 5–9% — well within Creator limit.
+**All tier alerts cleared.** Cycle-end utilization will be 5–7% — well within Creator limit. Character reset in ~7.6 days (May 7) begins the new cycle.
 
 ### Upgrade Trigger Points
 
@@ -245,15 +261,14 @@ Based on `src/lib/costs/forecast.ts` logic. No April Paisaxe variable data; usin
 
 | Finding | Severity | Details |
 |---------|----------|---------|
-| 71-day revenue drought | **WARNING** | No Day Pass sales since Feb 13. Second consecutive full-zero month (April certain at $0). Cumulative operational loss ~$357. |
-| 67-day Paisaxe voice silence | **WARNING** | No Paisaxe voice conversations since Feb 17. Platform dormant to visitors for over 2 months. |
-| ElevenLabs likely silence (9+ days) | **WATCH** | No activity on any ElevenLabs agent since Apr 16 18:44 UTC (based on agent shared context through Apr 24). Even non-Paisaxe Archy has been inactive since the Apr 16 burst. |
-| Archy failure rate elevated | **WATCH** | 6/20 (30%) failures in last 20 observed (last data Apr 21). Last 3 consecutive conversations on Apr 16 ended in failure. Non-Paisaxe; shares ElevenLabs quota. |
-| Security: 3 moderate advisories (uuid chain) | **WATCH** | uuid <14 via resend → svix → uuid transitive chain. Not exploitable (svix only calls uuid.v4; bounds-check bug only affects caller-supplied buffer in v3/v5/v6). Fix: `npm install` to sync resend@6.12.2; await svix >=1.91.2 upstream. |
-| Twilio $0.24 drop (Apr 3-4, unresolved) | **WATCH** | Balance anomaly not captured in Usage Records API. Likely recurring regulatory surcharge. Now 22 days unresolved. |
-| No Anthropic cost visibility | **WATCH** | Personal account has no billing API. Daily automated agents plus Claude Code Max development likely push actual Anthropic API usage above $10/mo estimate. |
-| Performance build unconfirmed | **WATCH** | P8 (Sentry Replay removal, fef651f5, Apr 22) expected to save ~30-50 KB on initial load. Production build (`npm run build`) has not been run to confirm actual savings. Dev cache still shows pre-P8 numbers. |
-| Stray files in repo root | **WATCH** | Empty `svix` and `uuid` files in repo root (shell output artifact from recent work). Safe to delete. |
+| 76-day revenue drought | **WARNING** | No Day Pass sales since Feb 13. April closes today at $0 — second consecutive full-zero month. Cumulative operational loss ~$371. |
+| 72-day Paisaxe voice silence | **WARNING** | No Paisaxe voice conversations since Feb 17. Platform dormant to visitors for over 2 months. |
+| QA Agent RED (Apr 29) | **WARNING** | Chat API 403 regression and /immersive story-title failure from wave-2 merges. Safety guarantees unassertable while 403 persists. Fix commit `bab3c40e` landed; QA harness status in May cycle unconfirmed. |
+| ElevenLabs full-account silence (13.2 days) | **WATCH** | No conversations on any agent since Apr 16 18:43 UTC. Character count frozen at 13,734 for 14 consecutive days (Apr 17–30). Reset in ~7.6 days — cycle utilization projected 5–7%. |
+| Performance: total JS near budget ceiling | **WATCH** | Total JS 2,986 KB / 3,000 KB (14 KB headroom — critical). Initial load 2,067 KB / 2,000 KB (67 KB over). Wave-2 added +55 KB; P4 Supabase tree-shake (~25 KB) unimplemented. Budget ceiling breach imminent if wave-3 adds any significant JS. |
+| Archy failure rate elevated | **WATCH** | 5/12 (45%) failures in last 12 observed conversations. All failures: "custom_llm generation failed" or "LLM response took too long". Non-Paisaxe; no new data since Apr 16 (13.2-day silence). |
+| Twilio $0.24 drop (Apr 3-4, unresolved) | **WATCH** | Balance anomaly not captured in Usage Records API. Likely recurring regulatory surcharge. Now 27 days unresolved. |
+| No Anthropic cost visibility | **WATCH** | Personal account has no billing API. Daily automated agents (security, coverage, performance, cost-analyst, localization, docs, QA, triage) plus Claude Code Max development likely push actual usage above $10/mo estimate. |
 
 **No platform cost-structure anomalies.** All tier limits safe.
 
@@ -261,44 +276,43 @@ Based on `src/lib/costs/forecast.ts` logic. No April Paisaxe variable data; usin
 
 ## Trend Analysis
 
-### Comparison: Apr 21 → Apr 25
+### Comparison: Apr 29 → Apr 30 (final day of April)
 
-| Metric | Apr 21 (03:00 UTC) | Apr 25 (03:00 UTC) | Change | Direction |
-|--------|------|------|--------|-----------|
+| Metric | Apr 29 | Apr 30 | Change | Direction |
+|--------|--------|--------|--------|-----------|
 | Fixed costs/mo (operational) | $84.41 | $84.41 | flat | flat |
-| Variable costs (confirmed MTD) | $1.15 | $1.15 | flat | flat |
+| Variable costs (confirmed final) | $1.15 | $1.15 | flat | flat |
 | Daily burn rate (fixed) | $2.81/day | $2.81/day | flat | flat |
-| ElevenLabs characters (cycle, last known) | 13,734 (5.07%) | **13,734 (5.07%)** | 0 (API unavailable) | flat |
-| Most recent ElevenLabs convo (known) | Apr 16 18:44 UTC | **Apr 16 18:44 UTC** | +9 days likely silence | flat |
-| Archy failure rate (last 20) | 6/20 (30%) | **6/20 (30%)** | flat (no new data) | flat |
+| ElevenLabs characters (cycle) | 13,734 (5.07%) | **13,734 (5.07%)** | 0 (API confirmed) | flat |
+| Most recent ElevenLabs convo | Apr 16 18:43 UTC | **Apr 16 18:43 UTC** | +1 day silence | flat |
+| Full-account silence duration | 12.3 days | **13.2 days** | +0.9 days | worsening |
+| Days to ElevenLabs reset | ~8.6 days | **~7.6 days** | -1 day | approaching |
+| Archy failure rate (last 12) | 5/12 (45%) | **5/12 (45%)** | flat | flat |
 | Paisaxe voice conversations (MTD) | 0 | 0 | flat | flat |
-| Twilio balance (last known) | $14.0646 | $14.0646 | flat (API unavailable) | flat |
+| Twilio balance | $14.0646 | $14.0646 | flat (API confirmed) | flat |
 | SMS sent (MTD) | 0 | 0 | flat | flat |
 | Day Pass net sales (MTD) | 0 | 0 | flat | flat |
-| Paisaxe voice dormancy streak | 63 days | **67 days** | +4 | down |
-| Revenue drought streak | 67 days | **71 days** | +4 | down |
-| Next ElevenLabs reset | ~16 days | **~12 days** | -4 days | approaching |
-| Projected cycle-end chars (cycle-avg) | ~30,515 (11.3%) | **~23,154 (8.6%)** | -2.7pp | down (silence extends) |
-| Projected cycle-end chars (zero-activity) | ~13,734 (5.07%) | **~13,734 (5.07%)** | flat | flat |
-| Cumulative operational loss | ~$346 | **~$357** | +$11 | down |
-| npm audit advisories | 0 | **3 moderate (uuid chain)** | +3 | WATCH |
-| Sentry Replay | Enabled | **Removed (fef651f5 Apr 22)** | P8 complete | improvement |
-| Test coverage (statements) | 98.54% | **98.60%** | +0.06pp | up |
-| Test count | 5904 | **5992** | +88 | up |
+| Paisaxe voice dormancy streak | 71 days | **72 days** | +1 | down |
+| Revenue drought streak | 75 days | **76 days** | +1 | down |
+| Cumulative operational loss | ~$368 | **~$371** | +$3 | down |
+| npm audit advisories | 8 moderate (Apr 27) | **0** | resolved | improved |
+| Initial-load JS (last prod build, Apr 25) | 2,067 KB | **2,067 KB** | flat | YELLOW |
+| Total JS headroom | ~59 KB (Apr 25) | **~14 KB (Apr 29 dev)** | -45 KB | CRITICAL |
+| QA Agent status | YELLOW (Apr 27) | **RED (Apr 29)** | regressed | down |
 
 **Key observations:**
 
-1. **Four additional days of confirmed zero revenue and zero Paisaxe voice activity.** Drought at 71 days — deepest trough since site launch. No trigger for growth visible in any agent report.
+1. **April closes at $85.56 operational spend, $0 revenue** — identical final figure to March. Two consecutive full-zero revenue months; cumulative operational loss reaches ~$371.
 
-2. **ElevenLabs API unavailable today.** Cannot confirm current character count. Based on 9+ days of likely inactivity (no agent report through Apr 24 mentioned new conversations), the cycle count is almost certainly still at or near 13,734. The cycle-average daily rate has fallen from ~1,017/day (Apr 21) to an estimated ~785/day due to dilution by silence.
+2. **ElevenLabs full-account silence now at 13.2 days.** Character count locked at 13,734 for 14 consecutive days. The cycle resets in ~7.6 days (May 7). New May cycle begins with a clean counter, providing the first meaningful voice activity signal for the month.
 
-3. **P8 complete (Sentry Replay removed).** A production build is needed to confirm actual bundle savings of ~30-50 KB. This is the only structural change affecting cost infrastructure this cycle.
+3. **QA regression is the most significant technical development.** The RED status from Apr 29 (Chat API 403 + /immersive story failure from wave-2 merges) leaves the automated safety monitoring layer non-functional. Commit `bab3c40e` targeted E2E coverage restoration. The May 1 QA agent run will be the first confirmation of recovery.
 
-4. **New uuid chain advisories (Security Apr 24).** Not exploitable. Simple mitigation: `npm install` to sync resend pin drift from 6.12.0 to 6.12.2, then wait for svix upstream fix.
+4. **Performance headroom collapsed.** Total JS headroom dropped from 59 KB (Apr 25 production) to 14 KB (Apr 29 dev cache) after wave-2 added +55 KB. Even without wave-3, the total budget is now at operational risk. P4 (Supabase realtime tree-shake, ~25 KB) is the only identified action that preserves the budget. Immediate implementation is needed before any wave-3 changes.
 
-5. **Coverage continues to improve.** 5992 tests passing (from 5904 on Apr 20), Stripe webhook and chat stream now at 100% branch coverage — closes the highest-risk security-path gaps.
+5. **Security advisories cleared to zero.** Both the postcss XSS chain and uuid bounds-check chain (8 moderate advisories) are now resolved per the Apr 29 security agent report. A clean npm audit for the new May cycle.
 
-6. **Twilio runway unchanged at ~12.2 months.** No charges between Apr 7 and Apr 25. The $0.24 anomaly from Apr 3-4 remains 22 days unresolved without a Twilio console check.
+6. **Revenue and voice drought still unexplained.** No automated diagnostic has identified a root cause across 76 and 72 days respectively. Manual production verification of Pelayo widget and Day Pass flow on paisaxe.es remains the outstanding action.
 
 ---
 
@@ -306,37 +320,36 @@ Based on `src/lib/costs/forecast.ts` logic. No April Paisaxe variable data; usin
 
 ### Immediate Actions (Priority)
 
-1. **Check Anthropic billing manually** — Visit [console.anthropic.com/settings/billing](https://console.anthropic.com/settings/billing). Daily automated agents (security, coverage, performance, cost-analyst, localization, docs, QA, triage) plus Claude Code Max development activity likely push actual usage well above the $10/mo config estimate. Still the single largest unmonitored cost surface.
+1. **Verify QA Agent recovery (P1)** — The RED status from Apr 29 (Chat API 403 + /immersive regression) left safety guarantees unassertable. Commit `bab3c40e` targeted E2E coverage restoration. Confirm the May 1 QA agent runs GREEN before assuming automated monitoring is restored. If 403 persists, `git diff HEAD~5 -- src/app/api/chat/route.ts` isolates the breaking change from wave-2 merges.
 
-2. **Investigate the revenue and voice drought — 71 days is critical** — Over two full months and counting with no revenue. Priority action items:
-   - Is the Pelayo voice widget rendering and accessible on production?
+2. **Implement P4 (Supabase realtime tree-shake) before wave-3 (P1)** — Total JS headroom is 14 KB in dev cache after wave-2 added +55 KB. P4 saves ~25 KB on initial load (creating `src/lib/supabase/browser-public.ts` for public-facing pages). Run a fresh `rm -rf .next && npm run build` after P4 to get an accurate post-wave-2 production baseline before any wave-3 work. Also consider raising the initial-load budget from 2,000 KB to 2,100 KB to reflect structural growth since the Apr 4 baseline.
+
+3. **Investigate the revenue and voice drought — 76 days is a critical threshold (P1)** — Three consecutive months (Feb partial, Mar full, Apr full) with near-zero revenue. Manual checks required:
+   - Is the Pelayo voice widget rendering and accessible on production (paisaxe.es)?
    - Is the Day Pass purchase flow functional end-to-end?
-   - Are Vercel deployment logs showing errors on production requests?
+   - Are Vercel deployment logs showing errors on production?
    - Has organic traffic dropped? (PostHog / Vercel Analytics)
-   - QA Agent browser journeys pass E2E (stable since Mar 23) — production behavior for paying flows remains unverified.
 
-3. **Resolve the Twilio $0.24 anomaly** — Check Twilio billing history for April 3-4. Now 22 days unresolved. Likely a US local number regulatory surcharge (~$0.24/mo). If confirmed recurring, update `src/config/recurring-costs.ts` to reflect ~$1.39/mo Twilio cost instead of $1.15.
+4. **Check Anthropic billing manually (P2)** — Visit console.anthropic.com/settings/billing. Daily automated agents plus Claude Code Max development activity likely push actual Anthropic API usage above the $10/mo config estimate. This remains the single largest unmonitored cost surface.
 
-4. **Run a production build to confirm P8 savings** — `rm -rf .next && npm run build && npm run build:analyze` to measure actual initial-load savings from Sentry Replay removal. If initial load drops below 2,000 KB, Performance Agent status goes GREEN.
-
-5. **Run `npm install` to resolve uuid advisory** — Syncs resend@6.12.2 pin (currently installed at 6.12.0 per lockfile drift). Non-breaking. Clears the advisory pin drift; full advisory resolution awaits svix >=1.91.2 upstream.
-
-6. **Clean up stray repo root files** — `rm svix uuid` in repo root. Empty shell output artifacts flagged by Performance Agent (Apr 24).
+5. **Resolve the Twilio $0.24 anomaly (P3)** — Now 27 days unresolved (Apr 3-4 balance drop). Check Twilio billing history for April 3-4. Likely a US local number regulatory surcharge (~$0.24/mo). If confirmed recurring, update `src/config/recurring-costs.ts` Twilio cost from $1.15 to ~$1.39/mo.
 
 ### Cost Reduction Evaluation
 
-7. **Evaluate Twilio phone number** — 67 days without a booking call. $1.15–1.39/mo unused. Consider releasing the number unless bookings are expected to resume soon. ~$14–17/yr savings.
+6. **Evaluate Twilio phone number (P3)** — 72 days without a booking call. $1.15/mo unused. Next billing ~May 7. Consider releasing the number unless bookings are expected to resume imminently. ~$14–17/yr savings.
 
-8. **Review Vercel Pro and Supabase Pro** — At current dormant scale (~50 visitors/mo), both Pro tiers may be overprovisioned:
-   - Vercel Pro ($20/mo) — Hobby tier is free for personal projects with limited bandwidth.
+7. **Review Vercel Pro and Supabase Pro if drought continues into May (P3)** — At current scale (~50 visitors/mo), both Pro tiers may be overprovisioned:
+   - Vercel Pro ($20/mo) — Hobby tier is free for personal projects.
    - Supabase Pro ($25/mo) — Free tier includes 500MB storage and 50K monthly active users.
    - Combined potential savings: up to $45/mo (~53% of operational costs).
 
 ### Long-Term Planning
 
-9. **Revenue trajectory remains critical** — Three consecutive near-zero or zero-revenue months. At $84.41/mo operational with $0 revenue: $2.81/day in losses. Break-even requires ~3,150 monthly visitors at 5% Day Pass conversion — 63x current traffic. Cumulative operational loss since Feb 2026: ~$357. The platform requires a growth event or cost reduction to achieve sustainability.
+8. **Revenue trajectory requires escalation** — Three consecutive near-zero or zero-revenue months. Cumulative operational loss since Feb 2026: ~$371. At $84.41/mo operational with $0 revenue: $2.81/day in losses. Break-even requires ~3,150 monthly visitors at 5% Day Pass conversion — 63x current traffic. The platform requires either a growth event or cost reduction to achieve sustainability.
 
-10. **ElevenLabs remains well-sized** — Creator tier at $22.18/mo effective (annual). Projected cycle utilization now 5–9% depending on future activity. Well within the 270,783 char limit. Scale tier ($99/mo) only needed if sustained Paisaxe voice traffic exceeds 100 min/mo — currently at 0 min.
+9. **ElevenLabs remains well-sized** — Creator tier at $22.18/mo effective (annual). Current cycle on track for 5–7% utilization. Scale tier ($99/mo) only warranted if sustained Paisaxe voice traffic exceeds 100 min/mo — currently at 0 min.
+
+10. **May cycle reset opportunity** — ElevenLabs character counter resets May 7. The new cycle will provide a clean signal for any voice activity that begins in May. Track Pelayo conversations from the reset date to distinguish May traffic from the 72-day dormancy period.
 
 ---
 
@@ -344,18 +357,19 @@ Based on `src/lib/costs/forecast.ts` logic. No April Paisaxe variable data; usin
 
 | Source | Method | Last Queried | Status |
 |--------|--------|-------------|--------|
-| ElevenLabs Subscription API | `/v1/user/subscription` | 2026-04-21 03:00 UTC | **Unavailable today** — env vars not present in execution context; using Apr 21 data |
-| ElevenLabs ConvAI API | `/v1/convai/conversations?page_size=20` | 2026-04-21 03:00 UTC | **Unavailable today** — using Apr 21 data + cross-agent context |
-| Twilio Balance API | `/Balance.json` | 2026-04-21 03:00 UTC | **Unavailable today** — env vars not present; using Apr 21 data |
-| Twilio Usage API (This Month) | `/Usage/Records/ThisMonth.json` | 2026-04-21 03:00 UTC | **Unavailable today** — using Apr 21 data |
-| Config: `service-tiers.ts` | File read | 2026-04-25 | OK |
-| Config: `recurring-costs.ts` | File read | 2026-04-25 | OK |
-| Config: `forecast.ts` | File read | 2026-04-25 | OK |
-| Anthropic Billing | **NOT AVAILABLE** (personal account) | — | Manual check required |
-| Cross-agent context | Agent shared context | 2026-04-25 | OK — Apr 22–24 reports incorporated |
+| ElevenLabs Subscription API | `/v1/user/subscription` | 2026-04-30 03:00 UTC | OK — character_count 13,734 confirmed, reset timestamp confirmed |
+| ElevenLabs ConvAI API | `/v1/convai/conversations?page_size=20` | 2026-04-30 03:00 UTC | OK — 20 conversations retrieved; most recent Apr 16 18:43 UTC (13.2-day silence) |
+| ElevenLabs Character Stats | `/v1/usage/character-stats` | 2026-04-30 03:00 UTC | Partial — returned empty usage object; subscription API used as authoritative source |
+| Twilio Balance API | `/Balance.json` | 2026-04-30 03:00 UTC | OK — $14.0646 confirmed |
+| Twilio Usage API (This Month) | `/Usage/Records/ThisMonth.json` | 2026-04-30 03:00 UTC | OK — 50 records retrieved; all $0.00 confirmed |
+| Config: `service-tiers.ts` | File read | 2026-04-30 | OK |
+| Config: `recurring-costs.ts` | File read | 2026-04-30 | OK |
+| Config: `forecast.ts` | File read | 2026-04-30 | OK |
+| Anthropic Billing | **NOT AVAILABLE** (personal account) | — | Manual check required at console.anthropic.com/settings/billing |
+| Cross-agent context | Agent shared context | 2026-04-30 | OK — Apr 29 reports incorporated |
 
 ---
 
-*Report generated by the Paisaxe Cost Analyst Agent. Next scheduled run: 2026-04-26.*
+*Report generated by the Paisaxe Cost Analyst Agent. Next scheduled run: 2026-05-01.*
 
 ---

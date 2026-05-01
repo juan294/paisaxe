@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { useStories, clearStoriesCache, prefetchStories } from "./use-stories";
+import React from "react";
+import { useStories, clearStoriesCache, prefetchStories, StoriesProvider } from "./use-stories";
+import type { Story } from "@/types/immersive";
 
-const mockStories = [
+const mockStories: Story[] = [
   {
     id: "db-story-1",
     slug: "db-story-1",
@@ -25,7 +27,7 @@ const mockStories = [
   },
 ];
 
-const mockFallbackStories = [
+const mockFallbackStories: Story[] = [
   {
     id: "fallback-1",
     slug: "fallback-1",
@@ -81,6 +83,10 @@ Object.defineProperty(window, "localStorage", {
   writable: true,
 });
 
+/** Default wrapper: StoriesProvider with no initial stories */
+const wrapper = ({ children }: { children: React.ReactNode }) =>
+  React.createElement(StoriesProvider, null, children);
+
 describe("useStories", () => {
   beforeEach(() => {
     clearStoriesCache();
@@ -103,14 +109,14 @@ describe("useStories", () => {
       () => new Promise((resolve) => setTimeout(() => resolve(mockStories), 100))
     );
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     // Initially should have fallback stories (no cache exists yet)
     expect(result.current.stories).toEqual(mockFallbackStories);
   });
 
   it("should fetch stories from DB on mount", async () => {
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -120,7 +126,7 @@ describe("useStories", () => {
   });
 
   it("should return fetched stories after load", async () => {
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -135,7 +141,7 @@ describe("useStories", () => {
       () => new Promise((resolve) => { resolveDB = resolve; })
     );
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     // Should be loading since no cache and fetch is pending
     expect(result.current.isLoading).toBe(true);
@@ -152,7 +158,7 @@ describe("useStories", () => {
   it("should handle fetch error and fall back to FALLBACK_STORIES", async () => {
     mockGetStoriesFromDB.mockRejectedValue(new Error("DB error"));
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -164,7 +170,7 @@ describe("useStories", () => {
   it("should set error state on failure", async () => {
     mockGetStoriesFromDB.mockRejectedValue(new Error("DB error"));
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -178,7 +184,7 @@ describe("useStories", () => {
   it("should set error state with generic message for non-Error throws", async () => {
     mockGetStoriesFromDB.mockRejectedValue("string error");
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -189,7 +195,7 @@ describe("useStories", () => {
   });
 
   it("should refresh and force-fetch new data", async () => {
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -217,7 +223,7 @@ describe("useStories", () => {
   it("should keep cached data on refresh failure when cache exists", async () => {
     const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -247,7 +253,7 @@ describe("useStories", () => {
     // Start with a fetch that fails immediately - no cache will be populated
     mockGetStoriesFromDB.mockRejectedValue(new Error("Initial error"));
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -272,7 +278,7 @@ describe("useStories", () => {
     // Start with a fetch that fails immediately (no cache)
     mockGetStoriesFromDB.mockRejectedValue("string error");
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -294,7 +300,7 @@ describe("useStories", () => {
   });
 
   it("should revalidate stale data on window focus", async () => {
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -330,7 +336,7 @@ describe("useStories", () => {
   });
 
   it("should not revalidate fresh cache on window focus", async () => {
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -358,9 +364,9 @@ describe("useStories", () => {
         })
     );
 
-    // Render two hook instances simultaneously
-    const { result: result1 } = renderHook(() => useStories());
-    const { result: result2 } = renderHook(() => useStories());
+    // Render two hook instances simultaneously (each with their own provider)
+    const { result: result1 } = renderHook(() => useStories(), { wrapper });
+    const { result: result2 } = renderHook(() => useStories(), { wrapper });
 
     // Both hooks should share the same promise, so only 1 call to getStoriesFromDB
     // (though the second renderHook may or may not trigger a second useEffect depending on timing)
@@ -380,7 +386,7 @@ describe("useStories", () => {
   });
 
   it("should use cached data when fresh (within 5min TTL)", async () => {
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -390,7 +396,7 @@ describe("useStories", () => {
     const initialCallCount = mockGetStoriesFromDB.mock.calls.length;
 
     // Render again - cache should still be fresh
-    const { result: result2 } = renderHook(() => useStories());
+    const { result: result2 } = renderHook(() => useStories(), { wrapper });
 
     // Should immediately have cached data
     expect(result2.current.stories).toEqual(mockStories);
@@ -401,7 +407,7 @@ describe("useStories", () => {
   });
 
   it("should return stories and no error initially", async () => {
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -413,7 +419,7 @@ describe("useStories", () => {
 
   it("should revalidate stale cache in background on mount", async () => {
     // Step 1: Populate the cache with initial data
-    const { result: result1 } = renderHook(() => useStories());
+    const { result: result1 } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result1.current.isLoading).toBe(false);
@@ -432,7 +438,7 @@ describe("useStories", () => {
     const updatedStories = [{ ...mockStories[0], title: "Background Updated" }];
     mockGetStoriesFromDB.mockResolvedValue(updatedStories);
 
-    const { result: result2 } = renderHook(() => useStories());
+    const { result: result2 } = renderHook(() => useStories(), { wrapper });
 
     // Should immediately have cached data (from stale cache), not loading
     expect(result2.current.stories).toEqual(mockStories);
@@ -453,7 +459,7 @@ describe("useStories", () => {
 
   it("should not update stories when unmounted during stale revalidation (line 190)", async () => {
     // Step 1: Populate the cache
-    const { result: result1 } = renderHook(() => useStories());
+    const { result: result1 } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result1.current.isLoading).toBe(false);
@@ -471,7 +477,7 @@ describe("useStories", () => {
     );
 
     // Step 4: Render a new hook that will trigger stale revalidation
-    const { unmount } = renderHook(() => useStories());
+    const { unmount } = renderHook(() => useStories(), { wrapper });
 
     // Step 5: Unmount before the fetch resolves — sets mounted = false
     unmount();
@@ -493,7 +499,7 @@ describe("useStories", () => {
       () => new Promise((resolve) => { resolveDB = resolve; })
     );
 
-    const { unmount, result } = renderHook(() => useStories());
+    const { unmount, result } = renderHook(() => useStories(), { wrapper });
 
     // Should be loading
     expect(result.current.isLoading).toBe(true);
@@ -514,7 +520,7 @@ describe("useStories", () => {
       () => new Promise((_, reject) => { rejectDB = reject; })
     );
 
-    const { unmount, result } = renderHook(() => useStories());
+    const { unmount, result } = renderHook(() => useStories(), { wrapper });
 
     // Should be loading
     expect(result.current.isLoading).toBe(true);
@@ -531,7 +537,7 @@ describe("useStories", () => {
 });
 
 describe("useStories with initialStories", () => {
-  const serverStories = [
+  const serverStories: Story[] = [
     {
       id: "server-1",
       slug: "server-1",
@@ -574,7 +580,9 @@ describe("useStories with initialStories", () => {
       () => new Promise((resolve) => setTimeout(() => resolve(mockStories), 1000))
     );
 
-    const { result } = renderHook(() => useStories(serverStories));
+    const wrapperWithInitial = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(StoriesProvider, { initialStories: serverStories }, children);
+    const { result } = renderHook(() => useStories(), { wrapper: wrapperWithInitial });
 
     // Should immediately have server stories, NOT loading
     expect(result.current.stories).toEqual(serverStories);
@@ -583,7 +591,7 @@ describe("useStories with initialStories", () => {
 
   it("should overwrite cache with initialStories for freshness", async () => {
     // First: populate cache via a hook with no initialStories
-    const { result: result1 } = renderHook(() => useStories());
+    const { result: result1 } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result1.current.isLoading).toBe(false);
@@ -592,7 +600,9 @@ describe("useStories with initialStories", () => {
 
     // Second: render with initialStories — initialStories overwrites cache
     // to ensure post-deploy freshness (FE-M2)
-    const { result: result2 } = renderHook(() => useStories(serverStories));
+    const wrapperWithInitial = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(StoriesProvider, { initialStories: serverStories }, children);
+    const { result: result2 } = renderHook(() => useStories(), { wrapper: wrapperWithInitial });
     expect(result2.current.stories).toEqual(serverStories);
     expect(result2.current.isLoading).toBe(false);
   });
@@ -603,7 +613,9 @@ describe("useStories with initialStories", () => {
       () => new Promise((resolve) => { resolveDB = resolve; })
     );
 
-    const { result } = renderHook(() => useStories([]));
+    const wrapperWithEmpty = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(StoriesProvider, { initialStories: [] }, children);
+    const { result } = renderHook(() => useStories(), { wrapper: wrapperWithEmpty });
 
     // Empty initialStories should not seed cache, so isLoading should be true
     expect(result.current.isLoading).toBe(true);
@@ -637,7 +649,7 @@ describe("useStories localStorage persistence", () => {
   });
 
   it("should persist stories to localStorage after fetch", async () => {
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -672,7 +684,7 @@ describe("useStories localStorage persistence", () => {
       () => new Promise((resolve) => setTimeout(() => resolve(mockStories), 1000))
     );
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     // Should immediately have stories from localStorage, not loading
     expect(result.current.stories).toEqual(mockStories);
@@ -688,7 +700,7 @@ describe("useStories localStorage persistence", () => {
     };
     localStorageMock.getItem.mockReturnValue(JSON.stringify(storedCache));
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     // Should be loading (localStorage cache ignored due to version mismatch)
     expect(result.current.isLoading).toBe(true);
@@ -706,7 +718,7 @@ describe("useStories localStorage persistence", () => {
     };
     localStorageMock.getItem.mockReturnValue(JSON.stringify(storedCache));
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     // Should be loading (localStorage cache expired)
     expect(result.current.isLoading).toBe(true);
@@ -718,7 +730,7 @@ describe("useStories localStorage persistence", () => {
   it("should handle invalid JSON in localStorage gracefully", async () => {
     localStorageMock.getItem.mockReturnValue("not valid json");
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     // Should be loading (localStorage invalid)
     expect(result.current.isLoading).toBe(true);
@@ -733,7 +745,7 @@ describe("useStories localStorage persistence", () => {
       throw new Error("localStorage full");
     });
 
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -763,7 +775,7 @@ describe("clearStoriesCache", () => {
   });
 
   it("should clear both memory and localStorage cache", async () => {
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -802,7 +814,7 @@ describe("prefetchStories", () => {
 
   it("should not fetch if cache is fresh", async () => {
     // First, populate the cache by using the hook
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -819,7 +831,7 @@ describe("prefetchStories", () => {
 
   it("should fetch if cache is stale", async () => {
     // First, populate the cache
-    const { result } = renderHook(() => useStories());
+    const { result } = renderHook(() => useStories(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -899,4 +911,3 @@ describe("use-stories SSR guard coverage notes (loadFromStorage, saveToStorage, 
     expect(typeof window).toBe("object");
   });
 });
-

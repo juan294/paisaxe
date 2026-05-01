@@ -39,6 +39,8 @@ export const en: Translations = {
     directions: 'Directions',
     copy_conversation: 'Copy conversation',
     copied: 'Copied',
+    copy_error: 'Could not copy',
+    assistant_label: 'Paisaxe',
   },
 
   stories: {
@@ -101,6 +103,7 @@ export const en: Translations = {
   share: {
     share: 'Share',
     link_copied: 'Link copied',
+    copy_error: 'Could not copy',
   },
 
   favorites: {
@@ -152,10 +155,13 @@ export const en: Translations = {
     go_back: 'Go back',
     loading: 'Loading',
     go_to_story: 'Go to story {current} of {total}',
+    show_info: 'Show story information',
+    hide_info: 'Hide story information',
   },
 
   auth: {
     user: 'User',
+    user_avatar: 'User avatar',
     sign_out: 'Sign out',
     sign_in: 'Sign in',
     sync_favorites_title: 'Sync your favorites',
@@ -197,6 +203,7 @@ export const en: Translations = {
     mute: 'Mute',
     unmute: 'Unmute',
     error: 'Connection error',
+    error_not_configured: 'Voice agent not configured',
     no_permission: 'Microphone access needed',
     you: 'You',
     loading: 'Loading voice assistant...',
@@ -248,6 +255,8 @@ export const en: Translations = {
   },
 
   premium: {
+    premium_access: 'Premium Access',
+    voice_pass_label: 'Voice Pass · 24h',
     voice_locked: 'Voice chat is a premium feature',
     get_day_pass: 'Get Day Pass',
     voice_title: 'Talk to Your Guide',
@@ -290,6 +299,7 @@ export const en: Translations = {
   },
 
   errors: {
+    unknown: 'Something went wrong, please try again',
     generic_title: 'Something went wrong',
     generic_description: 'An unexpected error occurred. Please try again.',
     retry: 'Retry',

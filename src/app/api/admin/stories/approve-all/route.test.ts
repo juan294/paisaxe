@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "./route";
 import { NextRequest } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
@@ -240,5 +248,27 @@ describe("POST /api/admin/stories/approve-all", () => {
     expect(response.status).toBe(500);
     const data = await response.json();
     expect(data.error).toBe("Failed to approve stories");
+  });
+
+  it("should use logger.error (not console.error) on database error", async () => {
+    const mockSelect = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "Database error" },
+    });
+    const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+    mockCreateAdminClient.mockReturnValue({ from: mockFrom });
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = new NextRequest("http://localhost/api/admin/stories/approve-all", {
+      method: "POST",
+    });
+
+    await POST(request);
+    consoleSpy.mockRestore();
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

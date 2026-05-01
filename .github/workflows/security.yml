@@ -51,10 +51,10 @@ jobs:
         run: npm ci
 
       - name: Run security audit (production deps)
-        # Only audit production dependencies at high level.
-        # Dev-only vulnerabilities (e.g. minimatch ReDoS in eslint) don't affect
-        # the deployed application and are tracked separately.
-        run: npm audit --omit=dev --audit-level=high
+        # Audit production dependencies only (dev vulns don't affect the deployed
+        # application). Threshold is "moderate" so medium-severity issues are caught
+        # before they accumulate into high/critical ones.
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Report all vulnerabilities (informational)
         if: always()

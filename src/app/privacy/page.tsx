@@ -1,11 +1,11 @@
-"use client";
-
 import Link from "next/link";
 import { ArrowLeft, Shield } from "lucide-react";
-import { useTranslation } from "@/lib/i18n";
+import { resolveTranslation } from "@/lib/i18n/resolve";
+import { es } from "@/lib/i18n/es";
+
+const t = (key: string) => resolveTranslation(key, es);
 
 export default function PrivacyPage() {
-  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-neutral-950">

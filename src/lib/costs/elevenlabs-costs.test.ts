@@ -209,6 +209,38 @@ describe("elevenlabs-costs", () => {
       expect(result?.billingPeriodEnd).toBe(expectedEnd);
     });
 
+    it("passes AbortSignal.timeout(8000) to fetch (#252)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-key";
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          character_count: 0,
+          character_limit: 10000,
+          can_extend_character_limit: false,
+          allowed_to_extend_character_limit: false,
+          next_character_count_reset_unix: 0,
+          voice_limit: 5,
+          max_voice_add_edits: 3,
+          voice_add_edit_counter: 0,
+          professional_voice_limit: 0,
+          can_extend_voice_limit: false,
+          can_use_instant_voice_cloning: false,
+          can_use_professional_voice_cloning: false,
+          currency: "usd",
+          status: "active",
+          billing_period: { start_unix: 1704067200, end_unix: 1706745600 },
+        }),
+      });
+
+      await fetchElevenLabsCosts("2024-01-01", "2024-01-31");
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+    });
+
     it("uses billing period from API response", async () => {
       process.env.ELEVENLABS_API_KEY = "test-key";
 

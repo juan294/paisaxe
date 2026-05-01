@@ -9,6 +9,15 @@ vi.mock("@/lib/unsplash-placeholders", () => ({
   getPlaceholderForStory: (...args: unknown[]) => mockGetPlaceholder(...args),
 }));
 
+// Mock logger — factory must not reference outer variables (vi.mock is hoisted)
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 import {
   generateSlug,
   normalizeName,
@@ -22,6 +31,7 @@ import {
   DISCOVERY_QUERIES,
   type DiscoverySupabaseClient,
 } from "./content-discovery";
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // generateSlug
@@ -245,6 +255,20 @@ describe("searchPlaces", () => {
     await expect(searchPlaces("test", "bad-key")).rejects.toThrow("Places API error");
   });
 
+  it("passes AbortSignal.timeout(8000) to Google Places fetch (#252)", async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ places: [] }),
+    });
+
+    await searchPlaces("test", "test-api-key");
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://places.googleapis.com/v1/places:searchText",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+  });
+
   it("handles missing fields in place results (fallback branches)", async () => {
     // Tests the || "Unknown", || "", || [], ?? null fallback branches
     // when place data has missing optional fields
@@ -300,6 +324,38 @@ describe("generateDescription", () => {
     const result = await generateDescription("Playa de Gulpiyuri", "test-key");
     expect(result).toContain("Playa de Gulpiyuri");
     expect(result).toContain("Asturias");
+  });
+
+  it("passes AbortSignal.timeout(8000) to Anthropic fetch (#252)", async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        content: [{ type: "text", text: "Descripción de prueba." }],
+      }),
+    });
+
+    await generateDescription("Test Place", "test-key");
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.anthropic.com/v1/messages",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+  });
+
+  it("logs [TABLE_FALLBACK] with logger.error on API error (#249)", async () => {
+    vi.mocked(logger.error).mockClear();
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: async () => "Server error",
+    });
+
+    await generateDescription("Test Place", "test-key");
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[TABLE_FALLBACK]",
+      expect.objectContaining({ table: "content_discovery_description" })
+    );
   });
 });
 

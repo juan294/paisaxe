@@ -235,7 +235,7 @@ describe("rate-limit", () => {
 
       expect(warnSpy).toHaveBeenCalledWith(
         "[RATE_LIMIT_DEGRADED]",
-        expect.objectContaining({ reason: "Redis unavailable" })
+        expect.objectContaining({ reason: "upstash_unavailable" })
       );
 
       vi.unstubAllEnvs();
@@ -284,6 +284,49 @@ describe("rate-limit", () => {
 
     it("resetRateLimit does not crash in Upstash mode", () => {
       expect(() => resetRateLimit()).not.toThrow();
+    });
+
+    it("BE-M1: emits logger.warn([RATE_LIMIT_DEGRADED]) with reason 'upstash_unavailable' in production fallback path", async () => {
+      // In production Upstash fails → fail closed, but must still warn
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubEnv("NODE_ENV", "production");
+      mockLimit.mockRejectedValue(new Error("Redis down in production"));
+
+      const loggerModule = await import("./logger");
+      const warnSpy = vi.spyOn(loggerModule.logger, "warn").mockImplementation(() => {});
+
+      await checkRateLimit("user-prod", {
+        windowMs: 60_000,
+        maxRequests: 10,
+        maxEntries: 100,
+      });
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[RATE_LIMIT_DEGRADED]",
+        expect.objectContaining({ reason: "upstash_unavailable" })
+      );
+
+      vi.unstubAllEnvs();
+      consoleSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    it("BE-M1: emits logger.warn([RATE_LIMIT_DEGRADED]) with reason 'upstash_unavailable' in dev fallback path", async () => {
+      vi.stubEnv("NODE_ENV", "test");
+      mockLimit.mockRejectedValue(new Error("Redis connection failed"));
+
+      const loggerModule = await import("./logger");
+      const warnSpy = vi.spyOn(loggerModule.logger, "warn").mockImplementation(() => {});
+
+      await checkRateLimit("user1");
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[RATE_LIMIT_DEGRADED]",
+        expect.objectContaining({ reason: "upstash_unavailable" })
+      );
+
+      vi.unstubAllEnvs();
+      warnSpy.mockRestore();
     });
 
     it("creates distinct Upstash limiter per config", async () => {
@@ -365,6 +408,33 @@ describe("rate-limit", () => {
       const result = await checkRateLimit("user1");
       expect(result.allowed).toBe(true);
       expect(getRateLimitStore().size).toBe(1);
+    });
+  });
+
+  describe("BE-M1: isRateLimitDegraded export", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      delete process.env.UPSTASH_REDIS_REST_URL;
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+      vi.unstubAllEnvs();
+    });
+
+    it("BE-M1: isRateLimitDegraded() is exported from the module", async () => {
+      vi.resetModules();
+      delete process.env.UPSTASH_REDIS_REST_URL;
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+
+      const mod = await import("./rate-limit");
+      expect(typeof mod.isRateLimitDegraded).toBe("function");
+    });
+
+    it("BE-M1: isRateLimitDegraded() returns false when no Upstash is configured", async () => {
+      vi.resetModules();
+      delete process.env.UPSTASH_REDIS_REST_URL;
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+
+      const { isRateLimitDegraded } = await import("./rate-limit");
+      expect(isRateLimitDegraded()).toBe(false);
     });
   });
 });

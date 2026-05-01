@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { buildCspHeader } from "@/proxy";
+import { buildCspHeader } from "@/lib/proxy/csp";
 
 /**
  * Tests for security headers.

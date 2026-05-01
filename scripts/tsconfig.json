@@ -8,6 +8,7 @@
     "../node_modules",
     "extract-images.ts",
     "seed-database.ts",
+    "seed-database.test.ts",
     "seed-images.ts",
     "seed-images.test.ts"
   ]

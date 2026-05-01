@@ -7,9 +7,11 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceSession } from "@/hooks/use-voice-session";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import type { Story } from "@/types/immersive";
 
 interface Message {
+  id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
@@ -115,6 +117,7 @@ export function VoiceChatElevenLabs({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { t, locale } = useTranslation();
   const localizedStory = getLocalizedStory(story, locale);
+  const prefersReducedMotion = useReducedMotion();
 
   // Voice session tracking for personalization
   const voiceSession = useVoiceSession();
@@ -153,33 +156,39 @@ export function VoiceChatElevenLabs({
 
   const addMessage = useCallback(
     (role: "user" | "assistant", content: string) => {
-      setMessages((prev) => [...prev, { role, content, timestamp: new Date() }]);
+      setMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), role, content, timestamp: new Date() },
+      ]);
     },
     []
   );
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom — respects prefers-reduced-motion
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Check microphone permission
-  useEffect(() => {
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then(() => setHasPermission(true))
-      .catch(() => setHasPermission(false));
-  }, []);
+    messagesEndRef.current?.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }, [messages, prefersReducedMotion]);
 
   const startConversation = async () => {
     if (!agentId) {
-      setError("Voice agent not configured");
+      setError(t("voice.error_not_configured"));
       onFallbackToText();
       return;
     }
 
     try {
       setError(null);
+
+      // Request mic permission on click — not on mount (UX-H1)
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        setHasPermission(true);
+      } catch {
+        setHasPermission(false);
+        return;
+      }
 
       // Determine language override based on user's locale
       const languageOverride = voiceSession.preferredLanguage === "Spanish" ? "es" : "en";
@@ -250,7 +259,10 @@ export function VoiceChatElevenLabs({
     <div className="flex flex-col h-full">
       {/* Permission Warning */}
       {hasPermission === false && (
-        <div className="mx-4 mt-4 flex items-center gap-2 rounded-lg bg-red-500/20 p-3 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mx-4 mt-4 flex items-center gap-2 rounded-lg bg-red-500/20 p-3 text-sm text-red-200"
+        >
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <p>{t("voice.no_permission")}</p>
         </div>
@@ -258,7 +270,10 @@ export function VoiceChatElevenLabs({
 
       {/* Error Display */}
       {error && (
-        <div className="mx-4 mt-4 flex items-center gap-2 rounded-lg bg-red-500/20 p-3 text-sm text-red-200">
+        <div
+          role="alert"
+          className="mx-4 mt-4 flex items-center gap-2 rounded-lg bg-red-500/20 p-3 text-sm text-red-200"
+        >
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <p>{error}</p>
         </div>
@@ -333,10 +348,14 @@ export function VoiceChatElevenLabs({
       {/* Transcript */}
       {messages.length > 0 && (
         <div className="border-t border-white/10 p-4">
-          <div className="max-h-32 space-y-2 overflow-y-auto">
-            {messages.map((msg, idx) => (
+          <div
+            role="log"
+            aria-live="polite"
+            className="max-h-32 space-y-2 overflow-y-auto"
+          >
+            {messages.map((msg) => (
               <div
-                key={idx}
+                key={msg.id}
                 className={cn(
                   "text-sm",
                   msg.role === "user" ? "text-white/80" : "text-white/60"

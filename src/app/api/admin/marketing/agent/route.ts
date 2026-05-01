@@ -9,16 +9,8 @@ import {
   type AgentConfig,
 } from "@/agents";
 import { supabase } from "@/lib/supabase";
-
-// Agent chat request body
-interface AgentChatRequest {
-  agentId: string;
-  message: string;
-  conversationHistory?: Array<{
-    role: "user" | "assistant";
-    content: string;
-  }>;
-}
+import { agentChatRequestSchema } from "@/lib/schemas";
+import { logger } from "@/lib/logger";
 
 // Agent chat response
 interface AgentChatResponse {
@@ -134,22 +126,23 @@ export async function POST(
   }
 
   try {
-    const body = (await request.json()) as AgentChatRequest;
-    const { agentId, message, conversationHistory = [] } = body;
+    const rawBody: unknown = await request.json();
+    const parsed = agentChatRequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
+      return NextResponse.json(
+        { error: firstIssue?.message ?? "Invalid request body" },
+        { status: 400 }
+      );
+    }
+
+    const { agentId, message, conversationHistory = [] } = parsed.data;
 
     // Validate agent ID
     const agent = getAgentById(agentId);
     if (!agent) {
       return NextResponse.json(
         { error: `Invalid agent ID: ${agentId}` },
-        { status: 400 }
-      );
-    }
-
-    // Validate message
-    if (!message || typeof message !== "string" || message.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Message is required" },
         { status: 400 }
       );
     }
@@ -188,7 +181,7 @@ export async function POST(
       },
     });
   } catch (error) {
-    console.error("Agent chat error:", error);
+    logger.error("Agent chat error:", { error: error instanceof Error ? error.message : String(error) });
 
     if (error instanceof Error && error.message.includes("Could not read")) {
       return NextResponse.json(

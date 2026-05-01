@@ -6,6 +6,7 @@ import {
   type MarketingAgentLogRow,
   type AgentStatus,
 } from "@/types/marketing";
+import { logger } from "@/lib/logger";
 
 const VALID_STATUSES: AgentStatus[] = ["started", "success", "failed"];
 
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query;
 
     if (error) {
-      console.error("Error fetching marketing logs:", error);
+      logger.error("Error fetching marketing logs:", { error: error.message });
       return NextResponse.json(
         { error: "Failed to fetch logs" },
         { status: 500 }
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
       offset,
     });
   } catch (error) {
-    console.error("Marketing logs GET error:", error);
+    logger.error("Marketing logs GET error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

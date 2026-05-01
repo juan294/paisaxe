@@ -74,11 +74,8 @@ async function signInTestUser(page: Page): Promise<{ userId: string }> {
     { key: storageKey, session: data.session }
   );
 
-  // Reload page to pick up the session
-  await page.reload();
-
-  // Wait for auth state to settle (flakiness mitigation)
-  await page.waitForTimeout(500);
+  // Reload page to pick up the session and wait for it to fully load
+  await page.reload({ waitUntil: "domcontentloaded" });
 
   return { userId: data.user.id };
 }
@@ -137,10 +134,12 @@ export const test = base.extend<AuthFixtures>({
 
   // Authenticated browser context
   authenticatedContext: async ({ browser }, use) => {
-    // Skip if credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD not set)
+    // Fail loudly if credentials are not configured — silent skips hide CI misconfigurations.
+    // Ensure QA_TEST_USER_EMAIL and QA_TEST_USER_PASSWORD are set in the workflow env.
     if (!hasAuthCredentials()) {
-      test.skip(true, "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD)");
-      return;
+      throw new Error(
+        "QA test user credentials not configured. Set QA_TEST_USER_EMAIL and QA_TEST_USER_PASSWORD in the CI environment."
+      );
     }
 
     const context = await browser.newContext();
@@ -150,10 +149,12 @@ export const test = base.extend<AuthFixtures>({
 
   // Authenticated page with session injected
   authenticatedPage: async ({ authenticatedContext }, use) => {
-    // Skip if credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD not set)
+    // Fail loudly if credentials are not configured — silent skips hide CI misconfigurations.
+    // Ensure QA_TEST_USER_EMAIL and QA_TEST_USER_PASSWORD are set in the workflow env.
     if (!hasAuthCredentials()) {
-      test.skip(true, "QA test user credentials not configured (QA_TEST_USER_EMAIL / QA_TEST_USER_PASSWORD)");
-      return;
+      throw new Error(
+        "QA test user credentials not configured. Set QA_TEST_USER_EMAIL and QA_TEST_USER_PASSWORD in the CI environment."
+      );
     }
 
     // Clean up before test (isolation)

@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import type { FeatureFlag, FeatureFlagRow } from "@/types/feature-flags";
 import { rowToFeatureFlag } from "@/types/feature-flags";
 import { getEnvironment } from "@/lib/environment";
+import { logger } from "@/lib/logger";
 
 /**
  * SE-H1: Scrub sensitive fields from specific flag configs before sending to clients.
@@ -35,6 +36,8 @@ export async function GET() {
     return NextResponse.json({ data: [] }, {
       headers: {
         "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
+        // BE-M4: Vary: Host prevents CDN from serving wrong flags across deployments/subdomains.
+        "Vary": "Host",
       },
     });
   }
@@ -49,7 +52,7 @@ export async function GET() {
       .order("flag_key", { ascending: true });
 
     if (error) {
-      console.error("Failed to fetch feature flags:", error.message);
+      logger.error("Failed to fetch feature flags:", { error: error.message });
       return NextResponse.json(
         { error: "Failed to fetch feature flags" },
         { status: 500 }
@@ -61,10 +64,12 @@ export async function GET() {
     return NextResponse.json({ data: flags }, {
       headers: {
         "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
+        // BE-M4: Vary: Host prevents CDN from serving wrong flags across deployments/subdomains.
+        "Vary": "Host",
       },
     });
   } catch (error) {
-    console.error("Feature flags API error:", error);
+    logger.error("Feature flags API error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

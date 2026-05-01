@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { AdminShell } from "./admin-shell";
 
+// Mock next/navigation (used after FE-H5 fix)
+const mockRouterPush = vi.fn();
+const mockSearchParamsGet = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockRouterPush }),
+  useSearchParams: () => ({ get: mockSearchParamsGet }),
+}));
+
 // Mock matchMedia for next-themes
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -35,18 +44,9 @@ vi.mock("@/hooks/use-admin-role", () => ({
   useAdminRole: () => mockUseAdminRole(),
 }));
 
-// Mock admin-api functions
-const mockFetchStories = vi.fn();
-vi.mock("@/lib/admin-api", () => ({
-  fetchStories: (...args: unknown[]) => mockFetchStories(...args),
-  bulkUpdateStoryStatus: vi.fn(),
-  bulkDeleteStories: vi.fn(),
-  approveAllPendingStories: vi.fn(),
-}));
-
-// Mock StoryGrid
-vi.mock("@/components/admin/story-grid", () => ({
-  StoryGrid: () => <div data-testid="story-grid">Story Grid</div>,
+// Mock StoriesTabPanel — stories tab is now a self-contained sub-component
+vi.mock("@/components/admin/stories-tab-panel", () => ({
+  StoriesTabPanel: () => <div data-testid="stories-tab-panel">Stories Panel</div>,
 }));
 
 // Mock AdminTabs
@@ -110,59 +110,20 @@ vi.mock("@/components/admin/agents-dashboard", () => ({
   AgentsDashboard: () => <div data-testid="agents-dashboard">Agents</div>,
 }));
 
-vi.mock("@/components/admin/story-editor-dialog", () => ({
-  StoryEditorDialog: () => null,
-}));
-
-vi.mock("@/components/admin/create-story-dialog", () => ({
-  CreateStoryDialog: () => null,
-}));
-
-vi.mock("@/components/admin/selection-toolbar", () => ({
-  SelectionToolbar: () => null,
-}));
-
 vi.mock("@/components/admin/theme-toggle", () => ({
   ThemeToggle: () => <button data-testid="theme-toggle">Toggle Theme</button>,
 }));
 
 vi.mock("lucide-react", () => ({
-  RefreshCw: ({ className, ...props }: Record<string, unknown>) => (
-    <span data-testid="icon-refresh" className={className as string} {...props} />
-  ),
   LogOut: (props: Record<string, unknown>) => <span data-testid="icon-logout" {...props} />,
-  AlertCircle: (props: Record<string, unknown>) => (
-    <span data-testid="icon-alert" {...props} />
-  ),
   ShieldX: (props: Record<string, unknown>) => (
     <span data-testid="icon-shield-x" {...props} />
   ),
   Loader2: (props: Record<string, unknown>) => (
     <span data-testid="icon-loader" {...props} />
   ),
-  ImageIcon: (props: Record<string, unknown>) => (
-    <span data-testid="icon-image" {...props} />
-  ),
-  CheckCircle2: (props: Record<string, unknown>) => (
-    <span data-testid="icon-check" {...props} />
-  ),
-  Clock: (props: Record<string, unknown>) => (
-    <span data-testid="icon-clock" {...props} />
-  ),
-  Layers: (props: Record<string, unknown>) => (
-    <span data-testid="icon-layers" {...props} />
-  ),
   ArrowUpRight: (props: Record<string, unknown>) => (
     <span data-testid="icon-arrow-up-right" {...props} />
-  ),
-  Search: (props: Record<string, unknown>) => (
-    <span data-testid="icon-search" {...props} />
-  ),
-  Plus: (props: Record<string, unknown>) => (
-    <span data-testid="icon-plus" {...props} />
-  ),
-  Languages: (props: Record<string, unknown>) => (
-    <span data-testid="icon-languages" {...props} />
   ),
 }));
 
@@ -179,7 +140,8 @@ function setupAdminAuth() {
 describe("AdminShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetchStories.mockResolvedValue({ data: [] });
+    // Default: no tab param in URL → defaults to "analytics"
+    mockSearchParamsGet.mockReturnValue(null);
   });
 
   describe("Auth gating", () => {
@@ -252,6 +214,8 @@ describe("AdminShell", () => {
       // Analytics panel should be UNMOUNTED (not just hidden)
       await waitFor(() => {
         expect(screen.queryByTestId("analytics-dashboard")).not.toBeInTheDocument();
+        // StoriesTabPanel should now be mounted
+        expect(screen.getByTestId("stories-tab-panel")).toBeInTheDocument();
       });
     });
 
@@ -395,6 +359,66 @@ describe("AdminShell", () => {
       });
 
       expect(mockSignOut).toHaveBeenCalled();
+    });
+  });
+
+  describe("FE-H5: activeTab derived from searchParams, tab change only calls router.push", () => {
+    beforeEach(() => {
+      setupAdminAuth();
+    });
+
+    it("derives activeTab from searchParams.get('tab')", async () => {
+      mockSearchParamsGet.mockReturnValue("stories");
+
+      render(<AdminShell />);
+
+      // StoriesTabPanel should be mounted; analytics should not
+      await waitFor(() => {
+        expect(screen.getByTestId("stories-tab-panel")).toBeInTheDocument();
+        expect(screen.queryByTestId("analytics-dashboard")).not.toBeInTheDocument();
+      });
+    });
+
+    it("defaults to 'analytics' tab when searchParams has no tab param", async () => {
+      mockSearchParamsGet.mockReturnValue(null);
+
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+    });
+
+    it("calls router.push (not double setState) when a tab is clicked", async () => {
+      mockSearchParamsGet.mockReturnValue(null); // start on analytics
+
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Features"));
+      });
+
+      // router.push must be called with the new tab in the URL
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.stringContaining("tab=features"),
+        expect.anything()
+      );
+    });
+
+    it("does not call router.push on initial render", async () => {
+      mockSearchParamsGet.mockReturnValue(null);
+
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      expect(mockRouterPush).not.toHaveBeenCalled();
     });
   });
 });

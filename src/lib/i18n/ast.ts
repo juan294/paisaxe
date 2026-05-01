@@ -39,6 +39,8 @@ export const ast: Translations = {
     directions: 'Cómo llegar',
     copy_conversation: 'Copiar conversación',
     copied: 'Copiao',
+    copy_error: 'Nun se pudo copiar',
+    assistant_label: 'Paisaxe',
   },
 
   stories: {
@@ -101,6 +103,7 @@ export const ast: Translations = {
   share: {
     share: 'Compartir',
     link_copied: 'Enllaz copiao',
+    copy_error: 'Nun se pudo copiar',
   },
 
   favorites: {
@@ -152,10 +155,13 @@ export const ast: Translations = {
     go_back: 'Tornar',
     loading: 'Cargando',
     go_to_story: 'Dir a la historia {current} de {total}',
+    show_info: 'Amosar información de la historia',
+    hide_info: 'Anubrir información de la historia',
   },
 
   auth: {
     user: 'Usuariu',
+    user_avatar: 'Avatar del usuariu',
     sign_out: 'Zarrar sesión',
     sign_in: 'Entrar',
     sync_favorites_title: 'Sincroniza los tos favoritos',
@@ -197,6 +203,7 @@ export const ast: Translations = {
     mute: 'Silenciar',
     unmute: 'Activar soníu',
     error: 'Error de conexón',
+    error_not_configured: 'Axente de voz nun configuráu',
     no_permission: 'Necesito accesu al micrófonu',
     you: 'Tu',
     loading: "Cargando l'asistente de voz...",
@@ -248,6 +255,8 @@ export const ast: Translations = {
   },
 
   premium: {
+    premium_access: 'Accesu Premium',
+    voice_pass_label: 'Pase de Voz · 24h',
     voice_locked: 'El chat de voz ye una función premium',
     get_day_pass: 'Obtener Pase Diariu',
     voice_title: 'Fala cola To Guía',
@@ -290,6 +299,7 @@ export const ast: Translations = {
   },
 
   errors: {
+    unknown: 'Algo salió mal, inténtalo otra vuelta',
     generic_title: 'Algo salió mal',
     generic_description: 'Hebo un error inesperáu. Por favor, inténtalo otra vuelta.',
     retry: 'Reintentar',

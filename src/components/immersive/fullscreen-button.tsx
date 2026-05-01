@@ -5,6 +5,7 @@ import { Maximize, X, Share } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { Button } from "@/components/ui/button";
 
 export function FullscreenButton() {
   const { t } = useTranslation();
@@ -70,15 +71,15 @@ export function FullscreenButton() {
 
   return (
     <>
-      <button
+      <Button
+        variant="glassIcon"
         onClick={toggleFullscreen}
-        className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
         aria-label={t("fullscreen.toggle")}
         title={t("fullscreen.toggle")}
       >
         <Maximize className={cn("h-5 w-5 text-white", isFullscreen && "hidden")} />
         <X className={cn("h-5 w-5 text-white", !isFullscreen && "hidden")} />
-      </button>
+      </Button>
 
       {/* iOS Instructions Modal */}
       {showInstructions && (
