@@ -69,15 +69,38 @@ alert on.
 | `[RERANK_FAILURE]` | error | Voyage reranking step failed; results returned unranked |
 | `[CSRF_VALIDATION_FAILURE]` | warn | CSRF double-submit cookie mismatch on a state-mutating request |
 | `[RATE_LIMIT_EXCEEDED]` | warn | Per-IP rate limit hit; includes `ip` and `route` in meta |
+| `[RATE_LIMIT_DEGRADED]` | warn | Rate limiter fell back to in-memory (Redis unavailable) |
 | `[STRIPE_WEBHOOK_INVALID_SIG]` | error | Stripe webhook signature verification failed |
 | `[TRANSLATION_STALE]` | warn | Story stuck in `translating` state past timeout; marked failed |
 | `[ELEVENLABS_WEBHOOK_FAILURE]` | error | Post-call ElevenLabs webhook could not parse transcript |
+| `[CRON_SUCCESS]` | info | Cron job completed; includes `job` (name) and `duration_ms` |
+| `[CRON_FAILURE]` | error | Cron job threw; includes `job` (name) and `error` (message) |
+| `[CRON_AUTH_REJECTED]` | warn | Vercel cron secret verification failed; includes `reason` (`missing_secret` \| `header_missing` \| `mismatch`) |
+| `[HONEYPOT_TRIGGERED]` | warn | Suggestion POST honeypot field was non-empty; request silently discarded |
+| `[ADMIN_AUDIT]` | info | Admin write action; includes `route`, `action`, and `user_id` |
+| `[ADMIN_PROFILE_LOOKUP_FAILED]` | error | Non-PGRST116 error during admin role lookup; indicates DB connectivity issue |
 
 Add new keys here when introducing new diagnostic log points.
 
 ---
 
 ## Vercel Log Drain Setup (BetterStack / Logtail)
+
+> **Status: NOT CONFIRMED — action required.**
+>
+> As of 2026-04-28, no log drain has been verified as active. Vercel Pro plan retention
+> can be as short as 1 hour for function logs. Without a drain, logs from incidents may
+> be irrecoverably lost before you can investigate.
+>
+> **Recommended action:** Configure BetterStack Starter (free) or Axiom (free tier) as a
+> Vercel log drain — see the step-by-step below.
+>
+> **How to verify:** Vercel dashboard → Project → Settings → Log Drains. If the list is
+> empty, no drain is active.
+>
+> **Impact of not doing it:** All runtime logs (errors, payment events, auth failures) are
+> lost after Vercel's retention window. Stripe dispute resolution requires payment audit
+> trails — this is a compliance risk.
 
 Vercel supports [log drains](https://vercel.com/docs/observability/log-drains/log-drains-reference)
 that forward all function logs to an external service in real time.

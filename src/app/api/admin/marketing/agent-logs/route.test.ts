@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
@@ -248,5 +256,24 @@ describe("/api/admin/marketing/agent-logs", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
     });
+  });
+
+  it("should use logger.error (not console.error) on unhandled GET error", async () => {
+    vi.doMock("@/lib/supabase", () => ({
+      createAdminClient: () => {
+        throw new Error("Connection refused");
+      },
+    }));
+
+    const { GET: GET5 } = await import("./route");
+    const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await GET5(request);
+    consoleSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

@@ -15,7 +15,7 @@ import { GET } from "./route";
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(() => ({
     auth: {
-      getUser: vi.fn(),
+      getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
     },
     from: vi.fn(() => ({
       select: vi.fn(() => ({

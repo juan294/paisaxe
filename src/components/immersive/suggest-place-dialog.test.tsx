@@ -424,6 +424,45 @@ describe("SuggestPlaceDialog", () => {
     expect(mockOnClose).toHaveBeenCalled();
   });
 
+  // -------------------------------------------------------------------------
+  // Honeypot field tests (BE-M7, issue #492)
+  // -------------------------------------------------------------------------
+
+  it("renders a hidden honeypot 'website' input that is not visible to users", () => {
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+    // The honeypot input must exist in the DOM but be hidden
+    const honeypot = document.querySelector('input[name="website"]');
+    expect(honeypot).toBeInTheDocument();
+    expect(honeypot).toHaveAttribute("tabindex", "-1");
+    expect(honeypot).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("includes honeypot 'website' value in fetch body when non-empty (simulating bot fill)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    // Simulate a bot filling in the hidden field
+    const honeypot = document.querySelector('input[name="website"]') as HTMLInputElement;
+    fireEvent.change(honeypot, { target: { value: "http://spam.example.com" } });
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    fireEvent.change(placeNameInput, { target: { value: "Bot Place" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/suggestions",
+        expect.objectContaining({
+          body: expect.stringContaining('"website":"http://spam.example.com"'),
+        })
+      );
+    });
+  });
+
   it("shows generic error when catch receives a non-Error value (line 83 else branch)", async () => {
     // Make fetch throw a non-Error value (string) to hit the else branch
     mockFetch.mockImplementationOnce(() => {

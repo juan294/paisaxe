@@ -57,6 +57,7 @@ vi.mock("@/lib/i18n", () => ({
         "voice.mute": "Silenciar",
         "voice.unmute": "Activar sonido",
         "voice.error": "Error de conexión",
+        "voice.error_not_configured": "Agente de voz no configurado",
         "voice.no_permission": "Necesito acceso al micrófono",
         "voice.you": "Tú",
         "voice.welcome_message": "Bienvenido a {title}",
@@ -301,7 +302,7 @@ describe("VoiceChatElevenLabs", () => {
       });
     });
 
-    it("should show error message when microphone permission is denied", async () => {
+    it("should show error message when microphone permission is denied (on click)", async () => {
       Object.defineProperty(navigator, "mediaDevices", {
         value: {
           getUserMedia: vi.fn().mockRejectedValue(new Error("Permission denied")),
@@ -316,6 +317,10 @@ describe("VoiceChatElevenLabs", () => {
           onFallbackToText={() => {}}
         />
       );
+
+      // UX-H1: permission is only requested when the user clicks start, not on mount
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
 
       await waitFor(() => {
         expect(screen.getByText(/acceso al micrófono/i)).toBeInTheDocument();
@@ -455,7 +460,7 @@ describe("VoiceChatElevenLabs", () => {
       fireEvent.click(orbButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Voice agent not configured")).toBeInTheDocument();
+        expect(screen.getByText("Agente de voz no configurado")).toBeInTheDocument();
       });
 
       expect(onFallbackToText).toHaveBeenCalledTimes(1);
@@ -709,6 +714,178 @@ describe("VoiceChatElevenLabs", () => {
       });
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  // UX-H1: getUserMedia should NOT be called on mount — only on startConversation click
+  describe("UX-H1: deferred microphone permission", () => {
+    it("should NOT call getUserMedia on mount", async () => {
+      const getUserMediaMock = vi.fn().mockResolvedValue({});
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: { getUserMedia: getUserMediaMock },
+        writable: true,
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Give effects time to run
+      await new Promise((r) => setTimeout(r, 50));
+      expect(getUserMediaMock).not.toHaveBeenCalled();
+    });
+
+    it("should call getUserMedia when startConversation is triggered", async () => {
+      const getUserMediaMock = vi.fn().mockResolvedValue({});
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: { getUserMedia: getUserMediaMock },
+        writable: true,
+      });
+      mockStartSession.mockResolvedValue(undefined);
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(getUserMediaMock).toHaveBeenCalledWith({ audio: true });
+      });
+    });
+
+    it("should show permission error when getUserMedia fails on click", async () => {
+      const getUserMediaMock = vi
+        .fn()
+        .mockRejectedValue(new Error("Permission denied"));
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: { getUserMedia: getUserMediaMock },
+        writable: true,
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/acceso al micrófono/i)).toBeInTheDocument();
+      });
+    });
+
+    it("should keep hasPermission as null until the user clicks start", async () => {
+      const getUserMediaMock = vi.fn().mockResolvedValue({});
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: { getUserMedia: getUserMediaMock },
+        writable: true,
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // The mic permission warning should NOT be visible (hasPermission is null, not false)
+      expect(screen.queryByText(/acceso al micrófono/i)).not.toBeInTheDocument();
+    });
+  });
+
+  // UX-H6: ARIA live regions on voice errors and transcript
+  describe("UX-H6: ARIA live regions", () => {
+    it("should have role=alert on mic permission warning", async () => {
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: {
+          getUserMedia: vi.fn().mockRejectedValue(new Error("Permission denied")),
+        },
+        writable: true,
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Trigger the permission check by clicking start
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        const alert = screen.getAllByRole("alert");
+        expect(alert.length).toBeGreaterThan(0);
+      });
+    });
+
+    it("should have role=alert on error display", async () => {
+      const onFallbackToText = vi.fn();
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={onFallbackToText}
+        />
+      );
+
+      // Trigger the onError callback
+      act(() => {
+        conversationHandlers.onError?.(new Error("connection error"));
+      });
+
+      await waitFor(() => {
+        const alerts = screen.getAllByRole("alert");
+        expect(alerts.some((a) => a.textContent?.includes("Error de conexión"))).toBe(true);
+      });
+    });
+
+    it("should have role=log and aria-live=polite on transcript wrapper", async () => {
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connected",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+        };
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Simulate a message to make the transcript visible
+      act(() => {
+        conversationHandlers.onMessage?.({ message: "Hola!", source: "ai" });
+      });
+
+      await waitFor(() => {
+        const log = screen.getByRole("log");
+        expect(log).toHaveAttribute("aria-live", "polite");
+      });
     });
   });
 });

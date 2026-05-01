@@ -57,6 +57,21 @@ function buildLocalOnlyResponse() {
   );
 }
 
+/**
+ * Guards all agent-runner endpoints against execution in deployed environments.
+ *
+ * LOCAL-ONLY BY DESIGN: Agent scripts (scripts/*.sh) invoke Claude CLI headless
+ * via sub-processes. Vercel serverless functions cannot spawn long-lived child
+ * processes, have no filesystem access for shell scripts, and lack the local
+ * environment (CLAUDE code, API keys, git context) these scripts require.
+ *
+ * The in-process `runningAgents` Map is also instance-local — Vercel spins up
+ * many instances, so state would be desynchronised across requests.
+ *
+ * Gate: presence of `VERCEL_ENV` env var (set by Vercel for all deployments —
+ * preview, staging, and production alike). When undefined, we are running
+ * locally and agent spawning is safe. (BE-M5)
+ */
 function ensureLocalRuntime() {
   if (process.env.VERCEL_ENV !== undefined) {
     return buildLocalOnlyResponse();

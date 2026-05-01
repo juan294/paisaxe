@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "./route";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock dependencies
 vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(),
@@ -1243,5 +1251,21 @@ describe("GET /api/admin/marketing/dashboard", () => {
     expect(data.data.stats.failedPosts).toBe(0);
     expect(data.data.stats.byPlatform.x.posts).toBe(0);
     expect(data.data.stats.byPlatform.x.scheduled).toBe(0);
+  });
+
+  it("should use logger.error (not console.error) on unhandled GET error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin-1" });
+    const mockFrom = vi.fn(() => {
+      throw new Error("Unexpected DB failure");
+    });
+    vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await GET();
+    consoleSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

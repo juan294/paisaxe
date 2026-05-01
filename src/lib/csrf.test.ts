@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import {
   generateCsrfToken,
   CSRF_COOKIE_NAME,
@@ -7,6 +7,7 @@ import {
   isExemptFromCsrf,
   csrfCookieOptions,
   validateOrigin,
+  isSecureRuntime,
 } from "./csrf";
 
 describe("generateCsrfToken", () => {
@@ -205,20 +206,48 @@ describe("validateOrigin", () => {
     expect(validateOrigin(req, allowedOrigins)).toBe(false);
   });
 
-  it("returns true when Origin header is absent (non-browser clients)", () => {
-    const req = new Request("https://paisaxe.es/api/chat");
+  it("returns true when Origin header is absent on GET (non-browser clients)", () => {
+    const req = new Request("https://paisaxe.es/api/chat", { method: "GET" });
     expect(validateOrigin(req, allowedOrigins)).toBe(true);
   });
 
-  it("uses Referer as fallback when Origin is absent but Referer is present", () => {
+  it("returns true when Origin header is absent on HEAD (non-browser clients)", () => {
+    const req = new Request("https://paisaxe.es/api/chat", { method: "HEAD" });
+    expect(validateOrigin(req, allowedOrigins)).toBe(true);
+  });
+
+  // SE-M2: state-changing methods must have Origin header
+  it("returns false when Origin header is absent on POST (SE-M2)", () => {
+    const req = new Request("https://paisaxe.es/api/chat", { method: "POST" });
+    expect(validateOrigin(req, allowedOrigins)).toBe(false);
+  });
+
+  it("returns false when Origin header is absent on PUT (SE-M2)", () => {
+    const req = new Request("https://paisaxe.es/api/chat", { method: "PUT" });
+    expect(validateOrigin(req, allowedOrigins)).toBe(false);
+  });
+
+  it("returns false when Origin header is absent on PATCH (SE-M2)", () => {
+    const req = new Request("https://paisaxe.es/api/chat", { method: "PATCH" });
+    expect(validateOrigin(req, allowedOrigins)).toBe(false);
+  });
+
+  it("returns false when Origin header is absent on DELETE (SE-M2)", () => {
+    const req = new Request("https://paisaxe.es/api/chat", { method: "DELETE" });
+    expect(validateOrigin(req, allowedOrigins)).toBe(false);
+  });
+
+  it("uses Referer as fallback when Origin is absent on GET but Referer is present", () => {
     const req = new Request("https://paisaxe.es/api/chat", {
+      method: "GET",
       headers: { referer: "https://evil.com/page" },
     });
     expect(validateOrigin(req, allowedOrigins)).toBe(false);
   });
 
-  it("returns true when Referer fallback matches allowed origin", () => {
+  it("returns true when Referer fallback matches allowed origin on GET", () => {
     const req = new Request("https://paisaxe.es/api/chat", {
+      method: "GET",
       headers: { referer: "https://paisaxe.es/immersive" },
     });
     expect(validateOrigin(req, allowedOrigins)).toBe(true);
@@ -227,8 +256,47 @@ describe("validateOrigin", () => {
   it("returns false when Referer header is a malformed URL", () => {
     // Exercises the `new URL(referer)` catch branch (csrf.ts:91)
     const req = new Request("https://paisaxe.es/api/chat", {
+      method: "GET",
       headers: { referer: "not a valid url" },
     });
     expect(validateOrigin(req, allowedOrigins)).toBe(false);
+  });
+});
+
+// SE-M5: isSecureRuntime() helper
+describe("isSecureRuntime", () => {
+  afterEach(() => {
+    // Restore all stubbed env vars after each test
+    vi.unstubAllEnvs();
+  });
+
+  it("returns true when NODE_ENV is production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "");
+    expect(isSecureRuntime()).toBe(true);
+  });
+
+  it("returns true when VERCEL_ENV is production", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(isSecureRuntime()).toBe(true);
+  });
+
+  it("returns true when VERCEL_ENV is preview (SE-M5)", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(isSecureRuntime()).toBe(true);
+  });
+
+  it("returns false in local development (NODE_ENV=development, no VERCEL_ENV)", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("VERCEL_ENV", "");
+    expect(isSecureRuntime()).toBe(false);
+  });
+
+  it("returns false in test environment (NODE_ENV=test, no VERCEL_ENV)", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("VERCEL_ENV", "");
+    expect(isSecureRuntime()).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ import {
   type UsageMetricsInput,
 } from "@/lib/subscription-optimizer";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
+import { logger } from "@/lib/logger";
 
 /** Postgres advisory lock ID — unique per cron route. */
 const LOCK_ID = 1002;
@@ -32,6 +33,7 @@ const DEFAULT_USAGE_METRICS: UsageMetricsInput = {
 
 /** Core analysis logic shared by GET (Vercel Cron) and POST (pg_cron/admin). */
 async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextResponse> {
+  const start = Date.now();
   const supabase = createAdminClient();
 
   // Acquire advisory lock to prevent concurrent runs
@@ -96,6 +98,7 @@ async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextRespon
       (r) => r.action !== "keep"
     ).length;
 
+    logger.info("[CRON_SUCCESS]", { job: "subscription-optimizer", duration_ms: Date.now() - start });
     return NextResponse.json({
       success: true,
       analyzedAt: result.analyzedAt,
@@ -110,7 +113,8 @@ async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextRespon
       report: markdownReport,
     });
   } catch (error) {
-    console.error("Subscription optimizer error:", error);
+    logger.error("[CRON_FAILURE]", { job: "subscription-optimizer", error: error instanceof Error ? error.message : "Unknown error" });
+    logger.error("Subscription optimizer error:", { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(
       {
         error: "Analysis failed",

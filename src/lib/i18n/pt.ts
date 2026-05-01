@@ -39,6 +39,8 @@ export const pt: Translations = {
     directions: 'Como chegar',
     copy_conversation: 'Copiar conversa',
     copied: 'Copiado',
+    copy_error: 'Não foi possível copiar',
+    assistant_label: 'Paisaxe',
   },
 
   stories: {
@@ -101,6 +103,7 @@ export const pt: Translations = {
   share: {
     share: 'Partilhar',
     link_copied: 'Link copiado',
+    copy_error: 'Não foi possível copiar',
   },
 
   favorites: {
@@ -152,10 +155,13 @@ export const pt: Translations = {
     go_back: 'Voltar',
     loading: 'Carregando',
     go_to_story: 'Ir para a história {current} de {total}',
+    show_info: 'Mostrar informações da história',
+    hide_info: 'Ocultar informações da história',
   },
 
   auth: {
     user: 'Utilizador',
+    user_avatar: 'Avatar do utilizador',
     sign_out: 'Terminar sessão',
     sign_in: 'Iniciar sessão',
     sync_favorites_title: 'Sincronize os seus favoritos',
@@ -197,6 +203,7 @@ export const pt: Translations = {
     mute: 'Silenciar',
     unmute: 'Ativar som',
     error: 'Erro de conexão',
+    error_not_configured: 'Agente de voz não configurado',
     no_permission: 'Acesso ao microfone necessário',
     you: 'Você',
     loading: 'Carregando assistente de voz...',
@@ -248,6 +255,8 @@ export const pt: Translations = {
   },
 
   premium: {
+    premium_access: 'Acesso Premium',
+    voice_pass_label: 'Passe de Voz · 24h',
     voice_locked: 'O chat de voz é uma função premium',
     get_day_pass: 'Obter Passe Diário',
     voice_title: 'Fale com o Seu Guia',
@@ -290,6 +299,7 @@ export const pt: Translations = {
   },
 
   errors: {
+    unknown: 'Algo correu mal, tenta novamente',
     generic_title: 'Algo correu mal',
     generic_description: 'Ocorreu um erro inesperado. Por favor, tente novamente.',
     retry: 'Tentar novamente',

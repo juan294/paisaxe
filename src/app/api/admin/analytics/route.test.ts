@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "./route";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock dependencies
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
@@ -361,5 +369,28 @@ describe("GET /api/admin/analytics (PostHog)", () => {
     expect(data.data.utmCampaigns[0].medium).toBe("social");
     expect(data.data.utmCampaigns[1].medium).toBe("(none)");
     expect(data.data.utmCampaigns[1].campaign).toBe("(none)");
+  });
+
+  // -----------------------------------------------------------------------
+  // SE-M3 / DO-H3: logger migration — uses structured logger, not console
+  // -----------------------------------------------------------------------
+
+  it("should use logger.warn (not console.warn) when PostHog API fails", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    mockFetch.mockImplementation(() => {
+      throw new Error("PostHog timeout");
+    });
+
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const request = new NextRequest("http://localhost:3000/api/admin/analytics");
+    await GET(request);
+
+    // Route uses logger.warn, not console.warn
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 });

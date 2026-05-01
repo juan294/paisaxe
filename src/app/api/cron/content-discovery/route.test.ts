@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // vi.hoisted runs before vi.mock hoisting, so mockAuthError and mockRpc are available in factories
 const { mockAuthError, mockRpc } = vi.hoisted(() => {
   // Cannot use NextResponse here (not imported yet), so use a plain sentinel object
@@ -324,5 +332,71 @@ describe("Advisory lock (DO-M2) — content-discovery", () => {
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
 
     consoleSpy.mockRestore();
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
+  });
+});
+
+describe("CRON_SUCCESS/CRON_FAILURE telemetry — content-discovery", () => {
+  const ORIGINAL_ENV = { ...process.env };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env = {
+      ...ORIGINAL_ENV,
+      WEBHOOK_SECRET: "test-secret",
+      CRON_SECRET: "test-cron-secret",
+      GOOGLE_PLACES_API_KEY: "test-google-key",
+      ANTHROPIC_API_KEY: "test-anthropic-key",
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_SERVICE_KEY: "test-service-key",
+    };
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+  });
+
+  afterAll(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it("emits [CRON_SUCCESS] with job name and duration_ms on successful discovery", async () => {
+    (runDiscovery as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      discovered: 2,
+      created: 2,
+      skippedDuplicates: 0,
+      errors: [],
+      stories: [],
+    });
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(200);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "[CRON_SUCCESS]",
+      expect.objectContaining({
+        job: "content-discovery",
+        duration_ms: expect.any(Number),
+      })
+    );
+  });
+
+  it("emits [CRON_FAILURE] with job name and error message when discovery throws", async () => {
+    (runDiscovery as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("Google Places API rate limit exceeded")
+    );
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    expect(res.status).toBe(500);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CRON_FAILURE]",
+      expect.objectContaining({
+        job: "content-discovery",
+        error: expect.stringContaining("Google Places API rate limit exceeded"),
+      })
+    );
   });
 });

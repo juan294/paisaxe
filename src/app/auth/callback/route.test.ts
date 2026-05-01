@@ -58,6 +58,44 @@ describe("Auth Callback Route", () => {
     return new NextRequest(url);
   };
 
+  // ─── DO-M1: env vars must be trimmed before reaching createServerClient ──────
+  describe("DO-M1: auth callback trims Supabase env vars", () => {
+    it("strips trailing newline from SUPABASE_URL (Vercel CLI artifact)", async () => {
+      const { createServerClient } = await import("@supabase/ssr");
+      const mockCreate = vi.mocked(createServerClient);
+
+      const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co\n";
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({ code: "some-code" });
+      await GET(request);
+
+      const [url] = mockCreate.mock.calls[0];
+      expect(url).toBe("https://test.supabase.co");
+      expect(url).not.toMatch(/\n/);
+
+      process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
+    });
+
+    it("strips whitespace from SUPABASE_ANON_KEY (Vercel CLI artifact)", async () => {
+      const { createServerClient } = await import("@supabase/ssr");
+      const mockCreate = vi.mocked(createServerClient);
+
+      const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "  test-anon-key  ";
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({ code: "some-code" });
+      await GET(request);
+
+      const [, anonKey] = mockCreate.mock.calls[0];
+      expect(anonKey).toBe("test-anon-key");
+
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
+    });
+  });
+
   describe("GET /auth/callback", () => {
     it("should redirect to /immersive on successful code exchange", async () => {
       mockExchangeCodeForSession.mockResolvedValue({ error: null });

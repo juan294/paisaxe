@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { verifyVercelCron, verifyWebhookSecret } from "./cron-auth";
+import { logger } from "./logger";
 
 describe("checkCronSecretsConfigured (DO-H3)", () => {
   beforeEach(() => {
@@ -155,6 +156,82 @@ describe("verifyVercelCron", () => {
       authorization: "Bearer test-cron-secret-abc123",
     });
     expect(verifyVercelCron(req)).toBe(true);
+  });
+});
+
+describe("verifyVercelCron — [CRON_AUTH_REJECTED] observability (BE-B1)", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    vi.unstubAllEnvs();
+  });
+
+  it("logs [CRON_AUTH_REJECTED] with reason 'missing_secret' when CRON_SECRET env var is empty", () => {
+    vi.stubEnv("CRON_SECRET", "");
+    const req = makeRequest("http://localhost/api/cron/test", {
+      authorization: "Bearer anything",
+    });
+
+    expect(verifyVercelCron(req)).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[CRON_AUTH_REJECTED]",
+      expect.objectContaining({ reason: "missing_secret" })
+    );
+  });
+
+  it("logs [CRON_AUTH_REJECTED] with reason 'header_missing' when authorization header is absent", () => {
+    vi.stubEnv("CRON_SECRET", "test-cron-secret-abc123");
+    const req = makeRequest("http://localhost/api/cron/test");
+
+    expect(verifyVercelCron(req)).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[CRON_AUTH_REJECTED]",
+      expect.objectContaining({ reason: "header_missing" })
+    );
+  });
+
+  it("logs [CRON_AUTH_REJECTED] with reason 'mismatch' when the bearer token is wrong", () => {
+    vi.stubEnv("CRON_SECRET", "test-cron-secret-abc123");
+    const req = makeRequest("http://localhost/api/cron/test", {
+      authorization: "Bearer wrong-secret",
+    });
+
+    expect(verifyVercelCron(req)).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[CRON_AUTH_REJECTED]",
+      expect.objectContaining({ reason: "mismatch" })
+    );
+  });
+
+  it("logs [CRON_AUTH_REJECTED] with reason 'mismatch' when the Bearer prefix is missing", () => {
+    vi.stubEnv("CRON_SECRET", "test-cron-secret-abc123");
+    const req = makeRequest("http://localhost/api/cron/test", {
+      authorization: "test-cron-secret-abc123",
+    });
+
+    expect(verifyVercelCron(req)).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[CRON_AUTH_REJECTED]",
+      expect.objectContaining({ reason: "mismatch" })
+    );
+  });
+
+  it("does not log when authentication succeeds (no regression noise)", () => {
+    vi.stubEnv("CRON_SECRET", "test-cron-secret-abc123");
+    const req = makeRequest("http://localhost/api/cron/test", {
+      authorization: "Bearer test-cron-secret-abc123",
+    });
+
+    expect(verifyVercelCron(req)).toBe(true);
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      "[CRON_AUTH_REJECTED]",
+      expect.anything()
+    );
   });
 });
 

@@ -92,6 +92,20 @@ describe("supabase", () => {
     });
   });
 
+  // ─── BE-M3: singleton getAdminClient() ───────────────────────────────────
+  describe("getAdminClient", () => {
+    it("should return the same instance on subsequent calls (singleton)", async () => {
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "singleton-role-key";
+
+      const { getAdminClient } = await import("./supabase");
+
+      const first = getAdminClient();
+      const second = getAdminClient();
+
+      expect(first).toBe(second);
+    });
+  });
+
   describe("createAdminClient", () => {
     it("should throw error if neither service key env var is set", async () => {
       const { createAdminClient } = await import("./supabase");

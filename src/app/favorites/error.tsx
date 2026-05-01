@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 import { useTranslation } from "@/lib/i18n";
 
 export default function FavoritesError({
@@ -13,6 +14,7 @@ export default function FavoritesError({
 }) {
   useEffect(() => {
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   const { t } = useTranslation();

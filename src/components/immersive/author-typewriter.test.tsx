@@ -16,11 +16,11 @@ describe("AuthorTypewriter", () => {
     vi.useRealTimers();
   });
 
-  it("should render with initial text '</> JG'", async () => {
+  it("should render with initial text 'JG'", async () => {
     const { AuthorTypewriter } = await import("./author-typewriter");
     render(<AuthorTypewriter prefersReducedMotion={false} t={mockT} />);
 
-    expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+    expect(screen.getByText(/JG/)).toBeInTheDocument();
   });
 
   it("should render blinking cursor element with aria-hidden", async () => {
@@ -92,7 +92,7 @@ describe("AuthorTypewriter", () => {
     });
 
     // Text should still be the initial value — no animation
-    expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+    expect(screen.getByText(/JG/)).toBeInTheDocument();
   });
 
   it("should update text via DOM ref (not React state re-renders)", async () => {
@@ -169,8 +169,8 @@ describe("AuthorTypewriter", () => {
 
     const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
 
-    // Initially shows "</> JG"
-    expect(textSpan.textContent).toBe("</> JG");
+    // Initially shows "JG"
+    expect(textSpan.textContent).toBe("JG");
 
     // Advance past HOME_HOLD (30s)
     await act(async () => {
@@ -178,7 +178,7 @@ describe("AuthorTypewriter", () => {
     });
 
     // Now the erase phase starts — text should begin to shorten
-    // Advance through the erase of "</> JG" (5 chars * 80ms = 400ms)
+    // Advance through the erase of "JG" (2 chars * 80ms = 160ms)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(500);
     });
@@ -213,8 +213,8 @@ describe("AuthorTypewriter", () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
 
-    // Should be typing HOME ("</> JG") back
-    // The text should eventually return to "</> JG" or be mid-type
+    // Should be typing HOME ("JG") back
+    // The text should eventually return to "JG" or be mid-type
     expect(textSpan.textContent!.length).toBeGreaterThanOrEqual(0);
   });
 
@@ -262,7 +262,7 @@ describe("AuthorTypewriter", () => {
 
     const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
 
-    // Advance past HOME_HOLD (30s) + full erase of "</> JG" (5 * 80ms = 400ms) + EMPTY_PAUSE (300ms)
+    // Advance past HOME_HOLD (30s) + full erase of "JG" (2 * 80ms = 160ms) + EMPTY_PAUSE (300ms)
     // into the typing of the next message
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_900);
@@ -282,18 +282,18 @@ describe("AuthorTypewriter", () => {
     );
 
     const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
-    expect(textSpan.textContent).toBe("</> JG");
+    expect(textSpan.textContent).toBe("JG");
 
-    // Full cycle: HOME_HOLD(30s) + erase HOME(5*80=400ms) + EMPTY_PAUSE(300ms)
+    // Full cycle: HOME_HOLD(30s) + erase HOME(2*80=160ms) + EMPTY_PAUSE(300ms)
     // + type next msg (~21*80=1680ms) + MSG_HOLD(4000ms) + erase next msg(~21*80=1680ms)
-    // + EMPTY_PAUSE(300ms) + type HOME(5*80=400ms)
-    // Total ~ 30000 + 400 + 300 + 1680 + 4000 + 1680 + 300 + 400 = ~38760ms
+    // + EMPTY_PAUSE(300ms) + type HOME(2*80=160ms)
+    // Total ~ 30000 + 160 + 300 + 1680 + 4000 + 1680 + 300 + 160 = ~38280ms
     // Use generous time to ensure full cycle
     await act(async () => {
       await vi.advanceTimersByTimeAsync(45_000);
     });
 
-    // After a full cycle, text should be back to "</> JG" or be typing it
+    // After a full cycle, text should be back to "JG" or be typing it
     // The exact state depends on timing precision, but text should exist
     expect(textSpan.textContent!.length).toBeGreaterThanOrEqual(0);
   });
@@ -305,9 +305,9 @@ describe("AuthorTypewriter", () => {
     );
 
     const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
-    expect(textSpan.textContent).toBe("</> JG");
+    expect(textSpan.textContent).toBe("JG");
 
-    const originalLength = textSpan.textContent!.length; // 6 chars: < / > space J G
+    const originalLength = textSpan.textContent!.length; // 2 chars: J G
 
     // Start erasing: advance past HOME_HOLD + a few char delays
     await act(async () => {
@@ -332,9 +332,9 @@ describe("AuthorTypewriter", () => {
     const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
 
     // Advance past HOME_HOLD + full erase + EMPTY_PAUSE to start typing
-    // HOME_HOLD(30s) + erase(5*80=400ms) + EMPTY_PAUSE(300ms) = 30700ms
+    // HOME_HOLD(30s) + erase(2*80=160ms) + EMPTY_PAUSE(300ms) = 30460ms
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_750);
+      await vi.advanceTimersByTimeAsync(30_600);
     });
 
     // Now typing should have started - text should be short (just began)
@@ -398,17 +398,17 @@ describe("AuthorTypewriter", () => {
     );
 
     const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
-    expect(textSpan.textContent).toBe("</> JG");
+    expect(textSpan.textContent).toBe("JG");
 
     // Phase 1: Wait for HOME_HOLD (30s) — setText(HOME) was called at start of cycle
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000);
     });
-    expect(textSpan.textContent).toBe("</> JG");
+    expect(textSpan.textContent).toBe("JG");
 
-    // Phase 2: Erase HOME character by character (6 chars * 80ms = 480ms)
-    // Each step: setText(text.slice(0, i)) for i from 6 down to 0
-    for (let step = 0; step < 6; step++) {
+    // Phase 2: Erase HOME character by character (2 chars * 80ms = 160ms)
+    // Each step: setText(text.slice(0, i)) for i from 2 down to 0
+    for (let step = 0; step < 2; step++) {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(80);
       });
@@ -452,13 +452,13 @@ describe("AuthorTypewriter", () => {
     });
 
     // Phase 8: Type HOME back
-    const home = "</> JG";
+    const home = "JG";
     for (let step = 0; step < home.length; step++) {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(80);
       });
     }
-    expect(textSpan.textContent).toBe("</> JG");
+    expect(textSpan.textContent).toBe("JG");
   });
 
   it("should skip index 0 and go to index 1 when messageIndex wraps around", async () => {
@@ -469,18 +469,18 @@ describe("AuthorTypewriter", () => {
 
     const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
 
-    // There are 11 messages total. After cycling through messages 1..10,
+    // There are 8 messages total. After cycling through messages 1..7,
     // the next would be index 0 again, but line 77 corrects it to 1.
-    // We need to run through 10 full cycles (messages 1-10) to trigger the wrap.
+    // We need to run through 7 full cycles (messages 1-7) to trigger the wrap.
     // Each cycle: erase HOME + pause + type msg + hold + erase msg + pause + type HOME + HOME_HOLD
-    // HOME = 6 chars, messages vary in length (~10-25 chars)
+    // HOME = 2 chars, messages vary in length (~10-25 chars)
     // First HOME_HOLD is 30s, subsequent HOME_HOLDs are 30s each
-    // Approximate per-cycle timing: 6*80 + 300 + msg*80 + 4000 + msg*80 + 300 + 6*80 + 30000
+    // Approximate per-cycle timing: 2*80 + 300 + msg*80 + 4000 + msg*80 + 300 + 2*80 + 30000
 
-    // Instead of precise timing, advance enough time to cover 10+ full cycles
-    // Each cycle ~ 30000 + 480 + 300 + 1600 + 4000 + 1600 + 300 + 480 = ~38760ms
-    // 10 cycles ~ 387600ms, plus initial HOME_HOLD = 30000ms
-    // Total ~ 420000ms. Use generous amount.
+    // Instead of precise timing, advance enough time to cover 7+ full cycles
+    // Each cycle ~ 30000 + 160 + 300 + 1600 + 4000 + 1600 + 300 + 160 = ~38120ms
+    // 7 cycles ~ 266840ms, plus initial HOME_HOLD = 30000ms
+    // Total ~ 300000ms. Use generous amount.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(500_000);
     });
@@ -504,8 +504,6 @@ describe("AuthorTypewriter", () => {
       "author_pill.out_cycling",
       "author_pill.scaling_rocks",
       "author_pill.sleep_not_found",
-      "author_pill.works_on_my_machine",
-      "author_pill.bug_free",
     ];
 
     for (const key of expectedKeys) {
@@ -687,7 +685,7 @@ describe("AuthorTypewriter", () => {
 
     const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
 
-    // Advance past HOME_HOLD (30s) to begin erasing "</> JG" (6 chars, 80ms each)
+    // Advance past HOME_HOLD (30s) to begin erasing "JG" (2 chars, 80ms each)
     // Advance exactly 1 char-erase step so eraseText loop is mid-iteration
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000 + 80);
@@ -716,7 +714,7 @@ describe("AuthorTypewriter", () => {
 
     const textSpan = container.querySelector("span[class*='font-mono'] > span:first-child")!;
 
-    const home = "</> JG";
+    const home = "JG";
     // Advance past HOME_HOLD + full erase of HOME + EMPTY_PAUSE to start typing next msg
     // Then advance 1 char step into the typeText loop
     await act(async () => {
@@ -744,14 +742,14 @@ describe("AuthorTypewriter", () => {
       <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
     );
 
-    const home = "</> JG";
+    const home = "JG";
     // Advance to: HOME_HOLD + full erase of HOME (all chars erased, loop done)
     // eraseText finishes when the last char-delay fires at char index 1
     // That's HOME_HOLD + (home.length - 1) * CHAR_DELAY for the waits
     // But setText is called for i = home.length down to 0, with waits for i > 0
-    // Waits: (home.length - 1) iterations with 80ms each = 5 * 80 = 400ms
+    // Waits: (home.length - 1) iterations with 80ms each = 1 * 80 = 80ms
     // plus the final setText(text.slice(0,0)) which has no wait
-    // Total: 30_000 + 400 = 30_400ms — eraseText just finished
+    // Total: 30_000 + 80 = 30_080ms — eraseText just finished
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000 + (home.length - 1) * 80 + 10);
     });
@@ -771,7 +769,7 @@ describe("AuthorTypewriter", () => {
       <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
     );
 
-    const home = "</> JG";
+    const home = "JG";
     // HOME_HOLD + erase HOME + EMPTY_PAUSE = right before typeText(nextMsg)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000 + (home.length - 1) * 80 + 300 + 10);
@@ -792,7 +790,7 @@ describe("AuthorTypewriter", () => {
       <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
     );
 
-    const home = "</> JG";
+    const home = "JG";
     const nextMsg = mockT("author_pill.made_with_love");
     // HOME_HOLD + erase HOME + EMPTY_PAUSE + type nextMsg
     const typeTime = 30_000 + (home.length - 1) * 80 + 300 + (nextMsg.length - 1) * 80;
@@ -815,7 +813,7 @@ describe("AuthorTypewriter", () => {
       <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
     );
 
-    const home = "</> JG";
+    const home = "JG";
     const nextMsg = mockT("author_pill.made_with_love");
     const afterType = 30_000 + (home.length - 1) * 80 + 300 + (nextMsg.length - 1) * 80;
     // + MSG_HOLD
@@ -838,7 +836,7 @@ describe("AuthorTypewriter", () => {
       <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
     );
 
-    const home = "</> JG";
+    const home = "JG";
     const nextMsg = mockT("author_pill.made_with_love");
     const afterType = 30_000 + (home.length - 1) * 80 + 300 + (nextMsg.length - 1) * 80;
     // + MSG_HOLD + erase nextMsg
@@ -862,7 +860,7 @@ describe("AuthorTypewriter", () => {
       <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
     );
 
-    const home = "</> JG";
+    const home = "JG";
     const nextMsg = mockT("author_pill.made_with_love");
     const afterType = 30_000 + (home.length - 1) * 80 + 300 + (nextMsg.length - 1) * 80;
     const afterErase = afterType + 4000 + (nextMsg.length - 1) * 80;
@@ -886,7 +884,7 @@ describe("AuthorTypewriter", () => {
       <AuthorTypewriter prefersReducedMotion={false} t={mockT} />
     );
 
-    const home = "</> JG";
+    const home = "JG";
     const nextMsg = mockT("author_pill.made_with_love");
     const afterType = 30_000 + (home.length - 1) * 80 + 300 + (nextMsg.length - 1) * 80;
     const afterErase = afterType + 4000 + (nextMsg.length - 1) * 80;

@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock next/server
 vi.mock("next/server", () => ({
   NextRequest: class MockNextRequest {
@@ -701,5 +709,95 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
 
     consoleSpy.mockRestore();
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
+  });
+});
+
+describe("CRON_SUCCESS/CRON_FAILURE telemetry — subscription-optimizer", () => {
+  const originalEnv = process.env;
+  const WEBHOOK_SECRET = "test-webhook-secret-123";
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = {
+      ...originalEnv,
+      WEBHOOK_SECRET,
+      CRON_SECRET: "test-cron-secret-456",
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      SUPABASE_SERVICE_KEY: "test-service-key",
+    };
+    mockAnalyze.mockReset();
+    mockGenerateReport.mockReset();
+    mockGenerateSharedContextEntry.mockReset();
+    mockWriteFile.mockReset();
+    mockReadFile.mockReset();
+    mockWriteFile.mockResolvedValue(undefined);
+    mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
+    mockRpc.mockReset();
+    logger.info.mockClear();
+    logger.error.mockClear();
+    logger.warn.mockClear();
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("emits [CRON_SUCCESS] with job name and duration_ms on successful analysis", async () => {
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "[CRON_SUCCESS]",
+      expect.objectContaining({
+        job: "subscription-optimizer",
+        duration_ms: expect.any(Number),
+      })
+    );
+  });
+
+  it("emits [CRON_FAILURE] with job name and error message when analysis throws", async () => {
+    mockAnalyze.mockImplementation(() => {
+      throw new Error("Analysis crashed");
+    });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(500);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CRON_FAILURE]",
+      expect.objectContaining({
+        job: "subscription-optimizer",
+        error: expect.stringContaining("Analysis crashed"),
+      })
+    );
   });
 });

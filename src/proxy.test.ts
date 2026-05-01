@@ -21,7 +21,9 @@ vi.mock("@supabase/ssr", () => ({
   }),
 }));
 
-import { proxy, shouldBypassMaintenanceMode, AUTH_REFRESH_TIMEOUT_MS, hasSupabaseAuthCookies, isTokenNearExpiry } from "./proxy";
+import { proxy } from "./proxy";
+import { shouldBypassMaintenanceMode } from "@/lib/proxy/maintenance";
+import { AUTH_REFRESH_TIMEOUT_MS, hasSupabaseAuthCookies, isTokenNearExpiry } from "@/lib/proxy/auth-refresh";
 
 // Mock global fetch for database checks
 const mockFetch = vi.fn();
@@ -1122,6 +1124,8 @@ describe("CSRF protection", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        // Use production origin so SE-M2 origin check passes; CSRF token is still missing
+        origin: "https://paisaxe.es",
       },
       body: JSON.stringify({ title: "test" }),
     });
@@ -1175,6 +1179,8 @@ describe("CSRF protection", () => {
         "Content-Type": "application/json",
         "x-csrf-token": token,
         cookie: `__csrf=${token}`,
+        // Origin required (SE-M2) — use production origin (always in ALLOWED_ORIGINS)
+        origin: "https://paisaxe.es",
       },
       body: JSON.stringify({ message: "hello" }),
     });

@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Share2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 import type { Story } from "@/types/immersive";
 
 interface ShareButtonProps {
@@ -37,8 +38,13 @@ export function ShareButton({ story }: ShareButtonProps) {
       if (isTouchDevice && navigator.share && navigator.canShare?.(shareData)) {
         await navigator.share(shareData);
       } else {
-        await navigator.clipboard.writeText(shareUrl);
-        showToast(t("share.link_copied"));
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          showToast(t("share.link_copied"));
+        } catch {
+          // UX-L3 (#523): Show error feedback when clipboard fails on desktop
+          showToast(t("share.copy_error"));
+        }
       }
     } catch (err) {
       // User cancelled share or clipboard failed - try clipboard as fallback
@@ -47,7 +53,8 @@ export function ShareButton({ story }: ShareButtonProps) {
           await navigator.clipboard.writeText(shareUrl);
           showToast(t("share.link_copied"));
         } catch {
-          // Silently ignore
+          // UX-L3 (#523): Show error feedback instead of silently ignoring
+          showToast(t("share.copy_error"));
         }
       }
     }
@@ -55,9 +62,9 @@ export function ShareButton({ story }: ShareButtonProps) {
 
   return (
     <div className="relative">
-      <button
+      <Button
+        variant="glassIcon"
         onClick={handleShare}
-        className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
         aria-label={t("share.share")}
         title={t("share.share")}
       >
@@ -66,7 +73,7 @@ export function ShareButton({ story }: ShareButtonProps) {
         ) : (
           <Share2 className="h-5 w-5 text-white" />
         )}
-      </button>
+      </Button>
 
       {/* Toast */}
       <div

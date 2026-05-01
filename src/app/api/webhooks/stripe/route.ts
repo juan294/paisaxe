@@ -54,12 +54,37 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
+    const supabase = createAdminClient();
+
+    // BE-L2: Audit trail — insert into stripe_webhook_events after signature verification.
+    // On duplicate event_id (unique constraint 23505), return 200 immediately (idempotent).
+    // Other insert errors are logged but do not block event processing.
+    const { error: auditError } = await supabase
+      .from("stripe_webhook_events")
+      .insert({
+        stripe_event_id: event.id,
+        event_type: event.type,
+        payload: event.data as unknown as Record<string, unknown>,
+      });
+
+    if (auditError) {
+      const pgCode = (auditError as { code?: string }).code;
+      if (pgCode === "23505") {
+        // Duplicate event — already processed. Return 200 idempotently.
+        return NextResponse.json({ received: true }, { status: 200 });
+      }
+      logger.error("[STRIPE_WEBHOOK_AUDIT_FAILED]", {
+        eventId: event.id,
+        code: pgCode,
+        error: auditError.message,
+      });
+      // Continue processing despite audit failure.
+    }
+
     // Only handle checkout.session.completed events
     if (event.type !== "checkout.session.completed") {
       return NextResponse.json({ received: true });
     }
-
-    const supabase = createAdminClient();
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.user_id;
 

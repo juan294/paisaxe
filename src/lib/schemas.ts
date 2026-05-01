@@ -97,6 +97,8 @@ export const createSuggestionSchema = z.object({
   comment: boundedString(500).optional(),
   location: z.enum(["eastern", "central", "western"]).optional(),
   attribution: boundedString(100).optional(),
+  /** Honeypot field: bots fill this, humans never see it (display:none in form). */
+  website: z.string().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -152,6 +154,54 @@ export const bulkStatusStoriesSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// admin/marketing/agent POST (agent chat)
+// ---------------------------------------------------------------------------
+
+const conversationMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().max(4000, "History message content must not exceed 4000 characters"),
+});
+
+export const agentChatRequestSchema = z.object({
+  agentId: z.string().min(1, "agentId is required"),
+  message: z.string().trim().min(1, "Message is required").max(4000, "Message must not exceed 4000 characters"),
+  conversationHistory: z
+    .array(conversationMessageSchema)
+    .max(20, "conversationHistory must not exceed 20 items")
+    .optional(),
+});
+
+// ---------------------------------------------------------------------------
+// admin/marketing/posts POST (create draft)
+// ---------------------------------------------------------------------------
+
+export const marketingDraftSchema = z.object({
+  platform: z.enum(["x", "instagram", "pinterest"]),
+  content: z.string().min(1, "content is required").max(5000),
+  mediaUrls: z.array(z.string().url()).optional(),
+  hashtags: z.array(z.string().max(100)).optional(),
+  linkUrl: z.string().url().optional(),
+  scheduledFor: z.string().optional(),
+  storyId: uuidSchema.optional(),
+  contentTheme: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
+// admin/marketing/posts PATCH (update draft)
+// ---------------------------------------------------------------------------
+
+export const marketingDraftPatchSchema = z.object({
+  platform: z.enum(["x", "instagram", "pinterest"]).optional(),
+  content: z.string().min(1).max(5000).optional(),
+  mediaUrls: z.array(z.string().url()).optional(),
+  hashtags: z.array(z.string().max(100)).optional(),
+  linkUrl: z.string().url().optional(),
+  scheduledFor: z.string().optional(),
+  storyId: uuidSchema.optional(),
+  contentTheme: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
 // admin/feature-flags/[key] PUT
 // ---------------------------------------------------------------------------
 
@@ -163,3 +213,75 @@ export const updateFeatureFlagSchema = z
   .refine((data) => data.enabled !== undefined || data.config !== undefined, {
     message: "Must provide enabled (boolean) or config (object)",
   });
+
+// ---------------------------------------------------------------------------
+// chat POST (shared by /api/chat and /api/chat/stream)
+// ---------------------------------------------------------------------------
+
+export const chatRequestSchema = z.object({
+  message: z.string().min(1, "Message is required").max(500, "Message exceeds maximum length of 500 characters"),
+  context: z.string().max(600, "Context exceeds maximum length of 600 characters").optional(),
+  messageIndex: z.number().int().min(0).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// admin/agent-config PUT
+// ---------------------------------------------------------------------------
+
+/** Toggle master switch. */
+export const agentConfigMasterSchema = z.object({
+  master_enabled: z.boolean(),
+});
+
+/** Enable/disable an individual agent. */
+export const agentConfigEnableSchema = z.object({
+  key: z.string().min(1).max(200),
+  enabled: z.boolean().optional(),
+  config_key: z.string().min(1).max(200).optional(),
+  value: z.unknown().optional(),
+});
+
+// ---------------------------------------------------------------------------
+// admin/suggestions/[id] PUT
+// ---------------------------------------------------------------------------
+
+export const updateSuggestionSchema = z.object({
+  status: z.enum(["pending", "reviewed", "converted", "rejected"]).optional(),
+  adminNotes: z.string().max(2000).optional(),
+}).refine((data) => data.status !== undefined || data.adminNotes !== undefined, {
+  message: "No updates provided",
+});
+
+// ---------------------------------------------------------------------------
+// checkout (day-pass and embedded) POST
+// ---------------------------------------------------------------------------
+
+export const checkoutBodySchema = z.object({
+  returnTo: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/i).max(100).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// mcp/places GET query params
+// ---------------------------------------------------------------------------
+
+export const placesQuerySchema = z.object({
+  query: z
+    .string()
+    .min(1, "Query parameter is required")
+    .max(200)
+    .describe("query"),
+  type: z.string().max(100).optional(),
+  city: z.string().max(200).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// mcp/weather GET query params
+// ---------------------------------------------------------------------------
+
+export const weatherQuerySchema = z.object({
+  city: z
+    .string()
+    .min(1, "City parameter is required")
+    .max(200)
+    .describe("city"),
+});

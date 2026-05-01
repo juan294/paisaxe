@@ -195,6 +195,7 @@ describe("/api/mcp/places", () => {
 
       expect(response.status).toBe(400);
       const data = await response.json();
+      // Zod returns the custom min(1) message when query is absent
       expect(data.error).toBe("Query parameter is required");
     });
 
@@ -785,6 +786,46 @@ describe("/api/mcp/places", () => {
       const call = mockFetch.mock.calls[0];
       const body = JSON.parse(call[1].body);
       expect(body.includedType).toBeUndefined();
+    });
+  });
+
+  describe("GET - Zod query parameter validation", () => {
+    it("should return 400 with 'Query parameter is required' for empty query string", async () => {
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("Query parameter is required");
+    });
+
+    it("should return 400 when query exceeds 200 characters", async () => {
+      const longQuery = "a".repeat(201);
+      const request = new Request(
+        `http://localhost:3000/api/mcp/places?query=${longQuery}`,
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(400);
+    });
+
+    it("should accept valid query with optional type and city", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ places: [] }),
+      });
+
+      const request = new Request(
+        "http://localhost:3000/api/mcp/places?query=sidra&type=bar&city=Oviedo",
+        { headers: { "x-mcp-secret": MCP_SECRET } }
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
     });
   });
 });

@@ -20,9 +20,19 @@ vi.mock("./rerank", () => ({
   rerankChunks: vi.fn(),
 }));
 
+// Mock logger — factory must not reference outer variables (vi.mock is hoisted)
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 import { searchChunks, getRelatedImages, search, keywordSearch } from "./search";
 import { supabase } from "./supabase";
 import { rerankChunks } from "./rerank";
+import { logger } from "@/lib/logger";
 
 describe("search", () => {
   beforeEach(() => {
@@ -30,6 +40,28 @@ describe("search", () => {
   });
 
   describe("searchChunks", () => {
+    it("should not pass ef_search as a client-side parameter (HNSW sets it via SET LOCAL inside match_chunks SQL function)", async () => {
+      // Regression test for PE-H1: hnsw.ef_search = 40 is set via SET LOCAL
+      // inside the match_chunks plpgsql function (migration 084), NOT as a
+      // client-supplied RPC argument. This verifies the RPC call shape is clean.
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        data: [],
+        error: null,
+      } as never);
+
+      const embedding = new Array(512).fill(0.1);
+      await searchChunks(embedding, 5);
+
+      const rpcCall = vi.mocked(supabase.rpc).mock.calls[0];
+      expect(rpcCall[0]).toBe("match_chunks");
+      // Only these three parameters should be passed — no ef_search, no probes
+      expect(Object.keys(rpcCall[1] as object)).toEqual(
+        expect.arrayContaining(["query_embedding", "match_threshold", "match_count"])
+      );
+      expect(rpcCall[1]).not.toHaveProperty("ef_search");
+      expect(rpcCall[1]).not.toHaveProperty("probes");
+    });
+
     it("should search chunks with vector embedding", async () => {
       const mockData = [
         {
@@ -143,6 +175,25 @@ describe("search", () => {
 
       const results = await getRelatedImages(["test.jpg"]);
       expect(results).toEqual([]);
+    });
+
+    it("logs [TABLE_FALLBACK] with logger.error on images fetch error (#249)", async () => {
+      vi.mocked(logger.error).mockClear();
+
+      const mockSelect = vi.fn().mockReturnValue({
+        in: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { message: "DB connection failed" },
+        }),
+      });
+      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+      await getRelatedImages(["test.jpg"]);
+
+      expect(logger.error).toHaveBeenCalledWith(
+        "[TABLE_FALLBACK]",
+        expect.objectContaining({ table: "images" })
+      );
     });
   });
 
@@ -309,6 +360,75 @@ describe("search", () => {
       expect(result.images).toEqual([]);
     });
 
+    it("PE-H3: getRelatedImages is called with all candidate refs, images filtered to reranked top-k refs", async () => {
+      // Verifies the parallelism invariant:
+      // - rerankChunks gets all 10 candidates
+      // - getRelatedImages is called with ALL candidate imageRefs (not just reranked ones)
+      // - final images are filtered to only the refs that appear in the reranked top-k chunks
+      const mockDbChunks = Array.from({ length: 10 }, (_, i) => ({
+        id: `chunk-${i}`,
+        content: `Content ${i}`,
+        source_pdf: `guide-${i}.pdf`,
+        page_number: i + 1,
+        section_title: null,
+        image_refs: [`img${i}.jpg`],
+        similarity: 0.9 - i * 0.02,
+      }));
+
+      vi.mocked(supabase.rpc).mockResolvedValueOnce({
+        data: mockDbChunks,
+        error: null,
+      } as never);
+
+      // Reranker returns top 3
+      const rerankedChunks = [
+        { id: "chunk-1", content: "Content 1", sourcePdf: "guide-1.pdf", pageNumber: 2, sectionTitle: undefined, imageRefs: ["img1.jpg"], similarity: 0.88 },
+        { id: "chunk-3", content: "Content 3", sourcePdf: "guide-3.pdf", pageNumber: 4, sectionTitle: undefined, imageRefs: ["img3.jpg"], similarity: 0.85 },
+        { id: "chunk-7", content: "Content 7", sourcePdf: "guide-7.pdf", pageNumber: 8, sectionTitle: undefined, imageRefs: ["img7.jpg"], similarity: 0.80 },
+      ];
+      vi.mocked(rerankChunks).mockResolvedValueOnce(rerankedChunks);
+
+      // Track what refs getRelatedImages was called with
+      let capturedImageRefs: string[] = [];
+      const mockSelect = vi.fn().mockImplementation(() => ({
+        in: vi.fn().mockImplementation((_, refs: string[]) => {
+          capturedImageRefs = [...refs];
+          return Promise.resolve({
+            data: [
+              { id: "img-1", path: "img1.jpg", caption: null, source_pdf: "guide-1.pdf" },
+              { id: "img-3", path: "img3.jpg", caption: null, source_pdf: "guide-3.pdf" },
+              { id: "img-7", path: "img7.jpg", caption: null, source_pdf: "guide-7.pdf" },
+              // img0.jpg through img9.jpg may be included — we just filter the output
+            ],
+            error: null,
+          });
+        }),
+      }));
+      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+      const embedding = new Array(512).fill(0.1);
+      const result = await search(embedding, 3, "hiking in Asturias");
+
+      // getRelatedImages must be called with ALL candidate imageRefs (all 10),
+      // because it's fired in parallel before rerank resolves
+      expect(capturedImageRefs.length).toBe(10);
+      expect(capturedImageRefs).toContain("img0.jpg");
+      expect(capturedImageRefs).toContain("img9.jpg");
+
+      // Result chunks come from reranker
+      expect(result.chunks).toHaveLength(3);
+      expect(result.chunks[0].id).toBe("chunk-1");
+
+      // Result images are filtered to only the refs present in the reranked top-k
+      const returnedPaths = result.images.map((img) => img.path);
+      expect(returnedPaths).toContain("img1.jpg");
+      expect(returnedPaths).toContain("img3.jpg");
+      expect(returnedPaths).toContain("img7.jpg");
+      // Images not in reranked chunks should not appear
+      expect(returnedPaths).not.toContain("img0.jpg");
+      expect(returnedPaths).not.toContain("img9.jpg");
+    });
+
     it("should use limit directly when no query text is provided", async () => {
       vi.mocked(supabase.rpc).mockResolvedValueOnce({
         data: [],
@@ -382,6 +502,26 @@ describe("search", () => {
 
       const results = await keywordSearch("test");
       expect(results).toEqual([]);
+    });
+
+    it("logs [TABLE_FALLBACK] with logger.error on keyword search error (#249)", async () => {
+      vi.mocked(logger.error).mockClear();
+
+      const mockTextSearch = vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { message: "DB error" },
+        }),
+      });
+      const mockSelect = vi.fn().mockReturnValue({ textSearch: mockTextSearch });
+      vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+      await keywordSearch("test");
+
+      expect(logger.error).toHaveBeenCalledWith(
+        "[TABLE_FALLBACK]",
+        expect.objectContaining({ table: "chunks" })
+      );
     });
   });
 });

@@ -1,125 +1,128 @@
-# Remediation Report
-> Generated on 2026-04-20 | Branch: `develop` | 52 findings resolved (Wave 1: 20, Wave 2: 32)
->
-> Pre-launch report: `docs/agents/pre-launch-report.md`
+# Remediation Report — 2026-04-27
+> Pre-launch audit: `docs/agents/pre-launch-report.md` (generated 2026-04-26)
+> Branch: `develop` | Wave 1 complete | Wave 2 pending user approval
 
-## Summary
-- Findings processed: 67 total (Wave 1: 20, Wave 2: 32, Wave 3: 15)
-- Issues created: 67 (#269–#335)
-- Issues resolved (merged): 52 (Wave 1: 20, Wave 2: 32)
-- Issues filed only (not fixed): 15 (Wave 3 — requires human architectural judgment)
-- Tests added: ~285 new tests across both waves (5690 → 5976)
-- Files modified: ~60+ source files, 3 new migrations, 2 new GitHub workflows
-- CI status: **PASSING** — CI, Security Scan, Lighthouse all green; E2E pre-existing failure
+---
 
-## Wave 1: Before launch (must-fix)
+## Executive Status
 
-| # | Work Unit | Domain | Finding IDs | Tests Added | Commit | Status |
-|---|-----------|--------|------------|------------|--------|--------|
-| 1 | BE-B2: Zod validation | backend | BE-B2 | 56 | `0c7c8be` | ✅ |
-| 2 | BE-B7: withAdmin HOF | backend | BE-B7 | 4 | `d467e36` | ✅ |
-| 3 | BE-B1: Stripe idempotency | backend | BE-B1 | ~10 | `fdb85b1` | ✅ |
-| 4 | BE-B4+B6: ElevenLabs booking | backend | BE-B4, BE-B6 | 10 | `e0b645d` | ✅ |
-| 5 | DO-B2+PE-H4: Sentry + proxy session cache | devops+perf | DO-B2, PE-H4 | 4 | `663e655` | ✅ |
-| 6 | DO-H1+H2: Rollback + migration runbooks | devops | DO-H1, DO-H2 | 0 (docs) | `4011803` | ✅ |
-| 7 | DO-H4: Branch protection docs | devops | DO-H4 | 0 (docs) | `a55a61c` | ✅ |
-| 8 | DO-H3+DO-M2: Cron alerting + idempotency | devops | DO-H3, DO-M2 | ~20 | `98ec72d` | ✅ |
-| 9 | PE-H1: Admin analytics consolidation | performance | PE-H1 | 0 (refactor) | `72cbbc5` | ✅ |
-| 10 | PE-H2: Chat static imports | performance | PE-H2 | 6 | `2dcfa2a` | ✅ |
-| 11 | DO-M1: Preview smoke test | devops | DO-M1 | 0 (CI config) | `fd732a4` | ✅ |
-| 12 | QA-M1: E2E timeout cleanup | qa | QA-M1 | 0 (E2E refactor) | `cc958cc` | ✅ |
-| 13 | QA-M3: Feature flags observability | qa | QA-M3 | 4 | `eb26774` | ✅ |
-| 14 | SE-M2: Safe markdown renderer | security | SE-M2 | 13 | `69264da` | ✅ |
-| 15 | UX-H1+H2: VoiceChat focus + error UI | ux | UX-H1, UX-H2 | ~8 (i18n+hooks) | `5c3d428` | ✅ |
+| Wave | Findings | Status |
+|------|----------|--------|
+| Wave 1 (Before launch) | 52 findings | ✅ Implemented + tests green |
+| Wave 2 (After launch) | 39 findings | ⏳ Issues filed — awaiting user approval |
+| Wave 3 (Later/strategic) | 21 findings | ⏳ Issues filed — no fix agents |
 
-**Note**: 15 work units covered 20 findings (some units combined related findings sharing files).
+**Tests after Wave 1:** 6285 passing (341 files)
+**Final commit:** `00f1c608` — fix: update tests to match Wave 1 behavioral changes
+**Wave 2 issues filed:** #485–#523 (39 issues)
+**Wave 3 issues filed:** #524–#544 (21 issues)
 
-## Wave 1: Merge conflicts resolved
+---
 
-| Conflict | Resolution |
-|---------|------------|
-| Migration 076 naming — BE-B1 and BE-B7 both created `076_*.sql` | BE-B1 migration renamed to `077_stripe_webhook_events.sql` |
-| `stories/route.ts` — BE-B2 Zod + BE-B7 withAdmin both modified POST handler | Combined: withAdmin wraps handler + Zod validates body; removed redundant `createAdminClient()` call; updated 4 test mocks from `validateAdminAuth` → `mockWithAdminAuthorized` |
-| `make-booking/route.ts` — BE-B2 `.insert()` call vs BE-B4+B6 `.update()` | Kept BE-B4+B6's update approach (correct: pre-insert happens before call, update after) |
-| `make-booking/route.test.ts` — BE-B2 Zod tests + BE-B4+B6 race condition tests at same location | Both test suites preserved: BE-B6 race condition tests first, then Zod validation tests |
-| `package.json` — BE-B2 (zod) + DO-B2 (@sentry/nextjs) both added dependencies | All three deps kept; newer stripe versions from HEAD preserved |
-| `proxy.ts` — HEAD `[TABLE_FALLBACK]` log vs DO-B2 Sentry capture | Combined: `[TABLE_FALLBACK]` log + `Sentry.captureException()` |
-| `feature-flags-server.ts` — HEAD `[TABLE_FALLBACK]` vs QA-M3 `[FEATURE_FLAG_FAILURE]` | QA-M3's `[FEATURE_FLAG_FAILURE]` format used (purpose-specific log key) |
-| `chat/route.ts` + `chat/stream/route.ts` — HEAD asturianu cache vs PE-H2 static imports | Both preserved: static lightweight imports + module-level cache |
-| `.env.example` — multiple agents added entries at EOF | All entries preserved (Sentry, TURBOPACK, QA vars) |
+## Wave 1: Before Launch — COMPLETE
 
-## Wave 2: After launch
+All 52 Wave 1 findings resolved across 5 implementation commits + 1 test-fix commit.
 
-19 work units covering 32 findings, all merged to `develop`.
+### Implementation Commits
 
-| # | Work Unit | Domain | Finding IDs | Status |
-|---|-----------|--------|------------|--------|
-| WU1 | Env layer + proxy decomposition + auth skip | arch+perf | AR-M1, AR-M3, PE-H4 | ✅ |
-| WU2 | Webhook validation + admin auth HOF | backend | BE-M5, BE-M7 | ✅ |
-| WU3 | PGRST116 consistent handling | backend | BE-M1 | ✅ |
-| WU4 | Anthropic SDK retry | backend | BE-M3, BE-M4 | ✅ |
-| WU5 | Error boundary correlation | devops | DO-L2 | ✅ |
-| WU6 | Pino structured logging | devops | DO-M3, DO-M5, DO-M6 | ✅ |
-| WU7 | Admin page tab unmounting | frontend | FE-M3, AR-M2 | ✅ |
-| WU8 | Provider tree boundary | frontend | FE-H1 | ✅ |
-| WU9 | StoryViewer decomposition | frontend | FE-H2 | ✅ |
-| WU10 | setTimeout transition fix | frontend | FE-M1 | ✅ |
-| WU11 | Feature flag flash fix | frontend | FE-M7 | ✅ |
-| WU12 | Admin analytics fan-out | performance | PE-L1 | ✅ |
-| WU13 | Image priority optimization | performance | PE-M2, PE-M3, PE-M5 | ✅ |
-| WU14 | Search fallback observability | qa | QA-L1 | ✅ |
-| WU15 | Health endpoint expansion | qa | QA-L2 | ✅ |
-| WU16 | Playwright retry config | qa | QA-L3 | ✅ |
-| WU17 | CSRF httpOnly + SUPABASE_SERVICE_ROLE_KEY | security | SE-L1, SE-L2 | ✅ |
-| WU18 | Voice/chat accessibility | ux | UX-L1, UX-L2, UX-L3 | ✅ |
-| WU19 | Pricing page UX | ux | UX-M4, UX-L4 | ✅ |
+| Commit | Description | Findings |
+|--------|-------------|---------|
+| `92023fbc` | fix: split health endpoint into liveness and diagnostics | BE-H5, DO-H1 |
+| `d1cbec52` | fix: frontend component quality improvements | FE-H1–H6, UX-B1–B4, UX-H1–H7, UX-M1–M8, AR-M1–M3 |
+| `4c3cf4e6` | fix: parallelize chat embedding + feature flag lookup | PE-H3, PE-M3, PE-M6 |
+| `7af7d381` | chore: config improvements and architectural decisions | DO-M1, DO-M4, DO-M6, BE-M1, BE-M5, BE-M6, SE-M5 |
+| `5cc21453` | fix: add Zod runtime validation to remaining API routes | BE-H1, BE-H2, BE-H3, BE-H4, BE-H6, SE-H1, SE-H2, SE-M1, SE-M2, QA-H1–H3, QA-M1, QA-M2, AR-H1, AR-H2, PE-H1, DO-H2 |
+| `00f1c608` | fix: update tests to match Wave 1 behavioral changes | Test alignment for SE-M2, AR-H2, FE-H5, FE-H6 behavioral changes |
 
-### Wave 2: Merge conflicts resolved
+### Behavioral Changes Introduced (affects tests)
 
-| Conflict | Resolution |
-|---------|------------|
-| `proxy.ts` (monolithic vs decomposed) | WU1's decomposed submodule structure taken; PE-H4 fresh-token skip added to auth-refresh.ts |
-| `chat/route.ts` and `stream/route.ts` (asturianCache vs isFeatureFlagEnabled) | WU1's `isFeatureFlagEnabled` approach taken; PE-H2 cold-start tests preserved |
-| `translate/route.ts` (body vs rawBody variable) | Fixed WU2 bug: `safeParse(body)` → `safeParse(rawBody)`, destructure from `parsed.data` |
-| `stories/route.test.ts` (invalid validateAdminAuth mock) | Removed WU2's stray mock (file uses withAdmin HOF pattern) |
-| `translate/route.test.ts` (invalid UUID "test-story-id") | Fixed to valid UUID for Zod uuidSchema validation |
-| `story-viewer.tsx` (monolith vs decomposed + StoryToolbar) | WU9's decomposed structure taken; chatTriggerRef threaded through StoryInfoPanel |
-| `story-info-panel.tsx` (missing chatTriggerRef prop) | Added `chatTriggerRef` to interface, function signature, attached to ask button |
-| `voice-chat.tsx` (a11y attributes) | WU18's role="status" + aria-label on VoiceLoadingFallback taken |
-| `voice-chat.test.tsx` (wrong mock expectation) | Fixed tests to expect "Cargando asistente de voz..." (actual mock return value) not key string |
-| `ast.ts` and `fr.ts` (quote style) | HEAD's double-quote version taken (semantically identical) |
-| `package.json` (pino + posthog) | Both dependencies kept |
+- **SE-M2 (Origin required):** POST with no Origin header now returns 403 before CSRF check. Tests must supply `origin: "https://paisaxe.es"` for CSRF tests.
+- **AR-H2 (pino logger):** `logger.error("msg", meta)` → single JSON string argument to `console.error`. Tests must use `expect.stringContaining("msg")` instead of two-arg matchers.
+- **FE-H5 (Admin shell URL state):** Tab state derived from `searchParams` with local state for instant responsiveness. `router.push(url, { scroll: false })` called with two args on tab change.
+- **FE-H6 (analytics-cache useEffect):** Staleness check moved from render phase to `useEffect([cacheKey, enabled])`. Tests must toggle `enabled` false→true to trigger the effect.
 
-## Wave 3: Later / strategic (filed, not fixed)
+---
 
-15 issues filed — requires human architectural judgment. No fix agents spawned.
+## Wave 2: After Launch — PENDING
 
-## Final Verification
+Issues filed for all 39 findings. Wave 2 implementation requires explicit user approval.
 
-- [x] All 19 Wave 2 worktree branches merged to `develop`
-- [x] 316 test files, 5976 tests passing (285 new tests added across Wave 1 + 2)
-- [x] TypeScript typecheck clean
-- [x] ESLint lint clean
-- [x] Build clean
-- [x] `git push origin develop` succeeded
-- [x] All worktrees removed, all Wave 2 branches deleted
-- [x] CI (lint-and-typecheck + test): **PASSING** (run #24652558645)
-- [x] Security Scan: **PASSING** — dompurify + protobufjs CVEs fixed (run #24652558633)
-- [x] Lighthouse CI: **PASSING** (run #24652558625)
-- [ ] E2E Tests: pre-existing failure (was failing before Wave 2 push, run #24626995829)
-- [x] Wave 2 issues #289–#320 closed
-- [x] Duplicate Wave 2 issues #255, #257-#258, #260-#261, #263-#264, #266-#267 closed
+### Findings (ordered by priority)
 
-## New Dependencies (Wave 2)
+| ID | Title | Domain | Effort |
+|----|-------|--------|--------|
+| DO-H3 | Console lint ignore-list undermines logging | DevOps | M |
+| PE-H2 | Embedding cache in-process — cold lambdas pay Voyage RTT | Performance | M |
+| PE-H3 | Search pipeline rerank/image-fetch serialized | Performance | S |
+| PE-H4 | Anthropic SDK dynamic import per request | Performance | S |
+| BE-M2 | Admin auth double round-trips with no caching | Backend | S |
+| BE-M3 | Service-role client recreated per call | Backend | S |
+| BE-M4 | Feature flags cache no Vary header | Backend | S |
+| BE-M7 | Suggestion POST no spam mitigation | Backend | M |
+| FE-M1 | voice-chat.tsx 423-line monolith | Frontend | M |
+| FE-M2 | admin-shell.tsx 806-line monolith | Frontend | M |
+| FE-M3 | Bespoke fetch-cache duplicated across 5+ hooks | Frontend | L |
+| FE-M4 | Providers remounts AuthProvider on nav | Frontend | S |
+| FE-M5 | PostHog provider reshapes tree on init | Frontend | S |
+| FE-M6 | Unconditional idle voice-chat prefetch | Frontend | S |
+| FE-M7 | Manual SSE buffer parsing not abstracted | Frontend | M |
+| DO-M2 | Cron jobs lack telemetry | DevOps | M |
+| DO-M3 | No regional failover documentation | DevOps | S |
+| DO-M5 | CI runtime gap on develop | DevOps | M |
+| DO-M7 | No log drain confirmed | DevOps | S |
+| DO-L1 | npm audit only at high level | DevOps | S |
+| AR-M4 | proxy.ts re-exports for tests only | Architecture | S |
+| AR-M5 | Hook imports type from route file | Architecture | S |
+| AR-L1 | Three outdated minor deps | Architecture | S |
+| AR-L2 | Two moderate audit findings | Architecture | S |
+| SE-M3 | Service-role bypasses RLS for reads | Security | M |
+| SE-M4 | CSP unsafe-inline no SRI | Security | L |
+| SE-L2 | Bearer precedence implicit and untested | Security | S |
+| SE-L3 | Stripe API version unpinned | Security | S |
+| PE-M1 | Streaming SSE on Node lambda | Performance | M |
+| PE-M5 | Admin loads all stories with no pagination | Performance | M |
+| QA-M3 | Data pipeline scripts untested | QA | M |
+| QA-L1 | No test.skip lint rule | QA | S |
+| BE-L1 | console.* in API routes | Backend | S |
+| BE-L2 | Stripe unrecoverable events no audit trail | Backend | S |
+| UX-M9 | Glassmorphism button pattern not abstracted | UX | M |
+| UX-M10 | Progress bar segments 4px — poor touch affordance | UX | S |
+| UX-L1 | role=region redundant on section with aria-label | UX | S |
+| UX-L2 | alt text repeats visible heading | UX | S |
+| UX-L3 | Clipboard failure silent to user | UX | S |
 
-- `pino@^10.3.1` — structured JSON logging
+---
 
-## Security Fixes (Wave 2)
+## Wave 3: Later / Strategic — ISSUES FILED
 
-- `dompurify` upgraded past 3.3.3 (GHSA-39q2-94rc-95cp, moderate)
-- `protobufjs` upgraded past 7.5.5 (GHSA-xq3m-2v4x-88gg, critical)
+21 findings filed as GitHub issues. No fix agents spawned — requires human architectural judgment.
 
-## Notes
+| ID | Title | Domain |
+|----|-------|--------|
+| BE-L3 | Duplicate validation in chat routes | Backend |
+| BE-S1 | No dedicated background worker | Backend |
+| AR-S1 | Flat src/lib/ lacks layering | Architecture |
+| AR-S2 | Optional TypeScript strict flags not enabled | Architecture |
+| DO-L2 | withTimeout leaks promise after timeout fires | DevOps |
+| DO-S1 | Solo escalation single point of failure | DevOps |
+| FE-L1 | console.* in 16+ client component paths | Frontend |
+| FE-L2 | navigator.standalone any cast | Frontend |
+| FE-L3 | Share URL logic duplicated | Frontend |
+| FE-S1 | No state management library decision | Frontend |
+| PE-M2 | Curl-spawn dev/prod parity gap | Performance |
+| PE-M4 | Marketing dashboard JS aggregation vs SQL | Performance |
+| PE-M7 | Sentry sourcemap upload on every build | Performance |
+| PE-L1 | 1-second setInterval for elapsed timer | Performance |
+| PE-L2 | story/[slug] prerenders for redirect only | Performance |
+| PE-L3 | console.* on chat hot path | Performance |
+| PE-L4 | EmbeddingCache SHA-256 overhead | Performance |
+| PE-S1 | Single-region deployment observability | Performance |
+| SE-L1 | Child process exposes full process.env | Security |
+| SE-S1 | Single admin role, no fine-grained RBAC | Security |
+| UX-S1 | Bookmark vs favourite metaphor conflict | UX |
 
-- E2E failure (`POST /api/suggestions rejects short name`) is pre-existing — confirmed by run #24626995829 failing before Wave 2 push.
-- Wave 3 items (#321–#335) remain as open GitHub issues in the backlog.
+---
+
+## Previous Remediation (2026-04-20 audit)
+
+The prior remediation cycle (documented in git history) resolved Wave 1 + Wave 2 from the April 20 pre-launch audit. The April 26 audit re-audited the codebase and found new/remaining findings above.

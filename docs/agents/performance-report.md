@@ -1,174 +1,146 @@
 # Performance Report
 
-> Updated on 2026-04-25 (dev server cache -- last production build verified Apr 4)
+> Updated on 2026-04-30 (dev server cache -- no production build this cycle. Apr 25 prod build remains authoritative for initial load.)
 
-## Health Status: YELLOW (initial load budget unconfirmed; production build required for 3+ cycles)
+## Health Status: YELLOW
 
-**Initial load JS: ~2,065 KB (est., budget: 2,000 KB) -- UNCONFIRMED. P8 savings of ~30-50 KB expected but not measured.**
-**Total JS: 2,940 KB (budget: 3,000 KB) -- Under budget (+60 KB headroom)**
+**Initial load JS: ~2,067 KB (Apr 25 prod baseline, budget: 2,000 KB) -- OVER by 67 KB. P4 not yet implemented.**
+**Total JS: 2,986 KB dev cache (budget: 3,000 KB) -- 14 KB headroom only. CRITICAL.**
 
-**0 KB change this cycle** (2,940 KB -> 2,940 KB, Apr 24 -> Apr 25). The dev server was running again and `.next` cache was used for bundle measurement. This is the **5th consecutive cycle** with no change in measured total JS. The Sentry Replay removal from `fef651f5` (Apr 22) and two additional source commits (`87a3f149`, `610601b4`) are not reflected in these numbers.
+Zero change this cycle. All 10 top chunks carry identical byte sizes to Apr 29 -- the dev cache was not invalidated (no code changes landed between Apr 29 and Apr 30 agent runs). The YELLOW status and all outstanding action items carry forward unchanged.
 
-**YELLOW status is driven entirely by the unverified initial load budget.** A single `rm -rf .next && npm run build` would either close the gap (if P8 savings bring initial load below 2,000 KB) or reveal whether P4 is also needed.
+**QA regression clarification**: The Apr 29 Chat API 403 (QA RED) is confirmed by Security Agent and QA Agent (Apr 30) to be a test harness gap -- Node.js `fetch` omits the `Origin` header automatically, and CSRF enforcement (SE-M2) requires it. Fix is a one-line change in `src/tests/qa/llm-quality.test.ts:43`: add `'Origin': API_URL` to headers. Production chat is not broken. The immersive page journeys recovered to 10/10, confirming `bab3c40e` fixed the story render regression.
 
-**Notable this cycle:** The `.next` directory grew from ~800 MB to 1,404 MB (+604 MB). This is dev-server cache expansion from PPR static pre-rendering during normal use -- it does not affect client bundle sizes but does indicate the dev server rebuilt more routes.
+**Key state entering May:**
+- P4 (Supabase realtime tree-shake) -- activated Apr 25, still unimplemented
+- Budget raise to 2,100 KB initial / 3,100 KB total -- still pending
+- Production build -- still needed this cycle (dev cache only since Apr 25)
+- Chunk 7 (0v_78g45r38tv, 119 KB) -- still unclassified (static vs deferred)
+- QA harness Origin header fix -- one-line change, unblocks LLM safety confirmation
 
 ## Key Metrics
 
-| Metric | Current (2026-04-25) | Previous (2026-04-24) | Apr 20 | Apr 4 (prod build) | Budget | Status |
-|--------|----------------------|------------------------|--------|---------------------|--------|--------|
-| Total JS | **2,940 KB** | 2,940 KB | 2,941 KB | 2,851 KB | 3,000 KB (split) | Under budget (+60 KB) |
-| Initial load JS | **~2,065 KB (est.)** | ~2,065 KB | ~2,066 KB | ~1,800 KB | 2,000 KB (split) | Potentially over -- unverified |
-| Total CSS | **125 KB** | 125 KB | 125 KB | 122 KB | -- | Stable |
-| Production deps | **35** | 35 | 34 | 31 | 40 | Good (+5 headroom) |
-| Development deps | **29** | 29 | 29 | -- | -- | Stable |
-| node_modules | **1,047 MB** | 1,047 MB | 1,047 MB | 896 MB | 1,000 MB | OVER BUDGET (-47 MB) |
-| .next | **1,404 MB** | ~800 MB | 801 MB | 46 MB (dev) | -- | Dev cache (grew +604 MB this cycle) |
+| Metric | Today (2026-04-30 dev) | Apr 29 (dev) | Apr 25 (prod) | Apr 4 (prod) | Budget | Status |
+|--------|------------------------|--------------|----------------|--------------|--------|--------|
+| Total JS | **2,986 KB** (dev cache) | 2,986 KB | **2,941 KB** | 2,851 KB | 3,000 KB | 14 KB headroom -- CRITICAL |
+| Initial load JS | **~2,067 KB** (Apr 25 prod) | 2,067 KB | **2,067 KB** | ~1,800 KB | 2,000 KB | OVER by 67 KB |
+| Total CSS | 125 KB | 125 KB | 125 KB | 122 KB | -- | Stable |
+| Production deps | **35** | 35 | 35 | 31 | 40 | Good |
+| Development deps | 30 | 30 | 29 | -- | -- | Stable |
+| node_modules | **1,048 MB** | 1,048 MB | 1,047 MB | 896 MB | 1,100 MB | Under (+52 MB) |
+| .next | 959 MB | 873 MB | -- | 46 MB | -- | Active dev session |
 
-*Dev server was running -- all bundle measurements are from stale `.next` cache. Initial load estimate is derived (total minus known deferred chunks). Production build is required for exact numbers.*
+*Apr 30: Dev cache, zero change from Apr 29. Apr 25 prod build is authoritative for initial load.*
+*2.7-month total growth (prod baseline): 2,455 -> 2,986 KB dev (+531 KB, +21.6%).*
 
 ## Budget Status
 
-**Split budget in effect since 2026-04-04.**
-
 | Budget | Limit | Current | Headroom | Status |
 |--------|-------|---------|----------|--------|
-| **Initial load JS** (static, excl. deferred) | 2,000 KB | **~2,065 KB (est.)** | -65 KB (est.) | Potentially OVER -- P8 expected to close gap |
-| **Total JS** (including deferred chunks) | 3,000 KB | **2,940 KB** | +60 KB | Under budget |
+| **Initial load JS** | 2,000 KB | **~2,067 KB** (Apr 25 prod) | -67 KB | OVER -- P4 not yet implemented |
+| **Total JS** | 3,000 KB | **2,986 KB** (dev cache) | +14 KB | CRITICAL -- any wave-3 growth risks breach |
 | Production deps | 40 | 35 | +5 | Good |
-| node_modules | 1,000 MB | 1,047 MB | -47 MB | OVER BUDGET (operational only) |
+| node_modules | 1,100 MB | 1,048 MB | +52 MB | Under |
 
-**Deferred chunks (excluded from initial load budget):**
+**Deferred chunks (excluded from initial load budget, included in total):**
 
-| Chunk | Size | Status vs Apr 24 |
-|-------|------|-------------------|
-| ElevenLabs SDK + LiveKit | ~478 KB | 0 KB (stable) |
-| PostHog analytics | ~180 KB | 0 KB (stable) |
-| react-markdown + micromark | ~110 KB | 0 KB (stable) |
-| Admin analytics UI | ~107 KB | 0 KB (stable) |
-| **Total deferred** | **~875 KB** | 0 KB (stable) |
+| Chunk | Size | Status |
+|-------|------|--------|
+| ElevenLabs SDK + LiveKit | ~478 KB | Stable |
+| PostHog analytics | ~180 KB | Stable |
+| react-markdown + micromark | ~110 KB | Stable |
+| Admin analytics UI | ~107 KB | Stable |
+| **Total deferred** | **~875 KB** | Stable |
 
-## Top 10 Chunks Identified
+## Top 10 Chunks (Apr 30 dev cache)
 
-Chunk hashes change on each build -- sizes in bytes from dev cache. Content attribution by size comparison with prior cycles.
+All chunks byte-for-byte identical to Apr 29. Hashes unchanged -- no code changes landed this cycle.
 
-| Rank | Chunk (bytes) | Size | Contents | Loading | Actionable? |
-|------|--------------|------|----------|---------|-------------|
-| 1 | 0jgxvc_nt0fmz (489,726) | **478 KB** | ElevenLabs SDK + LiveKit WebRTC + protobuf | Deferred (dynamic import) + idle prefetch | No -- already optimized |
-| 2 | 07y9atwelbm1e (233,018) | **228 KB** | Next.js App Router bootstrap + PPR + hydration (16.2.4) | Static (framework) | No -- required |
-| 3 | 0o~u430-x9btt (191,438) | **187 KB** | Supabase SDK (auth, postgrest, realtime) | Static | See P4 below |
-| 4 | 01jcq5ly8dpgu (183,807) | **180 KB** | PostHog analytics SDK v1.369.5 | Deferred (useEffect lazy import) | No -- already optimized |
-| 5 | 0wu4~xh-5rs6g (134,887) | **132 KB** | React RSC Flight client runtime | Static (framework) | No -- required |
-| 6 | 0gb0~kkj~zqpo (125,174) | **122 KB** | i18n strings (all 6 locales -- Turbopack limitation) | Static | P5 closed -- not fixable |
-| 7 | 0zqk8~mlt73qo (114,323) | **112 KB** | Polyfills (core-js v3) | Static | P1 applied -- no further savings |
-| 8 | 03~yq9q893hmn (112,594) | **110 KB** | react-markdown + micromark parser | Deferred (inside VoiceChat) | No -- already optimized |
-| 9 | 0j.n0_xy~ouxq (109,497) | **107 KB** | Admin analytics (Stripe dashboard UI) | Deferred (admin tab import) | No -- already optimized |
-| 10 | 0c_qd452s0tgs (85,120) | **83 KB** | Sentry client SDK (core + browser tracing, post-Replay-removal) OR i18n secondary content | Static | **Re-measure after prod build** |
+| Rank | Chunk | Size | Contents | Loading | Actionable? |
+|------|-------|------|----------|---------|-------------|
+| 1 | 0jgxvc_nt0fmz (489,726 B) | **478 KB** | ElevenLabs SDK + LiveKit WebRTC + protobuf | Deferred (dynamic import) | No -- already optimized |
+| 2 | 07y9atwelbm1e (233,018 B) | **228 KB** | Next.js App Router bootstrap + PPR (16.2.4) | Static (framework) | No -- required |
+| 3 | 08xx2ho6aacv7 (191,461 B) | **187 KB** | Supabase SDK (auth, postgrest, realtime) | Static | **P4 target -- ~20-30 KB savings** |
+| 4 | 0bopql_owpunr (183,793 B) | **180 KB** | PostHog analytics SDK v1.369.5 | Deferred (useEffect lazy import) | No -- already optimized |
+| 5 | 0wu4~xh-5rs6g (134,887 B) | **132 KB** | React RSC Flight client runtime | Static (framework) | No -- required |
+| 6 | 0mzmsu1pb-cds (127,520 B) | **125 KB** | i18n strings -- all 6 locales, 405 keys | Static | Closed (P5) -- Turbopack limitation |
+| 7 | 0v_78g45r38tv (121,745 B) | **119 KB** | Unknown -- appeared in Apr 29 top 10. Likely shared code from FE-M1 voice-chat sub-component extraction. | Unknown -- run prod build to classify | **Investigate: determine static vs deferred** |
+| 8 | 0ktbr965wa~br (114,831 B) | **112 KB** | Polyfills (core-js v3) | Static | No -- P1 applied, stable |
+| 9 | 03~yq9q893hmn (112,594 B) | **110 KB** | react-markdown + micromark | Deferred (inside VoiceChat) | No -- already optimized |
+| 10 | 0ax6.6ah0eu8 (109,497 B) | **107 KB** | Admin analytics (Stripe dashboard UI) | Deferred (admin tab import) | No -- already optimized |
 
-*Chunk 10 remained at 85,120 bytes unchanged from Apr 24, Apr 22, and Apr 20. This confirms the dev cache has not been rebuilt since before the P8 Replay removal. The real post-P8 Sentry chunk size is unknown until a production build is run.*
+**All 10 hashes match Apr 29 exactly.** Zero code changes reached the dev cache between reporting cycles.
 
-## Changes This Cycle (Apr 25 vs Apr 24)
-
-**0 KB total JS change** -- dev cache stale; recent source commits not reflected.
+## Changes This Cycle (Apr 30 vs Apr 29)
 
 | Item | Change | Driver |
 |------|--------|--------|
-| Total JS | **0 KB** (2,940 -> 2,940 KB) | Cache stale (no rebuild) |
-| Initial load (est.) | **0 KB** (~2,065 -> ~2,065 KB) | Cache stale |
-| Deferred chunks | **0 KB** (~875 -> ~875 KB) | Stable |
-| node_modules | **0 MB** (1,047 -> 1,047 MB) | No net dep-size change |
-| Production deps | **0** (35 -> 35) | Stable |
-| .next disk usage | **+604 MB** (800 -> 1,404 MB) | Dev server PPR cache expansion |
+| Total JS (dev cache) | **0 KB** (2,986 KB unchanged) | No code changes; dev server cache frozen |
+| Initial load (prod baseline) | **0 KB** (2,067 KB) | No new prod build; Apr 25 baseline unchanged |
+| i18n chunk | **0 KB** (127,520 B) | Localization Agent confirms 405 keys (up from 404 Apr 27), but chunk hash unchanged -- byte size stable |
+| Deferred chunks | **0 KB** (~875 KB) | Stable |
+| node_modules | **0 MB** (1,048 MB) | Stable |
+| Production deps | **0** (35) | Stable |
 
-### Commits Since Apr 24 (Source Changes Not Yet Reflected in Metrics)
+## P4: Tree-Shake Supabase Realtime -- ACTIVATED, NOT YET IMPLEMENTED
 
-| Commit | Description | Bundle Impact |
-|--------|-------------|---------------|
-| `87a3f149` | Fix development CSP eval support | Zero -- CSP is a response header, not client JS |
-| `610601b4` | fix: address ultrareview findings on #384 | Likely zero or minimal -- ultrareview findings typically target server-side logic |
+**Status: Activated Apr 25 by triage. Not implemented. `src/lib/supabase/browser-public.ts` does not exist.**
 
-*Previously unverified (since Apr 22):*
-- `fef651f5` P8: removed `replaysOnErrorSampleRate` + `replaysSessionSampleRate` from `sentry.client.config.ts`. Expected ~30-50 KB off Sentry static chunk.
-- `af583fd6` PII sanitization in `sentry-before-send.ts`. Server-side only.
+**Estimated savings: ~20-30 KB from initial load. Also protects the 14 KB total headroom.**
 
-## Critical Action: Production Build Required (5th Consecutive Request)
+With total headroom at 14 KB and any wave-3 PR likely adding 5-30 KB, P4 is the gating action before further development. Cost Analyst Agent (Apr 30) echoes: "P4 (Supabase realtime tree-shake, ~25 KB) must be implemented before wave-3."
 
-**This is the single most impactful action available. It costs ~3 minutes and resolves the YELLOW status.**
+### Implementation
 
-The dev server cache has not been cleared since before `fef651f5` (Apr 22). Until a production build is run:
-- The ~30-50 KB P8 Sentry Replay savings are **invisible in all metrics**
-- The initial load budget violation (-65 KB estimated) **cannot be confirmed or cleared**
-- The YELLOW status will persist indefinitely regardless of further code improvements
-
-```bash
-rm -rf .next && npm run build
-```
-
-Post-P8 initial load estimate:
-- Current estimate: ~2,065 KB
-- P8 savings: ~30-50 KB
-- Post-P8 estimate: ~2,015-2,035 KB
-
-**This still lands over the 2,000 KB budget.** If confirmed, P4 (Supabase realtime tree-shake, ~20-30 KB) becomes necessary to clear the budget. Combined P8 + P4 estimated: ~2,000 KB -- right at the edge.
-
-## Action Items (Prioritized by Impact)
-
-| Priority | Action | Estimated Savings | Effort | Notes |
-|----------|--------|-------------------|--------|-------|
-| **CRITICAL** | **Run production build** | **Verify P8 savings** | 3 min | `rm -rf .next && npm run build`. Resolves YELLOW status. 5th cycle requested. |
-| **HIGH** | **Run bundle-analyzer on fresh prod build** | Visibility | 3 min | `npm run build:analyze`. Confirms chunk 10 attribution, verifies `@sentry/replay` is gone from static chunks. |
-| **MEDIUM** | **P4: Tree-shake Supabase realtime** | ~20-30 KB | Medium | Activate only if P8 + prod build still shows initial load over 2,000 KB. See code below. |
-| **LOW** | **postcss override** (Security Agent recommendation) | 0 KB bundle | Trivial | Add `"postcss": ">=8.5.10"` to `package.json` overrides. Clears 5 security advisories. postcss is build-time only -- zero bundle impact. |
-| **LOW** | **Sync `npm install`** | 0 KB | Trivial | Security Agent (Apr 24/25): resend pin drift. Also clears uuid advisory chain partially. |
-| **LOW** | node_modules budget raise | Process | Trivial | Raise to 1,100 MB now @sentry/nextjs (67 MB) is a permanent dep. 47 MB overrun is structural. |
-
-## P4: Tree-Shake Supabase Realtime -- Standby
-
-Activate only after production build confirms initial load is still above 2,000 KB after P8. The Supabase `realtime` module adds ~20-30 KB to public pages that don't need live subscriptions.
+Step 1 -- Create a realtime-free client for public pages:
 
 ```typescript
-// src/lib/supabase-browser-public.ts -- new file for public pages
+// src/lib/supabase-browser-public.ts
 import { createBrowserClient } from "@supabase/ssr";
 
 export const supabaseBrowserPublic = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  { realtime: { enabled: false } },
+  {
+    realtime: {
+      params: { eventsPerSecond: 0 },
+    },
+  }
 );
 ```
 
-Replace `supabaseBrowser` imports in public-facing pages (immersive, chat, homepage) with `supabaseBrowserPublic`. Admin pages keep the full client with realtime.
+Step 2 -- Replace `supabaseBrowser` import in public components:
+- `src/components/immersive/` (story viewer, voice-chat sub-components)
+- `src/components/chat/`
+- Homepage components
 
-## Cross-Agent Findings
+Step 3 -- Keep full client in:
+- `src/components/admin/`
+- Any caller using `supabase.channel()` or `.on()` subscriptions
 
-### QA Agent (Apr 25): Chat API 500 Regression
-
-QA Agent reports `/api/chat` returning 500 for all non-safety LLM tests since the wave 1 remediation commits (`77359718` logger edge runtime isolation). **Performance implication:** Fast 500s (124-321ms) suggest an initialization failure, not a timeout. This is a correctness issue, not a bundle size issue. No action from the performance side -- but if the fix introduces new client-side imports, monitor the initial load delta.
-
-### Security Agent (Apr 25): postcss Advisory
-
-Security Agent recommends adding `"postcss": ">=8.5.10"` to `package.json` overrides to clear 5 of 8 moderate advisories (GHSA-qx2v-qp2m-jg93 chain). postcss is a build-time dependency only. **Adding the override has zero client bundle impact** -- it just forces hoisted transitive deps to use the patched version.
-
-## P8 Verification: Sentry Config Current State
-
-`sentry.client.config.ts` (confirmed clean as of Apr 25):
-
-```typescript
-import * as Sentry from "@sentry/nextjs";
-import { sanitizeSentryEvent } from "@/lib/sentry-before-send";
-
-const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim();
-
-if (dsn) {
-  Sentry.init({
-    dsn,
-    tracesSampleRate: 0.1,
-    beforeSend: sanitizeSentryEvent,
-  });
-}
+Step 4 -- Verify:
+```bash
+rm -rf .next && npm run build
 ```
 
-`replaysOnErrorSampleRate` and `replaysSessionSampleRate` are confirmed absent. The `@sentry/replay` integration should not be auto-instrumented into the static client bundle. Chunk 10 (83 KB, confirmed unchanged in dev cache) must be re-measured in a production build to confirm actual savings.
+Expected: Supabase chunk drops from ~187 KB to ~160-165 KB. Initial load: 2,067 KB -> ~2,040-2,047 KB.
+
+**P4 alone still leaves initial load ~40-47 KB over budget.** Pair with budget raise to 2,100 KB for GREEN.
+
+## Action Items (Prioritized by Impact)
+
+| Priority | Action | Estimated Savings | Effort | Notes |
+|----------|--------|-------------------|--------|-------|
+| **CRITICAL** | **Implement P4: Supabase realtime tree-shake** | ~20-30 KB initial load + protects 14 KB total headroom | Medium | See code above. Activated Apr 25, still unimplemented. Wave-3 cannot proceed without it. |
+| **CRITICAL** | **Run prod build after P4** | Visibility + confirms chunk 7 | Trivial | `rm -rf .next && npm run build`. Dev cache frozen at 2,986 KB -- need confirmation of actual initial-load impact of wave-2 merges. |
+| **HIGH** | **Raise initial load budget to 2,100 KB** | YELLOW -> GREEN (initial load) | Trivial | P4 alone brings initial load to ~2,042 KB -- still over 2,000 KB. 2,100 KB reflects structural growth since Apr 4 baseline. |
+| **HIGH** | **Fix QA harness Origin header** | LLM safety tests unblocked | Trivial | `src/tests/qa/llm-quality.test.ts:43`: add `'Origin': API_URL` to fetch headers. CSRF (SE-M2) enforcement requires it. This is a harness gap, not a production bug -- production chat is unaffected. |
+| **MEDIUM** | **Classify chunk 7 (0v_78g45r38tv, 119 KB)** | Potential savings if static | Trivial | Prod build will reveal if this chunk is deferred or in initial load. If static, it needs investigation -- FE-M1 voice-chat extraction may have accidentally pulled code into the initial load path. |
+| **MEDIUM** | **Raise total budget to 3,100 KB if wave-3 planned** | Process change | Trivial | 14 KB headroom is exhausted by a single medium-size feature PR. Either implement P4 first or raise total budget before wave-3 begins. |
+| **LOW** | Monitor Next.js for postcss inner copy upgrade | Security cleanup | None | postcss override confirmed ineffective (Next.js isolation). Build-time only. Monitor upstream. |
+| **CLOSED** | ~~postcss override~~ | ~~0 KB~~ | -- | Confirmed ineffective Apr 25. |
+| **CLOSED** | ~~P8: Sentry Replay removal~~ | ~~0 KB~~ | -- | Replay was config-only. Confirmed Apr 25. |
+| **CLOSED** | ~~node_modules budget raise~~ | -- | -- | Done Apr 25 (1,000 -> 1,100 MB). |
 
 ## Dynamic Import Chain Verification
 
@@ -176,120 +148,101 @@ if (dsn) {
 
 ```
 immersive-page-content.tsx
-  -> dynamic(() => import("./voice-chat"), { ssr: false })     // DEFERRED
-    -> dynamic(() => import("./voice-chat-elevenlabs"))         // DEFERRED
-      -> import { useConversation } from "@elevenlabs/react"    // ~478 KB
-    -> import ReactMarkdown from "react-markdown"               // ~110 KB
-    -> import { usePostHog } from "posthog-js/react"            // ~180 KB
-  -> requestIdleCallback(() => import("./voice-chat"))          // PREFETCH (P2)
+  -> dynamic(() => import("./voice-chat"), { ssr: false })       // DEFERRED
+    -> voice-chat/chat-header.tsx                                // DEFERRED (FE-M1 sub-component)
+    -> voice-chat/chat-message-list.tsx                          // DEFERRED (FE-M1 sub-component)
+    -> voice-chat/chat-composer.tsx                              // DEFERRED (FE-M1 sub-component)
+    -> voice-chat/chat-error-banner.tsx                          // DEFERRED (FE-M1 sub-component)
+    -> dynamic(() => import("./voice-chat-elevenlabs"))           // DEFERRED
+      -> import { useConversation } from "@elevenlabs/react"      // ~478 KB
+    -> import ReactMarkdown from "react-markdown"                 // ~110 KB
+    -> import { usePostHog } from "posthog-js/react"              // ~180 KB
+  -> requestIdleCallback(() => import("./voice-chat"))            // PREFETCH (P2)
 
 admin/page.tsx
   -> 8 dynamic imports: FeatureToggles, Analytics, Marketing,
      Suggestions, Agents, StoryEditor, CreateStory, SelectionToolbar  // ~107 KB
-
-posthog-provider.tsx -> useEffect(() => Promise.all([
-  import("posthog-js"), import("posthog-js/react")
-]))   // ~180 KB after hydration, production only (v1.369.5)
 ```
 
-**Static (in initial load -- unchanged from Apr 24):**
+**Static (in initial load):**
 
 ```
-// @sentry/nextjs: auto-instrumented at build time by Next.js.
-// AS OF fef651f5 (Apr 22): Replay integration NO LONGER included.
-// Next prod build needed to confirm the actual chunk-10 size drop.
+@sentry/nextjs: core + browser tracing (~83 KB, unchanged)
+Supabase SDK: ~187 KB including realtime -- P4 target
+i18n: ~125 KB -- Turbopack limitation (405 keys, stable)
+core-js polyfills: ~112 KB -- P1 browserslist applied, stable
+Button component: glass variants (UX-M9) -- small increase absorbed
+```
 
-// Supabase SDK: includes realtime module (~20-30 KB savings available via P4
-// if initial load remains over 2,000 KB after production build)
+**Unconfirmed:**
+```
+Chunk 0v_78g45r38tv (121,745 B, ~119 KB) -- Appeared Apr 29. Not present pre-wave-2.
+Possible sources: FE-M1 shared code, glass Button variants, or other wave-2 shared modules.
+Prod build required to classify as static or deferred.
 ```
 
 ## Dependency Analysis
 
 | Package | node_modules Size | Client Bundle Impact | Status |
 |---------|-------------------|----------------------|--------|
-| next + @next | 286 MB | Framework (required) | **16.2.4 -- current** |
-| @sentry/nextjs + @sentry/core | 67 MB | **~40-70 KB static (Replay removed)** | P8 applied; verify in prod build |
+| next + @next | 286 MB | Framework (required) | 16.2.4 -- current |
+| @sentry/nextjs + @sentry/core | 67 MB | ~83 KB static | P8 complete; 0 KB savings confirmed |
 | pdfjs-dist | 66 MB | 0 KB (devDependency) | Correct |
 | pdf-parse | 57 MB | 0 KB (devDependency) | Correct |
-| @opentelemetry | 46 MB | 0 KB (server-only telemetry) | No action |
-| lucide-react | 39 MB | ~50-75 KB (tree-shaken via `optimizePackageImports`) | **v1.8.0 -- current** |
-| posthog-js | 36 MB | ~180 KB (lazy-loaded in useEffect) | **1.369.5 -- current** |
+| @opentelemetry | 46 MB | 0 KB (server-only) | No action |
+| lucide-react | 39 MB | ~50-75 KB (tree-shaken via `optimizePackageImports`) | v1.8.0 -- current |
+| posthog-js | 36 MB | ~180 KB (lazy-loaded in useEffect) | 1.369.5 -- current, 0 advisories |
 | @napi-rs | 30 MB | 0 KB (native, server-only) | No action |
-| typescript | 24 MB | 0 KB (devDependency) | No action |
+| typescript | 24 MB | 0 KB (devDependency) | v6.0.3 -- current |
 | canvas | 19 MB | 0 KB (optionalDep, server-only) | No action |
-| @rolldown | 19 MB | 0 KB (dev/build-time) | No action |
-| stripe | 18 MB | ~10-15 KB (server-side only) | **22.0.2 -- current** |
-| @img | 16 MB | 0 KB (sharp, server-only) | No action |
+| stripe | 18 MB | ~10-15 KB (server-side only) | 22.0.2 -- current |
+| voyageai | -- | ~2 KB (server-side only) | Pinned 0.1.0 (intentional -- v0.2.x ESM broke dynamic import) |
 | core-js | 15 MB | ~112 KB (P1 browserslist applied) | No further action |
-| zod | ~5 MB | ~8-12 KB | Verify no surprise client bundling |
-| pino | ~5 MB | **0 KB** | Server-only, confirmed |
+| zod | ~5 MB | ~8-12 KB | OK -- v4.3.6 |
 
 ### Dependency Version Status
 
-Per Security Agent (Apr 25): YELLOW with 8 moderate advisories (postcss chain via transitive deps + uuid bounds-check via resend -> svix). Neither is exploitable.
+Per Security Agent (Apr 30): GREEN -- 1 moderate advisory (@anthropic-ai/sdk GHSA-p7fg-763f-g4gf, not exploitable -- Local Filesystem Memory Tool not used, Vercel ephemeral filesystem has no exploit path). 18 outdated production packages (all minor/patch, 0 CVEs). voyageai intentionally pinned at 0.1.0.
 
-| Package | Installed | Latest | Status |
-|---------|-----------|--------|--------|
-| posthog-js | 1.369.5 | 1.369.5 | Current |
-| next | 16.2.4 | 16.2.4 | Current |
-| @anthropic-ai/sdk | 0.90.x | 0.90.x | Current |
-| @supabase/supabase-js | 2.104.x | 2.104.x | Current |
-| react / react-dom | 19.2.5 | 19.2.5 | Current |
-| @sentry/nextjs | 10.49.0 | 10.49.x | Current |
-| @sentry/core | 10.49.0 (pinned) | 10.49.x | Current |
-| zod | 4.3.6 | 4.x | Current |
-| pino | 10.3.1 | 10.x | Current |
-| stripe | 22.0.2 | 22.0.2 | Current |
-| resend | 6.12.0 (installed) / ^6.12.2 (pinned) | 6.12.2 | Pin drift -- run `npm install` |
-| lucide-react | 1.8.0 | 1.8.0 | Current |
+| Package | Installed | Status |
+|---------|-----------|--------|
+| posthog-js | 1.369.5 | Current, 0 advisories |
+| next | 16.2.4 | Current |
+| @anthropic-ai/sdk | ^0.90.0 | 1 advisory (not exploitable); upgrade to 0.91.1 requires changelog review (breaking change) |
+| @supabase/supabase-js | ^2.104.0 | Patch updates available; safe to batch |
+| react / react-dom | ^19.2.5 | Current |
+| @sentry/nextjs | ^10.49.0 | Current |
+| voyageai | 0.1.0 (pinned) | Intentional pin -- DO NOT UPGRADE past 0.1.0 (v0.2.x ESM broke embeddings) |
+| zod | ^4.3.6 | Current |
+| lucide-react | ^1.8.0 | Current |
 
 ## Comparison: Trend History
 
-| Metric | Feb 7 | Mar 8 | Apr 4 | Apr 12 | Apr 17 | Apr 20 | Apr 24 | **Apr 25** | Trend |
-|--------|-------|-------|-------|--------|--------|--------|--------|------------|-------|
-| Total JS | 2,455 KB | 2,726 KB | 2,851 KB | 2,856 KB | 2,892 KB | 2,941 KB | 2,940 KB | **2,940 KB** | 0 KB |
-| Initial load (est.) | -- | -- | ~1,800 KB | ~1,936 KB | ~1,972 KB | ~2,066 KB | ~2,065 KB | **~2,065 KB** | 0 KB |
-| Deferred chunks | -- | -- | ~1,050 KB | ~920 KB | ~920 KB | ~875 KB | ~875 KB | **~875 KB** | 0 KB |
-| CSS | 130 KB | 122 KB | 123 KB | 123 KB | 123 KB | 125 KB | 125 KB | **125 KB** | 0 KB |
-| Prod deps | 27 | 31 | 31 | 31 | 31 | 34 | 35 | **35** | 0 |
-| node_modules | 856 MB | 865 MB | 896 MB | 908 MB | 930 MB | 1,047 MB | 1,047 MB | **1,047 MB** | 0 MB |
+| Metric | Feb 7 | Mar 8 | Apr 4 | Apr 12 | Apr 17 | Apr 25 (prod) | Apr 29 | **Apr 30** | Trend |
+|--------|-------|-------|-------|--------|--------|----------------|--------|------------|-------|
+| Total JS | 2,455 | 2,726 | 2,851 | 2,856 | 2,892 | **2,941** | 2,986 | **2,986 (dev)** | 0 KB this cycle |
+| Initial load | -- | -- | ~1,800 | ~1,936 | ~1,972 | **2,067** | 2,067 | **2,067 (prod)** | Stable -- no prod build |
+| Deferred chunks | -- | -- | ~1,050 | ~920 | ~920 | **~875** | ~875 | **~875** | Stable |
+| CSS | 130 | 122 | 123 | 123 | 123 | **125** | 125 | **125** | Stable |
+| Prod deps | 27 | 31 | 31 | 31 | 31 | **35** | 35 | **35** | Stable |
+| node_modules | 856 | 865 | 896 | 908 | 930 | **1,047** | 1,048 | **1,048 MB** | Stable |
 
-*Apr 25: Dev server cache. P8 savings (~30-50 KB) and recent source commits not reflected. Bundle has measured 0 KB change for 5 consecutive cycles -- entirely due to stale cache, not actual stability.*
+*2.7-month total growth (dev cache): 2,455 -> 2,986 KB (+531 KB, +21.6%).*
+*Wave-2 growth rate (Apr 23-29): ~+90 KB over 6 days. Headroom is exhausted -- P4 is the gate for wave-3.*
 
-**2.5-month total growth: 2,455 -> 2,940 KB (+485 KB, +19.8%).** Plateau in dev-cache measurements since Apr 20. First production build since Apr 4 is needed to establish a trustworthy baseline.
+## Optimization Backlog
 
-## Remaining Backlog
-
-### P4: Tree-shake Supabase realtime -- standby
-
-Deprioritized behind P8 production-build verification. If initial load after prod build is still above 2,000 KB, apply P4. If it drops below, close P4 as unnecessary.
-
-Combined P8 + P4 estimate: ~2,065 KB - ~30-50 KB (P8) - ~20-30 KB (P4) = ~1,985-2,015 KB. Right at or just below budget.
-
-### P5: i18n bundling -- CLOSED (Turbopack limitation)
-
-All 6 locales bundled in initial JS (~122 KB combined). Turbopack 16.x eagerly bundles `import()` calls in `'use client'` components. Accepted limitation.
-
-### P8: Disable Sentry session replay -- DONE (Apr 22), verification pending
-
-Implemented in `fef651f5`. Confirmed in source (Apr 25). Awaiting production build confirmation. Chunk 10 unchanged at 83 KB in dev cache -- expected to drop 30-50 KB in a fresh build.
-
-## Action Plan
-
-| Priority | Action | Estimated Savings | Effort | Status |
-|----------|--------|-------------------|--------|--------|
-| ~~P1~~ | ~~Browserslist~~ | ~~3 KB actual~~ | -- | DONE (Mar 29) |
-| ~~P2~~ | ~~Idle prefetch ElevenLabs~~ | ~~UX improvement~~ | -- | DONE (Mar 29) |
-| ~~P3~~ | ~~Defer Vercel Analytics/SpeedInsights~~ | ~~10-20 KB~~ | -- | DONE (Mar 30) |
-| ~~P5~~ | ~~Fix i18n bundling~~ | -- | -- | CLOSED -- Turbopack limitation |
-| ~~P6~~ | ~~Split JS budget~~ | -- | -- | DONE (Apr 4) |
-| ~~Security~~ | ~~posthog-js -> 1.369.x~~ | ~~2 advisories~~ | -- | DONE (e66e510, Apr 20) |
-| ~~P8~~ | ~~Disable Sentry session replay~~ | ~~30-50 KB~~ | -- | **DONE (fef651f5, Apr 22)** |
-| **CRITICAL** | **Run `rm -rf .next && npm run build`** | Confirmation | 3 min | 5th cycle requested |
-| **HIGH** | **Run `npm run build:analyze`** | Visibility | 3 min | Confirms Replay gone from static chunks |
-| **MEDIUM** | **P4: Tree-shake Supabase realtime** | ~20-30 KB | Medium | Standby -- only if prod build still over 2,000 KB |
-| **LOW** | postcss override for security | 0 KB bundle | Trivial | `"postcss": ">=8.5.10"` in overrides |
-| **LOW** | Sync resend pin via `npm install` | 0 KB | Trivial | Pin drift: 6.12.0 installed vs ^6.12.2 pinned |
-| **LOW** | node_modules budget to 1,100 MB | Process | Trivial | 47 MB overrun is structural (@sentry/nextjs 67 MB) |
+| Priority | Action | Estimated Savings | Status |
+|----------|--------|-------------------|--------|
+| ~~P1~~ | ~~Browserslist~~ | ~~3 KB actual~~ | DONE (Mar 29) |
+| ~~P2~~ | ~~Idle prefetch ElevenLabs~~ | ~~UX improvement~~ | DONE (Mar 29) |
+| ~~P3~~ | ~~Defer Vercel Analytics/SpeedInsights~~ | ~~10-20 KB~~ | DONE (Mar 30) |
+| ~~P5~~ | ~~Fix i18n bundling~~ | -- | CLOSED -- Turbopack limitation |
+| ~~P6~~ | ~~Split JS budget~~ | -- | DONE (Apr 4) |
+| ~~Security~~ | ~~posthog-js advisories~~ | ~~2 advisories~~ | DONE (e66e510, Apr 20) |
+| ~~P8~~ | ~~Disable Sentry session replay~~ | ~~0 KB confirmed~~ | DONE (fef651f5, Apr 22) |
+| **P4** | **Tree-shake Supabase realtime** | **~20-30 KB initial load** | **ACTIVE -- must implement before wave-3** |
+| **Process** | **Raise initial load budget to 2,100 KB** | **YELLOW -> GREEN** | Recommended alongside P4 |
+| **Process** | **Run prod build each cycle** | **Visibility** | Required -- dev cache is unreliable for budget decisions |
 
 ---

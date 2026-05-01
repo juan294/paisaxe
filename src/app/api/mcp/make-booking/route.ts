@@ -214,7 +214,9 @@ async function initiateCall(
       },
     };
 
-    // Use US regional endpoint to match Twilio webhook configuration
+    // Use US regional endpoint to match Twilio webhook configuration.
+    // 15-second timeout prevents hung requests from leaving pending_bookings rows
+    // stuck in 'initiating' state and causing 409 conflicts on retry (BE-H4).
     const response = await fetch(
       "https://api.us.elevenlabs.io/v1/convai/twilio/outbound-call",
       {
@@ -224,6 +226,7 @@ async function initiateCall(
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(15_000),
       }
     );
 

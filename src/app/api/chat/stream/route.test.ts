@@ -128,12 +128,7 @@ describe("POST /api/chat/stream", () => {
     expect(response.headers.get("Retry-After")).toBe("30");
   });
 
-  it("should return 400 when validation fails", async () => {
-    vi.mocked(validateChatRequest).mockReturnValue({
-      valid: false,
-      error: "Message is required",
-    });
-
+  it("should return 400 when validation fails (Zod catches missing message)", async () => {
     const request = new NextRequest("http://localhost:3000/api/chat/stream", {
       method: "POST",
       body: JSON.stringify({}),
@@ -143,10 +138,28 @@ describe("POST /api/chat/stream", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Message is required");
+    // Zod catches missing message before validateChatRequest
+    expect(data.error).toBe("Invalid request");
+    expect(data.details).toBeDefined();
   });
 
-  it("should return 400 when message exceeds max length", async () => {
+  it("should return 400 when message exceeds Zod max (500 chars)", async () => {
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "a".repeat(501) }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Invalid request");
+    expect(data.details).toBeDefined();
+  });
+
+  it("should return 400 when message exceeds MAX_INPUT_LENGTH (post-Zod security check)", async () => {
+    // To reach the MAX_INPUT_LENGTH branch, the request body must pass Zod (≤500 chars)
+    // but validateChatRequest must return a sanitized message that is longer.
     vi.mocked(validateChatRequest).mockReturnValue({
       valid: true,
       sanitizedMessage: "a".repeat(2001),
@@ -155,7 +168,7 @@ describe("POST /api/chat/stream", () => {
 
     const request = new NextRequest("http://localhost:3000/api/chat/stream", {
       method: "POST",
-      body: JSON.stringify({ message: "a".repeat(2001) }),
+      body: JSON.stringify({ message: "short" }),
     });
 
     const response = await POST(request);
@@ -835,5 +848,60 @@ describe("POST /api/chat/stream", () => {
       "[CHAT_STREAM_FAILURE]",
       expect.anything()
     );
+  });
+
+  describe("Zod runtime validation", () => {
+    it("should return 400 with Zod details for invalid JSON body", async () => {
+      const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: "not-json",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request");
+      expect(data.details).toBeDefined();
+      expect(generateEmbedding).not.toHaveBeenCalled();
+    });
+
+    it("should return 400 with details when message is null", async () => {
+      const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({ message: null }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request");
+      expect(data.details).toBeDefined();
+    });
+
+    it("should pass valid request with optional context and messageIndex", async () => {
+      vi.mocked(validateChatRequest).mockReturnValue({
+        valid: true,
+        sanitizedMessage: "hello",
+        sanitizedContext: "context",
+        messageIndex: 1,
+      });
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+      vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+      vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+      vi.mocked(streamChatResponse).mockImplementation(async function* () {
+        yield "chunk";
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({ message: "hello", context: "context", messageIndex: 1 }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+    });
   });
 });

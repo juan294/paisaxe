@@ -19,6 +19,7 @@ import type {
 
 import { queryPostHog, formatForHogQL } from "@/lib/posthog-query";
 import { buildDomainFilter } from "@/lib/analytics-filter";
+import { logger } from "@/lib/logger";
 
 function getEmptyData(fromParam: string, toParam: string) {
   return {
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
   const apiKey = process.env.POSTHOG_PERSONAL_API_KEY?.trim();
 
   if (!projectId || !apiKey) {
-    console.error("Missing POSTHOG_PROJECT_ID or POSTHOG_PERSONAL_API_KEY");
+    logger.error("Missing POSTHOG_PROJECT_ID or POSTHOG_PERSONAL_API_KEY");
     return NextResponse.json(
       { error: "Analytics configuration missing" },
       { status: 500 }
@@ -486,7 +487,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // Log concisely - full stack traces for timeouts are noisy
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.warn(`Analytics API: ${errorMessage}`);
+    logger.warn(`Analytics API: ${errorMessage}`);
 
     // Return empty data structure instead of error for query failures
     // (e.g., new project with no events yet, or PostHog timeout)

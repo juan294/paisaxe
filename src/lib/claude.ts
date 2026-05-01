@@ -1,5 +1,11 @@
+// PE-H4: Static import for production SDK path (avoids per-request dynamic import overhead).
+// Note: claude.ts uses curl in development/test (Turbopack workaround) and the SDK only in
+// production. The dynamic-import deferral that remains in route.ts is a separate concern
+// (documented in docs/engineering/turbopack-fix.md) and is intentionally left as-is there.
+import AnthropicSDK from "@anthropic-ai/sdk";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Chunk, ImageResult, Source } from "@/types";
+import { CHAT_MODEL } from "@/lib/models";
 
 interface AnthropicMessage {
   role: "user" | "assistant";
@@ -49,7 +55,6 @@ async function* streamWithSDK(
   maxTokens: number,
   options: StreamOptions = {}
 ): AsyncGenerator<string, void, unknown> {
-  const { default: AnthropicSDK } = await import("@anthropic-ai/sdk");
   const client = new AnthropicSDK({ maxRetries: 3 });
 
   const systemBlock = [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }];
@@ -252,7 +257,6 @@ async function callWithSDK(
   model: string,
   maxTokens: number
 ): Promise<Anthropic.Message> {
-  const { default: AnthropicSDK } = await import("@anthropic-ai/sdk");
   const client = new AnthropicSDK({ maxRetries: 3 });
 
   const systemBlock = [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }];
@@ -451,7 +455,7 @@ export async function generateChatResponse(
   const response = await callAnthropicAPI(
     systemPrompt,
     [{ role: "user", content: userContent }],
-    "claude-sonnet-4-20250514",
+    CHAT_MODEL,
     1024
   );
 
@@ -488,7 +492,7 @@ export async function* streamChatResponse(
   yield* streamAnthropicAPI(
     systemPrompt,
     [{ role: "user", content: userContent }],
-    "claude-sonnet-4-20250514",
+    CHAT_MODEL,
     1024,
     options
   );

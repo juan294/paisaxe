@@ -97,6 +97,7 @@ export default defineConfig({
       MAINTENANCE_MODE: "false",
       STRIPE_SECRET_KEY: "sk_test_dummy_for_e2e",
       STRIPE_DAY_PASS_PRICE_ID: "price_test_dummy_for_e2e",
+      PLAYWRIGHT_TEST_ORIGIN: baseURL,
     },
   },
 });

@@ -272,6 +272,8 @@ The admin panel uses Supabase Auth (Google OAuth) with role-based access control
 
 All admin API routes (`/api/admin/*`) validate the session cookie and confirm the user holds the `admin` role. Cookies are sent automatically by the browser on every fetch request. Requests from unauthenticated users or users without the `admin` role return 401/403 errors. On the client side, the `useAdminRole()` hook queries the user's role via Row Level Security to control UI access.
 
+Admin auth uses two HOFs internally: `withAdmin` (service-role client, bypasses RLS, used for write operations) and `withAdminRead` (cookie-scoped client, respects RLS, used for read-only GET routes). Both include a 30-second in-process LRU cache to avoid redundant Supabase round-trips.
+
 ### Story Management
 
 **Story grid** — The Stories tab shows all stories in a responsive grid (1-4 columns depending on screen width). Every 5th card spans 2 columns for visual rhythm.
@@ -321,6 +323,14 @@ Uploaded files are stored in the `story-images` Supabase Storage bucket with a u
 **Curation status toggle** — The dialog shows the current status badge and a button to switch between "Mark as approved" and "Mark as pending".
 
 **Placeholder image system** — Stories without real images are assigned consistent placeholder images from a curated pool of Unsplash photos (8 per category). The assignment is deterministic based on the story slug, so the same story always gets the same placeholder. A blue "Placeholder" badge in the admin grid flags these stories as needing real images.
+
+### Story Details
+
+The story editor **Details tab** lets admins edit title, URL slug, subtitle, description, and category. Optional fields (collapsible) include location (region), visit duration, source PDF reference, and up to 5 question prompts per story.
+
+### Story Translations
+
+The story editor **Translations tab** manages multilingual story content for 5 target locales (en, fr, de, pt, ast). Admins can auto-generate translations via Claude for all locales at once or regenerate individual locales. Each locale shows a status badge (Complete / Pending / Translating / Failed). Translations can also be edited manually and are saved together with other story changes.
 
 ### Feature Flags
 
@@ -589,7 +599,10 @@ Both produce 1200x630 PNG images. The root image cascades to child routes that d
 
 ## Infrastructure
 
-**Health check** (`GET /api/health`) — Returns service status (healthy/degraded), uptime, app version, Supabase connectivity with latency, and database storage usage. Reports "degraded" if Supabase connection fails or database usage exceeds 80% of the 8 GB Pro tier limit. Always returns HTTP 200 to work with uptime monitors. Monitored every 5 minutes by [Upptime](https://juan294.github.io/paisaxe-upptime/).
+**Health checks:**
+
+- `GET /api/health/live` — Liveness probe. Always returns HTTP 200 with `{ "status": "ok" }`. Used by Upptime and develop-smoke CI.
+- `GET /api/health` — Diagnostics endpoint. Returns service status (healthy/degraded), Supabase connectivity with latency, database storage usage, and cron auth state. Returns HTTP 200 when healthy, HTTP 503 when degraded. Reports "degraded" if Supabase connection fails or database usage exceeds 80% of the 8 GB Pro tier limit. Monitored every 5 minutes by [Upptime](https://juan294.github.io/paisaxe-upptime/).
 
 **Database size monitoring** — The health endpoint reports `database.size_mb`, `database.limit_mb` (8192), and `database.usage_percent`. Useful for tracking storage growth as content expands.
 

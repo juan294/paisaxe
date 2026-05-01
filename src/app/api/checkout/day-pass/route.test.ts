@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Set env vars before any imports that might use them
 vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
 vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_123");
@@ -331,5 +339,79 @@ describe("POST /api/checkout/day-pass", () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to create checkout session");
     expect(data.details).toBe("Unknown error");
+  });
+
+  describe("Zod validation for returnTo", () => {
+    it("should accept a valid returnTo slug via Zod schema", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1", email: "user@example.com" } },
+        error: null,
+      });
+      vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+        "https://checkout.stripe.com/abc"
+      );
+
+      const request = createRequest({ origin: "https://paisaxe.es" }, { returnTo: "oviedo-tour" });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.url).toBeDefined();
+    });
+
+    it("should silently ignore returnTo that fails Zod regex (path traversal)", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1", email: "user@example.com" } },
+        error: null,
+      });
+      vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+        "https://checkout.stripe.com/abc"
+      );
+
+      // Fails Zod regex: starts with digit but contains path segment separator
+      const request = createRequest(
+        { origin: "https://paisaxe.es" },
+        { returnTo: "../../admin" }
+      );
+      await POST(request);
+
+      expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({ successUrl: "https://paisaxe.es/pricing/success" })
+      );
+    });
+
+    it("should silently ignore non-string returnTo", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1", email: "user@example.com" } },
+        error: null,
+      });
+      vi.mocked(createDayPassCheckoutSession).mockResolvedValue(
+        "https://checkout.stripe.com/abc"
+      );
+
+      const request = createRequest({ origin: "https://paisaxe.es" }, { returnTo: 42 as unknown as string });
+      await POST(request);
+
+      expect(createDayPassCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({ successUrl: "https://paisaxe.es/pricing/success" })
+      );
+    });
+  });
+
+  it("should use logger.error (not console.error) on unhandled POST error", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-1", email: "user@example.com" } },
+      error: null,
+    });
+    vi.mocked(createDayPassCheckoutSession).mockRejectedValue(new Error("Stripe unavailable"));
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = createRequest({ origin: "https://paisaxe.es" });
+    const response = await POST(request);
+    consoleSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

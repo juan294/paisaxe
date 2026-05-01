@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 
 interface ToolbarOverflowMenuProps {
   children: React.ReactNode;
@@ -95,8 +96,9 @@ export function ToolbarOverflowMenu({ children }: ToolbarOverflowMenuProps) {
 
   return (
     <div ref={menuRef} className="relative md:hidden">
-      <button
+      <Button
         ref={triggerRef}
+        variant="glassIcon"
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
@@ -104,10 +106,9 @@ export function ToolbarOverflowMenu({ children }: ToolbarOverflowMenuProps) {
         aria-label={t("accessibility.more_options")}
         aria-expanded={isOpen}
         aria-haspopup="true"
-        className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
       >
         <MoreVertical className="h-5 w-5 text-white" />
-      </button>
+      </Button>
 
       {isOpen && (
         <div

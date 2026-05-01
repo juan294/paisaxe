@@ -15,7 +15,7 @@ const mockGet = vi.fn();
 const mockSet = vi.fn();
 vi.mock("./embedding-cache", () => ({
   EmbeddingCache: vi.fn(function () {
-    return { get: mockGet, set: mockSet, clear: vi.fn() };
+    return { get: mockGet, set: mockSet };
   }),
 }));
 
@@ -26,7 +26,8 @@ describe("embeddings", () => {
     mockContextualizedEmbed.mockReset();
     mockGet.mockReset();
     mockSet.mockReset();
-    mockGet.mockReturnValue(null);
+    mockGet.mockResolvedValue(null);
+    mockSet.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -43,7 +44,7 @@ describe("embeddings", () => {
   describe("generateEmbedding", () => {
     it("should return embedding for a single text", async () => {
       const mockEmbedding = Array(512).fill(0.1);
-      mockGet.mockReturnValue(null);
+      mockGet.mockResolvedValue(null);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
       });
@@ -61,7 +62,7 @@ describe("embeddings", () => {
     });
 
     it("should throw error when no embedding is returned", async () => {
-      mockGet.mockReturnValue(null);
+      mockGet.mockResolvedValue(null);
       mockEmbed.mockResolvedValue({ data: [] });
 
       const { generateEmbedding } = await import("./embeddings");
@@ -72,7 +73,7 @@ describe("embeddings", () => {
     });
 
     it("should throw error when data is null", async () => {
-      mockGet.mockReturnValue(null);
+      mockGet.mockResolvedValue(null);
       mockEmbed.mockResolvedValue({ data: null });
 
       const { generateEmbedding } = await import("./embeddings");
@@ -83,7 +84,7 @@ describe("embeddings", () => {
     });
 
     it("should throw error when embedding is undefined", async () => {
-      mockGet.mockReturnValue(null);
+      mockGet.mockResolvedValue(null);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: undefined }],
       });
@@ -97,7 +98,7 @@ describe("embeddings", () => {
 
     it("should return cached embedding without API call", async () => {
       const cachedEmbedding = Array(512).fill(0.5);
-      mockGet.mockReturnValue(cachedEmbedding);
+      mockGet.mockResolvedValue(cachedEmbedding);
 
       const { generateEmbedding } = await import("./embeddings");
       const result = await generateEmbedding("cached text");
@@ -108,7 +109,7 @@ describe("embeddings", () => {
 
     it("should cache embedding after API call", async () => {
       const mockEmbedding = Array(512).fill(0.1);
-      mockGet.mockReturnValue(null);
+      mockGet.mockResolvedValue(null);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
         usage: { totalTokens: 10 },
@@ -123,7 +124,7 @@ describe("embeddings", () => {
     it("should log token usage", async () => {
       const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
       const mockEmbedding = Array(512).fill(0.1);
-      mockGet.mockReturnValue(null);
+      mockGet.mockResolvedValue(null);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
         usage: { totalTokens: 42 },

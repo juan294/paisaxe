@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { useTranslation } from "@/lib/i18n";
 
 export default function AdminError({
@@ -12,6 +13,7 @@ export default function AdminError({
 }) {
   useEffect(() => {
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   const { t } = useTranslation();

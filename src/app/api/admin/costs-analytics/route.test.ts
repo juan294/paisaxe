@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock dependencies
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
@@ -1362,5 +1370,30 @@ describe("POST /api/admin/costs-analytics", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to create cost entry");
+  });
+
+  // -----------------------------------------------------------------------
+  // SE-M3 / DO-H3: logger migration — uses structured logger, not console
+  // -----------------------------------------------------------------------
+
+  it("should use logger.error (not console.error) on unhandled GET error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    vi.mocked(fetchAnthropicCosts).mockRejectedValue(new Error("unexpected"));
+    vi.mocked(fetchTwilioCosts).mockResolvedValue(null);
+    vi.mocked(fetchElevenLabsCosts).mockResolvedValue(null);
+    vi.mocked(fetchManualCosts).mockResolvedValue([]);
+    vi.mocked(fetchAnthropicCostsByDay).mockResolvedValue([]);
+    vi.mocked(generateRecurringCosts).mockReturnValue([]);
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const request = new NextRequest("http://localhost/api/admin/costs-analytics");
+    const response = await GET(request);
+
+    expect(response.status).toBe(500);
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 });

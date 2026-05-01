@@ -290,5 +290,41 @@ describe("twilio-costs", () => {
         expect.any(Object)
       );
     });
+
+    it("passes AbortSignal.timeout(8000) to fetch (#252)", async () => {
+      process.env.TWILIO_ACCOUNT_SID = "AC123";
+      process.env.TWILIO_AUTH_TOKEN = "token123";
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ usage_records: [] }),
+      });
+
+      await fetchTwilioCostsByDay("2024-01-01", "2024-01-31");
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+    });
+  });
+
+  describe("fetchTwilioCosts AbortSignal (#252)", () => {
+    it("passes AbortSignal.timeout(8000) to fetch", async () => {
+      process.env.TWILIO_ACCOUNT_SID = "AC123";
+      process.env.TWILIO_AUTH_TOKEN = "token123";
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ usage_records: [] }),
+      });
+
+      await fetchTwilioCosts("2024-01-01", "2024-01-31");
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+    });
   });
 });

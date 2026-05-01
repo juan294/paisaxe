@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type { StorySuggestionRow } from "@/types/suggestions";
 
+const logger = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+}));
+
+vi.mock("@/lib/logger", () => ({ logger }));
+
 // Mock admin auth
 vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
@@ -259,6 +267,39 @@ describe("/api/admin/suggestions/[id]", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
     });
+
+    describe("Zod validation", () => {
+      it("should return 400 for invalid status value (Zod catches it)", async () => {
+        const request = createRequest({ status: "invalid-status-value" });
+
+        const response = await PUT(request, { params });
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.error).toContain("Invalid status");
+      });
+
+      it("should return 400 with Zod details for adminNotes exceeding max length", async () => {
+        const request = createRequest({ adminNotes: "x".repeat(2001) });
+
+        const response = await PUT(request, { params });
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.error).toBe("Invalid request");
+        expect(data.details).toBeDefined();
+      });
+
+      it("should return 400 when body is empty object (no updates)", async () => {
+        const request = createRequest({});
+
+        const response = await PUT(request, { params });
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.error).toBe("No updates provided");
+      });
+    });
   });
 
   describe("DELETE", () => {
@@ -337,5 +378,20 @@ describe("/api/admin/suggestions/[id]", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
     });
+  });
+
+  it("should use logger.error (not console.error) on unhandled DELETE error", async () => {
+    mockCreateAdminClientThrows = true;
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const request = new NextRequest("http://localhost/api/admin/suggestions/suggestion-1", {
+      method: "DELETE",
+    });
+
+    await DELETE(request, { params: Promise.resolve({ id: "suggestion-1" }) });
+    consoleSpy.mockRestore();
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 });

@@ -12,26 +12,73 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 import { createClient } from "@supabase/supabase-js";
 
-const TRANSLATION_LOCALES = ["en", "fr", "de", "pt", "ast"] as const;
-type StoryLocale = (typeof TRANSLATION_LOCALES)[number];
+export const TRANSLATION_LOCALES = ["en", "fr", "de", "pt", "ast"] as const;
+export type StoryLocale = (typeof TRANSLATION_LOCALES)[number];
 
-interface TranslationStatus {
+export interface TranslationStatus {
   status: "pending" | "translating" | "complete" | "failed";
   error?: string;
   updatedAt?: string;
 }
 
-interface StoryTranslation {
+export interface StoryTranslation {
   title: string;
   subtitle: string;
   description: string;
 }
 
-interface StoryMetadata {
+export interface StoryMetadata {
   translations?: Partial<Record<StoryLocale, StoryTranslation>>;
   translation_status?: Partial<Record<StoryLocale, TranslationStatus>>;
   last_translated_at?: string;
   [key: string]: unknown;
+}
+
+/**
+ * Determine which locales have translation content (any non-empty field).
+ * Pure function — no I/O.
+ */
+export function localesWithContent(metadata: StoryMetadata): StoryLocale[] {
+  const translations = metadata.translations ?? {};
+  return TRANSLATION_LOCALES.filter((locale) => {
+    const t = translations[locale];
+    return t && (t.title?.trim() || t.subtitle?.trim() || t.description?.trim());
+  });
+}
+
+/**
+ * Determine which locales have content but missing or non-"complete" status.
+ * Pure function — no I/O.
+ */
+export function localesNeedingStatusUpdate(metadata: StoryMetadata): StoryLocale[] {
+  const existingStatus = metadata.translation_status ?? {};
+  return localesWithContent(metadata).filter((locale) => {
+    const status = existingStatus[locale];
+    return !status || status.status !== "complete";
+  });
+}
+
+/**
+ * Build the updated metadata object with translation_status set to "complete"
+ * for the given locales. Does not mutate input.
+ * Pure function — no I/O.
+ */
+export function buildUpdatedMetadata(
+  metadata: StoryMetadata,
+  localesToMark: StoryLocale[],
+  now: string,
+): StoryMetadata {
+  const newStatus: Partial<Record<StoryLocale, TranslationStatus>> = {
+    ...(metadata.translation_status ?? {}),
+  };
+  for (const locale of localesToMark) {
+    newStatus[locale] = { status: "complete", updatedAt: now };
+  }
+  return {
+    ...metadata,
+    translation_status: newStatus,
+    last_translated_at: metadata.last_translated_at ?? now,
+  };
 }
 
 async function main() {
@@ -70,33 +117,9 @@ async function main() {
 
   for (const story of stories) {
     const metadata = (story.metadata || {}) as StoryMetadata;
-    const translations = metadata.translations || {};
-    const existingStatus = metadata.translation_status || {};
 
-    // Check which locales have translations but missing/incorrect status
-    const localesNeedingUpdate: StoryLocale[] = [];
-    const localesWithTranslations: StoryLocale[] = [];
-
-    for (const locale of TRANSLATION_LOCALES) {
-      const translation = translations[locale];
-      const status = existingStatus[locale];
-
-      // Check if translation exists and has content
-      const hasTranslation = translation && (
-        translation.title?.trim() ||
-        translation.subtitle?.trim() ||
-        translation.description?.trim()
-      );
-
-      if (hasTranslation) {
-        localesWithTranslations.push(locale);
-
-        // Check if status is missing or not "complete"
-        if (!status || status.status !== "complete") {
-          localesNeedingUpdate.push(locale);
-        }
-      }
-    }
+    const localesWithTranslations = localesWithContent(metadata);
+    const localesNeedingUpdate = localesNeedingStatusUpdate(metadata);
 
     if (localesWithTranslations.length === 0) {
       noTranslationsCount++;
@@ -108,22 +131,8 @@ async function main() {
       continue;
     }
 
-    // Update the status for locales that need it
-    const newStatus: Partial<Record<StoryLocale, TranslationStatus>> = { ...existingStatus };
     const now = new Date().toISOString();
-
-    for (const locale of localesNeedingUpdate) {
-      newStatus[locale] = {
-        status: "complete",
-        updatedAt: now,
-      };
-    }
-
-    const updatedMetadata: StoryMetadata = {
-      ...metadata,
-      translation_status: newStatus,
-      last_translated_at: metadata.last_translated_at || now,
-    };
+    const updatedMetadata = buildUpdatedMetadata(metadata, localesNeedingUpdate, now);
 
     const { error: updateError } = await supabase
       .from("stories")
@@ -147,4 +156,11 @@ async function main() {
   console.log("=".repeat(60));
 }
 
-main().catch(console.error);
+// Only run when invoked directly, not when imported by tests
+const isDirectExecution =
+  process.argv[1]?.endsWith("sync-translation-status.ts") ||
+  process.argv[1]?.endsWith("sync-translation-status.js");
+
+if (isDirectExecution) {
+  main().catch(console.error);
+}

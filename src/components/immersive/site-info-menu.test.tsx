@@ -1,7 +1,38 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { SiteInfoMenu } from "./site-info-menu";
 import { createMockT } from "@/test/i18n-mock";
+
+// PE-M6: next/image must be used for Google profile photos (not raw <img>)
+vi.mock("next/image", () => ({
+  default: ({
+    src,
+    alt,
+    width,
+    height,
+    className,
+    referrerPolicy,
+  }: {
+    src: string;
+    alt: string;
+    width?: number;
+    height?: number;
+    className?: string;
+    referrerPolicy?: React.HTMLAttributeReferrerPolicy;
+  }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+      referrerPolicy={referrerPolicy}
+      data-testid="next-image"
+    />
+  ),
+}));
 
 const mockT = createMockT();
 
@@ -135,7 +166,7 @@ describe("SiteInfoMenu", () => {
       id: "user-123",
       email: "test@example.com",
       name: "Test User",
-      avatarUrl: "https://example.com/avatar.jpg",
+      avatarUrl: "https://lh3.googleusercontent.com/avatar.jpg",
     };
 
     beforeEach(() => {
@@ -151,7 +182,7 @@ describe("SiteInfoMenu", () => {
     it("shows user avatar as trigger", () => {
       render(<SiteInfoMenu />);
       const avatar = screen.getByAltText("Test User");
-      expect(avatar).toHaveAttribute("src", "https://example.com/avatar.jpg");
+      expect(avatar).toHaveAttribute("src", "https://lh3.googleusercontent.com/avatar.jpg");
     });
 
     it("shows user name and email in panel", () => {
@@ -189,7 +220,7 @@ describe("SiteInfoMenu", () => {
       render(<SiteInfoMenu />);
       // Trigger button: img alt should fall back to "Avatar"
       const triggerImg = screen.getByAltText("Avatar");
-      expect(triggerImg).toHaveAttribute("src", "https://example.com/avatar.jpg");
+      expect(triggerImg).toHaveAttribute("src", "https://lh3.googleusercontent.com/avatar.jpg");
 
       // Open panel to verify dropdown avatar also has "Avatar" fallback
       fireEvent.click(screen.getByRole("button"));
@@ -268,6 +299,23 @@ describe("SiteInfoMenu", () => {
 
       expect(screen.getByText("Test User")).toBeInTheDocument();
       expect(screen.queryByText("test@example.com")).not.toBeInTheDocument();
+    });
+
+    // PE-M6: avatar images must use next/image (data-testid="next-image"), not raw <img>
+    it("PE-M6: trigger avatar uses next/image component, not raw img", () => {
+      render(<SiteInfoMenu />);
+      const nextImages = screen.getAllByTestId("next-image");
+      // At minimum the trigger button avatar should be a next/image
+      expect(nextImages.length).toBeGreaterThanOrEqual(1);
+      expect(nextImages[0]).toHaveAttribute("src", "https://lh3.googleusercontent.com/avatar.jpg");
+    });
+
+    it("PE-M6: panel avatar uses next/image component, not raw img", () => {
+      render(<SiteInfoMenu />);
+      fireEvent.click(screen.getByRole("button"));
+      const nextImages = screen.getAllByTestId("next-image");
+      // Both trigger and panel avatars should be next/image
+      expect(nextImages.length).toBeGreaterThanOrEqual(2);
     });
 
     it("shows loading skeleton when auth is loading", () => {

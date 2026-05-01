@@ -14,14 +14,22 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
 const voyageApiKey = process.env.VOYAGE_API_KEY!;
 
-if (!supabaseUrl || !supabaseServiceKey) {
+// Only enforce env vars when running as a script (not when imported by tests)
+const isDirectExecution =
+  process.argv[1]?.endsWith("seed-database.ts") ||
+  process.argv[1]?.endsWith("seed-database.js");
+
+if (isDirectExecution && (!supabaseUrl || !supabaseServiceKey)) {
   console.error("Missing required environment variables:");
   if (!supabaseUrl) console.error("  - NEXT_PUBLIC_SUPABASE_URL");
   if (!supabaseServiceKey) console.error("  - SUPABASE_SERVICE_KEY");
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Supabase client — only meaningful at runtime, not during test imports
+const supabase = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null as unknown as ReturnType<typeof createClient>;
 
 // Voyage client is optional for stories-only seeding
 let voyage: VoyageAIClient | null = null;
@@ -35,7 +43,7 @@ const EMBEDDING_DIMENSIONS = 512; // Matryoshka embeddings: reduce from 1024 to 
 const MAX_RETRIES = 3; // Max retries on 429 rate limit errors
 const INITIAL_RETRY_DELAY = 1000; // Start with 1s, doubles each retry (exponential backoff)
 
-interface Chunk {
+export interface Chunk {
   content: string;
   sourcePdf: string;
   pageNumber: number;
@@ -318,6 +326,17 @@ const filteredGenerated = GENERATED_STORIES
 
 ALL_STORIES.push(...filteredGenerated);
 
+/**
+ * Determine whether an error represents a 429 rate-limit response.
+ * Pure helper — no side effects.
+ */
+export function isRateLimitError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message.includes("429") || error.message.includes("rate limit"))
+  );
+}
+
 async function generateContextualizedEmbeddingsWithRetry(
   texts: string[],
   sourcePdf: string
@@ -345,12 +364,8 @@ async function generateContextualizedEmbeddingsWithRetry(
         totalTokens: result.usage?.totalTokens || 0,
       };
     } catch (error: unknown) {
-      const isRateLimited =
-        error instanceof Error &&
-        (error.message.includes("429") || error.message.includes("rate limit"));
-
-      if (isRateLimited && attempt < MAX_RETRIES) {
-        const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt);
+      if (isRateLimitError(error) && attempt < MAX_RETRIES) {
+        const delay = computeRetryDelay(attempt, INITIAL_RETRY_DELAY);
         console.warn(`Rate limited (429). Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue;
@@ -425,10 +440,19 @@ async function clearStories(): Promise<void> {
 }
 
 /**
+ * Calculate exponential backoff delay in milliseconds.
+ * @param attempt    Zero-based attempt index (0 = first retry)
+ * @param initialDelay  Base delay in ms (doubles each attempt)
+ */
+export function computeRetryDelay(attempt: number, initialDelay: number): number {
+  return initialDelay * Math.pow(2, attempt);
+}
+
+/**
  * Group chunks by their source PDF so that chunks from the same document
  * can be embedded together with contextual awareness.
  */
-function groupChunksByPdf(chunks: Chunk[]): Map<string, Chunk[]> {
+export function groupChunksByPdf(chunks: Chunk[]): Map<string, Chunk[]> {
   const groups = new Map<string, Chunk[]>();
   for (const chunk of chunks) {
     const existing = groups.get(chunk.sourcePdf);
@@ -592,4 +616,6 @@ async function main(): Promise<void> {
   console.log("\n=== Seeding complete ===");
 }
 
-main().catch(console.error);
+if (isDirectExecution) {
+  main().catch(console.error);
+}

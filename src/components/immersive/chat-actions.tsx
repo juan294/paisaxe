@@ -5,6 +5,7 @@ import { Phone, MapPin, Copy, Check } from "lucide-react";
 import { detectChatActions } from "@/lib/chat-action-detection";
 import { useTranslation } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -25,6 +26,7 @@ interface ChatActionsProps {
 export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Find the last assistant message
@@ -52,9 +54,11 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
 
   const handleCopy = async () => {
     // Format conversation for clipboard
+    const userLabel = t("voice.you");
+    const assistantLabel = t("chat.assistant_label");
     const conversationText = messages
       .map((msg) => {
-        const label = msg.role === "user" ? "You" : "Paisaxe";
+        const label = msg.role === "user" ? userLabel : assistantLabel;
         return `${label}: ${msg.content}`;
       })
       .join("\n\n");
@@ -63,20 +67,20 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
       await navigator.clipboard.writeText(conversationText);
       if (timerRef.current) clearTimeout(timerRef.current);
       setCopied(true);
+      setCopyError(false);
       timerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Silently ignore clipboard errors
+      // UX-L3 (#523): Show brief error feedback instead of silently ignoring
+      if (timerRef.current) clearTimeout(timerRef.current);
+      setCopyError(true);
+      timerRef.current = setTimeout(() => setCopyError(false), 2000);
     }
   };
 
-  // Icon-only button style
+  // Icon-only button style — uses glass variant base + animation + smaller p-2 padding
   const iconButtonClass = cn(
-    "p-2 rounded-full",
-    "bg-white/10 hover:bg-white/20 backdrop-blur-sm",
-    "text-white",
-    "transition-all duration-200 motion-reduce:transition-none",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
-    // Smooth fade-in animation
+    buttonVariants({ variant: "glassIcon" }),
+    "p-2",
     "animate-in fade-in slide-in-from-bottom-2 duration-300"
   );
 
@@ -126,10 +130,11 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
         {/* Copy conversation button - always visible when messages exist */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
+            <Button
+              variant="glassIcon"
               onClick={handleCopy}
               aria-label={t("chat.copy_conversation")}
-              className={iconButtonClass}
+              className="p-2 animate-in fade-in slide-in-from-bottom-2 duration-300"
               style={{ animationDelay: `${(actions.phones.length + (actions.addresses.length > 0 ? 1 : 0)) * 50}ms` }}
             >
               {copied ? (
@@ -137,12 +142,22 @@ export function ChatActions({ messages, isLoading = false }: ChatActionsProps) {
               ) : (
                 <Copy className="h-4 w-4" />
               )}
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>
-            {copied ? t("chat.copied") : t("chat.copy_conversation")}
+            {copied
+              ? t("chat.copied")
+              : copyError
+                ? t("chat.copy_error")
+                : t("chat.copy_conversation")}
           </TooltipContent>
         </Tooltip>
+        {/* UX-L3: Inline error message when clipboard fails (visible without hover) */}
+        {copyError && (
+          <span role="alert" className="text-xs text-white/70 px-1">
+            {t("chat.copy_error")}
+          </span>
+        )}
       </div>
     </TooltipProvider>
   );

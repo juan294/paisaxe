@@ -272,44 +272,52 @@ describe("StoryViewer", () => {
       expect(querySelectorSpy).not.toHaveBeenCalled();
     });
 
+    // UX-L2 (#522): Hero images are decorative (title announced by adjacent <h1>)
+    // so alt="" — query by src or the specific img within the background div instead.
     it("should render story image with blur placeholder", async () => {
-      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const img = screen.getByAltText("Lagos de Covadonga");
+      // Hero image is decorative (alt=""), find it by src
+      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-placeholder", "blur");
     });
 
     it("PE-M2: should set priority=true only on the first story (index 0)", async () => {
-      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 0 })} />);
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 0 })} />);
 
-      const img = screen.getByAltText("Lagos de Covadonga");
+      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-priority", "true");
     });
 
     it("PE-M2: should set priority=false for stories after index 0", async () => {
-      await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
 
-      const img = screen.getByAltText("Oviedo Cathedral");
+      const img = container.querySelector(`img[src="${mockStories[1].image}"]`);
+      expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-priority", "false");
     });
 
     it("should use darkPlaceholder fallback when story has no blurDataUrl", async () => {
-      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const img = screen.getByAltText("Lagos de Covadonga");
+      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      expect(img).not.toBeNull();
       // Should use the dark SVG placeholder as fallback
-      expect(img.getAttribute("data-blur-data-url")).toMatch(/^data:image\/svg\+xml/);
+      expect(img!.getAttribute("data-blur-data-url")).toMatch(/^data:image\/svg\+xml/);
     });
 
     it("should use story blurDataUrl when available", async () => {
       const storiesWithBlur = mockStories.map((s, i) =>
         i === 0 ? { ...s, blurDataUrl: "data:image/webp;base64,mockblur" } : s
       );
-      await renderWithAuth(
+      const { container } = await renderWithAuth(
         <StoryViewer {...getDefaultProps({ stories: storiesWithBlur })} />
       );
 
-      const img = screen.getByAltText("Lagos de Covadonga");
+      const img = container.querySelector(`img[src="${storiesWithBlur[0].image}"]`);
+      expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-blur-data-url", "data:image/webp;base64,mockblur");
     });
   });
@@ -555,7 +563,7 @@ describe("StoryViewer", () => {
   });
 
   describe("info toggle", () => {
-    it("should toggle info visibility when clicking screen on desktop (pointer: fine)", async () => {
+    it("should toggle info visibility when clicking the overlay button on desktop (pointer: fine)", async () => {
       // Simulate desktop device with pointer: fine
       vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
         matches: query === "(pointer: fine)",
@@ -570,10 +578,10 @@ describe("StoryViewer", () => {
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const mainContainer = screen.getByRole("main");
-      fireEvent.click(mainContainer);
+      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
+      fireEvent.click(infoToggleBtn);
 
-      // After clicking on desktop, info should be hidden
+      // After clicking the overlay button on desktop, info should be hidden
       const bottomContent = screen
         .getByText("Lagos de Covadonga")
         .closest("article[class*='bottom-0']");
@@ -630,7 +638,7 @@ describe("StoryViewer", () => {
       expect(controlsNav).toHaveClass("opacity-0");
     });
 
-    it("should hide upper-right toolbar controls when clicking screen on desktop", async () => {
+    it("should hide upper-right toolbar controls when clicking the overlay button on desktop", async () => {
       // Simulate desktop device with pointer: fine
       vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
         matches: query === "(pointer: fine)",
@@ -646,11 +654,11 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
-      const mainContainer = screen.getByRole("main");
+      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
 
-      fireEvent.click(mainContainer);
+      fireEvent.click(infoToggleBtn);
 
-      // After clicking on desktop, upper-right controls should be hidden
+      // After clicking the overlay button on desktop, upper-right controls should be hidden
       expect(controlsNav).toHaveClass("opacity-0");
     });
 
@@ -864,10 +872,10 @@ describe("StoryViewer", () => {
   });
 
   describe("author pill", () => {
-    it("should render the pill with initial '</> JG' text", async () => {
+    it("should render the pill with initial 'JG' text", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+      expect(screen.getByText(/JG/)).toBeInTheDocument();
     });
 
     it("should render the pill with aria-label for accessibility", async () => {
@@ -979,8 +987,8 @@ describe("StoryViewer", () => {
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // With reduced motion, typewriter stays at initial "</> JG" — no animation
-      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+      // With reduced motion, typewriter stays at initial "JG" — no animation
+      expect(screen.getByText(/JG/)).toBeInTheDocument();
 
       // Advance time — should NOT cycle
       await act(async () => {
@@ -988,7 +996,7 @@ describe("StoryViewer", () => {
       });
 
       // Still shows initial text
-      expect(screen.getByText(/<\/> JG/)).toBeInTheDocument();
+      expect(screen.getByText(/JG/)).toBeInTheDocument();
 
       // Restore
       vi.restoreAllMocks();
@@ -1128,8 +1136,87 @@ describe("StoryViewer", () => {
       const shareItem = screen.getByText("Compartir");
       fireEvent.click(shareItem);
 
+      // UX-B1: must use singular `/story/<slug>` to match the actual route,
+      // never the plural `/stories/<id>` (which produces a 404).
       expect(mockWriteText).toHaveBeenCalledWith(
-        expect.stringContaining("/stories/story-1")
+        expect.stringMatching(/\/story\/(story-1-slug|story-1)$/)
+      );
+      expect(mockWriteText).not.toHaveBeenCalledWith(
+        expect.stringContaining("/stories/")
+      );
+    });
+
+    it("UX-B1: should build share URL using slug (not id) when slug is available", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "story_sharing"
+      );
+
+      const mockWriteText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: mockWriteText },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(navigator, "share", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+
+      const storiesWithSlugs: Story[] = [
+        { ...mockStories[0], slug: "lagos-de-covadonga" },
+        ...mockStories.slice(1),
+      ];
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            stories: storiesWithSlugs,
+            allStories: storiesWithSlugs,
+          })}
+        />
+      );
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      const shareItem = screen.getByText("Compartir");
+      fireEvent.click(shareItem);
+
+      expect(mockWriteText).toHaveBeenCalledWith(
+        expect.stringContaining("/story/lagos-de-covadonga")
+      );
+    });
+
+    it("UX-B1: should fall back to story id when slug is missing", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "story_sharing"
+      );
+
+      const mockWriteText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: mockWriteText },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(navigator, "share", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+
+      // Stories without slugs (default mockStories have no slug field)
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      const shareItem = screen.getByText("Compartir");
+      fireEvent.click(shareItem);
+
+      // Falls back to id under the singular `/story/` path
+      expect(mockWriteText).toHaveBeenCalledWith(
+        expect.stringContaining("/story/story-1")
       );
     });
   });
@@ -1215,6 +1302,26 @@ describe("StoryViewer", () => {
     });
   });
 
+  describe("UX-B4: aria-hidden on background carousel when chat is open", () => {
+    it("should set aria-hidden=\"true\" on <main> when chatOpen is true", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ chatOpen: true })} />
+      );
+
+      const mainEl = screen.getByRole("main", { hidden: true });
+      expect(mainEl).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("should NOT set aria-hidden on <main> when chatOpen is false", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ chatOpen: false })} />
+      );
+
+      const mainEl = screen.getByRole("main");
+      expect(mainEl).not.toHaveAttribute("aria-hidden");
+    });
+  });
+
   describe("auto-play when chat is open", () => {
     beforeEach(() => {
       mockIsEnabled.mockImplementation((flag: string) => flag === "autoplay_button");
@@ -1230,7 +1337,9 @@ describe("StoryViewer", () => {
       );
 
       // Try to enable autoplay even though chat is open
-      const autoPlayButton = screen.getAllByRole("button").find(
+      // UX-B4: when chatOpen, <main> is aria-hidden, so we must opt in to
+      // hidden elements when querying inside the carousel for this test.
+      const autoPlayButton = screen.getAllByRole("button", { hidden: true }).find(
         (btn) => btn.querySelector(".lucide-play")
       );
       if (autoPlayButton) {
@@ -1270,9 +1379,15 @@ describe("StoryViewer", () => {
       const shareItem = screen.getByText("Compartir");
       fireEvent.click(shareItem);
 
+      // UX-B1: must use singular `/story/<slug-or-id>`, not plural `/stories/<id>`
       expect(mockShare).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: expect.stringContaining("/stories/story-1"),
+          url: expect.stringContaining("/story/story-1"),
+        })
+      );
+      expect(mockShare).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringContaining("/stories/"),
         })
       );
 
@@ -1814,6 +1929,88 @@ describe("StoryViewer", () => {
   // The falsy branches are architecturally unreachable because the component returns null
   // at line 215 when `!story`, so BookmarkButton at line 556 is never rendered without a
   // valid story. The ternary guards are defensive programming.
+
+  describe("FE-H4: Image key stability", () => {
+    it("should not include ambient or autoPlay state in the Image key (prevents flash on flag toggle)", async () => {
+      // Enable ambient_discovery so isAmbient can become true
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "autoplay_button" || flag === "ambient_discovery"
+      );
+
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // UX-L2: Hero image is decorative (alt=""), query by src
+      const heroSrc = mockStories[0].image;
+      const img = container.querySelector(`img[src="${heroSrc}"]`);
+      expect(img).not.toBeNull();
+
+      // The key is not directly observable in the DOM, but the img src should stay stable.
+      // What we CAN assert: the story image renders and does NOT have "ambient" or "autoPlay"
+      // baked into a data attribute that forces a remount.
+      // The canonical test: clicking ambient toggle should NOT cause a new <img> element to mount.
+      const imgBefore = container.querySelector(`img[src="${heroSrc}"]`);
+
+      const ambientButton = screen.getAllByRole("button").find(
+        (btn) => btn.querySelector(".lucide-play")
+      );
+      if (ambientButton) {
+        fireEvent.click(ambientButton!);
+      }
+
+      // After toggling ambient, the SAME img element should still be in the DOM (no remount)
+      const imgAfter = container.querySelector(`img[src="${heroSrc}"]`);
+      expect(imgAfter).toBe(imgBefore);
+
+      mockIsEnabled.mockReturnValue(false);
+    });
+  });
+
+  describe("UX-H7: Info toggle keyboard accessibility", () => {
+    it("main landmark should NOT have an onClick handler (no interactive main element)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const main = screen.getByRole("main");
+      // Verify <main> is the landmark — its implicit role is "main" (no explicit role attribute needed)
+      expect(main.tagName).toBe("MAIN");
+
+      // The onClick must NOT be on <main> itself. We verify by checking there's no
+      // React onClick handler attached to the main element. In jsdom, we can verify
+      // the main element does not have cursor-pointer class (which signals interactivity).
+      expect(main).not.toHaveClass("cursor-pointer");
+    });
+
+    it("should have a transparent button overlay for toggling info on desktop", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // There should be a dedicated button for toggling info visibility
+      const infoToggleBtn = screen.queryByRole("button", { name: /mostrar información|ocultar información/i });
+      expect(infoToggleBtn).toBeInTheDocument();
+    });
+
+    it("info toggle overlay button should have aria-expanded reflecting showInfo state", async () => {
+      // Simulate desktop device with pointer: fine so the toggle fires
+      vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+        matches: query === "(pointer: fine)",
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
+      // Initially info is shown (showInfo = true)
+      expect(infoToggleBtn).toHaveAttribute("aria-expanded", "true");
+
+      fireEvent.click(infoToggleBtn);
+      // After toggle, info is hidden
+      expect(infoToggleBtn).toHaveAttribute("aria-expanded", "false");
+    });
+  });
 
   describe("related stories onSelectStory callback (lines 290-292)", () => {
     it("should call onIndexChange when a related story is selected and found in stories array", async () => {

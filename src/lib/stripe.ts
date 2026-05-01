@@ -15,6 +15,13 @@ import {
 
 
 /**
+ * SE-L3: Pinned Stripe API version.
+ * Explicit pin prevents silent behavior changes when the SDK is upgraded.
+ * Update this after reading the Stripe API changelog and testing locally.
+ */
+const STRIPE_API_VERSION = "2026-04-22.dahlia" as const;
+
+/**
  * Get server-side Stripe client.
  * Only use in API routes - never on client side.
  */
@@ -24,6 +31,7 @@ export function getStripeClient(): Stripe {
     throw new Error("STRIPE_SECRET_KEY not configured");
   }
   return new Stripe(secretKey, {
+    apiVersion: STRIPE_API_VERSION,
     timeout: 30000, // 30 second timeout
     maxNetworkRetries: 3,
   });

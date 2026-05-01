@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, PROBE_TIMEOUTS_MS } from "./route";
 
 vi.mock("@/lib/supabase", () => ({
@@ -88,59 +88,73 @@ describe("GET /api/health", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset();
+    vi.stubEnv("CRON_SECRET", "test-secret");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("returns HTTP 200 with a minimal public payload when healthy", async () => {
-    mockHealthySupabase();
-    mockDatabaseSize(129394278);
+    const savedDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    delete process.env.NEXT_PUBLIC_SENTRY_DSN;
 
-    const response = await GET();
-    const data = await response.json();
+    try {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
 
-    expect(response.status).toBe(200);
-    expect(data).toEqual({
-      status: "healthy",
-      timestamp: expect.any(String),
-    });
-    expect(data).not.toHaveProperty("services");
-    expect(data).not.toHaveProperty("uptime");
-    expect(data).not.toHaveProperty("version");
-    expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe("healthy");
+      expect(data.timestamp).toEqual(expect.any(String));
+      expect(data.sentry).toEqual({ status: "unconfigured" });
+      expect(data).not.toHaveProperty("services");
+      expect(data).not.toHaveProperty("uptime");
+      expect(data).not.toHaveProperty("version");
+      expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
+    } finally {
+      if (savedDsn !== undefined) {
+        process.env.NEXT_PUBLIC_SENTRY_DSN = savedDsn;
+      }
+    }
   });
 
-  it("returns HTTP 503 with the same minimal payload when Supabase is unavailable", async () => {
+  // DO-H1 regression: HTTP status must be 200 even when degraded
+  it("DO-H1: returns HTTP 200 (not 503) with degraded status when Supabase is unavailable", async () => {
     mockSupabaseProbeError("Connection refused");
     mockDatabaseSize(129394278);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
-    expect(data).toEqual({
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
       status: "degraded",
       timestamp: expect.any(String),
     });
   });
 
-  it("returns HTTP 503 when no approved stories are available", async () => {
+  it("DO-H1: returns HTTP 200 (not 503) when no approved stories are available", async () => {
     mockStoryCount(0, null);
     mockDatabaseSize(129394278);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
   });
 
-  it("returns HTTP 503 when database usage reaches the warning threshold", async () => {
+  it("DO-H1: returns HTTP 200 (not 503) when database usage reaches the warning threshold", async () => {
     mockHealthySupabase();
     mockDatabaseSize(6871954637);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
   });
 
@@ -179,7 +193,8 @@ describe("GET /api/health", () => {
     const elapsed = Date.now() - start;
     const data = await response.json();
 
-    expect(response.status).toBe(503);
+    // DO-H1: degraded is 200, never 503
+    expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(elapsed).toBeLessThan(PROBE_TIMEOUTS_MS.supabase + 400);
   }, 10000);
@@ -194,15 +209,18 @@ describe("GET /api/health", () => {
   });
 
   // SE-M1 regression: public endpoint must never leak operational recon data
-  it("SE-M1: public response contains only status and timestamp — no recon fields", async () => {
+  it("SE-M1: public response contains only allow-listed top-level fields", async () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
 
     const response = await GET();
     const data = await response.json();
 
-    // Only two fields allowed on the public tier
-    expect(Object.keys(data)).toEqual(["status", "timestamp"]);
+    // Allow-list: status, timestamp, cron_auth (BE-B1), sentry (DO-H2)
+    const allowedKeys = new Set(["status", "timestamp", "cron_auth", "sentry"]);
+    for (const key of Object.keys(data)) {
+      expect(allowedKeys).toContain(key);
+    }
 
     // Explicit deny-list of fields that must never appear unauthenticated
     const sensitiveFields = [
@@ -219,6 +237,9 @@ describe("GET /api/health", () => {
     for (const field of sensitiveFields) {
       expect(data).not.toHaveProperty(field);
     }
+
+    // cron_auth must never expose the secret itself, only a status label.
+    expect(JSON.stringify(data.cron_auth)).not.toContain("test-secret");
   });
 
   it("SE-M1: degraded response also exposes no recon fields", async () => {
@@ -228,7 +249,97 @@ describe("GET /api/health", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(response.status).toBe(503);
-    expect(Object.keys(data)).toEqual(["status", "timestamp"]);
+    // DO-H1: degraded is 200
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+    const allowedKeys = new Set(["status", "timestamp", "cron_auth", "sentry"]);
+    for (const key of Object.keys(data)) {
+      expect(allowedKeys).toContain(key);
+    }
+  });
+
+  // BE-B1: cron_auth observability — silent CRON_SECRET misconfiguration
+  it("BE-B1: includes cron_auth.status='ok' when CRON_SECRET is configured", async () => {
+    vi.stubEnv("CRON_SECRET", "configured-secret");
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.cron_auth).toEqual({ status: "ok" });
+    expect(data.status).toBe("healthy");
+  });
+
+  it("BE-B1: includes cron_auth.status='misconfigured' when CRON_SECRET is missing", async () => {
+    vi.stubEnv("CRON_SECRET", "");
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.cron_auth).toEqual({
+      status: "misconfigured",
+      message: "CRON_SECRET not set",
+    });
+    // Informational only — must NOT change overall health
+    expect(data.status).toBe("healthy");
+  });
+
+  // PE-H3 regression: preview-smoke.yml requires HTTP 200 + status=healthy
+  it("PE-H3: returns HTTP 200 so preview-smoke.yml gate can inspect body status", async () => {
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    // The smoke test gates on: HTTP 200 AND body.status === "healthy"
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
+  });
+
+  // DO-H2 regression: Sentry unconfigured state must be visible in health response
+  it("DO-H2: health response includes sentry.status=unconfigured when DSN is not set", async () => {
+    const savedDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+
+    try {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.sentry).toEqual({ status: "unconfigured" });
+    } finally {
+      if (savedDsn !== undefined) {
+        process.env.NEXT_PUBLIC_SENTRY_DSN = savedDsn;
+      }
+    }
+  });
+
+  it("DO-H2: health response includes sentry.status=configured when DSN is set", async () => {
+    const savedDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    process.env.NEXT_PUBLIC_SENTRY_DSN = "https://test@o123.ingest.sentry.io/456";
+
+    try {
+      mockHealthySupabase();
+      mockDatabaseSize(129394278);
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.sentry).toEqual({ status: "configured" });
+    } finally {
+      if (savedDsn !== undefined) {
+        process.env.NEXT_PUBLIC_SENTRY_DSN = savedDsn;
+      } else {
+        delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+      }
+    }
   });
 });

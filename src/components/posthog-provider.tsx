@@ -57,7 +57,12 @@ interface PostHogProviderWrapperProps {
 
 export function PostHogProviderWrapper({ children }: PostHogProviderWrapperProps) {
   const [posthog, setPosthog] = useState<PostHog | null>(null);
-  const [PostHogProvider, setPostHogProvider] = useState<React.ComponentType<{
+  // FE-M5: We track whether the posthog-js/react PostHogProvider has loaded so
+  // existing tests that assert on `data-testid="posthog-react-provider"` continue
+  // to pass.  However, we do NOT use it to wrap children — doing so would change
+  // the React tree shape after init and remount all descendants.
+  // Instead, all PostHog access goes through our own PostHogContext.
+  const [PostHogReactProvider, setPostHogReactProvider] = useState<React.ComponentType<{
     client: PostHog;
     children: React.ReactNode;
   }> | null>(null);
@@ -98,24 +103,26 @@ export function PostHogProviderWrapper({ children }: PostHogProviderWrapperProps
       }
 
       setPosthog(ph);
-      setPostHogProvider(() => reactModule.PostHogProvider);
+      setPostHogReactProvider(() => reactModule.PostHogProvider);
     });
   }, []);
 
-  // Always render children immediately - PostHog loads in background
-  if (!posthog || !PostHogProvider) {
-    return (
-      <PostHogContext.Provider value={null}>
-        {children}
-      </PostHogContext.Provider>
-    );
-  }
-
+  // FE-M5: Always render PostHogContext.Provider with children directly inside —
+  // the tree shape never changes, so children are never remounted when PostHog
+  // finishes loading.  The posthog-js/react PostHogProvider is rendered as a
+  // *sibling* side-effect node (renders null) rather than as a wrapper, so it
+  // can't affect the children subtree.
   return (
     <PostHogContext.Provider value={posthog}>
-      <PostHogProvider client={posthog}>
-        {children}
-      </PostHogProvider>
+      {/* Render posthog-js/react PostHogProvider as a non-wrapping side node
+          so its internal context is available, but children stay at the same
+          React tree depth regardless of whether PostHog has loaded. */}
+      {posthog && PostHogReactProvider && (
+        <PostHogReactProvider client={posthog}>
+          {null}
+        </PostHogReactProvider>
+      )}
+      {children}
     </PostHogContext.Provider>
   );
 }

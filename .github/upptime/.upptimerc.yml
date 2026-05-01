@@ -15,13 +15,12 @@ sites:
     method: GET
     expectedStatusCode: 200
 
-  - name: Paisaxe API Health
-    url: https://paisaxe.es/api/health
+  - name: Paisaxe API Health (Liveness)
+    url: https://paisaxe.es/api/health/live
     method: GET
-    # Healthy state returns HTTP 200; degraded state intentionally returns HTTP 503.
-    # Upptime expects 200 here — a 503 will open an incident automatically,
-    # surfacing any Supabase outage, zero approved stories, or DB capacity alert
-    # without requiring manual investigation.
+    # Lightweight liveness probe — always returns HTTP 200 with {"status":"live"}.
+    # No backend probes are run. This is the correct endpoint for uptime monitors
+    # because it never returns 503 regardless of DB/stories state (DO-B1 fix).
     expectedStatusCode: 200
 
 status-website:

@@ -19,6 +19,7 @@ import { SurpriseMeButton } from "./surprise-me-button";
 import { ShareButton } from "./share-button";
 import { LanguageSwitcher } from "./language-switcher";
 import { SuggestPlaceButton } from "./suggest-place-button";
+import { SuggestPlaceDialog } from "./suggest-place-dialog";
 import { ToolbarOverflowMenu, ToolbarOverflowItem } from "./toolbar-overflow-menu";
 import { FullscreenButton } from "./fullscreen-button";
 import { useTranslation } from "@/lib/i18n";
@@ -29,6 +30,7 @@ import { StoryProgressBar } from "./story-progress-bar";
 import { StoryToolbar } from "./story-toolbar";
 import { StoryInfoPanel } from "./story-info-panel";
 import { useStoryKeyboardNav } from "@/hooks/use-story-keyboard-nav";
+import { Button } from "@/components/ui/button";
 
 // Simple dark placeholder for images (prevents flash of white)
 const darkPlaceholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect fill='%231a1a1a' width='1' height='1'/%3E%3C/svg%3E";
@@ -75,6 +77,8 @@ export function StoryViewer({
   const [showInfo, setShowInfo] = useState(true);
   const [autoPlay, setAutoPlay] = useState(false);
   const [ambientMode, setAmbientMode] = useState(false);
+  // #328: lifted suggest-dialog state — avoids DOM coupling in overflow menu
+  const [isSuggestDialogOpen, setIsSuggestDialogOpen] = useState(false);
   const { isEnabled } = useFeatureFlags();
   const { t, locale } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
@@ -85,33 +89,10 @@ export function StoryViewer({
   const router = useRouter();
 
   const story = stories[currentIndex];
-  const prefetchedUrls = useRef<Set<string>>(new Set());
   const ambientStartRef = useRef<number | null>(null);
   // FE-M1: Single ref to track the pending transition timer so rapid navigation
   // cancels any in-flight timer before setting a new one, preventing stacking.
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Prefetch adjacent images for smoother navigation
-  useEffect(() => {
-    const prefetchImage = (url: string) => {
-      if (!url || prefetchedUrls.current.has(url)) return;
-
-      const img = new window.Image();
-      img.src = url;
-      prefetchedUrls.current.add(url);
-    };
-
-    if (stories.length === 0) return;
-    // Prefetch next image (wraps to first)
-    const nextIdx = (currentIndex + 1) % stories.length;
-    prefetchImage(stories[nextIdx].image);
-    // Prefetch previous image (wraps to last)
-    const prevIdx = (currentIndex - 1 + stories.length) % stories.length;
-    prefetchImage(stories[prevIdx].image);
-    // Prefetch 2 ahead (for faster auto-play)
-    const next2Idx = (currentIndex + 2) % stories.length;
-    prefetchImage(stories[next2Idx].image);
-  }, [currentIndex, stories]);
 
   const goToNext = useCallback(() => {
     const nextIndex = currentIndex < stories.length - 1 ? currentIndex + 1 : 0;
@@ -221,13 +202,8 @@ export function StoryViewer({
 
   return (
     <main
-      className="relative h-dvh w-screen overflow-hidden bg-black cursor-pointer"
-      onClick={() => {
-        // Only toggle info on desktop (pointer: fine) — on mobile, tap zones handle navigation
-        if (window.matchMedia("(pointer: fine)").matches) {
-          setShowInfo((prev) => !prev);
-        }
-      }}
+      className="relative h-dvh w-screen overflow-hidden bg-black"
+      aria-hidden={chatOpen ? "true" : undefined}
     >
       {/* Screen reader announcement for story changes */}
       <div
@@ -240,6 +216,21 @@ export function StoryViewer({
           .replace("{total}", String(stories.length))}: {localizedStory.title} — {localizedStory.subtitle}
       </div>
 
+      {/* Transparent overlay button for toggling info — desktop (pointer:fine) only.
+          Placed on a dedicated <button> so keyboard users can activate it (UX-H7).
+          z-[5]: above the background image (z-0) but below all interactive UI (z-10+). */}
+      <button
+        className="desktop-pointer-only absolute inset-0 z-[5] w-full h-full cursor-pointer bg-transparent"
+        aria-label={showInfo ? t("accessibility.hide_info") : t("accessibility.show_info")}
+        aria-expanded={showInfo}
+        onClick={() => {
+          // Only toggle info on desktop (pointer: fine) — on mobile, tap zones handle navigation
+          if (window.matchMedia("(pointer: fine)").matches) {
+            setShowInfo((prev) => !prev);
+          }
+        }}
+      />
+
       {/* Background Image with Ken Burns effect */}
       <div
         className={cn(
@@ -249,14 +240,14 @@ export function StoryViewer({
       >
         <Image
           src={story.image}
-          alt={story.title}
+          alt=""
           fill
           sizes="100vw"
           className={cn("object-cover", zoomClass)}
           priority={currentIndex === 0}
           placeholder="blur"
           blurDataURL={story.blurDataUrl || darkPlaceholder}
-          key={`${story.id}-${isAmbient ? "ambient" : autoPlay ? "auto" : "static"}`}
+          key={story.id}
         />
         {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
@@ -334,13 +325,14 @@ export function StoryViewer({
         {/* Ambient / Auto-play toggle - hidden on mobile */}
         {isEnabled("autoplay_button") && (
           isEnabled("ambient_discovery") ? (
-            <button
+            <Button
+              variant="glassIcon"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleAmbient();
               }}
               className={cn(
-                "hidden md:flex p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+                "hidden md:flex p-2",
                 ambientMode && "ring-1 ring-white/30"
               )}
               aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
@@ -351,22 +343,23 @@ export function StoryViewer({
               ) : (
                 <Play className="h-5 w-5 text-white" />
               )}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              variant="glassIcon"
               onClick={(e) => {
                 e.stopPropagation();
                 setAutoPlay((prev) => !prev);
               }}
               aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
-              className="hidden md:flex p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              className="hidden md:flex p-2"
             >
               {autoPlay ? (
                 <Pause className="h-5 w-5 text-white" />
               ) : (
                 <Play className="h-5 w-5 text-white" />
               )}
-            </button>
+            </Button>
           )
         )}
 
@@ -392,7 +385,7 @@ export function StoryViewer({
         {/* Suggest Place button - hidden on mobile */}
         {isEnabled("user_story_suggestions") && (
           <div className="hidden md:block">
-            <SuggestPlaceButton />
+            <SuggestPlaceButton onOpen={() => setIsSuggestDialogOpen(true)} />
           </div>
         )}
 
@@ -438,7 +431,9 @@ export function StoryViewer({
               icon={<Share2 className="h-4 w-4" />}
               label={t("share.share")}
               onClick={() => {
-                const shareUrl = `${window.location.origin}/stories/${story.id}`;
+                // UX-B1: route is `/story/[slug]` (singular, by slug) — using the
+                // plural `/stories/<id>` path would 404. Mirrors share-button.tsx.
+                const shareUrl = `${window.location.origin}/story/${story.slug || story.id}`;
                 if (navigator.share) {
                   navigator.share({
                     title: localizedStory.title,
@@ -452,7 +447,10 @@ export function StoryViewer({
             />
           )}
           {isEnabled("user_story_suggestions") && (
-            <SuggestPlaceButton variant="menu" />
+            <SuggestPlaceButton
+              variant="menu"
+              onOpen={() => setIsSuggestDialogOpen(true)}
+            />
           )}
         </ToolbarOverflowMenu>
 
@@ -485,6 +483,12 @@ export function StoryViewer({
 
       {/* First-visit navigation hint for mobile users */}
       <NavigationHint />
+
+      {/* Suggest Place dialog — state lifted here (#328: no DOM coupling) */}
+      <SuggestPlaceDialog
+        isOpen={isSuggestDialogOpen}
+        onClose={() => setIsSuggestDialogOpen(false)}
+      />
     </main>
   );
 }
