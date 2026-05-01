@@ -24,7 +24,6 @@ makes the codebase production-ready.
 - `StatCard` shared UI component extracted from admin shell
 - `readSseStream` async utility (`src/hooks/use-sse-stream.ts`) — SSE buffer parsing extracted from `use-stream-chat`, now independently testable
 - `glass` and `glassIcon` CVA Button variants — replaces 10+ inline glassmorphism class copies across immersive components
-- Typed Supabase factory functions (`createTypedSupabaseClient`, `createTypedBrowserClient`) covering all 20 tables
 - `CHAT_MODEL` constant in `src/lib/models.ts` — centralized model name reference
 - 30-second in-process LRU role cache in admin auth (`user_id → role`) — eliminates two sequential Supabase round-trips per request
 - Lazy singleton `getAdminClient()` for service-role Supabase client

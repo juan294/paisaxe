@@ -13,7 +13,7 @@
  *   decides whether to ignore AbortError.
  */
 
-export interface SseStreamOptions {
+interface SseStreamOptions {
   /** Called for each non-empty double-newline-delimited SSE line. */
   onEvent: (rawLine: string) => void;
   /** Called once when the stream ends cleanly. */
