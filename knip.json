@@ -11,13 +11,12 @@
   "project": ["src/**/*.{ts,tsx}"],
   "ignore": [
     "src/test/**",
-    "**/*.test.{ts,tsx}",
-    "**/__tests__/**",
     "src/components/ui/**"
   ],
   "ignoreDependencies": [
     "@types/*"
   ],
+  "ignoreExportsUsedInFile": true,
   "ignoreBinaries": [
     "license-checker",
     "GPL-3.0",
