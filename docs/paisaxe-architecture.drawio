@@ -1,4 +1,4 @@
-<mxGraphModel adaptiveColors="auto" dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200">
+<mxGraphModel adaptiveColors="auto" dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1300">
   <root>
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
@@ -53,29 +53,38 @@
     <mxCell id="proxy-cors" value="CORS Headers" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
       <mxGeometry x="1020" y="33" width="140" height="45" as="geometry"/>
     </mxCell>
+    <mxCell id="proxy-canonical" value="Canonical Domain&#xa;Redirect" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
+      <mxGeometry x="1180" y="33" width="150" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="proxy-storyrewrite" value="Story URL&#xa;Rewrite" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="swim-proxy">
+      <mxGeometry x="1350" y="33" width="140" height="45" as="geometry"/>
+    </mxCell>
     <mxCell id="swim-api" value="API Layer (Next.js Route Handlers)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
       <mxGeometry x="40" y="380" width="1520" height="130" as="geometry"/>
     </mxCell>
-    <mxCell id="api-chat" value="/api/chat&#xa;(RAG Pipeline)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+    <mxCell id="api-chat" value="/api/chat&#xa;(embed ‖ flags parallel&#xa;→ Claude RAG)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
       <mxGeometry x="30" y="45" width="145" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="api-admin" value="/api/admin&#xa;(Content Mgmt)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+    <mxCell id="api-admin" value="/api/admin&#xa;GET: withAdminRead&#xa;mutations: withAdmin" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
       <mxGeometry x="195" y="45" width="150" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="api-webhooks" value="/api/webhooks&#xa;(ElevenLabs/Translate)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
       <mxGeometry x="365" y="45" width="170" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="api-health" value="/api/health" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="555" y="45" width="125" height="60" as="geometry"/>
+    <mxCell id="api-health-live" value="/api/health/live&#xa;(liveness)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="555" y="45" width="110" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="api-health-diag" value="/api/health&#xa;(diagnostics)" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
+      <mxGeometry x="675" y="45" width="110" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="api-stripe-wh" value="/api/webhooks/stripe" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="700" y="45" width="165" height="60" as="geometry"/>
+      <mxGeometry x="800" y="45" width="165" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="api-auth-cb" value="/api/auth/callback" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="885" y="45" width="155" height="60" as="geometry"/>
+      <mxGeometry x="980" y="45" width="155" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="api-agentrun" value="/api/agent-run" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="swim-api">
-      <mxGeometry x="1060" y="45" width="145" height="60" as="geometry"/>
+      <mxGeometry x="1150" y="45" width="145" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="swim-logic" value="Business Logic (src/lib/)" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
       <mxGeometry x="40" y="530" width="1520" height="150" as="geometry"/>
@@ -132,7 +141,7 @@
       <mxGeometry x="230" y="55" width="160" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="swim-external" value="External Services" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;rounded=1;swimlaneLine=1;container=1;collapsible=0;" vertex="1" parent="1">
-      <mxGeometry x="40" y="870" width="1520" height="160" as="geometry"/>
+      <mxGeometry x="40" y="870" width="1520" height="220" as="geometry"/>
     </mxCell>
     <mxCell id="ext-claude" value="Claude API&#xa;(Anthropic)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
       <mxGeometry x="30" y="55" width="130" height="60" as="geometry"/>
@@ -146,6 +155,9 @@
     <mxCell id="ext-eleven-booking" value="ElevenLabs&#xa;Pelayo Booking" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
       <mxGeometry x="502" y="55" width="148" height="60" as="geometry"/>
     </mxCell>
+    <mxCell id="ext-eleven-aac" value="ElevenLabs Agents-as-Code&#xa;(agent_configs/ in git · elevenlabs push/pull)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;" vertex="1" parent="swim-external">
+      <mxGeometry x="336" y="140" width="314" height="50" as="geometry"/>
+    </mxCell>
     <mxCell id="ext-stripe" value="Stripe&#xa;(Payments)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
       <mxGeometry x="668" y="55" width="120" height="60" as="geometry"/>
     </mxCell>
@@ -158,8 +170,14 @@
     <mxCell id="ext-posthog" value="PostHog&#xa;(Analytics)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
       <mxGeometry x="1097" y="55" width="125" height="60" as="geometry"/>
     </mxCell>
-    <mxCell id="ext-upstash" value="Upstash&#xa;(Rate Limiting)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+    <mxCell id="ext-upstash" value="Upstash Redis&#xa;(Rate Limit +&#xa;Embed Cache)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
       <mxGeometry x="1240" y="55" width="130" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext-pino" value="Pino&#xa;(Structured Logs)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="668" y="140" width="130" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="ext-sentry" value="Sentry&#xa;(Error Tracking)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="swim-external">
+      <mxGeometry x="810" y="140" width="130" height="50" as="geometry"/>
     </mxCell>
     <mxCell id="ext-vercel" value="Vercel&#xa;(Edge Hosting)" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;" vertex="1" parent="swim-external">
       <mxGeometry x="1388" y="-30" width="110" height="60" as="geometry"/>
@@ -222,6 +240,9 @@
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
     <mxCell id="e-lib-voyage" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;" edge="1" source="lib-embed" target="ext-voyage" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e-lib-embed-upstash" value="embed cache" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;dashed=1;" edge="1" source="lib-embed" target="ext-upstash" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
     <mxCell id="e-fe-eleven" value="WebSocket" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;dashed=1;" edge="1" source="fe-voice" target="ext-eleven-guide" parent="1">

@@ -1,82 +1,50 @@
-# Localization Report — 2026-04-30
+# Localization Agent Report
 
-Status: GREEN — 100% translation coverage across all 6 supported locales. No edits needed this cycle.
+**Date:** 2026-05-02
+**Status:** GREEN
 
 ## Summary
 
-| Locale | UI Keys | UI Complete | Story Translations | Story Complete |
-|--------|---------|-------------|-------------------|----------------|
-| es (Spanish, default) | 405 | 100% | 100 stories (source) | N/A |
-| en (English) | 405 | 100% | 100 × 5 fields | 100% |
-| fr (French) | 405 | 100% | 100 × 5 fields | 100% |
-| de (German) | 405 | 100% | 100 × 5 fields | 100% |
-| pt (Portuguese) | 405 | 100% | 100 × 5 fields | 100% |
-| ast (Asturian) | 405 | 100% | 100 × 5 fields | 100% |
+Coverage is 100% complete across all 6 supported locales. No edits were required this cycle. Forty-fifth consecutive clean run.
 
-- Total UI leaf keys (source): 405
-- Total story translations: 100 stories × 5 locales × 3 fields (title, subtitle, description) = 1,500 translation entries, all present
-- Missing keys: 0
-- Orphaned keys: 0
-- TypeScript: Pass — `npx tsc --noEmit` exits clean (0 errors)
+| Locale | UI keys | Story translations | Status   |
+|--------|---------|--------------------|----------|
+| es     | 405     | source of truth    | Complete |
+| en     | 405     | 100/100 stories    | Complete |
+| fr     | 405     | 100/100 stories    | Complete |
+| de     | 405     | 100/100 stories    | Complete |
+| pt     | 405     | 100/100 stories    | Complete |
+| ast    | 405     | 100/100 stories    | Complete |
 
-## Changes Since Last Run (2026-04-17)
-
-No translation edits needed this cycle. All new keys added by recent commits were applied to all locales simultaneously.
-
-### New Keys Added (8 keys, all 6 locales)
-
-Commits `8771ca8c` (UX-B2, 2026-04-27) and `241dcb6b` (UX-L3, 2026-04-28) added 8 new i18n keys to all 6 locales in the same commits that introduced them:
-
-| Key | Added by commit |
-|-----|----------------|
-| `chat.assistant_label` | 8771ca8c |
-| `auth.user_avatar` | 8771ca8c |
-| `voice.error_not_configured` | 8771ca8c |
-| `premium.premium_access` | 8771ca8c |
-| `premium.voice_pass_label` | 8771ca8c |
-| `errors.unknown` | 8771ca8c |
-| `chat.copy_error` | 241dcb6b |
-| `share.copy_error` | 241dcb6b |
-
-Prior key count was 392 (as of 2026-04-17). Current count is 405. The discrepancy (13 vs 8) accounts for prior additions between the last report and these commits that were already tracked.
-
-### New Story Translations (5 cycling stories, all 5 locales)
-
-Commit `064e2acc` (2026-04-22) added 5 new cycling story slugs to `content/translations/story-translations.ts`. All 5 include complete en/fr/de/pt/ast translations:
-
-1. `angliru-bestia-asturias` — Angliru: The Beast of Asturias
-2. `lagos-covadonga-bicicleta` — Lakes of Covadonga by Bike
-3. (3 additional cycling stories in the same commit)
-
-Story count increased from 95 to 100.
-
-### Slug Fixes
-
-Two story slugs were corrected in the translation index (commit `064e2acc`):
-- `descenso-del-sella` → `descenso-sella`
-- `bufones-de-pria` → `bufones-pria`
-- `museo-del-jurasico-muja` → `museo-jurrasico`
-
-These are slug renames only; translation content was not changed.
-
-## Fixed This Cycle
-
-None. All translations were complete on arrival.
-
-## Remaining Gaps
-
-None. Coverage is 100% across all locales.
-
-## Orphaned Keys
-
-None. The programmatic comparison (`flattenKeys` diff) showed `extra=0` for all 5 non-Spanish locales.
+- **UI strings:** 405 leaf keys per locale, programmatically verified. 0 missing, 0 orphaned.
+- **Story translations:** 100 stories x 5 target locales x 3 fields (title, subtitle, description) = 1,500 records. 0 gaps.
+- **Type safety:** Pass. `npx tsc --noEmit` exits clean (0 errors) project-wide.
 
 ## Methodology
 
-- Read all 6 locale files (`src/lib/i18n/{es,en,fr,de,pt,ast}.ts`)
-- Programmatic key comparison using Node.js `flattenKeys()` — recursively extracts all leaf keys and diffs against es.ts as source of truth
-- Checked `content/translations/story-translations.ts` for story coverage: verified all 100 slugs have title + subtitle + description for en, fr, de, pt, ast
-- TypeScript check: `npx tsc --noEmit` — exit 0 (clean)
-- Reviewed git log since last run (2026-04-17) to identify new keys and stories
+1. Loaded all 6 locale modules (`src/lib/i18n/{es,en,fr,de,pt,ast}.ts`) via `tsx` and recursively extracted every leaf key.
+2. Compared each non-Spanish locale against the Spanish source of truth. Computed missing keys (in es but not in target) and orphan keys (in target but not in es).
+3. Loaded `STORY_TRANSLATIONS` from `content/translations/story-translations.ts` and verified every story slug has a non-empty `title`, `subtitle`, and `description` for each of en, fr, de, pt, ast.
+4. Ran `npx tsc --noEmit` to confirm no TypeScript regression.
 
----
+## Fixed
+
+Nothing this cycle. No edits were necessary.
+
+## Remaining gaps
+
+None.
+
+## Orphaned keys
+
+None.
+
+## Recent changes affecting locales
+
+- No commits touched `src/lib/i18n/` or `content/translations/` since 2026-04-30. Last batches that added new UI keys were `241dcb6b` (wave-2 frontend/UX quick wins) and `8771ca8c` (pricing copy and Voice Pass localisation), both already at full parity.
+- The pattern of adding new UI keys to all 6 locales in the same commit continues to hold — no backlog has accumulated.
+
+## Notes on cross-cutting concerns
+
+- **Asturian/Spanish place-name synonyms (Xixón/Gijón, Uviéu/Oviedo)** flagged by the QA Agent on 2026-04-27 affect the RAG retrieval layer, not the translation layer. No translation file change can address that — recommend handling via embeddings/keyword index synonym mapping rather than i18n.
+- **`// LOCATION-SPECIFIC` inline comments** are at parity across all 6 locales since 2026-04-14 (triage commit `e858ef7`).
