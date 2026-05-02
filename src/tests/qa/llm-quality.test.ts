@@ -43,6 +43,7 @@ async function sendChatMessage(message: string, retries = 3): Promise<ChatRespon
         'Content-Type': 'application/json',
         'x-csrf-token': csrfToken,
         Cookie: `__csrf=${csrfToken}`,
+        Origin: API_URL,
       },
       body: JSON.stringify({ message }),
     });
