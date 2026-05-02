@@ -11,4 +11,11 @@ describe("next.config.ts voyageai module resolution", () => {
     const config = readFileSync(join(process.cwd(), "next.config.ts"), "utf-8");
     expect(config).not.toMatch(/serverExternalPackages:\s*\[[^\]]*voyageai/);
   });
+
+  it("voyageai is pinned to 0.1.0 in package.json", () => {
+    // v0.2.x has a broken ESM build — do not bump until the upstream issue is fixed.
+    // See: https://github.com/voyage-ai/typescript-sdk/issues (bare dir imports in .mjs)
+    const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8"));
+    expect(pkg.dependencies.voyageai).toBe("0.1.0");
+  });
 });

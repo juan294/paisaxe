@@ -86,7 +86,7 @@
     "sharp": "^0.34.5",
     "stripe": "^22.1.0",
     "tailwind-merge": "^3.5.0",
-    "voyageai": "^0.2.1",
+    "voyageai": "0.1.0",
     "zod": "^4.4.1"
   },
   "devDependencies": {
