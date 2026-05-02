@@ -33,17 +33,11 @@ No new findings. Dependabot PR fixed and queued for auto-merge.
 ## Carried Items
 | Item | Cycles | Escalation |
 |------|--------|------------|
-| Revenue drought (78 days) + voice silence (74 days) | — | HIGH — manual production verification needed |
 | P4 Supabase realtime tree-shake (infeasible as described) | 7+ | REDIRECTED — see GitHub issue #558 |
 | MCP routes `/api/mcp/*` at 0% E2E coverage | 12 | Medium — external-facing APIs |
 | voice-agent-chat.tsx (46%), agents-dashboard/index (49%) need Playwright E2E | 17+ | Low — structural |
 | Architecture diagram `docs/paisaxe-architecture.drawio` needs Draw.io update | 3 | Low — manual only |
-| Twilio $0.24 anomaly | 30 days | Low — watch May 3-4 for recurrence |
 
 ## Manual Actions Required (user only)
-1. **Verify Pelayo voice widget on production** (paisaxe.es) — 74-day silence needs explanation.
-2. **Verify Day Pass purchase flow on production** — 78-day revenue drought.
-3. **Check Anthropic billing**: console.anthropic.com/settings/billing — daily agents may exceed $10/mo estimate.
-4. **Check Twilio billing console** — watch May 3-4 for Twilio $0.24 anomaly recurrence.
-5. **Update architecture diagram** in Draw.io per `update-docs-report` [NEEDS REVIEW] flag.
-6. **Review Wave 2 issues #485–#523** to approve implementation batch.
+1. **Check Anthropic billing**: console.anthropic.com/settings/billing — daily agents may exceed $10/mo estimate.
+2. **Update architecture diagram** in Draw.io per `update-docs-report` [NEEDS REVIEW] flag.
