@@ -38,12 +38,24 @@ export function requireEnv(key: string): string {
 // throw at import time — callers that don't use Supabase/Stripe shouldn't
 // crash. Use requireEnv() inside functions that truly need the value at
 // call-time, or reference these helpers directly.
+//
+// IMPORTANT (#556): NEXT_PUBLIC_* getters MUST use literal property access
+// (`process.env` followed by the variable name), not the dynamic
+// `getEnv("...")` helper. Next.js / Turbopack only inlines NEXT_PUBLIC vars
+// into the client bundle when accessed by literal name — `process.env[key]`
+// is left as a runtime lookup against the empty
+// browser polyfill, returning undefined and silently breaking client features
+// (e.g. the Supabase browser client falls back to null and sign-in becomes
+// a dead button). Server-only vars can use either form because Node has a
+// real `process.env`.
 
-/** Supabase project URL (public, trimmed) */
-export const getSupabaseUrl = () => getEnv("NEXT_PUBLIC_SUPABASE_URL");
+/** Supabase project URL (public, trimmed). */
+export const getSupabaseUrl = () =>
+  process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || undefined;
 
-/** Supabase anonymous key (public, trimmed) */
-export const getSupabaseAnonKey = () => getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+/** Supabase anonymous key (public, trimmed). */
+export const getSupabaseAnonKey = () =>
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || undefined;
 
 /** Supabase service role key (server-only, trimmed) */
 export const getSupabaseServiceRoleKey = () => getEnv("SUPABASE_SERVICE_ROLE_KEY");
@@ -60,12 +72,14 @@ export const getStripeDayPassPriceId = () => getEnv("STRIPE_DAY_PASS_PRICE_ID");
 /** Stripe webhook secret (server-only, trimmed) */
 export const getStripeWebhookSecret = () => getEnv("STRIPE_WEBHOOK_SECRET");
 
-/** Site URL (public, trimmed) */
-export const getSiteUrl = () => getEnv("NEXT_PUBLIC_SITE_URL");
+/** Site URL (public, trimmed). */
+export const getSiteUrl = () =>
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() || undefined;
 
-/** PostHog API key (public, trimmed) */
-export const getPostHogKey = () => getEnv("NEXT_PUBLIC_POSTHOG_KEY");
+/** PostHog API key (public, trimmed). */
+export const getPostHogKey = () =>
+  process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() || undefined;
 
-/** PostHog host (public, trimmed) */
+/** PostHog host (public, trimmed). */
 export const getPostHogHost = () =>
-  getEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://eu.i.posthog.com");
+  process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim() || "https://eu.i.posthog.com";

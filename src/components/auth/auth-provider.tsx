@@ -87,6 +87,16 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
   }, [supabase]);
 
   const signInWithGoogle = useCallback(async (redirectPath?: string) => {
+    if (!supabase) {
+      // #556: env vars may be missing client-side (e.g. NEXT_PUBLIC_SUPABASE_*
+      // not inlined). Never throw inside a click handler — the user-visible
+      // symptom would be a dead button with no feedback.
+      console.error(
+        "Supabase client unavailable — cannot sign in. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.",
+      );
+      return;
+    }
+
     const baseRedirectTo = typeof window !== "undefined"
       ? `${window.location.origin}/auth/callback`
       : siteUrl
@@ -111,6 +121,10 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
   }, [siteUrl, supabase]);
 
   const signOut = useCallback(async () => {
+    if (!supabase) {
+      console.error("Supabase client unavailable — cannot sign out.");
+      return;
+    }
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error("Error signing out:", error);
