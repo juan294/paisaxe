@@ -109,6 +109,25 @@ describe("AuthProvider — null supabase client (FE-M4 regression)", () => {
     });
     expect(screen.getByTestId("user").textContent).toBe("none");
   });
+
+  // Regression for #556: clicking sign-in (e.g. via the bookmark button) when
+  // the supabase client failed to initialize must not throw a TypeError. The
+  // user-visible symptom was a silent click-with-no-feedback.
+  it("signInWithGoogle does not throw when supabase client is null", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { result } = renderHook(() => useAuthContext(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await expect(result.current.signInWithGoogle()).resolves.toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Supabase client unavailable"),
+    );
+
+    consoleSpy.mockRestore();
+  });
 });
 
 describe("AuthProvider", () => {
