@@ -20,15 +20,19 @@ Run all quality checks sequentially:
 
 ```bash
 npm run test           # All tests must pass
-npm run typecheck      # No TypeScript errors
-npm run lint           # No linting errors
+npm run typecheck      # No TypeScript errors in app, scripts, E2E, or Edge functions
+npm run lint           # No linting errors in src/ or scripts/
+npm run check-verification-coverage  # Verification wiring is intact
 npm run build          # Production build succeeds
+npm run prelaunch:live # Real Stripe/Supabase QA happy path; fails if credentials are missing
 ```
 
 **Expected results:**
 - Tests: All passing (currently ~6,347 tests)
 - TypeScript: Exit code 0, no output
 - Lint: Exit code 0, no output
+- Verification wiring: reports explicit coverage for non-src TS surfaces and live integration gate
+- Pre-launch live gate: real Stripe test-mode checkout passes; missing Stripe/Supabase QA secrets fail this gate instead of skipping
 - Build: "Generating static pages" completes successfully
 
 ### 2. Health Endpoints
@@ -113,6 +117,8 @@ Check critical flags at https://paisaxe.es/api/feature-flags:
 | Tests | `npm run test` | All pass |
 | Types | `npm run typecheck` | No errors |
 | Lint | `npm run lint` | No errors |
+| Verification wiring | `npm run check-verification-coverage` | Explicit coverage check passes |
+| Live integration | `npm run prelaunch:live` | Real Stripe happy path passes; no skipped critical path |
 | Build | `npm run build` | Completes |
 | Health | `curl .../api/health` | HTTP 200, `status: healthy`, and `sentry.status: configured` |
 | Site | `curl -w "%{http_code}" .../` | 200 (after launch) |
@@ -282,13 +288,17 @@ Automated quality checks run on every push and pull request to `develop` and `ma
 
 | Job | Description |
 |-----|-------------|
-| **lint-and-typecheck** | Runs `npm run typecheck`, `npm run lint`, `npm run check-env`, and migration numbering check (`npx tsx scripts/check-migrations.ts`) |
+| **lint-and-typecheck** | Runs `npm run typecheck`, `npm run check-verification-coverage`, `npm run lint`, `npm run check-env`, and migration numbering check (`npx tsx scripts/check-migrations.ts`) |
 | **test** | Runs `npm run test` |
 | **build** | Verifies production build with `npm run build` |
 
 ### E2E Tests (`e2e.yml`)
 
 Playwright E2E tests run against a built app on push/PR to `develop` and `main`.
+
+### Stripe E2E Integration (`e2e-stripe-integration.yml`)
+
+Runs the real Stripe test-mode checkout path on nightly schedule, manual dispatch, and PRs touching checkout/webhook/Stripe code. Normal PR behavior still skips when repository secrets are unavailable. Manual dispatch defaults `require_live_gate` to true, which fails the workflow if any required Stripe/Supabase QA secret is missing.
 
 ### Preview Smoke Test (`preview-smoke.yml`)
 

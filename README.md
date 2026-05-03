@@ -129,8 +129,10 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 | `npm run dev` | Start development server |
 | `npm run build` | Create production build |
 | `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npm run typecheck` | Run TypeScript checks |
+| `npm run lint` | Run ESLint for `src/` and TypeScript scripts |
+| `npm run lint:scripts` | Run ESLint for `scripts/` |
+| `npm run typecheck` | Run TypeScript checks for app, scripts, E2E, and Edge functions |
+| `npm run check-verification-coverage` | Verify CI/package wiring for non-src and live-gate coverage |
 
 ### Testing
 
@@ -144,6 +146,8 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 | `npm run test:e2e:ui` | Playwright UI mode |
 | `npm run test:e2e:headed` | Run with visible browser |
 | `npm run test:e2e:debug` | Debug mode with inspector |
+| `npm run test:e2e:stripe` | Run real Stripe test-mode checkout integration (requires Stripe/Supabase QA env vars) |
+| `npm run prelaunch:live` | Run launch-critical live integration gate; fails instead of skipping missing credentials |
 
 ### Data Pipeline
 
@@ -209,8 +213,9 @@ Automated quality checks run on every push and pull request via GitHub Actions.
 
 | Workflow | Trigger | Description |
 |----------|---------|-------------|
-| **CI** | Push/PR | Lint, typecheck, test, build |
+| **CI** | Push/PR | Lint, typecheck, verification wiring, test, build |
 | **E2E** | Push/PR | Playwright end-to-end tests |
+| **Stripe E2E Integration** | Stripe-touching PR paths, nightly, manual dispatch | Real Stripe test-mode checkout; manual live gate fails if required secrets are missing |
 | **Security Audit** | Push/PR + weekly | `npm audit` for vulnerabilities |
 | **Gitleaks** | Push/PR + daily | Scans for secrets in git history |
 | **License Check** | PRs | Blocks copyleft/GPL dependencies |
