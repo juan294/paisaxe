@@ -15,13 +15,73 @@ import {
 } from "@/lib/chat-safety";
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
+import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import { encodeSseEvent } from "@/types/sse";
+
+export const CHAT_STREAM_STAGE_TIMEOUTS_MS = {
+  embedding: 8_000,
+  search: 5_000,
+  featureFlag: 2_000,
+} as const;
+
+type ChatStreamStage = keyof typeof CHAT_STREAM_STAGE_TIMEOUTS_MS;
+
+class ChatStreamStageTimeoutError extends Error {
+  constructor(
+    readonly stage: ChatStreamStage,
+    readonly timeoutMs: number
+  ) {
+    super(`${stage} timed out after ${timeoutMs}ms`);
+    this.name = "ChatStreamStageTimeoutError";
+  }
+}
 
 function isAbortError(error: unknown): boolean {
   return (
     (error instanceof DOMException && error.name === "AbortError") ||
     (error instanceof Error && error.name === "AbortError")
   );
+}
+
+function isChatStreamStageTimeout(error: unknown): error is ChatStreamStageTimeoutError {
+  return error instanceof ChatStreamStageTimeoutError;
+}
+
+async function withStageTiming<T>(
+  stage: ChatStreamStage,
+  promise: Promise<T>
+): Promise<T> {
+  const startedAt = Date.now();
+  const timeoutMs = CHAT_STREAM_STAGE_TIMEOUTS_MS[stage];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      reject(new ChatStreamStageTimeoutError(stage, timeoutMs));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } catch (error) {
+    if (isChatStreamStageTimeout(error)) {
+      logger.warn("[CHAT_STREAM_STAGE_TIMEOUT]", {
+        stage,
+        timeoutMs,
+      });
+    }
+    throw error;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    logger.info("[CHAT_STREAM_STAGE_TIMING]", {
+      stage,
+      durationMs: Date.now() - startedAt,
+      timeoutMs,
+      timedOut,
+    });
+  }
 }
 
 /**
@@ -43,7 +103,7 @@ export async function POST(request: NextRequest) {
           status: 429,
           headers: {
             "Content-Type": "application/json",
-            "Retry-After": String(rateLimit.retryAfter),
+            ...buildRateLimitHeaders(rateLimit, true),
           },
         }
       );
@@ -141,11 +201,20 @@ export async function POST(request: NextRequest) {
     let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
     let images: Awaited<ReturnType<typeof search>>["images"] = [];
     try {
-      const queryEmbedding = await generateEmbedding(cleanMessage);
-      ({ chunks, images } = await search(queryEmbedding, 3, cleanMessage));
+      const queryEmbedding = await withStageTiming(
+        "embedding",
+        generateEmbedding(cleanMessage)
+      );
+      ({ chunks, images } = await withStageTiming(
+        "search",
+        search(queryEmbedding, 3, cleanMessage)
+      ));
     } catch (searchErr) {
       request.signal.removeEventListener("abort", handleRequestAbort);
-      logger.warn("[CHAT_STREAM_SEARCH_UNAVAILABLE]", { error: searchErr });
+      logger.warn("[CHAT_STREAM_SEARCH_UNAVAILABLE]", {
+        error: searchErr,
+        stage: isChatStreamStageTimeout(searchErr) ? searchErr.stage : undefined,
+      });
       const encoder = new TextEncoder();
       const errorStream = new ReadableStream({
         start(controller) {
@@ -166,11 +235,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Enrich message with context
-    const enrichedMessage = context
-      ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
-      : cleanMessage;
+    const enrichedMessage = buildEnrichedChatMessage(cleanMessage, context);
 
-    const asturianEnabled = await asturianEnabledPromise;
+    let asturianEnabled = false;
+    try {
+      asturianEnabled = await withStageTiming("featureFlag", asturianEnabledPromise);
+    } catch (flagErr) {
+      logger.warn("[CHAT_STREAM_FEATURE_FLAG_FALLBACK]", { error: flagErr });
+    }
 
     // Create a readable stream for SSE
     const encoder = new TextEncoder();
@@ -245,7 +317,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
-        "X-RateLimit-Remaining": String(rateLimit.remaining),
+        ...buildRateLimitHeaders(rateLimit),
       },
     });
   } catch (error) {

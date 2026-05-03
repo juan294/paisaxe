@@ -17,6 +17,7 @@ import {
 } from "@/lib/chat-safety";
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
+import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
 
 /**
  * Extended response type with security metadata
@@ -41,12 +42,7 @@ export async function POST(request: NextRequest) {
         { error: "Too many requests. Please try again later." },
         {
           status: 429,
-          headers: {
-            "Retry-After": String(rateLimit.retryAfter),
-            "X-RateLimit-Limit": String(rateLimit.limit),
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(rateLimit.resetAt),
-          },
+          headers: buildRateLimitHeaders(rateLimit, true),
         }
       );
     }
@@ -151,9 +147,7 @@ export async function POST(request: NextRequest) {
     const { chunks, images } = await search(queryEmbedding, 3, cleanMessage);
 
     // If context is provided (e.g., from immersive mode), prepend it
-    const enrichedMessage = context
-      ? `${context}\n\nPregunta del usuario: ${cleanMessage}`
-      : cleanMessage;
+    const enrichedMessage = buildEnrichedChatMessage(cleanMessage, context);
 
     // Generate response using Claude with context
     const responseText = await generateChatResponse(

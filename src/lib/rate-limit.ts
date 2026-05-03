@@ -20,6 +20,16 @@ interface RateLimitResult {
   retryAfter?: number;
 }
 
+type RateLimitBackend = "upstash" | "memory" | "blocked";
+type RateLimitBackendReason = "upstash_missing" | "upstash_unavailable";
+
+interface RateLimitBackendStatus {
+  backend: RateLimitBackend;
+  configured: boolean;
+  degraded: boolean;
+  reason?: RateLimitBackendReason;
+}
+
 const DEFAULT_CONFIG: RateLimitConfig = {
   windowMs: 60_000,     // 60 seconds
   maxRequests: 10,       // 10 requests per window
@@ -97,6 +107,10 @@ const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 const useUpstash = Boolean(upstashUrl && upstashToken);
 
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
 // Cache Ratelimit instances by config key so each route's limits are enforced independently
 const upstashInstances = new Map<string, Ratelimit>();
 
@@ -158,6 +172,48 @@ export function isRateLimitDegraded(): boolean {
   return _rateLimitDegraded;
 }
 
+export function getRateLimitBackendStatus(): RateLimitBackendStatus {
+  if (useUpstash) {
+    return _rateLimitDegraded
+      ? {
+          backend: "upstash",
+          configured: true,
+          degraded: true,
+          reason: "upstash_unavailable",
+        }
+      : {
+          backend: "upstash",
+          configured: true,
+          degraded: false,
+        };
+  }
+
+  if (isProduction()) {
+    return {
+      backend: "blocked",
+      configured: false,
+      degraded: true,
+      reason: "upstash_missing",
+    };
+  }
+
+  return {
+    backend: "memory",
+    configured: false,
+    degraded: false,
+  };
+}
+
+function failClosed(config: RateLimitConfig): RateLimitResult {
+  return {
+    allowed: false,
+    limit: config.maxRequests,
+    remaining: 0,
+    resetAt: Date.now() + config.windowMs,
+    retryAfter: Math.ceil(config.windowMs / 1000),
+  };
+}
+
 // --- Public API ---
 
 export async function checkRateLimit(
@@ -171,7 +227,6 @@ export async function checkRateLimit(
       _rateLimitDegraded = false;
       return result;
     } catch (err) {
-      const isProduction = process.env.NODE_ENV === "production";
       _rateLimitDegraded = true;
       console.error("[RATE_LIMIT_FALLBACK]", {
         identifier,
@@ -180,19 +235,22 @@ export async function checkRateLimit(
       // BE-M1: warn on every fallback request so monitoring can detect degradation,
       // regardless of environment. Production fails closed; dev/test uses in-memory.
       logger.warn("[RATE_LIMIT_DEGRADED]", { reason: "upstash_unavailable" });
-      if (isProduction) {
+      if (isProduction()) {
         // Fail closed in production: deny the request so Upstash failure doesn't bypass limits
-        return {
-          allowed: false,
-          limit: config.maxRequests,
-          remaining: 0,
-          resetAt: Date.now() + config.windowMs,
-          retryAfter: Math.ceil(config.windowMs / 1000),
-        };
+        return failClosed(config);
       }
       // Dev/test: fall through to in-memory
       return checkInMemory(identifier, config);
     }
+  }
+
+  if (isProduction()) {
+    _rateLimitDegraded = true;
+    logger.warn("[RATE_LIMIT_DEGRADED]", {
+      reason: "upstash_missing",
+      backend: "blocked",
+    });
+    return failClosed(config);
   }
 
   return checkInMemory(identifier, config);

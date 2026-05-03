@@ -8,7 +8,16 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 
+vi.mock("@/lib/rate-limit", () => ({
+  getRateLimitBackendStatus: vi.fn(() => ({
+    backend: "memory",
+    configured: false,
+    degraded: false,
+  })),
+}));
+
 import { supabase } from "@/lib/supabase";
+import { getRateLimitBackendStatus } from "@/lib/rate-limit";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -89,6 +98,11 @@ describe("GET /api/health", () => {
     vi.clearAllMocks();
     mockFetch.mockReset();
     vi.stubEnv("CRON_SECRET", "test-secret");
+    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+      backend: "memory",
+      configured: false,
+      degraded: false,
+    });
   });
 
   afterEach(() => {
@@ -212,12 +226,18 @@ describe("GET /api/health", () => {
   it("SE-M1: public response contains only allow-listed top-level fields", async () => {
     mockHealthySupabase();
     mockDatabaseSize(129394278);
+    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+      backend: "blocked",
+      configured: false,
+      degraded: true,
+      reason: "upstash_missing",
+    });
 
     const response = await GET();
     const data = await response.json();
 
     // Allow-list: status, timestamp, cron_auth (BE-B1), sentry (DO-H2)
-    const allowedKeys = new Set(["status", "timestamp", "cron_auth", "sentry"]);
+    const allowedKeys = new Set(["status", "timestamp", "cron_auth", "sentry", "rate_limit"]);
     for (const key of Object.keys(data)) {
       expect(allowedKeys).toContain(key);
     }
@@ -240,6 +260,12 @@ describe("GET /api/health", () => {
 
     // cron_auth must never expose the secret itself, only a status label.
     expect(JSON.stringify(data.cron_auth)).not.toContain("test-secret");
+    expect(data.rate_limit).toEqual({
+      status: "degraded",
+      backend: "blocked",
+      reason: "upstash_missing",
+    });
+    expect(data.rate_limit).not.toHaveProperty("configured");
   });
 
   it("SE-M1: degraded response also exposes no recon fields", async () => {
@@ -252,7 +278,7 @@ describe("GET /api/health", () => {
     // DO-H1: degraded is 200
     expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
-    const allowedKeys = new Set(["status", "timestamp", "cron_auth", "sentry"]);
+    const allowedKeys = new Set(["status", "timestamp", "cron_auth", "sentry", "rate_limit"]);
     for (const key of Object.keys(data)) {
       expect(allowedKeys).toContain(key);
     }
