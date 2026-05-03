@@ -347,6 +347,34 @@ describe("GET /api/health", () => {
     }
   });
 
+  it("DO-H2: marks deployed preview health degraded when Sentry DSN is missing", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+    expect(data.sentry).toEqual({ status: "unconfigured" });
+  });
+
+  it("DO-H2: marks deployed production health degraded when Sentry DSN is missing", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+    expect(data.sentry).toEqual({ status: "unconfigured" });
+  });
+
   it("DO-H2: health response includes sentry.status=configured when DSN is set", async () => {
     const savedDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
     process.env.NEXT_PUBLIC_SENTRY_DSN = "https://test@o123.ingest.sentry.io/456";

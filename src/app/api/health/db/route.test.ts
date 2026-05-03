@@ -27,9 +27,9 @@ describe("GET /api/health/db", () => {
 
     expect(response.status).toBe(500);
     expect(body.success).toBe(false);
-    expect(body.error).toBe("Supabase not configured");
-    expect(body.hasUrl).toBe(false);
-    expect(body.hasKey).toBe(true);
+    expect(body.error).toBe("Database diagnostic unavailable");
+    expect(body).not.toHaveProperty("hasUrl");
+    expect(body).not.toHaveProperty("hasKey");
   });
 
   it("returns 500 when SUPABASE_ANON_KEY is missing", async () => {
@@ -41,8 +41,9 @@ describe("GET /api/health/db", () => {
 
     expect(response.status).toBe(500);
     expect(body.success).toBe(false);
-    expect(body.hasUrl).toBe(true);
-    expect(body.hasKey).toBe(false);
+    expect(body.error).toBe("Database diagnostic unavailable");
+    expect(body).not.toHaveProperty("hasUrl");
+    expect(body).not.toHaveProperty("hasKey");
   });
 
   it("returns 500 when both env vars are missing", async () => {
@@ -82,7 +83,7 @@ describe("GET /api/health/db", () => {
     expect(body.latencyMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("returns 500 when database query returns error", async () => {
+  it("returns redacted 500 when database query returns error", async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-key";
 
@@ -103,12 +104,14 @@ describe("GET /api/health/db", () => {
 
     expect(response.status).toBe(500);
     expect(body.success).toBe(false);
-    expect(body.error).toBe("permission denied");
-    expect(body.code).toBe("42501");
+    expect(body.error).toBe("Database diagnostic check failed");
+    expect(body).not.toHaveProperty("code");
+    expect(JSON.stringify(body)).not.toContain("permission denied");
+    expect(JSON.stringify(body)).not.toContain("42501");
     expect(body.latencyMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("returns 500 when createClient throws", async () => {
+  it("returns redacted 500 when createClient throws", async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-key";
 
@@ -122,11 +125,12 @@ describe("GET /api/health/db", () => {
 
     expect(response.status).toBe(500);
     expect(body.success).toBe(false);
-    expect(body.error).toBe("Connection failed");
+    expect(body.error).toBe("Database diagnostic check failed");
+    expect(JSON.stringify(body)).not.toContain("Connection failed");
     expect(body.latencyMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("returns 500 with generic message for non-Error throws", async () => {
+  it("returns redacted 500 for non-Error throws", async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-key";
 
@@ -140,7 +144,8 @@ describe("GET /api/health/db", () => {
 
     expect(response.status).toBe(500);
     expect(body.success).toBe(false);
-    expect(body.error).toBe("Unknown error");
+    expect(body.error).toBe("Database diagnostic check failed");
+    expect(JSON.stringify(body)).not.toContain("string error");
   });
 
   it("returns rowsReturned 0 when data is null", async () => {
