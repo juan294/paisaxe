@@ -7,7 +7,6 @@ import { createAdminClient } from "@/lib/supabase";
 import { translateStory } from "@/lib/translate-story";
 import type { StoryLocale } from "@/types/immersive";
 
-const TRANSLATE_WORKER_LOCK_ID = 1007;
 // BE-H6: Reduced lease to 3 minutes (180s). Each job takes ~5-15s so a
 // 3-job batch fits in ~45s, well within Vercel's 60s function timeout.
 // Shorter lease means crashed handlers are reclaimed faster than the old 10min.
@@ -151,11 +150,10 @@ async function processClaimedJob(
  *
  * Background webhook for auto-translation on story approval.
  * Jobs are durably enqueued, claimed with a lease, and processed by a
- * single worker lock so bulk approvals do not fan out unbounded work.
+ * row-level leased claims so bulk approvals do not fan out unbounded work.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const supabase = createAdminClient();
-  let workerLocked = false;
 
   try {
     const secret = request.headers.get("x-webhook-secret");
@@ -249,33 +247,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       requestedEventKey = parsed.payload.eventKey;
     }
 
-    const { data: locked, error: lockError } = await supabase.rpc(
-      "pg_try_advisory_lock",
-      { lockid: TRANSLATE_WORKER_LOCK_ID }
-    );
-
-    if (lockError) {
-      logger.error("[TRANSLATE_WEBHOOK_LOCK_FAILURE]", {
-        event_key: requestedEventKey,
-        error: lockError.message,
-      });
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
-
-    if (!locked) {
-      return NextResponse.json(
-        {
-          success: true,
-          status: "queued",
-          eventKey: requestedEventKey,
-          storyId: requestedStoryId,
-        },
-        { status: 202 }
-      );
-    }
-
-    workerLocked = true;
-
     const { data: claimedJobs, error: claimError } = await supabase.rpc(
       "claim_next_translate_webhook_event",
       {
@@ -296,14 +267,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const jobs = (claimedJobs ?? []) as ClaimedTranslateJob[];
 
     if (jobs.length === 0) {
+      if (enqueueStatus === "duplicate") {
+        return NextResponse.json(
+          {
+            success: true,
+            status: "duplicate",
+            eventKey: requestedEventKey,
+            storyId: requestedStoryId,
+          },
+          { status: 200 }
+        );
+      }
+
       return NextResponse.json(
         {
           success: true,
-          status: "duplicate",
+          status: "queued",
           eventKey: requestedEventKey,
           storyId: requestedStoryId,
         },
-        { status: 200 }
+        { status: 202 }
       );
     }
 
@@ -404,11 +387,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { error: "Internal server error" },
       { status: 500 }
     );
-  } finally {
-    if (workerLocked) {
-      await supabase.rpc("pg_advisory_unlock", {
-        lockid: TRANSLATE_WORKER_LOCK_ID,
-      });
-    }
   }
 }

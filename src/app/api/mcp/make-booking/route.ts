@@ -44,9 +44,10 @@ interface MakeBookingResponse {
   success: boolean;
   message: string;
   call_sid?: string;
-  status?: "initiated" | "queued" | "failed" | "not_configured" | "duplicate";
+  status?: "initiated" | "queued" | "failed" | "not_configured" | "duplicate" | "degraded";
   estimated_wait?: string;
   fallback_action?: string;
+  recovery_action?: string;
 }
 
 function buildClaimPersistenceFailureResponse(): NextResponse<MakeBookingResponse> {
@@ -58,6 +59,57 @@ function buildClaimPersistenceFailureResponse(): NextResponse<MakeBookingRespons
     },
     { status: 500 }
   );
+}
+
+function buildConversationPersistenceFailureResponse(
+  callId: string | undefined
+): NextResponse<MakeBookingResponse> {
+  return NextResponse.json<MakeBookingResponse>(
+    {
+      success: false,
+      message:
+        "The call was initiated, but booking tracking is degraded because the conversation ID could not be persisted.",
+      call_sid: callId,
+      status: "degraded",
+      recovery_action:
+        "manual recovery required: inspect the pending booking row and reconcile the accepted ElevenLabs call conversation_id.",
+    },
+    { status: 202 }
+  );
+}
+
+async function markPendingBookingFailed(
+  pendingRowId: string,
+  idempotencyKey: string,
+  outcomeMessage: string,
+  logContext: Record<string, unknown> = {}
+): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("pending_bookings")
+      .update({
+        status: "failed",
+        outcome_message: outcomeMessage,
+      })
+      .eq("id", pendingRowId);
+
+    if (error) {
+      logger.error("[MAKE_BOOKING_PENDING_FAIL_MARK_FAILED]", {
+        pending_booking_id: pendingRowId,
+        idempotency_key: idempotencyKey,
+        error,
+        ...logContext,
+      });
+    }
+  } catch (error) {
+    logger.error("[MAKE_BOOKING_PENDING_FAIL_MARK_DB_ERROR]", {
+      pending_booking_id: pendingRowId,
+      idempotency_key: idempotencyKey,
+      error,
+      ...logContext,
+    });
+  }
 }
 
 // Validate Spanish phone number format
@@ -445,8 +497,8 @@ export async function POST(request: Request): Promise<NextResponse> {
           const { error: updateError } = await supabase
             .from("pending_bookings")
             .update({
-            conversation_id: conversationId,
-            status: "pending",
+              conversation_id: conversationId,
+              status: "pending",
             })
             .eq("id", pendingRowId);
 
@@ -457,7 +509,15 @@ export async function POST(request: Request): Promise<NextResponse> {
               conversation_id: conversationId,
               error: updateError,
             });
-            // Don't fail the request — call was already initiated
+            await markPendingBookingFailed(
+              pendingRowId,
+              idempotencyKey,
+              `Call initiated but conversation_id persistence failed for ${conversationId}. Manual recovery required.`,
+              { conversation_id: conversationId }
+            );
+            return buildConversationPersistenceFailureResponse(
+              result.callSid || result.conversationId
+            );
           }
         } catch (dbError) {
           logger.error("[MAKE_BOOKING_PENDING_UPDATE_DB_ERROR]", {
@@ -466,7 +526,15 @@ export async function POST(request: Request): Promise<NextResponse> {
             conversation_id: conversationId,
             error: dbError,
           });
-          // Don't fail the request — call was already initiated
+          await markPendingBookingFailed(
+            pendingRowId,
+            idempotencyKey,
+            `Call initiated but conversation_id persistence threw for ${conversationId}. Manual recovery required.`,
+            { conversation_id: conversationId }
+          );
+          return buildConversationPersistenceFailureResponse(
+            result.callSid || result.conversationId
+          );
         }
       }
 
@@ -484,6 +552,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         estimated_wait: "30-60 seconds",
       });
     } else {
+      await markPendingBookingFailed(
+        pendingRowId,
+        idempotencyKey,
+        `Call initiation failed: ${result.error ?? "Unknown error"}`,
+        { error: result.error }
+      );
       return NextResponse.json<MakeBookingResponse>(
         {
           success: false,
