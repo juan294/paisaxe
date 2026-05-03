@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { StoriesTabPanel } from "./stories-tab-panel";
 import type { AdminStory } from "@/types/admin";
 
@@ -31,21 +31,136 @@ vi.mock("next/navigation", () => ({
 
 // Mock dynamic imports
 vi.mock("@/components/admin/story-grid", () => ({
-  StoryGrid: ({ stories }: { stories: AdminStory[] }) => (
-    <div data-testid="story-grid">{stories.length} stories</div>
+  StoryGrid: ({
+    stories,
+    onEdit,
+    onToggleSelect,
+    selectedIds,
+  }: {
+    stories: AdminStory[];
+    onEdit: (s: AdminStory) => void;
+    onToggleSelect: (id: string) => void;
+    selectedIds: Set<string>;
+    selectionMode: boolean;
+  }) => (
+    <div data-testid="story-grid">
+      {stories.length} stories
+      {stories.map((s) => (
+        <div key={s.id}>
+          <button
+            data-testid={`story-edit-${s.id}`}
+            onClick={() => onEdit(s)}
+          >
+            edit {s.id}
+          </button>
+          <button
+            data-testid={`story-toggle-${s.id}`}
+            data-selected={selectedIds.has(s.id) ? "true" : "false"}
+            onClick={() => onToggleSelect(s.id)}
+          >
+            toggle {s.id}
+          </button>
+        </div>
+      ))}
+    </div>
   ),
 }));
 
+const editorDialogProps: {
+  story: AdminStory | null;
+  onUpdate?: (id: string, updates: Partial<AdminStory>) => void;
+  onClose?: () => void;
+} = { story: null };
 vi.mock("@/components/admin/story-editor-dialog", () => ({
-  StoryEditorDialog: () => null,
+  StoryEditorDialog: (props: {
+    story: AdminStory | null;
+    onClose: () => void;
+    onUpdate: (id: string, updates: Partial<AdminStory>) => void;
+  }) => {
+    editorDialogProps.story = props.story;
+    editorDialogProps.onUpdate = props.onUpdate;
+    editorDialogProps.onClose = props.onClose;
+    return props.story ? (
+      <div data-testid="editor-dialog">
+        editing {props.story.id}
+        <button
+          data-testid="editor-close"
+          onClick={props.onClose}
+        >
+          close
+        </button>
+      </div>
+    ) : null;
+  },
 }));
 
+const createDialogProps: {
+  open: boolean;
+  onCreated?: (s: unknown) => void;
+  onOpenChange?: (open: boolean) => void;
+} = { open: false };
 vi.mock("@/components/admin/create-story-dialog", () => ({
-  CreateStoryDialog: () => null,
+  CreateStoryDialog: (props: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onCreated: (s: unknown) => void;
+  }) => {
+    createDialogProps.open = props.open;
+    createDialogProps.onCreated = props.onCreated;
+    createDialogProps.onOpenChange = props.onOpenChange;
+    return props.open ? (
+      <div data-testid="create-dialog">
+        <button
+          data-testid="create-confirm"
+          onClick={() => props.onCreated({ id: "new-story" })}
+        >
+          confirm
+        </button>
+      </div>
+    ) : null;
+  },
 }));
 
+const toolbarProps: {
+  selectedCount: number;
+  onMarkApproved?: () => void;
+  onMarkPending?: () => void;
+  onDelete?: () => void;
+  onClearSelection?: () => void;
+} = { selectedCount: 0 };
 vi.mock("@/components/admin/selection-toolbar", () => ({
-  SelectionToolbar: () => null,
+  SelectionToolbar: (props: {
+    selectedCount: number;
+    onMarkApproved: () => void;
+    onMarkPending: () => void;
+    onDelete: () => void;
+    onClearSelection: () => void;
+    isLoading: boolean;
+  }) => {
+    toolbarProps.selectedCount = props.selectedCount;
+    toolbarProps.onMarkApproved = props.onMarkApproved;
+    toolbarProps.onMarkPending = props.onMarkPending;
+    toolbarProps.onDelete = props.onDelete;
+    toolbarProps.onClearSelection = props.onClearSelection;
+    if (props.selectedCount === 0) return null;
+    return (
+      <div data-testid="selection-toolbar">
+        <span data-testid="selection-count">{props.selectedCount}</span>
+        <button data-testid="bulk-approve" onClick={props.onMarkApproved}>
+          approve
+        </button>
+        <button data-testid="bulk-pending" onClick={props.onMarkPending}>
+          pending
+        </button>
+        <button data-testid="bulk-delete" onClick={props.onDelete}>
+          delete
+        </button>
+        <button data-testid="bulk-clear" onClick={props.onClearSelection}>
+          clear
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock("@/components/ui/stat-card", () => ({
@@ -87,11 +202,16 @@ vi.mock("lucide-react", () => ({
 }));
 
 const mockFetchStories = vi.fn();
+const mockBulkUpdateStoryStatus = vi.fn();
+const mockBulkDeleteStories = vi.fn();
+const mockApproveAllPendingStories = vi.fn();
 vi.mock("@/lib/admin-api", () => ({
   fetchStories: (...args: unknown[]) => mockFetchStories(...args),
-  bulkUpdateStoryStatus: vi.fn().mockResolvedValue({ data: { updatedIds: [], status: "approved" } }),
-  bulkDeleteStories: vi.fn().mockResolvedValue({ data: { deletedIds: [] } }),
-  approveAllPendingStories: vi.fn().mockResolvedValue({ data: { approvedCount: 0, approvedIds: [] } }),
+  bulkUpdateStoryStatus: (...args: unknown[]) =>
+    mockBulkUpdateStoryStatus(...args),
+  bulkDeleteStories: (...args: unknown[]) => mockBulkDeleteStories(...args),
+  approveAllPendingStories: (...args: unknown[]) =>
+    mockApproveAllPendingStories(...args),
 }));
 
 function makeStory(overrides: Partial<AdminStory> = {}): AdminStory {
@@ -116,6 +236,26 @@ describe("StoriesTabPanel", () => {
     vi.clearAllMocks();
     mockSearchParamsGet.mockReturnValue(null);
     mockFetchStories.mockResolvedValue({ data: { stories: [], total: 0 } });
+    mockBulkUpdateStoryStatus.mockResolvedValue({
+      data: { updatedIds: [], status: "approved" },
+    });
+    mockBulkDeleteStories.mockResolvedValue({
+      data: { deletedIds: [] },
+    });
+    mockApproveAllPendingStories.mockResolvedValue({
+      data: { approvedCount: 0, approvedIds: [] },
+    });
+    editorDialogProps.story = null;
+    editorDialogProps.onUpdate = undefined;
+    editorDialogProps.onClose = undefined;
+    createDialogProps.open = false;
+    createDialogProps.onCreated = undefined;
+    createDialogProps.onOpenChange = undefined;
+    toolbarProps.selectedCount = 0;
+    toolbarProps.onMarkApproved = undefined;
+    toolbarProps.onMarkPending = undefined;
+    toolbarProps.onDelete = undefined;
+    toolbarProps.onClearSelection = undefined;
   });
 
   describe("Rendering", () => {
@@ -332,6 +472,645 @@ describe("StoriesTabPanel", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Failed to load")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Filter switching", () => {
+    const mixed = [
+      makeStory({ id: "a", curationStatus: "needs_curation" }),
+      makeStory({ id: "b", curationStatus: "approved" }),
+      makeStory({
+        id: "c",
+        curationStatus: "approved",
+        metadata: { translations: { en: { title: "T" } } },
+      } as Partial<AdminStory>),
+    ];
+
+    beforeEach(() => {
+      mockFetchStories.mockResolvedValue({
+        data: { stories: mixed, total: mixed.length },
+      });
+    });
+
+    it("clicking the Pending stat card switches back to needs_curation filter", async () => {
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+
+      // Switch away from default needs_curation
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+
+      // Click Pending to return to needs_curation filter
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-pending"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toHaveTextContent("1 stories");
+      });
+    });
+
+    it("clicking the Approved stat card filters out non-approved stories", async () => {
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-approved"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toHaveTextContent(
+          "2 stories"
+        );
+      });
+    });
+
+    it("clicking Total stat card shows all stories regardless of status", async () => {
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toHaveTextContent(
+          `${mixed.length} stories`
+        );
+      });
+    });
+
+    it("clicking Missing i18n stat card uses hasMissingTranslations filter", async () => {
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-missing i18n"));
+      });
+
+      await waitFor(() => {
+        // Stories without complete translations metadata are kept; story with
+        // partial translations metadata is also kept (missing locales).
+        const grid = screen.getByTestId("story-grid");
+        expect(grid).toBeInTheDocument();
+      });
+    });
+
+    it("typing in search filters stories by title (case-insensitive)", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [
+            makeStory({ id: "a", curationStatus: "approved", title: "Lakes of Asturias" }),
+            makeStory({ id: "b", curationStatus: "approved", title: "Mountains" }),
+          ],
+          total: 2,
+        },
+      });
+
+      render(<StoriesTabPanel />);
+
+      // Default filter is "needs_curation"; approved stories hidden.
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toHaveTextContent("2 stories");
+      });
+
+      const search = screen.getByPlaceholderText("Search stories...");
+      await act(async () => {
+        fireEvent.change(search, { target: { value: "lakes" } });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toHaveTextContent("1 stories");
+      });
+    });
+  });
+
+  describe("Bulk operations", () => {
+    const stories = [
+      makeStory({ id: "s1", curationStatus: "approved" }),
+      makeStory({ id: "s2", curationStatus: "approved" }),
+    ];
+
+    beforeEach(() => {
+      mockFetchStories.mockResolvedValue({
+        data: { stories, total: stories.length },
+      });
+    });
+
+    async function renderAndSelect(ids: string[]) {
+      render(<StoriesTabPanel />);
+
+      // Default filter is "needs_curation"; approved stories are hidden.
+      // Wait for the stat card to appear, switch to "all", then wait for grid.
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      for (const id of ids) {
+        await act(async () => {
+          fireEvent.click(screen.getByTestId(`story-toggle-${id}`));
+        });
+      }
+    }
+
+    it("bulk mark approved updates selected stories and clears selection", async () => {
+      mockBulkUpdateStoryStatus.mockResolvedValue({
+        data: { updatedIds: ["s1"], status: "approved" },
+      });
+
+      await renderAndSelect(["s1"]);
+
+      expect(screen.getByTestId("selection-count")).toHaveTextContent("1");
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-approve"));
+      });
+
+      await waitFor(() => {
+        expect(mockBulkUpdateStoryStatus).toHaveBeenCalledWith(
+          ["s1"],
+          "approved"
+        );
+        expect(screen.queryByTestId("selection-toolbar")).not.toBeInTheDocument();
+      });
+    });
+
+    it("bulk mark approved surfaces error and keeps selection", async () => {
+      mockBulkUpdateStoryStatus.mockResolvedValue({ error: "boom" });
+
+      await renderAndSelect(["s1"]);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-approve"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("boom")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("selection-toolbar")).toBeInTheDocument();
+    });
+
+    it("bulk mark pending calls API with needs_curation status", async () => {
+      mockBulkUpdateStoryStatus.mockResolvedValue({
+        data: { updatedIds: ["s1", "s2"], status: "needs_curation" },
+      });
+
+      await renderAndSelect(["s1", "s2"]);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-pending"));
+      });
+
+      await waitFor(() => {
+        expect(mockBulkUpdateStoryStatus).toHaveBeenCalledWith(
+          expect.arrayContaining(["s1", "s2"]),
+          "needs_curation"
+        );
+      });
+    });
+
+    it("bulk mark pending surfaces error", async () => {
+      mockBulkUpdateStoryStatus.mockResolvedValue({ error: "pending boom" });
+
+      await renderAndSelect(["s1"]);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-pending"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("pending boom")).toBeInTheDocument();
+      });
+    });
+
+    it("bulk delete calls confirm and removes stories on accept", async () => {
+      const confirmSpy = vi
+        .spyOn(window, "confirm")
+        .mockReturnValue(true);
+      mockBulkDeleteStories.mockResolvedValue({
+        data: { deletedIds: ["s1"] },
+      });
+
+      await renderAndSelect(["s1"]);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-delete"));
+      });
+
+      await waitFor(() => {
+        expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("delete 1 story"));
+        expect(mockBulkDeleteStories).toHaveBeenCalledWith(["s1"]);
+      });
+      confirmSpy.mockRestore();
+    });
+
+    it("bulk delete plural confirm message when multiple selected", async () => {
+      const confirmSpy = vi
+        .spyOn(window, "confirm")
+        .mockReturnValue(true);
+
+      await renderAndSelect(["s1", "s2"]);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-delete"));
+      });
+
+      await waitFor(() => {
+        expect(confirmSpy).toHaveBeenCalledWith(
+          expect.stringContaining("delete 2 stories")
+        );
+      });
+      confirmSpy.mockRestore();
+    });
+
+    it("bulk delete is a no-op when user cancels confirm", async () => {
+      const confirmSpy = vi
+        .spyOn(window, "confirm")
+        .mockReturnValue(false);
+
+      await renderAndSelect(["s1"]);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-delete"));
+      });
+
+      expect(mockBulkDeleteStories).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
+
+    it("bulk delete surfaces error from API", async () => {
+      const confirmSpy = vi
+        .spyOn(window, "confirm")
+        .mockReturnValue(true);
+      mockBulkDeleteStories.mockResolvedValue({ error: "delete failed" });
+
+      await renderAndSelect(["s1"]);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-delete"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("delete failed")).toBeInTheDocument();
+      });
+      confirmSpy.mockRestore();
+    });
+
+    it("clearing selection hides the selection toolbar", async () => {
+      await renderAndSelect(["s1"]);
+      expect(screen.getByTestId("selection-toolbar")).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-clear"));
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("selection-toolbar")).not.toBeInTheDocument();
+      });
+    });
+
+    it("toggling the same story twice deselects it", async () => {
+      await renderAndSelect(["s1", "s1"]);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("selection-toolbar")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Approve all", () => {
+    it("opens confirm dialog when Approve All is clicked", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [makeStory({ id: "p", curationStatus: "needs_curation" })],
+          total: 1,
+        },
+      });
+
+      render(<StoriesTabPanel />);
+
+      const approveAllBtn = await screen.findByText(/Approve All \(1\)/);
+      await act(async () => {
+        fireEvent.click(approveAllBtn);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByRole("dialog")).toBeInTheDocument();
+        expect(
+          screen.getByText("Approve All Stories")
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("Cancel closes the approve-all confirm dialog", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [makeStory({ id: "p", curationStatus: "needs_curation" })],
+          total: 1,
+        },
+      });
+
+      render(<StoriesTabPanel />);
+
+      const approveAllBtn = await screen.findByText(/Approve All \(1\)/);
+      await act(async () => {
+        fireEvent.click(approveAllBtn);
+      });
+
+      const cancelBtn = await screen.findByRole("button", { name: /Cancel/i });
+      await act(async () => {
+        fireEvent.click(cancelBtn);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+    });
+
+    it("Approve All confirm calls approveAllPendingStories", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [makeStory({ id: "p", curationStatus: "needs_curation" })],
+          total: 1,
+        },
+      });
+      mockApproveAllPendingStories.mockResolvedValue({
+        data: { approvedCount: 1, approvedIds: ["p"] },
+      });
+
+      render(<StoriesTabPanel />);
+
+      const approveAllBtn = await screen.findByText(/Approve All \(1\)/);
+      await act(async () => {
+        fireEvent.click(approveAllBtn);
+      });
+
+      const dialog = await screen.findByRole("dialog");
+      const confirmBtn = within(dialog).getByRole("button", { name: /Approve All/i });
+
+      await act(async () => {
+        fireEvent.click(confirmBtn);
+      });
+
+      await waitFor(() => {
+        expect(mockApproveAllPendingStories).toHaveBeenCalled();
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+    });
+
+    it("Approve All surfaces API error and closes dialog", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [makeStory({ id: "p", curationStatus: "needs_curation" })],
+          total: 1,
+        },
+      });
+      mockApproveAllPendingStories.mockResolvedValue({ error: "fail" });
+
+      render(<StoriesTabPanel />);
+
+      const approveAllBtn = await screen.findByText(/Approve All \(1\)/);
+      await act(async () => {
+        fireEvent.click(approveAllBtn);
+      });
+
+      const dialog = await screen.findByRole("dialog");
+      const confirmBtn = within(dialog).getByRole("button", { name: /Approve All/i });
+      await act(async () => {
+        fireEvent.click(confirmBtn);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("fail")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Editor + create dialog handlers", () => {
+    it("clicking edit on a story opens the editor dialog", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [makeStory({ id: "edit-me", curationStatus: "approved" })],
+          total: 1,
+        },
+      });
+
+      render(<StoriesTabPanel />);
+
+      // Switch to all filter so approved story is visible
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-edit-edit-me")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("story-edit-edit-me"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("editor-dialog")).toBeInTheDocument();
+      });
+    });
+
+    it("editor onUpdate updates story state", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [
+            makeStory({
+              id: "u1",
+              curationStatus: "approved",
+              title: "Old",
+            }),
+          ],
+          total: 1,
+        },
+      });
+
+      render(<StoriesTabPanel />);
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-edit-u1")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("story-edit-u1"));
+      });
+
+      await waitFor(() => {
+        expect(editorDialogProps.onUpdate).toBeDefined();
+      });
+
+      await act(async () => {
+        editorDialogProps.onUpdate!("u1", { title: "New Title" });
+      });
+
+      await act(async () => {
+        editorDialogProps.onUpdate!("missing-id", { title: "ignored" });
+      });
+
+      // Closing the editor clears editingStory
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("editor-close"));
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("editor-dialog")).not.toBeInTheDocument();
+      });
+    });
+
+    it("clicking Create Story opens create dialog and onCreated reloads page 1", async () => {
+      render(<StoriesTabPanel />);
+
+      const btn = await screen.findByText("Create Story");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+
+      await waitFor(() => {
+        expect(createDialogProps.open).toBe(true);
+      });
+
+      await act(async () => {
+        createDialogProps.onCreated!({ id: "new-story" });
+      });
+
+      await waitFor(() => {
+        expect(mockRouterPush).toHaveBeenCalledWith(
+          expect.stringContaining("storiesPage=1"),
+          expect.anything()
+        );
+      });
+    });
+  });
+
+  describe("Loading state", () => {
+    it("shows loading spinner while initial fetch is in flight", async () => {
+      let resolveFetch: ((v: unknown) => void) | undefined;
+      mockFetchStories.mockImplementation(
+        () => new Promise((r) => {
+          resolveFetch = r;
+        })
+      );
+
+      render(<StoriesTabPanel />);
+
+      expect(screen.getByText("Loading stories...")).toBeInTheDocument();
+
+      await act(async () => {
+        resolveFetch!({ data: { stories: [], total: 0 } });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Loading stories...")).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows 'No stories match this filter' when stories exist but filter rejects them", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [makeStory({ id: "x", curationStatus: "approved" })],
+          total: 1,
+        },
+      });
+
+      render(<StoriesTabPanel />);
+
+      // Default filter is "needs_curation"; approved story will be filtered out.
+      await waitFor(() => {
+        expect(
+          screen.getByText("No stories match this filter")
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Pagination clamping", () => {
+    it("clamps URL page below 1 to page 1", async () => {
+      mockSearchParamsGet.mockImplementation((k: string) =>
+        k === "storiesPage" ? "0" : null
+      );
+
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(mockFetchStories).toHaveBeenCalledWith(
+          expect.objectContaining({ page: 1 })
+        );
+      });
+    });
+
+    it("non-numeric URL page falls back to page 1", async () => {
+      mockSearchParamsGet.mockImplementation((k: string) =>
+        k === "storiesPage" ? "abc" : null
+      );
+
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(mockFetchStories).toHaveBeenCalledWith(
+          expect.objectContaining({ page: 1 })
+        );
+      });
+    });
+
+    it("Next from last page is a no-op (clamped)", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: Array.from({ length: 5 }, (_, i) =>
+            makeStory({ id: `s-${i}`, displayOrder: i + 1 })
+          ),
+          total: 25,
+        },
+      });
+      mockSearchParamsGet.mockImplementation((k: string) =>
+        k === "storiesPage" ? "2" : null
+      );
+
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Next/i })).toBeDisabled();
       });
     });
   });

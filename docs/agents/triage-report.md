@@ -33,11 +33,15 @@ No new findings. Dependabot PR fixed and queued for auto-merge.
 ## Carried Items
 | Item | Cycles | Escalation |
 |------|--------|------------|
-| P4 Supabase realtime tree-shake (infeasible as described) | 7+ | REDIRECTED — see GitHub issue #558 |
-| MCP routes `/api/mcp/*` at 0% E2E coverage | 12 | Medium — external-facing APIs |
-| voice-agent-chat.tsx (46%), agents-dashboard/index (49%) need Playwright E2E | 17+ | Low — structural |
-| Architecture diagram `docs/paisaxe-architecture.drawio` needs Draw.io update | 3 | Low — manual only |
+| (none — all carried items resolved this cycle) | — | — |
+
+## Resolved This Cycle
+| Item | Resolution |
+|------|-----------|
+| P4 Supabase realtime tree-shake | Issue #558 closed as accepted (infeasible, ADR on file) |
+| MCP routes `/api/mcp/*` E2E coverage | `e2e/mcp.spec.ts` added — 13 tests, 15 skip for live services |
+| voice-agent-chat / agents-dashboard E2E | `e2e/voice-agents.spec.ts` added — 28 tests, unauthenticated guard path |
+| Architecture diagram update | `docs/paisaxe-architecture.drawio` + PNG updated with MCP routes, ElevenLabs agents-as-code, proxy.ts |
 
 ## Manual Actions Required (user only)
 1. **Check Anthropic billing**: console.anthropic.com/settings/billing — daily agents may exceed $10/mo estimate.
-2. **Update architecture diagram** in Draw.io per `update-docs-report` [NEEDS REVIEW] flag.
