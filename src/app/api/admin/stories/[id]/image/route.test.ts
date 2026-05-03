@@ -10,6 +10,15 @@ const logger = vi.hoisted(() => ({
 
 vi.mock("@/lib/logger", () => ({ logger }));
 
+const dns = vi.hoisted(() => ({
+  lookup: vi.fn().mockResolvedValue([{ address: "93.184.216.34", family: 4 }]),
+}));
+
+vi.mock("node:dns/promises", () => ({
+  default: { lookup: dns.lookup },
+  lookup: dns.lookup,
+}));
+
 // Mock dependencies
 vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(),
@@ -69,6 +78,7 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    dns.lookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
   });
 
   describe("authentication", () => {
@@ -759,6 +769,108 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toBe("Private or reserved IP addresses are not allowed");
+    });
+
+    it.each([
+      "https://169.254.169.254/latest/meta-data",
+      "https://100.64.0.1/image.jpg",
+      "https://192.0.2.10/image.jpg",
+      "https://198.51.100.10/image.jpg",
+      "https://224.0.0.1/image.jpg",
+    ])("should return 400 for private, link-local, multicast, or reserved IP literal %s", async (imageUrl) => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl }),
+      });
+
+      const response = await PUT(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Private or reserved IP addresses are not allowed");
+    });
+
+    it("should reject a public hostname when DNS resolves to a private IP before fetch", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      dns.lookup.mockResolvedValueOnce([{ address: "10.0.0.5", family: 4 }]);
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://cdn.example.com/image.jpg" }),
+      });
+
+      const response = await PUT(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Private or reserved IP addresses are not allowed");
+      expect(dns.lookup).toHaveBeenCalledWith("cdn.example.com", { all: true, verbatim: true });
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("should reject external image URLs when hostname DNS validation fails", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      dns.lookup.mockRejectedValueOnce(new Error("ENOTFOUND"));
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://missing.example.com/image.jpg" }),
+      });
+
+      const response = await PUT(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Remote image host could not be validated");
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("should disable automatic redirects when fetching external images for blur generation", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: { id: "story-123", image_path: "https://example.com/image.jpg", image_source: null },
+        error: null,
+      });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: false,
+        status: 302,
+        headers: new Headers({ location: "https://127.0.0.1/private.jpg" }),
+      } as Response);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
+      });
+
+      const response = await PUT(request, mockParams);
+
+      expect(response.status).toBe(200);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://example.com/image.jpg",
+        expect.objectContaining({ redirect: "manual" })
+      );
+      expect(mockUpdate).toHaveBeenCalledWith({ image_path: "https://example.com/image.jpg" });
+
+      fetchSpy.mockRestore();
     });
 
     it("SE-M1: fetch with timeout — response body too large (>10MB content-length) is rejected at 400", async () => {
