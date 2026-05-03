@@ -22,7 +22,7 @@ describe("rowToMarketingAccount", () => {
     platform: "x",
     account_name: "Paisaxe",
     account_handle: "@paisaxe",
-    credentials: { accessToken: "secret-token", refreshToken: "refresh" },
+    credentials: { encrypted: "encrypted-credentials" },
     platform_user_id: "12345",
     is_active: true,
     last_sync_at: "2025-01-15T10:00:00.000Z",
@@ -51,8 +51,7 @@ describe("rowToMarketingAccount", () => {
     expect(account.accountName).toBe("Paisaxe");
     expect(account.accountHandle).toBe("@paisaxe");
     expect(account.credentials).toEqual({
-      accessToken: "secret-token",
-      refreshToken: "refresh",
+      encrypted: "encrypted-credentials",
     });
     expect(account.platformUserId).toBe("12345");
     expect(account.isActive).toBe(true);
@@ -81,7 +80,7 @@ describe("rowToMarketingAccountPublic", () => {
     platform: "instagram",
     account_name: "Paisaxe",
     account_handle: "@paisaxe",
-    credentials: { accessToken: "secret-token" },
+    credentials: { encrypted: "encrypted-credentials" },
     platform_user_id: "12345",
     is_active: true,
     last_sync_at: "2025-01-15T10:00:00.000Z",
@@ -97,6 +96,15 @@ describe("rowToMarketingAccountPublic", () => {
     expect(publicAccount.id).toBe("acc-123");
     expect(publicAccount.platform).toBe("instagram");
     expect(publicAccount.accountName).toBe("Paisaxe");
+  });
+
+  it("does not report legacy plaintext credentials as valid", () => {
+    const publicAccount = rowToMarketingAccountPublic({
+      ...sampleRow,
+      credentials: { accessToken: "secret-token" } as unknown as MarketingAccountRow["credentials"],
+    });
+
+    expect(publicAccount.hasCredentials).toBe(false);
   });
 });
 

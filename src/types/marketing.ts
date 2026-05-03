@@ -67,7 +67,7 @@ interface MarketingAccount {
   accountName: string;
   accountHandle: string | null;
   /** OAuth tokens - stored encrypted in DB, decrypt with getDecryptedCredentials() when needed */
-  credentials: MarketingCredentials | EncryptedCredentials | null;
+  credentials: EncryptedCredentials | null;
   platformUserId: string | null;
   isActive: boolean;
   lastSyncAt: string | null;
@@ -179,8 +179,8 @@ export interface MarketingAccountRow {
   platform: string;
   account_name: string;
   account_handle: string | null;
-  /** Credentials can be encrypted or plain (legacy). Always store encrypted going forward. */
-  credentials: MarketingCredentials | EncryptedCredentials | null;
+  /** Credentials must be encrypted. Plain OAuth tokens are rejected by runtime and DB checks. */
+  credentials: EncryptedCredentials | null;
   platform_user_id: string | null;
   is_active: boolean;
   last_sync_at: string | null;
@@ -270,11 +270,12 @@ export function rowToMarketingAccount(
 export function rowToMarketingAccountPublic(
   row: MarketingAccountRow
 ): MarketingAccountPublic {
-  // Check for credentials - handles both encrypted format { encrypted: "..." }
-  // and legacy plain format { accessToken: "..." }
-  const hasCredentials = row.credentials !== null &&
-    (('encrypted' in row.credentials && typeof row.credentials.encrypted === 'string') ||
-     ('accessToken' in row.credentials && typeof row.credentials.accessToken === 'string'));
+  const hasCredentials =
+    typeof row.credentials === "object" &&
+    row.credentials !== null &&
+    "encrypted" in row.credentials &&
+    typeof row.credentials.encrypted === "string" &&
+    row.credentials.encrypted.length > 0;
 
   return {
     id: row.id,

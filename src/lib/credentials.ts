@@ -17,34 +17,23 @@ import type {
  * Type guard to check if credentials are in encrypted format
  */
 export function isEncryptedCredentials(
-  credentials: MarketingCredentials | EncryptedCredentials | null
+  credentials: unknown
 ): credentials is EncryptedCredentials {
   return (
+    typeof credentials === "object" &&
     credentials !== null &&
     "encrypted" in credentials &&
-    typeof credentials.encrypted === "string"
-  );
-}
-
-/**
- * Type guard to check if credentials are in plain format (legacy)
- */
-export function isPlainCredentials(
-  credentials: MarketingCredentials | EncryptedCredentials | null
-): credentials is MarketingCredentials {
-  return (
-    credentials !== null &&
-    "accessToken" in credentials &&
-    typeof credentials.accessToken === "string"
+    typeof credentials.encrypted === "string" &&
+    credentials.encrypted.length > 0
   );
 }
 
 /**
  * Get decrypted credentials from an account row.
- * Handles both encrypted and legacy plain formats.
  *
  * @throws Error if encryption is not configured and credentials are encrypted
  * @throws Error if decryption fails (e.g., wrong key)
+ * @throws Error if credentials are present but not encrypted
  */
 export function getDecryptedCredentials(
   row: MarketingAccountRow
@@ -63,19 +52,12 @@ export function getDecryptedCredentials(
     return decryptJson<MarketingCredentials>(row.credentials.encrypted);
   }
 
-  // Handle legacy plain credentials (backwards compatibility)
-  if (isPlainCredentials(row.credentials)) {
-    return row.credentials;
-  }
-
-  // Unknown format
-  console.warn("Unknown credentials format for account:", row.id);
-  return null;
+  throw new Error(`Marketing account credentials must be encrypted: ${row.id}`);
 }
 
 /**
  * Check if an account has valid credentials (without decrypting them)
  */
 export function hasValidCredentials(row: MarketingAccountRow): boolean {
-  return isEncryptedCredentials(row.credentials) || isPlainCredentials(row.credentials);
+  return isEncryptedCredentials(row.credentials);
 }
