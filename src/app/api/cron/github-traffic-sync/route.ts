@@ -3,12 +3,13 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
+import { acquireCronJobLease, releaseCronJobLease } from "@/lib/cron-job-lock";
 
 const GITHUB_API_BASE = "https://api.github.com";
 const REPO = "juan294/paisaxe";
 
-/** Postgres advisory lock ID — unique per cron route. */
-const LOCK_ID = 1001;
+const LOCK_KEY = "github-traffic-sync";
+const LOCK_LEASE_SECONDS = 20 * 60;
 
 interface GitHubTrafficViewsResponse {
   count: number;
@@ -65,18 +66,19 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
   }
 
   const supabase = createAdminClient();
+  let lockToken: string | null = null;
 
-  // Acquire advisory lock to prevent concurrent runs
-  const { data: locked, error: lockError } = await supabase.rpc(
-    "pg_try_advisory_lock",
-    { lockid: LOCK_ID }
-  );
-  if (lockError || !locked) {
+  const lease = await acquireCronJobLease(supabase, LOCK_KEY, LOCK_LEASE_SECONDS);
+  if (!lease.acquired) {
+    if (lease.error) {
+      logger.error("[GITHUB_TRAFFIC_SYNC_LOCK_FAILED]", { error: lease.error });
+    }
     return NextResponse.json(
       { status: "skipped", reason: "concurrent run in progress" },
       { status: 409 }
     );
   }
+  lockToken = lease.token;
 
   try {
     // Fetch all 4 GitHub Traffic endpoints in parallel
@@ -209,7 +211,11 @@ async function syncGitHubTraffic(): Promise<NextResponse> {
       { status: 500 }
     );
   } finally {
-    await supabase.rpc("pg_advisory_unlock", { lockid: LOCK_ID });
+    try {
+      await releaseCronJobLease(supabase, LOCK_KEY, lockToken);
+    } catch (error) {
+      logger.error("[GITHUB_TRAFFIC_SYNC_LOCK_RELEASE_FAILED]", { error });
+    }
   }
 }
 

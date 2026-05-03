@@ -45,7 +45,7 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-// Mock Supabase client (for advisory lock)
+// Mock Supabase client (for durable cron lease)
 const mockRpc = vi.fn();
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({ rpc: mockRpc }),
@@ -85,10 +85,10 @@ describe("POST /api/cron/subscription-optimizer", () => {
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
     mockRpc.mockReset();
-    // Default: advisory lock succeeds
+    // Default: durable cron lease succeeds
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });
@@ -524,8 +524,8 @@ describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
     mockRpc.mockReset();
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });
@@ -585,7 +585,7 @@ describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
   });
 });
 
-describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
+describe("Cron lease (DO-M2) — subscription-optimizer", () => {
   const originalEnv = process.env;
   const WEBHOOK_SECRET = "test-webhook-secret-123";
 
@@ -613,9 +613,9 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     process.env = originalEnv;
   });
 
-  it("returns 409 when advisory lock is already held (concurrent run)", async () => {
+  it("returns 409 when durable cron lease is already held (concurrent run)", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: false, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: false, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -633,9 +633,9 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     );
   });
 
-  it("returns 409 when pg_try_advisory_lock returns an error", async () => {
+  it("returns 409 when try_acquire_cron_job_lease returns an error", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock")
+      if (fn === "try_acquire_cron_job_lock")
         return Promise.resolve({ data: null, error: { message: "DB error" } });
       return Promise.resolve({ data: null, error: null });
     });
@@ -650,10 +650,10 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     expect(response.status).toBe(409);
   });
 
-  it("executes optimizer and calls pg_advisory_unlock when lock is acquired", async () => {
+  it("executes optimizer and calls release_cron_job_lock when lease is acquired", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -676,15 +676,49 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     expect(response.status).toBe(200);
 
     const unlockCalls = mockRpc.mock.calls.filter(
-      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+      (args: unknown[]) => args[0] === "release_cron_job_lock"
     );
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("calls pg_advisory_unlock in finally block even when optimizer throws", async () => {
+  it("#439 QA-H1: uses durable cron lease RPCs instead of session durable cron lease RPCs", async () => {
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock")
+        return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock")
+        return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const mockReport = {
+      recommendations: [],
+      totalMonthlySpend: 50,
+      analyzedAt: "2026-02-09T10:00:00.000Z",
+      dismissedFeatures: [],
+    };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(200);
+
+    const rpcNames = mockRpc.mock.calls.map((args: unknown[]) => args[0]);
+    expect(rpcNames).toContain("try_acquire_cron_job_lock");
+    expect(rpcNames).toContain("release_cron_job_lock");
+    expect(rpcNames).not.toContain("pg_try_advisory_lock");
+    expect(rpcNames).not.toContain("pg_advisory_unlock");
+  });
+
+  it("calls release_cron_job_lock in finally block even when optimizer throws", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
 
@@ -704,7 +738,7 @@ describe("Advisory lock (DO-M2) — subscription-optimizer", () => {
     expect(response.status).toBe(500);
 
     const unlockCalls = mockRpc.mock.calls.filter(
-      (args: unknown[]) => args[0] === "pg_advisory_unlock"
+      (args: unknown[]) => args[0] === "release_cron_job_lock"
     );
     expect(unlockCalls.length).toBeGreaterThanOrEqual(1);
 
@@ -740,8 +774,8 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — subscription-optimizer", () =>
     logger.error.mockClear();
     logger.warn.mockClear();
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
-      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: true, error: null });
       return Promise.resolve({ data: null, error: null });
     });
   });
