@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   isEncryptedCredentials,
-  isPlainCredentials,
   getDecryptedCredentials,
   hasValidCredentials,
 } from "./credentials";
@@ -41,27 +40,6 @@ describe("credentials", () => {
     });
   });
 
-  describe("isPlainCredentials", () => {
-    it("returns true for plain credentials", () => {
-      const credentials = { accessToken: "token", refreshToken: "refresh" };
-      expect(isPlainCredentials(credentials)).toBe(true);
-    });
-
-    it("returns false for encrypted credentials", () => {
-      const credentials = { encrypted: "some-encrypted-string" };
-      expect(isPlainCredentials(credentials)).toBe(false);
-    });
-
-    it("returns false for null", () => {
-      expect(isPlainCredentials(null)).toBe(false);
-    });
-
-    it("returns false when accessToken is not a string", () => {
-      const credentials = { accessToken: 123 };
-      expect(isPlainCredentials(credentials as any)).toBe(false);
-    });
-  });
-
   describe("getDecryptedCredentials", () => {
     it("returns null when credentials are null", () => {
       const row: MarketingAccountRow = {
@@ -79,13 +57,13 @@ describe("credentials", () => {
       expect(getDecryptedCredentials(row)).toBeNull();
     });
 
-    it("returns plain credentials directly", () => {
+    it("rejects legacy plain credentials", () => {
       const credentials = { accessToken: "plain-token", refreshToken: "plain-refresh" };
       const row: MarketingAccountRow = {
         id: "acc-1",
         platform: "x",
         account_name: "test",
-        credentials,
+        credentials: credentials as any,
         account_handle: null,
         platform_user_id: null,
         is_active: true,
@@ -93,7 +71,9 @@ describe("credentials", () => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      expect(getDecryptedCredentials(row)).toEqual(credentials);
+      expect(() => getDecryptedCredentials(row)).toThrow(
+        "Marketing account credentials must be encrypted"
+      );
     });
 
     it("decrypts encrypted credentials", () => {
@@ -116,8 +96,7 @@ describe("credentials", () => {
       });
     });
 
-    it("returns null and logs warning for unknown format", () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    it("rejects unknown credential format", () => {
       const row: MarketingAccountRow = {
         id: "acc-1",
         platform: "x",
@@ -130,12 +109,9 @@ describe("credentials", () => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      expect(getDecryptedCredentials(row)).toBeNull();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Unknown credentials format for account:",
-        "acc-1"
+      expect(() => getDecryptedCredentials(row)).toThrow(
+        "Marketing account credentials must be encrypted"
       );
-      consoleSpy.mockRestore();
     });
   });
 
@@ -191,12 +167,12 @@ describe("credentials", () => {
       expect(hasValidCredentials(row)).toBe(true);
     });
 
-    it("returns true for plain credentials", () => {
+    it("returns false for plain credentials", () => {
       const row: MarketingAccountRow = {
         id: "acc-1",
         platform: "x",
         account_name: "test",
-        credentials: { accessToken: "token", refreshToken: "refresh" },
+        credentials: { accessToken: "token", refreshToken: "refresh" } as any,
         account_handle: null,
         platform_user_id: null,
         is_active: true,
@@ -204,7 +180,7 @@ describe("credentials", () => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      expect(hasValidCredentials(row)).toBe(true);
+      expect(hasValidCredentials(row)).toBe(false);
     });
 
     it("returns false for null credentials", () => {
