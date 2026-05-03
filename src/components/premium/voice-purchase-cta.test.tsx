@@ -119,6 +119,18 @@ describe("VoicePurchaseCTA", () => {
       fireEvent.click(screen.getByRole("button", { name: "Sign in to purchase" }));
       expect(mockSignInWithGoogle).toHaveBeenCalled();
     });
+
+    it("preserves returnTo when signing in before purchase", () => {
+      mockUser = null;
+      mockSession = null;
+      render(<VoicePurchaseCTA returnTo="oviedo-walking-tour" />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Sign in to purchase" }));
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+        "/pricing/checkout?returnTo=oviedo-walking-tour"
+      );
+    });
   });
 
   describe("compact view", () => {

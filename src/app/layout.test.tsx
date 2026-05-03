@@ -123,21 +123,22 @@ describe("RootLayout", () => {
     });
   });
 
-  describe("main landmark", () => {
-    it("renders <main id='main-content'> as a server-side landmark (not delegated to client providers)", () => {
+  describe("content target", () => {
+    it("renders a non-landmark #main-content target so route pages own the main landmark", () => {
       const Component = RootLayout({ children: <div data-testid="child">Child</div> });
       const { container } = render(Component);
-      const mainElement = container.querySelector("main#main-content");
-      expect(mainElement).not.toBeNull();
-      expect(mainElement?.tagName).toBe("MAIN");
+      const mainTarget = container.querySelector("#main-content");
+      expect(mainTarget).not.toBeNull();
+      expect(mainTarget?.tagName).toBe("DIV");
+      expect(container.querySelector("main#main-content")).toBeNull();
     });
 
-    it("places children inside the <main id='main-content'> landmark", () => {
+    it("places children inside the #main-content target", () => {
       const Component = RootLayout({ children: <div data-testid="inner">Inner</div> });
       const { container } = render(Component);
-      const mainElement = container.querySelector("main#main-content");
-      expect(mainElement).not.toBeNull();
-      expect(mainElement?.querySelector("[data-testid='inner']")).not.toBeNull();
+      const mainTarget = container.querySelector("#main-content");
+      expect(mainTarget).not.toBeNull();
+      expect(mainTarget?.querySelector("[data-testid='inner']")).not.toBeNull();
     });
   });
 

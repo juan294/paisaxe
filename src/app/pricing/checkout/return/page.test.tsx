@@ -102,6 +102,8 @@ describe("CheckoutReturnPage", () => {
 
       const spinner = document.querySelector(".animate-spin");
       expect(spinner).toBeInTheDocument();
+      expect(spinner?.getAttribute("class")).toContain("motion-reduce:animate-none");
+      expect(screen.getByRole("status")).toHaveTextContent("premium.loading_access");
     });
 
     it("should not render success content when loading", () => {

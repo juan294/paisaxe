@@ -41,14 +41,14 @@ export default function GlobalError({
           <div className="mt-8 flex flex-col items-center gap-4">
             <button
               onClick={reset}
-              className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-6 py-3 text-white transition-colors"
+              className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-6 py-3 text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             >
               {t("errors.retry")}
             </button>
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- global-error replaces the root layout, so next/link is unavailable */}
             <a
               href="/"
-              className="text-white/60 hover:text-white transition-colors text-sm underline underline-offset-4"
+              className="text-white/60 hover:text-white transition-colors text-sm underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             >
               {t("errors.go_home")}
             </a>

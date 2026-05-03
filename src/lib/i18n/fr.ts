@@ -273,6 +273,7 @@ export const fr: Translations = {
     success_expires: 'Votre accès est valide jusqu\'à',
     success_cta: 'Commencer à Parler',
     success_retry_hint: 'Si votre accès ne s\'affiche pas, veuillez patienter un moment et actualiser.',
+    loading_access: 'Vérification de votre accès...',
     checkout_title: 'Paiement',
     checkout_back_to_pricing: 'Retour aux tarifs',
     pricing_title: 'Conversations Vocales',

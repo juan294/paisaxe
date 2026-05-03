@@ -25,19 +25,15 @@ export const StoryProgressBar = memo(function StoryProgressBar({
   const base = currentIndex - fillPosition;
 
   // Refs for roving tabindex focus management
-  const segmentRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const segmentRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Keep refs array sized correctly
   useEffect(() => {
     segmentRefs.current = segmentRefs.current.slice(0, segmentCount);
   }, [segmentCount]);
 
-  const handleClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const target = (e.target as HTMLElement).closest("[data-segment-index]");
-      if (!target) return;
-      e.stopPropagation();
-      const idx = Number(target.getAttribute("data-segment-index"));
+  const handleSelect = useCallback(
+    (idx: number) => {
       const targetIndex = base + idx;
       if (targetIndex >= 0 && targetIndex < storiesLength) {
         onIndexChange(targetIndex);
@@ -47,11 +43,7 @@ export const StoryProgressBar = memo(function StoryProgressBar({
   );
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      const target = (e.target as HTMLElement).closest("[data-segment-index]");
-      if (!target) return;
-
-      const idx = Number(target.getAttribute("data-segment-index"));
+    (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
 
       // Arrow-key navigation (roving tabindex pattern)
       if (e.key === "ArrowRight") {
@@ -106,13 +98,10 @@ export const StoryProgressBar = memo(function StoryProgressBar({
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         e.stopPropagation();
-        const targetIndex = base + idx;
-        if (targetIndex >= 0 && targetIndex < storiesLength) {
-          onIndexChange(targetIndex);
-        }
+        handleSelect(idx);
       }
     },
-    [base, segmentCount, storiesLength, onIndexChange]
+    [base, segmentCount, storiesLength, onIndexChange, handleSelect]
   );
 
   /**
@@ -120,7 +109,7 @@ export const StoryProgressBar = memo(function StoryProgressBar({
    * When storyTitles are provided, includes the story title for screen readers.
    */
   const getSegmentLabel = useCallback(
-    (segmentIdx: number, targetIndex: number): string => {
+    (targetIndex: number): string => {
       const baseLabel = t("accessibility.go_to_story")
         .replace("{current}", String(targetIndex + 1))
         .replace("{total}", String(storiesLength));
@@ -135,45 +124,50 @@ export const StoryProgressBar = memo(function StoryProgressBar({
   );
 
   return (
-    <div
-      role="progressbar"
+    <nav
       aria-label={t("accessibility.story_progress")}
-      aria-valuenow={currentIndex + 1}
-      aria-valuemin={1}
-      aria-valuemax={storiesLength}
       className="absolute top-0 left-0 right-0 z-20 flex items-center gap-1 p-4"
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
     >
-      {Array.from({ length: segmentCount }, (_, i) => {
-        const targetIndex = base + i;
-        const isCurrent = i === fillPosition;
-        return (
-          <div
-            key={i}
-            ref={(el) => { segmentRefs.current[i] = el; }}
-            role="button"
-            tabIndex={isCurrent ? 0 : -1}
-            data-segment-index={i}
-            aria-label={getSegmentLabel(i, targetIndex)}
-            aria-current={isCurrent ? "true" : undefined}
-            className={cn(
-              // UX-M10 (#520): h-1.5 default (was h-1) for better touch affordance;
-              // hover/focus grows to h-2; inactive segments use bg-white/40 (was bg-white/30)
-              // for better contrast on touch (coarse pointer) devices.
-              "flex-1 h-1.5 hover:h-2 focus-visible:h-2 rounded-full bg-white/40 touch:bg-white/40 overflow-hidden cursor-pointer transition-all duration-300 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
-              isCurrent && "ring-1 ring-white/50"
-            )}
-          >
-            <div
-              className={cn(
-                "h-full bg-white transition-all duration-300 motion-reduce:transition-none",
-                i <= fillPosition ? "w-full" : "w-0"
-              )}
-            />
-          </div>
-        );
-      })}
-    </div>
+      <span className="sr-only">
+        {t("accessibility.story_counter")
+          .replace("{current}", String(currentIndex + 1))
+          .replace("{total}", String(storiesLength))}
+      </span>
+      <ol role="list" className="flex w-full items-center gap-1">
+        {Array.from({ length: segmentCount }, (_, i) => {
+          const targetIndex = base + i;
+          const isCurrent = i === fillPosition;
+          return (
+            <li key={i} className="flex flex-1">
+              <button
+                type="button"
+                ref={(el) => { segmentRefs.current[i] = el; }}
+                tabIndex={isCurrent ? 0 : -1}
+                data-segment-index={i}
+                aria-label={getSegmentLabel(targetIndex)}
+                aria-current={isCurrent ? "page" : undefined}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleSelect(i);
+                }}
+                onKeyDown={(event) => handleKeyDown(event, i)}
+                className={cn(
+                  "h-1.5 w-full hover:h-2 focus-visible:h-2 rounded-full bg-white/40 touch:bg-white/40 overflow-hidden cursor-pointer transition-all duration-300 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+                  isCurrent && "ring-1 ring-white/50"
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "block h-full bg-white transition-all duration-300 motion-reduce:transition-none",
+                    i <= fillPosition ? "w-full" : "w-0"
+                  )}
+                />
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 });
