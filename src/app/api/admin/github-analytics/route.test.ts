@@ -439,16 +439,24 @@ describe("GET /api/admin/github-analytics", () => {
    * PE-L1: The four Supabase queries (daily, referrers, paths, lastSync)
    * must be dispatched concurrently via Promise.all, not sequentially.
    *
-   * Strategy: inject a 40 ms delay per query and assert total elapsed < 4 * 40 ms.
+   * Strategy: track overlapping in-flight query promises instead of relying
+   * on wall-clock timing, which can be noisy on loaded machines.
    */
   it("PE-L1: fetches all four Supabase tables concurrently (#307)", async () => {
-
     const DELAY_MS = 40;
+    let activeQueries = 0;
+    let maxActiveQueries = 0;
 
     function delayedResolve<T>(data: T) {
-      return new Promise<{ data: T; error: null }>((resolve) =>
-        setTimeout(() => resolve({ data, error: null }), DELAY_MS)
-      );
+      activeQueries += 1;
+      maxActiveQueries = Math.max(maxActiveQueries, activeQueries);
+
+      return new Promise<{ data: T; error: null }>((resolve) => {
+        setTimeout(() => {
+          activeQueries -= 1;
+          resolve({ data, error: null });
+        }, DELAY_MS);
+      });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -503,15 +511,11 @@ describe("GET /api/admin/github-analytics", () => {
       "https://paisaxe.es/api/admin/github-analytics?from=2026-02-01&to=2026-02-07"
     );
 
-    const start = Date.now();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = await GET(request as never) as any;
-    const elapsed = Date.now() - start;
 
     expect(response.status).toBe(200);
-    // Sequential would take >= 4 * DELAY_MS; parallel finishes in ~1 * DELAY_MS.
-    // We give a generous 3× budget to tolerate slow CI environments.
-    expect(elapsed).toBeLessThan(3 * DELAY_MS);
+    expect(maxActiveQueries).toBe(4);
     expect(response.body.data.summary.totalViews).toBe(110);
   });
 
