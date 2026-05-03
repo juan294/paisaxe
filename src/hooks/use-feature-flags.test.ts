@@ -161,6 +161,21 @@ describe("useFeatureFlags", () => {
     expect(result.current.flags).toEqual([]);
     expect(result.current.isEnabled("contextual_prompts")).toBe(false);
   });
+
+  it("should not fetch flags when the provider is disabled", async () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, { enabled: false }, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(result.current.isReady).toBe(false);
+    expect(result.current.flags).toEqual([]);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 });
 
 describe("useFeatureFlags isReady state", () => {

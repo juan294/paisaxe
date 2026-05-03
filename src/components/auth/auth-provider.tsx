@@ -34,6 +34,8 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
       return;
     }
 
+    let cancelled = false;
+
     // Get initial session using getUser() to validate with server
     // This ensures client and server auth state stay in sync
     const initializeAuth = async () => {
@@ -42,7 +44,7 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
       // hangs on NXDOMAIN DNS resolution.
       const anonKey = getSupabaseAnonKey();
       if (!anonKey || !anonKey.startsWith("eyJ")) {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
         return;
       }
 
@@ -55,26 +57,38 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
 
         if (error || !validatedUser) {
           // Session invalid or expired - clear state
-          setSession(null);
-          setUser(null);
+          if (!cancelled) {
+            setSession(null);
+            setUser(null);
+          }
         } else {
-          setSession(currentSession);
-          setUser(mapSupabaseUser(validatedUser));
+          if (!cancelled) {
+            setSession(currentSession);
+            setUser(mapSupabaseUser(validatedUser));
+          }
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
-        setSession(null);
-        setUser(null);
+        if (!cancelled) {
+          setSession(null);
+          setUser(null);
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
-    initializeAuth();
+    if (deferInitialAuth) {
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+      void initializeAuth();
+    }
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, newSession: Session | null) => {
+        if (cancelled) return;
         setSession(newSession);
         setUser(mapSupabaseUser(newSession?.user ?? null));
         setIsLoading(false);
@@ -82,9 +96,10 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
     );
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [deferInitialAuth, supabase]);
 
   const signInWithGoogle = useCallback(async (redirectPath?: string) => {
     if (!supabase) {

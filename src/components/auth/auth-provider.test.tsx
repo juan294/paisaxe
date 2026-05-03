@@ -186,7 +186,7 @@ describe("AuthProvider", () => {
     });
   });
 
-  it("can treat anonymous as resolved while auth bootstraps in the background", () => {
+  it("does not call Supabase session bootstrap while initial auth is deferred", async () => {
     mockGetSession.mockImplementation(() => new Promise(() => {}));
     mockGetUser.mockImplementation(() => new Promise(() => {}));
 
@@ -198,6 +198,35 @@ describe("AuthProvider", () => {
 
     expect(screen.getByTestId("loading").textContent).toBe("false");
     expect(screen.getByTestId("user").textContent).toBe("none");
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(mockGetSession).not.toHaveBeenCalled();
+    expect(mockGetUser).not.toHaveBeenCalled();
+    expect(mockOnAuthStateChange).toHaveBeenCalled();
+  });
+
+  it("runs the Supabase session bootstrap when a deferred route later requires auth", async () => {
+    const { rerender } = render(
+      <AuthProvider deferInitialAuth>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(mockGetSession).not.toHaveBeenCalled();
+    expect(mockGetUser).not.toHaveBeenCalled();
+
+    rerender(
+      <AuthProvider deferInitialAuth={false}>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(mockGetSession).toHaveBeenCalledTimes(1);
+      expect(mockGetUser).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("handles getSession error gracefully (sets isLoading false)", async () => {
