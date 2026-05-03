@@ -141,9 +141,9 @@ export default function RootLayout({
         <JsonLd type="website" />
         <Providers>
           <PostHogPageView />
-          <main id="main-content">
+          <div id="main-content">
             {children}
-          </main>
+          </div>
         </Providers>
         <VercelAnalytics />
       </body>

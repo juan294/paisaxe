@@ -14,7 +14,7 @@ export default function TermsPage() {
           <Link
             href="/immersive"
             aria-label={t("terms.back")}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -161,7 +161,7 @@ export default function TermsPage() {
               {t("terms.contact_description")}{" "}
               <a
                 href="mailto:support@paisaxe.es"
-                className="text-white/70 hover:text-white transition-colors underline underline-offset-4"
+                className="text-white/70 hover:text-white transition-colors underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
               >
                 support@paisaxe.es
               </a>
@@ -170,11 +170,11 @@ export default function TermsPage() {
         </div>
 
         <div className="mt-16 pt-8 border-t border-white/5 flex items-center justify-center gap-4 text-xs text-neutral-500">
-          <Link href="/privacy" className="hover:text-neutral-300 transition-colors">
+          <Link href="/privacy" className="hover:text-neutral-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
             {t("terms.footer_privacy")}
           </Link>
           <span className="text-neutral-700" aria-hidden="true">&middot;</span>
-          <Link href="/about" className="hover:text-neutral-300 transition-colors">
+          <Link href="/about" className="hover:text-neutral-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
             {t("terms.footer_about")}
           </Link>
         </div>

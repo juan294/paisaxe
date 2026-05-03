@@ -384,23 +384,24 @@ describe("Accessibility: StoryViewer", () => {
     });
   });
 
-  describe("progress bar accessibility", () => {
-    it("should have an accessible role on the progress bar", async () => {
+  describe("progress navigation accessibility", () => {
+    it("should have an accessible navigation role for story progress", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const progressBar = screen.getByRole("progressbar");
-      expect(progressBar).toBeInTheDocument();
+      const progressNav = screen.getByRole("navigation", { name: "Progreso de historias" });
+      expect(progressNav).toBeInTheDocument();
+      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     });
 
-    it("should indicate the current position in the progress bar", async () => {
+    it("should indicate the current position in the progress navigation", async () => {
       await renderWithAuth(
         <StoryViewer {...getDefaultProps({ currentIndex: 0 })} />
       );
 
-      const progressBar = screen.getByRole("progressbar");
-      expect(progressBar).toHaveAttribute("aria-valuenow", "1");
-      expect(progressBar).toHaveAttribute("aria-valuemin", "1");
-      expect(progressBar).toHaveAttribute("aria-valuemax", "2");
+      const currentSegment = screen.getByRole("button", {
+        name: /Lagos de Covadonga/,
+      });
+      expect(currentSegment).toHaveAttribute("aria-current", "page");
     });
   });
 });

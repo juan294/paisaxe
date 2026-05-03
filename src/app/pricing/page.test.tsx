@@ -54,8 +54,9 @@ vi.mock("next/link", () => ({
 
 // Mock next/navigation
 const mockPush = vi.fn();
+const mockSearchParams = new URLSearchParams();
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
   useRouter: () => ({
     push: mockPush,
     replace: vi.fn(),
@@ -70,6 +71,7 @@ describe("PricingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPush.mockReset();
+    mockSearchParams.delete("returnTo");
     mockUseAuth.mockReturnValue({
       user: null,
       session: null,
@@ -211,6 +213,20 @@ describe("PricingPage", () => {
     expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing");
   });
 
+  it("preserves returnTo when starting sign-in from pricing", () => {
+    mockSearchParams.set("returnTo", "oviedo-walking-tour");
+
+    render(<PricingPage />);
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "premium.sign_in_to_purchase",
+    }));
+
+    expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+      "/pricing?returnTo=oviedo-walking-tour"
+    );
+  });
+
   it("should show purchase button when user is authenticated", () => {
     mockUseAuth.mockReturnValue({
       user: { id: "user-123", email: "test@example.com" },
@@ -342,6 +358,24 @@ describe("PricingPage", () => {
     expect(mockPush).toHaveBeenCalledWith("/pricing/checkout");
   });
 
+  it("preserves returnTo when authenticated users continue to checkout", () => {
+    mockSearchParams.set("returnTo", "oviedo-walking-tour");
+    mockUseAuth.mockReturnValue({
+      user: { id: "user-123", email: "test@example.com" },
+      session: { access_token: "token" },
+      signInWithGoogle: mockSignInWithGoogle,
+      isLoading: false,
+    });
+
+    render(<PricingPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "premium.pricing_cta" }));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      "/pricing/checkout?returnTo=oviedo-walking-tour"
+    );
+  });
+
   it("should show Premium Access text when isWhitelisted is true with no expiresAt", () => {
     mockUseVoiceAccess.mockReturnValue({
       hasAccess: false,
@@ -401,6 +435,14 @@ describe("PricingPage", () => {
       // Spinner should be inside the button
       const spinner = button.querySelector(".animate-spin");
       expect(spinner).toBeInTheDocument();
+    });
+
+    it("should have visible focus styles on the primary CTA", () => {
+      render(<PricingPage />);
+
+      const button = screen.getByRole("button", { name: "premium.sign_in_to_purchase" });
+      expect(button.className).toContain("focus-visible:ring-2");
+      expect(button.className).toContain("focus-visible:ring-green-300");
     });
   });
 

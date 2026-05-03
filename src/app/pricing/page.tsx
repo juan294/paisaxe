@@ -15,17 +15,20 @@ export default function PricingPage() {
   const router = useRouter();
   const returnTo = searchParams.get("returnTo");
   const isResolvingAuthenticatedAccess = isLoading && !!user && !!session;
+  const encodedReturnTo = returnTo ? encodeURIComponent(returnTo) : null;
+  const pricingUrl = encodedReturnTo
+    ? `/pricing?returnTo=${encodedReturnTo}`
+    : "/pricing";
+  const checkoutUrl = encodedReturnTo
+    ? `/pricing/checkout?returnTo=${encodedReturnTo}`
+    : "/pricing/checkout";
 
   const handlePurchase = () => {
     if (!user || !session) {
-      signInWithGoogle("/pricing");
+      signInWithGoogle(pricingUrl);
       return;
     }
 
-    // Navigate to embedded checkout page
-    const checkoutUrl = returnTo
-      ? `/pricing/checkout?returnTo=${returnTo}`
-      : "/pricing/checkout";
     router.push(checkoutUrl);
   };
 
@@ -137,7 +140,7 @@ export default function PricingPage() {
               <button
                 onClick={handlePurchase}
                 disabled={isResolvingAuthenticatedAccess}
-                className="w-full px-5 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black text-sm font-medium rounded-lg hover:from-green-400 hover:to-green-300 transition-colors flex items-center justify-center gap-2 disabled:from-gray-500 disabled:to-gray-600 disabled:opacity-75 disabled:cursor-not-allowed"
+                className="w-full px-5 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black text-sm font-medium rounded-lg hover:from-green-400 hover:to-green-300 transition-colors flex items-center justify-center gap-2 disabled:from-gray-500 disabled:to-gray-600 disabled:opacity-75 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
               >
                 {isResolvingAuthenticatedAccess ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />

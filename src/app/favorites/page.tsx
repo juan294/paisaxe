@@ -96,7 +96,7 @@ export default function FavoritesPage() {
             <Link
               href="/immersive"
               aria-label={t("accessibility.go_back")}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -134,7 +134,7 @@ export default function FavoritesPage() {
             )}
             <Link
               href="/immersive"
-              className="px-5 py-2.5 bg-white text-neutral-900 rounded-full text-sm font-medium transition-all hover:bg-neutral-200"
+              className="px-5 py-2.5 bg-white text-neutral-900 rounded-full text-sm font-medium transition-all hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
             >
               {t("favorites.explore")}
             </Link>
@@ -185,8 +185,9 @@ interface GalleryItemProps {
 
 function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
   const [isVisible, setIsVisible] = useState(false);
-  const itemRef = useRef<HTMLAnchorElement>(null);
+  const itemRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
+  const storyHref = `/immersive?story=${story.slug || story.id}`;
 
   // Intersection Observer for lazy rendering
   useEffect(() => {
@@ -216,9 +217,8 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
   }, []);
 
   return (
-    <Link
+    <div
       ref={itemRef}
-      href={`/immersive?story=${story.slug || story.id}`}
       className={cn(
         "group relative w-full overflow-hidden rounded-lg",
         isFeature && "sm:col-span-2"
@@ -245,11 +245,14 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
             />
 
             {/* Gradient overlay - appears on hover */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-100 md:opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none" />
 
             {/* Content overlay - appears on hover */}
-            <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 transition-all duration-300 group-hover:opacity-100">
-              <div className="translate-y-2 transform transition-transform duration-300 group-hover:translate-y-0">
+            <Link
+              href={storyHref}
+              className="absolute inset-0 flex flex-col justify-end p-4 opacity-100 transition-all duration-300 md:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-inset"
+            >
+              <div className="translate-y-0 transform transition-transform duration-300 md:translate-y-2 group-hover:translate-y-0 group-focus-within:translate-y-0">
                 <p className="text-xs font-medium uppercase tracking-wider text-white/60">
                   {t(`stories.categories.${story.category}`)}
                 </p>
@@ -262,24 +265,15 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
                   </p>
                 )}
               </div>
-            </div>
+            </Link>
 
-            {/* Delete button - top right on hover */}
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onRemove();
-              }}
-              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 hover:bg-red-500 group-hover:opacity-100"
-              aria-label={t("favorites.remove_from_saved")}
-            >
-              <Trash2 className="h-4 w-4 text-neutral-800 group-hover/btn:text-white" />
-            </button>
           </>
         ) : (
           /* Placeholder while loading or no image */
-          <div className="flex h-full flex-col items-center justify-center gap-3 bg-neutral-800 animate-pulse">
+          <Link
+            href={storyHref}
+            className="flex h-full flex-col items-center justify-center gap-3 bg-neutral-800 animate-pulse focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-inset"
+          >
             {!isVisible ? (
               <div className="h-8 w-8 rounded bg-neutral-700" />
             ) : (
@@ -290,9 +284,22 @@ function GalleryItem({ story, isFeature, onRemove }: GalleryItemProps) {
                 </p>
               </>
             )}
-          </div>
+          </Link>
         )}
+
+        {/* Delete button - top right on hover/focus and always visible on touch */}
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 opacity-100 shadow-lg backdrop-blur-sm transition-all duration-300 hover:bg-red-500 md:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
+          aria-label={t("favorites.remove_from_saved")}
+        >
+          <Trash2 className="h-4 w-4 text-neutral-800" />
+        </button>
       </div>
-    </Link>
+    </div>
   );
 }
