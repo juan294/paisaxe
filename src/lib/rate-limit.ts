@@ -108,7 +108,7 @@ const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 const useUpstash = Boolean(upstashUrl && upstashToken);
 
 function isProduction(): boolean {
-  return process.env.NODE_ENV === "production";
+  return process.env.VERCEL_ENV === "production";
 }
 
 // Cache Ratelimit instances by config key so each route's limits are enforced independently

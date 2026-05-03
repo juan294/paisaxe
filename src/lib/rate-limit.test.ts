@@ -244,7 +244,7 @@ describe("rate-limit", () => {
 
     it("fails closed (denies) in production when Upstash call fails", async () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("VERCEL_ENV", "production");
       mockLimit.mockRejectedValue(new Error("Redis down"));
 
       const result = await checkRateLimit("user1", {
@@ -289,7 +289,7 @@ describe("rate-limit", () => {
     it("BE-M1: emits logger.warn([RATE_LIMIT_DEGRADED]) with reason 'upstash_unavailable' in production fallback path", async () => {
       // In production Upstash fails → fail closed, but must still warn
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("VERCEL_ENV", "production");
       mockLimit.mockRejectedValue(new Error("Redis down in production"));
 
       const loggerModule = await import("./logger");
@@ -412,7 +412,7 @@ describe("rate-limit", () => {
 
     it("AR-M2: fails closed in production when Upstash credentials are missing", async () => {
       vi.resetModules();
-      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("VERCEL_ENV", "production");
       delete process.env.UPSTASH_REDIS_REST_URL;
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
@@ -430,6 +430,27 @@ describe("rate-limit", () => {
         configured: false,
         degraded: true,
         reason: "upstash_missing",
+      });
+    });
+
+    it("AR-M2b: uses in-memory when NODE_ENV=production but VERCEL_ENV is unset (CI / next start)", async () => {
+      vi.resetModules();
+      vi.stubEnv("NODE_ENV", "production");
+      delete process.env.VERCEL_ENV;
+      delete process.env.UPSTASH_REDIS_REST_URL;
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+
+      const { checkRateLimit, getRateLimitStore, getRateLimitBackendStatus } =
+        await import("./rate-limit");
+
+      const result = await checkRateLimit("ci-user");
+
+      expect(result.allowed).toBe(true);
+      expect(getRateLimitStore().size).toBe(1);
+      expect(getRateLimitBackendStatus()).toEqual({
+        backend: "memory",
+        configured: false,
+        degraded: false,
       });
     });
   });
