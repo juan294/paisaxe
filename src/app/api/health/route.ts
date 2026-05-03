@@ -64,6 +64,10 @@ function isSentryRequired(): boolean {
   return process.env.VERCEL_ENV === "production";
 }
 
+function isRateLimitBackendRequired(): boolean {
+  return process.env.VERCEL_ENV === "production";
+}
+
 const STORAGE_LIMIT_MB = 8192; // Supabase Pro tier: 8 GB
 const STORAGE_WARNING_THRESHOLD = 0.8; // 80%
 
@@ -207,14 +211,15 @@ export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
       databaseStatus.usage_percent >= STORAGE_WARNING_THRESHOLD * 100;
     const isSentryMissingInDeployedEnv =
       isSentryRequired() && sentryStatus.status !== "configured";
-    const isRateLimitDegraded = rateLimitStatus.status === "degraded";
+    const isRateLimitDegradedInRequiredEnv =
+      isRateLimitBackendRequired() && rateLimitStatus.status === "degraded";
 
     const overallStatus =
       isSupabaseError ||
       isStoriesFallback ||
       isDatabaseOverThreshold ||
       isSentryMissingInDeployedEnv ||
-      isRateLimitDegraded
+      isRateLimitDegradedInRequiredEnv
         ? "degraded"
         : "healthy";
 

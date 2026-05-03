@@ -361,6 +361,29 @@ describe("GET /api/health", () => {
     expect(data.sentry).toEqual({ status: "unconfigured" });
   });
 
+  it("DO-H2: keeps deployed preview health healthy when only Upstash is missing", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+      backend: "blocked",
+      configured: false,
+      degraded: true,
+      reason: "upstash_missing",
+    });
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
+    expect(data.rate_limit).toEqual({
+      status: "degraded",
+      backend: "blocked",
+      reason: "upstash_missing",
+    });
+  });
+
   it("DO-H2: marks deployed production health degraded when Sentry DSN is missing", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
@@ -373,6 +396,29 @@ describe("GET /api/health", () => {
     expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
     expect(data.sentry).toEqual({ status: "unconfigured" });
+  });
+
+  it("DO-H2: marks deployed production health degraded when Upstash is missing", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.mocked(getRateLimitBackendStatus).mockReturnValue({
+      backend: "blocked",
+      configured: false,
+      degraded: true,
+      reason: "upstash_missing",
+    });
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+    expect(data.rate_limit).toEqual({
+      status: "degraded",
+      backend: "blocked",
+      reason: "upstash_missing",
+    });
   });
 
   it("DO-H2: health response includes sentry.status=configured when DSN is set", async () => {
