@@ -3,7 +3,7 @@
 > Comprehensive guide to the automation, security, and quality infrastructure for Paisaxe.
 > Designed to be replicable by other teams on any Next.js + GitHub + Vercel + Supabase stack.
 
-**Last Updated**: April 24, 2026
+**Last Updated**: May 3, 2026
 **Scope**: CI/CD workflows, local agents, security measures, monitoring, and admin controls
 
 ---
@@ -30,7 +30,7 @@
 ```
 GitHub Actions (Push/PR)
   +-- ci.yml .............. Lint, Typecheck, Tests, Build
-  +-- e2e.yml ............. Playwright E2E tests (16 spec files)
+  +-- e2e.yml ............. Playwright E2E tests (18 spec files)
   +-- e2e-stripe-integration.yml .. Stripe test-mode E2E
   +-- preview-smoke.yml ... Smoke test on Vercel preview deploy
   +-- gitleaks.yml ........ Secret scanning
@@ -276,7 +276,7 @@ Runs on every push and PR to `develop` or `main`.
 
 | Job | Description |
 |-----|-------------|
-| lint-and-typecheck | `npm run typecheck` + `npm run lint` |
+| lint-and-typecheck | `npm run typecheck` + `npm run check-verification-coverage` + `npm run lint` + `npm run check-env` + `npm run check-migrations` |
 | test | `npm run test` (Vitest) |
 | build | `npm run build` (production build) |
 
@@ -416,9 +416,9 @@ AI code review on every PR. Also responds to `@claude` mentions.
 
 ### Health Check Endpoint
 
-**Endpoint**: `GET /api/health` — returns `{ "status": "healthy"|"degraded", "timestamp": "..." }`.
-
-Returns HTTP 200 when healthy; HTTP 503 when Supabase connectivity fails, approved stories are unavailable, or database usage reaches the 80% warning threshold. Used by Upptime and the preview smoke CI as the machine health gate.
+**Endpoints**:
+- `GET /api/health/live` — liveness probe; always returns HTTP 200 with `{ "status": "ok" }`. Used by Upptime for uptime monitoring.
+- `GET /api/health` — diagnostics endpoint; always returns HTTP 200. The JSON body signals health state: `{ "status": "healthy"|"degraded", "timestamp": "...", "rate_limit": { "status": "ok"|"degraded", "backend": "upstash"|"memory"|"blocked" }, ... }`. Reports "degraded" if Supabase connection fails, approved stories are unavailable, or database usage exceeds 80% of the Pro tier limit. Used by the preview smoke CI as the diagnostics gate.
 
 **Sub-endpoint**: `GET /api/health/db` — database connectivity only (used internally by health checks and preview smoke tests).
 
@@ -453,7 +453,7 @@ Use the correlation ID to trace a single user request across distributed logs.
 
 Monitors every 5 minutes:
 - `paisaxe.es` — main site
-- `paisaxe.es/api/health` — API health
+- `paisaxe.es/api/health/live` — API liveness
 
 Auto-creates GitHub Issues on downtime.
 

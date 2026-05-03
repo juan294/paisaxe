@@ -8,7 +8,7 @@ Two endpoints serve different consumers:
 
 **`GET /api/health/live`** — liveness probe. Always returns HTTP 200 with `{ "status": "live", "timestamp": "..." }`. No Supabase or external checks. Used by Upptime and liveness-only monitors. Safe to call in tight loops.
 
-**`GET /api/health`** — public release diagnostics endpoint. Always returns HTTP 200 with `{ "status": "healthy" | "degraded", "timestamp": "...", "cron_auth": { "status": "ok" | "misconfigured" }, "sentry": { "status": "configured" | "unconfigured" } }`. The body status becomes `"degraded"` when Supabase connectivity fails, approved stories are unavailable, database usage reaches the 80% warning threshold, or `NEXT_PUBLIC_SENTRY_DSN` is missing in Vercel preview/production. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
+**`GET /api/health`** — public release diagnostics endpoint. Always returns HTTP 200 with `{ "status": "healthy" | "degraded", "timestamp": "...", "cron_auth": { "status": "ok" | "misconfigured" }, "sentry": { "status": "configured" | "unconfigured" }, "rate_limit": { "status": "ok" | "degraded", "backend": "upstash" | "memory" | "blocked", "reason"?: "upstash_missing" | "upstash_unavailable" } }`. The body status becomes `"degraded"` when Supabase connectivity fails, approved stories are unavailable, database usage reaches the 80% warning threshold, `NEXT_PUBLIC_SENTRY_DSN` is missing in Vercel production, or the rate-limit backend is misconfigured in production. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
 
 ## Pre-Launch Checklist
 
@@ -161,6 +161,7 @@ Automated maintenance jobs run on Supabase via pg_cron:
 | `fail-stale-translations` | Daily 6:00 AM UTC | Vercel Cron | Mark stories stuck in `translating` state as failed |
 | `github-traffic-sync` | Daily 1:00 AM UTC | Vercel Cron | Sync GitHub traffic stats to admin dashboard |
 | `subscription-optimizer` | Weekly Monday 4:00 AM UTC | Vercel Cron | Analyze service costs and spending |
+| `retry-booking-sms` | Every 10 minutes | Vercel Cron | Retry failed booking SMS confirmations (up to 3 attempts per job) |
 
 Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
 
@@ -288,7 +289,7 @@ Automated quality checks run on every push and pull request to `develop` and `ma
 
 | Job | Description |
 |-----|-------------|
-| **lint-and-typecheck** | Runs `npm run typecheck`, `npm run check-verification-coverage`, `npm run lint`, `npm run check-env`, and migration numbering check (`npx tsx scripts/check-migrations.ts`) |
+| **lint-and-typecheck** | Runs `npm run typecheck`, `npm run check-verification-coverage`, `npm run lint`, `npm run check-env`, and migration numbering check (`npm run check-migrations`) |
 | **test** | Runs `npm run test` |
 | **build** | Verifies production build with `npm run build` |
 

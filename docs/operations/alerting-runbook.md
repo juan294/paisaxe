@@ -17,7 +17,7 @@
 
 ## Health Endpoint Degraded
 
-**Trigger:** `GET https://paisaxe.es/api/health` returns non-200 or `status != "healthy"`.
+**Trigger:** `GET https://paisaxe.es/api/health` returns `status != "healthy"` in the JSON body (the endpoint always returns HTTP 200; degraded state is signalled via the body only).
 
 **Steps:**
 
@@ -63,6 +63,7 @@ All cron handlers emit structured log events on every run:
 | `subscription-optimizer` | `/api/cron/subscription-optimizer` | Weekly Mon 4 AM |
 | `fail-stale-translations` | `/api/cron/fail-stale-translations` | Every 15 min |
 | `fail-stale-bookings` | `/api/cron/fail-stale-bookings` | Every 5 min |
+| `retry-booking-sms` | `/api/cron/retry-booking-sms` | Every 10 min |
 
 **Example log drain query** (filter by structured field in Vercel / log aggregator):
 ```
@@ -102,6 +103,20 @@ msg:[CRON_FAILURE] OR msg:[CRON_SUCCESS]
    curl -X POST https://paisaxe.es/api/cron/<route> \
      -H "Authorization: Bearer $CRON_SECRET"
    ```
+
+---
+
+## Rate Limit Backend Degraded
+
+**Trigger:** `GET https://paisaxe.es/api/health` returns `rate_limit.status: "degraded"` in the JSON body.
+
+**Fields:** `rate_limit.backend` — `"blocked"` (Upstash credentials absent in production) or `"upstash"` with `reason: "upstash_unavailable"` (credentials present but Redis unreachable).
+
+**Steps:**
+
+1. For `backend: "blocked"` / `reason: "upstash_missing"`: verify `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set in Vercel environment variables → Settings → Environment Variables.
+2. For `reason: "upstash_unavailable"`: check the Upstash console for Redis instance health. The rate limiter has already failed closed — all chat/API requests are being denied until Redis recovers.
+3. Once credentials are corrected or Redis recovers, the `rate_limit.status` will return to `"ok"` on the next health probe without a redeploy.
 
 ---
 
