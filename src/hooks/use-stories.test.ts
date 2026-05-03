@@ -666,8 +666,52 @@ describe("useStories localStorage persistence", () => {
     // Parse the stored data and verify structure
     const stored = JSON.parse(storiesCall![1]);
     expect(stored.version).toBe(1);
-    expect(stored.data).toEqual(mockStories);
+    expect(stored.data).toEqual(mockStories.map(({ sourcePdf: _sourcePdf, ...story }) => story));
     expect(stored.timestamp).toBeDefined();
+  });
+
+  it("persists only the slim public story payload to localStorage", async () => {
+    mockGetStoriesFromDB.mockResolvedValue([
+      {
+        ...mockStories[0],
+        sourcePdf: "private-guide.pdf",
+        suggestionId: "suggestion-1",
+        metadata: {
+          question_prompts: ["Ask this"],
+          mood_tags: ["relajante"],
+          translation_status: { en: { status: "failed", error: "private" } },
+          last_translated_at: "2026-01-01T00:00:00Z",
+          discovery_source: "admin-only",
+        },
+      },
+    ]);
+
+    const { result } = renderHook(() => useStories(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    const storiesCall = localStorageMock.setItem.mock.calls.find(
+      (call: [string, string]) => call[0] === "paisaxe-stories-cache"
+    );
+    const stored = JSON.parse(storiesCall![1]);
+
+    expect(stored.data).toEqual([
+      expect.objectContaining({
+        id: "db-story-1",
+        title: "DB Story 1",
+        metadata: {
+          question_prompts: ["Ask this"],
+          mood_tags: ["relajante"],
+        },
+      }),
+    ]);
+    expect(stored.data[0]).not.toHaveProperty("sourcePdf");
+    expect(stored.data[0]).not.toHaveProperty("suggestionId");
+    expect(stored.data[0].metadata).not.toHaveProperty("translation_status");
+    expect(stored.data[0].metadata).not.toHaveProperty("last_translated_at");
+    expect(stored.data[0].metadata).not.toHaveProperty("discovery_source");
   });
 
   it("should restore stories from localStorage on mount", async () => {
@@ -686,8 +730,10 @@ describe("useStories localStorage persistence", () => {
 
     const { result } = renderHook(() => useStories(), { wrapper });
 
-    // Should immediately have stories from localStorage, not loading
-    expect(result.current.stories).toEqual(mockStories);
+    // Should immediately have stories from localStorage, mapped back to Story compatibility
+    expect(result.current.stories).toEqual(
+      mockStories.map((story) => ({ ...story, sourcePdf: "" }))
+    );
     expect(result.current.isLoading).toBe(false);
   });
 

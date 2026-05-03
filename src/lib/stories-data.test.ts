@@ -319,6 +319,65 @@ describe("stories-data", () => {
       expect(result[0].slug).toBe("test-story");
     });
 
+    it("selects only the public story fields for immersive/public lists", async () => {
+      const mockOrder = vi.fn().mockResolvedValue({
+        data: [
+          {
+            ...mockStoryRow,
+            metadata: {
+              question_prompts: ["Ask this"],
+              translation_status: { en: { status: "failed" } },
+            },
+            source_pdf: "private-guide.pdf",
+            suggestion_id: "suggestion-1",
+            updated_at: "2025-01-02T00:00:00Z",
+            curation_status: "approved",
+          },
+        ],
+        error: null,
+      });
+      const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const result = await getStoriesFromDB();
+      const selectedFields = mockSelect.mock.calls[0][0].split(",");
+
+      expect(mockSelect).not.toHaveBeenCalledWith("*");
+      expect(selectedFields).toEqual([
+        "id",
+        "slug",
+        "title",
+        "subtitle",
+        "description",
+        "image_path",
+        "image_source",
+        "blur_data_url",
+        "category",
+        "location",
+        "duration",
+        "display_order",
+        "related_stories",
+        "metadata",
+        "best_months",
+        "created_at",
+        "source_type",
+      ]);
+      expect(selectedFields).not.toEqual(
+        expect.arrayContaining([
+          "source_pdf",
+          "suggestion_id",
+          "updated_at",
+          "curation_status",
+          "is_active",
+        ])
+      );
+      expect(result[0]).not.toHaveProperty("suggestionId");
+      expect(result[0]).not.toHaveProperty("sourcePdf", "private-guide.pdf");
+      expect(result[0].metadata).not.toHaveProperty("translation_status");
+    });
+
     it("should filter by curation_status approved", async () => {
       const mockOrder = vi.fn().mockResolvedValue({ data: [mockStoryRow], error: null });
       const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
