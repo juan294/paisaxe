@@ -126,9 +126,12 @@ export function StoriesTabPanel() {
   const goToPage = useCallback(
     (page: number) => {
       const clamped = Math.max(1, Math.min(totalPages, page));
-      router.push(`?storiesPage=${clamped}`, { scroll: false });
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set("tab", "stories");
+      nextParams.set("storiesPage", String(clamped));
+      router.push(`?${nextParams.toString()}`, { scroll: false });
     },
-    [router, totalPages]
+    [router, searchParams, totalPages]
   );
 
   // ── Client-side filter (applied on top of the page) ──────────────────────

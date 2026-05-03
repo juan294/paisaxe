@@ -1,4 +1,4 @@
-import type { StoryRow, StoryCategory, StoryLocation, StoryDuration, StoryLocale, StoryTranslation, TranslationStatus } from "./immersive";
+import type { StoryRow, StoryCategory, StoryLocation, StoryDuration, StoryLocale, StoryTranslation, TranslationStatus, StorySourceType } from "./immersive";
 
 // Curation status for admin workflow
 export type CurationStatus = "needs_curation" | "approved";
@@ -86,7 +86,7 @@ export interface CreateStoryRequest {
   bestMonths?: number[];
   metadata?: Record<string, unknown>;
   displayOrder?: number;
-  sourceType?: "curated" | "user_submitted" | "agent_discovered";
+  sourceType?: StorySourceType;
   suggestionId?: string;
 }
 
