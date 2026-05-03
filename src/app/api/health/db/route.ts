@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { logger } from "@/lib/logger";
+
+function failureResponse(error: string, latencyMs?: number) {
+  return NextResponse.json(
+    {
+      success: false,
+      error,
+      ...(latencyMs === undefined ? {} : { latencyMs }),
+    },
+    { status: 500 }
+  );
+}
 
 /**
  * GET /api/health/db
@@ -14,15 +26,11 @@ export async function GET() {
 
   // Check env vars are configured
   if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Supabase not configured",
-        hasUrl: !!supabaseUrl,
-        hasKey: !!supabaseKey,
-      },
-      { status: 500 }
-    );
+    logger.error("[HEALTH_DB_CONFIG_MISSING]", {
+      has_supabase_url: !!supabaseUrl,
+      has_supabase_anon_key: !!supabaseKey,
+    });
+    return failureResponse("Database diagnostic unavailable");
   }
 
   const startTime = Date.now();
@@ -40,15 +48,12 @@ export async function GET() {
     const latencyMs = Date.now() - startTime;
 
     if (error) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: error.message,
-          code: error.code,
-          latencyMs,
-        },
-        { status: 500 }
-      );
+      logger.error("[HEALTH_DB_QUERY_FAILED]", {
+        code: error.code,
+        error: error.message,
+        latency_ms: latencyMs,
+      });
+      return failureResponse("Database diagnostic check failed", latencyMs);
     }
 
     return NextResponse.json({
@@ -61,13 +66,10 @@ export async function GET() {
     const latencyMs = Date.now() - startTime;
     const message = error instanceof Error ? error.message : "Unknown error";
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: message,
-        latencyMs,
-      },
-      { status: 500 }
-    );
+    logger.error("[HEALTH_DB_CLIENT_FAILED]", {
+      error: message,
+      latency_ms: latencyMs,
+    });
+    return failureResponse("Database diagnostic check failed", latencyMs);
   }
 }
