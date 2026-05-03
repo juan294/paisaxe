@@ -54,6 +54,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -744,20 +745,6 @@
 - Coverage Agent: Stripe webhook and CSRF paths confirmed at 100% branch coverage. No regression risk.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-04-25T12:10:00Z -->
-## Triage — 2026-04-25
-- **Reports processed**: 10 (cc-rpi-update, coverage, update-docs, localization, documentation, cost-analyst, qa, security, performance, pre-launch)
-- **Agent failures**: 0
-- **Action items resolved**: 2 (node_modules budget 1000→1100 MB committed; production build run)
-- **Summary**: Chat API 500 (QA YELLOW) already fixed post-report by voyageai pin commits (`8f53cd29`, `d0b5576e`, `1344e58d`). postcss advisory not fixable via npm overrides — Next.js bundles its own copy and the override doesn't penetrate it. resend pin already synced in prior commit. Production build: Total JS 2,941 KB ✓; initial load ~2,067 KB — still over 2,000 KB budget (YELLOW persists). P8 savings were 0 KB (Replay was config-only, never loaded as integration). P4 officially activated. 5996 tests green.
-**Cross-agent recommendations:**
-- Performance Agent: P4 (Supabase realtime tree-shake, ~20-30 KB) officially activated — prod build confirms initial load 2,067 KB vs 2,000 KB budget. P4 alone insufficient (saves ~25 KB → ~2,042 KB); consider raising budget to 2,100 KB to reflect structural growth since Apr 4 baseline.
-- Security Agent: postcss advisory in `node_modules/next/node_modules/postcss@8.4.31` cannot be resolved via npm overrides (Next.js isolation). Build-time only, not exploitable. Monitor Next.js releases for upstream fix.
-- QA Agent: Chat API 500 root cause confirmed — voyageai v0.2.x ESM build broke dynamic import of `@/lib/embeddings`. Fixed by pinning voyageai to 0.1.0 (`8f53cd29`, `d0b5576e`, `1344e58d`). Re-run LLM quality tests next cycle to confirm GREEN.
-- Cost Analyst Agent: resend@6.12.2 already synced in prior commit. Pre-launch hard blockers (BE-B1 booking schema, QA-B1 E2E failures) need dedicated /remediate session before revenue-generating features can be validated.
-- All agents: Pre-launch audit (Apr 23) hard blockers not cleared this cycle. Revenue drought (71 days) + voice silence (67 days) require manual production verification by user.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-04-27T06:05:20Z -->
 ## QA Agent — 2026-04-27
 - Status: YELLOW. LLM quality 10/12 (one-day regression from 12/12 on Apr 26). Browser journeys 10/10. Integration 3/3.
@@ -789,23 +776,6 @@
 - Performance Agent: /immersive page not rendering stories in Playwright — may indicate a runtime error affecting hydration, not just testid changes. Worth checking after P4 Supabase client split.
 - Code Quality Agent: Priority investigation — `git diff HEAD~5 -- src/app/api/chat/route.ts src/components/immersive/` to identify the breaking change from wave-2 merges.
 - Cost Analyst Agent: Automated safety net fully down this cycle. Manual production verification of Pelayo voice widget and Day Pass flow is now the highest-priority action.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-04-29T07:00:00Z -->
-## Localization Agent — 2026-04-29
-- Status: GREEN. 100% coverage across 6 locales (es, en, fr, de, pt, ast). No edits needed.
-- UI strings: **404 leaf keys** per locale (up from 395 on Apr 27 — 9 new keys added by 3 commits since then, all backfilled to all locales simultaneously, zero gap created).
-- Story translations: 100 stories x 5 target locales = 500 records, all complete. Count stable at 100.
-- Type safety: project-wide `npx tsc --noEmit` passes clean (0 errors, 0 output lines).
-- New keys added since Apr 27: chat.error, chat.retry (5c3d4281); chat.assistant_label, auth.user_avatar, voice.error_not_configured, premium.premium_access, premium.voice_pass_label, errors.unknown (8771ca8c); chat.copy_error, share.copy_error (241dcb6b).
-
-**Cross-agent recommendations:**
-- Performance Agent: i18n bundling unchanged. es+en static imports, fr/de/pt/ast dynamic. No optimization needed.
-- Code Quality Agent: All 404 UI keys remain actively referenced — no dead translations. The pattern of adding new keys to all 6 locales in the same commit is working well — no backlog accumulation.
-- Security Agent: No PII, tokens, or secrets in any locale file or story-translations file.
-- Coverage Agent: No locale-related coverage gaps. Story count stable at 100.
-- QA Agent: QA Agent noted Asturian place-name synonyms (Xixón/Gijón) affect RAG retrieval, not the translation layer. No translation changes needed.
-- Documentation Agent: Story Translations admin tab documented in features.md. No localization impact from this cycle's doc fixes.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=security_agent_enabled timestamp=2026-04-29T07:03:02Z -->
@@ -1120,6 +1090,22 @@
 - Performance Agent: No documentation-impacting changes.
 - Cost Analyst Agent: Untracked `scripts/tmp-cost-*.sh` scripts — clean up if no longer needed.
 - Localization Agent: No locale-related documentation concerns.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-05-03T05:03:07Z -->
+## Localization Agent — 2026-05-03
+- Coverage: 100% across all 6 locales (es, en, fr, de, pt, ast). No edits needed. Forty-fourth consecutive clean run.
+- UI strings: 405 leaf keys per locale, 0 missing, 0 orphans. Parity test suite (`translations.test.ts`) 102/102 pass.
+- Story translations: 100 stories x 5 target locales = 500 records, all complete (title + subtitle + description). Story count stable at 100 since `064e2acc`.
+- Type safety: Pass — `npx tsc --noEmit` clean.
+
+**Cross-agent recommendations:**
+- Performance Agent: i18n bundle sizes stable. 405 keys per locale (~15 KB each). Lazy-loading (es+en static, fr/de/pt/ast dynamic) in place. No optimization needed.
+- Coverage Agent: `translations.test.ts` already covers parity + diacritics + essential keys (102 tests). No new locale-related test gaps.
+- Code Quality Agent: Multi-locale commit pattern (every new key added to all 6 locales in the same commit) continues to work — zero backlog accumulation since 2026-03-21.
+- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
+- QA Agent: No locale-related issues. Asturian place-name synonyms (Xixón/Gijón) flagged Apr 27 affect RAG retrieval, not the translation layer.
+- Triage Agent: Untracked temp script `scripts/tmp-i18n-audit.mjs` left behind (sandbox blocked rm); safe to delete with `rm scripts/tmp-i18n-audit.mjs`.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-05-03T07:00:00Z -->
