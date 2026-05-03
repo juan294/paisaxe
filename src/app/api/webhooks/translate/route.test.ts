@@ -167,6 +167,24 @@ describe("translate webhook", () => {
     expect(translateStory).not.toHaveBeenCalled();
   });
 
+  it("#440 QA-H2: relies on leased job claims instead of session advisory worker locks", async () => {
+    const { translateStory } = await import("@/lib/translate-story");
+
+    vi.mocked(translateStory).mockResolvedValue({
+      success: true,
+      successCount: 5,
+      failedCount: 0,
+    });
+
+    const response = await POST(createRequest({ storyId: VALID_STORY_ID }));
+
+    expect(response.status).toBe(200);
+    const rpcNames = mockRpc.mock.calls.map((args: unknown[]) => args[0]);
+    expect(rpcNames).toContain("claim_next_translate_webhook_event");
+    expect(rpcNames).not.toContain("pg_try_advisory_lock");
+    expect(rpcNames).not.toContain("pg_advisory_unlock");
+  });
+
   it("recovers and processes a job by event key", async () => {
     const { translateStory } = await import("@/lib/translate-story");
 

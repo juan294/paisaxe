@@ -12,9 +12,10 @@ import {
 } from "@/lib/subscription-optimizer";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 import { logger } from "@/lib/logger";
+import { acquireCronJobLease, releaseCronJobLease } from "@/lib/cron-job-lock";
 
-/** Postgres advisory lock ID — unique per cron route. */
-const LOCK_ID = 1002;
+const LOCK_KEY = "subscription-optimizer";
+const LOCK_LEASE_SECONDS = 20 * 60;
 
 /**
  * Default usage metrics when none are provided.
@@ -35,18 +36,19 @@ const DEFAULT_USAGE_METRICS: UsageMetricsInput = {
 async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextResponse> {
   const start = Date.now();
   const supabase = createAdminClient();
+  let lockToken: string | null = null;
 
-  // Acquire advisory lock to prevent concurrent runs
-  const { data: locked, error: lockError } = await supabase.rpc(
-    "pg_try_advisory_lock",
-    { lockid: LOCK_ID }
-  );
-  if (lockError || !locked) {
+  const lease = await acquireCronJobLease(supabase, LOCK_KEY, LOCK_LEASE_SECONDS);
+  if (!lease.acquired) {
+    if (lease.error) {
+      logger.error("[SUBSCRIPTION_OPTIMIZER_LOCK_FAILED]", { error: lease.error });
+    }
     return NextResponse.json(
       { status: "skipped", reason: "concurrent run in progress" },
       { status: 409 }
     );
   }
+  lockToken = lease.token;
 
   try {
     const result = analyzeSubscriptions({
@@ -123,7 +125,11 @@ async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextRespon
       { status: 500 }
     );
   } finally {
-    await supabase.rpc("pg_advisory_unlock", { lockid: LOCK_ID });
+    try {
+      await releaseCronJobLease(supabase, LOCK_KEY, lockToken);
+    } catch (error) {
+      logger.error("[SUBSCRIPTION_OPTIMIZER_LOCK_RELEASE_FAILED]", { error });
+    }
   }
 }
 
