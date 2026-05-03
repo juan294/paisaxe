@@ -37,8 +37,17 @@ vi.mock("@/hooks/use-voice-access", () => ({
 
 // Mock PostHog
 const mockCapture = vi.fn();
+const mockReactPostHog = {
+  current: { capture: mockCapture } as { capture: typeof mockCapture } | null,
+};
+const mockAppPostHog = {
+  current: { capture: mockCapture } as { capture: typeof mockCapture } | null,
+};
 vi.mock("posthog-js/react", () => ({
-  usePostHog: () => ({ capture: mockCapture }),
+  usePostHog: () => mockReactPostHog.current,
+}));
+vi.mock("@/components/posthog-provider", () => ({
+  usePaisaxePostHog: () => mockAppPostHog.current,
 }));
 
 // Mock next/image — renders a plain <img> with all props forwarded for test assertions
@@ -226,6 +235,8 @@ describe("VoiceChat", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockCapture.mockReset();
+    mockReactPostHog.current = { capture: mockCapture };
+    mockAppPostHog.current = { capture: mockCapture };
     localStorageMock.clear();
     resetMockVoiceAccess();
   });
@@ -732,6 +743,28 @@ describe("VoiceChat", () => {
     });
 
     it("should fire chat_message_sent on every message", async () => {
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Response"));
+
+      render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);
+
+      const input = screen.getByPlaceholderText("Escribe tu pregunta...");
+      await userEvent.type(input, "My question");
+
+      const form = input.closest("form");
+      expect(form).toBeTruthy();
+      fireEvent.submit(form!);
+
+      await waitFor(() => {
+        expect(mockCapture).toHaveBeenCalledWith("chat_message_sent", {
+          story_id: "story-1",
+          message_index: 0,
+        });
+      });
+    });
+
+    it("FE-M1: uses the initialized app-owned PostHog context for chat analytics", async () => {
+      mockReactPostHog.current = null;
+      mockAppPostHog.current = { capture: mockCapture };
       mockFetch.mockResolvedValueOnce(createStreamingResponse("Response"));
 
       render(<VoiceChat story={mockStory} open={true} onClose={() => {}} />);

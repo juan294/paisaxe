@@ -8,7 +8,7 @@ import type { PostHog } from "posthog-js";
 const PostHogContext = createContext<PostHog | null>(null);
 
 // Hook to access PostHog instance (may be null if not yet loaded)
-function usePostHog(): PostHog | null {
+export function usePaisaxePostHog(): PostHog | null {
   return useContext(PostHogContext);
 }
 
@@ -23,7 +23,7 @@ function shouldInitializePostHog(): boolean {
 
 // Component that tracks page views on route changes
 function PostHogPageViewTracker() {
-  const posthog = usePostHog();
+  const posthog = usePaisaxePostHog();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 

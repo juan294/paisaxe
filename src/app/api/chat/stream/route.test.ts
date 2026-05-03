@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { POST } from "./route";
+import { CHAT_STREAM_STAGE_TIMEOUTS_MS, POST } from "./route";
 import { NextRequest } from "next/server";
 
 // Mock the dependencies - must use dynamic import compatible approach
@@ -28,6 +28,7 @@ vi.mock("@/lib/logger", () => ({
   logger: {
     warn: vi.fn(),
     error: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -442,6 +443,41 @@ describe("POST /api/chat/stream", () => {
       message: string;
     };
     expect(errorEvent).toBeDefined();
+  });
+
+  it("PE-H2: returns an SSE error event when retrieval exceeds the stage timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const mockEmbedding = new Array(512).fill(0.1);
+      vi.mocked(generateEmbedding).mockResolvedValue(mockEmbedding);
+      vi.mocked(search).mockReturnValue(new Promise(() => {}));
+
+      const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+        method: "POST",
+        body: JSON.stringify({ message: "Tell me about Asturias" }),
+      });
+
+      const pendingResponse = POST(request);
+      await vi.advanceTimersByTimeAsync(CHAT_STREAM_STAGE_TIMEOUTS_MS.search + 1);
+      const response = await pendingResponse;
+      const events = await collectStreamEvents(response);
+
+      expect(response.status).toBe(200);
+      expect(events).toContainEqual({
+        type: "error",
+        message: "search_unavailable",
+      });
+      expect(logger.warn).toHaveBeenCalledWith(
+        "[CHAT_STREAM_STAGE_TIMEOUT]",
+        expect.objectContaining({ stage: "search" })
+      );
+      expect(logger.info).toHaveBeenCalledWith(
+        "[CHAT_STREAM_STAGE_TIMING]",
+        expect.objectContaining({ stage: "search" })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("should pass query text to search for reranking", async () => {
