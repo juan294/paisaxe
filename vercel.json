@@ -21,6 +21,10 @@
     {
       "path": "/api/cron/fail-stale-bookings",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/retry-booking-sms",
+      "schedule": "*/10 * * * *"
     }
   ],
   "redirects": [
