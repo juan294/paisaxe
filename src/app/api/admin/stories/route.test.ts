@@ -473,7 +473,7 @@ describe("POST /api/admin/stories", () => {
         title: "Suggested Place",
         category: "nature",
         suggestionId: "550e8400-e29b-41d4-a716-446655440000",
-        sourceType: "user-suggested",
+        sourceType: "user_submitted",
       }),
     });
     const response = await POST(request);
@@ -484,6 +484,82 @@ describe("POST /api/admin/stories", () => {
       converted_story_id: "new-story-id",
       updated_at: expect.any(String),
     });
+  });
+
+  it("should insert the canonical DB source type for user-submitted stories", async () => {
+    const mockUpdate = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    });
+    const mockInsert = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: {
+            id: "new-story-id",
+            slug: "suggested-place",
+            title: "Suggested Place",
+            category: "nature",
+            display_order: 1,
+            curation_status: "needs_curation",
+            created_at: "2024-01-01T00:00:00Z",
+          },
+          error: null,
+        }),
+      }),
+    });
+    const mockSelect = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }),
+      order: vi.fn().mockReturnValue({
+        limit: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      }),
+    });
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === "story_suggestions") {
+        return { update: mockUpdate };
+      }
+      return { select: mockSelect, insert: mockInsert };
+    });
+    mockWithAdminAuthorized({ from: mockFrom });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "Suggested Place",
+        category: "nature",
+        suggestionId: "550e8400-e29b-41d4-a716-446655440000",
+        sourceType: "user_submitted",
+      }),
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(201);
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source_type: "user_submitted",
+        suggestion_id: "550e8400-e29b-41d4-a716-446655440000",
+      })
+    );
+  });
+
+  it("should reject legacy user-suggested source type values", async () => {
+    mockWithAdminAuthorized({ from: vi.fn() });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "Suggested Place",
+        category: "nature",
+        sourceType: "user-suggested",
+      }),
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.errors.sourceType).toBeDefined();
   });
 
   it("should create story with all optional fields", async () => {
@@ -588,7 +664,7 @@ describe("POST /api/admin/stories", () => {
         title: "Suggested Place",
         category: "nature",
         suggestionId: "550e8400-e29b-41d4-a716-446655440000",
-        sourceType: "user-suggested",
+        sourceType: "user_submitted",
       }),
     });
     const response = await POST(request);

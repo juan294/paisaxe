@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import { STORY_SOURCE_TYPES } from "@/types/immersive";
 
 // ---------------------------------------------------------------------------
 // Primitives
@@ -84,7 +85,7 @@ export const createStorySchema = z.object({
   bestMonths: z.array(z.number().int().min(1).max(12)).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   displayOrder: z.number().int().min(0).optional(),
-  sourceType: z.enum(["curated", "ai-generated", "user-suggested"]).optional(),
+  sourceType: z.enum(STORY_SOURCE_TYPES).optional(),
   suggestionId: uuidSchema.optional(),
 });
 
