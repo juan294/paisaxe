@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `retry-booking-sms` Vercel Cron job — retries failed SMS booking confirmations every 10 minutes (`/api/cron/retry-booking-sms`)
+- Durable cron job locking via `cron_job_locks` DB table and `src/lib/cron-job-lock.ts` (`acquireCronJobLease` / `releaseCronJobLease` helpers backed by DB RPC)
+- `/api/health` response now includes `rate_limit` field reporting backend status (`upstash`, `memory`, or `blocked`)
+- `check-verification-coverage` CI gate — verifies TypeScript surfaces (scripts, e2e, edge) and live integration gate are wired in CI
+- `prelaunch:live` npm script — real Stripe/Supabase E2E gate that fails (not skips) when credentials are absent
+- `FeatureFlagsProvider` `enabled` prop for disabling background polling in SSR/test contexts
+- ADR-0017: decision not to migrate client hooks to SWR/TanStack Query
+- ADR-0018: Edge Runtime not feasible for chat stream endpoint
+- Playwright E2E specs for voice-agent chat (`e2e/voice-agents.spec.ts`) and MCP tool endpoints (`e2e/mcp.spec.ts`)
+- `require_live_gate` dispatch input for Stripe E2E workflow
+- Preview smoke CI: Sentry DSN gate — fails if `sentry.status` is not `"configured"` on preview deployments
+- DB migration 087: RLS + service-role-only access on sensitive operational tables (`booking_sms_jobs`, `elevenlabs_webhook_events`, `translate_webhook_events`, `stripe_webhook_events`, `marketing_accounts`)
+- DB migration 088: `cron_job_locks` table and `try_acquire_cron_job_lock` / `release_cron_job_lock` DB functions for durable cron exclusion
+- `PublicStory` / `PublicStoryRow` types and `PUBLIC_STORY_SELECT` constant — strips private fields (`sourcePdf`, `suggestionId`) from client-side cache
+- `src/lib/chat-route-utils.ts` — shared `buildEnrichedChatMessage` and `buildRateLimitHeaders` helpers extracted from chat routes
+- 30+ Spanish i18n keys added and diacritics corrected (`src/lib/i18n/es.ts`)
+
+### Fixed
+
+- Rate-limit production detection now uses `VERCEL_ENV === "production"` instead of `NODE_ENV` — fixes false 429s in CI and Vercel preview deployments
+- `NEXT_PUBLIC_*` env getters use literal `process.env.X` access — fixes undefined values in client bundle caused by Turbopack dynamic bracket-notation inlining (#556)
+- Auth provider: null-safe state updates + `deferInitialAuth` correctly defers loading state and calls `setIsLoading(false)` synchronously (#556)
+- Checkout return URL: `returnTo` parameter is `encodeURIComponent`-encoded; `useSearchParams` wrapped in `<Suspense>` to prevent hydration errors
+- Voice Purchase CTA: `returnTo` encoded; `signInWithGoogle(checkoutUrl)` ensures post-OAuth redirect lands at checkout
+- SSRF hardening: admin image ingestion resolves DNS and rejects resolved private IP ranges (not just parse-time hostname check)
+- Chat stream: per-stage timeouts (embedding 8s, search 5s, feature flag 2s) prevent indefinite hangs on slow upstream calls
+- Search rerank: 2.5s timeout with fallback to top-N candidates if Voyage reranking times out
+- Immersive deep-link guard keyed on `${slug}:${voice}` — allows re-triggering on genuine URL changes without repeating for filter-only re-renders
+- Story progress bar replaced `<div role="progressbar">` with `<nav>` + `<button>` per segment for proper keyboard navigation
+- Favorites page: mobile overlay always visible (not hover-only); focus-visible rings added to interactive elements
+- `loading.tsx`, `error.tsx`, `not-found.tsx`: `role="status"`, `aria-live="polite"`, and focus-visible rings added
+- Marketing credentials: `getDecryptedCredentials` now throws on plain-format credentials; `isPlainCredentials` type guard removed
+- Health endpoint always returns HTTP 200 (was HTTP 503 on degraded state); degraded condition signalled in JSON body only
+- Translate webhook removed session-scoped `pg_advisory_lock`; uses row-level lease claims exclusively (safe across pooled connections)
+- MCP `make-booking` degrades gracefully when conversation ID cannot be persisted — returns 202 with `recovery_action` instead of 500
+- Cron routes: unified dual-auth (`verifyVercelCron` + `verifyWebhookSecret`) across all handlers
+- Health DB route: structured error logging; generic external error message (no Supabase error codes exposed publicly)
+- `.env.example` comment for `NEXT_PUBLIC_SENTRY_DSN` fixed to prevent false positive in `check-env` script
+- `voyageai` package pinned to `0.1.0` — v0.2.x ESM build is broken (CJS interop failure)
+- QA harness: `Origin` header added to all HTTP requests; performance budget thresholds updated to match current Lighthouse scores
+- Anthropic monthly cost estimate updated to $25/mo; billing URL corrected in recurring costs config
+
+### Changed
+
+- `npm run typecheck` now runs 4 sub-commands: `typecheck:app`, `typecheck:scripts`, `typecheck:e2e`, `typecheck:edge`
+- `npm run lint` now includes `lint:scripts` sub-command
+- `npm run check-migrations` is now an npm script (replaces inline `npx tsx scripts/check-migrations.ts` in CI)
+- Stories localStorage cache stores `PublicStory[]` (excludes `sourcePdf` and `suggestionId` from client-side cache)
+- Upptime monitor for liveness uses `/api/health/live`; `/api/health` is used for diagnostics and release gates
+
 ## [1.5.1] - 2026-05-01
 
 Single-bug-fix patch release. Restores the author-pill typewriter animation

@@ -1,91 +1,58 @@
 # Documentation Update Report
-> Generated on 2026-04-29 | Branch: `develop` | Changes since `v1.4.0`
+> Generated on 2026-05-03 | Branch: chore/update-docs | Changes since v1.5.1
 
 ## Summary
 
-- **12 documents updated**
-- **1 diagram updated** (ASCII CI flow in testing-guide.md)
-- **9 version references corrected** (test counts, migration count, dates, Last Updated)
-- **0 inline doc blocks updated** (project has no JSDoc/docstrings in scope)
-- **1 item flagged [NEEDS REVIEW]** — `docs/paisaxe-architecture.drawio`
+- 7 documents updated
+- 0 diagrams refreshed (1 flagged [NEEDS REVIEW])
+- 12+ version/count references corrected
+- 0 inline doc blocks updated
+- 1 item flagged [NEEDS REVIEW]
 
 ## Changes by File
 
 ### `CHANGELOG.md`
-- Added `[1.5.0] - 2026-04-29` section covering all 99 post-v1.4.0 commits (Wave 1 + Wave 2 remediation): Added, Fixed, Security, Performance, Changed, Removed, Testing subsections
-- Fixed 4 date placeholders: `[1.3.0] 2026-04-20`, `[1.2.0] 2026-02-03`, `[1.1.0] 2026-01-31`, `[1.0.0] 2026-01-31`
+Populated the `[Unreleased]` section with ~45 entries covering all commits since v1.5.1:
+- **Added**: `retry-booking-sms` cron job, durable cron locking (`cron_job_locks`), `rate_limit` field in health endpoint, `check-verification-coverage` CI gate, `prelaunch:live` npm script, `FeatureFlagsProvider` `enabled` prop, ADR-0017 + ADR-0018, Playwright E2E specs for voice agents and MCP tools, migrations 087–088, `PublicStory`/`PublicStoryRow` types, `chat-route-utils.ts`, 30+ Spanish i18n keys.
+- **Fixed**: `VERCEL_ENV` production detection fix, `NEXT_PUBLIC_*` static access fix, auth provider null-safe updates, checkout return URL encoding, SSRF hardening, chat per-stage timeouts, search rerank timeout, various a11y fixes, health endpoint HTTP 503→200.
+- **Changed**: `npm run typecheck` now runs 4 sub-commands; `lint:scripts` added; `check-migrations` is now an npm script; Upptime liveness monitor moved to `/api/health/live`.
 
 ### `ROADMAP.md`
-- Updated `Last Updated` from April 24 → April 29, 2026
-- Updated test count `~6,000 (324 files)` → `6,347 (341 files)` in two places
-- Added `v1.5.0` row to release history table
-
-### `README.md`
-- Fixed migration count `17 migrations` → `83 migrations` in two places (setup instructions + directory tree)
-- Added `Pino (structured JSON) + Sentry` and `Upstash Redis` rows to tech stack table
-
-### `CLAUDE.md`
-- Added `Pino (structured JSON) + Sentry` and `Upstash Redis` rows to tech stack table
+- Updated **Last Updated** date: May 1 → May 3, 2026
+- Added migrations 087 (`restrict_operational_table_access`) and 088 (`voice_booking_durability`) to the database migrations table
+- Added **SMS Retry Cron** row to Phase 9 (MCP Tool Integrations)
 
 ### `docs/operations/operations.md`
-- Replaced single "Health Check Endpoint" section with two-endpoint description (`/api/health/live` + `/api/health`)
-- Updated test count `~6,000` → `~6,347`
-- Updated pre-launch checklist "Health Endpoint" step to probe both endpoints
-
-### `docs/operations/logging.md`
-- Added 8 new event codes to the Key Conventions table:
-  - `[RATE_LIMIT_DEGRADED]` — Redis fallback warning
-  - `[CRON_SUCCESS]` — cron job completion with `job` + `duration_ms`
-  - `[CRON_FAILURE]` — cron job error with `job` + `error`
-  - `[CRON_AUTH_REJECTED]` — cron secret verification failure with `reason`
-  - `[HONEYPOT_TRIGGERED]` — bot-triggered suggestion field
-  - `[ADMIN_AUDIT]` — admin write action audit log
-  - `[ADMIN_PROFILE_LOOKUP_FAILED]` — non-PGRST116 admin role lookup error
+- Updated health endpoint description to include `rate_limit` field schema
+- Added `retry-booking-sms` cron job row (every 10 min) to the Vercel cron jobs table
+- Fixed `check-migrations` reference: `npx tsx scripts/check-migrations.ts` → `npm run check-migrations`
 
 ### `docs/operations/alerting-runbook.md`
-- Added "Cron Auth Rejected" section with steps for `[CRON_AUTH_REJECTED]` events
-- Added "Honeypot Triggered" section for `[HONEYPOT_TRIGGERED]` events
+- Updated "Health Endpoint Degraded" trigger: removed "returns non-200 HTTP status" (endpoint always returns 200 now); added check for `status != "healthy"` in JSON body
+- Added `retry-booking-sms` to the cron job names table (every 10 min)
+- Added new **Rate Limit Backend Degraded** runbook section covering `backend: "blocked"` and `reason: "upstash_unavailable"` scenarios
 
-### `docs/operations/database-backup.md`
-- Added HNSW index note to post-restore checklist: migration 086 dropped IVFFlat for HNSW and must be re-run if restoring to a pre-086 point
+### `docs/operations/quality-agents.md`
+- Updated **Last Updated** date: April 24 → May 3, 2026
+- Updated E2E spec file count: 16 → 18 in the architecture overview
+- Expanded `lint-and-typecheck` CI job description to include `check-verification-coverage`, `check-env`, and `check-migrations` steps
+- Updated health endpoint description: now always returns HTTP 200; split into `/api/health/live` (liveness, used by Upptime) and `/api/health` (diagnostics); added `rate_limit` field to payload description
+- Updated Upptime monitor: `paisaxe.es/api/health` → `paisaxe.es/api/health/live`
 
 ### `docs/engineering/testing-guide.md`
-- Updated test counts: `332 files / 6,059 tests` → `341 files / 6,347 tests` in two places
-- Updated CI flow ASCII diagram: added `E2E` and `develop-smoke` boxes; updated "All three must pass" → "All five must pass"
-- Added `withAdminRead` HOF mock pattern code example
-- Added `admin-auth.test.ts` and `use-sse-stream.test.ts` to test file inventory
+- Updated **Last updated** date: 2026-04-24 → 2026-05-03
+- Updated overview table: 332 files / 6,059 tests → **353 files / 6,496 tests**; 16 E2E specs / 32 configs → **18 E2E specs / 36 configs**
+- Updated inventory section heading: 341 files / 6,347 tests → **353 files / 6,496 tests**
+- Updated E2E configuration sentence: `32 test configurations from 16 spec files` → `36 from 18`
+- Updated "E2E suite has grown to N spec files": 16 → 18
+- Added `voice-agents.spec.ts` and `mcp.spec.ts` entries (descriptions + file tree)
+- Updated pre-commit hook test count: `~6,347` → `6,496`
 
 ### `docs/project/features.md`
-- Updated Infrastructure health check entry to document both `/api/health/live` and `/api/health`
-- Added `withAdminRead` / `withAdmin` + LRU role cache description to Admin Access section
-
-### `docs/project/markdown-render-sinks.md`
-- Updated react-markdown sink path: `voice-chat.tsx` → `voice-chat/chat-message-list.tsx` (FE-M1 monolith split)
-
-### `docs/decisions/0015-service-layer.md`
-- Updated consequences note: `src/services/.gitkeep` was removed during AR-M2; ADR remains Proposed
+- Updated `/api/health` description: removed "HTTP 503 when degraded" (endpoint now always returns HTTP 200); added `rate_limit.status` field to the payload description; clarified that `/api/health` is the diagnostics endpoint and Upptime uses `/api/health/live` for liveness.
 
 ## Flagged for Review
 
-### `docs/paisaxe-architecture.drawio` — [NEEDS REVIEW]
+`docs/paisaxe-architecture.drawio` — The architecture diagram was not updated. It may show stale connections for the health endpoint (now split into `/live` and diagnostics) and is missing the `retry-booking-sms` cron job. Use the `/drawio` skill or update manually in draw.io before the next release.
 
-The DrawIO XML diagram has 7 stale elements that cannot be confidently auto-updated from text edits:
-
-1. `/api/health` node — needs split into `/api/health` (diagnostics) and `/api/health/live` (liveness)
-2. `lib-embed` → `ext-upstash` edge — embedding cache now Upstash Redis (not in-process LRU)
-3. Parallel `feature-flags ‖ embedding` annotation on `api-chat` path
-4. Admin path — add `withAdminRead` distinction (GET vs mutation)
-5. Observability layer — Pino + Sentry + `x-request-id` correlation
-6. ElevenLabs lane — Agents-as-Code workflow (`agent_configs/` in git)
-7. Proxy lane — add `Canonical Domain Redirect` and `Story URL Rewrite` nodes
-
-**Action:** Open `docs/paisaxe-architecture.drawio` in draw.io, apply changes, re-export PNG.
-
-## What Was Not Updated
-
-- `AGENTS.md` — Codex compatibility guide, no tech stack table
-- `docs/operations/branch-protection.md` — Already correct; develop-smoke is not a required check for main merges
-- Historical snapshots: `docs/research/`, `docs/plans/`, `docs/operations/pre-launch-audit.md` (immutable)
-- `docs/agents/*-report.md` — Gitignored operational history (Rule #70)
-- `content/prompts/` — No prompt changes since v1.4.0
-- ADR-0016 (claude.ts modularization) — Still correctly Proposed
+<!-- [NEEDS REVIEW] docs/paisaxe-architecture.drawio — may not reflect recent changes to cron jobs (retry-booking-sms), health endpoint split (/api/health/live vs /api/health), and rate-limit backend. Requires the /drawio skill to update. -->

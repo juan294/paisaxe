@@ -602,7 +602,7 @@ Both produce 1200x630 PNG images. The root image cascades to child routes that d
 **Health checks:**
 
 - `GET /api/health/live` — Liveness probe. Always returns HTTP 200 with `{ "status": "ok" }`. Used by Upptime and develop-smoke CI.
-- `GET /api/health` — Diagnostics endpoint. Returns service status (healthy/degraded), Supabase connectivity with latency, database storage usage, and cron auth state. Returns HTTP 200 when healthy, HTTP 503 when degraded. Reports "degraded" if Supabase connection fails or database usage exceeds 80% of the 8 GB Pro tier limit. Monitored every 5 minutes by [Upptime](https://juan294.github.io/paisaxe-upptime/).
+- `GET /api/health` — Diagnostics endpoint. Always returns HTTP 200. The JSON body signals health state: `status: "healthy"|"degraded"`, plus Supabase connectivity with latency, database storage usage, cron auth state, and rate limit backend (`rate_limit.status: "ok"|"degraded"`). Reports "degraded" if Supabase connection fails or database usage exceeds 80% of the 8 GB Pro tier limit. Used by the preview smoke CI; diagnostics only (not the Upptime liveness probe).
 
 **Database size monitoring** — The health endpoint reports `database.size_mb`, `database.limit_mb` (8192), and `database.usage_percent`. Useful for tracking storage growth as content expands.
 

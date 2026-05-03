@@ -3,7 +3,7 @@
 A living document tracking implemented features and future development plans.
 
 **Domain**: paisaxe.es
-**Last Updated**: May 1, 2026
+**Last Updated**: May 3, 2026
 
 ---
 
@@ -350,6 +350,8 @@ Automated agents and scheduled workflows to guarantee code quality, security, an
 | `009_analytics_events.sql` | Custom analytics events | :white_check_mark: |
 | `010_story_metadata_extensions.sql` | Extended metadata for visitor features | :white_check_mark: |
 | `011_pg_cron_maintenance.sql` | Scheduled VACUUM/ANALYZE via pg_cron | :white_check_mark: |
+| `087_restrict_operational_table_access.sql` | RLS + service-role-only grants on `booking_sms_jobs`, `elevenlabs_webhook_events`, `translate_webhook_events`, `stripe_webhook_events`, `marketing_accounts` | :white_check_mark: |
+| `088_voice_booking_durability.sql` | `cron_job_locks` table + `try_acquire_cron_job_lock` / `release_cron_job_lock` functions for durable cron exclusion | :white_check_mark: |
 
 ---
 
@@ -377,6 +379,7 @@ Pelayo's real-time capabilities via custom webhook tools (at `/api/mcp/*`):
 | Places Search | :white_check_mark: | `search_places` — restaurants, attractions, hotels via Google Places API |
 | Booking Integration | :white_check_mark: | `make_booking` — outbound calls via ElevenLabs + Twilio (gated by `booking_system` flag) |
 | SMS Confirmation | :white_check_mark: | `sms_booking_confirmation` — post-call SMS via Twilio webhook |
+| SMS Retry Cron | :white_check_mark: | `retry-booking-sms` — retries failed SMS jobs every 10 minutes via durable cron lock |
 | Events/Calendar | :calendar: | Not yet implemented |
 | Maps/Directions | :calendar: | Not yet implemented |
 
