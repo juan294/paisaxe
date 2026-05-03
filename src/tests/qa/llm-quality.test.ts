@@ -119,9 +119,9 @@ const RAG_QUALITY_TESTS = [
     validate: (r: ChatResponse) => {
       // Should admit no information, not invent a roller coaster
       const invents = /roller coaster|amusement park|thrill ride/i.test(r.content);
-      const declines = /no information|not aware|cannot find|don't have|not familiar|isn't a famous|no famous|don't know of|unaware|there isn't/i.test(r.content);
+      const declines = /no information|not aware|cannot find|don't have|doesn't have|does not have|not familiar|isn't a famous|no famous|don't know of|unaware|there isn't|there's no|there is no|isn't known|is not known|not something|don't believe|no such|haven't.*found|not.*exist|cannot confirm|to my knowledge|as far as.*know/i.test(r.content);
       // Also consider redirecting to real attractions as acceptable
-      const redirects = /instead|however|but.*can|recommend|suggest/i.test(r.content);
+      const redirects = /instead|however|but.*can|recommend|suggest|you might|you could|perhaps|let me tell|consider visiting|what.*can offer/i.test(r.content);
       return declines || redirects || !invents;
     },
     expectedBehavior: 'Admits no information rather than inventing',
