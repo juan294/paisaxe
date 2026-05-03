@@ -41,6 +41,22 @@ export interface Story {
   suggestionId?: string;
 }
 
+export type PublicStoryMetadata = Pick<
+  StoryMetadata,
+  | "question_prompts"
+  | "mood_tags"
+  | "asturianu_title"
+  | "asturianu_subtitle"
+  | "translations"
+>;
+
+export type PublicStory = Omit<
+  Story,
+  "sourcePdf" | "suggestionId" | "metadata"
+> & {
+  metadata?: PublicStoryMetadata;
+};
+
 /** Localized text for a story in a specific language */
 export interface StoryTranslation {
   title: string;
@@ -174,6 +190,74 @@ export interface StoryRow {
   suggestion_id: string | null;
 }
 
+export const PUBLIC_STORY_SELECT = [
+  "id",
+  "slug",
+  "title",
+  "subtitle",
+  "description",
+  "image_path",
+  "image_source",
+  "blur_data_url",
+  "category",
+  "location",
+  "duration",
+  "display_order",
+  "related_stories",
+  "metadata",
+  "best_months",
+  "created_at",
+  "source_type",
+].join(",");
+
+export type PublicStoryRow = Pick<
+  StoryRow,
+  | "id"
+  | "slug"
+  | "title"
+  | "subtitle"
+  | "description"
+  | "image_path"
+  | "image_source"
+  | "blur_data_url"
+  | "category"
+  | "location"
+  | "duration"
+  | "display_order"
+  | "related_stories"
+  | "metadata"
+  | "best_months"
+  | "created_at"
+  | "source_type"
+>;
+
+function sanitizePublicMetadata(
+  metadata: Record<string, unknown> | StoryMetadata | null | undefined
+): PublicStoryMetadata | undefined {
+  if (!metadata) return undefined;
+
+  const publicMetadata: PublicStoryMetadata = {};
+  const source = metadata as StoryMetadata;
+
+  if (Array.isArray(source.question_prompts)) {
+    publicMetadata.question_prompts = source.question_prompts;
+  }
+  if (Array.isArray(source.mood_tags)) {
+    publicMetadata.mood_tags = source.mood_tags;
+  }
+  if (typeof source.asturianu_title === "string") {
+    publicMetadata.asturianu_title = source.asturianu_title;
+  }
+  if (typeof source.asturianu_subtitle === "string") {
+    publicMetadata.asturianu_subtitle = source.asturianu_subtitle;
+  }
+  if (source.translations) {
+    publicMetadata.translations = source.translations;
+  }
+
+  return Object.keys(publicMetadata).length > 0 ? publicMetadata : undefined;
+}
+
 // Convert database row to Story interface
 export function rowToStory(row: StoryRow): Story {
   return {
@@ -196,5 +280,72 @@ export function rowToStory(row: StoryRow): Story {
     metadata: (row.metadata as StoryMetadata) || undefined,
     sourceType: row.source_type ? (row.source_type as StorySourceType) : undefined,
     suggestionId: row.suggestion_id || undefined,
+  };
+}
+
+export function rowToPublicStory(row: PublicStoryRow): Story {
+  return publicStoryToStory({
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    subtitle: row.subtitle || "",
+    description: row.description || "",
+    image: row.image_path || "",
+    imageSource: row.image_source || undefined,
+    blurDataUrl: row.blur_data_url || undefined,
+    category: row.category as StoryCategory,
+    location: row.location ? (row.location as StoryLocation) : undefined,
+    duration: row.duration ? (row.duration as StoryDuration) : undefined,
+    displayOrder: row.display_order,
+    relatedStories: row.related_stories || undefined,
+    createdAt: row.created_at,
+    bestMonths: row.best_months || undefined,
+    metadata: sanitizePublicMetadata(row.metadata),
+    sourceType: row.source_type ? (row.source_type as StorySourceType) : undefined,
+  });
+}
+
+export function toPublicStory(story: Story): PublicStory {
+  return {
+    id: story.id,
+    slug: story.slug,
+    title: story.title,
+    subtitle: story.subtitle,
+    description: story.description,
+    image: story.image,
+    imageSource: story.imageSource,
+    blurDataUrl: story.blurDataUrl,
+    category: story.category,
+    location: story.location,
+    duration: story.duration,
+    displayOrder: story.displayOrder,
+    relatedStories: story.relatedStories,
+    createdAt: story.createdAt,
+    bestMonths: story.bestMonths,
+    metadata: sanitizePublicMetadata(story.metadata),
+    sourceType: story.sourceType,
+  };
+}
+
+export function publicStoryToStory(story: PublicStory): Story {
+  return {
+    id: story.id,
+    slug: story.slug,
+    title: story.title,
+    subtitle: story.subtitle,
+    description: story.description,
+    image: story.image,
+    imageSource: story.imageSource,
+    blurDataUrl: story.blurDataUrl,
+    category: story.category,
+    sourcePdf: "",
+    location: story.location,
+    duration: story.duration,
+    displayOrder: story.displayOrder,
+    relatedStories: story.relatedStories,
+    createdAt: story.createdAt,
+    bestMonths: story.bestMonths,
+    metadata: sanitizePublicMetadata(story.metadata),
+    sourceType: story.sourceType,
   };
 }
