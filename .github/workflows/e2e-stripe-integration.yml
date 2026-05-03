@@ -2,6 +2,12 @@ name: Stripe E2E Integration
 
 on:
   workflow_dispatch:
+    inputs:
+      require_live_gate:
+        description: "Fail instead of skipping when Stripe/Supabase QA secrets are missing"
+        required: true
+        default: true
+        type: boolean
   schedule:
     - cron: "0 3 * * *"
   pull_request:
@@ -42,6 +48,7 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           QA_TEST_USER_EMAIL: ${{ secrets.QA_TEST_USER_EMAIL }}
           QA_TEST_USER_PASSWORD: ${{ secrets.QA_TEST_USER_PASSWORD }}
+          REQUIRE_LIVE_INTEGRATION: ${{ github.event_name == 'workflow_dispatch' && inputs.require_live_gate }}
         run: |
           missing=0
           for key in \
@@ -61,6 +68,11 @@ jobs:
           done
 
           if [ "$missing" -eq 1 ]; then
+            if [ "$REQUIRE_LIVE_INTEGRATION" = "true" ]; then
+              echo "Live gate requires all Stripe/Supabase QA secrets; failing instead of skipping."
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
             echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi

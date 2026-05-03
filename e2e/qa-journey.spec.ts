@@ -487,7 +487,7 @@ authTest.describe("QA Journey: Authenticated User", () => {
 
   authTest(
     "Journey 10: Add favorite via API and verify on favorites page",
-    async ({ authenticatedPage, request }) => {
+    async ({ authenticatedPage }) => {
       const page = authenticatedPage;
 
       // First, get the first story ID from the stories API

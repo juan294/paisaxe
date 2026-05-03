@@ -53,6 +53,9 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck
 
+      - name: Check verification coverage wiring
+        run: npm run check-verification-coverage
+
       - name: Run lint
         run: npm run lint
 

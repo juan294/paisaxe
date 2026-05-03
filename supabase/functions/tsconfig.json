@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "types": []
+  },
+  "include": [
+    "deno-types.d.ts",
+    "**/*.ts"
+  ],
+  "exclude": [
+    "../../node_modules"
+  ]
+}

@@ -348,7 +348,7 @@ async function main() {
     console.log(`✓ ${valid.length} stories passed validation`);
 
     // Strip sourceQuote before adding to output (validation-only field)
-    const cleaned: GeneratedStory[] = valid.map(({ sourceQuote, ...rest }) => rest);
+    const cleaned: GeneratedStory[] = valid.map(({ sourceQuote: _sourceQuote, ...rest }) => rest);
     allStories.push(...cleaned);
 
     // Rate limiting
@@ -379,7 +379,7 @@ async function main() {
 
     console.log(`✓ ${valid.length} stories passed validation`);
 
-    const cleaned: GeneratedStory[] = valid.map(({ sourceQuote, ...rest }) => rest);
+    const cleaned: GeneratedStory[] = valid.map(({ sourceQuote: _sourceQuote, ...rest }) => rest);
     allStories.push(...cleaned);
 
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -387,8 +387,6 @@ async function main() {
 
   // Deduplicate by ID and assign display order
   const uniqueStories = new Map<string, GeneratedStory>();
-  let displayOrder = 1;
-
   for (const story of allStories) {
     if (!uniqueStories.has(story.id)) {
       uniqueStories.set(story.id, {
@@ -396,7 +394,6 @@ async function main() {
         id: story.id.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
         slug: story.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
       });
-      displayOrder++;
     }
   }
 

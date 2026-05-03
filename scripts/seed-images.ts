@@ -18,6 +18,31 @@ import path from "path";
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
+type SeedDatabase = {
+  public: {
+    Tables: {
+      images: {
+        Row: {
+          id: string;
+        };
+        Insert: {
+          path: string;
+          caption: string | null;
+          source_pdf: string;
+          page_number: number;
+          tags: string[];
+        };
+        Update: Partial<SeedDatabase["public"]["Tables"]["images"]["Insert"]>;
+        Relationships: [];
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+  };
+};
+
+type SeedSupabaseClient = ReturnType<typeof createClient<SeedDatabase>>;
+
 config({ path: ".env.local" });
 
 // --- Types (exported for tests) ---
@@ -186,7 +211,7 @@ export function deriveCaption(
 // --- Script logic (not exported) ---
 
 async function uploadBatch(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SeedSupabaseClient,
   batch: Array<{ image: ManifestImage; filePath: string; storagePath: string }>,
   chunks: ProcessedChunk[]
 ): Promise<SelectedImage[]> {
@@ -242,7 +267,7 @@ async function uploadBatch(
 }
 
 async function clearImages(
-  supabase: ReturnType<typeof createClient>
+  supabase: SeedSupabaseClient
 ): Promise<void> {
   console.log("Clearing images table...");
   const { error: deleteError } = await supabase
@@ -321,7 +346,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient<SeedDatabase>(supabaseUrl, supabaseServiceKey);
 
   // Read manifest
   if (!fs.existsSync(MANIFEST_PATH)) {
