@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
@@ -8,6 +8,14 @@ import { useSearchParams } from "next/navigation";
 import { Check, Mic, RefreshCw } from "lucide-react";
 
 export default function PricingSuccessPage() {
+  return (
+    <Suspense fallback={null}>
+      <PricingSuccessPageContent />
+    </Suspense>
+  );
+}
+
+function PricingSuccessPageContent() {
   const { canUseVoice, expiresAt, isLoading, refresh } = useVoiceAccess();
   const { t } = useTranslation();
   const searchParams = useSearchParams();

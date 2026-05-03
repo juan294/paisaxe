@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import PricingSuccessPage from "./page";
+import { Suspense, type ReactElement } from "react";
 
 // Mock hooks
 const mockRefresh = vi.fn();
@@ -40,14 +41,16 @@ vi.mock("next/link", () => ({
 
 // Mock next/navigation
 const mockSearchParams = new URLSearchParams();
+const mockUseSearchParams = vi.fn(() => mockSearchParams);
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => mockSearchParams,
+  useSearchParams: () => mockUseSearchParams(),
 }));
 
 describe("PricingSuccessPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams.delete("returnTo");
+    mockUseSearchParams.mockReturnValue(mockSearchParams);
     mockUseVoiceAccess.mockReturnValue({
       hasAccess: true,
       isWhitelisted: false,
@@ -66,6 +69,16 @@ describe("PricingSuccessPage", () => {
     render(<PricingSuccessPage />);
 
     expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it("isolates search params behind a route shell when they suspend", () => {
+    expect((PricingSuccessPage() as ReactElement).type).toBe(Suspense);
+
+    mockUseSearchParams.mockImplementation(() => {
+      throw new Promise(() => {});
+    });
+
+    expect(() => render(<PricingSuccessPage />)).not.toThrow();
   });
 
   it("should render loading state", () => {

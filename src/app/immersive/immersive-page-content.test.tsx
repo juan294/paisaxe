@@ -367,6 +367,26 @@ describe("ImmersivePageContent", () => {
     expect(viewer).toHaveAttribute("data-chat-open", "true");
   });
 
+  it("responds when the story and voice query params change after an earlier deep link", () => {
+    setupDefaults();
+    let params = new URLSearchParams("story=lagos-covadonga");
+    vi.mocked(useSearchParams).mockImplementation(
+      () => params as unknown as ReturnType<typeof useSearchParams>
+    );
+
+    const { rerender } = render(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    expect(screen.getByTestId("story-viewer")).toHaveAttribute("data-index", "0");
+    expect(screen.getByTestId("story-viewer")).toHaveAttribute("data-chat-open", "false");
+
+    params = new URLSearchParams("story=oviedo-cathedral&voice=ready");
+    rerender(<ImmersivePageContent serverShuffleSeed={null} />);
+
+    const viewer = screen.getByTestId("story-viewer");
+    expect(viewer).toHaveAttribute("data-index", "1");
+    expect(viewer).toHaveAttribute("data-chat-open", "true");
+  });
+
   // -----------------------------------------------------------------------
   // 6c. Index resets when filters reduce story list (line 136)
   // -----------------------------------------------------------------------

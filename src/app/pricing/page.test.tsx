@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import PricingPage from "./page";
+import { Suspense, type ReactElement } from "react";
 
 // Mock hooks
 const mockSignInWithGoogle = vi.fn();
@@ -54,8 +55,9 @@ vi.mock("next/link", () => ({
 
 // Mock next/navigation
 const mockPush = vi.fn();
+const mockUseSearchParams = vi.fn(() => new URLSearchParams());
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockUseSearchParams(),
   useRouter: () => ({
     push: mockPush,
     replace: vi.fn(),
@@ -70,6 +72,7 @@ describe("PricingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPush.mockReset();
+    mockUseSearchParams.mockReturnValue(new URLSearchParams());
     mockUseAuth.mockReturnValue({
       user: null,
       session: null,
@@ -111,6 +114,16 @@ describe("PricingPage", () => {
     expect(screen.getByText("€1.99")).toBeInTheDocument();
     expect(screen.getByText("premium.faq_title")).toBeInTheDocument();
     expect(screen.getByText("premium.feature_24h")).toBeInTheDocument();
+  });
+
+  it("isolates search params behind a route shell when they suspend", () => {
+    expect((PricingPage() as ReactElement).type).toBe(Suspense);
+
+    mockUseSearchParams.mockImplementation(() => {
+      throw new Promise(() => {});
+    });
+
+    expect(() => render(<PricingPage />)).not.toThrow();
   });
 
   it("should show disabled button with spinner during loading", () => {
