@@ -23,10 +23,14 @@ beforeAll(() => {
 // Mock next/navigation
 const mockRouterPush = vi.fn();
 const mockSearchParamsGet = vi.fn();
+const mockSearchParamsToString = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockRouterPush }),
-  useSearchParams: () => ({ get: mockSearchParamsGet }),
+  useSearchParams: () => ({
+    get: mockSearchParamsGet,
+    toString: mockSearchParamsToString,
+  }),
 }));
 
 // Mock dynamic imports
@@ -235,6 +239,7 @@ describe("StoriesTabPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParamsGet.mockReturnValue(null);
+    mockSearchParamsToString.mockReturnValue("");
     mockFetchStories.mockResolvedValue({ data: { stories: [], total: 0 } });
     mockBulkUpdateStoryStatus.mockResolvedValue({
       data: { updatedIds: [], status: "approved" },
@@ -395,6 +400,38 @@ describe("StoriesTabPanel", () => {
 
       expect(mockRouterPush).toHaveBeenCalledWith(
         expect.stringContaining("storiesPage=2"),
+        expect.anything()
+      );
+    });
+
+    it("clicking Next preserves the stories tab and existing query params", async () => {
+      mockSearchParamsGet.mockImplementation((key: string) =>
+        key === "storiesPage" ? "1" : null
+      );
+      mockSearchParamsToString.mockReturnValue(
+        "tab=stories&filter=approved&storiesPage=1"
+      );
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: Array.from({ length: 20 }, (_, i) =>
+            makeStory({ id: `s-${i}`, displayOrder: i + 1 })
+          ),
+          total: 40,
+        },
+      });
+
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Next/i })).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /Next/i }));
+      });
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        "?tab=stories&filter=approved&storiesPage=2",
         expect.anything()
       );
     });

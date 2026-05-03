@@ -8,7 +8,13 @@
  * - CATEGORY_LABELS (if categories differ)
  */
 
-export type StorySourceType = "curated" | "user_submitted" | "agent_discovered";
+export const STORY_SOURCE_TYPES = [
+  "curated",
+  "user_submitted",
+  "agent_discovered",
+] as const;
+
+export type StorySourceType = (typeof STORY_SOURCE_TYPES)[number];
 
 export interface Story {
   id: string;
