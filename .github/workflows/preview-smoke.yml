@@ -81,8 +81,9 @@ jobs:
 
       # ------------------------------------------------------------------ #
       # Health endpoint — must return HTTP 200 and JSON status "healthy".   #
-      # A 503 (degraded) or a non-healthy body means a backend dependency   #
-      # is down, so fail the preview gate instead of silently merging it.   #
+      # A non-healthy body means a backend dependency or required runtime   #
+      # config such as Sentry is missing, so fail the preview gate instead  #
+      # of silently merging it.                                            #
       # ------------------------------------------------------------------ #
       - name: Smoke test - health endpoint
         env:
@@ -103,6 +104,12 @@ jobs:
           status=$(python3 -c 'import json; print(json.load(open("/tmp/health.json"))["status"])')
           if [ "$status" != "healthy" ]; then
             echo "Health check failed: status=$status"
+            cat /tmp/health.json
+            exit 1
+          fi
+          sentry_status=$(python3 -c 'import json; print(json.load(open("/tmp/health.json")).get("sentry", {}).get("status", ""))')
+          if [ "$sentry_status" != "configured" ]; then
+            echo "Health check failed: NEXT_PUBLIC_SENTRY_DSN is not configured for this preview"
             cat /tmp/health.json
             exit 1
           fi

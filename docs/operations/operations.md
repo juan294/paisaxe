@@ -6,9 +6,9 @@ Detailed documentation for database maintenance, monitoring, webhooks, and autom
 
 Two endpoints serve different consumers:
 
-**`GET /api/health/live`** — liveness probe. Always returns HTTP 200 with `{ "status": "ok" }`. No Supabase or external checks. Used by Upptime and the develop-smoke CI job. Safe to call in tight loops.
+**`GET /api/health/live`** — liveness probe. Always returns HTTP 200 with `{ "status": "live", "timestamp": "..." }`. No Supabase or external checks. Used by Upptime and liveness-only monitors. Safe to call in tight loops.
 
-**`GET /api/health`** — diagnostics endpoint. Returns `{ "status": "healthy" | "degraded", "timestamp": "...", "cron_auth": "..." }`. Returns HTTP 200 when healthy, HTTP 503 when Supabase connectivity fails, approved stories are unavailable, or database usage reaches the 80% warning threshold. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
+**`GET /api/health`** — public release diagnostics endpoint. Always returns HTTP 200 with `{ "status": "healthy" | "degraded", "timestamp": "...", "cron_auth": { "status": "ok" | "misconfigured" }, "sentry": { "status": "configured" | "unconfigured" } }`. The body status becomes `"degraded"` when Supabase connectivity fails, approved stories are unavailable, database usage reaches the 80% warning threshold, or `NEXT_PUBLIC_SENTRY_DSN` is missing in Vercel preview/production. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
 
 ## Pre-Launch Checklist
 
@@ -16,7 +16,7 @@ Run this checklist before every production release. Invoke with: "Run the pre-la
 
 ### 1. Code Quality Gates
 
-Run all quality checks in parallel:
+Run all quality checks sequentially:
 
 ```bash
 npm run test           # All tests must pass
@@ -37,14 +37,14 @@ npm run build          # Production build succeeds
 # Liveness probe — should always return 200
 curl -sS https://paisaxe.es/api/health/live -w " %{http_code}\n"
 
-# Diagnostics — returns 200 (healthy) or 503 (degraded)
+# Diagnostics — always returns 200; inspect JSON status
 curl -sS https://paisaxe.es/api/health -o /tmp/paisaxe-health.json -w "%{http_code}\n"
 cat /tmp/paisaxe-health.json | jq
 ```
 
 **Verify:**
 - `/api/health/live`: HTTP `200`
-- `/api/health`: HTTP `200` and `status`: `"healthy"`
+- `/api/health`: HTTP `200`, `status`: `"healthy"`, and `sentry.status`: `"configured"`
 
 ### 3. Core Endpoints
 
@@ -114,15 +114,15 @@ Check critical flags at https://paisaxe.es/api/feature-flags:
 | Types | `npm run typecheck` | No errors |
 | Lint | `npm run lint` | No errors |
 | Build | `npm run build` | Completes |
-| Health | `curl .../api/health` | HTTP 200 and `status: healthy` |
+| Health | `curl .../api/health` | HTTP 200, `status: healthy`, and `sentry.status: configured` |
 | Site | `curl -w "%{http_code}" .../` | 200 (after launch) |
 
 ## Upptime Status Page
 
 - **Repo**: https://github.com/juan294/paisaxe-upptime
 - **Status page**: https://juan294.github.io/paisaxe-upptime/
-- **Monitors**: `paisaxe.es` and `paisaxe.es/api/health` every 5 minutes
-- **Machine gate behavior**: `/api/health` returns HTTP 503 on degraded state, so Upptime opens an incident instead of masking a bad backend with a 200
+- **Monitors**: `paisaxe.es` and `paisaxe.es/api/health/live` every 5 minutes
+- **Machine gate behavior**: `/api/health/live` is liveness-only and always returns HTTP 200. Release gates and preview smoke tests use `/api/health` and must parse `status: "healthy"` plus `sentry.status: "configured"`.
 - Opens GitHub Issues automatically on detected downtime
 - Reference config kept in `.github/upptime/.upptimerc.yml`
 

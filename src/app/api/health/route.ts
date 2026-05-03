@@ -43,6 +43,13 @@ function checkSentry(): SentryProbeResult {
   return { status: dsn ? "configured" : "unconfigured" };
 }
 
+function isSentryRequired(): boolean {
+  return (
+    process.env.VERCEL_ENV === "preview" ||
+    process.env.VERCEL_ENV === "production"
+  );
+}
+
 const STORAGE_LIMIT_MB = 8192; // Supabase Pro tier: 8 GB
 const STORAGE_WARNING_THRESHOLD = 0.8; // 80%
 
@@ -181,9 +188,14 @@ export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
     const isDatabaseOverThreshold =
       databaseStatus.usage_percent !== null &&
       databaseStatus.usage_percent >= STORAGE_WARNING_THRESHOLD * 100;
+    const isSentryMissingInDeployedEnv =
+      isSentryRequired() && sentryStatus.status !== "configured";
 
     const overallStatus =
-      isSupabaseError || isStoriesFallback || isDatabaseOverThreshold
+      isSupabaseError ||
+      isStoriesFallback ||
+      isDatabaseOverThreshold ||
+      isSentryMissingInDeployedEnv
         ? "degraded"
         : "healthy";
 
