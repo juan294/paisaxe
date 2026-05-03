@@ -126,6 +126,19 @@ describe("CheckoutPage", () => {
       expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing/checkout");
     });
 
+    it("should preserve returnTo in Google sign-in redirect", () => {
+      mockSearchParams.set("returnTo", "oviedo-walking-tour");
+      render(<CheckoutPage />);
+
+      fireEvent.click(screen.getByRole("button", {
+        name: "auth.continue_with_google",
+      }));
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+        "/pricing/checkout?returnTo=oviedo-walking-tour"
+      );
+    });
+
     it("should not render Stripe checkout when unauthenticated", () => {
       render(<CheckoutPage />);
 
@@ -380,7 +393,7 @@ describe("CheckoutPage", () => {
   });
 
   describe("returnTo parameter", () => {
-    it("should not include returnTo in sign-in redirect (always goes to /pricing/checkout)", () => {
+    it("should include returnTo in sign-in redirect", () => {
       mockSearchParams.set("returnTo", "oviedo-walking-tour");
 
       render(<CheckoutPage />);
@@ -390,8 +403,9 @@ describe("CheckoutPage", () => {
       });
       fireEvent.click(button);
 
-      // signInWithGoogle is called with the checkout path, not with returnTo
-      expect(mockSignInWithGoogle).toHaveBeenCalledWith("/pricing/checkout");
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith(
+        "/pricing/checkout?returnTo=oviedo-walking-tour"
+      );
 
       mockSearchParams.delete("returnTo");
     });

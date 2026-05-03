@@ -22,8 +22,8 @@ const DEFERRED_AUTH_PATHS = new Set(["/immersive", "/pricing", "/favorites"]);
 const STATIC_PATHS = new Set(["/about", "/privacy", "/terms"]);
 
 // Providers wraps only client-context concerns (PostHog, i18n, Auth).
-// The <main id="main-content"> landmark lives in layout.tsx (server component)
-// so that server-rendered children are NOT pulled into the client hydration boundary.
+// The #main-content skip target lives in layout.tsx; route pages own their
+// <main> landmarks so public pages do not nest landmarks.
 export function Providers({ children }: ProvidersProps) {
   const pathname = usePathname();
   // On static paths we defer auth init (no Supabase round-trip) but still

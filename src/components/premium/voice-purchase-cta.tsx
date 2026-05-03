@@ -22,17 +22,16 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
   const { user, session, signInWithGoogle } = useAuth();
   const { t } = useTranslation();
   const router = useRouter();
+  const checkoutUrl = returnTo
+    ? `/pricing/checkout?returnTo=${encodeURIComponent(returnTo)}`
+    : "/pricing/checkout";
 
   const handlePurchase = () => {
     if (!user || !session) {
-      signInWithGoogle();
+      signInWithGoogle(checkoutUrl);
       return;
     }
 
-    // Navigate to embedded checkout page
-    const checkoutUrl = returnTo
-      ? `/pricing/checkout?returnTo=${returnTo}`
-      : "/pricing/checkout";
     router.push(checkoutUrl);
   };
 
@@ -45,7 +44,7 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
         </div>
         <button
           onClick={handlePurchase}
-          className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-400 text-black font-medium rounded-full hover:from-green-400 hover:to-green-300 transition-all text-sm flex items-center gap-2"
+          className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-400 text-black font-medium rounded-full hover:from-green-400 hover:to-green-300 transition-all text-sm flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
         >
           {t("premium.get_day_pass")} - €1.99
         </button>
@@ -105,7 +104,7 @@ export function VoicePurchaseCTA({ compact = false, returnTo, className }: Voice
       {/* CTA Button */}
       <button
         onClick={handlePurchase}
-        className="w-full max-w-xs px-6 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black font-semibold rounded-full hover:from-green-400 hover:to-green-300 transition-all shadow-lg shadow-green-500/25 flex items-center justify-center gap-2"
+        className="w-full max-w-xs px-6 py-3 bg-gradient-to-r from-green-500 to-green-400 text-black font-semibold rounded-full hover:from-green-400 hover:to-green-300 transition-all shadow-lg shadow-green-500/25 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
       >
         {user ? t("premium.get_day_pass") : t("premium.sign_in_to_purchase")}
       </button>

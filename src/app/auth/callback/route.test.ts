@@ -121,6 +121,21 @@ describe("Auth Callback Route", () => {
       expect(response.headers.get("location")).toContain("/favorites");
     });
 
+    it("should preserve query parameters in a safe next path", async () => {
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({
+        code: "valid-auth-code",
+        next: "/pricing/checkout?returnTo=oviedo-walking-tour",
+      });
+      const response = await GET(request);
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe(
+        "http://localhost:3000/pricing/checkout?returnTo=oviedo-walking-tour"
+      );
+    });
+
     it("should reject open redirect via //evil.com in next param", async () => {
       mockExchangeCodeForSession.mockResolvedValue({ error: null });
 

@@ -224,6 +224,32 @@ describe("FavoritesPage", () => {
       expect(mockToggleFavorite).toHaveBeenCalledWith("story-1");
     });
 
+    it("does not nest the remove button inside the story link", async () => {
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+      });
+
+      const removeButton = screen.getByLabelText(mockT("favorites.remove_from_saved"));
+      expect(removeButton.closest("a")).toBeNull();
+    });
+
+    it("keeps metadata and removal reachable on touch and keyboard", async () => {
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Lagos de Covadonga")).toBeInTheDocument();
+      });
+
+      const metadata = screen.getByText("Lagos de Covadonga").closest("a");
+      expect(metadata?.className).toContain("opacity-100");
+
+      const removeButton = screen.getByLabelText(mockT("favorites.remove_from_saved"));
+      expect(removeButton.className).toContain("focus-visible:opacity-100");
+      expect(removeButton.className).toContain("focus-visible:ring-2");
+    });
+
     it("should not display non-favorited stories", async () => {
       render(<FavoritesPage />);
 

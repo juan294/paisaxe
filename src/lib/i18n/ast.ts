@@ -273,6 +273,7 @@ export const ast: Translations = {
     success_expires: 'L\'accesu ye válidu hasta',
     success_cta: 'Empezar a Falar',
     success_retry_hint: 'Si l\'accesu nun apaez, espera un momentu y recarga la páxina.',
+    loading_access: 'Comprobando l\'accesu...',
     checkout_title: 'Pagu',
     checkout_back_to_pricing: 'Tornar a precios',
     pricing_title: 'Conversaciones de Voz',

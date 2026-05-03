@@ -28,6 +28,9 @@ export default function CheckoutPage() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
+  const checkoutPath = returnTo
+    ? `/pricing/checkout?returnTo=${encodeURIComponent(returnTo)}`
+    : "/pricing/checkout";
   const [error, setError] = useState<string | null>(null);
 
   const fetchClientSecret = useCallback(async () => {
@@ -60,8 +63,8 @@ export default function CheckoutPage() {
             {t("premium.sign_in_to_purchase")}
           </h1>
           <button
-            onClick={() => signInWithGoogle("/pricing/checkout")}
-            className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors"
+            onClick={() => signInWithGoogle(checkoutPath)}
+            className="w-full px-5 py-3 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
           >
             {t("auth.continue_with_google")}
           </button>
@@ -78,7 +81,7 @@ export default function CheckoutPage() {
           <Link
             href="/pricing"
             aria-label={t("premium.checkout_back_to_pricing")}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -101,7 +104,7 @@ export default function CheckoutPage() {
             </p>
             <button
               onClick={() => setError(null)}
-              className="px-5 py-2.5 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors"
+              className="px-5 py-2.5 bg-green-500 text-black text-sm font-medium rounded-lg hover:bg-green-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
             >
               {t("errors.retry")}
             </button>
