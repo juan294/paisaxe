@@ -29,7 +29,7 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
-import { searchChunks, getRelatedImages, search, keywordSearch } from "./search";
+import { RERANK_TIMEOUT_MS, searchChunks, getRelatedImages, search, keywordSearch } from "./search";
 import { supabase } from "./supabase";
 import { rerankChunks } from "./rerank";
 import { logger } from "@/lib/logger";
@@ -427,6 +427,61 @@ describe("search", () => {
       // Images not in reranked chunks should not appear
       expect(returnedPaths).not.toContain("img0.jpg");
       expect(returnedPaths).not.toContain("img9.jpg");
+    });
+
+    it("PE-H2: falls back to vector order when rerank exceeds its timeout", async () => {
+      vi.useFakeTimers();
+      try {
+        const mockDbChunks = Array.from({ length: 10 }, (_, i) => ({
+          id: `chunk-${i}`,
+          content: `Content ${i}`,
+          source_pdf: `guide-${i}.pdf`,
+          page_number: i + 1,
+          section_title: null,
+          image_refs: [`img${i}.jpg`],
+          similarity: 0.9 - i * 0.02,
+        }));
+
+        vi.mocked(supabase.rpc).mockResolvedValueOnce({
+          data: mockDbChunks,
+          error: null,
+        } as never);
+        vi.mocked(rerankChunks).mockReturnValue(new Promise(() => {}));
+
+        const mockSelect = vi.fn().mockReturnValue({
+          in: vi.fn().mockResolvedValueOnce({
+            data: [
+              { id: "img-0", path: "img0.jpg", caption: null, source_pdf: "guide-0.pdf" },
+              { id: "img-1", path: "img1.jpg", caption: null, source_pdf: "guide-1.pdf" },
+              { id: "img-2", path: "img2.jpg", caption: null, source_pdf: "guide-2.pdf" },
+              { id: "img-9", path: "img9.jpg", caption: null, source_pdf: "guide-9.pdf" },
+            ],
+            error: null,
+          }),
+        });
+        vi.mocked(supabase.from).mockReturnValue({ select: mockSelect } as never);
+
+        const pendingSearch = search(new Array(512).fill(0.1), 3, "slow rerank");
+        await vi.advanceTimersByTimeAsync(RERANK_TIMEOUT_MS + 1);
+        const result = await pendingSearch;
+
+        expect(result.chunks.map((chunk) => chunk.id)).toEqual([
+          "chunk-0",
+          "chunk-1",
+          "chunk-2",
+        ]);
+        expect(result.images.map((image) => image.path)).toEqual([
+          "img0.jpg",
+          "img1.jpg",
+          "img2.jpg",
+        ]);
+        expect(logger.warn).toHaveBeenCalledWith(
+          "[SEARCH_RERANK_TIMEOUT]",
+          expect.objectContaining({ timeoutMs: RERANK_TIMEOUT_MS })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("should use limit directly when no query text is provided", async () => {

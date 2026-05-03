@@ -409,6 +409,29 @@ describe("rate-limit", () => {
       expect(result.allowed).toBe(true);
       expect(getRateLimitStore().size).toBe(1);
     });
+
+    it("AR-M2: fails closed in production when Upstash credentials are missing", async () => {
+      vi.resetModules();
+      vi.stubEnv("NODE_ENV", "production");
+      delete process.env.UPSTASH_REDIS_REST_URL;
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+
+      const { checkRateLimit, getRateLimitStore, getRateLimitBackendStatus } =
+        await import("./rate-limit");
+
+      const result = await checkRateLimit("prod-user");
+
+      expect(result.allowed).toBe(false);
+      expect(result.remaining).toBe(0);
+      expect(result.retryAfter).toBe(60);
+      expect(getRateLimitStore().size).toBe(0);
+      expect(getRateLimitBackendStatus()).toEqual({
+        backend: "blocked",
+        configured: false,
+        degraded: true,
+        reason: "upstash_missing",
+      });
+    });
   });
 
   describe("BE-M1: isRateLimitDegraded export", () => {
