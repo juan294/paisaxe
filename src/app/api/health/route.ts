@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getEnv } from "@/lib/env";
+import { getRateLimitBackendStatus } from "@/lib/rate-limit";
 
 type HealthStatus = "healthy" | "degraded";
 type SentryStatus = "configured" | "unconfigured";
 
 interface SentryProbeResult {
   status: SentryStatus;
+}
+
+interface RateLimitProbeResult {
+  status: "ok" | "degraded";
+  backend: "upstash" | "memory" | "blocked";
+  reason?: "upstash_missing" | "upstash_unavailable";
 }
 
 type CronAuthStatus =
@@ -18,6 +25,7 @@ interface PublicHealthResponse {
   timestamp: string;
   cron_auth: CronAuthStatus;
   sentry: SentryProbeResult;
+  rate_limit: RateLimitProbeResult;
 }
 
 interface SupabaseProbeResult {
@@ -41,6 +49,15 @@ export const PROBE_TIMEOUTS_MS = {
 function checkSentry(): SentryProbeResult {
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim();
   return { status: dsn ? "configured" : "unconfigured" };
+}
+
+function checkRateLimitBackend(): RateLimitProbeResult {
+  const backendStatus = getRateLimitBackendStatus();
+  return {
+    status: backendStatus.degraded ? "degraded" : "ok",
+    backend: backendStatus.backend,
+    ...(backendStatus.reason ? { reason: backendStatus.reason } : {}),
+  };
 }
 
 const STORAGE_LIMIT_MB = 8192; // Supabase Pro tier: 8 GB
@@ -141,7 +158,8 @@ function checkCronAuthConfigured(): CronAuthStatus {
 function buildHealthResponse(
   status: HealthStatus,
   cronAuth: CronAuthStatus,
-  sentry: SentryProbeResult
+  sentry: SentryProbeResult,
+  rateLimit: RateLimitProbeResult
 ): NextResponse<PublicHealthResponse> {
   // DO-H1 / PE-H3: Always return HTTP 200.
   // Degraded state is signalled via the JSON body only.
@@ -154,6 +172,7 @@ function buildHealthResponse(
       timestamp: new Date().toISOString(),
       cron_auth: cronAuth,
       sentry,
+      rate_limit: rateLimit,
     },
     {
       status: 200,
@@ -168,6 +187,7 @@ function buildHealthResponse(
 export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
   const cronAuth = checkCronAuthConfigured();
   const sentryStatus = checkSentry();
+  const rateLimitStatus = checkRateLimitBackend();
 
   try {
     const [supabaseStatus, storiesStatus, databaseStatus] = await Promise.all([
@@ -181,14 +201,15 @@ export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
     const isDatabaseOverThreshold =
       databaseStatus.usage_percent !== null &&
       databaseStatus.usage_percent >= STORAGE_WARNING_THRESHOLD * 100;
+    const isRateLimitDegraded = rateLimitStatus.status === "degraded";
 
     const overallStatus =
-      isSupabaseError || isStoriesFallback || isDatabaseOverThreshold
+      isSupabaseError || isStoriesFallback || isDatabaseOverThreshold || isRateLimitDegraded
         ? "degraded"
         : "healthy";
 
-    return buildHealthResponse(overallStatus, cronAuth, sentryStatus);
+    return buildHealthResponse(overallStatus, cronAuth, sentryStatus, rateLimitStatus);
   } catch {
-    return buildHealthResponse("degraded", cronAuth, sentryStatus);
+    return buildHealthResponse("degraded", cronAuth, sentryStatus, rateLimitStatus);
   }
 }
