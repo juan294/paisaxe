@@ -123,14 +123,35 @@ describe('locale files', () => {
 
     it('Spanish has correct diacritics', () => {
       const filters = (es.stories as Record<string, unknown>).filters as Record<string, string>;
+      expect(filters.category).toBe('Categoría');
       expect(filters.location).toBe('Ubicación');
       expect(filters.duration).toBe('Duración');
 
       const auth = es.auth as Record<string, string>;
       expect(auth.sign_out).toContain('sesión');
+      expect(auth.sync_favorites_description).toContain('sesión');
 
       const mood = es.mood as Record<string, string>;
       expect(mood.title).toContain('¿Qué');
+
+      const chat = es.chat as Record<string, string>;
+      expect(chat.speech_hint).toContain('micrófono');
+
+      const stories = es.stories as Record<string, unknown>;
+      expect(stories.related).toContain('También');
+
+      const favorites = es.favorites as Record<string, string>;
+      expect(favorites.empty_title).toContain('todavía');
+      expect(favorites.loading_more).toContain('más');
+
+      const premium = es.premium as Record<string, string>;
+      expect(premium.voice_title).toContain('Guía');
+      expect(premium.per_day).toBe('/ día');
+      expect(premium.sign_in_to_purchase).toContain('sesión');
+      expect(premium.secure_payment).toContain('vía');
+      expect(premium.success_subtitle).toContain('está');
+      expect(premium.success_expires).toContain('válido');
+      expect(premium.faq_title).toContain('¿');
     });
   });
 

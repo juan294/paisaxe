@@ -350,4 +350,26 @@ describe("CategoryFilterBadge", () => {
     const hiddenDropdown = container.querySelector('[class*="opacity-0"][class*="pointer-events-none"]');
     expect(hiddenDropdown).not.toBeNull();
   });
+
+  it("keeps collapsed dropdown controls out of the tab order and accessibility tree", () => {
+    renderBadge({ selectedCategory: "food" });
+
+    const dropdown = screen.getByText(mockT("stories.filters.category")).closest("div[class*='absolute']");
+    expect(dropdown).toHaveAttribute("aria-hidden", "true");
+
+    for (const button of screen.getAllByRole("button")) {
+      if (button.getAttribute("aria-expanded") === "false") continue;
+      expect(button).toHaveAttribute("tabindex", "-1");
+    }
+  });
+
+  it("keeps the whole filter badge unreachable when hidden with the story info panel", () => {
+    const { container } = renderBadge({ visible: false });
+
+    expect(screen.queryByRole("button", { name: CATEGORY_LABELS.nature })).toBeNull();
+    const outerDiv = container.firstChild as HTMLElement;
+    const toggleButton = outerDiv.querySelector("button[aria-expanded='false']");
+    expect(toggleButton).toHaveAttribute("tabindex", "-1");
+    expect(outerDiv).toHaveAttribute("aria-hidden", "true");
+  });
 });

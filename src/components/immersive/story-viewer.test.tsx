@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { StoryViewer } from "./story-viewer";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 import { AuthProvider } from "@/components/auth/auth-provider";
@@ -211,22 +211,19 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // With 3 stories (< PAGE_SIZE), should show 3 segments
-      const progressbar = screen.getByRole("progressbar");
-      const progressBars = progressbar.querySelectorAll('[role="button"]');
+      const progressBars = within(screen.getByRole("navigation", { name: "Progreso de historias" })).getAllByRole("button");
       expect(progressBars).toHaveLength(3);
     });
 
     it("should cycle progress bar position based on current index", async () => {
       // At index 1 of 3 stories, position 1 should be filled (segments 0 and 1)
       await renderWithAuth(<StoryViewer {...getDefaultProps({ currentIndex: 1 })} />);
-
-      const progressbar = screen.getByRole("progressbar");
-      const progressBars = progressbar.querySelectorAll('[role="button"]');
+      const progressBars = within(screen.getByRole("navigation", { name: "Progreso de historias" })).getAllByRole("button");
 
       // First two segments should have filled inner div (w-full)
-      const filled0 = progressBars[0]?.querySelector("div");
-      const filled1 = progressBars[1]?.querySelector("div");
-      const filled2 = progressBars[2]?.querySelector("div");
+      const filled0 = progressBars[0]?.querySelector("span[aria-hidden='true']");
+      const filled1 = progressBars[1]?.querySelector("span[aria-hidden='true']");
+      const filled2 = progressBars[2]?.querySelector("span[aria-hidden='true']");
 
       expect(filled0?.classList.contains("w-full")).toBe(true);
       expect(filled1?.classList.contains("w-full")).toBe(true);
@@ -460,9 +457,7 @@ describe("StoryViewer", () => {
 
     it("should jump to specific story when clicking progress bar", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
-
-      const progressbar = screen.getByRole("progressbar");
-      const progressBars = progressbar.querySelectorAll('[role="button"]');
+      const progressBars = within(screen.getByRole("navigation", { name: "Progreso de historias" })).getAllByRole("button");
 
       if (progressBars[2]) {
         fireEvent.click(progressBars[2]);

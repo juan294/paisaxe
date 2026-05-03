@@ -28,7 +28,7 @@ export const mockTranslations: Record<string, string> = {
 
   // Stories
   "stories.new_badge": "Nuevo",
-  "stories.ambient": "Ambient",
+  "stories.ambient": "Ambiente",
   "stories.surprise": "Sorpréndeme",
   "stories.related": "También te puede interesar",
   "stories.no_results": "No hay historias con estos filtros",
@@ -89,19 +89,19 @@ export const mockTranslations: Record<string, string> = {
   "favorites.explore": "Explorar historias",
   "favorites.loading_more": "Cargando más...",
   "favorites.all_viewed": "Has visto todos tus guardados",
-  "favorites.local_only": "Tus guardados solo estan en este dispositivo",
-  "favorites.local_only_description": "Si borras los datos del navegador o cambias de dispositivo, los perderas.",
+  "favorites.local_only": "Tus guardados solo están en este dispositivo",
+  "favorites.local_only_description": "Si borras los datos del navegador o cambias de dispositivo, los perderás.",
   "favorites.sync_with_google": "Sincronizar con Google",
 
   // Auth
   "auth.sign_in": "Entrar",
-  "auth.sign_out": "Cerrar sesion",
+  "auth.sign_out": "Cerrar sesión",
   "auth.user": "Usuario",
   "auth.user_avatar": "Avatar del usuario",
   "auth.sync_favorites_title": "Sincroniza tus favoritos",
-  "auth.sync_favorites_description": "Inicia sesion para guardar tus favoritos en la nube y acceder desde cualquier dispositivo.",
+  "auth.sync_favorites_description": "Inicia sesión para guardar tus favoritos en la nube y acceder desde cualquier dispositivo.",
   "auth.continue_with_google": "Continuar con Google",
-  "auth.maybe_later": "Quiza mas tarde",
+  "auth.maybe_later": "Quizá más tarde",
 
   // Mood
   "mood.title": "¿Qué te apetece?",
@@ -144,14 +144,15 @@ export const mockTranslations: Record<string, string> = {
 
   // Footer
   "footer.terms": "Condiciones de Uso",
-  "footer.privacy": "Politica de Privacidad",
+  "footer.privacy": "Política de Privacidad",
   "footer.content_attribution": "Contenido parcialmente basado en materiales disponibles gratuitamente en turismoasturias.es",
   "footer.ai_disclaimer": "Las respuestas son generadas por IA y deben verificarse",
 
   // Info Menu
   "info_menu.about": "Acerca de Paisaxe",
   "info_menu.saved_places": "Guardados",
-  "info_menu.sign_in": "Iniciar sesion",
+  "info_menu.sign_in": "Iniciar sesión",
+  "premium.loading_access": "Comprobando tu acceso...",
 
   // Voice
   "voice.loading": "Cargando asistente de voz...",
