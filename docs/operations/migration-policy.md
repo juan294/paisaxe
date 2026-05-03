@@ -141,18 +141,20 @@ Examples:
 076_revert_drop_legacy_sessions.sql   # compensation migration
 ```
 
-### Automated Numbering Check (CI)
+### Automated Migration Check (CI)
 
-The `lint-and-typecheck` CI job runs `npx tsx scripts/check-migrations.ts` on every push. The script validates:
+The `lint-and-typecheck` CI job runs `npm run check-migrations` on every push. The script validates:
 
 1. **Filename format** — every file matches `NNN_description.sql`
 2. **No duplicates** — no two files share the same sequence number
 3. **No unexpected gaps** — sequence numbers are contiguous, except for deliberate historical gaps documented in `KNOWN_GAPS` inside `scripts/check-migrations.ts`
+4. **Sensitive table posture** — operational webhook/job tables must enable RLS, revoke anon/authenticated privileges, grant `service_role` explicitly, and define a service-role policy
+5. **Marketing credential shape** — `marketing_accounts.credentials` must be constrained to `NULL` or an encrypted wrapper
 
 If you create a migration with a number that is already taken, or skip a number without adding it to `KNOWN_GAPS`, CI will fail. Run the check locally before pushing:
 
 ```bash
-npx tsx scripts/check-migrations.ts
+npm run check-migrations
 ```
 
 The known historical gaps in this project (numbers 5, 23, and 24) were applied out-of-band during early development. They are registered in `KNOWN_GAPS` and will not trigger a CI failure.
@@ -169,11 +171,13 @@ The known historical gaps in this project (numbers 5, 23, and 24) were applied o
 
 4. **Functions must set `search_path`** — all `CREATE FUNCTION` statements that are `SECURITY DEFINER` must include `SET search_path = ''` and use fully qualified references (e.g., `public.chunks`, not `chunks`).
 
-5. **Grants on new tables** — every migration that creates a public-facing table must include:
+5. **Grants on new public-facing tables** — every migration that creates a public-facing table must include:
 
    ```sql
    GRANT SELECT ON table_name TO anon, authenticated;
    ```
+
+6. **Revokes on sensitive operational tables** — migrations that create webhook event tables, background job tables, or other operational tables with PII/secrets must explicitly revoke anon/authenticated privileges and use a service-role-only RLS posture.
 
 ---
 
