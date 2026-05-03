@@ -1,5 +1,5 @@
-import type { Story, StoryRow } from "@/types/immersive";
-import { rowToStory } from "@/types/immersive";
+import type { PublicStoryRow, Story } from "@/types/immersive";
+import { PUBLIC_STORY_SELECT, rowToPublicStory } from "@/types/immersive";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/env";
 import { FALLBACK_STORIES } from "@/lib/stories-data";
 import { getEnvironment } from "@/lib/environment";
@@ -40,7 +40,7 @@ export async function getStoriesServer(): Promise<Story[]> {
     const isDev = getEnvironment() === "development";
 
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/stories?is_active=eq.true&curation_status=eq.approved&order=display_order.asc&select=*`,
+      `${supabaseUrl}/rest/v1/stories?is_active=eq.true&curation_status=eq.approved&order=display_order.asc&select=${PUBLIC_STORY_SELECT}`,
       {
         headers: {
           apikey: supabaseKey,
@@ -58,13 +58,13 @@ export async function getStoriesServer(): Promise<Story[]> {
       return FALLBACK_STORIES;
     }
 
-    const data: StoryRow[] = await response.json();
+    const data: PublicStoryRow[] = await response.json();
     if (!data || data.length === 0) {
       logFallback("No approved stories in database");
       return FALLBACK_STORIES;
     }
 
-    return data.map(rowToStory);
+    return data.map(rowToPublicStory);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error("[TABLE_FALLBACK]", { table: "stories", error: message });
