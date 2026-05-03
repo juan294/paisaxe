@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import {
@@ -17,39 +19,106 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_REMOTE_SIZE = 10 * 1024 * 1024; // 10MB cap for fetched remote images
 const FETCH_TIMEOUT_MS = 8_000;
 
-/** Block private/loopback hostnames and IP ranges to prevent SSRF. */
-function isPrivateHostname(hostname: string): boolean {
-  // Strip IPv6 brackets: [::1] → ::1
-  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+function normalizeHostname(hostname: string): string {
+  return hostname.replace(/^\[|\]$/g, "").toLowerCase();
+}
 
-  // Loopback names
-  if (host === "localhost") return true;
+function parseIpv4Octets(address: string): number[] | null {
+  const octets = address.split(".");
+  if (octets.length !== 4) return null;
 
-  // IPv6 loopback
-  if (host === "::1" || host === "0:0:0:0:0:0:0:1") return true;
+  const parsed = octets.map((octet) => {
+    if (!/^\d{1,3}$/.test(octet)) return Number.NaN;
+    return Number(octet);
+  });
 
-  // IPv4: parse octets
-  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4) {
-    const [, a, b, c] = ipv4.map(Number);
-    if (a === 127) return true;                               // 127.x.x.x loopback
-    if (a === 10) return true;                                // 10.x.x.x private
-    if (a === 172 && b >= 16 && b <= 31) return true;        // 172.16–31.x.x private
-    if (a === 192 && b === 168) return true;                  // 192.168.x.x private
-    if (a === 169 && b === 254) return true;                  // 169.254.x.x link-local
-    if (a === 0) return true;                                 // 0.0.0.0/8 reserved
-    if (a === 100 && b >= 64 && b <= 127) return true;       // 100.64–127.x CGNAT
-    if (a === 198 && (b === 18 || b === 19)) return true;    // 198.18–19.x benchmarking
-    if (a === 203 && b === 0 && c === 113) return true;      // 203.0.113.x documentation
-    if (a === 240) return true;                               // 240.x.x.x reserved
-    if (a === 255) return true;                               // 255.255.255.255 broadcast
+  return parsed.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255)
+    ? parsed
+    : null;
+}
+
+function isUnsafeIpv4(address: string): boolean {
+  const octets = parseIpv4Octets(address);
+  if (!octets) return false;
+
+  const [a, b, c] = octets;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 0) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113) ||
+    (a >= 224 && a <= 239) ||
+    a >= 240
+  );
+}
+
+function firstIpv6Hextet(address: string): number | null {
+  const [first] = address.split(":");
+  if (!first || !/^[0-9a-f]{1,4}$/i.test(first)) return null;
+  return parseInt(first, 16);
+}
+
+function isUnsafeIpv6(address: string): boolean {
+  const host = normalizeHostname(address);
+  const mappedIpv4 = host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mappedIpv4) return isUnsafeIpv4(mappedIpv4[1]);
+
+  if (host === "::" || host === "::1" || host === "0:0:0:0:0:0:0:1") {
+    return true;
   }
 
-  // IPv6 private/reserved prefixes
-  if (host.startsWith("fc") || host.startsWith("fd")) return true; // ULA fc00::/7
-  if (host.startsWith("fe80")) return true;                         // link-local fe80::/10
+  const first = firstIpv6Hextet(host);
+  if (first === null) return false;
+
+  return (
+    (first >= 0xfc00 && first <= 0xfdff) ||
+    (first >= 0xfe80 && first <= 0xfebf) ||
+    (first >= 0xff00 && first <= 0xffff) ||
+    host.startsWith("2001:db8:")
+  );
+}
+
+function isUnsafeIpAddress(address: string): boolean {
+  const host = normalizeHostname(address);
+  const ipVersion = isIP(host);
+
+  if (ipVersion === 4) return isUnsafeIpv4(host);
+  if (ipVersion === 6) return isUnsafeIpv6(host);
 
   return false;
+}
+
+async function validateRemoteImageUrl(parsedUrl: URL): Promise<string | null> {
+  if (parsedUrl.protocol !== "https:") {
+    return "Only https:// URLs are allowed";
+  }
+
+  const hostname = normalizeHostname(parsedUrl.hostname);
+  if (hostname === "localhost" || isUnsafeIpAddress(hostname)) {
+    return "Private or reserved IP addresses are not allowed";
+  }
+
+  try {
+    const addresses = await lookup(hostname, { all: true, verbatim: true });
+    if (addresses.length === 0 || addresses.some(({ address }) => isUnsafeIpAddress(address))) {
+      return "Private or reserved IP addresses are not allowed";
+    }
+  } catch (error) {
+    logger.warn("Could not validate remote image host:", {
+      hostname,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return "Remote image host could not be validated";
+  }
+
+  return null;
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
@@ -184,18 +253,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      // SSRF hardening: only allow https:// scheme
-      if (parsedUrl.protocol !== "https:") {
+      const remoteValidationError = await validateRemoteImageUrl(parsedUrl);
+      if (remoteValidationError) {
         return NextResponse.json(
-          { error: "Only https:// URLs are allowed" },
-          { status: 400 }
-        );
-      }
-
-      // SSRF hardening: block private/loopback IPs
-      if (isPrivateHostname(parsedUrl.hostname)) {
-        return NextResponse.json(
-          { error: "Private or reserved IP addresses are not allowed" },
+          { error: remoteValidationError },
           { status: 400 }
         );
       }
@@ -209,6 +270,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       try {
         const response = await fetch(imageUrl, {
           headers: { Accept: "image/*" },
+          redirect: "manual",
           signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
 
