@@ -116,6 +116,80 @@ describe("getStoriesServer", () => {
     expect(callUrl).toContain("curation_status=eq.approved");
   });
 
+  it("requests the slim public story projection instead of select=*", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: "story-1",
+          slug: "story-1",
+          title: "Story One",
+          subtitle: "Sub 1",
+          description: "Desc 1",
+          image_path: "/img1.png",
+          image_source: "Photo credit",
+          blur_data_url: "data:image/webp;base64,abc",
+          category: "nature",
+          location: "central",
+          duration: "day-trip",
+          display_order: 1,
+          related_stories: ["story-2"],
+          metadata: {
+            question_prompts: ["What should I ask?"],
+            translation_status: { en: { status: "failed" } },
+          },
+          best_months: [6],
+          created_at: "2025-01-01T00:00:00Z",
+          source_type: "curated",
+          source_pdf: "private-guide.pdf",
+          suggestion_id: "suggestion-1",
+          updated_at: "2025-01-02T00:00:00Z",
+          curation_status: "approved",
+          is_active: true,
+        },
+      ],
+    });
+
+    const { getStoriesServer } = await import("./stories-server");
+    const result = await getStoriesServer();
+
+    const callUrl = new URL(mockFetch.mock.calls[0][0]);
+    const selectedFields = callUrl.searchParams.get("select")?.split(",") ?? [];
+
+    expect(callUrl.searchParams.get("select")).not.toBe("*");
+    expect(selectedFields).toEqual([
+      "id",
+      "slug",
+      "title",
+      "subtitle",
+      "description",
+      "image_path",
+      "image_source",
+      "blur_data_url",
+      "category",
+      "location",
+      "duration",
+      "display_order",
+      "related_stories",
+      "metadata",
+      "best_months",
+      "created_at",
+      "source_type",
+    ]);
+    expect(selectedFields).not.toEqual(
+      expect.arrayContaining([
+        "source_pdf",
+        "suggestion_id",
+        "updated_at",
+        "curation_status",
+        "is_active",
+      ])
+    );
+    expect(result[0]).not.toHaveProperty("suggestionId");
+    expect(result[0]).not.toHaveProperty("sourcePdf", "private-guide.pdf");
+    expect(result[0].metadata).not.toHaveProperty("translation_status");
+  });
+
   it("returns FALLBACK_STORIES when API fails", async () => {
     mockFetch.mockResolvedValue({
       ok: false,

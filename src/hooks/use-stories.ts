@@ -11,7 +11,8 @@ import {
   type ReactNode,
 } from "react";
 import { FALLBACK_STORIES, getStoriesFromDB } from "@/lib/stories-data";
-import type { Story } from "@/types/immersive";
+import type { PublicStory, Story } from "@/types/immersive";
+import { publicStoryToStory, toPublicStory } from "@/types/immersive";
 
 // LocalStorage key for persistent cache
 const STORAGE_KEY = "paisaxe-stories-cache";
@@ -27,7 +28,7 @@ interface StoriesCache {
 // LocalStorage cache structure
 interface PersistedCache {
   version: number;
-  data: Story[];
+  data: PublicStory[];
   timestamp: number;
 }
 
@@ -75,7 +76,7 @@ function loadFromStorage(): Story[] | null {
       return null;
     }
 
-    return parsed.data;
+    return parsed.data.map(publicStoryToStory);
   } catch {
     // Invalid JSON or other error - clear it
     try {
@@ -96,7 +97,7 @@ function saveToStorage(data: Story[]): void {
   try {
     const toStore: PersistedCache = {
       version: STORAGE_VERSION,
-      data,
+      data: data.map(toPublicStory),
       timestamp: Date.now(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));

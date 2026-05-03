@@ -87,6 +87,11 @@ const serverStories = [
   },
 ];
 
+const cachedStoriesFromStorage = cachedStories.map((story) => ({
+  ...story,
+  sourcePdf: "",
+}));
+
 const fallbackStory = {
   id: "fallback-1",
   slug: "fallback-1",
@@ -246,7 +251,7 @@ describe("FE-M1: useStories initial render uses initialStories or FALLBACK_STORI
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.stories).toEqual(cachedStories);
+    expect(result.current.stories).toEqual(cachedStoriesFromStorage);
     // localStorage.getItem must have been called (in the effect, not during render)
     expect(localStorageMock.getItem).toHaveBeenCalledWith("paisaxe-stories-cache");
   });

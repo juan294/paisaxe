@@ -1,5 +1,5 @@
-import type { Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
-import { rowToStory } from "@/types/immersive";
+import type { PublicStoryRow, Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
+import { PUBLIC_STORY_SELECT, rowToPublicStory } from "@/types/immersive";
 import { supabase } from "./supabase";
 import { logger } from "@/lib/logger";
 
@@ -34,7 +34,7 @@ export async function getStoriesFromDB(): Promise<Story[]> {
   try {
     const { data, error } = await supabase
       .from("stories")
-      .select("*")
+      .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
       .eq("curation_status", "approved")
       .order("display_order", { ascending: true });
@@ -50,7 +50,7 @@ export async function getStoriesFromDB(): Promise<Story[]> {
       return FALLBACK_STORIES;
     }
 
-    return (data as StoryRow[]).map(rowToStory);
+    return (data as unknown as PublicStoryRow[]).map(rowToPublicStory);
   } catch (error) {
     if (!isBuildPhase()) {
       logger.error("[TABLE_FALLBACK]", { table: "stories", error: error instanceof Error ? error.message : String(error) });
@@ -70,7 +70,7 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
   try {
     const { data, error } = await supabase
       .from("stories")
-      .select("*")
+      .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
       .eq("curation_status", "approved")
       .eq("category", category)
@@ -87,7 +87,7 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
       return FALLBACK_STORIES.filter(s => s.category === category);
     }
 
-    return (data as StoryRow[]).map(rowToStory);
+    return (data as unknown as PublicStoryRow[]).map(rowToPublicStory);
   } catch (error) {
     if (!isBuildPhase()) {
       logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "category", error: error instanceof Error ? error.message : String(error) });
@@ -103,7 +103,7 @@ export async function getStoriesByLocationFromDB(location: StoryLocation): Promi
   try {
     const { data, error } = await supabase
       .from("stories")
-      .select("*")
+      .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
       .eq("curation_status", "approved")
       .eq("location", location)
@@ -120,7 +120,7 @@ export async function getStoriesByLocationFromDB(location: StoryLocation): Promi
       return FALLBACK_STORIES.filter(s => s.location === location);
     }
 
-    return (data as StoryRow[]).map(rowToStory);
+    return (data as unknown as PublicStoryRow[]).map(rowToPublicStory);
   } catch (error) {
     if (!isBuildPhase()) {
       logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "location", error: error instanceof Error ? error.message : String(error) });
@@ -136,7 +136,7 @@ export async function getStoriesByDurationFromDB(duration: StoryDuration): Promi
   try {
     const { data, error } = await supabase
       .from("stories")
-      .select("*")
+      .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
       .eq("curation_status", "approved")
       .eq("duration", duration)
@@ -153,7 +153,7 @@ export async function getStoriesByDurationFromDB(duration: StoryDuration): Promi
       return FALLBACK_STORIES.filter(s => s.duration === duration);
     }
 
-    return (data as StoryRow[]).map(rowToStory);
+    return (data as unknown as PublicStoryRow[]).map(rowToPublicStory);
   } catch (error) {
     if (!isBuildPhase()) {
       logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "duration", error: error instanceof Error ? error.message : String(error) });
@@ -169,7 +169,7 @@ export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> 
   try {
     const { data, error } = await supabase
       .from("stories")
-      .select("*")
+      .select(PUBLIC_STORY_SELECT)
       .eq("slug", slug)
       .eq("is_active", true)
       .eq("curation_status", "approved")
@@ -182,7 +182,7 @@ export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> 
       return FALLBACK_STORIES.find(s => s.slug === slug || s.id === slug) || null;
     }
 
-    return data ? rowToStory(data as StoryRow) : null;
+    return data ? rowToPublicStory(data as unknown as PublicStoryRow) : null;
   } catch (error) {
     if (!isBuildPhase()) {
       logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "slug", error: error instanceof Error ? error.message : String(error) });
