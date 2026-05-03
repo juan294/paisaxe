@@ -31,11 +31,14 @@ export function Providers({ children }: ProvidersProps) {
   const deferInitialAuth = pathname
     ? STATIC_PATHS.has(pathname) || DEFERRED_AUTH_PATHS.has(pathname)
     : false;
+  const rootFeatureFlagsEnabled = pathname
+    ? !pathname.startsWith("/immersive")
+    : true;
 
   return (
     <PostHogProviderWrapper>
       <LanguageProvider>
-        <FeatureFlagsProvider>
+        <FeatureFlagsProvider enabled={rootFeatureFlagsEnabled}>
           <AuthProvider deferInitialAuth={deferInitialAuth}>
             <SkipLink />
             <LangSync />

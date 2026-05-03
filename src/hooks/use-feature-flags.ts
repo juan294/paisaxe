@@ -197,13 +197,15 @@ function useFeatureFlagsState(
 interface FeatureFlagsProviderProps {
   children?: ReactNode;
   initialFlags?: Partial<Record<FeatureFlagKey, boolean>>;
+  enabled?: boolean;
 }
 
 export function FeatureFlagsProvider({
   children,
   initialFlags,
+  enabled = true,
 }: FeatureFlagsProviderProps) {
-  const value = useFeatureFlagsState(initialFlags);
+  const value = useFeatureFlagsState(initialFlags, enabled);
 
   return createElement(FeatureFlagsContext.Provider, { value }, children);
 }
