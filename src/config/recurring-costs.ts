@@ -58,10 +58,10 @@ export const RECURRING_SUBSCRIPTIONS: RecurringSubscription[] = [
     serviceId: "anthropic",
     serviceName: "Anthropic Claude",
     category: "ai",
-    costUsd: 10,
+    costUsd: 25,
     billingCycle: "monthly",
-    notes: "Prepaid credits (API + Claude Code + agents). ~$10/mo estimated",
-    dashboardUrl: "https://console.anthropic.com/settings/billing",
+    notes: "Prepaid credits (API + agents). ~$25/mo estimated (all projects; no per-project breakdown available)",
+    dashboardUrl: "https://platform.claude.com/settings/billing",
     startDate: "2025-12-15",
   },
   {
