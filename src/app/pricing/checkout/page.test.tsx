@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import CheckoutPage from "./page";
+import { Suspense, type ReactElement } from "react";
 
 // --- Mocks ---
 
@@ -70,8 +71,9 @@ vi.mock("next/link", () => ({
 
 // Mock next/navigation
 const mockSearchParams = new URLSearchParams();
+const mockUseSearchParams = vi.fn(() => mockSearchParams);
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => mockSearchParams,
+  useSearchParams: () => mockUseSearchParams(),
 }));
 
 // Mock fetch for fetchClientSecret
@@ -84,6 +86,7 @@ describe("CheckoutPage", () => {
     capturedFetchClientSecret = null;
     capturedStripePromise = null;
     mockSearchParams.delete("returnTo");
+    mockUseSearchParams.mockReturnValue(mockSearchParams);
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({
       ok: true,
@@ -98,6 +101,16 @@ describe("CheckoutPage", () => {
   });
 
   describe("unauthenticated state", () => {
+    it("isolates search params behind a route shell when they suspend", () => {
+      expect((CheckoutPage() as ReactElement).type).toBe(Suspense);
+
+      mockUseSearchParams.mockImplementation(() => {
+        throw new Promise(() => {});
+      });
+
+      expect(() => render(<CheckoutPage />)).not.toThrow();
+    });
+
     it("should show sign-in prompt when user is not authenticated", () => {
       render(<CheckoutPage />);
 

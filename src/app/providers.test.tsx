@@ -39,8 +39,8 @@ vi.mock("@/components/posthog-provider", () => ({
 }));
 
 vi.mock("@/hooks/use-feature-flags", () => ({
-  FeatureFlagsProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="feature-flags-provider">{children}</div>
+  FeatureFlagsProvider: ({ children, enabled }: { children: React.ReactNode; enabled?: boolean }) => (
+    <div data-testid="feature-flags-provider" data-enabled={String(enabled ?? true)}>{children}</div>
   ),
   useFeatureFlags: vi.fn(() => ({
     flags: [],
@@ -110,6 +110,34 @@ describe("Providers", () => {
 
     expect(container.querySelector("[data-testid='auth-provider']")).toHaveAttribute(
       "data-defer-initial-auth",
+      "true"
+    );
+  });
+
+  it("disables the root feature flag fetch on immersive routes with server-seeded flags", () => {
+    mockUsePathname.mockReturnValue("/immersive");
+    const { container } = render(
+      <Providers>
+        <p>Content</p>
+      </Providers>
+    );
+
+    expect(container.querySelector("[data-testid='feature-flags-provider']")).toHaveAttribute(
+      "data-enabled",
+      "false"
+    );
+  });
+
+  it("keeps the root feature flag fetch enabled outside immersive", () => {
+    mockUsePathname.mockReturnValue("/pricing");
+    const { container } = render(
+      <Providers>
+        <p>Content</p>
+      </Providers>
+    );
+
+    expect(container.querySelector("[data-testid='feature-flags-provider']")).toHaveAttribute(
+      "data-enabled",
       "true"
     );
   });

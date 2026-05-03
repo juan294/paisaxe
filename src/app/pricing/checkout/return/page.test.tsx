@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import CheckoutReturnPage from "./page";
+import { Suspense, type ReactElement } from "react";
 
 // --- Mocks ---
 
@@ -48,14 +49,16 @@ vi.mock("next/link", () => ({
 
 // Mock next/navigation
 const mockSearchParams = new URLSearchParams();
+const mockUseSearchParams = vi.fn(() => mockSearchParams);
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => mockSearchParams,
+  useSearchParams: () => mockUseSearchParams(),
 }));
 
 describe("CheckoutReturnPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams.delete("returnTo");
+    mockUseSearchParams.mockReturnValue(mockSearchParams);
     mockUseVoiceAccess.mockReturnValue({
       hasAccess: true,
       isWhitelisted: false,
@@ -71,6 +74,16 @@ describe("CheckoutReturnPage", () => {
   });
 
   describe("loading state", () => {
+    it("isolates search params behind a route shell when they suspend", () => {
+      expect((CheckoutReturnPage() as ReactElement).type).toBe(Suspense);
+
+      mockUseSearchParams.mockImplementation(() => {
+        throw new Promise(() => {});
+      });
+
+      expect(() => render(<CheckoutReturnPage />)).not.toThrow();
+    });
+
     it("should render loading spinner when isLoading is true", () => {
       mockUseVoiceAccess.mockReturnValue({
         hasAccess: false,

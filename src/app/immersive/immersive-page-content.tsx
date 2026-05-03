@@ -66,7 +66,7 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [moodDismissed, setMoodDismissed] = useState(false);
   const [, startTransition] = useTransition();
-  const deepLinkHandled = useRef(false);
+  const lastHandledDeepLink = useRef<string | null>(null);
   const chatTriggerRef = useRef<HTMLButtonElement>(null);
 
   // Use server-provided seed if available, otherwise generate client-side
@@ -148,17 +148,23 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
 
   // Check for ?story= query param from share links or post-payment return.
   // Searches filteredStories (post-shuffle) so the index matches the displayed order.
-  // Uses a ref guard to fire only once — prevents re-triggering on filter changes.
+  // Tracks the handled story/voice tuple so later URL changes are honored while
+  // filter-only rerenders do not keep reapplying the same deep link.
   useEffect(() => {
     const storySlug = searchParams.get("story");
-    if (storySlug && filteredStories.length > 0 && !deepLinkHandled.current) {
-      const index = filteredStories.findIndex((s) => s.slug === storySlug || s.id === storySlug);
-      if (index >= 0) {
-        deepLinkHandled.current = true;
-        setCurrentIndex(index);
-        if (searchParams.get("voice") === "ready") {
-          setChatOpen(true);
-        }
+    const voiceState = searchParams.get("voice");
+    const deepLinkKey = `${storySlug ?? ""}:${voiceState ?? ""}`;
+
+    if (!storySlug || filteredStories.length === 0 || lastHandledDeepLink.current === deepLinkKey) {
+      return;
+    }
+
+    const index = filteredStories.findIndex((s) => s.slug === storySlug || s.id === storySlug);
+    if (index >= 0) {
+      lastHandledDeepLink.current = deepLinkKey;
+      setCurrentIndex(index);
+      if (voiceState === "ready") {
+        setChatOpen(true);
       }
     }
   }, [searchParams, filteredStories]);

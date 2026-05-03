@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
@@ -13,6 +13,14 @@ import { Check, Mic, RefreshCw } from "lucide-react";
  * Checks voice access and shows confirmation.
  */
 export default function CheckoutReturnPage() {
+  return (
+    <Suspense fallback={null}>
+      <CheckoutReturnPageContent />
+    </Suspense>
+  );
+}
+
+function CheckoutReturnPageContent() {
   const { canUseVoice, expiresAt, isLoading, refresh } = useVoiceAccess();
   const { t } = useTranslation();
   const searchParams = useSearchParams();
