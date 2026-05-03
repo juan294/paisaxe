@@ -1,128 +1,102 @@
-# Remediation Report — 2026-04-27
-> Pre-launch audit: `docs/agents/pre-launch-report.md` (generated 2026-04-26)
-> Branch: `develop` | Wave 1 complete | Wave 2 pending user approval
+# Remediation Report
+> Generated on 2026-05-03 | Branch: `develop` | 48 findings processed
+>
+> Pre-launch report: `docs/agents/pre-launch-report.md`
 
----
+## Summary
 
-## Executive Status
+- Findings processed: 48 (Wave 1: 35, Wave 2: 10, Wave 3: 3)
+- Issues created/reused: 48
+- Issues resolved locally: 35 (Wave 1 merged to local `develop`)
+- Issues filed only: 3 (Wave 3)
+- Wave 2 status: deferred per `/remediate` gate after Wave 1
+- CI status: pending remote push/CI
 
-| Wave | Findings | Status |
-|------|----------|--------|
-| Wave 1 (Before launch) | 52 findings | ✅ Implemented + tests green |
-| Wave 2 (After launch) | 39 findings | ⏳ Issues filed — awaiting user approval |
-| Wave 3 (Later/strategic) | 21 findings | ⏳ Issues filed — no fix agents |
+## Wave 1: Before launch (must-fix)
 
-**Tests after Wave 1:** 6285 passing (341 files)
-**Final commit:** `00f1c608` — fix: update tests to match Wave 1 behavioral changes
-**Wave 2 issues filed:** #485–#523 (39 issues)
-**Wave 3 issues filed:** #524–#544 (21 issues)
+| # | Finding ID | Title | Severity | Tests Added | Branch | Status |
+|---|---|---|---|---|---|---|
+| 1 | SE-B1 | Default anon/authenticated SELECT grants expose operational tables with SMS PII | launch-blocker | Yes | `remediate/db-security` | Merged locally |
+| 2 | DO-H2 | Database migrations are not applied in CI | high | Yes | `remediate/db-security` | Merged locally |
+| 3 | SE-M3 | Marketing credential encryption is not enforced | medium | Yes | `remediate/db-security` | Merged locally |
+| 4 | SE-H1 | Admin image URL ingestion has SSRF bypass paths | high | Yes | `remediate/admin-image-ssrf` | Merged locally |
+| 5 | BE-H1 | Session-scoped advisory locks are used through pooled RPC calls | high | Yes | `remediate/voice-booking` | Merged locally |
+| 6 | BE-H2 | SMS outbox has no independent retry worker | high | Yes | `remediate/voice-booking` | Merged locally |
+| 7 | QA-H1 | Booking SMS failures have no autonomous retry runner | high | Yes | `remediate/voice-booking` | Merged locally |
+| 8 | QA-H2 | Successful booking calls can be orphaned | high | Yes | `remediate/voice-booking` | Merged locally |
+| 9 | BE-M1 | Failed ElevenLabs initiation leaves idempotency stuck | medium | Yes | `remediate/voice-booking` | Merged locally |
+| 10 | UX-H1 | Nested main landmarks break page structure | high | Yes | `remediate/ux-a11y` | Merged locally |
+| 11 | UX-H2 | Collapsed filter popover leaves hidden controls keyboard-reachable | high | Yes | `remediate/ux-a11y` | Merged locally |
+| 12 | UX-H3 | Favorites cards hide information/removal behind hover | high | Yes | `remediate/ux-a11y` | Merged locally |
+| 13 | UX-H4 | Paid voice funnel drops intent during sign-in | high | Yes | `remediate/ux-a11y` | Merged locally |
+| 14 | UX-M2 | Missing focus indicators on public actions | medium | Yes | `remediate/ux-a11y` | Merged locally |
+| 15 | UX-M3 | Interactive progress segments inside progressbar | medium | Yes | `remediate/ux-a11y` | Merged locally |
+| 16 | UX-M4 | Spanish public copy needs editorial pass | medium | Yes | `remediate/ux-a11y` | Merged locally |
+| 17 | UX-M5 | Loading states expose motion-only/textless feedback | medium | Yes | `remediate/ux-a11y` | Merged locally |
+| 18 | AR-H1 | Story `source_type` contract is split | high | Yes | `remediate/admin-story-workflow` | Merged locally |
+| 19 | FE-H1 | Admin stories pagination loses the active tab | high | Yes | `remediate/admin-story-workflow` | Merged locally |
+| 20 | PE-H1 | Public pages do global auth and flag startup work | high | Yes | `remediate/public-startup` | Merged locally |
+| 21 | FE-M2 | Global providers still perform deferred side effects | medium | Yes | `remediate/public-startup` | Merged locally |
+| 22 | FE-M3 | Query-param reads sit in broad route shells | medium | Yes | `remediate/public-startup` | Merged locally |
+| 23 | FE-M4 | Immersive deep-link handling ignores later URL changes | medium | Yes | `remediate/public-startup` | Merged locally |
+| 24 | PE-H2 | Chat p99 is gated by unbounded third-party stages | high | Yes | `remediate/chat-reliability` | Merged locally |
+| 25 | AR-M2 | Chat behavior duplicated across endpoints | medium | Yes | `remediate/chat-reliability` | Merged locally |
+| 26 | SE-M1 | Production rate limiting falls back to memory | medium | Yes | `remediate/chat-reliability` | Merged locally |
+| 27 | FE-M1 | Chat analytics use wrong PostHog context | medium | Yes | `remediate/chat-reliability` | Merged locally |
+| 28 | DO-H1 | Production error tracking can be silently disabled | high | Yes | `remediate/ops-readiness` | Merged locally |
+| 29 | DO-M1 | Health runbooks contradict implementation | medium | Docs/tests | `remediate/ops-readiness` | Merged locally |
+| 30 | DO-M2 | Public DB diagnostics endpoint exposes error detail | medium | Yes | `remediate/ops-readiness` | Merged locally |
+| 31 | DO-M4 | Branch protection docs conflict | medium | Docs | `remediate/ops-readiness` | Merged locally |
+| 32 | PE-M1 | Immersive hydrates and persists full story catalog | medium | Yes | `remediate/immersive-payload` | Merged locally |
+| 33 | AR-M1 | Operational scripts excluded from gates | medium | Yes | `remediate/verification-coverage` | Merged locally |
+| 34 | QA-M1 | Non-src operational code outside gates | medium | Yes | `remediate/verification-coverage` | Merged locally |
+| 35 | QA-M2 | Live integration coverage skips critical happy paths | medium | Config/tests | `remediate/verification-coverage` | Merged locally |
 
----
+## Wave 2: After launch
 
-## Wave 1: Before Launch — COMPLETE
+| # | Finding ID | Title | Severity | Status |
+|---|---|---|---|---|
+| 1 | AR-M3 | Supabase access is not typed at the DB boundary | medium | Deferred |
+| 2 | FE-M5 | Feature-flagged tools are statically imported | medium | Deferred |
+| 3 | BE-M2 | Request validation is inconsistent | medium | Deferred |
+| 4 | BE-M3 | Stripe webhook audit insert mismatches table | medium | Deferred |
+| 5 | BE-M4 | Story conversion from suggestion is not atomic | medium | Deferred |
+| 6 | PE-M2 | Story metadata generation does full-row N+1 work | medium | Deferred |
+| 7 | PE-M3 | MCP POST calls bypass GET cache strategy | medium | Deferred |
+| 8 | DO-M3 | Request IDs not bound into server log context | medium | Deferred |
+| 9 | SE-M2 | MCP POST routes bypass GET validation schemas | medium | Deferred |
+| 10 | UX-M1 | Design-system signals are fragmented | medium | Deferred |
 
-All 52 Wave 1 findings resolved across 5 implementation commits + 1 test-fix commit.
+## Wave 3: Later / strategic (filed, not fixed)
 
-### Implementation Commits
+| # | Finding ID | Title | Severity | Issue | Rationale |
+|---|---|---|---|---|---|
+| 1 | PE-L1 | UI unused export checks have blind spots | low | #575 | Filed only per Wave 3 rule |
+| 2 | SE-L1 | License policy misses weak-copyleft dev exceptions | low | #576 | Filed only per Wave 3 rule |
+| 3 | AR-S1 | Route handlers still act as service layer | strategic | #577 | Filed only per Wave 3 rule |
 
-| Commit | Description | Findings |
-|--------|-------------|---------|
-| `92023fbc` | fix: split health endpoint into liveness and diagnostics | BE-H5, DO-H1 |
-| `d1cbec52` | fix: frontend component quality improvements | FE-H1–H6, UX-B1–B4, UX-H1–H7, UX-M1–M8, AR-M1–M3 |
-| `4c3cf4e6` | fix: parallelize chat embedding + feature flag lookup | PE-H3, PE-M3, PE-M6 |
-| `7af7d381` | chore: config improvements and architectural decisions | DO-M1, DO-M4, DO-M6, BE-M1, BE-M5, BE-M6, SE-M5 |
-| `5cc21453` | fix: add Zod runtime validation to remaining API routes | BE-H1, BE-H2, BE-H3, BE-H4, BE-H6, SE-H1, SE-H2, SE-M1, SE-M2, QA-H1–H3, QA-M1, QA-M2, AR-H1, AR-H2, PE-H1, DO-H2 |
-| `00f1c608` | fix: update tests to match Wave 1 behavioral changes | Test alignment for SE-M2, AR-H2, FE-H5, FE-H6 behavioral changes |
+## Final Verification
 
-### Behavioral Changes Introduced (affects tests)
+- [x] Wave 1 merged locally to `develop`
+- [x] `npm run check-migrations`
+- [x] `npm run check-verification-coverage`
+- [x] `npm run test` - 352 files, 6482 tests passed
+- [x] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npm run build`
+- [ ] Remote push completed
+- [ ] CI green on remote
+- [ ] Wave 2 merged or explicitly deferred
+- [x] Wave 3 issues filed in backlog
+- [ ] Remediate worktrees and branches removed after push/CI
 
-- **SE-M2 (Origin required):** POST with no Origin header now returns 403 before CSRF check. Tests must supply `origin: "https://paisaxe.es"` for CSRF tests.
-- **AR-H2 (pino logger):** `logger.error("msg", meta)` → single JSON string argument to `console.error`. Tests must use `expect.stringContaining("msg")` instead of two-arg matchers.
-- **FE-H5 (Admin shell URL state):** Tab state derived from `searchParams` with local state for instant responsiveness. `router.push(url, { scroll: false })` called with two args on tab change.
-- **FE-H6 (analytics-cache useEffect):** Staleness check moved from render phase to `useEffect([cacheKey, enabled])`. Tests must toggle `enabled` false→true to trigger the effect.
+## Deferred Items
 
----
+Wave 2 remains deferred until the user explicitly asks to continue with `/remediate wave=2`. Wave 3 is issue-only by workflow design.
 
-## Wave 2: After Launch — PENDING
+## Notes
 
-Issues filed for all 39 findings. Wave 2 implementation requires explicit user approval.
-
-### Findings (ordered by priority)
-
-| ID | Title | Domain | Effort |
-|----|-------|--------|--------|
-| DO-H3 | Console lint ignore-list undermines logging | DevOps | M |
-| PE-H2 | Embedding cache in-process — cold lambdas pay Voyage RTT | Performance | M |
-| PE-H3 | Search pipeline rerank/image-fetch serialized | Performance | S |
-| PE-H4 | Anthropic SDK dynamic import per request | Performance | S |
-| BE-M2 | Admin auth double round-trips with no caching | Backend | S |
-| BE-M3 | Service-role client recreated per call | Backend | S |
-| BE-M4 | Feature flags cache no Vary header | Backend | S |
-| BE-M7 | Suggestion POST no spam mitigation | Backend | M |
-| FE-M1 | voice-chat.tsx 423-line monolith | Frontend | M |
-| FE-M2 | admin-shell.tsx 806-line monolith | Frontend | M |
-| FE-M3 | Bespoke fetch-cache duplicated across 5+ hooks | Frontend | L |
-| FE-M4 | Providers remounts AuthProvider on nav | Frontend | S |
-| FE-M5 | PostHog provider reshapes tree on init | Frontend | S |
-| FE-M6 | Unconditional idle voice-chat prefetch | Frontend | S |
-| FE-M7 | Manual SSE buffer parsing not abstracted | Frontend | M |
-| DO-M2 | Cron jobs lack telemetry | DevOps | M |
-| DO-M3 | No regional failover documentation | DevOps | S |
-| DO-M5 | CI runtime gap on develop | DevOps | M |
-| DO-M7 | No log drain confirmed | DevOps | S |
-| DO-L1 | npm audit only at high level | DevOps | S |
-| AR-M4 | proxy.ts re-exports for tests only | Architecture | S |
-| AR-M5 | Hook imports type from route file | Architecture | S |
-| AR-L1 | Three outdated minor deps | Architecture | S |
-| AR-L2 | Two moderate audit findings | Architecture | S |
-| SE-M3 | Service-role bypasses RLS for reads | Security | M |
-| SE-M4 | CSP unsafe-inline no SRI | Security | L |
-| SE-L2 | Bearer precedence implicit and untested | Security | S |
-| SE-L3 | Stripe API version unpinned | Security | S |
-| PE-M1 | Streaming SSE on Node lambda | Performance | M |
-| PE-M5 | Admin loads all stories with no pagination | Performance | M |
-| QA-M3 | Data pipeline scripts untested | QA | M |
-| QA-L1 | No test.skip lint rule | QA | S |
-| BE-L1 | console.* in API routes | Backend | S |
-| BE-L2 | Stripe unrecoverable events no audit trail | Backend | S |
-| UX-M9 | Glassmorphism button pattern not abstracted | UX | M |
-| UX-M10 | Progress bar segments 4px — poor touch affordance | UX | S |
-| UX-L1 | role=region redundant on section with aria-label | UX | S |
-| UX-L2 | alt text repeats visible heading | UX | S |
-| UX-L3 | Clipboard failure silent to user | UX | S |
-
----
-
-## Wave 3: Later / Strategic — ISSUES FILED
-
-21 findings filed as GitHub issues. No fix agents spawned — requires human architectural judgment.
-
-| ID | Title | Domain |
-|----|-------|--------|
-| BE-L3 | Duplicate validation in chat routes | Backend |
-| BE-S1 | No dedicated background worker | Backend |
-| AR-S1 | Flat src/lib/ lacks layering | Architecture |
-| AR-S2 | Optional TypeScript strict flags not enabled | Architecture |
-| DO-L2 | withTimeout leaks promise after timeout fires | DevOps |
-| DO-S1 | Solo escalation single point of failure | DevOps |
-| FE-L1 | console.* in 16+ client component paths | Frontend |
-| FE-L2 | navigator.standalone any cast | Frontend |
-| FE-L3 | Share URL logic duplicated | Frontend |
-| FE-S1 | No state management library decision | Frontend |
-| PE-M2 | Curl-spawn dev/prod parity gap | Performance |
-| PE-M4 | Marketing dashboard JS aggregation vs SQL | Performance |
-| PE-M7 | Sentry sourcemap upload on every build | Performance |
-| PE-L1 | 1-second setInterval for elapsed timer | Performance |
-| PE-L2 | story/[slug] prerenders for redirect only | Performance |
-| PE-L3 | console.* on chat hot path | Performance |
-| PE-L4 | EmbeddingCache SHA-256 overhead | Performance |
-| PE-S1 | Single-region deployment observability | Performance |
-| SE-L1 | Child process exposes full process.env | Security |
-| SE-S1 | Single admin role, no fine-grained RBAC | Security |
-| UX-S1 | Bookmark vs favourite metaphor conflict | UX |
-
----
-
-## Previous Remediation (2026-04-20 audit)
-
-The prior remediation cycle (documented in git history) resolved Wave 1 + Wave 2 from the April 20 pre-launch audit. The April 26 audit re-audited the codebase and found new/remaining findings above.
+- No Vercel deploy commands were run.
+- No partial branch pushes were performed.
+- Local worker commits were merged into `develop`; remote push is intentionally held until final local verification is complete.
+- Local shell reports Node `v23.9.0` while the project declares `>=24.0.0`; verification still passed locally.
