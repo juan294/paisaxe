@@ -61,10 +61,7 @@ function checkRateLimitBackend(): RateLimitProbeResult {
 }
 
 function isSentryRequired(): boolean {
-  return (
-    process.env.VERCEL_ENV === "preview" ||
-    process.env.VERCEL_ENV === "production"
-  );
+  return process.env.VERCEL_ENV === "production";
 }
 
 const STORAGE_LIMIT_MB = 8192; // Supabase Pro tier: 8 GB

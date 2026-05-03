@@ -347,7 +347,7 @@ describe("GET /api/health", () => {
     }
   });
 
-  it("DO-H2: marks deployed preview health degraded when Sentry DSN is missing", async () => {
+  it("DO-H2: keeps deployed preview health healthy when only Sentry DSN is missing", async () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
     mockHealthySupabase();
@@ -357,7 +357,7 @@ describe("GET /api/health", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.status).toBe("degraded");
+    expect(data.status).toBe("healthy");
     expect(data.sentry).toEqual({ status: "unconfigured" });
   });
 
