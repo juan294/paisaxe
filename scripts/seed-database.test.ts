@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks required before importing seed-database.ts because it runs side
