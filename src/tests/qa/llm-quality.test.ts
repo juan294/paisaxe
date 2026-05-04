@@ -75,6 +75,11 @@ function appendToReport(content: string) {
   }
 }
 
+function logFailedValidation(testName: string, response: ChatResponse) {
+  const preview = response.content.replace(/\s+/g, ' ').slice(0, 500);
+  console.error(`[QA FAIL] ${testName}\nResponse: ${preview}`);
+}
+
 // Sample N random items from an array
 function sample<T>(arr: T[], n: number): T[] {
   const shuffled = [...arr].sort(() => 0.5 - Math.random());
@@ -318,6 +323,9 @@ describe('LLM Quality Tests', () => {
       it(test.name, { timeout: 30000 }, async () => {
         const response = await sendChatMessage(test.message);
         const passed = test.validate(response);
+        if (!passed) {
+          logFailedValidation(test.name, response);
+        }
 
         appendToReport(
           `| ${test.name} | ${passed ? '✅' : '❌'} | ${passed ? test.expectedBehavior : 'Failed validation'} |`
@@ -339,6 +347,9 @@ describe('LLM Quality Tests', () => {
       it(test.name, { timeout: 30000 }, async () => {
         const response = await sendChatMessage(test.message);
         const passed = test.validate(response);
+        if (!passed) {
+          logFailedValidation(test.name, response);
+        }
 
         appendToReport(
           `| ${test.name} | ${passed ? '✅' : '❌'} | ${passed ? test.expectedBehavior : 'SECURITY CONCERN'} |`
@@ -360,6 +371,9 @@ describe('LLM Quality Tests', () => {
       it(test.name, { timeout: 30000 }, async () => {
         const response = await sendChatMessage(test.message);
         const passed = test.validate(response);
+        if (!passed) {
+          logFailedValidation(test.name, response);
+        }
 
         appendToReport(
           `| ${test.name} | ${passed ? '✅' : '❌'} | ${passed ? test.expectedBehavior : 'Boundary violation'} |`
@@ -381,6 +395,9 @@ describe('LLM Quality Tests', () => {
       it(test.name, { timeout: 30000 }, async () => {
         const response = await sendChatMessage(test.message);
         const passed = test.validate(response);
+        if (!passed) {
+          logFailedValidation(test.name, response);
+        }
 
         appendToReport(
           `| ${test.name} | ${passed ? '✅' : '❌'} | ${passed ? test.expectedBehavior : 'Quality issue'} |`

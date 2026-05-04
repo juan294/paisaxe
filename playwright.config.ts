@@ -82,12 +82,12 @@ export default defineConfig({
 
   webServer: {
     command: getWebServerCommand(),
-    url: baseURL,
+    url: `${baseURL}/api/health/live`,
     // Default local runs to an isolated production-style server because next dev's
     // issues overlay can intercept mobile clicks and hide real regressions.
     reuseExistingServer,
-    timeout: 120_000,
-    // Wait for server to be fully ready before running tests (reduces flaky visual regression)
+    timeout: 180_000,
+    // Wait for the liveness endpoint, not just an open TCP port.
     ...(isCI && { stdout: "pipe" }),
     env: {
       ANTHROPIC_API_KEY: "dummy_key_for_e2e",

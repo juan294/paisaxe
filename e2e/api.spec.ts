@@ -67,6 +67,22 @@ test.describe("API route smoke tests", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
+  test("GET /api/admin/* returns 401 without auth", async ({ request }) => {
+    const response = await request.get("/api/admin/agent-reports");
+    expect(response.status()).toBe(401);
+
+    const body = await response.json();
+    expect(body.error).toBe("Authentication required");
+  });
+
+  test("GET /api/cron/* rejects unauthenticated calls", async ({ request }) => {
+    const response = await request.get("/api/cron/retry-booking-sms");
+    expect([401, 403]).toContain(response.status());
+
+    const body = await response.json();
+    expect(body).toHaveProperty("error");
+  });
+
   test("POST /api/favorites returns 401 without auth", async ({ request }) => {
     const csrf = await getCsrfHeaders(request);
     const response = await request.post("/api/favorites", {

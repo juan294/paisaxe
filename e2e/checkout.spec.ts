@@ -129,6 +129,13 @@ test.describe("Checkout flow", () => {
     await expect(immersiveLink).toBeVisible({ timeout: 10000 });
   });
 
+  test("checkout return page renders", async ({ page }) => {
+    const response = await page.goto("/pricing/checkout/return");
+    expect(response?.ok()).toBe(true);
+
+    await expect(page.locator("body")).not.toBeEmpty();
+  });
+
   test("pricing page back link navigates to /immersive", async ({ page }) => {
     await page.route("**/api/voice-access", (route) =>
       route.fulfill({

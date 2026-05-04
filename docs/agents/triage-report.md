@@ -1,52 +1,63 @@
 # Triage Report
-> Generated on 2026-05-03 | 6 reports processed | 2 code items (4 total changes) | 0 Dependabot PRs
+> Generated on 2026-05-04 | 11 reports processed | 7 action items | 0 Dependabot PRs
 
 ## Agent Failures
-None — all agents ran successfully.
+None -- all agents ran successfully.
 
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `cc-rpi-update-report.md` | CC-RPI Update | — | 0 — already up to date (v1.18.0) |
-| 2 | `coverage-report.md` | Coverage | GREEN | 1 — commit +29 uncommitted tests |
-| 3 | `cost-analyst-report.md` | Cost Analyst | WATCH | 0 code — 4 user actions |
-| 4 | `documentation-report.md` | Documentation | GREEN | 0 — 20th consecutive clean run |
-| 5 | `performance-report.md` | Performance | GREEN | 0 code — 1 user action (prod build) |
-| 6 | `security-report.md` | Security | GREEN | 1 — optional patch dep refresh |
+| 1 | `pre-launch-report.md` | Pre-launch | RED source audit | Cross-referenced against remediation; Wave 1 already locally resolved |
+| 2 | `cost-analyst-report.md` | Cost Analyst | WATCH | 0 code; revenue/voice and Anthropic billing remain manual |
+| 3 | `remediation-report.md` | Remediation | YELLOW | Wave 1 merged locally; Wave 2/3 carried by workflow |
+| 4 | `performance-report.md` | Performance | GREEN stale baseline | Fresh production build required |
+| 5 | `coverage-report.md` | Coverage | GREEN | Preserve uncommitted +19 tests |
+| 6 | `localization-report.md` | Localization | GREEN | 0 -- complete across 6 locales |
+| 7 | `documentation-report.md` | Documentation | GREEN | 0 -- docs already current |
+| 8 | `security-report.md` | Security | GREEN | Improve live header coverage |
+| 9 | `cc-rpi-update-report.md` | CC-RPI Update | GREEN | 0 -- already up to date |
+| 10 | `update-docs-report.md` | Update Docs | GREEN | Diagram review already resolved |
+| 11 | `qa-report.md` | QA | YELLOW | Add failure logging, E2E gaps, Playwright readiness |
 
 ## Overall Status: GREEN
 
-All agents reporting GREEN or WATCH. No agent failures. No Dependabot PRs. Single uncommitted code item (coverage agent's test additions) plus patch housekeeping deps.
+No agent failures. No open Dependabot PRs. Security, localization, documentation, and coverage are green. QA remains operationally yellow because production voice/revenue checks require manual verification, but the actionable code/test items from this triage cycle were resolved.
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Commit `stories-tab-panel.test.tsx` +29 tests (47.61%→96.59% stmt) | coverage | +29 | ✅ Committed `3bd22122` |
-| 2 | Simplify: add `within`-based button queries (replace fragile CSS class selectors) | coverage/simplify | 0 | ✅ Fixed in `3bd22122` |
-| 3 | Simplify: add module-scope prop resets in `beforeEach` (prevent state leak between tests) | coverage/simplify | 0 | ✅ Fixed in `3bd22122` |
-| 4 | Patch dep refresh: `posthog-js@1.372.6`, `zod@4.4.2` | security | 0 | ✅ Committed `5f7025db` |
+| 1 | Preserve coverage agent tests for chat stream, health, stream hook, story viewer, and admin auth | coverage | +19 | Done |
+| 2 | Add failed-response logging to LLM QA assertions | QA | 0 | Done |
+| 3 | Make Playwright webServer wait on `/api/health/live` and extend startup timeout to 180s | QA | 0 | Done |
+| 4 | Add E2E smoke for unauthenticated `/api/admin/*` | QA | +1 | Done |
+| 5 | Add E2E smoke for unauthenticated `/api/cron/*` | QA | +1 | Done |
+| 6 | Add E2E render smoke for `/pricing/checkout/return` | QA | +1 | Done |
+| 7 | Extend security-agent header check to fall back to production headers when local server is absent | security | 0 | Done |
 
 ## Dependabot PRs
-None — no open Dependabot PRs.
+None -- no open Dependabot PRs.
 
 ## Verification
-- [x] 6421/6421 tests passing (349 files) — pre-commit hook confirmed on both commits
-- [x] Typecheck clean — pre-commit hook confirmed
-- [x] Lint clean — pre-commit hook confirmed
-- [x] npm audit — 0 vulnerabilities after dep bumps
-- [ ] CI green on develop — in progress (two pushes: `3bd22122`, `5f7025db`)
+- [x] `npm install` -- 0 vulnerabilities; Node 23.9.0 engine warnings only
+- [x] `npm run build` -- production build passed
+- [x] Targeted Vitest -- 6 files, 236 tests passed
+- [x] Targeted Playwright -- 16 desktop API/checkout tests passed
+- [x] `npm run test` -- 353 files, 6515 tests passed
+- [x] `npm run typecheck` -- clean
+- [x] `npm run lint` -- clean
+- [ ] CI green -- pending push
 
 ## Carried Items
-| Item | Source | Cycles |
+| Item | Source | Status |
 |------|--------|--------|
-| `voice-agent-chat.tsx` (42.7% stmt) requires Playwright E2E | coverage | 17+ |
-| `agents-dashboard/index.tsx` (49.3% stmt) requires Playwright E2E | coverage | 17+ |
-| 79-day revenue drought — Pelayo widget / Day Pass verification on production | cost-analyst | persistent |
-| 75-day Paisaxe voice silence — no conversations since Feb 17 | cost-analyst | persistent |
+| Revenue drought: 80 days since Feb 13 | cost-analyst | Manual production verification required |
+| Paisaxe voice silence: 76 days since Feb 17 | cost-analyst | Manual Pelayo widget verification required |
+| Anthropic billing visibility | cost-analyst | Manual console check required |
+| `voice-agent-chat.tsx` low coverage | coverage | Requires Playwright E2E |
+| `agents-dashboard/index.tsx` low coverage | coverage | Requires Playwright E2E |
+| Wave 2 remediation items | remediation | Deferred until explicit `/remediate wave=2` |
 
-## Manual Actions Required (user only)
-1. **P1 — Revenue/voice drought**: Manually verify Pelayo voice widget and Day Pass purchase flow on `paisaxe.es`. 79 days without revenue, 75 days without voice conversations. No automated diagnostic has identified a root cause.
-2. **P2 — Anthropic billing**: Check `console.anthropic.com/settings/billing` — daily agents plus Claude Code Max likely exceed the $10/mo config estimate.
-3. **P2 — Twilio $0.24 anomaly**: Watch balance today/tomorrow (May 3-4) for a $0.24 drop similar to Apr 3-4. Confirms monthly regulatory surcharge pattern → update `src/config/recurring-costs.ts`.
-4. **P3 — Fresh production build**: `rm -rf .next && npm run build` — provides authoritative post-`3163f478` initial-load baseline. Performance agent has used the Apr 25 prod baseline for 8 cycles; actual initial-load is unknown.
-5. **Low — postcss**: To bump postcss from 8.5.12→8.5.13, update both `devDependencies` and `overrides` in `package.json` then run `npm install`. Skipped this cycle due to override conflict with direct install. `^8.5.10` already satisfies 8.5.13 semantically.
+## Notes
+- Twilio $0.24 anomaly watch is closed with no recurrence; no `recurring-costs.ts` update needed.
+- `voyageai` remains pinned at `0.1.0`; do not include it in dependency batches.
+- Fresh production build no longer contains the old `10e1-kbfg7iqw.js` chunk name.
