@@ -61,6 +61,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -82,21 +83,6 @@
 - Code Quality Agent: New extracted components: `author-typewriter.tsx`, `story-progress-bar.tsx`. These follow React.memo + ref patterns documented in `perf-optimization-2026-02.md`.
 - Coverage Agent: New components (`AuthorTypewriter`, `StoryProgressBar`) may need test coverage.
 - Localization Agent: Translation lazy-loading caches in module-level Map. `es` and `en` are static imports; others load on demand. No change to translation content.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-05-04T07:05:23Z -->
-## Triage — 2026-05-04
-- **Reports processed**: 11
-- **Agent failures**: 0
-- **Action items resolved**: 6 code/test items + fresh production build
-- **Summary**: Preserved the coverage agent's uncommitted test additions, added QA failure response logging, hardened Playwright server readiness, added E2E smokes for admin/cron/checkout-return gaps, and extended the security agent header check to fall back to live production headers.
-- **Verification**: `npm run test` (353 files, 6515 tests), `npm run typecheck`, `npm run lint`, `npm run build`, targeted Playwright API/checkout E2E all passed.
-
-**Cross-agent recommendations:**
-- QA Agent: Failed LLM assertions now print a 500-character response preview. Browser E2E server readiness now waits on `/api/health/live` with a 180s timeout.
-- Performance Agent: A fresh production build completed successfully. The old `10e1-kbfg7iqw.js` chunk name is no longer present in the generated build output.
-- Security Agent: Header metrics now prefer local headers but fall back to `https://paisaxe.es/`, so CSP/HSTS should appear in scheduled reports even when no dev server is running.
-- Cost Analyst Agent: Twilio anomaly watch is resolved with no code action. Revenue/voice drought and Anthropic billing remain manual checks.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=code_quality_audit timestamp=2026-02-09T18:00:00Z -->
@@ -818,36 +804,6 @@
 - Coverage Agent: All webhook timing-safe paths and CSRF origin checks remain at 100% branch coverage. No security-driven test additions required.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-05-02T07:30:00Z -->
-## Triage — 2026-05-02
-- **Reports processed**: 10 (cc-rpi-update, cost-analyst, documentation, performance, localization, pre-launch, qa, remediation, security, update-docs)
-- **Agent failures**: 0
-- **Action items resolved**: 2 (QA harness Origin header; performance budget raises)
-- **Summary**: QA Origin header fix unblocks 12 LLM safety tests after 3 blocked cycles (SE-M2 CSRF requires Origin; Node.js fetch doesn't auto-inject it). Performance budgets raised 2000→2100 KB initial / 3000→3100 KB total to reflect structural growth since Apr 4 (Wave 1+2 + 13-pkg dep bumps). P4 (Supabase realtime tree-shake) analyzed and found infeasible as previously described — `eventsPerSecond: 0` doesn't tree-shake the realtime module; filed #558 with correct approach. @anthropic-ai/sdk advisory already fixed in `52b8f484` + `3163f478`. Commit: `a7fcb23f`.
-**Cross-agent recommendations:**
-- QA Agent: `sendChatMessage()` now sends `Origin: API_URL` — next cycle should recover to 12/12 LLM tests. If still failing, check that the dev server is running on `http://localhost:3000` when tests execute.
-- Performance Agent: Budgets now 2,100 KB initial / 3,100 KB total. Current dev cache (3,008 KB total / ~2,067 KB initial) is GREEN under new budgets. Run a fresh prod build (`rm -rf .next && npm run build`) before next performance report — dev cache is ~7 days stale.
-- Performance Agent: P4 (Supabase realtime tree-shake) needs a different approach — see GitHub issue #558. The `eventsPerSecond: 0` option does not tree-shake `@supabase/realtime-js` from the webpack bundle. Real savings require using `@supabase/auth-js` directly in `auth-provider.tsx` or lazy-loading the Supabase client.
-- Cost Analyst Agent: Revenue drought 78 days / voice silence 74 days — manual production verification of Pelayo widget and Day Pass flow on paisaxe.es remains the highest-priority outstanding action.
-- Security Agent: @anthropic-ai/sdk GHSA-p7fg-763f-g4gf already patched in `52b8f484` + `3163f478`. No advisory action remaining.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-05-02T08:02:53Z -->
-## Performance Agent — 2026-05-02
-- **Status: GREEN** — Total JS 3,008 KB / 3,100 KB (+92 KB headroom). Initial load ~2,067 KB / 2,100 KB (+33 KB, stale Apr 25 prod baseline). Recovered from RED via triage `a7fcb23f` budget raise.
-- **Bundle byte-stable** vs May 1 — all 10 top chunk hashes identical, no client-side dep changes since `3163f478`.
-- **P4 reclassified** (#558): `eventsPerSecond: 0` does NOT tree-shake `@supabase/realtime-js`. Real savings require Option A (use `@supabase/auth-js` directly in auth-provider) or Option B (lazy-load full client). Both deferred — current headroom is sufficient.
-- **Production build still skipped 8 cycles running.** Apr 25 prod baseline (2,067 KB initial) is the only authoritative number. Run `rm -rf .next && npm run build` to confirm reported headroom.
-- **Chunk 7 (10e1-kbfg7iqw, 122 KB)** unclassified for 2 cycles; prod build needed to determine if static or deferred.
-
-**Cross-agent recommendations:**
-- Triage Agent: Run a fresh prod build at the start of next cycle. The performance agent's headroom claim depends on a stale baseline; without a build, "GREEN" cannot be verified. Also classifies chunk 7.
-- Security Agent: voyageai 0.1.0 pin confirmed in `749048e5`. Do not include voyageai in any future dep batch.
-- Code Quality Agent: Dependency PRs (e.g. `3163f478` +22 KB) should run `du -sk .next/static/chunks` before/after to surface silent bundle growth at review time. Recurring pattern: minor/patch bumps each adding 3-9 KB.
-- QA Agent: No bundle-driven regressions this cycle. Chat panel (Journey 3) and multi-turn chat (Journey 14) unaffected.
-- Cost Analyst Agent: Bundle stable at 3,008 KB. ElevenLabs deferred chunk (482 KB) and PostHog deferred chunk (186 KB) not in initial load; no UX impact from voice-silence period.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=triage timestamp=2026-05-02T08:10:00Z -->
 ## Triage — 2026-05-02 (cycle 2)
 - **Reports processed**: 0 (all reports pre-dated .last-triage marker at 07:22)
@@ -1081,4 +1037,35 @@
 - Coverage Agent: Webhook timingSafeEqual + CSRF origin paths remain fully covered. No security-driven coverage work needed.
 - QA Agent: Safety guardrails passed last cycle (May 3). No security blocker for LLM safety tests.
 - Cost Analyst Agent: No cost-related security concerns. voyageai pin remains in effect.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-05-04T07:05:23Z -->
+## Triage — 2026-05-04
+- **Reports processed**: 11
+- **Agent failures**: 0
+- **Action items resolved**: 6 code/test items + fresh production build
+- **Summary**: Preserved the coverage agent's uncommitted test additions, added QA failure response logging, hardened Playwright server readiness, added E2E smokes for admin/cron/checkout-return gaps, and extended the security agent header check to fall back to live production headers.
+- **Verification**: `npm run test` (353 files, 6515 tests), `npm run typecheck`, `npm run lint`, `npm run build`, targeted Playwright API/checkout E2E all passed.
+
+**Cross-agent recommendations:**
+- QA Agent: Failed LLM assertions now print a 500-character response preview. Browser E2E server readiness now waits on `/api/health/live` with a 180s timeout.
+- Performance Agent: A fresh production build completed successfully. The old `10e1-kbfg7iqw.js` chunk name is no longer present in the generated build output.
+- Security Agent: Header metrics now prefer local headers but fall back to `https://paisaxe.es/`, so CSP/HSTS should appear in scheduled reports even when no dev server is running.
+- Cost Analyst Agent: Twilio anomaly watch is resolved with no code action. Revenue/voice drought and Anthropic billing remain manual checks.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-05-04T08:03:07Z -->
+## Performance Agent — 2026-05-04
+- Status: GREEN. Total JS 2,999 / 3,100 KB (101 KB headroom). Initial load 2,067 / 2,100 KB but baseline is 10 cycles stale.
+- Bundle plateau holds: -9 KB dev-cache delta vs May 3 is a `.next` rebuild artifact (327 MB -> 59 MB), not a real reduction. All ten top chunks within ~1 KB of May 3 sizes.
+- Chunk 7 (122 KB, hash rotated `10e1-kbfg7iqw` -> `0-zzfjv3~jbbq`) byte-stable for 4 cycles, still unclassified — largest unexplained contributor to initial-load growth since Apr 4.
+- 3 patch bumps (posthog-js 1.372.6, zod 4.4.2, postcss 8.5.13) pending `npm install` for the 3rd cycle. node_modules byte-stable.
+- i18n chunk +0.5 KB from `premium.loading_access` (locale agent).
+
+**Cross-agent recommendations:**
+- Triage Agent: `npm install && rm -rf .next && npm run build` is the single highest-priority outstanding action. Resolves stale baseline, installs 3 pending patches, and unlocks chunk 7 classification — all in one 10-minute step.
+- Security Agent: 3 patch bumps still uninstalled. Once installed, deferred PostHog chunk (~187 KB) may shift 0-2 KB; will note in next cycle.
+- Cost Analyst Agent: Bundle composition stable. ElevenLabs deferred chunk unchanged at 482 KB. No cost-impact deltas.
+- Code Quality Agent: Chunk 7 classification is the only outstanding bundle question. Suspected sources: FE-M1 voice-chat extraction shared code, Anthropic SDK 0.92.0 client surface, or other wave-2 shared modules.
+- Localization Agent: 406 keys per locale confirmed in chunk 6 (~125 KB, +0.5 KB this cycle). Lazy-loading split (es+en static, fr/de/pt/ast dynamic) holding stable.
 <!-- ENTRY:END -->
