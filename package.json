@@ -95,7 +95,7 @@
     "stripe": "^22.1.0",
     "tailwind-merge": "^3.5.0",
     "voyageai": "0.1.0",
-    "zod": "^4.4.2"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^16.2.4",
@@ -119,7 +119,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
-    "knip": "^6.9.0",
+    "knip": "^6.11.0",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.7.284",
     "postcss": "^8.5.10",
