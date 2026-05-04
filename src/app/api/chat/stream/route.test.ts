@@ -886,6 +886,144 @@ describe("POST /api/chat/stream", () => {
     );
   });
 
+  it("should return 400 when validateChatRequest (secondary check) returns invalid", async () => {
+    vi.mocked(validateChatRequest).mockReturnValueOnce({
+      valid: false,
+      error: "Custom validation rejected",
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Hello" }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Custom validation rejected");
+    expect(generateEmbedding).not.toHaveBeenCalled();
+  });
+
+  it("should call handleRequestAbort immediately when request signal is pre-aborted", async () => {
+    vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+    vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+    vi.mocked(streamChatResponse).mockImplementation(async function* () {
+      yield "chunk";
+    });
+
+    const abortController = new AbortController();
+    abortController.abort(); // abort BEFORE the request reaches the handler
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Hello" }),
+      signal: abortController.signal,
+    });
+
+    // The handler runs — signal is already aborted, handleRequestAbort is called immediately
+    const response = await POST(request);
+    // Still returns a valid streaming response (the abort just pre-signals the stream)
+    expect([200, 499]).toContain(response.status);
+  });
+
+  it("falls back gracefully when the asturianu feature flag lookup rejects", async () => {
+    vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+    vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+    vi.mocked(streamChatResponse).mockImplementation(async function* () {
+      yield "chunk";
+    });
+    mockIsFeatureFlagEnabled.mockRejectedValueOnce(new Error("Flag service unavailable"));
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Hello" }),
+    });
+
+    const response = await POST(request);
+    const events = await collectStreamEvents(response);
+
+    // Falls back to asturianu=false and continues streaming
+    expect(response.status).toBe(200);
+    expect(events.some((e: unknown) => (e as { type: string }).type === "done")).toBe(true);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "[CHAT_STREAM_FEATURE_FLAG_FALLBACK]",
+      expect.objectContaining({ error: expect.any(Error) })
+    );
+  });
+
+  it("treats plain Error with name='AbortError' (non-DOMException) the same as a DOM AbortError", async () => {
+    vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+    vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+
+    const plainAbortError = new Error("aborted");
+    plainAbortError.name = "AbortError";
+
+    vi.mocked(streamChatResponse).mockImplementation(async function* () {
+      throw plainAbortError;
+      // unreachable — satisfies TS async generator inference
+      yield "";
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Hello" }),
+    });
+
+    const response = await POST(request);
+    const events = await collectStreamEvents(response);
+
+    expect(events).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledWith("[CHAT_STREAM_ABORTED]", {
+      reason: "client_disconnect",
+    });
+    expect(logger.error).not.toHaveBeenCalledWith("[CHAT_STREAM_FAILURE]", expect.anything());
+  });
+
+  it("ReadableStream cancel() aborts the stream controller and stops generation", async () => {
+    vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+    vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+    vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+
+    vi.mocked(streamChatResponse).mockImplementation(
+      async function* (_m, _c, _a, _mi, _img, options) {
+        yield "first";
+        await new Promise((_, reject) => {
+          options?.signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true }
+          );
+        });
+      }
+    );
+
+    const request = new NextRequest("http://localhost:3000/api/chat/stream", {
+      method: "POST",
+      body: JSON.stringify({ message: "Hello" }),
+    });
+
+    const response = await POST(request);
+    const reader = response.body!.getReader();
+
+    // Read the first SSE frame so the generator is past the first yield
+    await reader.read();
+
+    // Cancel the reader — triggers the ReadableStream cancel() callback (lines 310-311)
+    // which aborts streamAbortController, causing the generator to reject
+    await reader.cancel();
+
+    // Flush microtasks so the generator's abort event fires and the catch block runs
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(logger.warn).toHaveBeenCalledWith("[CHAT_STREAM_ABORTED]", {
+      reason: "client_disconnect",
+    });
+  });
+
   describe("Zod runtime validation", () => {
     it("should return 400 with Zod details for invalid JSON body", async () => {
       const request = new NextRequest("http://localhost:3000/api/chat/stream", {

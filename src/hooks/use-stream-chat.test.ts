@@ -1051,4 +1051,136 @@ describe("useStreamChat", () => {
     // Should have the valid content, skipping the malformed event
     expect(result.current.messages[1].content).toBe("Good content");
   });
+
+  it("onError: sets error state and replaces assistant message when the stream reader throws", async () => {
+    // Trigger readSseStream's onError by providing a ReadableStream that errors immediately
+    const streamError = new Error("Unexpected read failure");
+    const erroringStream = new ReadableStream({
+      start(controller) {
+        controller.error(streamError);
+      },
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: erroringStream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // onError non-AbortError path: sets error and updates assistant message
+    expect(result.current.error).toBe("chat.error");
+    expect(result.current.messages[1].content).toBe(
+      "Lo siento, hubo un error. Intenta de nuevo."
+    );
+  });
+
+  it("onError: silently ignores AbortError from the stream reader", async () => {
+    const abortError = new Error("AbortError");
+    abortError.name = "AbortError";
+    const erroringStream = new ReadableStream({
+      start(controller) {
+        controller.error(abortError);
+      },
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: erroringStream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // AbortError is silently ignored — no error state set
+    expect(result.current.error).toBeNull();
+  });
+
+  it("onError else branch: pushes new error message when assistantIndex is out of bounds after reset", async () => {
+    // To hit the else branch (line 209), assistantIndex must be out of bounds in the
+    // setMessages callback. This happens when messages are reset while the stream hangs:
+    // 1. sendMessage starts → assistantIndex = 1, messages = [user, assistant]
+    // 2. resetMessages() → messages = []
+    // 3. stream errors → onError fires → setMessages(prev => ...) where prev = []
+    // 4. updated[1] is undefined → else branch (line 209) pushes a new error message
+    let triggerStreamError: (err: Error) => void;
+    const hangingStream = new ReadableStream({
+      start(controller) {
+        triggerStreamError = (err) => controller.error(err);
+      },
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: hangingStream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    let sendPromise: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // Messages should have user + assistant placeholder
+    expect(result.current.messages).toHaveLength(2);
+
+    // Reset messages while the stream is pending
+    act(() => {
+      result.current.resetMessages();
+    });
+    expect(result.current.messages).toEqual([]);
+
+    // Trigger stream error — onError will see an empty messages array
+    await act(async () => {
+      triggerStreamError!(new Error("Stream read error"));
+      await sendPromise!;
+    });
+
+    // else branch (line 209): pushed a new error message
+    expect(result.current.error).toBe("chat.error");
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({
+      role: "assistant",
+      content: "Lo siento, hubo un error. Intenta de nuevo.",
+    });
+  });
+
+  it("outer catch: silently ignores AbortError thrown by fetch()", async () => {
+    const abortError = new Error("AbortError");
+    abortError.name = "AbortError";
+    mockFetch.mockRejectedValueOnce(abortError);
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // AbortError from fetch() is silently returned (no error state, no crash)
+    expect(result.current.error).toBeNull();
+  });
 });

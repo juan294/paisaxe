@@ -199,6 +199,24 @@ describe("validateAdminAuth", () => {
     }
   });
 
+  it("should return 403 (not 500) when profile query returns PGRST116 (no rows found)", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "pgrst116-user", email: "missing@example.com" } },
+      error: null,
+    });
+    // PGRST116 = "no rows returned" — treated as missing profile → 403, not 500
+    setupProfileMock(null, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned" });
+
+    const result = await validateAdminAuth();
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      const body = await result.error.json();
+      expect(result.error.status).toBe(403);
+      expect(body.error).toBe("Admin access required");
+    }
+  });
+
   it("should return 500 when an unexpected error is thrown", async () => {
     mockGetUser.mockRejectedValue(new Error("Unexpected failure"));
 
@@ -481,6 +499,38 @@ describe("validateAdminAuth", () => {
       const result = await withAdminRead(vi.fn().mockResolvedValue(handlerResult));
 
       expect(result).toBe(handlerResult);
+    });
+
+    it("getAll and setAll callbacks work correctly in withAdminRead cookie context", async () => {
+      const fakeCookies = [{ name: "sb-token", value: "abc" }];
+      mockGetAll.mockReturnValue(fakeCookies);
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "read-setall-user", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      // withAdminRead makes two createServerClient calls:
+      // 1. Inside validateAdminAuth()
+      // 2. Its own call — this overwrites capturedCookieConfig
+      await withAdminRead(vi.fn().mockResolvedValue("done"));
+
+      // capturedCookieConfig is now from withAdminRead's own createServerClient call
+      expect(capturedCookieConfig).not.toBeNull();
+
+      // Exercise getAll (line 190)
+      const result = capturedCookieConfig!.cookies.getAll();
+      expect(result).toEqual(fakeCookies);
+
+      // Exercise setAll catch block (lines 192-199): mockSet throws
+      mockSet.mockImplementation(() => {
+        throw new Error("Headers already sent");
+      });
+      expect(() => {
+        capturedCookieConfig!.cookies.setAll([
+          { name: "sb-token", value: "val", options: {} },
+        ]);
+      }).not.toThrow();
     });
   });
 });

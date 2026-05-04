@@ -1925,10 +1925,70 @@ describe("StoryViewer", () => {
     });
   });
 
+  // Line 306: `onToggleFavorite={() => toggleFavorite(story.id)}` is a dead prop —
+  // StoryInfoPanel accepts it in its interface but never calls it. Architecturally
+  // untestable without modifying the source.
+
   // Lines 559-560: `story ? isFavorite(story.id) : false` and `story && toggleFavorite(story.id)`
   // The falsy branches are architecturally unreachable because the component returns null
   // at line 215 when `!story`, so BookmarkButton at line 556 is never rendered without a
   // valid story. The ternary guards are defensive programming.
+
+  describe("FE-M1: timer cancellation on rapid prev navigation (line 123)", () => {
+    it("should cancel the pending backward transition timer on rapid double-click", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
+      );
+
+      const prevButton = screen.getAllByRole("button").find(
+        (btn) => btn.classList.contains("left-0")
+      );
+      expect(prevButton).toBeDefined();
+
+      // Rapid double-click on prev: second click calls clearTimeout (line 123) on the first timer
+      fireEvent.click(prevButton!);
+      fireEvent.click(prevButton!);
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      // onIndexChange called once (second call wins — first timer was cancelled)
+      expect(onIndexChange).toHaveBeenCalledTimes(1);
+    }, 30000);
+  });
+
+  describe("suggest place dialog lifecycle (lines 388, 490)", () => {
+    it("should invoke onOpen on SuggestPlaceButton click and onClose when dialog Cancel is pressed", async () => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "user_story_suggestions"
+      );
+
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Trigger onOpen (line 388): click the desktop SuggestPlaceButton
+      const suggestBtn = screen.getByRole("button", {
+        name: "suggestions.suggest_place",
+      });
+      fireEvent.click(suggestBtn);
+
+      // Verify dialog opened (Cancel button appears)
+      const cancelBtn = screen.getByRole("button", {
+        name: "suggestions.cancel",
+      });
+      expect(cancelBtn).toBeInTheDocument();
+
+      // Trigger onClose (line 490): click Cancel in the dialog
+      fireEvent.click(cancelBtn);
+
+      // Dialog should close
+      expect(
+        screen.queryByRole("button", { name: "suggestions.cancel" })
+      ).not.toBeInTheDocument();
+
+      mockIsEnabled.mockReturnValue(false);
+    });
+  });
 
   describe("FE-H4: Image key stability", () => {
     it("should not include ambient or autoPlay state in the Image key (prevents flash on flag toggle)", async () => {

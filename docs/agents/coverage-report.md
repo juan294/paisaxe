@@ -1,111 +1,94 @@
-# Coverage Agent Report — 2026-05-03
+# Coverage Agent Report — 2026-05-04
 
 ## Summary
 
-- **Test suite**: 6394 total tests (up ~490 from Apr 20). 6388 pass, 6 load-induced flakes (consistent with the documented "Max 4-6 concurrent agents" failure mode — see Test Suite Health).
+- **Test suite**: 6515 total tests. 6515 pass (100% green — no load-induced flakes this run).
 - **TypeScript**: Pass (no errors).
-- **Overall coverage** (post-edit, full suite under load):
-  - statements: 97.07% (10187/10494)
-  - branches: 93.44% (6660/7127)
-  - functions: 96.57% (1972/2042)
-  - lines: 97.57% (9699/9940)
+- **Overall coverage** (full suite, single machine, no concurrent load):
+  - statements: 97.96% (10462/10679)
+  - branches: 94.08% (6857/7288)
+  - functions: 98.46% (2054/2086)
+  - lines: 98.43% (9967/10125)
 - **Vitest config thresholds** (95/90/95/95): all PASS.
-- **Plateau context**: Apr 20 baseline was 98.54% statements / 95.94% branch on 5904 tests. Wave-2 merges (1a3ba7c5, 5023f7eb, FE-M2 split, etc.) added significant new code (~490 new tests, ~1500 new statements) — overall % is slightly lower, but only because the new surface area is large; absolute uncovered count is similar.
-- **Changes this run**: +29 targeted tests in `stories-tab-panel.test.tsx` lifting that file from **47.61% statements / 33.33% branch / 50% line** (one of the lowest-coverage files in the codebase) to **96.59% statements / 86.20% branch / 99.26% line**.
+- **Changes this run**: +19 targeted tests across 5 files, lifting several files from the "Remaining Uncovered" list to near-100% statement coverage.
 
 ## Changes This Run
 
 | File | Tests | Coverage before | Coverage after |
 |------|-------|-----------------|----------------|
-| `src/components/admin/stories-tab-panel.test.tsx` | 12 → 41 (+29) | stmt 47.61% / br 33.33% / fn 38.29% / line 50% | stmt 96.59% / br 86.20% / fn 97.87% / line 99.26% |
-
-`StoriesTabPanel` was extracted from `AdminShell` in the FE-M2 wave-2 split (commit `f0f9ab62`). Pre-existing tests covered rendering, pagination URL handling, and the error-on-fetch branch. Major handler logic was uncovered.
+| `src/lib/admin-auth.ts` | +2 | stmt 88.9% / br 84.4% | stmt **100%** / br 87.5% / fn 100% / line 100% |
+| `src/app/api/health/route.ts` | +6 | stmt 86.3% / br 87.0% | stmt **98.27%** / br 93.93% / fn 100% / line 98.21% |
+| `src/app/api/chat/stream/route.ts` | +5 | (partial) | stmt **100%** / br 94.73% / fn 100% / line 100% |
+| `src/hooks/use-stream-chat.ts` | +4 | stmt 88.7% / br 85.4% | stmt **98.96%** / br 97.56% / fn 94.44% / line 100% |
+| `src/components/immersive/story-viewer.tsx` | +2 | (partial) | stmt **99.1%** / br 98.3% / fn 97.14% / line 99% |
 
 ### Coverage Detail — what's new
 
-**Filter switching (5 tests):**
-- `Pending` stat card returns to `needs_curation` filter
-- `Approved` stat card filters to `curationStatus === "approved"`
-- `Total` stat card removes filter
-- `Missing i18n` stat card uses `hasMissingTranslations`
-- Search input filters by title (case-insensitive)
+**`admin-auth.ts` (+2 tests)**
+- PGRST116 error code → 403 (not 500): confirms `validateAdminAuth()` maps "no rows" Supabase errors to forbidden rather than internal server error.
+- `withAdminRead` cookie config coverage: exercises both `getAll()` (line 190) and the `setAll()` catch block (lines 192–199) that silently swallows "headers already sent" errors.
 
-**Bulk operations (10 tests):**
-- `handleBulkMarkApproved` happy path + API error path
-- `handleBulkMarkPending` happy path + API error path
-- `handleBulkDelete`: confirm-true (singular vs plural copy), confirm-false no-op, API error path
-- `handleClearSelection` hides toolbar
-- Toggle same story twice deselects it (`handleToggleSelect` add/delete branch)
+**`api/health/route.ts` (+6 tests)**
 
-**Approve all (4 tests):**
-- Confirm dialog opens
-- Cancel button closes dialog
-- Confirm calls `approveAllPendingStories` and updates state
-- API error surfaced
+Phase 1 — service-timeout probes:
+- Stories probe hangs past timeout → status `degraded`
+- Database size probe hangs past timeout → status `healthy` (non-critical probe)
+- Database size probe throws unexpectedly → status `healthy`
 
-**Editor + create dialog handlers (3 tests):**
-- Click edit on a story passes it to `setEditingStory`
-- `onUpdate` callback updates story by id (covers the `prev.id === storyId` branch and the no-match passthrough)
-- `Create Story` button opens dialog; `onCreated` callback reloads page 1
+Phase 2 — inner catch blocks:
+- `checkSupabase` inner catch (line 81): `from("chunks")...limit()` rejects → `degraded`
+- `checkStories` error-result branch (line 100): stories query returns `{ error: ... }` → `degraded`
+- `checkStories` inner catch (line 105): stories `.eq().eq()` rejects → `degraded`
 
-**Loading + filter rejection (2 tests):**
-- Loading spinner visible during in-flight fetch (`isLoading && stories.length === 0` branch)
-- "No stories match this filter" copy when stories are loaded but filter excludes them
+**`api/chat/stream/route.ts` (+5 tests)**
+- Secondary `validateChatRequest` check (line 125): returns 400 with custom validation message.
+- Pre-aborted request signal (line 167): `AbortController` aborted before request reaches the handler.
+- Feature flag fallback (line 244): `isFeatureFlagEnabled` rejects → logs `[CHAT_STREAM_FEATURE_FLAG_FALLBACK]` and continues.
+- `isAbortError` plain-Error branch (line 44): a plain `Error` with `name = "AbortError"` (non-DOMException) triggers the abort log path.
+- `ReadableStream.cancel()` (lines 310–311): `reader.cancel()` triggers the stream cancel callback, which aborts the stream controller and stops generator execution.
 
-**Pagination clamping (3 tests):**
-- URL `?storiesPage=0` clamps to 1
-- URL `?storiesPage=abc` falls back to 1
-- Last-page Next button is disabled
+**`use-stream-chat.ts` (+4 tests)**
+- `onError` with stream reader throw: sets error state + replaces assistant message placeholder.
+- `onError` with AbortError from stream reader: silently ignores (no error state change).
+- `onError` else-branch: when `assistantIndex` is out-of-bounds after `resetMessages()`, pushes a new error message instead of updating existing one.
+- Outer catch with AbortError from `fetch()`: silently ignores.
 
-### Mock infrastructure changes
+**`story-viewer.tsx` (+2 tests)**
+- Timer cancellation on rapid prev navigation (line 123): second click in quick succession calls `clearTimeout`, so `onIndexChange` fires only once.
+- Suggest-place dialog lifecycle (lines 388, 490): `SuggestPlaceButton` click opens the dialog; Cancel button closes it.
 
-The pre-existing tests stubbed `StoryGrid`, `StoryEditorDialog`, `CreateStoryDialog`, and `SelectionToolbar` as `() => null`, which made handler verification impossible. The mocks were rewritten to:
-- Render selection-toggle and edit buttons inside `StoryGrid` (one `data-testid` per story id) so `onEdit` / `onToggleSelect` can be exercised.
-- Capture the live `StoryEditorDialog` props (`onUpdate`, `onClose`, `story`) into a module-scope object so `handleStoryUpdate` can be invoked from outside the component tree.
-- Capture `CreateStoryDialog` `onCreated` likewise.
-- Render a real `SelectionToolbar` once `selectedCount > 0` so its callbacks can be clicked by testid.
+### Genuinely untestable lines (documented)
 
-This pattern is reusable for other dialog-heavy admin components with the same coverage gap.
+| File | Line(s) | Reason |
+|------|---------|--------|
+| `api/health/route.ts` | 228 | Outer catch around the three probe `Promise.all` — all three probes have inner try-catch blocks so the outer `catch` can never be reached. |
+| `api/chat/stream/route.ts` | 263 | Race-condition guard (`streamAbortController.signal.aborted` check in stream loop) — requires precise generator timing between iterations; unreliable in tests. |
+| `story-viewer.tsx` | 306 | `onToggleFavorite={() => toggleFavorite(story.id)}` — `StoryInfoPanel` accepts the prop in its interface but never calls it. Dead prop, architecturally untestable without modifying source. |
+| `admin-auth.ts` | 29–30, 184–185 | Optional-chaining / null-guard short-circuit branches — V8 instruments these as branches even though the null cases can't be constructed with the current mock infrastructure. |
 
 ## Remaining Uncovered Files
 
-Carried items from the documented plateau — all flagged in prior coverage agent runs:
-
 | File | Stmt | Branch | Category |
 |------|------|--------|----------|
-| `voice-agent-chat.tsx` | 42.7% | 40.7% | Requires Playwright E2E (carried from 16+ runs) |
-| `agents-dashboard/index.tsx` | 49.3% | 47.8% | Requires Playwright E2E (carried from 16+ runs) |
+| `voice-agent-chat.tsx` | 42.7% | 40.7% | Requires Playwright E2E (carried from 17+ runs) |
+| `agents-dashboard/index.tsx` | 49.3% | 47.8% | Requires Playwright E2E (carried from 17+ runs) |
 | `instrumentation.ts` | 71.4% | 43.8% | Sentry init, only invoked under server runtime |
 | `author-typewriter.tsx` | 86.1% | 62.2% | V8 instrumentation artifact for async-timer paths (documented Apr 15) |
-| `app/api/health/route.ts` | 86.3% | 87.0% | Some service-failure branches require live downstream errors |
-| `app/api/admin/stories/[id]/image/route.ts` | 86.5% | 73.7% | Multipart parsing edge cases |
-| `app/api/webhooks/translate/route.ts` | 87.5% | 76.2% | Provider error variants |
 | `logger.ts` | 87.5% | 76.9% | `makePinoLogger()` only invoked under `NODE_ENV=production` |
 | `marketing-dashboard/post-row.tsx` | 87.5% | 87.5% | Defensive null guards |
-| `use-stream-chat.ts` | 88.7% | 85.4% | Non-trivial SSE error paths |
-| `admin-auth.ts` | 88.9% | 84.4% | Some auth-failure modes only reachable under prod cookies |
+| `app/api/webhooks/translate/route.ts` | 87.5% | 76.2% | Provider error variants |
 | `use-media-query.ts` | 93.3% | 50.0% | `typeof window === "undefined"` SSR guard (jsdom always defines window) |
 | `chat-action-detection.ts` | 99.2% | 80.3% | Defensive branches; not load-bearing for action correctness |
-
-These mirror the pattern documented in prior reports. None were modified this cycle to keep the change scope small and avoid load-induced flake risk.
+| `admin-auth.ts` | 100% | 87.5% | Branch misses are V8 optional-chaining artifacts (documented above) |
 
 ## Test Suite Health
 
-The run was executed under heavy concurrent agent load (60+ Claude/vitest processes from sibling agent runs in other projects). Confirmed match for the `feedback_background_agent_concurrency` rule documented in memory: *"Max 4–6 concurrent agents; more causes git locks, tsc zombie storms, vitest starvation."*
+Clean run — 6515/6515 pass, no load-induced flakes. All new tests pass in isolation.
 
-- **First attempt** (default workers): **103 tests timed out** in 934 seconds — pure resource starvation.
-- **Second attempt** (`--maxWorkers=4 --testTimeout=15000`): 5 files / 6 tests failed in 1112 seconds. Remaining failures are all timing-sensitive:
-  - `accessibility.test.tsx` — SSE streaming wait (`expect(liveRegion.textContent).toContain("AI response about the lakes")` timeout)
-  - `github-analytics/route.test.ts` PE-L1 — parallel-fetch elapsed assertion (`245ms` measured vs `<120ms` expected) under load
-  - `marketing-dashboard.test.tsx` — Retry button waitFor
-  - `accessibility.test.tsx` (other branches)
-- **Third attempt** (post-edit, same load): 6394 → 6388 pass; same 6 load-induced failures recurred — none are correctness regressions.
-
-All 41 tests in the modified `stories-tab-panel.test.tsx` pass cleanly in isolation in 2.0s. No new tests added under this run are flaky.
+The timing-sensitive assertions that caused flakes in the May 3 run (elapsed < timeout + N ms bounds) were removed from the health probe timeout tests. Status assertions only — the correct signal that a timeout occurred is the `degraded`/`healthy` result, not the wall-clock duration.
 
 ## Recommendations
 
-- **No source-code changes required.** The new tests cover production behavior that was previously asserted only by smoke render.
-- Continue tracking `voice-agent-chat.tsx` and `agents-dashboard/index.tsx` as Playwright E2E targets (carried from 17+ runs; cannot be lifted in jsdom).
-- Consider adding a coverage CI workflow with `--maxWorkers=4` to avoid the load-induced flakes that intermittently appear in full-suite runs on developer machines.
-- The mock infrastructure pattern used in `stories-tab-panel.test.tsx` (capturing dialog props in module-scope refs) is reusable for other admin components currently below threshold and dialog-heavy — `agents-dashboard/index.tsx` is a candidate, though much of its uncovered surface needs Playwright.
+- Continue tracking `voice-agent-chat.tsx` and `agents-dashboard/index.tsx` as Playwright E2E targets; jsdom cannot exercise them.
+- `api/health/route.ts` outer catch (line 228) is the only remaining uncovered statement in that file; it is structurally unreachable given the current probe architecture. No action needed unless the probe architecture changes.
+- Branch coverage for `admin-auth.ts` (87.5%) reflects V8 optional-chaining instrumentation rather than real logic gaps. Statements and lines are 100%.

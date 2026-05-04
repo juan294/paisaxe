@@ -172,6 +172,67 @@ describe("GET /api/health", () => {
     expect(data.status).toBe("degraded");
   });
 
+  it("degrades when the chunks probe throws unexpectedly (inner catch, line 81)", async () => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        const lastEq = vi.fn().mockResolvedValue({ count: 1, error: null });
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          limit: vi.fn().mockRejectedValue(new Error("Connection refused")),
+        }),
+      } as never;
+    });
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+  });
+
+  it("degrades when the stories probe returns an error response (line 100)", async () => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        const lastEq = vi.fn().mockResolvedValue({
+          count: null,
+          error: { message: "Stories DB error" },
+        });
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
+      }
+      return createChainMock({ error: null }) as never;
+    });
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+  });
+
+  it("degrades when the stories probe throws unexpectedly (inner catch, line 105)", async () => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        const lastEq = vi.fn().mockRejectedValue(new Error("Stories DB crash"));
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
+      }
+      return createChainMock({ error: null }) as never;
+    });
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+  });
+
   it("does not degrade when the capacity probe errors but core app checks are healthy", async () => {
     mockHealthySupabase();
     mockDatabaseSizeError("permission denied for function get_database_size");
@@ -212,6 +273,49 @@ describe("GET /api/health", () => {
     expect(data.status).toBe("degraded");
     expect(elapsed).toBeLessThan(PROBE_TIMEOUTS_MS.supabase + 400);
   }, 10000);
+
+  it("degrades when the stories probe hangs past its timeout", async () => {
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        const lastEq = vi.fn().mockReturnValue(new Promise(() => {}));
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return {
+          select: vi.fn().mockReturnValue({ eq: firstEq }),
+        } as never;
+      }
+      return createChainMock({ error: null }) as never;
+    });
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+  }, 10000);
+
+  it("stays healthy when the database size probe hangs past its timeout", async () => {
+    mockHealthySupabase();
+    vi.mocked(supabase.rpc).mockReturnValue(new Promise(() => {}) as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    // Database timeout returns null usage_percent → not over threshold → healthy
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
+  }, 10000);
+
+  it("does not degrade when the database size probe throws unexpectedly", async () => {
+    mockHealthySupabase();
+    vi.mocked(supabase.rpc).mockRejectedValue(new Error("Unexpected DB error"));
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
+  });
 
   it("does not call external probes for the public health endpoint", async () => {
     mockHealthySupabase();

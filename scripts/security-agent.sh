@@ -67,11 +67,15 @@ NPM_AUDIT_IN_CI=$(grep -rqlE "npm audit|npm run audit" .github/workflows/ 2>/dev
 log_info "Identifying flagged license packages..." | tee -a "$LOG_FILE"
 FLAGGED_LICENSES=$(npx license-checker --production --csv 2>/dev/null | grep -iE "MPL|LGPL|GPL|UNLICENSED|Unknown" | head -20 || echo "none")
 
-# Check security headers (if server is running)
+# Check security headers. Prefer a local server when available, then fall back
+# to production so CSP/HSTS delivery is still visible in scheduled reports.
 log_info "Checking security headers..." | tee -a "$LOG_FILE"
 SECURITY_HEADERS="Server not running - skipped"
+SECURITY_HEADER_PATTERN="^(content-security-policy|x-frame-options|x-content-type-options|strict-transport-security|referrer-policy|permissions-policy):"
 if curl -s --max-time 2 "http://localhost:3000/api/health" > /dev/null 2>&1; then
-  SECURITY_HEADERS=$(curl -sI "http://localhost:3000" 2>/dev/null | grep -iE "^(content-security-policy|x-frame-options|x-content-type-options|strict-transport-security|referrer-policy|permissions-policy):" || echo "No security headers found")
+  SECURITY_HEADERS=$(curl -sI "http://localhost:3000" 2>/dev/null | grep -iE "$SECURITY_HEADER_PATTERN" || echo "No security headers found")
+elif curl -s --max-time 5 "https://paisaxe.es/api/health/live" > /dev/null 2>&1; then
+  SECURITY_HEADERS=$(curl -sI "https://paisaxe.es/" 2>/dev/null | grep -iE "$SECURITY_HEADER_PATTERN" || echo "No security headers found")
 fi
 
 # Write metrics to temp file for Claude
