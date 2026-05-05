@@ -188,4 +188,47 @@ describe("logger", () => {
       expect(parsed.rawBody).toContain("[REDACTED]");
     });
   });
+
+  describe("in production environment (makePinoLogger)", () => {
+    it("routes info, warn, error, and child calls through pino instance", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+
+      const mockChild = {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        child: vi.fn(),
+      };
+      const mockPinoInstance = {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        child: vi.fn().mockReturnValue(mockChild),
+      };
+      vi.doMock("pino", () => ({ default: vi.fn().mockReturnValue(mockPinoInstance) }));
+
+      const { logger } = await import("./logger");
+
+      // info with meta → hits the "meta keys present" branch (line 118)
+      logger.info("[TEST_META]", { key: "value" });
+      expect(mockPinoInstance.info).toHaveBeenCalledTimes(1);
+
+      // info without meta → hits the no-meta branch (line 122)
+      logger.info("[TEST_NO_META]");
+      expect(mockPinoInstance.info).toHaveBeenCalledTimes(2);
+
+      // warn (line 127)
+      logger.warn("[WARN]");
+      expect(mockPinoInstance.warn).toHaveBeenCalledTimes(1);
+
+      // error (line 128)
+      logger.error("[ERROR]");
+      expect(mockPinoInstance.error).toHaveBeenCalledTimes(1);
+
+      // child (line 129)
+      const child = logger.child({ service: "test" });
+      expect(mockPinoInstance.child).toHaveBeenCalledWith(expect.objectContaining({ service: "test" }));
+      expect(typeof child.info).toBe("function");
+    });
+  });
 });

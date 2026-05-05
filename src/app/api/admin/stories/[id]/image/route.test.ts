@@ -934,6 +934,57 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
       fetchSpy.mockRestore();
     });
+
+    it.each([
+      ["fc00::1", "fc00::/7 private"],
+      ["fe80::1", "fe80::/10 link-local"],
+      ["ff02::1", "ff00::/8 multicast"],
+    ])("should return 400 for IPv6 %s (%s) literal URL (covers firstIpv6Hextet + isUnsafeIpv6 branches)", async (ipv6, _label) => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: `https://[${ipv6}]/image.jpg` }),
+      });
+
+      const response = await PUT(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Private or reserved IP addresses are not allowed");
+    });
+
+    it("should allow URL when DNS resolves to non-private IPv6 (covers firstIpv6Hextet null return path)", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      // "::2" is not in any blocked range: firstIpv6Hextet returns null (empty first hextet)
+      // so isUnsafeIpv6 returns false, and the address is allowed through DNS check
+      dns.lookup.mockResolvedValueOnce([{ address: "::2", family: 6 }]);
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network"));
+
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: { id: "story-123", image_path: "https://cdn.example.com/image.jpg", image_source: null },
+        error: null,
+      });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://cdn.example.com/image.jpg" }),
+      });
+
+      const response = await PUT(request, mockParams);
+      expect(response.status).toBe(200);
+      expect(mockUpdate).toHaveBeenCalledWith({ image_path: "https://cdn.example.com/image.jpg" });
+
+      fetchSpy.mockRestore();
+    });
   });
 
   describe("content-type fallback", () => {

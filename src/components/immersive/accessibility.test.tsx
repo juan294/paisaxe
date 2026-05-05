@@ -449,7 +449,7 @@ describe("Accessibility: VoiceChat", () => {
       await waitFor(() => {
         const liveRegion = screen.getByRole("log");
         expect(liveRegion.textContent).toContain("AI response about the lakes");
-      });
+      }, { timeout: 5000 });
     });
   });
 

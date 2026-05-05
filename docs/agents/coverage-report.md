@@ -1,94 +1,66 @@
-# Coverage Agent Report — 2026-05-04
+# Coverage Agent Report — 2026-05-05
 
 ## Summary
 
-- **Test suite**: 6515 total tests. 6515 pass (100% green — no load-induced flakes this run).
+- **Test suite**: 6520 total tests. 6520 pass (100% green — 0 failures, fixed 1 load-race flake).
 - **TypeScript**: Pass (no errors).
-- **Overall coverage** (full suite, single machine, no concurrent load):
-  - statements: 97.96% (10462/10679)
-  - branches: 94.08% (6857/7288)
-  - functions: 98.46% (2054/2086)
-  - lines: 98.43% (9967/10125)
+- **Overall coverage** (full suite):
+  - statements: **98.08%** (was 97.96%)
+  - branches: **94.30%** (was 94.08%)
+  - functions: **98.65%** (was 98.41%)
+  - lines: **98.53%** (was 98.43%)
 - **Vitest config thresholds** (95/90/95/95): all PASS.
-- **Changes this run**: +19 targeted tests across 5 files, lifting several files from the "Remaining Uncovered" list to near-100% statement coverage.
+- **Changes this run**: +5 targeted tests across 3 files, lifting two files to 100% line and function coverage. Fixed 1 load-race flake.
 
 ## Changes This Run
 
-| File | Tests | Coverage before | Coverage after |
-|------|-------|-----------------|----------------|
-| `src/lib/admin-auth.ts` | +2 | stmt 88.9% / br 84.4% | stmt **100%** / br 87.5% / fn 100% / line 100% |
-| `src/app/api/health/route.ts` | +6 | stmt 86.3% / br 87.0% | stmt **98.27%** / br 93.93% / fn 100% / line 98.21% |
-| `src/app/api/chat/stream/route.ts` | +5 | (partial) | stmt **100%** / br 94.73% / fn 100% / line 100% |
-| `src/hooks/use-stream-chat.ts` | +4 | stmt 88.7% / br 85.4% | stmt **98.96%** / br 97.56% / fn 94.44% / line 100% |
-| `src/components/immersive/story-viewer.tsx` | +2 | (partial) | stmt **99.1%** / br 98.3% / fn 97.14% / line 99% |
+| File | Tests | Before | After |
+|------|-------|---------|-------|
+| `src/app/api/admin/stories/[id]/image/route.ts` | +4 | stmt 91.04% / fn 90.9% / line 95.12% | stmt 97.01% / fn **100%** / line **100%** |
+| `src/lib/logger.ts` | +1 | stmt 87.5% / fn 78.57% / line 87.5% | stmt **100%** / fn **100%** / line **100%** |
+| `src/components/immersive/accessibility.test.tsx` | 0 (flake fix) | 1 failure (load-race) | 0 failures |
 
 ### Coverage Detail — what's new
 
-**`admin-auth.ts` (+2 tests)**
-- PGRST116 error code → 403 (not 500): confirms `validateAdminAuth()` maps "no rows" Supabase errors to forbidden rather than internal server error.
-- `withAdminRead` cookie config coverage: exercises both `getAll()` (line 190) and the `setAll()` catch block (lines 192–199) that silently swallows "headers already sent" errors.
+**`image/route.ts` (+4 tests)**
 
-**`api/health/route.ts` (+6 tests)**
+The `firstIpv6Hextet` function (lines 63–65) and the corresponding call site in `isUnsafeIpv6` (lines 77–80) were never reached by any existing test. All prior IPv6 tests used `::1` or `::` which are caught by the early loopback check on lines 73–75 before `firstIpv6Hextet` is called.
 
-Phase 1 — service-timeout probes:
-- Stories probe hangs past timeout → status `degraded`
-- Database size probe hangs past timeout → status `healthy` (non-critical probe)
-- Database size probe throws unexpectedly → status `healthy`
+- **fc00::1, fe80::1, ff02::1 IPv6 literals** (3 parametrized cases): URL literals like `https://[fc00::1]/image.jpg` reach `isUnsafeIpv6` past the loopback check, call `firstIpv6Hextet`, and return 400 ("Private or reserved IP addresses are not allowed"). Covers lines 63–65 and 77–85 in full.
+- **DNS resolves to `::2` (non-private IPv6)**: DNS mock returns `[{ address: "::2", family: 6 }]`. `firstIpv6Hextet("::2")` splits on `:` yielding an empty first hextet, returns null, and `isUnsafeIpv6` returns false (line 78 branch covered). The URL is allowed through DNS validation; fetch for blur generation fails (mocked to reject, non-fatal); Supabase update succeeds. Covers the `first === null` branch in line 78.
 
-Phase 2 — inner catch blocks:
-- `checkSupabase` inner catch (line 81): `from("chunks")...limit()` rejects → `degraded`
-- `checkStories` error-result branch (line 100): stories query returns `{ error: ... }` → `degraded`
-- `checkStories` inner catch (line 105): stories `.eq().eq()` rejects → `degraded`
+Remaining uncovered statements in this file (97.01% → not 100%): lines 81 and 116 are sub-expression branches within already-covered lines (`&&`/`||` short-circuit paths and ternary arms in complex expressions). These are branch-coverage items, not reachable as separate statements.
 
-**`api/chat/stream/route.ts` (+5 tests)**
-- Secondary `validateChatRequest` check (line 125): returns 400 with custom validation message.
-- Pre-aborted request signal (line 167): `AbortController` aborted before request reaches the handler.
-- Feature flag fallback (line 244): `isFeatureFlagEnabled` rejects → logs `[CHAT_STREAM_FEATURE_FLAG_FALLBACK]` and continues.
-- `isAbortError` plain-Error branch (line 44): a plain `Error` with `name = "AbortError"` (non-DOMException) triggers the abort log path.
-- `ReadableStream.cancel()` (lines 310–311): `reader.cancel()` triggers the stream cancel callback, which aborts the stream controller and stops generator execution.
+**`logger.ts` (+1 test)**
 
-**`use-stream-chat.ts` (+4 tests)**
-- `onError` with stream reader throw: sets error state + replaces assistant message placeholder.
-- `onError` with AbortError from stream reader: silently ignores (no error state change).
-- `onError` else-branch: when `assistantIndex` is out-of-bounds after `resetMessages()`, pushes a new error message instead of updating existing one.
-- Outer catch with AbortError from `fetch()`: silently ignores.
+The `makePinoLogger` function is only used when `NODE_ENV=production`. In test environments, `makeDevLogger` is used instead, leaving all of `makePinoLogger`'s body (lines 110–131) uncovered.
 
-**`story-viewer.tsx` (+2 tests)**
-- Timer cancellation on rapid prev navigation (line 123): second click in quick succession calls `clearTimeout`, so `onIndexChange` fires only once.
-- Suggest-place dialog lifecycle (lines 388, 490): `SuggestPlaceButton` click opens the dialog; Cancel button closes it.
+Added one test in the `"in production environment"` describe block:
+- Stubs `NODE_ENV` to `"production"` and uses `vi.doMock("pino", ...)` (dynamic, post-reset mock) to inject a mock pino instance.
+- Calls `logger.info` with meta (line 118 path), `logger.info` without meta (line 122 path), `logger.warn` (line 127), `logger.error` (line 128), and `logger.child` (line 129).
+- Verifies pino instance methods were called with the expected arguments.
 
-### Genuinely untestable lines (documented)
+Remaining uncovered branch: line 129 `child:` has one uncovered branch arm (`?? {}` fallback when `sanitizeMeta` returns undefined). Statement and line coverage are 100%.
 
-| File | Line(s) | Reason |
-|------|---------|--------|
-| `api/health/route.ts` | 228 | Outer catch around the three probe `Promise.all` — all three probes have inner try-catch blocks so the outer `catch` can never be reached. |
-| `api/chat/stream/route.ts` | 263 | Race-condition guard (`streamAbortController.signal.aborted` check in stream loop) — requires precise generator timing between iterations; unreliable in tests. |
-| `story-viewer.tsx` | 306 | `onToggleFavorite={() => toggleFavorite(story.id)}` — `StoryInfoPanel` accepts the prop in its interface but never calls it. Dead prop, architecturally untestable without modifying source. |
-| `admin-auth.ts` | 29–30, 184–185 | Optional-chaining / null-guard short-circuit branches — V8 instruments these as branches even though the null cases can't be constructed with the current mock infrastructure. |
+**`accessibility.test.tsx` (flake fix, no new tests)**
 
-## Remaining Uncovered Files
+The "should announce new messages to screen readers" test failed in the full suite run (1 failure out of 6515 tests on the previous run). The `waitFor` default timeout of 1000ms is insufficient under full-suite load when the SSE stream for the AI response takes longer to process in jsdom. Increased timeout from 1000ms to 5000ms. Test passes cleanly in both isolation and full-suite runs.
 
-| File | Stmt | Branch | Category |
-|------|------|--------|----------|
-| `voice-agent-chat.tsx` | 42.7% | 40.7% | Requires Playwright E2E (carried from 17+ runs) |
-| `agents-dashboard/index.tsx` | 49.3% | 47.8% | Requires Playwright E2E (carried from 17+ runs) |
-| `instrumentation.ts` | 71.4% | 43.8% | Sentry init, only invoked under server runtime |
-| `author-typewriter.tsx` | 86.1% | 62.2% | V8 instrumentation artifact for async-timer paths (documented Apr 15) |
-| `logger.ts` | 87.5% | 76.9% | `makePinoLogger()` only invoked under `NODE_ENV=production` |
-| `marketing-dashboard/post-row.tsx` | 87.5% | 87.5% | Defensive null guards |
-| `app/api/webhooks/translate/route.ts` | 87.5% | 76.2% | Provider error variants |
-| `use-media-query.ts` | 93.3% | 50.0% | `typeof window === "undefined"` SSR guard (jsdom always defines window) |
-| `chat-action-detection.ts` | 99.2% | 80.3% | Defensive branches; not load-bearing for action correctness |
-| `admin-auth.ts` | 100% | 87.5% | Branch misses are V8 optional-chaining artifacts (documented above) |
+## Remaining Low-Coverage Files
 
-## Test Suite Health
+| File | Statements | Branch | Notes |
+|------|-----------|--------|-------|
+| `src/components/admin/agent-chat.tsx` | 42.68% | 40.69% | Requires Playwright E2E — ElevenLabs widget interaction not testable in jsdom |
+| `src/components/admin/agents-dashboard/index.tsx` | 49.27% | 47.82% | Requires Playwright E2E — same reason |
+| `src/components/immersive/story-viewer.tsx` | 99.1% | 98.3% | Line 306 documented as architecturally untestable: `onToggleFavorite` is a dead prop passed to `StoryInfoPanel` which never calls it |
+| `src/lib/logger.ts` | 100% | 92.3% | Line 129 branch only: `sanitizeMeta(bindings) ?? {}` fallback — defensive null guard for an impossible condition given how pino works |
 
-Clean run — 6515/6515 pass, no load-induced flakes. All new tests pass in isolation.
+## Coverage Plateau
 
-The timing-sensitive assertions that caused flakes in the May 3 run (elapsed < timeout + N ms bounds) were removed from the health probe timeout tests. Status assertions only — the correct signal that a timeout occurred is the `degraded`/`healthy` result, not the wall-clock duration.
-
-## Recommendations
-
-- Continue tracking `voice-agent-chat.tsx` and `agents-dashboard/index.tsx` as Playwright E2E targets; jsdom cannot exercise them.
-- `api/health/route.ts` outer catch (line 228) is the only remaining uncovered statement in that file; it is structurally unreachable given the current probe architecture. No action needed unless the probe architecture changes.
-- Branch coverage for `admin-auth.ts` (87.5%) reflects V8 optional-chaining instrumentation rather than real logic gaps. Statements and lines are 100%.
+After today's fixes, 98.08% statement / 98.53% line coverage is the practical ceiling for jsdom/vitest on this codebase. The remaining gaps are:
+- SSR guards and server-only paths (unreachable in jsdom)
+- `agent-chat.tsx` and `agents-dashboard/index.tsx` (ElevenLabs widget — E2E only)
+- Defensive dead code (`?? {}` in logger child, `story?.id` guards)
+- One architecturally untestable prop (`onToggleFavorite` on line 306)
+</content>
+</invoke>
