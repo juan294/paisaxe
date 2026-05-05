@@ -1,16 +1,17 @@
-# Security Report — 2026-05-04
+# Security Report — 2026-05-05
 
 ## Health Status: GREEN
 
-0 advisories detected, 0 exploitable. Tenth consecutive GREEN cycle (since 2026-04-20, recovering from a 1-run YELLOW on 2026-04-17 caused by transitive `posthog-js` deps that have since been patched). All CI/CD security automation active. License policy compliant. All required security headers configured.
+0 advisories detected, 0 exploitable. Eleventh consecutive GREEN cycle. Live production security headers confirmed via fallback to paisaxe.es (enabled by triage on 2026-05-04 — first cycle with live header confirmation). All CI/CD security automation active. License policy compliant. IPv6 SSRF protection fully tested this cycle (coverage agent confirmed all private ranges).
 
 ## Executive Summary
 
 - **0 advisories** in `npm audit` (Critical/High/Moderate/Low all zero). Nothing exploitable.
 - **License compliance**: Pass. No copyleft violations. Two weak-copyleft packages (`sharp-libvips` LGPL-3.0, `dompurify` MPL-2.0) are documented exceptions in `docs/project/license-exceptions.md`.
 - **CI/CD security**: Dependabot, Gitleaks, npm audit, license-check all enforced on PRs and via daily schedule.
-- **Security headers**: All in place — HSTS (prod-only), X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy, CSP (PPR-compatible).
-- **Outdated packages**: 8 — all dev-only or patch-level. Zero production gaps with CVEs.
+- **Security headers**: All in place — HSTS confirmed in live production response, X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy, CSP (PPR-compatible, set per-request via `src/lib/proxy/csp.ts`).
+- **Outdated packages**: 10 (up from 8 last cycle) — 3 new releases for production/dev packages since May 4. Zero CVEs across all. `voyageai` intentionally pinned at 0.1.0.
+- **IPv6 SSRF**: Coverage agent confirmed `fc00::/7`, `fe80::/10`, `ff02::/8` ranges and `firstIpv6Hextet` null-return path all tested and passing (new this cycle).
 - **Webhook integrity**: All 4 webhook endpoints use `timingSafeEqual` (Stripe, Twilio, ElevenLabs, Resend); 7 call sites verified across prior cycles. Unchanged.
 
 ## Vulnerability Table
@@ -25,15 +26,15 @@
 
 No high or critical advisories to analyze this cycle. Historical context for awareness:
 
-- **Apr 17 YELLOW** — `protobufjs@7.5.4` (Critical, GHSA-xq3m-2v4x-88gg) and `dompurify@3.3.3` (Moderate, GHSA-39q2-94rc-95cp) reached the tree via `posthog-js`. Both were ruled non-exploitable: protobufjs serialized internal OpenTelemetry data (no user-controlled input path), and DOMPurify was used internally by PostHog with no application code calling it directly. Both resolved on 2026-04-20 by `npm audit fix` (commit `e66e510`). dompurify is currently at 3.4.0; protobufjs at >=7.5.5.
-- **Apr 25 YELLOW** — 8 moderate advisories (postcss XSS chain + uuid bounds-check). Already cleared. Source dependency tree no longer carries the affected transitive versions.
-- **May 2** — `@anthropic-ai/sdk` advisory GHSA-p7fg-763f-g4gf was patched in commits `52b8f484` + `3163f478`. Confirmed cleared.
+- **Apr 17 YELLOW** — `protobufjs@7.5.4` (Critical, GHSA-xq3m-2v4x-88gg) and `dompurify@3.3.3` (Moderate, GHSA-39q2-94rc-95cp) reached the tree via `posthog-js`. Both were ruled non-exploitable: protobufjs serialized internal OpenTelemetry data (no user-controlled input path), and DOMPurify was used internally by PostHog with no application code calling it directly. Both resolved 2026-04-20 by `npm audit fix` (commit `e66e510`). dompurify is currently at 3.4.0; protobufjs at >=7.5.5.
+- **Apr 25 YELLOW** — 8 moderate advisories (postcss XSS chain GHSA-qx2v-qp2m-jg93 + uuid bounds-check GHSA-w5hq-g745-h8pq). Already cleared via `package.json` overrides + lockfile sync. Source dependency tree no longer carries the affected transitive versions.
+- **May 2** — `@anthropic-ai/sdk` advisory GHSA-p7fg-763f-g4gf patched in commits `52b8f484` + `3163f478`. Confirmed cleared.
 
 ## Prioritized Remediation Steps
 
 1. **None required this cycle.** Audit is clean.
-2. **Optional housekeeping** — patch-level production deps queued by triage (postcss 8.5.13, posthog-js 1.372.6, zod 4.4.2). No advisory urgency. Batch with the next dependency refresh PR; do not include `voyageai` (pinned at 0.1.0 — v0.2.x ESM build breaks Turbopack).
-3. **Production build refresh** — performance agent has reported a stale prod baseline for 9 consecutive cycles. While not security-critical, a fresh build would re-validate header/CSP injection at runtime. Run `npm install && rm -rf .next && npm run build` when next opening a maintenance window.
+2. **Optional housekeeping** — pending patch-level production deps (postcss 8.5.14, posthog-js 1.372.8, zod 4.4.3, @supabase/supabase-js 2.105.3, @anthropic-ai/sdk 0.93.0). No advisory urgency. Batch with next dependency refresh PR. Do NOT include `voyageai` (pinned at 0.1.0 — v0.2.x ESM build breaks Turbopack embeddings pipeline).
+3. **@anthropic-ai/sdk 0.92.0 → 0.93.0** — minor version release; review changelog before batching to confirm no breaking changes in SDK surface used by this project.
 
 Standard remediation commands for any future advisory:
 ```
@@ -60,18 +61,18 @@ Pass. No GPL, AGPL, or SSPL packages. Two documented weak-copyleft exceptions an
 
 ## Security Headers Status
 
-All headers verified configured in `next.config.ts:64-67` and live response:
+All headers confirmed in live production response (fallback to paisaxe.es active since triage 2026-05-04):
 
 | Header | Value | Status |
 |--------|-------|--------|
-| Strict-Transport-Security | `max-age=63072000; includeSubDomains; preload` | Pass (prod-only by design) |
+| Strict-Transport-Security | `max-age=63072000; includeSubDomains; preload` | Pass (prod-only by design; confirmed in live response this cycle) |
 | X-Frame-Options | `DENY` | Pass |
 | X-Content-Type-Options | `nosniff` | Pass |
 | Referrer-Policy | `strict-origin-when-cross-origin` | Pass |
 | Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` | Pass |
-| Content-Security-Policy | `'self' 'unsafe-inline' blob: https://js.stripe.com` (script-src); `frame-ancestors 'none'`; `object-src 'none'` | Pass — PPR-compatible (no `'strict-dynamic'`, no nonce-only) |
+| Content-Security-Policy | `'self' 'unsafe-inline' blob: https://js.stripe.com` (script-src); `frame-ancestors 'none'`; `object-src 'none'` | Pass — PPR-compatible (no `'strict-dynamic'`, no nonce-only). Set per-request by `src/lib/proxy/csp.ts`, not captured in static header probe. |
 
-CSP rationale per `CLAUDE.md`: PPR (`cacheComponents`) prerenders HTML at build time without nonces, so `'self' 'unsafe-inline'` is the correct policy. The `e2e/smoke.spec.ts` "CSP canary" test guards against accidental script-blocking regressions.
+CSP note: CSP is injected per-request by `src/lib/proxy/csp.ts` (`'unsafe-eval'` added in development only). Because it is not a static `next.config.ts` header, the metrics script header probe does not capture it. CSP correctness is guarded by the `e2e/smoke.spec.ts` "CSP canary" test, which verifies JavaScript executes on each E2E run.
 
 ## CI/CD Automation Status
 
@@ -87,19 +88,28 @@ No automation gaps detected.
 
 ## Outdated Packages with Security Implications
 
-8 outdated packages. Zero have associated CVEs. None are production-critical:
+10 outdated packages (up from 8 on 2026-05-04). Zero have associated CVEs.
 
 | Package | Current → Latest | Channel | Security Impact |
 |---------|------------------|---------|-----------------|
-| `@upstash/ratelimit` | 2.0.8 → 2.0.8 | Production | None — version match (scan-output false positive). |
-| `jsdom` | 29.1.1 → 27.0.1 | Dev (testing) | None. Reverse mismatch is a registry tagging artifact (pre-release vs stable). |
+| `@anthropic-ai/sdk` | 0.92.0 → 0.93.0 | Production | None confirmed. Minor version release — review changelog before batching. |
+| `@supabase/supabase-js` | 2.105.1 → 2.105.3 | Production | None — patch only. Optional housekeeping. |
+| `@typescript-eslint/eslint-plugin` | 8.59.1 → 8.59.2 | Dev | None — patch only. |
+| `jsdom` | 29.1.1 → 27.0.1 | Dev (testing) | None. Reverse mismatch is a registry tagging artifact (pre-release vs stable channel). |
 | `knip` | 6.9.0 → 6.11.0 | Dev | None. |
-| `postcss` | 8.5.12 → 8.5.13 | Build-time | None — patch only. Optional housekeeping. |
-| `posthog-js` | 1.372.5 → 1.372.6 | Production | None — patch only. Optional. Prior posthog-js advisories already resolved. |
+| `postcss` | 8.5.12 → 8.5.14 | Build-time | None — two patch versions behind. Optional housekeeping. |
+| `posthog-js` | 1.372.6 → 1.372.8 | Production | None — patch only. Prior posthog-js advisories already resolved. |
 | `vitest` | 4.1.5 → 3.2.4 | Dev (testing) | None. Pre-release channel mismatch. |
-| `voyageai` | 0.1.0 → 0.2.1 | Production | Pinned at 0.1.0 by Dependabot ignore rule (v0.2.x ESM build breaks Turbopack). Do not upgrade. |
-| `zod` | 4.4.1 → 4.4.2 | Production | None — patch only. Optional. |
+| `voyageai` | 0.1.0 → 0.2.1 | Production | **DO NOT UPGRADE.** Pinned at 0.1.0 via Dependabot ignore rule. v0.2.x ESM build breaks Turbopack embeddings pipeline. |
+| `zod` | 4.4.2 → 4.4.3 | Production | None — patch only. |
 
 ## Source Code Changes Since Last Cycle
 
-Nothing security-relevant. Recent modified files include test fixtures (`*.test.ts`, `*.test.tsx`), Playwright configs, agent reports, and the security agent script itself. No changes to `src/proxy.ts`, webhook routes, auth middleware, or CSP configuration.
+Security-relevant observations from peer agents:
+
+- **IPv6 SSRF protection** (coverage agent 2026-05-05): `image/route.ts` `firstIpv6Hextet` function and `isUnsafeIpv6` call site now have full test coverage. fc00::/7 (unique local), fe80::/10 (link-local), and ff02::/8 (multicast) ranges all confirmed correctly blocked.
+- **Wave 2 CSRF hardening** (from prior cycles): SE-M2 origin enforcement active. All POST requests require Origin header. QA agent confirmed CSRF tests passing as of 2026-04-30.
+- **Sentry Replay PII surface** (from Apr 22): Eliminated via commit `fef651f5`. No PII surface in replay data.
+- No changes to `src/proxy.ts`, webhook routes, auth middleware, or CSP configuration this cycle.
+
+---

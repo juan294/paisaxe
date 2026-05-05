@@ -1,5 +1,15 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-05-04 06:00:03
+> Auto-generated on 2026-05-05 06:00:05
+
+## Changes Made This Run (2026-05-05)
+
+No documentation changes required. Twenty-first consecutive clean run.
+
+- Feature flags: 17 flags in `FeatureFlagKey` type verified against `docs/project/features.md` — zero gaps.
+- Agent flags: 10 agent flags verified against `docs/project/features.md` — zero gaps.
+- API routes: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, internal health probes). No external-consumption routes require new documentation.
+- CLAUDE.md current (last modified 2026-05-03). features.md complete — no additions needed.
+- Source changes since May 4: coverage test additions (image/route.ts IPv6 tests, logger.ts pino mock) — test-only, no new user-facing features or flags.
 
 ## CLAUDE.md Status
 
@@ -15,6 +25,7 @@ These source files have been modified since CLAUDE.md was last updated and may n
 src/app/about/page.tsx
 src/app/api/admin/elevenlabs-analytics/route.test.ts
 src/app/api/admin/github-analytics/route.test.ts
+src/app/api/admin/stories/[id]/image/route.test.ts
 src/app/api/chat/stream/route.test.ts
 src/app/api/health/db/route.test.ts
 src/app/api/health/db/route.ts
@@ -66,6 +77,7 @@ src/lib/i18n/fr.ts
 src/lib/i18n/pt.ts
 src/lib/i18n/resolve.test.ts
 src/lib/i18n/translations.test.ts
+src/lib/logger.test.ts
 src/lib/rate-limit.test.ts
 src/lib/rate-limit.ts
 src/test/i18n-mock.ts
@@ -82,6 +94,7 @@ scripts/check-verification-coverage.ts
 scripts/generate-icons.ts
 scripts/generate-stories.test.ts
 scripts/generate-stories.ts
+scripts/security-agent.sh
 scripts/seed-database.test.ts
 scripts/seed-database.ts
 scripts/seed-images.ts
@@ -160,24 +173,6 @@ webhooks/translate
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-05-03 |
 | README.md | 2026-05-03 |
-
-## Changes Made This Run
-
-**Status: GREEN** — No documentation changes needed. Twentieth consecutive clean run.
-
-**Feature flags**: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
-
-**API routes**: All 51 flagged routes confirmed internal:
-- `admin/*` routes serve the admin dashboard UI; not for external consumption.
-- `cron/*` routes are Vercel cron job endpoints; triggered by scheduler, not users.
-- `webhooks/*` routes (elevenlabs, stripe, supabase, translate) already documented in features.md under Infrastructure.
-- `mcp/*` routes (places, weather, make-booking, make-booking/status) already documented in features.md as Pelayo's Custom MCP tools.
-- `health/db` is an internal QA agent integration probe (no auth, queries feature_flags table); not external-facing documentation needed.
-- `health/live` already documented in features.md Infrastructure section.
-- `chat` and `chat/stream` are internal API endpoints consumed by the frontend; already described in the Voice & Text Chat section of features.md.
-- `favorites`, `feature-flags`, `suggestions`, `voice-access`, `checkout/*` are internal endpoints consumed by the frontend.
-
-**No additions made to features.md or CLAUDE.md.**
 
 ---
 
