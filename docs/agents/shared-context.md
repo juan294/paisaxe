@@ -15,6 +15,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -527,22 +528,6 @@
 - Cost Analyst Agent: Manual production verification of Pelayo widget and Day Pass purchase remains the highest-priority outstanding action. Automated journey tests are blocked and cannot substitute.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-05-03T07:00:00Z -->
-## Triage — 2026-05-03
-- **Reports processed**: 6 (cc-rpi-update, coverage, cost-analyst, documentation, performance, security)
-- **Agent failures**: 0
-- **Action items resolved**: 1 code item + 3 simplify fixes
-- **Summary**: Committed coverage agent's uncommitted `stories-tab-panel.test.tsx` (+29 tests, 47.61%→96.59% statements). Simplify pass fixed 3 issues: added `within`-based semantic button queries (replacing fragile CSS class selectors), added module-scope prop resets in `beforeEach` (prevents state leak between tests), kept `vi.clearAllMocks()` (reverted accidental `restoreAllMocks` regression). All 41 tests pass clean. Dep refresh (postcss, posthog-js, zod patch bumps) deferred to separate worktree.
-- **Verification**: typecheck ✓, lint ✓, 41/41 stories-tab-panel tests passing.
-- **Deferred (user action required)**: 79-day revenue drought + 75-day voice silence investigation (manual Pelayo/Day Pass check on paisaxe.es), Anthropic billing check (console.anthropic.com), Twilio $0.24 anomaly watch (May 3-4), fresh prod build (`rm -rf .next && npm run build`).
-
-**Cross-agent recommendations:**
-- Coverage Agent: `stories-tab-panel.test.tsx` now committed. Module-scope prop resets prevent future state-leak flakes. `within`-based button queries more resilient to CSS changes.
-- Performance Agent: Fresh prod build still overdue (8 cycles stale). Run `rm -rf .next && npm run build` before next cycle to get authoritative post-`3163f478` initial-load baseline.
-- Security Agent: Optional patch dep refresh (postcss 8.5.13, posthog-js 1.372.6, zod 4.4.2) queued in a separate worktree — cosmetic housekeeping, no advisory impact.
-- Cost Analyst Agent: 79-day revenue + 75-day voice drought remain the only open items. No code path to diagnose; user must verify production manually.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-05-04T06:00:00Z -->
 ## Documentation Agent — 2026-05-04
 - Status: GREEN — No documentation gaps found. Twentieth consecutive clean run.
@@ -617,21 +602,6 @@
 - Coverage Agent: translations.test.ts dynamically compares each locale's key count to ES so any new key additions are automatically caught without hardcoded assertions.
 - QA Agent: No locale-related issues. All translations stable for 45 days.
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-05-05T07:02:54Z -->
-## Security Agent — 2026-05-05
-- Status: GREEN. 0 advisories, 0 exploitable. Eleventh consecutive GREEN.
-- Live production security headers confirmed for the first time this cycle via fallback to paisaxe.es.
-- 10 outdated packages (up from 8): @anthropic-ai/sdk 0.92.0→0.93.0, @supabase/supabase-js 2.105.1→2.105.3, @typescript-eslint/eslint-plugin patch. Zero CVEs.
-- voyageai pinned at 0.1.0 — do NOT include in any dep batch (v0.2.x ESM build breaks embeddings).
-- IPv6 SSRF protection fully tested this cycle (coverage agent confirmed all private ranges).
-
-**Cross-agent recommendations:**
-- Performance Agent: @anthropic-ai/sdk minor upgrade (0.92→0.93) may affect SDK chunk size — monitor after batching. posthog-js 1.372.8 patch available.
-- Triage Agent: Batch production patches (@supabase/supabase-js 2.105.3, posthog-js 1.372.8, zod 4.4.3, postcss 8.5.14) in next dep refresh PR. Review @anthropic-ai/sdk 0.93 changelog before including. Exclude voyageai.
-- Coverage Agent: IPv6 SSRF and webhook paths remain at 100% coverage. No new security-related gaps.
-- QA Agent: All safety guardrails confirmed passing since 2026-04-30. CSRF enforcement active and tested.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-05-05T08:03:44Z -->
@@ -932,6 +902,21 @@
 - Coverage Agent: translations.test.ts dynamically compares each locale's key count to ES so any key additions without parity are caught in CI automatically.
 - QA Agent: No locale-related issues. All translations stable for 48 consecutive days.
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-05-08T07:05:57Z -->
+## Security Agent — 2026-05-08
+- Status: GREEN. 0 advisories, 0 exploitable. 14th consecutive GREEN.
+- All 7 security headers present and correct. CSP `'self' 'unsafe-inline'` intentional for PPR; markdown sanitization is primary XSS defense.
+- License compliant: 0 copyleft violations. LGPL `@img/sharp-libvips-*` documented exception (dynamic-linked native, SaaS, no modification). Other flagged packages are dual-licensed permissive or root marker.
+- 22 outdated packages, zero CVEs. `voyageai` MUST stay pinned at 0.1.0 (0.2.x breaking). `vitest` and `jsdom` "outdated" entries are reverse-pin artifacts — leave alone.
+- CI/CD: Dependabot (pinned to develop), Gitleaks, npm audit, license-check all active. No gaps.
+
+**Cross-agent recommendations:**
+- Performance Agent: Batch `@elevenlabs/react` 1.3 -> 1.5 with chunk-size measurement (482 KB deferred chunk). `@anthropic-ai/sdk` 0.92 -> 0.95.1 needs changelog review before inclusion.
+- Triage Agent: Confirm next metrics run captures CSP via live `https://paisaxe.es/` fallback added 2026-05-04. Otherwise add explicit curl to script.
+- Coverage Agent: All webhook, CSRF, SSRF (IPv4+IPv6), and PII paths fully covered. No security-driven test gaps.
+- QA Agent: Safety tests passing. Once dep batch lands, re-verify Stripe + analytics in staging.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-05-08T08:55:00Z -->

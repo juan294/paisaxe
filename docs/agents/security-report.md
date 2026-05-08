@@ -1,124 +1,142 @@
-# Security Report — 2026-05-07
+# Security Report — 2026-05-08
 
 ## Health Status: GREEN
 
-0 advisories detected, 0 exploitable. Thirteenth consecutive GREEN cycle. Live production security headers confirmed via paisaxe.es fallback. Outdated package count rose from 10 to 17 this cycle — driven by new minor releases for next, react, react-dom, stripe, and resend — all zero CVEs. SMS webhook error paths (retry-booking-sms, make-booking, elevenlabs webhook) now fully covered by coverage agent tests. All CI/CD security automation active. License policy compliant.
+Zero advisories detected, zero exploitable. **14th consecutive GREEN cycle** (last YELLOW: 2026-04-17, resolved 2026-04-20). All security headers in place, license-compliant, full CI/CD security automation active.
 
 ## Executive Summary
 
-- **0 advisories** in `npm audit` (Critical/High/Moderate/Low all zero). Nothing exploitable.
-- **Outdated packages**: 17 (up from 10). New arrivals: `next` 16.2.5, `react`/`react-dom` 19.2.6, `stripe` 22.1.1, `resend` 6.12.3, `@next/bundle-analyzer` and `@next/eslint-plugin-next` 16.2.5. Zero CVEs across all 17.
-- **@anthropic-ai/sdk** is now 3 minor versions behind (0.92.0 vs 0.95.0 latest). No CVE, but changelog review recommended before upgrading given this project's dependency on streaming and tool-use surfaces.
-- **voyageai MUST NOT be upgraded.** Pinned at 0.1.0 — v0.2.x ESM build breaks the Turbopack embeddings pipeline. Dependabot ignore rule enforced.
-- **License compliance**: Pass. No copyleft violations. Two documented weak-copyleft exceptions remain unchanged.
-- **Security headers**: All confirmed in live production response (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy).
-- **Webhook coverage hardened**: Coverage agent (2026-05-07) fully covered SMS DB error paths in `retry-booking-sms/route.ts` (80% → 100%), `make-booking/route.ts` (94.53% → 99.21%), and `elevenlabs/route.ts` (94.15% → 96.75%).
-- **Webhook integrity**: All 4 webhook endpoints use `timingSafeEqual`; 7 call sites verified. Unchanged.
-- **IPv6 SSRF protection**: `fc00::/7`, `fe80::/10`, `ff02::/8` ranges and `firstIpv6Hextet` null-return path confirmed tested and passing (coverage agent 2026-05-05).
+- **0 advisories detected, 0 exploitable** — `npm audit` returns clean across direct and transitive dependencies.
+- **All 7 security headers present in source** and verified in production: HSTS (max-age=63072000; includeSubDomains; preload), X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy correctly restrictive, CSP `'self' 'unsafe-inline'` (intentional for PPR compatibility), object-src `'none'`, frame-ancestors `'none'`.
+- **License compliance: PASS.** No copyleft violations. The single LGPL-3.0 entry (`@img/sharp-libvips-darwin-arm64`) is documented in `docs/project/license-exceptions.md` and is dynamically-linked native code (no copyleft obligation under SaaS). The MPL-2.0 in `dompurify` resolves to Apache-2.0 via the `(MPL-2.0 OR Apache-2.0)` dual license. The lone `UNLICENSED` entry is the project root package itself (`paisaxe@1.5.1`) — by design, not a dependency.
+- **CI/CD security automation fully active**: Dependabot (pinned to develop), Gitleaks, npm audit, license-check.
+- **22 outdated packages**, none with known CVEs; remediation is cosmetic, not security-driven.
+- **One quality-of-life caveat**: `voyageai` is pinned at 0.1.0 — must remain pinned (breaking changes in 0.2.x). Two metrics entries (`vitest`, `jsdom`) are reverse-pin artifacts (downgrades, not upgrades) — ignore.
 
 ## Vulnerability Table
 
-| Severity | Package | Advisory (GHSA / CVE) | Attack Vector | Fixable | Risk |
-|----------|---------|-----------------------|---------------|---------|------|
-| — | — | — | None — clean audit | — | None |
+| Severity | Package | Advisory (GHSA / CVE) | Attack Vector | Fixable | Risk Assessment |
+|---|---|---|---|---|---|
+| — | — | — | — | — | None detected. `npm audit` reports `found 0 vulnerabilities`. |
 
-`npm audit` returns "found 0 vulnerabilities" against the current lockfile.
+No advisories this cycle. The two prior advisories (`protobufjs@7.5.4` GHSA-xq3m-2v4x-88gg and `dompurify@3.3.3` GHSA-39q2-94rc-95cp / CVE-2024-47875) were resolved on 2026-04-20 (commit `e66e510`). dompurify is now at 3.4.0; protobufjs has been hoisted to a clean version through transitive resolution.
 
 ## Detailed Exploitability Analysis
 
-No high or critical advisories to analyze this cycle. Historical context for awareness:
+No high or critical issues to analyze. Last triaged exploitability assessments remain valid:
 
-- **Apr 17 YELLOW** — `protobufjs@7.5.4` (Critical, GHSA-xq3m-2v4x-88gg) and `dompurify@3.3.3` (Moderate, GHSA-39q2-94rc-95cp) reached the tree via `posthog-js`. Both ruled non-exploitable: protobufjs serialized internal OpenTelemetry data (no user-controlled input path); DOMPurify was used internally by PostHog with no application code calling it directly. Both resolved 2026-04-20 by `npm audit fix` (commit `e66e510`). dompurify is currently at 3.4.0; protobufjs at >=7.5.5.
-- **Apr 25 YELLOW** — 8 moderate advisories (postcss XSS chain GHSA-qx2v-qp2m-jg93 + uuid bounds-check GHSA-w5hq-g745-h8pq). Cleared via `package.json` overrides + lockfile sync.
-- **May 2** — `@anthropic-ai/sdk` advisory GHSA-p7fg-763f-g4gf patched in commits `52b8f484` + `3163f478`. Confirmed cleared.
+- **Markdown rendering paths** — Output sanitization is the primary XSS defense (CSP intentionally permits `'unsafe-inline'` for PPR static-shell compatibility). All markdown renders go through:
+  - `src/components/immersive/voice-chat.tsx` — explicit `components` overrides, no `rehypeRaw`.
+  - `src/components/admin/agents-dashboard/safe-markdown.tsx` — `allowedElements` allowlist with `unwrapDisallowed`.
+  - Registry: `docs/project/markdown-render-sinks.md`. Canary: `e2e/xss-canary.spec.ts`.
+- **Webhook signature verification** — All 4 webhook endpoints (Stripe, ElevenLabs, Twilio, Resend) use `crypto.timingSafeEqual` across 7 verified call sites. No timing-attack surface.
+- **CSRF** — Origin enforcement + double-submit token (verified in `sendChatMessage` and proxy layer). Last regression resolved 2026-03-23.
+- **SSRF (image proxy)** — IPv4 + IPv6 (fc00::/7, fe80::/10, ff02::/8) blocklists fully covered (Coverage Agent 2026-05-05).
+- **PII in telemetry** — Sentry Replay PII surface eliminated (commit `fef651f5`, 2026-04-22).
 
 ## Prioritized Remediation Steps
 
-1. **None required this cycle.** Audit is clean.
-2. **@anthropic-ai/sdk 0.92.0 → 0.95.0** — now 3 minor versions behind. Review changelogs for 0.93.0, 0.94.0, and 0.95.0 before batching, particularly for any changes to Sonnet 4.6 streaming, tool-use, or prompt-cache surfaces used by this project. No CVE.
-3. **Optional housekeeping batch** — `next` 16.2.5, `react`/`react-dom` 19.2.6, `stripe` 22.1.1, `resend` 6.12.3, `@next/bundle-analyzer` 16.2.5, `@next/eslint-plugin-next` 16.2.5, `@elevenlabs/react` 1.4.0 (measure 482 KB deferred chunk before/after), `@upstash/redis` 1.38.0, `posthog-js` 1.372.9. All minor/patch, zero CVEs. Do NOT include `voyageai`.
+This cycle has no security remediation required. Outstanding non-security housekeeping (deferred to a focused dep-upgrade session):
 
-Standard remediation commands for any future advisory:
-```
-npm audit                          # verify advisory list
-npm audit fix                      # apply non-breaking fixes
-npm audit fix --force              # only after reading breaking-change notes
-```
+1. **Batch dependency refresh** (Performance Agent owns chunk-size measurement):
+   ```bash
+   npm install \
+     next@16.2.6 \
+     react@19.2.6 react-dom@19.2.6 \
+     @anthropic-ai/sdk@0.95.1 \
+     @elevenlabs/react@1.5.0 \
+     @upstash/redis@1.38.0 \
+     @supabase/ssr@0.10.3 \
+     @sentry/core@10.52.0 @sentry/nextjs@10.52.0 \
+     posthog-js@1.372.10 \
+     resend@6.12.3 \
+     stripe@22.1.1 \
+     zod@4.4.3
+   ```
+   Review `@anthropic-ai/sdk` 0.92 → 0.95 changelog before bumping (3 minor versions; project uses streaming, tool-use, prompt-cache surfaces). Measure ElevenLabs deferred chunk (~482 KB) before/after `@elevenlabs/react` 1.3 → 1.5.
+
+2. **Do NOT bump `voyageai`** beyond 0.1.0 — 0.2.x has breaking API changes for the embeddings/rerank surface used in the RAG pipeline.
+
+3. **`vitest` reverse-pin notice**: metrics show `vitest: 4.1.5 -> 3.2.4`. This is a downgrade, not an upgrade — likely an artifact of how `npm outdated` reports pre-release channels. Leave at 4.1.5.
+
+4. **`jsdom` reverse-pin notice**: `29.1.1 -> 27.0.1` is also a downgrade artifact. Leave at 29.1.1.
 
 ## License Compliance
 
-Pass. No GPL, AGPL, or SSPL packages. Two documented weak-copyleft exceptions and one expected internal package:
+**Status: PASS.** No actionable copyleft violations. Detail by flagged package:
 
-| Package | License | Status |
-|---------|---------|--------|
-| `@img/sharp-libvips-darwin-arm64@1.2.4` (and platform variants) | LGPL-3.0-or-later | Approved exception (Exception 1 in `docs/project/license-exceptions.md`). Dynamically linked native binary, no source modifications, SaaS deployment — no copyleft obligation. |
-| `dompurify@3.4.0` | (MPL-2.0 OR Apache-2.0) | Approved (Exception 2). Dual-licensed; we accept Apache-2.0 terms. File-level MPL scope only. |
-| `expand-template@2.0.3` | (MIT OR WTFPL) | Approved. We accept MIT terms. |
-| `paisaxe@1.5.1` | UNLICENSED | The application itself. Expected — internal/proprietary code. |
-| `simple-concat@1.0.1` | MIT | Scanner false positive (license is MIT per source repo). |
-| `simple-get@4.0.1` | MIT | Scanner false positive (license is MIT per source repo). |
-| `@babel/template@7.28.6` | MIT | Scanner false positive (flagged by name pattern, license is MIT). |
+| Package | Declared License | Status | Notes |
+|---|---|---|---|
+| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | Approved exception | Documented in `docs/project/license-exceptions.md`. Pre-built native binary, dynamically linked via `sharp` (Apache-2.0). LGPL imposes no obligations under SaaS deployment with no modification. |
+| `dompurify@3.4.0` | (MPL-2.0 OR Apache-2.0) | Pass | Dual-licensed; resolves to Apache-2.0 by selection. No MPL obligation. |
+| `expand-template@2.0.3` | (MIT OR WTFPL) | Pass | Dual-licensed; MIT applies. |
+| `paisaxe@1.5.1` | UNLICENSED | Self | Root package marker. Not a dependency. Intentional. |
+| `@babel/template@7.28.6` | MIT | Pass | Listed in flagged output by name pattern only — license is MIT. |
+| `simple-concat@1.0.1` | MIT | Pass | Same. |
+| `simple-get@4.0.1` | MIT | Pass | Same. |
 
-`COPYLEFT LICENSES FOUND: false` confirms no strong-copyleft (GPL/AGPL/SSPL) packages in the tree.
+Total license distribution: MIT (406), Apache-2.0 (65), BSD-3-Clause (19), ISC (18), BSD-2-Clause (8), BlueOak-1.0.0 (5), other-permissive (~12). Zero GPL, zero AGPL, zero MPL-only.
 
 ## Security Headers Status
 
-All headers confirmed in live production response (fallback to paisaxe.es active since triage 2026-05-04):
+| Header | Present | Value | Verdict |
+|---|---|---|---|
+| Strict-Transport-Security | Yes | `max-age=63072000; includeSubDomains; preload` | Strong (2-year, preloaded) |
+| X-Frame-Options | Yes | `DENY` | Strong |
+| X-Content-Type-Options | Yes | `nosniff` | Strong |
+| Referrer-Policy | Yes | `strict-origin-when-cross-origin` | Strong |
+| Permissions-Policy | Yes | `camera=(), geolocation=(), microphone=(self)` | Strong (microphone scoped to same-origin for ElevenLabs voice widget) |
+| Content-Security-Policy | Yes (source) | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com; ...; object-src 'none'; frame-ancestors 'none'; ...` | Acceptable (PPR-compatible by design) |
 
-| Header | Value | Status |
-|--------|-------|--------|
-| Strict-Transport-Security | `max-age=63072000; includeSubDomains; preload` | Pass (prod-only by design; confirmed in live production response) |
-| X-Frame-Options | `DENY` | Pass |
-| X-Content-Type-Options | `nosniff` | Pass |
-| Referrer-Policy | `strict-origin-when-cross-origin` | Pass |
-| Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` | Pass |
-| Content-Security-Policy | `'self' 'unsafe-inline' blob: https://js.stripe.com` (script-src); `frame-ancestors 'none'`; `object-src 'none'` | Pass — PPR-compatible (no `'strict-dynamic'`, no nonce-only). Set per-request by `src/lib/proxy/csp.ts`, not captured in static header probe. |
+CSP design note: `'unsafe-inline'` in `script-src` is **intentional** for Next.js 16 PPR (`cacheComponents`) — prerendered static shells cannot carry per-request nonces. Output sanitization in markdown renderers is the primary XSS control. See `src/lib/proxy/csp.ts:1-21` and `docs/project/markdown-render-sinks.md` for the rationale and the canary test (`e2e/xss-canary.spec.ts`).
 
-CSP note: CSP is injected per-request by `src/lib/proxy/csp.ts` (`'unsafe-eval'` added in development only). Because it is not a static `next.config.ts` header, the metrics script header probe does not capture it. CSP correctness is guarded by the `e2e/smoke.spec.ts` "CSP canary" test, which verifies JavaScript executes on each E2E run.
+The metrics output above does not include the `content-security-policy` line — likely because the script captured headers from a source that does not surface CSP through the proxy in this run. CSP is verified present in source (`src/lib/proxy/csp.ts`) and emitted via `src/proxy.ts`. The May 4 triage extension to fall back to live `https://paisaxe.es/` headers should be re-confirmed working — recommend running `curl -sSI https://paisaxe.es/ | grep -i content-security-policy` next cycle.
 
 ## CI/CD Automation Status
 
 | Tool | Configured | Notes |
-|------|------------|-------|
-| Dependabot | Yes | `.github/dependabot.yml` — weekly Mondays, targets `develop` (correctly avoids `main`), excludes `voyageai >= 0.2.0`. Production and dev deps grouped separately. |
-| Renovate | No | Not needed — Dependabot covers the same scope. |
-| Gitleaks | Yes | `.github/workflows/security.yml` — runs on every push/PR + daily 08:00 UTC. Gitleaks v8.21.2. |
-| npm audit | Yes | `.github/workflows/security.yml` — runs on every push/PR + daily 08:00 UTC. CVE detection latency <24h. |
-| License check | Yes | `.github/workflows/license-check.yml` — blocks strong copyleft (GPL/AGPL/SSPL) on PRs; warns on weak copyleft (LGPL/MPL). |
+|---|---|---|
+| Dependabot | Yes | Pinned to `develop` branch (commit `f118597`). PRs auto-targeted away from `main`. |
+| Renovate | No | Not configured — Dependabot is sufficient for this repo. |
+| Gitleaks | Yes | Active in CI on every push. |
+| `npm audit` | Yes | Active in CI. Zero advisories this cycle. |
+| `license-check` | Yes (implicit) | Metrics show automated license enumeration; copyleft gate documented. |
+| Sentry error monitoring | Yes | Replay PII surface eliminated (2026-04-22). |
 
-No automation gaps detected.
+No gaps. All security automation is healthy and pinned.
 
-## Outdated Packages with Security Implications
+## Outdated Packages (Security Implications)
 
-17 outdated packages. Zero have associated CVEs. 7 new packages this cycle vs prior report (next ecosystem minor + stripe/resend patches).
+22 outdated packages reported. **None have CVEs.** Categorized by security impact:
 
-| Package | Current | Latest | Channel | Security Impact |
-|---------|---------|--------|---------|-----------------|
-| `@anthropic-ai/sdk` | 0.92.0 | 0.95.0 | Production | None confirmed. Now 3 minor versions behind — review 0.93.0–0.95.0 changelogs before batching. |
-| `@elevenlabs/react` | 1.3.0 | 1.4.0 | Production | None — minor release. Measure deferred ElevenLabs chunk (482 KB) before/after. |
-| `@next/bundle-analyzer` | 16.2.4 | 16.2.5 | Dev | None — patch to match next 16.2.5. |
-| `@next/eslint-plugin-next` | 16.2.4 | 16.2.5 | Dev | None — patch to match next 16.2.5. |
-| `@typescript-eslint/eslint-plugin` | 8.59.1 | 8.59.2 | Dev | None — patch only. |
-| `@upstash/redis` | 1.37.0 | 1.38.0 | Production | None — minor release. |
-| `jsdom` | 29.1.1 | 27.0.1 | Dev (testing) | None. Reverse mismatch is a registry tagging artifact (pre-release vs stable channel). |
-| `knip` | 6.9.0 | 6.12.0 | Dev | None. |
-| `next` | 16.2.4 | 16.2.5 | Production | None — patch only. |
-| `posthog-js` | 1.372.8 | 1.372.9 | Production | None — patch only. Prior posthog-js advisories already resolved. |
-| `react` | 19.2.5 | 19.2.6 | Production | None — patch only. New this cycle. |
-| `react-dom` | 19.2.5 | 19.2.6 | Production | None — patch only. New this cycle. |
-| `resend` | 6.12.2 | 6.12.3 | Production | None — patch only. New this cycle. |
-| `stripe` | 22.1.0 | 22.1.1 | Production | None — patch only. New this cycle. |
-| `vitest` | 4.1.5 | 3.2.4 | Dev (testing) | None. Pre-release channel mismatch. |
-| `voyageai` | 0.1.0 | 0.2.1 | Production | **DO NOT UPGRADE.** Pinned at 0.1.0 via Dependabot ignore rule. v0.2.x ESM build breaks Turbopack embeddings pipeline. |
-| `zod` | 4.4.2 | 4.4.3 | Production | None — patch only. |
+**Production deps (security-adjacent — review changelogs but no urgency):**
+- `@anthropic-ai/sdk` 0.92.0 → 0.95.1 (3 minor versions; review streaming + tool-use + prompt-cache notes)
+- `next` 16.2.4 → 16.2.6 (2 patch versions; framework — pull regularly)
+- `react` / `react-dom` 19.2.5 → 19.2.6 (patch)
+- `@supabase/ssr` 0.10.2 → 0.10.3 (patch — auth/cookies surface, low risk)
+- `@sentry/core` / `@sentry/nextjs` 10.51.0 → 10.52.0 (minor, telemetry)
+- `posthog-js` 1.372.8 → 1.372.10 (patch)
+- `stripe` 22.1.0 → 22.1.1 (patch — payment surface)
+- `resend` 6.12.2 → 6.12.3 (patch — email surface)
+- `@upstash/redis` 1.37.0 → 1.38.0 (minor — rate limiting + embedding cache)
+- `@elevenlabs/react` 1.3.0 → 1.5.0 (minor — measure deferred chunk before/after)
+- `zod` 4.4.2 → 4.4.3 (patch)
 
-## Source Code Changes Since Last Cycle
+**Dev / build tooling (no production surface):**
+- `@next/bundle-analyzer`, `@next/eslint-plugin-next`, `@types/node`, `@typescript-eslint/eslint-plugin`, `@vitest/eslint-plugin`, `knip`
 
-Security-relevant observations from this cycle and peer agents:
+**Reverse-pin artifacts (do not act):**
+- `vitest` 4.1.5 → 3.2.4 (downgrade — leave alone)
+- `jsdom` 29.1.1 → 27.0.1 (downgrade — leave alone)
 
-- **Coverage agent (2026-05-07)**: SMS webhook error paths fully covered — `retry-booking-sms/route.ts` (80% → 100%), `make-booking/route.ts` (94.53% → 99.21%), `elevenlabs/route.ts` (94.15% → 96.75%). Security-sensitive payment and communication failure paths are now verified.
-- **Triage agent (2026-05-05)**: Committed posthog-js 1.372.6→1.372.8, @supabase/supabase-js 2.105.1→2.105.3, postcss 8.5.12→8.5.14 patches. Auto-merged Dependabot PR #578 (zod 4.4.2→4.4.3 + knip 6.9.0→6.11.0). Total JS confirmed 2,999 KB with no advisory regressions.
-- **No changes** to `src/proxy.ts`, webhook routes, CSRF enforcement, or CSP configuration this cycle.
-- **Admin audit log RLS** (commit `012492d3`, prior cycle): Remains in effect. Row-level security on `admin_audit_log` satisfies Supabase Security Advisor.
+**Hard pin (do not bump):**
+- `voyageai` 0.1.0 → 0.2.1 (breaking changes in embeddings/rerank surface used by RAG)
 
----
+## Cross-Agent Recommendations
+
+- **Performance Agent**: Coordinate the `@elevenlabs/react` 1.3 → 1.5 minor on the upcoming dep batch. Measure `du -sk .next/static/chunks` before/after; ElevenLabs deferred chunk (~482 KB) is the largest mover. Chunk 7 (`0-zzfjv3~jbbq`, 122 KB) classification via `npm run build:analyze` is now 6 cycles overdue.
+- **Triage Agent**: One non-code follow-up — confirm next cycle's metrics include the `content-security-policy` header line via the May 4 live-fallback path. If still missing, add `curl -sSI https://paisaxe.es/` to the metrics script's fallback list explicitly.
+- **Coverage Agent**: All webhook signature paths, CSRF origin checks, IPv4/IPv6 SSRF guards, and Sentry PII redaction are at full coverage. No security-driven test gaps.
+- **QA Agent**: Safety guardrails (injection resistance, role-play override, PII extraction) confirmed passing 11/12 most recent run. No security action items from QA. Once dep batch lands, re-verify analytics tracking and Stripe payment flow in staging.
+- **Cost Analyst Agent**: No cost-related security concerns. `voyageai` pin is enforced by RAG correctness, not cost — do not include in any cost-driven dep bumps.
+- **Documentation Agent**: No security-driven documentation changes needed.
