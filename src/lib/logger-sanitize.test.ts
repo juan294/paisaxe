@@ -199,6 +199,20 @@ describe("sanitizeValue", () => {
       expect(sanitizeValue(BigInt("9007199254740993"))).toBe("9007199254740993");
     });
   });
+
+  describe("string-with-sensitive-key short-circuit", () => {
+    it("redacts a string value when its key is sensitive", () => {
+      const result = sanitizeValue({ password: "hunter2" }) as Record<string, string>;
+      expect(result.password).toBe("[REDACTED]");
+    });
+  });
+
+  describe("unknown-type fallback", () => {
+    it("falls back to String() for symbol values", () => {
+      const symbol = Symbol("trace-id");
+      expect(sanitizeValue(symbol)).toBe("Symbol(trace-id)");
+    });
+  });
 });
 
 describe("sanitizeLogMessage", () => {

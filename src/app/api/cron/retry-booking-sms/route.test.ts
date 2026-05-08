@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { GET, POST } from "./route";
 
 const logger = vi.hoisted(() => ({
@@ -141,5 +141,151 @@ describe("/api/cron/retry-booking-sms", () => {
     );
 
     expect(response.status).toBe(200);
+  });
+
+  it("returns 401 when POST has no webhook secret and admin auth fails (line 139)", async () => {
+    vi.mocked(verifyWebhookSecret).mockReturnValue(false);
+    const authError = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: false,
+      error: authError,
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "POST",
+      })
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it("returns 500 when claim_retryable_booking_sms_jobs RPC fails (line 43)", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: "DB connection lost" },
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to claim retryable SMS jobs");
+  });
+
+  it("counts as failed when complete_booking_sms_job RPC errors after successful SMS (lines 73-74)", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    vi.mocked(sendSMS).mockResolvedValue({ success: true, sid: "SM_ok" });
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "claim_retryable_booking_sms_jobs") {
+        return Promise.resolve({
+          data: [
+            {
+              booking_id: "booking-123",
+              event_key: "post_call_transcription:conv_456",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+              attempts: 1,
+            },
+          ],
+          error: null,
+        });
+      }
+      if (fn === "complete_booking_sms_job") {
+        return Promise.resolve({ data: null, error: { message: "write failed" } });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // SMS sent successfully but DB mark-complete failed → counts as failed
+    expect(data.sent_count).toBe(0);
+    expect(data.failed_count).toBe(1);
+  });
+
+  it("logs error when fail_booking_sms_job RPC errors after failed SMS (line 101)", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    vi.mocked(sendSMS).mockResolvedValue({ success: false, error: "Twilio down" });
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "claim_retryable_booking_sms_jobs") {
+        return Promise.resolve({
+          data: [
+            {
+              booking_id: "booking-123",
+              event_key: "post_call_transcription:conv_456",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+              attempts: 2,
+            },
+          ],
+          error: null,
+        });
+      }
+      if (fn === "fail_booking_sms_job") {
+        return Promise.resolve({ data: null, error: { message: "fail mark error" } });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.failed_count).toBe(1);
+    expect(data.sent_count).toBe(0);
+  });
+
+  it("wraps a thrown sendSMS exception as a failed result (lines 55-59)", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    vi.mocked(sendSMS).mockRejectedValue(new Error("network timeout"));
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.sent_count).toBe(0);
+    expect(data.failed_count).toBe(1);
+  });
+
+  it("handles empty claimed jobs list gracefully (no iterations)", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "claim_retryable_booking_sms_jobs") {
+        return Promise.resolve({ data: [], error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.claimed_count).toBe(0);
+    expect(data.sent_count).toBe(0);
+    expect(data.failed_count).toBe(0);
   });
 });

@@ -631,4 +631,183 @@ describe("translate webhook", () => {
       }
     });
   });
+
+  describe("batch processing: claimed job with different event_key", () => {
+    const OTHER_STORY_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
+    it("continues past a claimed job whose event_key does not match the requested key (line 310), returns processed for the requested event", async () => {
+      // Covers line 310: `continue` when job.event_key !== requestedEventKey.
+      // The non-matching job is fully processed by translateStory, but its result
+      // is skipped for the response. Since no matching job was found, the handler
+      // falls through to lines 375-383 and returns a generic processed response.
+      const { translateStory } = await import("@/lib/translate-story");
+
+      vi.mocked(translateStory).mockResolvedValue({
+        success: true,
+        successCount: 1,
+        failedCount: 0,
+      });
+
+      mockRpc.mockImplementation((fn: string, _args?: Record<string, unknown>) => {
+        if (fn === "enqueue_translate_webhook_event") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "pg_try_advisory_lock") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        if (fn === "claim_next_translate_webhook_event") {
+          // Return a job for a DIFFERENT story (event_key !== requestedEventKey)
+          return Promise.resolve({
+            data: [
+              {
+                event_key: `${OTHER_STORY_ID}:default:all`,
+                story_id: OTHER_STORY_ID,
+                locales: null,
+                force_retranslate: false,
+              },
+            ],
+            error: null,
+          });
+        }
+        if (
+          fn === "complete_translate_webhook_event" ||
+          fn === "pg_advisory_unlock"
+        ) {
+          return Promise.resolve({ data: true, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const response = await POST(createRequest({ storyId: VALID_STORY_ID }));
+      const json = await response.json();
+
+      // The non-matching job was processed but skipped for the response.
+      // Lines 375-383: falls through to generic "processed" response.
+      expect(response.status).toBe(200);
+      expect(json.status).toBe("processed");
+      expect(json.eventKey).toBe(`${VALID_STORY_ID}:default:all`);
+    });
+
+    it("returns duplicate status after processing non-matching jobs when enqueueStatus is duplicate (lines 363-373)", async () => {
+      // Covers lines 363-373: after all claimed jobs had different event_keys
+      // (all hit `continue`), preferredResponse is undefined and enqueueStatus
+      // is "duplicate", so the duplicate branch fires.
+      const { translateStory } = await import("@/lib/translate-story");
+
+      vi.mocked(translateStory).mockResolvedValue({
+        success: true,
+        successCount: 1,
+        failedCount: 0,
+      });
+
+      mockRpc.mockImplementation((fn: string, _args?: Record<string, unknown>) => {
+        if (fn === "enqueue_translate_webhook_event") {
+          return Promise.resolve({ data: "duplicate", error: null });
+        }
+        if (fn === "pg_try_advisory_lock") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        if (fn === "claim_next_translate_webhook_event") {
+          return Promise.resolve({
+            data: [
+              {
+                event_key: `${OTHER_STORY_ID}:default:all`,
+                story_id: OTHER_STORY_ID,
+                locales: null,
+                force_retranslate: false,
+              },
+            ],
+            error: null,
+          });
+        }
+        if (
+          fn === "complete_translate_webhook_event" ||
+          fn === "pg_advisory_unlock"
+        ) {
+          return Promise.resolve({ data: true, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const response = await POST(createRequest({ storyId: VALID_STORY_ID }));
+      const json = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(json.status).toBe("duplicate");
+      expect(json.eventKey).toBe(`${VALID_STORY_ID}:default:all`);
+    });
+  });
+
+  describe("databaseError from complete_translate_webhook_event (line 315)", () => {
+    it("returns 500 Database error when marking a successfully-translated job complete fails (line 315)", async () => {
+      // Covers line 315: processClaimedJob returns {ok: false, databaseError: true}
+      // when translateStory succeeds but the complete_translate_webhook_event RPC errors.
+      const { translateStory } = await import("@/lib/translate-story");
+
+      vi.mocked(translateStory).mockResolvedValue({
+        success: true,
+        successCount: 1,
+        failedCount: 0,
+      });
+
+      mockRpc.mockImplementation((fn: string, _args?: Record<string, unknown>) => {
+        if (fn === "enqueue_translate_webhook_event") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "pg_try_advisory_lock") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        if (fn === "claim_next_translate_webhook_event") {
+          return Promise.resolve({
+            data: [
+              {
+                event_key: `${VALID_STORY_ID}:default:all`,
+                story_id: VALID_STORY_ID,
+                locales: null,
+                force_retranslate: false,
+              },
+            ],
+            error: null,
+          });
+        }
+        if (fn === "complete_translate_webhook_event") {
+          // Simulate DB error when trying to mark job complete
+          return Promise.resolve({ data: null, error: { message: "DB write failed" } });
+        }
+        if (fn === "pg_advisory_unlock") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const response = await POST(createRequest({ storyId: VALID_STORY_ID }));
+      const json = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(json.error).toBe("Database error");
+    });
+  });
+
+  describe("outer catch block (lines 384-389)", () => {
+    it("returns 500 Internal server error when request.json() throws (lines 384-389)", async () => {
+      // Covers lines 384-389: the outer try-catch around the entire handler body.
+      // createAdminClient is called before the try block (line 156), so it cannot
+      // trigger this path. Instead we send a request with invalid JSON so that
+      // request.json() (line 172, inside the try block) throws a SyntaxError.
+      const invalidJsonRequest = new NextRequest(
+        "http://localhost/api/webhooks/translate",
+        {
+          method: "POST",
+          headers: { "x-webhook-secret": VALID_SECRET },
+          body: "{ not valid json {{{",
+        }
+      );
+
+      const response = await POST(invalidJsonRequest);
+      const json = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(json.error).toBe("Internal server error");
+    });
+  });
 });

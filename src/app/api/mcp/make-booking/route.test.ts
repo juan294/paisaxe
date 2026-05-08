@@ -1889,6 +1889,84 @@ describe("/api/mcp/make-booking", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it("BE-B6: should fail when pre-call insert returns empty data array (missing pendingRowId, lines 472-476)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // Insert succeeds but returns an empty array — no row id available
+      mockInsert.mockReturnValue({
+        select: vi.fn().mockResolvedValue({ data: [], error: null }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("Could not persist");
+      // ElevenLabs must NOT be called since no row ID was obtained
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("BE-B6: should degrade gracefully when conversation_id update throws a DB exception (lines 523-535)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // Pre-call insert succeeds with a valid row id
+      mockInsert.mockReturnValue({
+        select: vi.fn().mockResolvedValue({ data: [{ id: "pending-row-id" }], error: null }),
+      });
+
+      // ElevenLabs call succeeds with a conversation_id
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_update_throw" }),
+      });
+
+      // The conversation_id update throws (network/connection failure, not just an error object)
+      mockUpdate.mockReturnValue({
+        eq: vi.fn().mockRejectedValue(new Error("DB connection lost during update")),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "test-idempotency-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Call was initiated but conversation_id could not be persisted — degraded 202 response
+      expect(response.status).toBe(202);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("degraded");
+    });
+
     // -----------------------------------------------------------------------
     // Zod validation tests (issue #270)
     // -----------------------------------------------------------------------
