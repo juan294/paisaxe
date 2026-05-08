@@ -16,6 +16,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -604,20 +605,6 @@
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-05-05T08:03:44Z -->
-## Performance Agent — 2026-05-05
-- Status: GREEN. Total JS 2,999 KB / 3,100 KB (101 KB headroom). Initial load ~2,067 KB / 2,100 KB (33 KB headroom). 16th consecutive GREEN.
-- All 10 top chunks byte-identical to May 4. Zero KB change this cycle. No source changes, no npm install.
-- Fresh production build RESOLVED: May 4 triage ran `npm run build` successfully (was overdue 11 cycles). Chunk 7 hash confirmed in prod build (`0-zzfjv3~jbbq`, 122 KB). Still unclassified (static vs deferred unknown) — `npm run build:analyze` needed.
-- New outdated packages (Security Agent May 5): @anthropic-ai/sdk 0.93.0, posthog-js 1.372.8 available. Zero CVEs. voyageai remains pinned at 0.1.0.
-
-**Cross-agent recommendations:**
-- Security Agent: Batch @anthropic-ai/sdk 0.93.0 review with posthog-js 1.372.8, zod 4.4.2, postcss 8.5.14 in next dep refresh. Exclude voyageai. Monitor chunk sizes before/after with `du -sk .next/static/chunks`.
-- Triage Agent: Top code action is `npm run build:analyze` to classify chunk 7 (122 KB). If static, it is the largest remaining optimization target. Low effort (15 min), high insight.
-- Cost Analyst Agent: Bundle plateau holds at 2,999 KB. ElevenLabs deferred chunk unchanged at 482 KB. No bundle-related cost concerns.
-- QA Agent: No performance-related regressions. Chat journeys confirmed stable (coverage agent May 5).
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=triage timestamp=2026-05-05T12:20:00Z -->
 ## Triage — 2026-05-05
 - **Reports processed**: 7 (cc-rpi, cost-analyst, coverage, documentation, localization, performance, security)
@@ -917,6 +904,22 @@
 - Triage Agent: Confirm next metrics run captures CSP via live `https://paisaxe.es/` fallback added 2026-05-04. Otherwise add explicit curl to script.
 - Coverage Agent: All webhook, CSRF, SSRF (IPv4+IPv6), and PII paths fully covered. No security-driven test gaps.
 - QA Agent: Safety tests passing. Once dep batch lands, re-verify Stripe + analytics in staging.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-05-08T08:03:14Z -->
+## Performance Agent — 2026-05-08
+- Status: YELLOW (advisory) — bundle data this run is dev-server cache, not production. Production presumed unchanged from May 7 (2,892 KB total, ~1,972 KB initial — both within budget).
+- ElevenLabs chunk still the largest at ~482 KB (deferred). Eligible for click-to-mount given 80-day zero-voice-traffic streak.
+- Chunk `0-zzfjv3~jbbq` (123 KB) unclassified for 5th consecutive cycle — `npm run build:analyze` overdue. Likely candidates: pdfjs-dist leak, undeferred Stripe, or vendor framework.
+- node_modules disk grew +116 MB since Apr 17 (930 → 1,046 MB) without a package.json change. Worth a `npm dedupe`.
+- 22 outdated packages (per security agent); posthog-js + @elevenlabs/react are the bundled-critical-path ones. Measure chunk size before/after when the batch lands.
+
+**Cross-agent recommendations:**
+- Triage Agent: When the deferred dep batch (next/react/stripe/resend/posthog-js/@elevenlabs/react/@upstash/redis) runs, capture `du -k .next/static/chunks/*` before and after for the ElevenLabs and PostHog chunks specifically.
+- QA Agent: If P3 lands and ElevenLabs goes click-to-mount, the visitor_voice_agent flag path in journey tests will need a click trigger before voice assertions run.
+- Coverage Agent: voice-agent-chat (42.7%) priority drops if P3 lands — the component will ship to fewer users.
+- Cost Analyst Agent: ElevenLabs chunk is 482 KB of deferred JS for a feature with 80 days of zero traffic. P3 click-to-mount makes this a free deletion for non-voice users.
+- Security Agent: voyageai stays pinned at 0.1.0 — perf agent will not touch.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-05-08T08:55:00Z -->
