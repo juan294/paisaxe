@@ -27,6 +27,15 @@ echo "=== Cost Analyst Agent started at $(date) ===" | tee -a "$LOG_FILE"
 
 cd "$PROJECT_DIR"
 
+# Load .env.local so ELEVENLABS_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+# are exported for the Claude subprocess (launchd plist does not pass these).
+if [[ -f "$PROJECT_DIR/.env.local" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$PROJECT_DIR/.env.local"
+  set +a
+fi
+
 # Load the agent prompt from shared TypeScript config
 log_info "Loading agent prompt..." | tee -a "$LOG_FILE"
 AGENT_PROMPT=$(get_default_prompt "cost_analyst_agent_enabled" 2>/dev/null) || {

@@ -217,6 +217,27 @@ describe("Auth Callback Route", () => {
 
       expect(createServerClient).toHaveBeenCalled();
     });
+
+    it("falls back to empty strings when Supabase env vars are unset", async () => {
+      const { createServerClient } = await import("@supabase/ssr");
+      const mockCreate = vi.mocked(createServerClient);
+
+      const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      mockExchangeCodeForSession.mockResolvedValue({ error: null });
+
+      const request = createRequest({ code: "some-code" });
+      await GET(request);
+
+      const [url, anonKey] = mockCreate.mock.calls[0];
+      expect(url).toBe("");
+      expect(anonKey).toBe("");
+
+      if (savedUrl !== undefined) process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
+      if (savedKey !== undefined) process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
+    });
   });
 
   describe("cookie callbacks", () => {

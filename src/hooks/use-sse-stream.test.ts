@@ -244,4 +244,27 @@ describe("readSseStream", () => {
     expect(onError).toHaveBeenCalledWith(abortError);
     expect(onDone).not.toHaveBeenCalled();
   });
+
+  it("wraps a non-Error, non-DOMException thrown value in a new Error (line 78)", async () => {
+    // This covers the final else branch: `err` is not an Error instance and does
+    // not have both `name` and `message` properties, so it is wrapped via String().
+    const onEvent = vi.fn();
+    const onDone = vi.fn();
+    const onError = vi.fn();
+
+    const primitiveStream = new ReadableStream<Uint8Array>({
+      pull() {
+         
+        throw 42; // plain number — not an Error, not a DOMException-like object
+      },
+    });
+
+    await readSseStream(primitiveStream, { onEvent, onDone, onError });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    const [wrapped] = onError.mock.calls[0] as [Error];
+    expect(wrapped).toBeInstanceOf(Error);
+    expect(wrapped.message).toBe("42");
+    expect(onDone).not.toHaveBeenCalled();
+  });
 });

@@ -362,6 +362,31 @@ describe("Cron lease (DO-M2) — content-discovery", () => {
     expect(consoleSpy).not.toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalled();
   });
+
+  it("logs CONTENT_DISCOVERY_LOCK_RELEASE_FAILED when releaseCronJobLease throws in finally (line 86)", async () => {
+    // releaseCronJobLease throws when the RPC returns an error
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: null, error: { message: "lock release failed" } });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    (runDiscovery as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      discovered: 1,
+      created: 1,
+      skippedDuplicates: 0,
+      errors: [],
+      stories: [],
+    });
+
+    const res = await POST(makeRequest({ "x-webhook-secret": "test-secret" }));
+    // Discovery succeeded — should still return 200 despite lock release failure
+    expect(res.status).toBe(200);
+    expect(logger.error).toHaveBeenCalledWith(
+      "[CONTENT_DISCOVERY_LOCK_RELEASE_FAILED]",
+      expect.objectContaining({ error: expect.anything() })
+    );
+  });
 });
 
 describe("CRON_SUCCESS/CRON_FAILURE telemetry — content-discovery", () => {

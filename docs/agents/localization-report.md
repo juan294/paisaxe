@@ -1,71 +1,69 @@
-# Localization Agent Report — 2026-05-05
+# Localization Agent Report — 2026-05-08
 
 ## Summary
 
-**Status: 100% complete across all 6 locales. No changes required.**
+**Status: 100% complete across all 6 locales. No changes required. Forty-eighth consecutive clean run.**
 
-| Locale | UI Keys | Story Translations | Completion |
-|--------|---------|-------------------|------------|
-| es (Spanish — source) | 406 | 100 stories | Source of truth |
-| en (English) | 406 | 100/100 | Complete |
-| fr (French) | 406 | 100/100 | Complete |
-| de (German) | 406 | 100/100 | Complete |
-| pt (Portuguese) | 406 | 100/100 | Complete |
-| ast (Asturian) | 406 | 100/100 | Complete |
+| Locale | Code | UI Keys | Story Translations | Completion |
+|--------|------|---------|--------------------|------------|
+| Spanish | es | 406 | source of truth | 100% |
+| English | en | 406 | 100 / 100 stories | 100% |
+| French | fr | 406 | 100 / 100 stories | 100% |
+| German | de | 406 | 100 / 100 stories | 100% |
+| Portuguese | pt | 406 | 100 / 100 stories | 100% |
+| Asturian | ast | 406 | 100 / 100 stories | 100% |
 
-- **UI key count**: 406 leaf keys per locale (stable for 45 consecutive days)
-- **Story translations**: 100 stories x 5 non-ES locales = 500 records — all present (title + subtitle + description)
-- **Missing keys**: 0
-- **Orphaned keys**: 0
-- **Type safety**: Pass — `npx tsc --noEmit --ignoreConfig src/lib/i18n/*.ts` exits clean (0 errors)
+**Total UI keys**: 406 leaf keys per locale (verified programmatically).
 
----
+**Story translations**: 100 stories x 5 target locales = 500 records, all present with title, subtitle, and description.
+
+**Test suite**: 102 / 102 translation tests passing.
 
 ## Analysis
 
 ### UI Translations
 
-All 6 locale files (`es.ts`, `en.ts`, `fr.ts`, `de.ts`, `pt.ts`, `ast.ts`) were read and compared against the Spanish source of truth using a key-path extractor that enumerates all nested leaf keys. Results:
+All 6 locale files have exactly 406 leaf keys. Programmatic deep-flatten check (`/tmp/check-keys.mjs`) confirms:
 
-- es: 406 leaf keys (source of truth)
-- en: 406 leaf keys — 0 missing, 0 orphans
-- fr: 406 leaf keys — 0 missing, 0 orphans
-- de: 406 leaf keys — 0 missing, 0 orphans
-- pt: 406 leaf keys — 0 missing, 0 orphans
-- ast: 406 leaf keys — 0 missing, 0 orphans
+- es: 406 keys (source of truth)
+- en: 406 keys, 0 missing, 0 orphans
+- fr: 406 keys, 0 missing, 0 orphans
+- de: 406 keys, 0 missing, 0 orphans
+- pt: 406 keys, 0 missing, 0 orphans
+- ast: 406 keys, 0 missing, 0 orphans
 
-No gaps introduced since the `premium.loading_access` key was added in commit `1b450ac7` (Apr 30). All subsequent commits adding new keys have applied them to all 6 locales in the same commit, maintaining zero-gap discipline.
+The automated test suite (`src/lib/i18n/translations.test.ts`) further verifies:
+- Every key in Spanish exists in all other locales (bidirectional check)
+- No empty string values in any locale
+- Correct diacritics in French (accent marks), German (umlauts), Portuguese (cedillas, tildes)
+- Placeholders (`{current}`, `{total}`, `{title}`) preserved exactly
 
 ### Story Translations
 
-`content/translations/story-translations.ts` was scanned for all 100 story slugs. Each was checked for the presence of `en`, `fr`, `de`, `pt`, and `ast` locale blocks. All 500 target-locale records are present with `title`, `subtitle`, and `description` fields.
+`content/translations/story-translations.ts` contains entries for 100 stories. Each entry provides full translations (title, subtitle, description) for all 5 target locales (en, fr, de, pt, ast). Programmatic check (`/tmp/check-stories.mjs`) confirms zero missing fields across the entire matrix.
 
-Story count has been stable at 100 since commit `064e2acc` (5 cycling stories added Apr 30).
+### Type Safety
 
----
+`npx tsc --noEmit` (full project) reports 0 TypeScript errors involving the i18n source files.
 
 ## Fixed
 
-No translations were added or modified this cycle. All 6 locales remain at 100% coverage.
-
----
+None. No edits were necessary this cycle.
 
 ## Remaining Gaps
 
-None. All UI keys and story translations are complete.
-
----
+None.
 
 ## Orphaned Keys
 
-None. All keys in non-Spanish locales exist in the Spanish source of truth.
+None across any locale.
 
----
+## Recent Source Activity
 
-## Notes
+No commits since the previous run modified `src/lib/i18n/*.ts` or `content/translations/story-translations.ts`. The repository's translation surface is unchanged.
 
-- **LOCATION-SPECIFIC comment parity**: As of triage commit `e858ef7` (Apr 14), all 6 locale files have matching `// LOCATION-SPECIFIC` comment annotations (9 per file: 1 header + 8 inline). Cosmetic parity is maintained.
-- **Double-quoted string edge case**: The French locale uses double quotes for one value (`"Chargement de l'assistant vocal..."`) to handle the embedded apostrophe. This is counted correctly by the key extractor — it is not a missing key.
-- **Key count methodology**: The extractor uses `npx tsx` with TypeScript imports to traverse the actual exported objects, ensuring no counting artifacts from comment stripping.
+## Notes for Future Runs
 
----
+- Lazy-loading strategy (es+en static, fr/de/pt/ast dynamic) remains in place. No optimization opportunities surfaced this cycle.
+- The pattern of adding new keys to all 6 locales in the same commit continues to keep backlog at zero.
+- `translations.test.ts` dynamically compares each locale's key count to ES, so any future key drift will fail CI immediately rather than accumulate as silent gaps.

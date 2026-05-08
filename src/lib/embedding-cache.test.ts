@@ -57,6 +57,21 @@ describe("EmbeddingCache (Redis-backed)", () => {
     expect(result).toEqual(vector);
   });
 
+  it("returns embedding directly when Upstash auto-parses JSON (Redis returns Array, not string) — line 34", async () => {
+    // Upstash Redis client can auto-parse JSON responses into native JS types.
+    // When that happens, the stored embedding arrives as an Array, not a JSON string.
+    const vector = [0.4, 0.5, 0.6];
+    mockRedisGet.mockResolvedValue(vector); // already-parsed array, not a string
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    const result = await cache.get("auto-parsed text");
+
+    expect(result).toEqual(vector);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
   it("stores embedding as JSON string with 24h TTL", async () => {
     const vector = [0.4, 0.5, 0.6];
 

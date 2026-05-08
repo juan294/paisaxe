@@ -1217,4 +1217,108 @@ describe("POST /api/webhooks/elevenlabs", () => {
       expect(outcomeMessageUpdates).toHaveLength(0);
     });
   });
+
+  // === SMS DB error paths (lines 518-523, 565, 601) ===
+
+  describe("SMS DB error paths", () => {
+    const successTranscript = {
+      conversation_id: "conv_456",
+      transcript: buildTranscript(
+        { role: "user", message: "Confirmado, le esperamos." }
+      ),
+      analysis: { call_successful: "success" },
+    };
+
+    it("returns 500 when claim_booking_sms_job RPC errors (lines 518-523)", async () => {
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "processed", error: null });
+        }
+        if (fn === "enqueue_booking_sms_job") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "claim_booking_sms_job") {
+          return Promise.resolve({ data: null, error: { message: "lock table missing" } });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Database error");
+    });
+
+    it("logs error and returns 200 when fail_booking_sms_job RPC errors after failed SMS (line 565)", async () => {
+      vi.mocked(sendSMS).mockResolvedValue({ success: false, error: "Twilio down" });
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "processed", error: null });
+        }
+        if (fn === "enqueue_booking_sms_job") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "claim_booking_sms_job") {
+          return Promise.resolve({
+            data: {
+              booking_id: "booking-123",
+              event_key: "post_call_transcription:conv_456",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+            },
+            error: null,
+          });
+        }
+        if (fn === "fail_booking_sms_job") {
+          return Promise.resolve({ data: null, error: { message: "fail mark failed" } });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Booking state was committed — must return 200 even when fail_booking_sms_job errors
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(false);
+    });
+
+    it("logs error and returns 200 when complete_booking_sms_job RPC errors after successful SMS (line 601)", async () => {
+      vi.mocked(sendSMS).mockResolvedValue({ success: true, sid: "SM_ok" });
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "processed", error: null });
+        }
+        if (fn === "enqueue_booking_sms_job") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "claim_booking_sms_job") {
+          return Promise.resolve({
+            data: {
+              booking_id: "booking-123",
+              event_key: "post_call_transcription:conv_456",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+            },
+            error: null,
+          });
+        }
+        if (fn === "complete_booking_sms_job") {
+          return Promise.resolve({ data: null, error: { message: "complete write failed" } });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Booking state was committed — must return 200 even when complete_booking_sms_job errors
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(true);
+    });
+  });
 });
