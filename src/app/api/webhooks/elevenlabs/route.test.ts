@@ -1286,6 +1286,24 @@ describe("POST /api/webhooks/elevenlabs", () => {
       expect(data.smsSent).toBe(false);
     });
 
+    it("returns 200 ignored when process_elevenlabs_event_idempotent reports booking_missing (lines 467-471)", async () => {
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "booking_missing", error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.ignored).toBe(true);
+      expect(data.reason).toBe("Booking missing during processing");
+    });
+
     it("logs error and returns 200 when complete_booking_sms_job RPC errors after successful SMS (line 601)", async () => {
       vi.mocked(sendSMS).mockResolvedValue({ success: true, sid: "SM_ok" });
       mockRpc.mockImplementation((fn: string) => {
