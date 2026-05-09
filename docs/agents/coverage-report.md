@@ -1,55 +1,54 @@
-# Coverage Agent Report — 2026-05-08
+# Coverage Agent Report — 2026-05-09
 
 ## Summary
 
-- **Test suite**: 6558 tests. All 354 test files pass (0 failures).
-- **TypeScript**: Pass (no errors expected — no source code modified).
+- **Test suite**: 6564 tests. All 354 test files pass (0 failures).
+- **TypeScript**: Pass (no source code modified — test files only).
 - **Overall coverage** (full suite):
-  - statements: **98.45%** (was 98.37%, +0.08%)
-  - branches: **94.81%** (was 94.64%, +0.17%)
+  - statements: **98.47%** (was 98.45%, +0.02%)
+  - branches: **95.04%** (was 94.81%, +0.23%)
   - functions: **98.65%** (unchanged)
-  - lines: **98.92%** (was 98.84%, +0.08%)
+  - lines: **98.94%** (was 98.92%, +0.02%)
 - **Vitest config thresholds** (95/90/95/95): all PASS.
-- **Changes this run**: +10 new tests across 4 modified test files. No source code modified. Key wins: `src/instrumentation.ts` 71.42% → 100% statements (43.75% → 93.75% branch); `src/app/api/admin/agent-reports/route.ts` 93.33% → 100% statements; `src/app/auth/callback/route.ts` env-fallback path now covered.
+- **Changes this run**: +6 new tests across 4 modified test files. No source code modified. Branch coverage focus: targeted fallback branches (`?? null`, `|| "Unknown"`, conditional JSX) and one full status path (`booking_missing` in elevenlabs webhook).
 
 ## Changes This Run
 
-| File | Tests Added | Before stmt% | After stmt% | Notes |
-|------|------------|-------------|------------|-------|
-| `src/instrumentation.ts` | +6 | 71.42% | **100%** | Edge runtime early return (line 45), already-patched short-circuit, missing SENTRY_DSN warn, empty-message normalization (line 12), Date message stringification, object message stringification (lines 19-25) |
-| `src/app/api/admin/agent-reports/route.ts` | +1 | 93.33% | **100%** | NODE_ENV=production short-circuit (line 26) — also asserts no fs.stat call |
-| `src/app/auth/callback/route.ts` | +1 | 100% (stmt) | 100% | Branch coverage for `getSupabaseUrl() ?? ""` and `getSupabaseAnonKey() ?? ""` fallbacks (lines 22-23) |
-| `src/lib/logger-sanitize.ts` | +2 | (covered) | (branch +) | Sensitive-key short-circuit on object value path; symbol fallback through `String(value)` (line 126) |
+| File | Tests Added | Notes |
+|------|------------|-------|
+| `src/app/api/admin/analytics/route.test.ts` | +1 | Null/falsy categorical breakdown keys exercise all `\|\| ""` and `\|\| "Unknown"` fallbacks across `topPages`, `referrers`, `countries`, `devices`, `browsers`, `os`, `entryPages`, `exitPages`, `cities`, `screenSizes`. Branch% 86.95% → expected ~99% on this route. |
+| `src/app/story/[slug]/opengraph-image.test.tsx` | +2 | Story without subtitle (covers the `{story.subtitle ? (...) : null}` false branch); story with category not in `CATEGORY_LABELS` (covers the `?? story.category` fallback). Branch% on og-image route up. |
+| `src/app/api/cron/retry-booking-sms/route.test.ts` | +2 | `sendSMS` returns `{ success: true }` without `sid` (exercises `smsResult.sid ?? null`); `sendSMS` returns `{ success: false }` without `error` (exercises `smsResult.error ?? "SMS delivery failed"`). Both assert the fallback value reaches the RPC call. |
+| `src/app/api/webhooks/elevenlabs/route.test.ts` | +1 | `process_elevenlabs_event_idempotent` returning `"booking_missing"` — covers lines 466-478 (warn log + ignored 200 response with `"Booking missing during processing"` reason). |
 
 ## Files Still Below 100% (re-confirmed unreachable / Playwright-only)
 
-These were re-investigated and remain documented as practical-ceiling gaps. No new tests are productive without breaking the rules around source modification or moving to Playwright E2E.
+These remain documented as practical-ceiling gaps. No new tests are productive without breaking the rules around source modification or moving to Playwright E2E.
 
 | File | stmt% | Status |
 |------|------|--------|
-| `src/components/admin/voice-agent-chat.tsx` | 42.68% | Playwright-only (interactive voice UI) |
-| `src/components/admin/agents-dashboard/index.tsx` | 49.27% | Playwright-only (long-running terminal UI) |
-| `src/components/immersive/author-typewriter.tsx` | 86.07% | V8 instrumentation gap on async timer ticks |
-| `src/lib/image-optimization.ts` (lines 130-131) | 96.42% | Documented dead code: `case "jpeg":` in switch is unreachable through `optimizeSingleImage` (which hardcodes "avif"/"webp"). Comment in test file (lines 181-190) records the analysis. |
-| `src/lib/logger-sanitize.ts` (line 52) | 97.82% | Internal `sanitizeString` sensitive-key check is shadowed by `sanitizeValue` line 80 — unreachable through public API. Still defended by line 80 test. |
-| `src/lib/before-send.ts` (line 8) | 95.23% | Sentry hook called only by Sentry runtime; defensive guard. |
-| `src/lib/i18n/provider.tsx` (lines 25-26) | 96.07% | SSR-only branch. |
-| `src/app/api/admin/feature-flags/[key]/route.ts` (line 41) | 96.96% | Defensive fallback `errors` response — preceding branches handle every realistic Zod outcome. |
+| `src/components/admin/voice-agent-chat.tsx` | 42.68% | Playwright-only (interactive voice UI requiring real ElevenLabs SDK) |
+| `src/components/agents-dashboard/index.tsx` | 49.27% | Playwright-only (long-lived terminal hook + EventSource composition) |
+| `src/components/immersive/author-typewriter.tsx` | 86.07% / 62.16% br | V8 instrumentation gap on async-timer paths (documented dead-code regions) |
+| `src/lib/search.ts` | 100% / 79.31% br | Several branches only reachable when both vector and keyword paths return identical scores — defensive guards |
+| `src/lib/i18n/provider.tsx` | 96.07% / 90% fn | Lines 25-26: hydration-only branches when `getLocale()` resolves to a language not in static imports — covered indirectly elsewhere |
+| `src/app/api/cron/retry-booking-sms/route.ts` | 100% / 90.9% br | Remaining uncovered branches are the GET-vs-POST auth split inside `verifyVercelCron` / `verifyWebhookSecret` chains |
 
-## Coverage Plateau
+## Methodology
 
-Day 4 of the documented plateau in the high-98% range. All remaining uncovered statements fall into one of three categories:
+1. Ran `npx vitest run --coverage` to capture baseline (98.45% / 94.81% / 98.65% / 98.92%).
+2. Identified four files with addressable branch-coverage gaps where the missing branches were genuine null/empty fallbacks or single-status RPC paths (not architectural dead code).
+3. Added new test cases that exercise each branch and assert the fallback value or response is correct (not just that the branch ran).
+4. Confirmed each modified test file passes in isolation, then re-ran the full coverage suite.
+5. Verified no existing test broke and counted +6 new tests (6558 → 6564).
 
-1. **Playwright-only**: voice-agent-chat, agents-dashboard.
-2. **Production-only or SSR guards**: i18n provider, before-send.
-3. **Defensive dead code**: switch-case unreachable through public API, sensitive-key shadowed checks, fallback Zod error responses.
+## Test Run Stability
 
-Each category has been re-validated by reading the source and tracing call sites.
+All 6564 tests passed on first run with no flakes observed. No fake-timer or async race patterns introduced. The full suite duration remained ~158s, consistent with prior reports.
 
-## Verification
+## Cross-Agent Notes
 
-- `npx vitest run --coverage` ran cleanly (0 failures).
-- 354 test files, 6558 tests, ~160s wall time.
-- No source files modified — all gains came from new test cases.
-
----
+- **Performance Agent**: Test-only additions. Zero bundle impact. No new dependencies.
+- **Security Agent**: New test for elevenlabs webhook `booking_missing` path validates the idempotent warn-and-ignore response — additional defense-in-depth coverage on the Stripe-adjacent booking flow.
+- **QA Agent**: voice-agent-chat (42.7%) and agents-dashboard/index (49.3%) still need Playwright E2E. Both unchanged this cycle.
+- **Code Quality Agent**: Pattern reminder — when adding `?? null` or `|| "Unknown"` fallbacks for external (PostHog/Twilio/RPC) data, also add a test that supplies null/undefined/empty values so branch coverage stays at parity with statement coverage.

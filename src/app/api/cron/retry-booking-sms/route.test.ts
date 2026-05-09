@@ -267,6 +267,86 @@ describe("/api/cron/retry-booking-sms", () => {
     expect(data.failed_count).toBe(1);
   });
 
+  it("falls back to null sid when sendSMS succeeds without a sid (line 67 branch)", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    // success: true but sid is undefined → exercises `smsResult.sid ?? null` branch
+    vi.mocked(sendSMS).mockResolvedValue({ success: true });
+    let providerSidPassed: unknown = "untouched";
+    mockRpc.mockImplementation((fn: string, args?: Record<string, unknown>) => {
+      if (fn === "claim_retryable_booking_sms_jobs") {
+        return Promise.resolve({
+          data: [
+            {
+              booking_id: "booking-no-sid",
+              event_key: "post_call_transcription:conv_no_sid",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+              attempts: 1,
+            },
+          ],
+          error: null,
+        });
+      }
+      if (fn === "complete_booking_sms_job") {
+        providerSidPassed = args?.p_provider_sid;
+        return Promise.resolve({ data: null, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.sent_count).toBe(1);
+    expect(data.failed_count).toBe(0);
+    expect(providerSidPassed).toBeNull();
+  });
+
+  it("falls back to default error message when sendSMS fails without an error string (line 86 branch)", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    // success: false with no error field → exercises `smsResult.error ?? "SMS delivery failed"`
+    vi.mocked(sendSMS).mockResolvedValue({ success: false });
+    let failErrorPassed: unknown = "untouched";
+    mockRpc.mockImplementation((fn: string, args?: Record<string, unknown>) => {
+      if (fn === "claim_retryable_booking_sms_jobs") {
+        return Promise.resolve({
+          data: [
+            {
+              booking_id: "booking-no-err",
+              event_key: "post_call_transcription:conv_no_err",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+              attempts: 3,
+            },
+          ],
+          error: null,
+        });
+      }
+      if (fn === "fail_booking_sms_job") {
+        failErrorPassed = args?.p_error;
+        return Promise.resolve({ data: null, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/cron/retry-booking-sms", {
+        method: "GET",
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.sent_count).toBe(0);
+    expect(data.failed_count).toBe(1);
+    expect(failErrorPassed).toBe("SMS delivery failed");
+  });
+
   it("handles empty claimed jobs list gracefully (no iterations)", async () => {
     vi.mocked(verifyVercelCron).mockReturnValue(true);
     mockRpc.mockImplementation((fn: string) => {
