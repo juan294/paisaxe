@@ -1,52 +1,58 @@
 # Triage Report
-> Generated on 2026-05-09 | 7 reports processed | 1 action item | 1 Dependabot PR
+> Generated on 2026-05-10 | 7 reports processed | 6 action items | 1 Dependabot PR
 
 ## Agent Failures
-
-None — all agents ran successfully. No error logs in `logs/` modified in the last 24 hours.
+None — all agents ran successfully (no error logs in the last 24 hours).
 
 ## Reports Reviewed
 
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `cc-rpi-update-report.md` | cc-rpi-update | GREEN | None — blueprint at v1.18.0, already in sync |
-| 2 | `cost-analyst-report.md` | cost-analyst | WATCH | None (code) — 85-day revenue drought + 81-day voice silence; business concern only |
-| 3 | `coverage-report.md` | coverage | GREEN | Committed +6 tests from coverage agent's working-tree additions |
-| 4 | `documentation-report.md` | documentation | GREEN | None — 23rd consecutive clean run; all 51 routes confirmed internal |
-| 5 | `localization-report.md` | localization | GREEN | None — 49th consecutive clean run; 100% across all 6 locales |
-| 6 | `security-report.md` | security | GREEN | None — 14th consecutive GREEN; 0 advisories |
-| 7 | `performance-report.md` | performance | YELLOW | None (code) — dev-cache snapshot; prod (May 7) GREEN; P1 chunk classification carried forward |
+| 1 | security-report.md | Security | GREEN (16th consecutive) | CSP live verification (read-only) |
+| 2 | coverage-report.md | Coverage | GREEN | Commit 9 uncommitted tests |
+| 3 | performance-report.md | Performance | YELLOW | P3 prefetch removal; P1/P2/P6 noted |
+| 4 | cost-analyst-report.md | Cost Analyst | WATCH | No code items; manual investigation needed |
+| 5 | localization-report.md | Localization | GREEN (48th consecutive) | None |
+| 6 | documentation-report.md | Documentation | GREEN | None |
+| 7 | cc-rpi-update-report.md | CC-RPI Update | GREEN | None |
 
 ## Overall Status: GREEN
 
-All agent reports are GREEN or advisory WATCH/YELLOW with no code-level fixes required beyond the coverage additions.
+All code action items resolved. Revenue/voice investigation is a product concern requiring user action, not a triage code fix.
 
 ## Action Items Completed
 
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Committed +6 coverage tests: analytics null/empty fallbacks, og-image subtitle/category fallbacks, retry-booking-sms `?? null` / `?? "SMS delivery failed"` fallbacks, elevenlabs webhook `booking_missing` path (lines 466–478) | coverage-report | +6 (6558 → 6564 total) | Done — committed, CI running |
+| 1 | Commit 9 coverage tests (error-branch catch paths) | coverage-report | +9 | ✅ Committed (`d388d5cc`) |
+| 2 | P3: Remove ElevenLabs idle prefetch (493 KB passive sessions) | performance-report | Updated (P3 assertion) | ✅ Committed (`33312cf4`) |
+| 3 | P6: `npm dedupe` — node_modules growth investigation | performance-report | N/A | ✅ Ran; 0 duplicates found, lockfile normalized |
+| 4 | CSP live verification via curl | security-report | N/A | ✅ Confirmed — CSP present on `/immersive` 200 response |
+| 5 | Append triage entry to shared-context.md | triage protocol | N/A | ✅ Done |
+| 6 | Close Dependabot PR #581 (fast-uri superseded) | Dependabot | N/A | ✅ Closed with comment |
 
 ## Dependabot PRs
 
 | # | PR | Update Type | Disposition | Notes |
 |---|----|----|----|----|
-| #580 | `fast-uri 3.1.0 → 3.1.2` | patch | **DEFER** | All 14 CI checks green; smoke test fails because `VERCEL_AUTOMATION_BYPASS_SECRET` is not forwarded to Dependabot runs (structural restriction). Not a regression from the dep bump. Merge manually or grant Dependabot access to the secret in repo settings. |
+| 581 | Bump fast-uri 3.1.0 → 3.1.2 | patch | **Closed as superseded** | Patch was already applied manually in `81fc3e0f`. Smoke test failure was moot — the fix was already in `develop`. |
 
 ## Verification
 
-- [x] All 6564 tests passing
-- [x] Typecheck clean
-- [x] Lint clean
-- [ ] CI green (push pending — monitoring)
+- [x] All tests passing (6572 tests on `develop` post-merge)
+- [x] Typecheck clean (pre-commit hook verified in P3 worktree)
+- [x] Lint clean (pre-commit hook verified in P3 worktree)
+- [ ] CI green (pending push)
+
+## CSP Investigation Finding
+
+The automated security metrics script was capturing the 308 redirect response from `https://paisaxe.es/` (which correctly has no CSP — it's a redirect to `/immersive`). The actual page response (`/immersive`, HTTP 200) has the full CSP header. Fix: add `-L` flag to the curl in the security agent script to follow redirects and check the final response.
 
 ## Carried Items
 
-| Item | Cycles Deferred | Owner | Note |
-|------|----------------|-------|------|
-| Classify chunk `0-zzfjv3~jbbq` (123 KB) via `npm run build:analyze` | 5 | Performance Agent | Requires a real prod build session, not triage |
-| Verify `pdfjs-dist`/`pdf-parse` server-only (`grep -rn "from 'pdfjs-dist'" src/`) | 1 | Performance Agent | Quick audit |
-| `npm dedupe` — node_modules +116 MB drift | 1 | Performance Agent | 5-min investigation |
-| CSP header in metrics via live curl fallback | 1 | Security Agent | Confirm next cycle |
-| Manual production verification: Pelayo voice widget + Day Pass flow | 10+ | User | 85-day revenue drought — highest-priority non-code action |
-| Dep batch (22 outdated packages) | 3+ | Triage/User | Dedicated session with before/after chunk measurement |
+| Item | Cycles | Owner | Notes |
+|------|--------|-------|-------|
+| P1: Classify 125 KB chunk `0-zzfjv3~jbbq` via `npm run build:analyze` | 8 cycles | Performance | Requires full production build; schedule as focused session |
+| Dep batch (8 packages) | 2 cycles | Performance/Security | Deferred to focused session with before/after chunk measurement |
+| Revenue drought + voice silence investigation | 86 days | User (manual) | Manual production check of Pelayo widget + Day Pass flow; no agent fix possible |
+| `npm ls canvas` — confirm canvas dependency is needed | 1 cycle | Performance | 19 MB disk; quick check during next dep session |
