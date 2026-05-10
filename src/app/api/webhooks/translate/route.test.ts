@@ -564,11 +564,59 @@ describe("translate webhook", () => {
       loggerSpy.mockRestore();
     });
 
+    // translate/route.ts:206 — WEBHOOK_UNKNOWN_SHAPE in the recovery else-branch is
+    // architecturally unreachable. parseRequestBody() uses the same TranslateRecoverySchema
+    // (strict) as a gate: only bodies that pass it enter recovery mode. On those bodies the
+    // second safeParse at line 204 will always succeed, so line 206 is never reached.
+    // The guard is defensive code whose trigger condition cannot arise in the current design.
+
     it("rejects a non-string storyId", async () => {
       const response = await POST(createRequest({ storyId: 123 }));
 
       expect(response.status).toBe(400);
     });
+  });
+
+  it("logs [TRANSLATE_WEBHOOK_FAIL_MARK_FAILED] when fail_translate_webhook_event RPC itself errors", async () => {
+    // Covers translate/route.ts:90 — the error log inside markJobFailed when the
+    // fail_translate_webhook_event RPC returns an error
+    const { translateStory } = await import("@/lib/translate-story");
+
+    vi.mocked(translateStory).mockResolvedValue({
+      success: false,
+      error: "Translation API down",
+      successCount: 0,
+      failedCount: 1,
+    });
+
+    // Make fail_translate_webhook_event return an error so line 90 is reached
+    mockRpc.mockImplementation((fn: string, args?: Record<string, unknown>) => {
+      if (fn === "enqueue_translate_webhook_event") return Promise.resolve({ data: "queued", error: null, args });
+      if (fn === "pg_try_advisory_lock") return Promise.resolve({ data: true, error: null });
+      if (fn === "claim_next_translate_webhook_event") {
+        return Promise.resolve({
+          data: [{ event_key: `${VALID_STORY_ID}:default:all`, story_id: VALID_STORY_ID, locales: null, force_retranslate: false }],
+          error: null,
+        });
+      }
+      if (fn === "fail_translate_webhook_event") {
+        return Promise.resolve({ data: null, error: { message: "Cannot mark as failed" } });
+      }
+      if (fn === "pg_advisory_unlock") return Promise.resolve({ data: true, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+    const response = await POST(createRequest({ storyId: VALID_STORY_ID }));
+
+    expect(response.status).toBe(500);
+    expect(loggerSpy).toHaveBeenCalledWith(
+      "[TRANSLATE_WEBHOOK_FAIL_MARK_FAILED]",
+      expect.objectContaining({ event_key: `${VALID_STORY_ID}:default:all` })
+    );
+
+    loggerSpy.mockRestore();
   });
 
   describe("BE-H6: batch size and lease timeout", () => {

@@ -149,6 +149,7 @@ describe("rate-limit", () => {
   describe("Upstash backend (env vars set)", () => {
     let checkRateLimit: typeof import("./rate-limit").checkRateLimit;
     let resetRateLimit: typeof import("./rate-limit").resetRateLimit;
+    let getRateLimitBackendStatus: typeof import("./rate-limit").getRateLimitBackendStatus;
 
     const mockLimit = vi.fn();
 
@@ -175,6 +176,7 @@ describe("rate-limit", () => {
       const mod = await import("./rate-limit");
       checkRateLimit = mod.checkRateLimit;
       resetRateLimit = mod.resetRateLimit;
+      getRateLimitBackendStatus = mod.getRateLimitBackendStatus;
     });
 
     afterEach(() => {
@@ -284,6 +286,17 @@ describe("rate-limit", () => {
 
     it("resetRateLimit does not crash in Upstash mode", () => {
       expect(() => resetRateLimit()).not.toThrow();
+    });
+
+    it("getRateLimitBackendStatus returns healthy upstash status when configured and not degraded", () => {
+      // Covers rate-limit.ts:177 — the non-degraded upstash branch
+      // _rateLimitDegraded is false on module load (no failed calls yet)
+      const status = getRateLimitBackendStatus();
+      expect(status).toEqual({
+        backend: "upstash",
+        configured: true,
+        degraded: false,
+      });
     });
 
     it("BE-M1: emits logger.warn([RATE_LIMIT_DEGRADED]) with reason 'upstash_unavailable' in production fallback path", async () => {

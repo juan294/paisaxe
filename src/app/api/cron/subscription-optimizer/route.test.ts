@@ -834,4 +834,33 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — subscription-optimizer", () =>
       })
     );
   });
+
+  it("logs [SUBSCRIPTION_OPTIMIZER_LOCK_RELEASE_FAILED] when lock release RPC errors", async () => {
+    // Covers subscription-optimizer/route.ts:131 — the catch inside the finally block
+    // when releaseCronJobLease throws because the RPC returns an error
+    const mockReport = { recommendations: [], totalMonthlySpend: 50, analyzedAt: "2026-02-09T10:00:00.000Z", dismissedFeatures: [] };
+    mockAnalyze.mockReturnValue(mockReport);
+    mockGenerateReport.mockReturnValue("# Report");
+
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-abc", error: null });
+      if (fn === "release_cron_job_lock") return Promise.resolve({ data: null, error: { message: "Lock release DB error" } });
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/subscription-optimizer",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    const response = await POST(request as never);
+    // Main body succeeds (200) even though lock release failed
+    expect(response.status).toBe(200);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[SUBSCRIPTION_OPTIMIZER_LOCK_RELEASE_FAILED]",
+      expect.objectContaining({ error: expect.any(Error) })
+    );
+  });
 });

@@ -128,6 +128,23 @@ describe("AuthProvider — null supabase client (FE-M4 regression)", () => {
 
     consoleSpy.mockRestore();
   });
+
+  it("signOut returns early and logs error when supabase client is null", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { result } = renderHook(() => useAuthContext(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // signOut must resolve (not throw) even when supabase is null
+    await expect(result.current.signOut()).resolves.toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Supabase client unavailable — cannot sign out.",
+    );
+
+    consoleSpy.mockRestore();
+  });
 });
 
 describe("AuthProvider", () => {
