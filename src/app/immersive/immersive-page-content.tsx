@@ -99,16 +99,6 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
     }
   }, []);
 
-  // FE-M6: Only prefetch voice chat chunk when the visitor_voice_agent feature flag
-  // is enabled — avoids wasting bandwidth for visitors who can't use the feature.
-  useEffect(() => {
-    if (isEnabled("visitor_voice_agent") && "requestIdleCallback" in window) {
-      requestIdleCallback(() => {
-        import("@/components/immersive/voice-chat");
-      });
-    }
-  }, [isEnabled]);
-
   // Story ordering pipeline: allStories -> mood filter -> seasonal -> shuffle -> filters
   // Key fix: If serverShuffleSeed is provided, shuffle immediately without waiting for flags
   const processedStories = useMemo(() => {

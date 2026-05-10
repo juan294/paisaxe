@@ -591,16 +591,8 @@ describe("ImmersivePageContent", () => {
     expect(screen.getByTestId("mood-overlay")).toBeInTheDocument();
   });
 
-  it("prefetches voice chat chunk via requestIdleCallback when available (lines 82-83)", () => {
-    // Mock requestIdleCallback so the callback actually fires
-    const originalRIC = window.requestIdleCallback;
-    window.requestIdleCallback = (cb: IdleRequestCallback) => {
-      cb({} as IdleDeadline);
-      return 0;
-    };
-
+  it("renders story-viewer when visitor_voice_agent is enabled", () => {
     setupDefaults();
-    // Enable visitor_voice_agent so the prefetch is allowed
     vi.mocked(useFeatureFlags).mockReturnValue({
       flags: [],
       isReady: true,
@@ -609,44 +601,11 @@ describe("ImmersivePageContent", () => {
     });
 
     render(<ImmersivePageContent serverShuffleSeed={null} />);
-
-    // The callback fires synchronously via the mock, triggering the dynamic import.
-    // The voice-chat module is already mocked via next/dynamic, so no error occurs.
-    // This test exercises lines 82-83 (requestIdleCallback body).
     expect(screen.getByTestId("story-viewer")).toBeInTheDocument();
-
-    // Restore
-    window.requestIdleCallback = originalRIC;
   });
 
-  // FE-M6 (#498): Voice-chat prefetch must be gated behind visitor_voice_agent flag.
-  it("FE-M6: does NOT call requestIdleCallback prefetch when visitor_voice_agent is disabled", () => {
-    const originalRIC = window.requestIdleCallback;
-    const mockRIC = vi.fn((cb: IdleRequestCallback) => {
-      cb({} as IdleDeadline);
-      return 0;
-    });
-    window.requestIdleCallback = mockRIC;
-
-    setupDefaults();
-    // Feature flag is disabled (default from setupDefaults)
-    vi.mocked(useFeatureFlags).mockReturnValue({
-      flags: [],
-      isReady: true,
-      isEnabled: () => false,
-      isEnabledWithDefault: () => false,
-    });
-
-    render(<ImmersivePageContent serverShuffleSeed={null} />);
-
-    // requestIdleCallback should NOT have been called for the prefetch
-    // because visitor_voice_agent is disabled
-    expect(mockRIC).not.toHaveBeenCalled();
-
-    window.requestIdleCallback = originalRIC;
-  });
-
-  it("FE-M6: calls requestIdleCallback prefetch when visitor_voice_agent is enabled", () => {
+  // P3: No idle prefetch — ElevenLabs chunk only loads on explicit user interaction.
+  it("P3: does NOT call requestIdleCallback regardless of visitor_voice_agent flag", () => {
     const originalRIC = window.requestIdleCallback;
     const mockRIC = vi.fn((cb: IdleRequestCallback) => {
       cb({} as IdleDeadline);
@@ -664,8 +623,7 @@ describe("ImmersivePageContent", () => {
 
     render(<ImmersivePageContent serverShuffleSeed={null} />);
 
-    // requestIdleCallback SHOULD have been called because flag is enabled
-    expect(mockRIC).toHaveBeenCalled();
+    expect(mockRIC).not.toHaveBeenCalled();
 
     window.requestIdleCallback = originalRIC;
   });
