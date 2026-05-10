@@ -546,4 +546,18 @@ describe("GET /api/health", () => {
       }
     }
   });
+
+  it("returns degraded status when supabase probe throws unexpectedly", async () => {
+    // Covers health/route.ts:228 — the catch block that returns degraded
+    // when Promise.all rejects due to an unexpected throw inside a probe
+    vi.mocked(supabase.from).mockImplementation(() => {
+      throw new Error("Unexpected probe crash");
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+  });
 });

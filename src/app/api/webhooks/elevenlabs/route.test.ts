@@ -404,6 +404,26 @@ describe("POST /api/webhooks/elevenlabs", () => {
     expect(data.ignored).toBe(true);
   });
 
+  it("logs [ELEVENLABS_WEBHOOK_FETCH_BOOKING_FAILED] and ignores when pending_bookings fetch errors", async () => {
+    // Covers elevenlabs/route.ts:409 — fetchError branch when maybeSingle returns an error
+    // The webhook returns 200+ignored so ElevenLabs doesn't retry indefinitely
+    mockSelect.mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: null,
+          error: { message: "DB connection lost" },
+        }),
+      }),
+    });
+
+    const request = createSignedRequest({ conversation_id: "conv_error" });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.ignored).toBe(true);
+  });
+
   it("should return duplicate without sending SMS when the event was already processed", async () => {
     mockRpc.mockImplementation((fn: string) => {
       if (fn === "process_elevenlabs_event_idempotent") {
@@ -872,6 +892,31 @@ describe("POST /api/webhooks/elevenlabs", () => {
       p_provider_sid: "SM123",
       p_outcome_message: "Confirmation SMS", // BE-M6: atomic outcome_message update
     });
+  });
+
+  it("returns 500 and logs [ELEVENLABS_WEBHOOK_SMS_ENQUEUE_FAILED] when enqueue_booking_sms_job errors", async () => {
+    // Covers elevenlabs/route.ts:501-506 — SMS enqueue failure path
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "process_elevenlabs_event_idempotent") {
+        return Promise.resolve({ data: "processed", error: null });
+      }
+      if (fn === "enqueue_booking_sms_job") {
+        return Promise.resolve({ data: null, error: { message: "SMS outbox insert failed" } });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const request = createSignedRequest({
+      conversation_id: "conv_456",
+      transcript: buildTranscript({ role: "user", message: "Confirmado." }),
+      analysis: { call_successful: "success" },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Database error");
   });
 
   it("should return 401 when ELEVENLABS_WEBHOOK_SECRET is not configured", async () => {
