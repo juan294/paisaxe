@@ -1,5 +1,15 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-05-09 06:00:02
+> Auto-generated on 2026-05-10 06:00:01
+
+## Changes Made This Run
+
+No changes made. All documentation is current and complete.
+
+- Feature flags: 17 Features-tab flags and 10 Agent-tab flags verified against `docs/project/features.md`. Zero gaps.
+- API routes: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, app-internal user APIs, internal health probes). No external-consumption routes require new documentation.
+- CLAUDE.md current (last modified 2026-05-03). features.md complete -- no additions needed.
+
+---
 
 ## CLAUDE.md Status
 
@@ -21,6 +31,7 @@ src/app/api/admin/stories/[id]/image/route.test.ts
 src/app/api/chat/stream/route.test.ts
 src/app/api/cron/content-discovery/route.test.ts
 src/app/api/cron/retry-booking-sms/route.test.ts
+src/app/api/cron/subscription-optimizer/route.test.ts
 src/app/api/health/db/route.test.ts
 src/app/api/health/db/route.ts
 src/app/api/health/route.test.ts
@@ -58,6 +69,7 @@ src/components/auth/auth-provider.tsx
 src/components/immersive/accessibility.test.tsx
 src/components/immersive/category-filter-badge.test.tsx
 src/components/immersive/category-filter-badge.tsx
+src/components/immersive/chat-actions.test.tsx
 src/components/immersive/story-progress-bar.test.tsx
 src/components/immersive/story-progress-bar.tsx
 src/components/immersive/story-viewer.test.tsx
@@ -183,13 +195,7 @@ webhooks/translate
 | CLAUDE.md | 2026-05-03 |
 | README.md | 2026-05-03 |
 
-## Changes Made This Run
-
-2026-05-09 — No documentation changes. Twenty-third consecutive clean run.
-
-- Feature flags: 0 undocumented. All 17 feature flags + 10 agent flags verified against `docs/project/features.md`. Zero gaps.
-- API routes: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, app-internal user APIs like `/api/chat`, `/api/favorites`, `/api/suggestions`, `/api/voice-access`, internal health probes `/api/health/db` and `/api/health/live`). None are intended for external consumption — no entries added to `docs/project/features.md`.
-- CLAUDE.md and features.md remain current; no source changes since last run introduce new user-facing features or flags.
+---
 
 ---
 
