@@ -16,7 +16,7 @@ import {
   fetchStoryTranslations,
   generateStoryTranslations,
 } from "@/lib/admin-api";
-import { TRANSLATION_LOCALES, LOCALE_NAMES } from "@/lib/translate-story";
+import { TRANSLATION_LOCALES, LOCALE_NAMES } from "@/lib/translation-locales";
 import type { StoryLocale, StoryTranslation, TranslationStatus } from "@/types/immersive";
 import type { AdminStory } from "@/types/admin";
 import { cn } from "@/lib/utils";

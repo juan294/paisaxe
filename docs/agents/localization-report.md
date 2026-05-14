@@ -1,41 +1,55 @@
-# Localization Report — 2026-05-10
+# Localization Report — 2026-05-13
 
 ## Summary
 
-**Status: Complete — 48th consecutive clean run. No edits made.**
+**Status: Complete — 51st consecutive clean run. No edits made.**
 
-| Locale | UI Keys | Coverage | Story Translations | Coverage |
-|--------|---------|----------|-------------------|----------|
-| es (Spanish — source) | 406 | 100% | 100 stories | 100% |
-| en (English) | 406 | 100% | 100 stories | 100% |
-| fr (French) | 406 | 100% | 100 stories | 100% |
-| de (German) | 406 | 100% | 100 stories | 100% |
-| pt (Portuguese) | 406 | 100% | 100 stories | 100% |
-| ast (Asturian) | 406 | 100% | 100 stories | 100% |
+All supported locales (es, en, fr, de, pt, ast) are at 100% translation coverage. No missing keys detected in UI strings or story translations.
 
-Total leaf keys verified programmatically via tsx introspection. Story translations verified across 100 slugs x 5 target locales (500 records total). All counts confirmed exact match.
+### UI Translations (src/lib/i18n/)
 
-## Verification Methods
+| Locale | Code | Keys | Missing | Orphaned | Status |
+|--------|------|------|---------|----------|--------|
+| Spanish | es | 406 | 0 | — | Source of truth |
+| English | en | 406 | 0 | 0 | Complete |
+| French | fr | 406 | 0 | 0 | Complete |
+| German | de | 406 | 0 | 0 | Complete |
+| Portuguese | pt | 406 | 0 | 0 | Complete |
+| Asturian | ast | 406 | 0 | 0 | Complete |
 
-1. **Programmatic key comparison**: Loaded all 5 non-Spanish locale files and compared against es.ts as source of truth. Result: 0 missing keys, 0 orphaned keys in all locales.
-2. **Story translation audit**: Loaded STORY_TRANSLATIONS and verified all 100 slugs have en, fr, de, pt, and ast entries.
-3. **Test suite**: 102 / 102 translation tests pass (all essential key assertions across 6 locales).
-4. **TypeScript**: No type errors (--ignoreConfig check on all i18n source files returned clean).
+### Story Translations (content/translations/story-translations.ts)
+
+| Locale | Covered Stories | Total Stories | Missing | Status |
+|--------|----------------|---------------|---------|--------|
+| English | 100 | 100 | 0 | Complete |
+| French | 100 | 100 | 0 | Complete |
+| German | 100 | 100 | 0 | Complete |
+| Portuguese | 100 | 100 | 0 | Complete |
+| Asturian | 100 | 100 | 0 | Complete |
+
+## Verification
+
+- **Test suite**: 102 / 102 translation tests passing (vitest).
+- **Type check**: 0 TypeScript errors across all 6 locale files.
+- **Key parity**: All 5 non-Spanish locales have exactly 406 leaf keys, dynamically verified by translations.test.ts at each CI run.
+- **Story coverage**: 100 stories x 5 non-Spanish locales = 500 records, all present with title + subtitle + description.
 
 ## Fixed
 
-No translations added or modified this cycle. All locales were already complete.
+No translations added this cycle. Coverage was already at 100%.
 
 ## Remaining Gaps
 
-None.
+None. All locales complete.
 
 ## Orphaned Keys
 
-None.
+None. All keys in all locales are present in the Spanish source.
 
-## Recent History
+## Notes
 
-Coverage has been stable at 100% for 48 consecutive days (since ~2026-03-23). The last edit cycle was the triage agent adding 8 `LOCATION-SPECIFIC` inline comments to fr/de/pt (2026-04-14).
+- The CI test (translations.test.ts) dynamically compares every locale's key count to Spanish. Any future key additions that lack parity across locales will fail CI automatically.
+- Lazy-loading is configured: es and en are static imports; fr, de, pt, ast load on demand. Bundle sizes stable at approximately 15 KB per locale file.
+- The Asturian (ast) locale uses the Pelayo persona variant "Pelayu" consistently throughout voice prompts, matching the regional spelling convention.
 
 ---

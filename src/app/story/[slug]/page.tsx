@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { getStoryBySlugFromDB, getStoriesFromDB } from "@/lib/stories-data";
 import type { Metadata } from "next";
 
@@ -43,6 +44,7 @@ export async function generateMetadata({ params }: StoryPageProps): Promise<Meta
 }
 
 export default async function StoryPage({ params }: StoryPageProps) {
+  await connection();
   const { slug } = await params;
   redirect(`/immersive?story=${slug}`);
 }

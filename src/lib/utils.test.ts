@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cn, generateId, formatTimestamp } from "./utils";
+import { cn, formatTimestamp } from "./utils";
 
 describe("utils", () => {
   describe("cn", () => {
@@ -13,21 +13,6 @@ describe("utils", () => {
 
     it("should merge tailwind classes correctly", () => {
       expect(cn("p-4", "p-2")).toBe("p-2");
-    });
-  });
-
-  describe("generateId", () => {
-    it("should return a UUID string", () => {
-      const id = generateId();
-      expect(id).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      );
-    });
-
-    it("should generate unique IDs", () => {
-      const id1 = generateId();
-      const id2 = generateId();
-      expect(id1).not.toBe(id2);
     });
   });
 

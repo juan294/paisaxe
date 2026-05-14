@@ -7,6 +7,10 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
 }));
 
+vi.mock("next/server", () => ({
+  connection: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock stories-data
 vi.mock("@/lib/stories-data", () => ({
   getStoryBySlugFromDB: vi.fn(),

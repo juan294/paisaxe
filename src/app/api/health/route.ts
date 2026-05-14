@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getEnv } from "@/lib/env";
 import { getRateLimitBackendStatus } from "@/lib/rate-limit";
+import { PROBE_TIMEOUTS_MS } from "@/lib/health-timeouts";
 
 type HealthStatus = "healthy" | "degraded";
 type SentryStatus = "configured" | "unconfigured";
@@ -39,12 +40,6 @@ interface StoriesProbeResult {
 interface DatabaseProbeResult {
   usage_percent: number | null;
 }
-
-export const PROBE_TIMEOUTS_MS = {
-  supabase: 2_000,
-  stories: 2_000,
-  database: 2_000,
-} as const;
 
 function checkSentry(): SentryProbeResult {
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim();

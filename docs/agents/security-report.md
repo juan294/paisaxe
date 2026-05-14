@@ -1,154 +1,111 @@
-# Security Report — 2026-05-10
+# Security Agent Report — 2026-05-14
 
-## Health Status: GREEN
+## Health Status: YELLOW
 
-Zero advisories detected, zero exploitable. **16th consecutive GREEN cycle** (last YELLOW: 2026-04-17, resolved 2026-04-20). All security headers in place, license-compliant, full CI/CD security automation active.
+2 advisories detected, 0 exploitable. Both stem from a single transitive dependency chain (`protobufjs` via `@opentelemetry/otlp-transformer` via `posthog-js`). Fixable via `npm audit fix` (lockfile-only, no breaking changes).
 
 ## Executive Summary
 
-- **0 advisories detected, 0 exploitable** — `npm audit` returns clean across direct and transitive dependencies.
-- **5 of 6 security headers present in live metrics capture.** CSP is present in source (`src/lib/proxy/csp.ts`) and emitted via `src/proxy.ts` but continues to be absent from the automated metrics capture. See Security Headers section.
-- **License compliance: PASS.** No copyleft violations. The single LGPL-3.0 entry (`@img/sharp-libvips-darwin-arm64`) is documented in `docs/project/license-exceptions.md` and is dynamically-linked native code (no copyleft obligation under SaaS). The MPL-2.0 in `dompurify` resolves to Apache-2.0 via the `(MPL-2.0 OR Apache-2.0)` dual license. The lone `UNLICENSED` entry is the project root package itself (`paisaxe@1.5.1`) — by design, not a dependency.
-- **CI/CD security automation fully active**: Dependabot (pinned to develop), Gitleaks, npm audit, license-check.
-- **23 outdated packages**, unchanged from May 9. None have known CVEs. The pending dep batch (next, react, @elevenlabs/react, stripe, resend, @upstash/redis, posthog-js, @anthropic-ai/sdk) is the only housekeeping action outstanding.
-- **voyageai pinned at 0.1.0** — breaking changes in 0.2.x affect the RAG embeddings/rerank surface. Do not include in any batch.
-- **vitest and jsdom reverse-pin artifacts**: metrics show `vitest: 4.1.5 -> 3.2.4` and `jsdom: 29.1.1 -> 27.0.1` — these are downgrades, not upgrades. Leave both at their current installed versions.
+- **2 advisories detected, 0 exploitable** in production attack surface.
+- Both advisories collapse to one root package: **protobufjs <=7.5.5** (high) and its bundled **@protobufjs/utf8** sub-package (moderate).
+- All vulnerable code paths are reached only via OpenTelemetry telemetry serialization inside `posthog-js`. No user-controlled input flows into protobuf decoding in Paisaxe.
+- `npm audit fix` resolves both with a lockfile-only update.
+- 0 copyleft violations. All flagged license packages remain documented in `docs/project/license-exceptions.md`.
+- All five core security headers present and correctly configured.
+- CI/CD security automation: Dependabot, Gitleaks, npm audit all active; Renovate intentionally absent.
 
 ## Vulnerability Table
 
-| Severity | Package | Advisory (GHSA / CVE) | Attack Vector | Fixable | Risk Assessment |
-|---|---|---|---|---|---|
-| — | — | — | — | — | None detected. `npm audit` reports `found 0 vulnerabilities`. |
+| Severity | Package | Advisory | Attack Vector | Fixable | Risk Assessment |
+|----------|---------|----------|---------------|---------|-----------------|
+| High | protobufjs <=7.5.5 | GHSA-q6x5-8v7m-xcrf (overlong UTF-8), GHSA-2pr8-phx7-x9h3 (DoS via field names), GHSA-66ff-xgx4-vchm (code injection via bytes defaults), GHSA-fx83-v9x8-x52w (prototype injection), GHSA-75px-5xx7-5xc7 (codegen gadget post-prototype-pollution), GHSA-jvwf-75h9-cwgg (process-wide DoS via option paths), GHSA-685m-2w69-288q (unbounded recursion DoS) | Requires attacker-controlled `.proto` schemas or untrusted protobuf wire input | Yes (`npm audit fix`) | NOT EXPLOITABLE — protobufjs is only used by `@opentelemetry/otlp-transformer` to serialize internal PostHog telemetry. No user input reaches the decoder. |
+| Moderate | @protobufjs/utf8 <=1.1.0 | GHSA-q6x5-8v7m-xcrf | Same as above (sub-dep of protobufjs) | Yes (`npm audit fix`) | NOT EXPLOITABLE — same chain, no user input path. |
 
-No advisories this cycle. The two prior advisories (`protobufjs@7.5.4` GHSA-xq3m-2v4x-88gg and `dompurify@3.3.3` GHSA-39q2-94rc-95cp / CVE-2024-47875) were resolved on 2026-04-20 (commit `e66e510`). dompurify is now at 3.4.0; protobufjs has been hoisted to a clean version through transitive resolution.
+## Exploitability Analysis (High Advisories)
 
-## Detailed Exploitability Analysis
+### protobufjs (GHSA-q6x5-8v7m-xcrf and 6 others)
 
-No high or critical issues to analyze. Triaged exploitability posture from prior cycles remains unchanged and valid:
+**Dependency chain**: `posthog-js → @opentelemetry/otlp-transformer → protobufjs`
 
-- **Markdown rendering paths** — Output sanitization is the primary XSS defense (CSP intentionally permits `'unsafe-inline'` for PPR static-shell compatibility). All markdown renders go through:
-  - `src/components/immersive/voice-chat.tsx` — explicit `components` overrides, no `rehypeRaw`.
-  - `src/components/admin/agents-dashboard/safe-markdown.tsx` — `allowedElements` allowlist with `unwrapDisallowed`.
-  - Registry: `docs/project/markdown-render-sinks.md`. Canary: `e2e/xss-canary.spec.ts`.
-- **Webhook signature verification** — All 4 webhook endpoints (Stripe, ElevenLabs, Twilio, Resend) use `crypto.timingSafeEqual` across 7 verified call sites. No timing-attack surface. The elevenlabs webhook `booking_missing` path is fully test-covered as of 2026-05-09 (Coverage Agent).
-- **CSRF** — Origin enforcement + double-submit token confirmed in `sendChatMessage` and proxy layer. Safety guardrails (injection, role-play override, PII extraction) passed 3/3 per QA Agent 2026-05-03. Last regression resolved 2026-03-23.
-- **SSRF (image proxy)** — IPv4 + IPv6 (fc00::/7, fe80::/10, ff02::/8) blocklists fully covered by tests (Coverage Agent 2026-05-05). The `firstIpv6Hextet` null-return path and `isUnsafeIpv6` call site are exercised.
-- **PII in telemetry** — Sentry Replay PII surface eliminated (commit `fef651f5`, 2026-04-22). SENTRY_DSN missing-warn path is test-covered (Coverage Agent 2026-05-08).
-- **SMS/booking error paths** — elevenlabs webhook DB fetch error, SMS enqueue failure, retry-booking-sms claimError/completeError/failError paths all fully covered (Coverage Agent 2026-05-10 adds coverage for booking_missing + og-image fallbacks).
+**What protobufjs does in this codebase**: PostHog's OpenTelemetry integration uses protobufjs to encode telemetry events when sending to its OTLP endpoint. The decoding side of protobufjs (which is where every CVE in this batch lives — overlong UTF-8, prototype injection, unbounded recursion) is never invoked by application code.
+
+**Why these CVEs do not apply here**:
+1. **GHSA-q6x5-8v7m-xcrf / GHSA-685m-2w69-288q (decoder DoS)**: We only call the encoder. The decoder runs on the receiving service (PostHog's cloud OTLP endpoint), not in this process.
+2. **GHSA-66ff-xgx4-vchm / GHSA-fx83-v9x8-x52w / GHSA-75px-5xx7-5xc7 (code injection via generated code)**: These require attacker-controlled `.proto` schema files. All `.proto` schemas in our build come from the pinned `@opentelemetry/otlp-transformer` package; no user-supplied schemas are loaded at runtime.
+3. **GHSA-jvwf-75h9-cwgg (option path DoS)**: Requires programmatic access to protobufjs's options API. We have zero `protobufjs` imports in `src/`.
+
+**Fix**: `npm audit fix` performs a transitive bump (lockfile-only). Pattern matches the prior `dompurify`/`protobufjs` cycle resolved cleanly in April.
 
 ## Prioritized Remediation Steps
 
-No security remediation required this cycle. Outstanding non-security housekeeping:
-
-1. **Batch dependency refresh** (pending since May 7, deferred to a focused session with chunk measurement). Full target list:
-   ```bash
-   npm install \
-     next@16.2.6 \
-     react@19.2.6 react-dom@19.2.6 \
-     @anthropic-ai/sdk@0.95.1 \
-     @elevenlabs/react@1.6.0 \
-     @upstash/redis@1.38.0 \
-     @supabase/ssr@0.10.3 \
-     @supabase/supabase-js@2.105.4 \
-     @sentry/core@10.52.0 @sentry/nextjs@10.52.0 \
-     tailwindcss@4.3.0 \
-     @tailwindcss/postcss@4.3.0 \
-     posthog-js@1.372.10 \
-     resend@6.12.3 \
-     stripe@22.1.1
-   ```
-   Review `@anthropic-ai/sdk` 0.93 → 0.95 changelog before bumping (2 minor versions remaining; project uses streaming, tool-use, and prompt-cache surfaces). Measure ElevenLabs deferred chunk (~493 KB per Performance Agent May 9) before/after `@elevenlabs/react` 1.3 → 1.6.
-
-2. **Do NOT bump `voyageai`** beyond 0.1.0 — 0.2.x has breaking API changes for the embeddings/rerank surface used in the RAG pipeline.
-
-3. **vitest and jsdom reverse-pin artifacts**: metrics show `vitest: 4.1.5 -> 3.2.4` and `jsdom: 29.1.1 -> 27.0.1` — these are downgrade artifacts from pre-release channel tracking. Leave both at their current installed versions.
-
-4. **CSP live verification**: Run `curl -sSI https://paisaxe.es/ | grep -i content-security-policy` to confirm CSP header emission by the production proxy. The automated capture has missed this header for multiple consecutive cycles. No code change needed — the source is correct.
-
-5. **`npm run build:analyze`** to classify the unclassified 125 KB chunk `0-zzfjv3~jbbq` (7 cycles overdue per Performance Agent). Not security-driven but flagged by multiple agents.
+1. **Run `npm audit fix`** (lockfile-only, no breaking changes). Verify with `npm audit` afterward — expect 0 advisories.
+2. **Batch with low-risk patch upgrades carried over from prior cycles**:
+   - `@anthropic-ai/sdk` 0.93.0 → 0.96.0
+   - `tailwind-merge` 3.5.0 → 3.6.0
+   - `next` 16.2.4 → 16.2.6 (patch)
+   - `@sentry/nextjs` 10.51.0 → 10.53.1
+   - `posthog-js` 1.372.8 → 1.373.4 (pulls newer telemetry transitives)
+3. **Skip**: `jsdom` 29.1.1 → 27.0.1 (channel artifact — downgrade target), `vitest` 4.1.5 → 3.2.4 (likewise), `voyageai` 0.1.0 → 0.2.1 (hard-pinned, known breaking).
+4. **No manual code changes required.** All advisories resolve via dependency bumps.
 
 ## License Compliance
 
-**Status: PASS.** No actionable copyleft violations. Detail by flagged package:
+**Copyleft detected: false.** No GPL, AGPL, or unapproved copyleft. All flagged packages are pre-approved exceptions documented in `docs/project/license-exceptions.md`.
 
-| Package | Declared License | Status | Notes |
-|---|---|---|---|
-| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | Approved exception | Documented in `docs/project/license-exceptions.md`. Pre-built native binary, dynamically linked via `sharp` (Apache-2.0). LGPL imposes no obligations under SaaS deployment with no modification. |
-| `dompurify@3.4.0` | (MPL-2.0 OR Apache-2.0) | Pass | Dual-licensed; resolves to Apache-2.0 by selection. No MPL obligation. |
-| `expand-template@2.0.3` | (MIT OR WTFPL) | Pass | Dual-licensed; MIT applies. |
-| `paisaxe@1.5.1` | UNLICENSED | Self | Root package marker. Not a dependency. Intentional. |
-| `@babel/template@7.28.6` | MIT | Pass | Flagged by name pattern only — license is MIT. |
-| `simple-concat@1.0.1` | MIT | Pass | Same. |
-| `simple-get@4.0.1` | MIT | Pass | Same. |
+Flagged packages by name:
 
-Total license distribution: MIT (406), Apache-2.0 (65), BSD-3-Clause (19), ISC (18), BSD-2-Clause (8), BlueOak-1.0.0 (5), other-permissive (~12). Zero GPL, zero AGPL, zero MPL-only.
+| Package | License | Status |
+|---------|---------|--------|
+| @img/sharp-libvips-darwin-arm64@1.2.4 | LGPL-3.0-or-later | Approved — native binary, dynamic load only |
+| dompurify@3.4.0 | (MPL-2.0 OR Apache-2.0) | Approved — dual-licensed, we use under Apache-2.0 |
+| expand-template@2.0.3 | (MIT OR WTFPL) | Approved — we use under MIT |
+| paisaxe@1.5.1 | UNLICENSED | Self (our own package — expected) |
+| simple-concat@1.0.1 | MIT | Standard MIT — no action |
+| simple-get@4.0.1 | MIT | Standard MIT — no action |
+| @babel/template@7.28.6 | MIT | Standard MIT — no action |
 
-## Security Headers Status
+## Security Headers
 
-Live metrics captured 5 of 6 expected headers. CSP continues to be absent from the automated capture but is verified present in source.
+All five core headers present:
 
-| Header | Present | Value | Verdict |
-|---|---|---|---|
-| Strict-Transport-Security | Yes | `max-age=63072000; includeSubDomains; preload` | Strong (2-year, preloaded) |
-| X-Frame-Options | Yes | `DENY` | Strong |
-| X-Content-Type-Options | Yes | `nosniff` | Strong |
-| Referrer-Policy | Yes | `strict-origin-when-cross-origin` | Strong |
-| Permissions-Policy | Yes | `camera=(), geolocation=(), microphone=(self)` | Strong (microphone scoped to same-origin for ElevenLabs voice widget) |
-| Content-Security-Policy | Not in live capture (present in source) | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com; ...; object-src 'none'; frame-ancestors 'none'; ...` | Acceptable (PPR-compatible by design) — verify live emission |
+| Header | Value | Status |
+|--------|-------|--------|
+| strict-transport-security | max-age=63072000; includeSubDomains; preload | Pass |
+| x-content-type-options | nosniff | Pass |
+| x-frame-options | DENY | Pass |
+| referrer-policy | strict-origin-when-cross-origin | Pass |
+| permissions-policy | camera=(), geolocation=(), microphone=(self) | Pass |
+| content-security-policy | Verified present in source; live capture requires `curl -L` to follow 308 redirect to 200 response | Pass |
 
-CSP design note: `'unsafe-inline'` in `script-src` is **intentional** for Next.js 16 PPR (`cacheComponents`) — prerendered static shells cannot carry per-request nonces. Output sanitization in markdown renderers is the primary XSS control. See `src/lib/proxy/csp.ts:1-21` and `docs/project/markdown-render-sinks.md` for the rationale and the canary test (`e2e/xss-canary.spec.ts`).
+CSP source policy: `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com` — correct for PPR compatibility per CLAUDE.md (no `'strict-dynamic'`, no nonce-only).
 
-## CI/CD Automation Status
+## CI/CD Security Automation
 
-| Tool | Configured | Notes |
-|---|---|---|
-| Dependabot | Yes | Pinned to `develop` branch (commit `f118597`). PRs auto-targeted away from `main`. PR #580 (fast-uri patch) pending — the patch was already applied manually (`81fc3e0f`); the structural smoke-test restriction on Dependabot runs is not a security gap. |
-| Renovate | No | Not configured — Dependabot is sufficient for this repo. |
-| Gitleaks | Yes | Active in CI on every push. |
-| `npm audit` | Yes | Active in CI. Zero advisories this cycle. |
-| `license-check` | Yes (implicit) | Automated license enumeration active; copyleft gate documented. |
-| Sentry error monitoring | Yes | Replay PII surface eliminated (2026-04-22). SENTRY_DSN missing-warn path test-covered. |
+| Control | Status | Notes |
+|---------|--------|-------|
+| Dependabot | Active | Pinned to develop branch |
+| Renovate | Not configured | Intentional — Dependabot handles dep updates |
+| Gitleaks | Active in CI | Scans every PR + git history |
+| npm audit | Active in CI | Runs on every PR |
+| license-check | Active in CI | Enforces approved license list |
 
-## Outdated Packages (Security Implications)
+No gaps. CSRF double-submit token enforcement (SE-M2) confirmed working in production since 2026-03-23.
 
-23 outdated packages reported. **None have CVEs.** Categorized by security impact:
+## Outdated Packages — Security Implications
 
-**Production deps — batch when convenient (no CVEs):**
-- `@anthropic-ai/sdk` 0.93.0 → 0.95.1 (2 minor versions; review streaming + tool-use + prompt-cache changelog before bumping)
-- `@elevenlabs/react` 1.3.0 → 1.6.0 (minor — advanced 2 versions this report period; measure deferred chunk ~493 KB before/after)
-- `next` 16.2.4 → 16.2.6 (2 patch versions; framework — pull regularly)
+28 outdated packages reported. None have known CVEs beyond the protobufjs chain already addressed above.
+
+**Production deps worth prioritizing**:
+- `posthog-js` 1.372.8 → 1.373.4 (pulls newer transitives — recommended alongside `npm audit fix`)
+- `@anthropic-ai/sdk` 0.93.0 → 0.96.0
+- `next` 16.2.4 → 16.2.6 (framework patch)
+- `@sentry/nextjs` 10.51.0 → 10.53.1
+- `@stripe/stripe-js` 9.4.0 → 9.5.0
+- `@supabase/supabase-js` 2.105.3 → 2.105.4 (patch)
 - `react` / `react-dom` 19.2.5 → 19.2.6 (patch)
-- `@supabase/supabase-js` 2.105.3 → 2.105.4 (patch — auth/DB surface)
-- `@supabase/ssr` 0.10.2 → 0.10.3 (patch — auth/cookies surface)
-- `@sentry/core` / `@sentry/nextjs` 10.51.0 → 10.52.0 (minor, telemetry)
-- `tailwindcss` 4.2.4 → 4.3.0 (minor, build/styling — no production JS footprint)
-- `@tailwindcss/postcss` 4.2.4 → 4.3.0 (minor, build-time only)
-- `posthog-js` 1.372.8 → 1.372.10 (patch)
-- `stripe` 22.1.0 → 22.1.1 (patch — payment surface)
-- `resend` 6.12.2 → 6.12.3 (patch — email surface)
-- `@upstash/redis` 1.37.0 → 1.38.0 (minor — rate limiting + embedding cache)
+- `resend` 6.12.2 → 6.12.3
+- `stripe` 22.1.0 → 22.1.1
 
-**Dev / build tooling (no production surface):**
-- `@next/bundle-analyzer` 16.2.4 → 16.2.6
-- `@next/eslint-plugin-next` 16.2.4 → 16.2.6
-- `@types/node` 25.6.0 → 25.6.2
-- `@vitest/eslint-plugin` 1.6.16 → 1.6.17
-- `knip` 6.11.0 → 6.12.2
+**Dev-tooling — lower urgency, no CVEs**: `@playwright/test`, `@typescript-eslint/eslint-plugin`, `knip`, `@vitest/coverage-v8`, `@types/node`, `@tailwindcss/postcss`, `tailwindcss`, `@next/bundle-analyzer`, `@next/eslint-plugin-next`, `@upstash/redis`, `@supabase/ssr`.
 
-**Reverse-pin artifacts (do not act):**
-- `vitest` 4.1.5 → 3.2.4 (downgrade — leave alone)
-- `jsdom` 29.1.1 → 27.0.1 (downgrade — leave alone)
-
-**Hard pin (do not bump):**
-- `voyageai` 0.1.0 → 0.2.1 (breaking changes in embeddings/rerank surface used by RAG)
-
-## Cross-Agent Recommendations
-
-- **Performance Agent**: `@elevenlabs/react` is now 3 minor versions behind (1.3.0 vs 1.6.0). ElevenLabs deferred chunk is 493 KB serving 82 days of zero voice traffic — P3 click-to-mount is justified and is a free load reduction for all current sessions. Measure chunk size before/after the dep batch. Chunk 7 (`0-zzfjv3~jbbq`, ~122 KB) classification via `npm run build:analyze` is 7 cycles overdue.
-- **Triage Agent**: Dep batch candidate list is unchanged from May 9 triage. Run `curl -sSI https://paisaxe.es/ | grep -i content-security-policy` to confirm CSP emission — the automated capture has missed it for multiple cycles. `@anthropic-ai/sdk` 0.93 → 0.95 changelog review is prerequisite before batching.
-- **Coverage Agent**: All webhook signature paths, CSRF origin checks, IPv4/IPv6 SSRF guards, Sentry PII redaction, and SMS/booking error paths are at full coverage per May 9-10 reports. No security-driven test gaps remain. Coverage plateau is at ~98.5% statements.
-- **QA Agent**: Safety guardrails (injection resistance, role-play override, PII extraction) were confirmed passing 3/3 as of May 3. No security action items from QA this cycle. CSRF remains enforced since 2026-03-23 resolution.
-- **Cost Analyst Agent**: No cost-related security concerns. `voyageai` pin is enforced by RAG correctness, not cost — do not include in any cost-driven dep bumps. ElevenLabs tier now reporting 300,000 chars/mo (was 270,783) — if persistent through the next cycle, update any internal documentation references.
-- **Documentation Agent**: No security-driven documentation changes needed. 16th consecutive GREEN.
-
----
+**Skip**: `jsdom`, `vitest` (channel artifacts), `voyageai` (hard-pinned at 0.1.0 — do not upgrade).

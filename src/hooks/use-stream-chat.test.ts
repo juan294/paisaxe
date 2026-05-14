@@ -1183,4 +1183,45 @@ describe("useStreamChat", () => {
     // AbortError from fetch() is silently returned (no error state, no crash)
     expect(result.current.error).toBeNull();
   });
+
+  it("60-second timeout aborts the request and resolves gracefully (line 80 callback)", async () => {
+    vi.useFakeTimers();
+
+    let resolvePromise!: (value: unknown) => void;
+    const neverResolvingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockFetch.mockReturnValueOnce(neverResolvingPromise);
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    let sendPromise!: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // Advance 60 seconds — fires the timeout callback at line 80
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    // The AbortController abort fires — resolve mock with an abort error
+    const abortError = new Error("The operation was aborted");
+    abortError.name = "AbortError";
+    resolvePromise(Promise.reject(abortError));
+
+    await act(async () => {
+      await sendPromise;
+    });
+
+    vi.useRealTimers();
+
+    // After abort, isStreaming returns to false and no unhandled error
+    expect(result.current.isStreaming).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
 });

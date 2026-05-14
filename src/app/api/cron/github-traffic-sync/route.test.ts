@@ -760,6 +760,28 @@ describe("Cron lease (DO-M2) — github-traffic-sync", () => {
 
     consoleSpy.mockRestore();
   });
+
+  it("logs GITHUB_TRAFFIC_SYNC_LOCK_RELEASE_FAILED when release throws (line 217)", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "try_acquire_cron_job_lock") return Promise.resolve({ data: "lease-token-123", error: null });
+      if (fn === "release_cron_job_lock") return Promise.reject(new Error("DB lock release failure"));
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { POST } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/cron/github-traffic-sync",
+      { headers: { "x-webhook-secret": WEBHOOK_SECRET } }
+    );
+
+    // Should not throw — catch in finally swallows the error
+    await expect(POST(request as never)).resolves.toBeDefined();
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[GITHUB_TRAFFIC_SYNC_LOCK_RELEASE_FAILED]",
+      expect.objectContaining({ error: expect.any(Error) })
+    );
+  });
 });
 
 describe("CRON_SUCCESS/CRON_FAILURE telemetry — github-traffic-sync", () => {

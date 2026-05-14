@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { logger } from "@/lib/logger";
+import { isCallSuccessful } from "@/lib/elevenlabs-call-status";
 import {
   sendSMS,
   buildConfirmationSMS,
@@ -217,27 +218,6 @@ function extractTranscriptText(
       .join(" ");
   }
   return "";
-}
-
-/**
- * Normalize the call_successful field from ElevenLabs webhook analysis.
- *
- * ElevenLabs has delivered this field in multiple formats across API versions:
- * - Boolean: true / false
- * - String enum: "success" / "failure" / "unknown"
- * - String boolean: "true" / "false"
- * - Missing / null / undefined → treat as unsuccessful
- *
- * Returns:
- *  "success"  → call connected and succeeded
- *  "failure"  → call explicitly failed (no answer, network error, etc.)
- *  "unknown"  → ambiguous — fall through to transcript keyword analysis
- */
-export function isCallSuccessful(value: unknown): "success" | "failure" | "unknown" {
-  if (value === true || value === "success" || value === "true") return "success";
-  if (value === false || value === "failure" || value === "false") return "failure";
-  // null, undefined, "unknown", or any other value → unknown
-  return "unknown";
 }
 
 /**

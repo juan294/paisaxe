@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GET, PROBE_TIMEOUTS_MS } from "./route";
+import { GET } from "./route";
+import { PROBE_TIMEOUTS_MS } from "@/lib/health-timeouts";
 
 vi.mock("@/lib/supabase", () => ({
   supabase: {

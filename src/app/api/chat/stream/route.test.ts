@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { CHAT_STREAM_STAGE_TIMEOUTS_MS, POST } from "./route";
+import { POST } from "./route";
+import { CHAT_STREAM_STAGE_TIMEOUTS_MS } from "@/lib/chat-stream-timeouts";
 import { NextRequest } from "next/server";
 
 // Mock the dependencies - must use dynamic import compatible approach

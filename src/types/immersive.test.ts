@@ -459,5 +459,30 @@ describe("immersive types", () => {
         question_prompts: ["Prompt"],
       });
     });
+
+    it("sanitizes metadata that includes asturianu_subtitle (line 252)", () => {
+      const story: Story = {
+        id: "story-ast",
+        slug: "story-ast",
+        title: "Historia",
+        subtitle: "Sub",
+        description: "Desc",
+        image: "/story.jpg",
+        category: "nature",
+        sourcePdf: "guide.pdf",
+        metadata: {
+          asturianu_title: "Historia asturiana",
+          asturianu_subtitle: "Subtítulu asturianu",
+          translation_status: { en: { status: "failed", error: "private" } },
+        },
+      };
+
+      const publicStory = toPublicStory(story);
+
+      expect(publicStory.metadata).toEqual({
+        asturianu_title: "Historia asturiana",
+        asturianu_subtitle: "Subtítulu asturianu",
+      });
+    });
   });
 });

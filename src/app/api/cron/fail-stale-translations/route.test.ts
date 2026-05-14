@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const logger = vi.hoisted(() => ({
   error: vi.fn(),
@@ -103,6 +103,21 @@ describe("fail stale translations cron", () => {
 
     expect(response.status).toBe(200);
     expect(validateAdminAuth).toHaveBeenCalled();
+  });
+
+  it("returns 401 for POST when webhook secret missing and admin auth invalid (line 73)", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: false,
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    } as unknown as Awaited<ReturnType<typeof validateAdminAuth>>);
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
+      method: "POST",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
   });
 
   it("returns 409 when the advisory lock is already held", async () => {
