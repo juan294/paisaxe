@@ -722,3 +722,54 @@ describe("mapSupabaseUser", () => {
     });
   });
 });
+
+describe("AuthProvider — cancelled guard (line 91)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupDefaultMocks();
+    mockCreateSupabaseBrowserClient.mockReturnValue({
+      auth: {
+        getSession: mockGetSession,
+        getUser: mockGetUser,
+        onAuthStateChange: mockOnAuthStateChange,
+        signInWithOAuth: mockSignInWithOAuth,
+        signOut: mockSignOut,
+      },
+    });
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
+  });
+
+  it("ignores auth state changes after component unmounts (cancelled=true guard)", async () => {
+    let authChangeCallback: ((event: string, session: unknown) => void) | null = null;
+    const mockUnsubscribe = vi.fn();
+    mockOnAuthStateChange.mockImplementation(
+      (cb: (event: string, session: unknown) => void) => {
+        authChangeCallback = cb;
+        return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
+      }
+    );
+
+    const { unmount } = render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(authChangeCallback).not.toBeNull();
+      expect(screen.getByTestId("user").textContent).toBe("test@example.com");
+    });
+
+    // Unmount — sets cancelled = true and calls unsubscribe
+    unmount();
+    expect(mockUnsubscribe).toHaveBeenCalled();
+
+    // Fire the callback after unmount — the cancelled guard prevents state updates
+    // This should not throw a "can't perform state update on unmounted component" error
+    expect(() => {
+      act(() => {
+        authChangeCallback!("SIGNED_OUT", null);
+      });
+    }).not.toThrow();
+  });
+});

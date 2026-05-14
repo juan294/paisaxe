@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { ChatActions } from "./chat-actions";
 import { createMockT } from "@/test/i18n-mock";
 
@@ -476,6 +476,34 @@ describe("ChatActions", () => {
       });
 
       // Restore
+      mockClipboard.writeText = originalWriteText;
+    });
+
+    it("line 76 — error toast clears after 2s timeout (setCopyError(false) callback)", async () => {
+      vi.useFakeTimers();
+      const originalWriteText = mockClipboard.writeText;
+      mockClipboard.writeText = vi.fn().mockRejectedValue(new Error("Clipboard denied"));
+
+      const messages: Message[] = [
+        { role: "assistant", content: "Hello Asturias!" },
+      ];
+
+      render(<ChatActions messages={messages} />);
+
+      // act() flushes the async click handler including the catch block microtasks
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /copiar conversación/i }));
+      });
+
+      // After act, setCopyError(true) has run and setTimeout at line 76 is registered
+      expect(screen.getByText(/no se pudo copiar/i)).toBeInTheDocument();
+
+      // Fire the 2s timer — covers the () => setCopyError(false) callback body at line 76
+      act(() => { vi.advanceTimersByTime(2000); });
+
+      expect(screen.queryByText(/no se pudo copiar/i)).not.toBeInTheDocument();
+
+      vi.useRealTimers();
       mockClipboard.writeText = originalWriteText;
     });
   });

@@ -955,6 +955,34 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       expect(data.error).toBe("Private or reserved IP addresses are not allowed");
     });
 
+    it.each([
+      ["::ffff:10.0.0.1", "private class A"],
+      ["::ffff:192.168.1.1", "private class C"],
+      ["::ffff:127.0.0.1", "loopback"],
+    ])("should return 400 when DNS resolves to IPv6-mapped IPv4 %s (%s) — covers isUnsafeIpv6 line 71", async (address, _label) => {
+      // Line 71 is reached via DNS path: DNS can return IPv4-mapped IPv6 in decimal form
+      // (::ffff:10.0.0.1), which the URL parser does NOT normalize. isUnsafeIpv6 regex matches.
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      dns.lookup.mockResolvedValueOnce([{ address, family: 6 }]);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageUrl: "https://cdn.example.com/image.jpg" }),
+      });
+
+      const response = await PUT(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Private or reserved IP addresses are not allowed");
+    });
+
+    // parseIpv4Octets lines 28, 31, 42 are architecturally unreachable through this route:
+    // isUnsafeIpv4 is only called (a) from isUnsafeIpAddress when isIP returns 4 (guaranteeing
+    // valid 4-octet address), and (b) from the ::ffff: DNS regex match which enforces digit-only
+    // octets. There is no code path that feeds an invalid string to parseIpv4Octets.
+
     it("should allow URL when DNS resolves to non-private IPv6 (covers firstIpv6Hextet null return path)", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       // "::2" is not in any blocked range: firstIpv6Hextet returns null (empty first hextet)

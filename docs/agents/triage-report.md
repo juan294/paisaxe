@@ -1,58 +1,57 @@
 # Triage Report
-> Generated on 2026-05-10 | 7 reports processed | 6 action items | 1 Dependabot PR
+> Generated on 2026-05-14 10:18 CEST | 7 reports processed | 8 action items | 3 Dependabot PRs
 
 ## Agent Failures
-None — all agents ran successfully (no error logs in the last 24 hours).
+None. No new `logs/*.error.log` files were found after the previous triage marker.
 
 ## Reports Reviewed
 
-| # | Report | Agent | Status | Action Items |
-|---|--------|-------|--------|--------------|
-| 1 | security-report.md | Security | GREEN (16th consecutive) | CSP live verification (read-only) |
-| 2 | coverage-report.md | Coverage | GREEN | Commit 9 uncommitted tests |
-| 3 | performance-report.md | Performance | YELLOW | P3 prefetch removal; P1/P2/P6 noted |
-| 4 | cost-analyst-report.md | Cost Analyst | WATCH | No code items; manual investigation needed |
-| 5 | localization-report.md | Localization | GREEN (48th consecutive) | None |
-| 6 | documentation-report.md | Documentation | GREEN | None |
-| 7 | cc-rpi-update-report.md | CC-RPI Update | GREEN | None |
+| # | Report | Agent | Status | Triage Action |
+|---|--------|-------|--------|---------------|
+| 1 | cost-analyst-report.md | Cost Analyst | WATCH | No code change; production voice/revenue checks remain manual |
+| 2 | performance-report.md | Performance | YELLOW | Ran analyzer; removed `@anthropic-ai/sdk` from client bundle |
+| 3 | coverage-report.md | Coverage | GREEN | Existing test additions included in private repo commit scope |
+| 4 | localization-report.md | Localization | GREEN | No action needed |
+| 5 | documentation-report.md | Documentation | GREEN | No public docs needed; all flagged routes remain internal |
+| 6 | security-report.md | Security | YELLOW | Ran `npm audit fix`; advisories cleared |
+| 7 | cc-rpi-update-report.md | CC-RPI Update | GREEN | No action needed |
 
 ## Overall Status: GREEN
 
-All code action items resolved. Revenue/voice investigation is a product concern requiring user action, not a triage code fix.
+All actionable code findings from the current reports were resolved locally. Remaining cost/revenue items require production/manual verification outside this triage code pass.
 
 ## Action Items Completed
 
-| # | Item | Source Report | Tests Added | Status |
-|---|------|--------------|-------------|--------|
-| 1 | Commit 9 coverage tests (error-branch catch paths) | coverage-report | +9 | ✅ Committed (`d388d5cc`) |
-| 2 | P3: Remove ElevenLabs idle prefetch (493 KB passive sessions) | performance-report | Updated (P3 assertion) | ✅ Committed (`33312cf4`) |
-| 3 | P6: `npm dedupe` — node_modules growth investigation | performance-report | N/A | ✅ Ran; 0 duplicates found, lockfile normalized |
-| 4 | CSP live verification via curl | security-report | N/A | ✅ Confirmed — CSP present on `/immersive` 200 response |
-| 5 | Append triage entry to shared-context.md | triage protocol | N/A | ✅ Done |
-| 6 | Close Dependabot PR #581 (fast-uri superseded) | Dependabot | N/A | ✅ Closed with comment |
+| # | Item | Source | Status |
+|---|------|--------|--------|
+| 1 | Clear protobufjs audit advisories | security-report | Done — `npm audit fix`, `npm audit` reports 0 vulnerabilities |
+| 2 | Fix security agent CSP capture | security-report | Done — production curl now follows redirects with `-L` |
+| 3 | Confirm `canvas` dependency usage | performance-report | Done — direct optional dependency used by `scripts/extract-images.ts` |
+| 4 | Run webpack bundle analyzer | performance-report | Done — analyzer build passes and generated `.next/analyze/*.html` |
+| 5 | Remove `@anthropic-ai/sdk` from client bundle | performance-report | Done — translation locale constants split out for admin client imports |
+| 6 | Fix Next route export violations surfaced by webpack build | build/analyzer | Done — moved non-route exports to `src/lib/*` modules |
+| 7 | Fix Next 16 prerender crypto failures on redirect pages | Dependabot #584 / build | Done — redirect pages now call `connection()` before redirect |
+| 8 | Run `/simplify` cleanup pass | triage workflow | Done — removed unused UUID helper and tightened translation exports |
 
 ## Dependabot PRs
 
-| # | PR | Update Type | Disposition | Notes |
-|---|----|----|----|----|
-| 581 | Bump fast-uri 3.1.0 → 3.1.2 | patch | **Closed as superseded** | Patch was already applied manually in `81fc3e0f`. Smoke test failure was moot — the fix was already in `develop`. |
+| # | PR | Update Type | Current Disposition |
+|---|----|-------------|---------------------|
+| 582 | Production dependency group | minor/patch | Green and mergeable; auto-merge after triage commit |
+| 583 | Development/types dependency group | patch | Green and mergeable; auto-merge after triage commit |
+| 584 | Next 16.2.4 → 16.2.6 | patch | Build/audit failures fixed locally; re-check after triage commit |
 
 ## Verification
 
-- [x] All tests passing (6572 tests on `develop` post-merge)
-- [x] Typecheck clean (pre-commit hook verified in P3 worktree)
-- [x] Lint clean (pre-commit hook verified in P3 worktree)
-- [ ] CI green (pending push)
+- [x] `npm audit` — 0 vulnerabilities
+- [x] `npm run test` — 354 files passed, 6585 tests passed
+- [x] `npm run typecheck` — app, scripts, e2e, and edge configs passed
+- [x] `npm run lint` — source and scripts passed
+- [x] `ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' ./node_modules/.bin/next build --webpack` — passed
+- [ ] CI green after push
 
-## CSP Investigation Finding
+## Notes
 
-The automated security metrics script was capturing the 308 redirect response from `https://paisaxe.es/` (which correctly has no CSP — it's a redirect to `/immersive`). The actual page response (`/immersive`, HTTP 200) has the full CSP header. Fix: add `-L` flag to the curl in the security agent script to follow redirects and check the final response.
-
-## Carried Items
-
-| Item | Cycles | Owner | Notes |
-|------|--------|-------|-------|
-| P1: Classify 125 KB chunk `0-zzfjv3~jbbq` via `npm run build:analyze` | 8 cycles | Performance | Requires full production build; schedule as focused session |
-| Dep batch (8 packages) | 2 cycles | Performance/Security | Deferred to focused session with before/after chunk measurement |
-| Revenue drought + voice silence investigation | 86 days | User (manual) | Manual production check of Pelayo widget + Day Pass flow; no agent fix possible |
-| `npm ls canvas` — confirm canvas dependency is needed | 1 cycle | Performance | 19 MB disk; quick check during next dep session |
+- The analyzer still shows `livekit-client` as the largest client chunk (~475 KB parsed / ~121 KB gzip), which is expected for the voice experience and remains click-to-mount.
+- The `@anthropic-ai/sdk` client bundle regression was caused by admin UI importing constants from `src/lib/translate-story.ts`, which also imports server-only Claude code. Constants now live in `src/lib/translation-locales.ts`.
+- Webpack build surfaced invalid App Router exports from route/page modules. Timeout and webhook helpers now live in dedicated `src/lib/*` modules.

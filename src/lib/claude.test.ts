@@ -997,6 +997,22 @@ describe("claude", () => {
       expect(body.model).toBe("claude-sonnet-4-20250514");
     });
 
+    it("throws AbortError immediately when signal is already aborted before streaming starts (line 106)", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _chunk of streamChatResponse("Test", [], false, 0, undefined, {
+          signal: controller.signal,
+        })) {
+          /* noop */
+        }
+      }).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
     it("kills curl and surfaces AbortError when the stream signal aborts", async () => {
       const proc = setupMockSpawn();
       const controller = new AbortController();

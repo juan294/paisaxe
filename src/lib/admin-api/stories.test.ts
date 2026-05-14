@@ -166,6 +166,38 @@ describe("admin-api/stories", () => {
       expect(parsedUrl.searchParams.has("filter")).toBe(false);
     });
 
+    it("appends page query param when provided (line 101)", async () => {
+      global.fetch = vi.fn().mockResolvedValue(mockResponse({ data: [] }));
+
+      await fetchStories({ page: 2 });
+
+      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const parsedUrl = new URL(String(url));
+      expect(parsedUrl.searchParams.get("page")).toBe("2");
+    });
+
+    it("appends pageSize query param when provided (line 104)", async () => {
+      global.fetch = vi.fn().mockResolvedValue(mockResponse({ data: [] }));
+
+      await fetchStories({ pageSize: 50 });
+
+      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const parsedUrl = new URL(String(url));
+      expect(parsedUrl.searchParams.get("pageSize")).toBe("50");
+    });
+
+    it("appends all params together when filter, page, and pageSize provided", async () => {
+      global.fetch = vi.fn().mockResolvedValue(mockResponse({ data: [] }));
+
+      await fetchStories({ filter: "approved", page: 1, pageSize: 25 });
+
+      const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const parsedUrl = new URL(String(url));
+      expect(parsedUrl.searchParams.get("filter")).toBe("approved");
+      expect(parsedUrl.searchParams.get("page")).toBe("1");
+      expect(parsedUrl.searchParams.get("pageSize")).toBe("25");
+    });
+
     it("returns error from response body on non-ok response", async () => {
       global.fetch = vi.fn().mockResolvedValue(
         mockResponse({ error: "Unauthorized" }, false)

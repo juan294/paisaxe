@@ -9,18 +9,9 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { StoryLocale, StoryTranslation, TranslationStatus, StoryMetadata } from "@/types/immersive";
 import { callAnthropicAPI } from "./claude";
 import { createAdminClient } from "./supabase";
+import { LOCALE_NAMES, TRANSLATION_LOCALES } from "./translation-locales";
 
-/** All supported translation locales */
-export const TRANSLATION_LOCALES: StoryLocale[] = ["en", "fr", "de", "pt", "ast"];
-
-/** Locale display names for UI */
-export const LOCALE_NAMES: Record<StoryLocale, string> = {
-  en: "English",
-  fr: "Français",
-  de: "Deutsch",
-  pt: "Português",
-  ast: "Asturianu",
-};
+export { LOCALE_NAMES, TRANSLATION_LOCALES };
 
 interface TranslationOptions {
   /** Specific locales to translate. If omitted, translates all 5 locales */

@@ -16,15 +16,8 @@ import {
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
 import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
+import { CHAT_STREAM_STAGE_TIMEOUTS_MS, type ChatStreamStage } from "@/lib/chat-stream-timeouts";
 import { encodeSseEvent } from "@/types/sse";
-
-export const CHAT_STREAM_STAGE_TIMEOUTS_MS = {
-  embedding: 8_000,
-  search: 5_000,
-  featureFlag: 2_000,
-} as const;
-
-type ChatStreamStage = keyof typeof CHAT_STREAM_STAGE_TIMEOUTS_MS;
 
 class ChatStreamStageTimeoutError extends Error {
   constructor(

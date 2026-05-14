@@ -7,11 +7,15 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
 }));
 
+vi.mock("next/server", () => ({
+  connection: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe("Home Page", () => {
-  it("should redirect to /immersive", () => {
+  it("should redirect to /immersive", async () => {
     // Call the component function
     try {
-      Home();
+      await Home();
     } catch {
       // redirect throws NEXT_REDIRECT error which is expected
     }

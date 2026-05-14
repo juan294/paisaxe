@@ -309,7 +309,7 @@ describe("ImmersivePage (server component)", () => {
 
     // Await ImmersiveDataLoader directly — vitest can't render async
     // components through Suspense (that's a server-only feature).
-    const { ImmersiveDataLoader } = await import("./page");
+    const { ImmersiveDataLoader } = await import("./immersive-data-loader");
     const element = await ImmersiveDataLoader();
     return render(element);
   }
@@ -373,7 +373,7 @@ describe("ImmersivePage (server component)", () => {
   });
 
   it("should export ImmersiveDataLoader for streaming", async () => {
-    const pageModule = await import("./page");
-    expect(pageModule.ImmersiveDataLoader).toBeTypeOf("function");
+    const loaderModule = await import("./immersive-data-loader");
+    expect(loaderModule.ImmersiveDataLoader).toBeTypeOf("function");
   });
 });

@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { StoryTranslationsTab } from "./story-translations-tab";
 import type { AdminStory } from "@/types/admin";
 import type { StoryTranslationsResponse, GenerateTranslationsResponse } from "@/types/admin";
-import { TRANSLATION_LOCALES, LOCALE_NAMES } from "@/lib/translate-story";
+import { TRANSLATION_LOCALES, LOCALE_NAMES } from "@/lib/translation-locales";
 
 // Mock the admin-api module
 vi.mock("@/lib/admin-api", () => ({

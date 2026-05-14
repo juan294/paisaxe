@@ -2109,6 +2109,52 @@ describe("/api/mcp/make-booking", () => {
       expect(data.errors).toBeDefined();
     });
 
+    it("line 98 — markPendingBookingFailed logs when its own DB update errors", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_mark_fail_test" }),
+      });
+
+      // First eq() call: conversation_id update fails → markPendingBookingFailed is called
+      // Second eq() call: the update inside markPendingBookingFailed also returns an error → line 98
+      const mockEq = vi
+        .fn()
+        .mockResolvedValueOnce({ error: { message: "conv_id persistence failed" } })
+        .mockResolvedValueOnce({ error: { message: "marking failed also failed" } });
+      mockUpdate.mockReturnValue({ eq: mockEq });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "line-98-coverage-key",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 2,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Still returns the degraded response — line 98 logged the error internally
+      expect(response.status).toBe(202);
+      expect(data.status).toBe("degraded");
+      // Both update calls were made
+      expect(mockEq).toHaveBeenCalledTimes(2);
+    });
+
     // === BE-H4: AbortSignal.timeout on ElevenLabs fetch ===
 
     it("BE-H4: should pass AbortSignal.timeout(15000) to the ElevenLabs fetch call", async () => {
