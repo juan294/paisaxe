@@ -12,7 +12,7 @@ vi.mock("@/lib/admin-api", () => ({
 
 // Mock computeForecasts
 const mockComputeForecasts = vi.fn();
-vi.mock("@/lib/costs", () => ({
+vi.mock("@/lib/costs/forecast", () => ({
   computeForecasts: (...args: unknown[]) => mockComputeForecasts(...args),
 }));
 

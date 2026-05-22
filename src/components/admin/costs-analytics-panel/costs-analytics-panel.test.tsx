@@ -25,8 +25,11 @@ vi.mock("@/lib/admin-api", () => ({
   deleteManualCostEntry: vi.fn(),
 }));
 
-vi.mock("@/lib/costs", () => ({
+vi.mock("@/lib/costs/tier-alerts", () => ({
   computeTierAlerts: vi.fn(),
+}));
+
+vi.mock("@/lib/costs/forecast", () => ({
   computeForecasts: vi.fn(),
 }));
 
@@ -74,7 +77,8 @@ vi.mock("@/config/service-tiers", () => ({
 }));
 
 import * as adminApi from "@/lib/admin-api";
-import * as costsLib from "@/lib/costs";
+import * as tierAlertsLib from "@/lib/costs/tier-alerts";
+import * as forecastLib from "@/lib/costs/forecast";
 
 // ---------------------------------------------------------------------------
 // Helpers & fixtures
@@ -813,7 +817,7 @@ describe("TierAlertsSection", () => {
         usageMetrics: mockUsageMetrics,
       },
     });
-    vi.mocked(costsLib.computeTierAlerts).mockReturnValue([
+    vi.mocked(tierAlertsLib.computeTierAlerts).mockReturnValue([
       criticalAlert,
       safeAlert,
     ]);
@@ -851,7 +855,7 @@ describe("TierAlertsSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeTierAlerts).mockReturnValue(alerts);
+    vi.mocked(tierAlertsLib.computeTierAlerts).mockReturnValue(alerts);
 
     render(<TierAlertsSection dateRange={dateRange} />, { wrapper });
 
@@ -868,7 +872,7 @@ describe("TierAlertsSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeTierAlerts).mockReturnValue([
+    vi.mocked(tierAlertsLib.computeTierAlerts).mockReturnValue([
       makeTierAlert(),
     ]);
 
@@ -906,7 +910,7 @@ describe("TierAlertsSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeTierAlerts).mockReturnValue(alerts);
+    vi.mocked(tierAlertsLib.computeTierAlerts).mockReturnValue(alerts);
 
     render(<TierAlertsSection dateRange={dateRange} />, { wrapper });
 
@@ -947,7 +951,7 @@ describe("TierAlertsSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeTierAlerts).mockReturnValue(alerts);
+    vi.mocked(tierAlertsLib.computeTierAlerts).mockReturnValue(alerts);
 
     render(<TierAlertsSection dateRange={dateRange} />, { wrapper });
 
@@ -981,7 +985,7 @@ describe("TierAlertsSection", () => {
         usageMetrics: { ...mockUsageMetrics, periodDays: 10 },
       },
     });
-    vi.mocked(costsLib.computeTierAlerts).mockReturnValue([makeTierAlert()]);
+    vi.mocked(tierAlertsLib.computeTierAlerts).mockReturnValue([makeTierAlert()]);
 
     render(<TierAlertsSection dateRange={dateRange} />, { wrapper });
 
@@ -1000,7 +1004,7 @@ describe("TierAlertsSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeTierAlerts).mockReturnValue([exceededAlert]);
+    vi.mocked(tierAlertsLib.computeTierAlerts).mockReturnValue([exceededAlert]);
 
     render(<TierAlertsSection dateRange={dateRange} />, { wrapper });
 
@@ -1020,7 +1024,7 @@ describe("TierAlertsSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeTierAlerts).mockReturnValue([safeAlert]);
+    vi.mocked(tierAlertsLib.computeTierAlerts).mockReturnValue([safeAlert]);
 
     render(<TierAlertsSection dateRange={dateRange} />, { wrapper });
 
@@ -1048,7 +1052,7 @@ describe("TierAlertsSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeTierAlerts).mockReturnValue(safeAlerts);
+    vi.mocked(tierAlertsLib.computeTierAlerts).mockReturnValue(safeAlerts);
 
     render(<TierAlertsSection dateRange={dateRange} />, { wrapper });
 
@@ -1096,7 +1100,7 @@ describe("TierAlertsSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeTierAlerts).mockReturnValue([makeTierAlert()]);
+    vi.mocked(tierAlertsLib.computeTierAlerts).mockReturnValue([makeTierAlert()]);
 
     // Expand again — should trigger loadData since usageMetrics is null
     fireEvent.click(toggleButton);
@@ -1163,7 +1167,7 @@ describe("ScalingForecastSection", () => {
         usageMetrics: mockUsageMetrics,
       },
     });
-    vi.mocked(costsLib.computeForecasts).mockReturnValue(mockForecasts);
+    vi.mocked(forecastLib.computeForecasts).mockReturnValue(mockForecasts);
 
     render(
       <ScalingForecastSection services={mockServices} dateRange={dateRange} />,
@@ -1192,7 +1196,7 @@ describe("ScalingForecastSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeForecasts).mockReturnValue(mockForecasts);
+    vi.mocked(forecastLib.computeForecasts).mockReturnValue(mockForecasts);
 
     render(
       <ScalingForecastSection services={mockServices} dateRange={dateRange} />,
@@ -1223,7 +1227,7 @@ describe("ScalingForecastSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeForecasts).mockReturnValue(mockForecasts);
+    vi.mocked(forecastLib.computeForecasts).mockReturnValue(mockForecasts);
 
     render(
       <ScalingForecastSection services={mockServices} dateRange={dateRange} />,
@@ -1259,7 +1263,7 @@ describe("ScalingForecastSection", () => {
         usageMetrics: { ...mockUsageMetrics, periodDays: 12 },
       },
     });
-    vi.mocked(costsLib.computeForecasts).mockReturnValue(mockForecasts);
+    vi.mocked(forecastLib.computeForecasts).mockReturnValue(mockForecasts);
 
     render(
       <ScalingForecastSection services={mockServices} dateRange={dateRange} />,
@@ -1280,7 +1284,7 @@ describe("ScalingForecastSection", () => {
         usageMetrics: { ...mockUsageMetrics, periodDays: 30 },
       },
     });
-    vi.mocked(costsLib.computeForecasts).mockReturnValue(mockForecasts);
+    vi.mocked(forecastLib.computeForecasts).mockReturnValue(mockForecasts);
 
     render(
       <ScalingForecastSection services={mockServices} dateRange={dateRange} />,
@@ -1298,7 +1302,7 @@ describe("ScalingForecastSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeForecasts).mockReturnValue([]);
+    vi.mocked(forecastLib.computeForecasts).mockReturnValue([]);
 
     render(
       <ScalingForecastSection services={mockServices} dateRange={dateRange} />,
@@ -1339,7 +1343,7 @@ describe("ScalingForecastSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeForecasts).mockReturnValue(mockForecasts);
+    vi.mocked(forecastLib.computeForecasts).mockReturnValue(mockForecasts);
 
     // Expand again — should trigger loadUsageData since usageMetrics is null (line 44)
     fireEvent.click(toggleButton);
@@ -1353,7 +1357,7 @@ describe("ScalingForecastSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeForecasts).mockReturnValue(mockForecasts);
+    vi.mocked(forecastLib.computeForecasts).mockReturnValue(mockForecasts);
 
     render(
       <ScalingForecastSection services={mockServices} dateRange={dateRange} />,
@@ -1361,7 +1365,7 @@ describe("ScalingForecastSection", () => {
     );
 
     await waitFor(() => {
-      expect(costsLib.computeForecasts).toHaveBeenCalledWith(
+      expect(forecastLib.computeForecasts).toHaveBeenCalledWith(
         mockServices,
         mockUsageMetrics
       );
@@ -1372,7 +1376,7 @@ describe("ScalingForecastSection", () => {
     vi.mocked(adminApi.fetchCostsAnalytics).mockResolvedValue({
       data: { ...mockCostsData, usageMetrics: mockUsageMetrics },
     });
-    vi.mocked(costsLib.computeForecasts).mockReturnValue(mockForecasts);
+    vi.mocked(forecastLib.computeForecasts).mockReturnValue(mockForecasts);
 
     render(
       <ScalingForecastSection services={mockServices} dateRange={dateRange} />,
