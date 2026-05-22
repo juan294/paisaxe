@@ -1,49 +1,50 @@
-# Performance Agent Report — 2026-05-12
+# Performance Agent Report — 2026-05-21
 
 ## Summary
 
-**Status: YELLOW (advisory)** — bundle health is within budget, but this run's data was sampled from the **dev server's `.next` cache** for the **fifth consecutive cycle**. Dev-cache totals (2,999 KB) include HMR/RSC scaffolding absent from production. Treat bundle figures as upper-bound noise; dependency and chunk-name signals remain valid.
+**Status: YELLOW** — total JS is **3,082 KB / 3,100 KB budget** (18 KB headroom), **unchanged for the 7th consecutive cycle**. The largest 10 chunk hashes are byte-identical to May 15, 16, 17, 18, 19, and 20 (`144d3bae.2652f904bbcc62ad.js`, `7644-509cebe606f4f574.js`, `4bd1b696-4eb1eca0fdc48acb.js`, ...). The metrics script is still inspecting the `.next` cache produced by the running dev server — same "dev cache, not prod build" caveat as the prior seven cycles.
 
-**Dep batch `6706232c` confirmed:** `package.json` now reflects all 13 upgraded production dependencies. The batch included `@elevenlabs/react` 1.6.0, `@anthropic-ai/sdk` 0.95.1, `posthog-js` 1.372.10, `next` 16.2.6, `react`/`react-dom` 19.2.6, and six other packages. One follow-up patch is available: `@anthropic-ai/sdk` 0.95.2 is already available (batch landed 0.95.1). `tailwind-merge` 3.6.0 also remains one patch behind (currently 3.5.0 in `package.json`).
+No source, dependency, or lockfile changes landed in the last 24 hours. Security agent (2026-05-21) again flags the same `brace-expansion@5.0.5` advisory (GHSA-jxxr-4gwj-5jf2, not exploitable). Fix continues to be a one-line override bump (`">=5.0.5"` → `">=5.0.6"`) plus `npm install` — lockfile-only, zero expected bundle impact, naturally batched with the long-overdue `build:analyze`.
 
-**P3 remains closed** (commit `bd833288`, May 10): ElevenLabs 493 KB chunk is click-to-mount only — not downloaded on initial page load.
+The +190 KB regression vs the last confirmed prod build (May 7, 2,892 KB → dev-cache 3,082 KB) is now in its **eighth consecutive cycle without verification**. With 18 KB of headroom, any silent regression from the next dep upgrade will breach the 3,100 KB total-JS budget.
 
-The **last confirmed production-build state** (May 7) was **2,892 KB / 3,100 KB (GREEN)**. No production build has run since. Production bundle size is presumed lower due to P2 + P3, but unconfirmed. A fresh production build remains the most valuable single action this agent can recommend.
+P3 (ElevenLabs click-to-mount, `bd833288`, May 10) remains the most recent applied optimization. The 463 KB ElevenLabs chunk is deferred from first paint but still counts toward total JS. Cost analyst (2026-05-21) confirms **93 days of zero Paisaxe voice traffic** and **35 days of full ElevenLabs account silence** — that chunk currently serves no one.
 
 | Signal | Value | Status |
-|--------|------:|:------:|
-| Total JS (dev cache, May 12) | 2,999 KB | Yellow (cache, not prod) |
-| Total JS (last prod, May 7) | 2,892 KB / 3,100 KB | Green |
-| Initial load (last prod, May 7) | ~1,972 KB / 2,100 KB | Green |
-| Total CSS | 126 KB | Green |
+|---|---:|:---:|
+| Total JS (May 21) | 3,082 KB | Yellow — 18 KB to budget |
+| Total JS (May 15 – May 21) | 3,082 KB | (unchanged 7th cycle) |
+| Total JS (May 7 prod) | 2,892 KB | (+190 KB vs last confirmed prod) |
+| Total CSS | 121 KB | Green |
 | Production deps | 35 / 40 | Green |
-| node_modules disk | 1,049 MB | Watch |
-| .next disk | 59 MB | Green |
+| node_modules disk | 1,049 MB | Watch (flat 10th cycle) |
+| .next disk | 1,126 MB | Watch (build cache, not bundle) |
 
 ## Key Metrics
 
-### Bundle (dev-server cache snapshot)
+### Bundle
 
 ```
-Total JS:    2,999 KB  (split budget: 2,100 KB initial / 3,100 KB total)
-Total CSS:   126 KB
-Largest 10 chunks: 1,807 KB (60% of total)
+Total JS:    3,082 KB  (split budget: 2,100 KB initial / 3,100 KB total)
+Total CSS:   121 KB
+Largest 10 chunks: 2,171 KB (70.4% of total)
+Headroom to total budget: 18 KB
 ```
 
-### Largest chunks (dev-server names — hashes change every build)
+### Largest chunks (hashes identical to May 15 / 16 / 17 / 18 / 19 / 20)
 
 | Size | File | Likely contents |
-|------:|------|------|
-| 493 KB | `1206~6g7o__rc.js` | ElevenLabs SDK (click-to-mount — not loaded on page open) |
-| 233 KB | `07y9atwelbm1e.js` | Next.js framework / React vendor |
-| 201 KB | `16.-n76qj0h36.js` | PostHog (~179 KB prod) + extras |
-| 190 KB | `0rzlto6_bwxpx.js` | react-markdown + remark/rehype (~145 KB prod) |
-| 135 KB | `0wu4~xh-5rs6g.js` | Admin dashboard tabs / shadcn |
-| 128 KB | `06wz7w8nqnm1x.js` | Stripe.js |
-| 125 KB | `0-zzfjv3~jbbq.js` | **Unclassified — see P1 below (9th cycle deferred)** |
-| 115 KB | `0ktbr965wa~br.js` | Sentry browser bundle |
-| 113 KB | `03~yq9q893hmn.js` | shadcn/ui + Radix |
-| 109 KB | `13lm54j7eil8i.js` | i18n + lucide-react icons |
+|---:|---|---|
+| 463 KB | `144d3bae.2652f904bbcc62ad.js` | ElevenLabs SDK (deferred via click-to-mount) |
+| 452 KB | `7644-509cebe606f4f574.js` | Admin route bundle (analytics + dialogs) |
+| 196 KB | `4bd1b696-4eb1eca0fdc48acb.js` | PostHog (~179 KB) + overhead |
+| 186 KB | `9da6db1e.66956ed91cfbda8a.js` | react-markdown + remark/rehype |
+| 186 KB | `framework-65be2e97b05e8401.js` | Next.js framework / React vendor |
+| 165 KB | `9831-33dc756f68778806.js` | Stripe.js + shadcn/Radix overflow |
+| 144 KB | `main-94a0d1d204c02158.js` | App entry / proxy bootstrap |
+| 111 KB | `6444.d06fbb22973e0124.js` | Sentry browser bundle |
+| 110 KB | `polyfills-42372ed130431b0a.js` | Browserslist polyfills |
+| 107 KB | `5283.af26141bd96b8e53.js` | i18n + lucide-react icons |
 
 ### Dependencies (heaviest on disk)
 
@@ -51,126 +52,160 @@ Largest 10 chunks: 1,807 KB (60% of total)
 |---|---:|---|---|
 | next | 169 | Build/runtime | Required |
 | @next | 117 | Build/runtime | Required |
-| @sentry | 68 | Yes (~115 KB chunk) | Bundled in browser |
-| pdfjs-dist | 61 | No | devDependency — excluded from prod bundle |
-| pdf-parse | 57 | No | devDependency — excluded from prod bundle |
+| @sentry | 68 | Yes (~111 KB chunk) | Bundled in browser |
+| pdfjs-dist | 61 | No | devDependency — excluded |
+| pdf-parse | 57 | No | devDependency — excluded |
 | @opentelemetry | 46 | Server-only | Sentry transitive |
 | lucide-react | 39 | Yes (tree-shaken) | `optimizePackageImports` active |
-| posthog-js | 37 | Yes (~179 KB deferred) | `optimizePackageImports` active; now at 1.372.10 |
+| posthog-js | 36 | Yes (~196 KB deferred) | `optimizePackageImports` active |
 | @napi-rs | 30 | Server-only | Build artifacts |
 | typescript | 24 | No | devDependency |
+| canvas | 19 | No | Optional dep, server-side only |
 
 ## Budget Status
 
-Production budgets (since 2026-04-04 split):
-
-| Budget | Limit | Last prod (May 7) | Headroom |
+| Budget | Limit | May 21 | Headroom |
 |---|---:|---:|---:|
-| Initial load JS | 2,100 KB | ~1,972 KB | +128 KB |
-| Total JS | 3,100 KB | 2,892 KB | +208 KB |
-| Total CSS | 200 KB | 126 KB | +74 KB |
+| Total JS | 3,100 KB | 3,082 KB | +18 KB |
+| Total CSS | 200 KB | 121 KB | +79 KB |
+| Initial load JS | 2,100 KB | unmeasured | — (needs prod build) |
 | Production deps | 40 | 35 | +5 |
 
-**No budget exceeded.** All figures are from May 7 — the next production build (with P2 + P3 applied) is expected to show improvement, primarily from ElevenLabs moving off the critical load path. Headroom remains healthy.
+**No budget exceeded**, but 18 KB of headroom is one icon import or one minor dep upgrade away from breaching the 3,100 KB total-JS budget. The cumulative dep batch (P7) below carries a non-trivial probability of pushing past the budget — running it without `build:analyze` is risky.
 
 ## Top Optimization Opportunities
 
-### P1 — Classify and split chunk `0-zzfjv3~jbbq` (125 KB) — 9th cycle deferred
+### P1 — Run a clean production build (17+ cycles overdue)
 
-The 125 KB unclassified chunk is the single most overdue actionable item across all agents (triage has flagged it for 8 consecutive cycles; this is the 9th consecutive performance report carrying it). Without a production build and bundle analyzer, its contents cannot be identified or reduced.
+This is the highest-priority action and it is now blocking every measurement-dependent item below. Eight consecutive cycles have run against stale dev-server `.next` cache, so:
 
-Likely candidates: Supabase Realtime client (not tree-shaken), a Stripe utility pulled outside the paywall gate, or an admin-panel dependency missing a lazy-load boundary.
+- The +190 KB regression vs the last confirmed prod build (May 7) is unverified.
+- The "translation-locales extraction" claim from triage `d7328def` (May 14) is still unverified at chunk level — webpack analyzer hasn't been re-run in this report's data.
 
-**Action:**
+Procedure:
 
 ```bash
+# Stop dev server first (kill -TERM <pid> or Ctrl+C), then:
+rm -rf .next
+npm run build
+npm run build:analyze   # opens analyzer.html for chunk attribution
+```
+
+Compare the analyzer output to the baseline established by triage commit `d7328def`. **Effort:** 10 min build + 30 min comparison. **Information value:** unblocks every other P-item below.
+
+### P2 — Admin route chunk (452 KB) splitting
+
+The `7644-*` chunk is the second-largest payload and the largest non-deferred one. Tabs are already lazy-mounted (Speed Insights P1, Feb 9) but the entry chunk itself still includes the dashboard shell and all dialog imports.
+
+Move the dialog and analytics-panel imports out of the route entry and into per-tab dynamic imports:
+
+```ts
+// src/app/admin/page.tsx — instead of static import
+const StoryEditorDialog = dynamic(() => import("@/components/admin/story-editor-dialog"), {
+  ssr: false,
+});
+const AnalyticsPanel = dynamic(() => import("@/components/admin/analytics-panel"), {
+  ssr: false,
+});
+```
+
+**Estimated savings:** 150–250 KB off the admin route, zero impact on public routes. **Effort:** 2–4 h. Cannot be measured without P1 first.
+
+### P3 — ElevenLabs click-to-mount — CLOSED (commit `bd833288`, May 10)
+
+The 463 KB chunk is deferred from first paint. Given 93 days of zero Paisaxe voice traffic and 35 days of full ElevenLabs account silence, this chunk currently serves no one. No further action; revisit only if voice usage returns.
+
+### P4 — `optimizePackageImports` — CLOSED
+
+`next.config.ts` confirms `optimizePackageImports: ["lucide-react", "posthog-js"]` is active.
+
+### P5 — pdfjs-dist / pdf-parse — CLOSED
+
+Both are in `devDependencies` — confirmed excluded from production bundle.
+
+### P6 — Translation-locale extraction — CLOSED (triage `d7328def`, May 14)
+
+Constants moved out of the `@anthropic-ai/sdk` import path into `src/lib/translation-locales.ts`. Verified at source level; chunk-level verification still pending the overdue `build:analyze` (P1).
+
+### P7 — Outstanding minor patches (low priority — batch with P1)
+
+Per security agent (2026-05-21) and cost analyst (2026-05-21), the following non-CVE production patches are pending. Pair them with the P1 `build:analyze` session in one worktree commit so any chunk-size delta is attributable. Note: security agent's May 21 batch list adds `@sentry/core` and `@elevenlabs/react`, bumping the batch to 10 packages.
+
+- `@anthropic-ai/sdk` → 0.96.0
+- `posthog-js` → 1.374.3 (may shift the deferred ~196 KB PostHog chunk)
+- `@stripe/stripe-js` → 9.6.0
+- `@stripe/react-stripe-js` → 6.4.0
+- `@supabase/supabase-js` → 2.106.0
+- `@sentry/nextjs` → 10.53.1
+- `@sentry/core` → 10.53.1 (added May 21)
+- `@elevenlabs/react` → latest minor (added May 21)
+- `lucide-react` → 1.16.0 (may add icon variants affecting 107 KB i18n+icons chunk)
+- `tailwind-merge` → 3.6.0 (CSS-only; expected zero JS impact)
+
+Do NOT include `voyageai` (0.1.0 pin is intentional per security agent).
+
+```bash
+npm install @anthropic-ai/sdk@0.96.0 posthog-js@1.374.3 \
+            @stripe/stripe-js@9.6.0 @stripe/react-stripe-js@6.4.0 \
+            @supabase/supabase-js@2.106.0 \
+            @sentry/nextjs@10.53.1 @sentry/core@10.53.1 \
+            @elevenlabs/react@latest \
+            lucide-react@1.16.0 tailwind-merge@3.6.0
 npm run build:analyze
-open .next/analyze/client.html
 ```
 
-**Estimated savings:** 30–100 KB initial load if splittable. **Effort:** 30 min to identify, 1–4 h to fix.
+**Effort:** 10 min install + analyzer comparison. **Pairs naturally with P1.**
 
-### P2 — Dep batch — CLOSED (commit `6706232c`)
+### P8 — `brace-expansion` advisory fix (carried from May 19)
 
-13 production deps upgraded in batch:
+Security agent (May 19/20/21) flags `brace-expansion@5.0.5` (GHSA-jxxr-4gwj-5jf2, moderate regex DoS). Not exploitable (build/test-only via minimatch/glob), but the existing override matches the vulnerable range. Lockfile-only change, zero expected bundle impact, naturally batches with P1/P7:
 
-| Package | From | To |
-|---|---|---|
-| `@elevenlabs/react` | 1.3.0 | 1.6.0 |
-| `@anthropic-ai/sdk` | ~0.93.x | 0.95.1 |
-| `posthog-js` | ~1.369.x | 1.372.10 |
-| `next` | ~16.2.4 | 16.2.6 |
-| `react` / `react-dom` | 19.2.5 | 19.2.6 |
-| `stripe` | 22.1.0 | 22.1.1 |
-| `resend` | 6.12.2 | 6.12.3 |
-| `@upstash/redis` | ~1.34.x | 1.38.0 |
-| others (patches) | — | — |
-
-**One minor follow-up remaining:** `@anthropic-ai/sdk` 0.95.2 and `tailwind-merge` 3.6.0 are available patches not yet in `package.json`. Both are non-breaking; can be bundled into the next triage pass.
-
-Note: `voyageai` remains hard-pinned at 0.1.0 (breaking changes in 0.2.x) — correctly excluded from batch.
-
-### P3 — Click-to-mount voice widget — CLOSED (commit `bd833288`, May 10)
-
-ElevenLabs idle prefetch removed. The 493 KB SDK chunk now only loads when the user explicitly opens the voice chat. This eliminates the chunk from all passive visitor sessions — currently 100% of sessions given 84 days of zero voice traffic.
-
-### ~~P4 — Verify lucide-react tree-shaking~~ CLOSED
-
-`next.config.ts:18` confirms `optimizePackageImports: ["lucide-react", "posthog-js"]` is active.
-
-### ~~P5 — Confirm pdfjs-dist / pdf-parse are server-only~~ CLOSED
-
-Both are in `devDependencies` — confirmed excluded from the production bundle.
-
-### P6 — node_modules disk size (1,049 MB, flat)
-
-node_modules has been flat at 1,049 MB for two consecutive days (May 11–12), up from 930 MB on Apr 17. The 119 MB growth over three weeks coincides with the dep batch; no further expansion is occurring. The `canvas` optional dependency (19 MB) is a candidate for removal if unused in production.
-
-**Action:**
+```json
+// package.json overrides
+"brace-expansion": ">=5.0.6"
+```
 
 ```bash
-npm ls canvas  # Confirm whether canvas is needed (optional dep, 19 MB)
+npm install
+npm audit
 ```
 
-**Effort:** 5 min.
+### P9 — node_modules disk (1,049 MB, flat 10th cycle)
+
+Not blocking. `canvas` (19 MB optional) remains a removal candidate pending `npm ls canvas` confirmation that nothing imports it.
 
 ## Comparison vs Prior Runs
 
-| Metric | Apr 17 (prod) | May 7 (prod) | May 10 (dev) | May 11 (dev) | May 12 (dev) |
-|---|---:|---:|---:|---:|---:|
-| Total JS | 2,892 KB | 2,892 KB | 2,999 KB | 2,999 KB | 2,999 KB |
-| Initial JS | ~1,972 KB | ~1,972 KB | n/a | n/a | n/a |
-| Production deps | 35 | 35 | 35 | 35 | 35 |
-| node_modules | 930 MB | 930 MB | 1,047 MB | 1,049 MB | 1,049 MB |
-| ElevenLabs chunk | 487 KB | 487 KB | 493 KB | 493 KB (deferred) | 493 KB (deferred) |
-| PostHog chunk | ~179 KB | ~179 KB | ~201 KB | ~201 KB | ~201 KB |
+| Metric | May 7 (prod) | May 10 (dev) | May 15 | May 17 | May 19 | May 20 | May 21 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Total JS | 2,892 KB | 2,999 KB | 3,082 KB | 3,082 KB | 3,082 KB | 3,082 KB | 3,082 KB |
+| Production deps | 35 | 35 | 35 | 35 | 35 | 35 | 35 |
+| node_modules | 930 MB | 1,047 MB | 1,049 MB | 1,049 MB | 1,049 MB | 1,049 MB | 1,049 MB |
+| ElevenLabs chunk | 487 KB | 493 KB | 475 KB (def) | 475 KB (def) | 463 KB (def) | 463 KB (def) | 463 KB (def) |
+| PostHog chunk | ~179 KB | ~201 KB | ~200 KB | ~200 KB | ~196 KB | ~196 KB | ~196 KB |
+| Unclassified chunk | 125 KB | 125 KB | gone | gone | gone | gone | gone |
+| Headroom (total) | +208 KB | +101 KB | +18 KB | +18 KB | +18 KB | +18 KB | +18 KB |
 
-**Regressions:** None. Dev-cache chunk readings are stable and flat.
-
-**Improvements since last report:**
-- node_modules growth has stopped (flat at 1,049 MB for 2 days).
-- Dep batch `6706232c` confirmed in `package.json` — all 13 packages at latest versions.
+**Seventh consecutive cycle of zero change.** All chunk hashes are byte-identical to May 15 through May 20. The +190 KB regression vs May 7 prod has neither been verified nor refuted for eight cycles — it could be a genuine regression, a dev-vs-prod build artifact, or both.
 
 **Outstanding from prior cycles:**
-- P1 unclassified 125 KB chunk (9th consecutive cycle — highest priority).
-- Production build needed to confirm P2 + P3 bundle impact.
-- Minor patches: `@anthropic-ai/sdk` 0.95.2 and `tailwind-merge` 3.6.0 not yet applied.
-- Metrics script curl should add `-L` flag to follow redirects so CSP header capture hits the 200 response, not the 308 redirect hop.
+- P1: clean `npm run build` + `build:analyze` (17+ cycles overdue, blocking P2 / P6 / P7 measurement)
+- P2: admin route chunk split (452 KB → target <200 KB)
+- P7: 10 minor dep patches (expanded from 8 per security agent May 21)
+- P8: `brace-expansion` override bump (carried from May 19, lockfile-only)
 
 ## Cross-Agent Coordination
 
-- **Security agent (2026-05-12)** GREEN for 18th consecutive cycle. 0 advisories. Recommends `@anthropic-ai/sdk` 0.95.2 and `tailwind-merge` 3.6.0 as two low-effort follow-up patches. `voyageai` hard-pinned at 0.1.0 — excluded from all batches. CSP confirmed in production on 200 response.
-- **Cost analyst (2026-05-12)** WATCH: 88-day revenue drought, 84-day voice silence, 26 days full-account ElevenLabs inactivity. ElevenLabs P3 click-to-mount confirmed closed. $3.21/day burn, no revenue. Manual production verification of Pelayo widget and Day Pass remains the top business priority.
-- **Coverage agent (2026-05-11)** at 98.58% statements / 95.18% branches — test-only additions (+3 tests), zero bundle impact.
-- **Localization agent (2026-05-12)** i18n bundles stable at ~15 KB each; lazy-loading split unchanged (50th consecutive clean run).
-- **Documentation agent (2026-05-11)** GREEN for 23rd consecutive run — no doc-impacting changes.
+- **Security agent (2026-05-21)** YELLOW — same single moderate advisory (`brace-expansion@5.0.5`), still not exploitable. Same recommendation: bundle the override bump + the now-10-package prod-dep batch into one worktree session with the long-overdue `build:analyze`.
+- **Cost analyst (2026-05-21)** WATCH — 97-day revenue drought, 93-day Paisaxe voice silence, 35-day ElevenLabs full-account silence. Explicitly recommends the same single worktree session to close three open actions (brace-expansion override, 10-package dep batch, build:analyze). May certain to close at $0 revenue (fourth consecutive zero-revenue month, ~$366 cumulative loss since launch).
+- **Coverage agent (2026-05-21)** 98.66% statements / 95.40% branches — plateau holds for the third consecutive cycle. Three uncommitted test deltas still safe to commit. Zero bundle impact.
+- **Localization agent (2026-05-21)** 55th consecutive clean run; i18n locale chunks stable at ~15 KB each. No bundle-driven changes recommended.
+- **Triage (2026-05-14)** ran the previous webpack analyzer, removed `@anthropic-ai/sdk` client-bundle leak via `src/lib/translation-locales.ts`, ran `npm audit fix`. Triage commit `d7328def` remains the last point where chunk attribution was fresh.
 
 ## Recommendation
 
-1. **Immediate:** Run a production build (`npm run build`) — five consecutive dev-cache snapshots prevent trend analysis. P2 and P3 bundle-size impacts are unmeasured without it.
-2. **Immediate:** Run `npm run build:analyze` to classify chunk `0-zzfjv3~jbbq` (P1) — 9 consecutive cycles deferred. This is the most overdue actionable item in the project.
-3. **Low priority:** Apply two follow-up patches: `npm install @anthropic-ai/sdk@0.95.2 tailwind-merge@3.6.0`.
-4. **Low priority:** Add `-L` to the `curl` command in the metrics script so CSP header capture follows redirects to the 200 response.
-5. **Low priority:** Run `npm ls canvas` to determine if the 19 MB `canvas` optional dependency is actually used in production.
+1. **Immediate (P1 + P7 + P8, one worktree session):** Stop the dev server, `rm -rf .next`, apply the `brace-expansion` override and the 10 dep patches with one `npm install`, then run `npm run build:analyze`. This is the only way to (a) verify the +190 KB regression, (b) measure the cumulative effect of the pending patches, and (c) clear the brace-expansion advisory. **17+ cycles overdue** — the longer this slips, the larger the dep-batch surprise will be.
+2. **Next sprint (P2):** Split the admin route chunk (452 KB) via per-tab dynamic imports — largest remaining gain on a non-deferred path. Cannot be measured without P1 first.
+3. **Low (P9):** `npm ls canvas` to confirm the 19 MB optional dep is still reachable; remove if unused.
 
 ---

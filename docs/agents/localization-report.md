@@ -1,55 +1,49 @@
-# Localization Report — 2026-05-13
+# Localization Agent Report
+
+**Date:** 2026-05-21
+**Status:** Complete
+**Result:** GREEN — 100% coverage. No edits required. 55th consecutive clean run.
 
 ## Summary
 
-**Status: Complete — 51st consecutive clean run. No edits made.**
+| Locale | UI Keys | Missing | Orphaned | Completion |
+|--------|---------|---------|----------|------------|
+| es (source) | 406 | — | — | 100% |
+| en | 406 | 0 | 0 | 100% |
+| fr | 406 | 0 | 0 | 100% |
+| de | 406 | 0 | 0 | 100% |
+| pt | 406 | 0 | 0 | 100% |
+| ast | 406 | 0 | 0 | 100% |
 
-All supported locales (es, en, fr, de, pt, ast) are at 100% translation coverage. No missing keys detected in UI strings or story translations.
+| Story Translations | Count |
+|--------------------|-------|
+| Total stories | 100 |
+| Target-locale records expected (100 × 5) | 500 |
+| Records present (title + subtitle + description) | 500 |
+| Missing fields | 0 |
 
-### UI Translations (src/lib/i18n/)
-
-| Locale | Code | Keys | Missing | Orphaned | Status |
-|--------|------|------|---------|----------|--------|
-| Spanish | es | 406 | 0 | — | Source of truth |
-| English | en | 406 | 0 | 0 | Complete |
-| French | fr | 406 | 0 | 0 | Complete |
-| German | de | 406 | 0 | 0 | Complete |
-| Portuguese | pt | 406 | 0 | 0 | Complete |
-| Asturian | ast | 406 | 0 | 0 | Complete |
-
-### Story Translations (content/translations/story-translations.ts)
-
-| Locale | Covered Stories | Total Stories | Missing | Status |
-|--------|----------------|---------------|---------|--------|
-| English | 100 | 100 | 0 | Complete |
-| French | 100 | 100 | 0 | Complete |
-| German | 100 | 100 | 0 | Complete |
-| Portuguese | 100 | 100 | 0 | Complete |
-| Asturian | 100 | 100 | 0 | Complete |
+Note: the project locale set in code is 6 (es/en/fr/de/pt/ast). The prompt's "5 supported locales" is stale; `ast` (Asturianu) has been a first-class locale for many cycles and was checked equally.
 
 ## Verification
 
-- **Test suite**: 102 / 102 translation tests passing (vitest).
-- **Type check**: 0 TypeScript errors across all 6 locale files.
-- **Key parity**: All 5 non-Spanish locales have exactly 406 leaf keys, dynamically verified by translations.test.ts at each CI run.
-- **Story coverage**: 100 stories x 5 non-Spanish locales = 500 records, all present with title + subtitle + description.
+- Programmatic leaf-key parity check across all 6 locale files: 406 keys each, zero asymmetry.
+- Story coverage iteration over `STORY_TRANSLATIONS` in `content/translations/story-translations.ts`: every slug has `title`, `subtitle`, and `description` populated for `en`, `fr`, `de`, `pt`, `ast`.
+- `npx vitest run src/lib/i18n/translations.test.ts`: 102/102 passing.
+- TypeScript check on i18n files: clean. (Project-wide `tsc` surfaced one unrelated error in `src/lib/search.test.ts:680` — `Chunk.sectionTitle` typing, not a localization concern.)
 
 ## Fixed
 
-No translations added this cycle. Coverage was already at 100%.
+None. No translations were added or modified this cycle.
 
 ## Remaining Gaps
 
-None. All locales complete.
+None.
 
 ## Orphaned Keys
 
-None. All keys in all locales are present in the Spanish source.
+None across any locale.
 
 ## Notes
 
-- The CI test (translations.test.ts) dynamically compares every locale's key count to Spanish. Any future key additions that lack parity across locales will fail CI automatically.
-- Lazy-loading is configured: es and en are static imports; fr, de, pt, ast load on demand. Bundle sizes stable at approximately 15 KB per locale file.
-- The Asturian (ast) locale uses the Pelayo persona variant "Pelayu" consistently throughout voice prompts, matching the regional spelling convention.
-
----
+- UI lazy-loading split unchanged: `es` and `en` are static imports; `fr`, `de`, `pt`, `ast` are dynamic-imported on demand (~65 KB savings vs bundling all six).
+- The parity test (`translations.test.ts`) compares each locale's leaf-key set to ES at runtime, so any future key addition without locale parity will fail CI automatically.
