@@ -124,7 +124,6 @@ function saveToStorage(data: Story[]): void {
  */
 function useStoriesState(
   initialStories?: Story[],
-  enabled: boolean = true
 ): UseStoriesResult {
   // Seed in-memory cache from server-provided stories during render.
   // localStorage is intentionally NOT read here — that happens in useEffect
@@ -211,10 +210,6 @@ function useStoriesState(
 
   // Initial load
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
     let mounted = true;
 
     async function load() {
@@ -255,14 +250,10 @@ function useStoriesState(
     return () => {
       mounted = false;
     };
-  }, [enabled, fetchStories]);
+  }, [fetchStories]);
 
   // Revalidate on window focus (like SWR)
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
     function handleFocus() {
       const isStale = Date.now() - cache.timestamp > CACHE_TTL;
       if (isStale && cache.data) {
@@ -272,7 +263,7 @@ function useStoriesState(
 
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [enabled, fetchStories]);
+  }, [fetchStories]);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);

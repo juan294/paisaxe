@@ -342,6 +342,23 @@ describe("useFeatureFlags initialFlags", () => {
     expect(result.current.isEnabled("surprise_me")).toBe(false);
   });
 
+  it("should coerce undefined initialFlags value to false (enabled ?? false fallback)", async () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
+
+    const { useFeatureFlags, FeatureFlagsProvider } = await import("./use-feature-flags");
+    // Cast through unknown to allow explicit undefined value in the partial record
+    const initialFlags = { contextual_prompts: undefined } as unknown as Partial<
+      Record<"contextual_prompts", boolean>
+    >;
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(FeatureFlagsProvider, { initialFlags }, children);
+    const { result } = renderHook(() => useFeatureFlags(), { wrapper });
+
+    // Undefined initial value coerces to false via ?? operator
+    expect(result.current.isEnabled("contextual_prompts")).toBe(false);
+    expect(result.current.isReady).toBe(true);
+  });
+
   it("should eventually refetch after stale time and update flags", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
