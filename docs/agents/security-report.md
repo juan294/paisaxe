@@ -1,111 +1,139 @@
-# Security Agent Report — 2026-05-14
+# Security Agent Report — 2026-05-21
 
-## Health Status: YELLOW
+## Status: YELLOW (advisory)
 
-2 advisories detected, 0 exploitable. Both stem from a single transitive dependency chain (`protobufjs` via `@opentelemetry/otlp-transformer` via `posthog-js`). Fixable via `npm audit fix` (lockfile-only, no breaking changes).
+**1 advisory detected, 0 exploitable.** Same single moderate DoS advisory in transitive `brace-expansion@5.0.5` (loaded only via `eslint-plugin-react` → `minimatch` at lint time). Carries forward from May 19/20: existing `overrides.brace-expansion` pin in `package.json:138` (`">=5.0.5"`) is one patch behind the upstream fix (`>=5.0.6`). Not exploitable from any runtime code path. All other surface (CSP, HSTS, license, CI automation) remains in known-good state.
 
 ## Executive Summary
 
-- **2 advisories detected, 0 exploitable** in production attack surface.
-- Both advisories collapse to one root package: **protobufjs <=7.5.5** (high) and its bundled **@protobufjs/utf8** sub-package (moderate).
-- All vulnerable code paths are reached only via OpenTelemetry telemetry serialization inside `posthog-js`. No user-controlled input flows into protobuf decoding in Paisaxe.
-- `npm audit fix` resolves both with a lockfile-only update.
-- 0 copyleft violations. All flagged license packages remain documented in `docs/project/license-exceptions.md`.
-- All five core security headers present and correctly configured.
-- CI/CD security automation: Dependabot, Gitleaks, npm audit all active; Renovate intentionally absent.
+- **1 advisory total** (moderate), **0 exploitable** in the runtime bundle. Unchanged from May 20.
+- `brace-expansion` is reachable only via `eslint-plugin-react` → `minimatch@10.2.4` — pure dev/build-time path. No client-side or server-runtime ingestion of user input.
+- One-line fix still pending: bump `overrides.brace-expansion` in `package.json:138` from `">=5.0.5"` to `">=5.0.6"`, then `npm install`. `npm audit fix` will do the same in one shot.
+- All seven security headers present in source and verified previously in production (CSP, HSTS, X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy).
+- CI security automation healthy: Dependabot configured, Gitleaks in CI, npm audit in CI, license-check in CI. Renovate not configured — Dependabot covers the surface.
+- License compliance: no copyleft violations. The single LGPL-3.0 package is a platform-specific native binary (`@img/sharp-libvips-darwin-arm64`) covered by `docs/project/license-exceptions.md`.
+- 25 outdated packages, all minor/patch, none CVE-bearing. Five-to-eight production deps still recommended to batch with Performance Agent's 16+ cycle overdue `npm run build:analyze`.
 
 ## Vulnerability Table
 
 | Severity | Package | Advisory | Attack Vector | Fixable | Risk Assessment |
 |----------|---------|----------|---------------|---------|-----------------|
-| High | protobufjs <=7.5.5 | GHSA-q6x5-8v7m-xcrf (overlong UTF-8), GHSA-2pr8-phx7-x9h3 (DoS via field names), GHSA-66ff-xgx4-vchm (code injection via bytes defaults), GHSA-fx83-v9x8-x52w (prototype injection), GHSA-75px-5xx7-5xc7 (codegen gadget post-prototype-pollution), GHSA-jvwf-75h9-cwgg (process-wide DoS via option paths), GHSA-685m-2w69-288q (unbounded recursion DoS) | Requires attacker-controlled `.proto` schemas or untrusted protobuf wire input | Yes (`npm audit fix`) | NOT EXPLOITABLE — protobufjs is only used by `@opentelemetry/otlp-transformer` to serialize internal PostHog telemetry. No user input reaches the decoder. |
-| Moderate | @protobufjs/utf8 <=1.1.0 | GHSA-q6x5-8v7m-xcrf | Same as above (sub-dep of protobufjs) | Yes (`npm audit fix`) | NOT EXPLOITABLE — same chain, no user input path. |
+| Moderate | brace-expansion@5.0.5 | GHSA-jxxr-4gwj-5jf2 (no CVE assigned) | DoS via large numeric range bypassing documented `max` protection in `expand(pattern)` | Yes — `npm audit fix` (upstream patch >=5.0.6) | NOT EXPLOITABLE. Dep reached only via `eslint-plugin-react` → `minimatch@10.2.4` → `brace-expansion@5.0.5`. Lint/build-time only; never invoked on user-controlled input at runtime. |
 
-## Exploitability Analysis (High Advisories)
+## Detailed Exploitability Analysis
 
-### protobufjs (GHSA-q6x5-8v7m-xcrf and 6 others)
+### brace-expansion (GHSA-jxxr-4gwj-5jf2) — NOT EXPLOITABLE
 
-**Dependency chain**: `posthog-js → @opentelemetry/otlp-transformer → protobufjs`
+**Dep chain.** `npm ls brace-expansion` returns exactly one path:
 
-**What protobufjs does in this codebase**: PostHog's OpenTelemetry integration uses protobufjs to encode telemetry events when sending to its OTLP endpoint. The decoding side of protobufjs (which is where every CVE in this batch lives — overlong UTF-8, prototype injection, unbounded recursion) is never invoked by application code.
+```
+paisaxe@1.5.1
+`-- eslint-plugin-react@7.37.5
+  `-- minimatch@10.2.4
+    `-- brace-expansion@5.0.5
+```
 
-**Why these CVEs do not apply here**:
-1. **GHSA-q6x5-8v7m-xcrf / GHSA-685m-2w69-288q (decoder DoS)**: We only call the encoder. The decoder runs on the receiving service (PostHog's cloud OTLP endpoint), not in this process.
-2. **GHSA-66ff-xgx4-vchm / GHSA-fx83-v9x8-x52w / GHSA-75px-5xx7-5xc7 (code injection via generated code)**: These require attacker-controlled `.proto` schema files. All `.proto` schemas in our build come from the pinned `@opentelemetry/otlp-transformer` package; no user-supplied schemas are loaded at runtime.
-3. **GHSA-jvwf-75h9-cwgg (option path DoS)**: Requires programmatic access to protobufjs's options API. We have zero `protobufjs` imports in `src/`.
+**Why it does not apply here.**
 
-**Fix**: `npm audit fix` performs a transitive bump (lockfile-only). Pattern matches the prior `dompurify`/`protobufjs` cycle resolved cleanly in April.
+1. `eslint-plugin-react` runs only during `eslint` invocations (CI lint job and pre-commit) — never at production runtime, never in the client bundle, never on a Vercel function execution path.
+2. `minimatch` patterns inside ESLint come from project config (`eslint.config.mjs`, ignore patterns), not from user input.
+3. No `src/` code imports `minimatch` or `brace-expansion` directly. Application glob handling is done by `globby` / Next.js routing, neither of which depends on this version chain.
+4. Even at lint time, the only `brace-expansion` consumer is ESLint walking `node_modules` / source globs — none of which contain attacker-crafted numeric ranges like `{1..2147483647}`.
+
+**Fix.** The override in `package.json:138` currently pins `"brace-expansion": ">=5.0.5"`, which still matches the vulnerable `5.0.5`. Two equivalent paths:
+
+```bash
+# Option A — let npm pick it up via the existing override
+npm install   # only after bumping the override below
+
+# Option B — let npm audit fix do both
+npm audit fix
+```
+
+The sticky fix is to edit `package.json:138`:
+
+```diff
+-    "brace-expansion": ">=5.0.5",
++    "brace-expansion": ">=5.0.6",
+```
+
+Then `rm -rf node_modules package-lock.json && npm install` (or just `npm install` if you trust the resolver to honor the override on update).
 
 ## Prioritized Remediation Steps
 
-1. **Run `npm audit fix`** (lockfile-only, no breaking changes). Verify with `npm audit` afterward — expect 0 advisories.
-2. **Batch with low-risk patch upgrades carried over from prior cycles**:
-   - `@anthropic-ai/sdk` 0.93.0 → 0.96.0
-   - `tailwind-merge` 3.5.0 → 3.6.0
-   - `next` 16.2.4 → 16.2.6 (patch)
-   - `@sentry/nextjs` 10.51.0 → 10.53.1
-   - `posthog-js` 1.372.8 → 1.373.4 (pulls newer telemetry transitives)
-3. **Skip**: `jsdom` 29.1.1 → 27.0.1 (channel artifact — downgrade target), `vitest` 4.1.5 → 3.2.4 (likewise), `voyageai` 0.1.0 → 0.2.1 (hard-pinned, known breaking).
-4. **No manual code changes required.** All advisories resolve via dependency bumps.
+1. **Bump `brace-expansion` override to `">=5.0.6"`** — one-line edit in `package.json:138` + `npm install`. Clears the only advisory. **Pair with Performance Agent's overdue `npm run build:analyze` and the prod-dep batch — single worktree session, one commit, attributable bundle delta.** Stop the dev server and `rm -rf .next` first to get a clean production build.
+2. **Apply prod-dep batch (zero-CVE, non-urgent)**: `@anthropic-ai/sdk` 0.95.1 → 0.97.1, `posthog-js` 1.372.10 → 1.374.3, `@stripe/stripe-js` 9.4.0 → 9.6.0, `@stripe/react-stripe-js` 6.3.0 → 6.4.0, `@supabase/supabase-js` 2.105.4 → 2.106.1, `@sentry/nextjs` 10.52.0 → 10.53.1, `lucide-react` 1.14.0 → 1.16.0, `tailwind-merge` 3.5.0 → 3.6.0. Do NOT include `voyageai` (0.1.0 pin is intentional).
+3. **Re-verify CSP via redirect-following curl** — the metrics script now follows redirects per May 14 triage (`-L` flag). Confirm next-cycle metrics show CSP on the 200 response (not the 308 hop).
 
-## License Compliance
+## License Compliance — Pass
 
-**Copyleft detected: false.** No GPL, AGPL, or unapproved copyleft. All flagged packages are pre-approved exceptions documented in `docs/project/license-exceptions.md`.
+No copyleft violations. Flagged packages and disposition:
 
-Flagged packages by name:
+| Package | License | Disposition |
+|---------|---------|-------------|
+| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | Approved exception — platform-specific native binary dependency of `sharp`. Documented in `docs/project/license-exceptions.md`. LGPL on a native shared library used via FFI does not impose copyleft on the calling JS. |
+| `dompurify@3.4.0` | (MPL-2.0 OR Apache-2.0) | Dual-licensed — we use under Apache-2.0. No copyleft burden. Documented in `docs/project/license-exceptions.md`. |
+| `expand-template@2.0.3` | (MIT OR WTFPL) | Dual-licensed — MIT side applies. Permissive. |
+| `paisaxe@1.5.1` | UNLICENSED | Our own root package. Intentional — not distributed. |
+| `simple-concat@1.0.1` | MIT | False positive in flag script (MIT is permissive). No action. |
+| `simple-get@4.0.1` | MIT | False positive in flag script. No action. |
+| `@babel/template@7.28.6` | MIT | False positive in flag script. No action. |
 
-| Package | License | Status |
-|---------|---------|--------|
-| @img/sharp-libvips-darwin-arm64@1.2.4 | LGPL-3.0-or-later | Approved — native binary, dynamic load only |
-| dompurify@3.4.0 | (MPL-2.0 OR Apache-2.0) | Approved — dual-licensed, we use under Apache-2.0 |
-| expand-template@2.0.3 | (MIT OR WTFPL) | Approved — we use under MIT |
-| paisaxe@1.5.1 | UNLICENSED | Self (our own package — expected) |
-| simple-concat@1.0.1 | MIT | Standard MIT — no action |
-| simple-get@4.0.1 | MIT | Standard MIT — no action |
-| @babel/template@7.28.6 | MIT | Standard MIT — no action |
+`COPYLEFT LICENSES FOUND: false` confirmed by the license-check.
 
-## Security Headers
+## Security Headers — Pass
 
-All five core headers present:
+All required headers present in source (`next.config.ts`) and previously verified live in production (May 10 triage, after the redirect-following fix in May 14 triage).
 
 | Header | Value | Status |
 |--------|-------|--------|
-| strict-transport-security | max-age=63072000; includeSubDomains; preload | Pass |
-| x-content-type-options | nosniff | Pass |
-| x-frame-options | DENY | Pass |
-| referrer-policy | strict-origin-when-cross-origin | Pass |
-| permissions-policy | camera=(), geolocation=(), microphone=(self) | Pass |
-| content-security-policy | Verified present in source; live capture requires `curl -L` to follow 308 redirect to 200 response | Pass |
+| Content-Security-Policy | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com; ...; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'` | Pass. PPR-compatible (`'self' 'unsafe-inline'`, no `'strict-dynamic'`, no nonce dependency — matches the constraints in CLAUDE.md "CSP and PPR Compatibility"). |
+| Strict-Transport-Security | `max-age=63072000; includeSubDomains; preload` | Pass (2-year, preload-eligible). |
+| X-Frame-Options | `DENY` | Pass. Reinforced by `frame-ancestors 'none'` in CSP. |
+| X-Content-Type-Options | `nosniff` | Pass. |
+| Referrer-Policy | `strict-origin-when-cross-origin` | Pass. |
+| Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` | Pass — microphone allow-listed for Pelayo voice agent (visitor voice flag), camera and geolocation denied. |
 
-CSP source policy: `script-src 'self' 'unsafe-inline' blob: https://js.stripe.com` — correct for PPR compatibility per CLAUDE.md (no `'strict-dynamic'`, no nonce-only).
+**CSP notes (carried).** Script-src uses `'self' 'unsafe-inline'` instead of nonces — required because PPR (`cacheComponents`) prerenders HTML at build time without nonces. Switching to nonce-only would force the root layout dynamic and break the static shell. This is the documented and correct trade-off.
 
-## CI/CD Security Automation
+## CI/CD Security Automation — Healthy
 
 | Control | Status | Notes |
 |---------|--------|-------|
-| Dependabot | Active | Pinned to develop branch |
-| Renovate | Not configured | Intentional — Dependabot handles dep updates |
-| Gitleaks | Active in CI | Scans every PR + git history |
-| npm audit | Active in CI | Runs on every PR |
-| license-check | Active in CI | Enforces approved license list |
+| Dependabot | Configured | Pinned to `develop`. Generated PRs #582 and #583 successfully merged this cycle. |
+| Renovate | Not configured | Acceptable — Dependabot covers npm and gh-actions surface. |
+| Gitleaks in CI | Active | Scans git history on every PR. |
+| npm audit in CI | Active | Fails on high/critical. Moderate (brace-expansion) is informational and does not block. |
+| License check in CI | Active | Enforces allowed list (MIT, Apache-2.0, BSD, ISC, BlueOak, plus documented exceptions). |
+| Smoke test on preview | Active | E2E "CSP canary" verifies JavaScript executes — guards against any CSP regression that would block scripts. |
 
-No gaps. CSRF double-submit token enforcement (SE-M2) confirmed working in production since 2026-03-23.
+**Known structural gap (carried).** Dependabot PRs cannot consume `VERCEL_AUTOMATION_BYPASS_SECRET`, so the smoke test fails on Dependabot PRs. This is a secret-forwarding limitation in GitHub Actions, not a security weakness. User merges manually after confirming green elsewhere.
 
-## Outdated Packages — Security Implications
+## Outdated Packages — 25 (zero CVE-bearing)
 
-28 outdated packages reported. None have known CVEs beyond the protobufjs chain already addressed above.
+Selected production deps with security relevance (none vulnerable, all minor/patch):
 
-**Production deps worth prioritizing**:
-- `posthog-js` 1.372.8 → 1.373.4 (pulls newer transitives — recommended alongside `npm audit fix`)
-- `@anthropic-ai/sdk` 0.93.0 → 0.96.0
-- `next` 16.2.4 → 16.2.6 (framework patch)
-- `@sentry/nextjs` 10.51.0 → 10.53.1
-- `@stripe/stripe-js` 9.4.0 → 9.5.0
-- `@supabase/supabase-js` 2.105.3 → 2.105.4 (patch)
-- `react` / `react-dom` 19.2.5 → 19.2.6 (patch)
-- `resend` 6.12.2 → 6.12.3
-- `stripe` 22.1.0 → 22.1.1
+| Package | Current | Latest | Class | Notes |
+|---------|---------|--------|-------|-------|
+| @anthropic-ai/sdk | 0.95.1 | 0.97.1 | prod | LLM SDK. Patch only — no security advisories. |
+| posthog-js | 1.372.10 | 1.374.3 | prod | Analytics SDK. May shift the deferred PostHog chunk (~196 KB) after upgrade — Performance Agent should re-measure in `build:analyze`. |
+| @stripe/stripe-js | 9.4.0 | 9.6.0 | prod | Payments SDK. |
+| @stripe/react-stripe-js | 6.3.0 | 6.4.0 | prod | Payments wrapper. |
+| @supabase/supabase-js | 2.105.4 | 2.106.1 | prod | DB / auth client. |
+| @sentry/nextjs | 10.52.0 | 10.53.1 | prod | Error tracking. |
+| @sentry/core | 10.52.0 | 10.53.1 | prod | Sentry core. |
+| @elevenlabs/react | 1.6.0 | 1.6.2 | prod | Voice SDK (deferred, click-to-mount). |
+| @next/eslint-plugin-next | 16.2.4 | 16.2.6 | dev | Pulls in vulnerable brace-expansion chain indirectly — bumping does NOT clear the advisory since the chain comes via `eslint-plugin-react`. |
+| @next/bundle-analyzer | 16.2.4 | 16.2.6 | dev | |
+| @playwright/test | 1.59.1 | 1.60.0 | dev | |
+| jsdom | 29.1.1 | 27.0.1 | dev | Major downgrade in `latest` — likely a metric artifact (test channel divergence). No action. |
+| vitest | 4.1.5 | 3.2.4 | dev | Same divergence pattern — `latest` < installed. No action. |
+| knip | 6.11.0 | 6.14.1 | dev | |
+| voyageai | 0.1.0 | 0.2.1 | prod | **DO NOT UPGRADE** — pin is intentional (carried from prior memory). |
 
-**Dev-tooling — lower urgency, no CVEs**: `@playwright/test`, `@typescript-eslint/eslint-plugin`, `knip`, `@vitest/coverage-v8`, `@types/node`, `@tailwindcss/postcss`, `tailwindcss`, `@next/bundle-analyzer`, `@next/eslint-plugin-next`, `@upstash/redis`, `@supabase/ssr`.
+## Webhook & CSRF Surface — Unchanged
 
-**Skip**: `jsdom`, `vitest` (channel artifacts), `voyageai` (hard-pinned at 0.1.0 — do not upgrade).
+- All 4 webhook endpoints (Stripe, ElevenLabs, Supabase, translate) use `timingSafeEqual` for HMAC comparison — 7 call sites total, all verified previously and unchanged this cycle.
+- CSRF double-submit token enforcement confirmed working (QA Agent May 3 onward — 12/12 LLM tests pass with Origin-bearing client). SE-M2 origin enforcement still in place.
+- Sentry Replay PII surface remains eliminated (commit `fef651f5`, Apr 22).
+- Coverage Agent confirms all webhook DB-error and SMS-enqueue-failure paths fully covered.
