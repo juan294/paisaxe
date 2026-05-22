@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { ChevronDown, TrendingUp } from "lucide-react";
 import { fetchCostsAnalytics } from "@/lib/admin-api";
 import type { UsageMetrics, ForecastScenario } from "@/types/costs-analytics";
-import { computeForecasts } from "@/lib/costs";
+import { computeForecasts } from "@/lib/costs/forecast";
 import type { ScalingForecastSectionProps } from "./types";
 
 export function ScalingForecastSection({ services, dateRange }: ScalingForecastSectionProps) {

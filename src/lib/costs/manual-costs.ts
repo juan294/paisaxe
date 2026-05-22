@@ -1,3 +1,4 @@
+import "server-only";
 import { createAdminClient } from "@/lib/supabase";
 import type {
   ManualCostEntry,

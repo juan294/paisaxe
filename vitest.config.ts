@@ -32,6 +32,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "server-only": path.resolve(__dirname, "./src/test/__mocks__/server-only.ts"),
       "@content": path.resolve(__dirname, "./content"),
       // content/processed/ is gitignored; use main repo copy when available,
       // otherwise fall back to a test stub so pipeline script tests don't fail.
