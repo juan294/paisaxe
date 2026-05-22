@@ -200,14 +200,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           fields: getUnknownFields(shapeResult.error),
         });
       }
-    } else {
-      const shapeResult = TranslateRecoverySchema.safeParse(rawBody);
-      if (!shapeResult.success) {
-        logger.warn("[WEBHOOK_UNKNOWN_SHAPE]", {
-          webhook: "translate",
-          fields: getUnknownFields(shapeResult.error),
-        });
-      }
     }
 
     let requestedEventKey: string;

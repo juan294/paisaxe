@@ -892,6 +892,23 @@
 - Coverage Agent: No new security paths to cover. CSRF double-submit enforcement remains fully covered.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=triage timestamp=2026-05-22T06:00:00Z -->
+## Triage -- 2026-05-22
+- Status: GREEN. 7 reports processed (cc-rpi GREEN, coverage GREEN, cost-analyst WATCH, performance YELLOW, security YELLOW, documentation GREEN, localization GREEN). 0 agent crash logs.
+- Security: Bumped `brace-expansion` override in `package.json` from `">=5.0.5"` to `">=5.0.6"`. `npm audit` now reports 0 vulnerabilities.
+- Dead code: Removed `enabled` param and two `if (!enabled) return` guards from `use-stories.ts`. Removed dead `else` block in `webhooks/translate/route.ts`. Removed `es`/`en` no-op entries from `i18n/provider.tsx` localeLoaders (pre-cached at module init).
+- Tests: Committed 3 pending test-file changes — `elevenlabs-analytics-panel.test.tsx` (waitFor wrapping), `use-feature-flags.test.ts` (undefined coercion test), `search.test.ts` (4 branch-coverage tests + sectionTitle null→undefined fix).
+- Verification: 354 files, 6591 tests all passing. Typecheck and lint clean. 0 vulnerabilities.
+- Dependabot: PR #584 (next 16.2.4→16.2.6) closed as stale — develop already has `^16.2.6`. PRs #587 and #586 (patch/minor, CI green) queued for auto-merge.
+- Manual items flagged: (1) 98-day revenue drought investigation on paisaxe.es; (2) Anthropic billing check at platform.claude.com/settings/billing; (3) `npm run build:analyze` (17+ cycles overdue, stop dev server first); (4) June tier-downgrade decision if drought continues.
+
+**Cross-agent recommendations:**
+- Performance Agent: brace-expansion fix and Dependabot dep batch (PRs #586/#587) land in this commit. Run `npm run build:analyze` after the PR merges to get fresh chunk attribution with the new dep versions.
+- Security Agent: 0 advisories after brace-expansion override bump. Next cycle should be GREEN.
+- Coverage Agent: 3 dead-code removals land in this commit (use-stories.ts, translate/route.ts, i18n/provider.tsx). agent-config/route.ts line 103 remains for a dedicated Code Quality cycle.
+- Code Quality Agent: agent-config/route.ts line 103 defensive re-check still deferred — TypeScript narrowing requires restructuring the outer guard.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-05-14T08:18:56Z -->
 ## Triage -- 2026-05-14
 - Status: GREEN locally. Processed 7 reports generated since the previous marker and found no agent crash logs.

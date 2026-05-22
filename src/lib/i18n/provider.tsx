@@ -21,9 +21,8 @@ translationCache.set('es', es);
 translationCache.set('en', en);
 
 // Lazy loaders for other locales (~14KB each, loaded on demand)
-const localeLoaders: Record<Locale, () => Promise<Translations>> = {
-  es: () => Promise.resolve(es),
-  en: () => Promise.resolve(en),
+// es and en are pre-populated in translationCache above — no loader needed
+const localeLoaders: Partial<Record<Locale, () => Promise<Translations>>> = {
   fr: () => import('./fr').then(m => m.fr),
   de: () => import('./de').then(m => m.de),
   pt: () => import('./pt').then(m => m.pt),
@@ -72,7 +71,7 @@ export function LanguageProvider({ children, initialLocale }: LanguageProviderPr
   useEffect(() => {
     if (translationCache.has(locale)) return;
     let cancelled = false;
-    localeLoaders[locale]().then(translations => {
+    localeLoaders[locale]?.().then(translations => {
       if (cancelled) return;
       translationCache.set(locale, translations);
       setLoadGeneration(n => n + 1);

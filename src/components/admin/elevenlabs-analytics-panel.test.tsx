@@ -446,8 +446,10 @@ describe("ElevenLabsAnalyticsPanel", () => {
 
     // Empty recent conversations should show "No conversations yet"
     // (different from the global empty state, this is the table-level empty state)
-    const noConvMessages = screen.getAllByText("No conversations yet");
-    expect(noConvMessages.length).toBeGreaterThanOrEqual(1);
+    await waitFor(() => {
+      const noConvMessages = screen.getAllByText("No conversations yet");
+      expect(noConvMessages.length).toBeGreaterThanOrEqual(1);
+    });
   });
 
   it("renders active calls widget with zero active calls (idle styling)", async () => {
