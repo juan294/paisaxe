@@ -1,7 +1,18 @@
 import type { PublicStoryRow, Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
 import { PUBLIC_STORY_SELECT, rowToPublicStory } from "@/types/immersive";
 import { supabase } from "./supabase";
+import { createSupabaseBrowserClient } from "./supabase-browser";
 import { logger } from "@/lib/logger";
+
+// In the browser, reuse the existing createBrowserClient singleton to avoid
+// a duplicate GoTrueClient instance (which would share the same storage key
+// as the one created by AuthProvider).
+function getClient() {
+  if (typeof window !== "undefined") {
+    return createSupabaseBrowserClient() ?? supabase;
+  }
+  return supabase;
+}
 
 // LOCATION-SPECIFIC: Import fallback stories from content directory
 // When replicating, replace content/fallback-stories.json with location-specific stories
@@ -32,7 +43,7 @@ export async function getStoriesFromDB(): Promise<Story[]> {
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from("stories")
       .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
@@ -68,7 +79,7 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from("stories")
       .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
@@ -101,7 +112,7 @@ export async function getStoriesByCategoryFromDB(category: StoryCategory | null)
  */
 export async function getStoriesByLocationFromDB(location: StoryLocation): Promise<Story[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from("stories")
       .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
@@ -134,7 +145,7 @@ export async function getStoriesByLocationFromDB(location: StoryLocation): Promi
  */
 export async function getStoriesByDurationFromDB(duration: StoryDuration): Promise<Story[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from("stories")
       .select(PUBLIC_STORY_SELECT)
       .eq("is_active", true)
@@ -167,7 +178,7 @@ export async function getStoriesByDurationFromDB(duration: StoryDuration): Promi
  */
 export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from("stories")
       .select(PUBLIC_STORY_SELECT)
       .eq("slug", slug)

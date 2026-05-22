@@ -18,12 +18,21 @@ import {
 import { supabase } from "./supabase";
 import { logger } from "@/lib/logger";
 
-// Mock supabase
+// Mock supabase (server path)
 vi.mock("./supabase", () => ({
   supabase: {
     from: vi.fn(),
   },
 }));
+
+// Mock supabase-browser (client path in jsdom) — return the same mock client so
+// assertions work regardless of which branch getClient() takes.
+vi.mock("./supabase-browser", async () => {
+  const { supabase } = await import("./supabase");
+  return {
+    createSupabaseBrowserClient: () => supabase,
+  };
+});
 
 // Mock logger — factory must not reference outer variables (vi.mock is hoisted)
 vi.mock("@/lib/logger", () => ({
