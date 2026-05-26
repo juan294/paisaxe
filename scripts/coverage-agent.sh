@@ -40,10 +40,15 @@ SHARED_CONTEXT=$(read_shared_context "coverage_agent_enabled")
 SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" read 2>/dev/null || echo "")
 SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
-# Run the coverage agent via Claude CLI in non-interactive mode
-"$CLAUDE_BIN" -p \
-  --allowedTools 'Read,Write,Edit,Bash(npx vitest*),Bash(npm run typecheck*),Bash(ls *),Bash(find *),Glob,Grep' \
-  >> "$LOG_FILE" 2>&1 <<PROMPT
+# Run the coverage agent via Claude CLI in non-interactive mode.
+# flock serializes concurrent coverage runs across all projects on this host
+# to prevent vitest worker-pool starvation (38 concurrent vitest processes from
+# 3 projects corrupted coverage artifacts — observed May 2026).
+(
+  flock 200
+  "$CLAUDE_BIN" -p \
+    --allowedTools 'Read,Write,Edit,Bash(npx vitest*),Bash(npm run typecheck*),Bash(ls *),Bash(find *),Glob,Grep' \
+    >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT
 
 Additional context:
@@ -57,6 +62,7 @@ $SHARED_CONTEXT
 
 $SHARED_CONTEXT_WRITE
 PROMPT
+) 200>/tmp/paisaxe-vitest-coverage.lock
 
 # Extract and write shared context
 REPORT_CONTENT=$(cat "$DOC_FILE")

@@ -45,8 +45,9 @@ BUILD_OUTPUT=""
 DEV_SERVER_PID=""
 RESTART_DEV_SERVER=false
 
-# Detect if the dev server is running on port 3000
-DEV_SERVER_PID=$(timeout 5 lsof -ti :3000 2>/dev/null | head -1 || true)
+# Detect if THIS project's dev server is running (scoped to PROJECT_DIR to avoid
+# matching other projects' next dev processes running on port 3000).
+DEV_SERVER_PID=$(pgrep -fl "next dev" 2>/dev/null | grep "$PROJECT_DIR" | awk '{print $1}' | head -1 || true)
 if [[ -n "$DEV_SERVER_PID" ]]; then
   log_info "Dev server detected (PID $DEV_SERVER_PID) — stopping for production build..." | tee -a "$LOG_FILE"
   kill "$DEV_SERVER_PID" 2>/dev/null

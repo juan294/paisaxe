@@ -61,8 +61,8 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.96.0",
-    "@elevenlabs/react": "^1.6.0",
+    "@anthropic-ai/sdk": "^0.98.0",
+    "@elevenlabs/react": "^1.6.3",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-select": "^2.2.6",
@@ -70,10 +70,10 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/core": "^10.53.1",
     "@sentry/nextjs": "^10.53.1",
-    "@stripe/react-stripe-js": "^6.3.0",
-    "@stripe/stripe-js": "^9.5.0",
+    "@stripe/react-stripe-js": "^6.4.0",
+    "@stripe/stripe-js": "^9.6.0",
     "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.106.0",
+    "@supabase/supabase-js": "^2.106.1",
     "@tailwindcss/typography": "^0.5.19",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
@@ -85,7 +85,7 @@
     "next": "^16.2.6",
     "next-themes": "^0.4.6",
     "pino": "^10.3.1",
-    "posthog-js": "^1.374.0",
+    "posthog-js": "^1.376.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-markdown": "^10.1.0",
@@ -122,7 +122,7 @@
     "knip": "^6.14.1",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.7.284",
-    "postcss": "^8.5.14",
+    "postcss": "^8.5.15",
     "tailwindcss": "^4.3.0",
     "tsx": "^4.22.1",
     "twitter-api-v2": "^1.29.0",
@@ -133,10 +133,10 @@
     "canvas": "^3.2.3"
   },
   "overrides": {
-    "qs": ">=6.14.2",
+    "qs": ">=6.15.2",
     "minimatch": ">=10.2.1",
     "brace-expansion": ">=5.0.6",
-    "postcss": "^8.5.14",
+    "postcss": "^8.5.15",
     "uuid": ">=14.0.0"
   },
   "browserslist": [
