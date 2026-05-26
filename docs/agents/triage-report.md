@@ -1,70 +1,52 @@
 # Triage Report
-> Generated on 2026-05-22 | 7 reports processed | 10 action items completed | 3 Dependabot PRs
+> Generated on 2026-05-26 | 8 reports processed | 5 action items | 1 Dependabot PR
 
 ## Agent Failures
-
 None — all agents ran successfully.
 
 ## Reports Reviewed
-
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi | GREEN | None — already at v1.18.0 |
-| 2 | coverage-report.md | coverage | GREEN | Committed 3 pending test files; removed 3 dead-code blocks |
-| 3 | cost-analyst-report.md | cost-analyst | WATCH | Revenue/voice drought flagged (manual); brace-expansion fix done |
-| 4 | performance-report.md | performance | YELLOW | brace-expansion fix done; build:analyze flagged (manual); dep batch via Dependabot |
-| 5 | security-report.md | security | YELLOW | brace-expansion override bumped `>=5.0.5` → `>=5.0.6`; 0 vulnerabilities |
-| 6 | documentation-report.md | documentation | GREEN | None — 27th clean run |
-| 7 | localization-report.md | localization | GREEN | None — 55th clean run, 100% coverage |
+| 1 | cc-rpi-update-report.md | cc-rpi | GREEN | None — already at HEAD (v1.18.0) |
+| 2 | cost-analyst-report.md | cost-analyst | WATCH | Manual: revenue drought investigation, Anthropic billing, build:analyze, June tier decision |
+| 3 | coverage-report.md | coverage | YELLOW (env) | Add flock serialization to coverage-agent.sh ✓ |
+| 4 | documentation-report.md | documentation | GREEN | None — 28th consecutive clean run |
+| 5 | localization-report.md | localization | GREEN | None — 58th consecutive clean run, 100% across 6 locales |
+| 6 | performance-report.md | performance | YELLOW | Tighten dev-server guard in performance-agent.sh ✓ |
+| 7 | qa-report.md | qa | YELLOW | Run npx playwright install ✓ |
+| 8 | security-report.md | security | YELLOW | Bump qs override + batch 7 production patches ✓ |
 
-## Overall Status: YELLOW → GREEN
-
-Security advisory cleared. Performance budget unchanged (18 KB headroom, build:analyze still manual).
+## Overall Status: YELLOW → GREEN (after fixes)
 
 ## Action Items Completed
-
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Bump `brace-expansion` override `>=5.0.5` → `>=5.0.6` in package.json | security, performance, cost-analyst | N/A | ✅ Done — 0 vulnerabilities |
-| 2 | Commit `elevenlabs-analytics-panel.test.tsx` (waitFor wrapping) | coverage | Yes | ✅ Done |
-| 3 | Commit `use-feature-flags.test.ts` (undefined coercion test) | coverage | Yes | ✅ Done |
-| 4 | Commit `search.test.ts` (4 branch-coverage tests + sectionTitle null→undefined fix) | coverage | Yes | ✅ Done |
-| 5 | Remove `enabled` param + 2 guards from `use-stories.ts` | coverage | Existing | ✅ Done |
-| 6 | Remove dead `else` block from `webhooks/translate/route.ts` line 206 | coverage | Existing | ✅ Done |
-| 7 | Remove `es`/`en` no-op entries from `i18n/provider.tsx` localeLoaders | coverage | Existing | ✅ Done |
-| 8 | Auto-merge PR #587 (@types/node patch, CI green) | Dependabot | N/A | ✅ Queued |
-| 9 | Auto-merge PR #586 (12 prod deps minor/patch, CI green) | Dependabot | N/A | ✅ Queued |
-| 10 | Close PR #584 as stale (next already ^16.2.6 on develop) | Dependabot | N/A | ✅ Done |
+| 1 | Bump `qs` override from `>=6.14.2` to `>=6.15.2` in `package.json` overrides — clears 2 moderate GHSA-q8mj-m7cp-5q26 advisories (`npm audit` now 0 vulns) | security | No (lockfile-only) | ✅ Done |
+| 2 | Batch 7 production patches: `@anthropic-ai/sdk` 0.96→0.98, `@elevenlabs/react` 1.6.0→1.6.3, `@stripe/react-stripe-js` 6.3→6.4, `@stripe/stripe-js` 9.5→9.6, `@supabase/supabase-js` 2.106.0→2.106.1, `posthog-js` 1.374→1.376, `postcss` 8.5.14→8.5.15 (excluded `voyageai` — breaking) | security | No | ✅ Done |
+| 3 | Add `flock 200` + `/tmp/paisaxe-vitest-coverage.lock` around Claude invocation in `scripts/coverage-agent.sh` — serializes concurrent vitest runs across host projects | coverage | No | ✅ Done |
+| 4 | Scope dev-server guard in `scripts/performance-agent.sh` from `lsof -ti :3000` to `pgrep -fl "next dev" \| grep "$PROJECT_DIR"` — prevents false-positive match on other projects | performance | No | ✅ Done |
+| 5 | Run `npx playwright install` — `chromium_headless_shell-1223` now present; journey suite unblocked | qa | No (infrastructure) | ✅ Done |
 
 ## Dependabot PRs
-
-| # | PR | Update Type | Disposition | Notes |
-|---|----|----|----|----|
-| 587 | @types/node 25.7.0→25.9.0 | patch/dev | auto-merge | CI green, MERGEABLE |
-| 586 | 12 prod deps (minor/patch batch) | minor | auto-merge | CI green, MERGEABLE. Covers most of Performance P7 dep batch |
-| 584 | next 16.2.4→16.2.6 | patch (security) | closed as stale | develop already has `^16.2.6`; failures unrelated to the next bump itself |
-
-## Deferred Items (Manual Actions Required)
-
-| # | Item | Source | Priority |
-|---|------|--------|----------|
-| D1 | 98-day revenue drought — verify Pelayo widget + Day Pass flow on paisaxe.es | cost-analyst | CRITICAL |
-| D2 | Anthropic billing check at platform.claude.com/settings/billing | cost-analyst | P2 |
-| D3 | `npm run build:analyze` (stop dev server, `rm -rf .next` first) — 17+ cycles overdue | performance | P1 |
-| D4 | Admin route chunk split (452 KB → ~200 KB) — requires D3 first | performance | P2 |
-| D5 | June tier-downgrade decision (Vercel Hobby + Supabase Free saves ~$45/mo if drought continues) | cost-analyst | P3 |
-| D6 | `agent-config/route.ts` line 103 dead-code removal — TypeScript narrowing issue, needs dedicated cycle | coverage | low |
+| PR | Update Type | Disposition | Notes |
+|----|-------------|----|-------|
+| #588 — next 16.2.4→16.2.6, brace-expansion 5.0.5→5.0.6, protobufjs 7.5.5→7.6.1, qs 6.15.1→6.15.2 | Mixed minor/patch | attempt-fix | Triggered `@dependabot rebase` after qs override and dep batch landed on develop. next/brace-expansion bumps become no-ops after rebase (develop already at 16.2.6 / >=5.0.6). CI outcome pending. |
 
 ## Verification
-
 - [x] All tests passing (354 files, 6591 tests)
 - [x] Typecheck clean
 - [x] Lint clean
-- [x] 0 npm audit vulnerabilities
-- [ ] CI green (pending push)
+- [x] CI queued on develop after push (ca6a2d10)
+- [x] Playwright binaries restored (`chromium_headless_shell-1223` installed)
+- [x] `npm audit` reports 0 vulnerabilities
+
+## Manual Items (user-initiated, cannot automate)
+1. **Investigate 101-day revenue drought** — check Pelayo voice widget + Day Pass flow on paisaxe.es
+2. **Anthropic billing** — visit platform.claude.com/settings/billing ($25/mo config may be $40-60/mo actual)
+3. **`npm run build:analyze`** — 21+ cycles overdue; stop dev server first, `rm -rf .next`
+4. **June 1 tier decision** — evaluate Vercel Hobby + Supabase Free (~$45/mo savings) if drought continues
 
 ## Carried Items
-
-- **Performance P1** (`build:analyze`): 17+ cycles overdue. Requires stopping dev server. Manual only.
-- **agent-config/route.ts line 103**: Coverage dead-code deferred — TypeScript narrowing requires restructuring the outer guard.
-- **Revenue/voice drought**: 98 days. Requires manual investigation on paisaxe.es production.
+- `src/app/api/admin/agent-config/route.ts:103` — defensive re-check architecturally unreachable; next dead-code removal candidate, deferred for dedicated Code Quality cycle
+- `voyageai` upgrade (0.1.0→0.2.1) — breaking client surface; deferred until RAG pipeline refactor
+- `npm run build:analyze` — 21+ cycles overdue; requires user to stop dev server (P1)

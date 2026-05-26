@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-05-22 06:00:05
+> Auto-generated on 2026-05-26 06:00:05
 
 ## CLAUDE.md Status
 
@@ -33,6 +33,7 @@ src/app/api/mcp/make-booking/route.test.ts
 src/app/api/webhooks/elevenlabs/route.test.ts
 src/app/api/webhooks/elevenlabs/route.ts
 src/app/api/webhooks/translate/route.test.ts
+src/app/api/webhooks/translate/route.ts
 src/app/auth/callback/route.test.ts
 src/app/error.tsx
 src/app/favorites/page.test.tsx
@@ -65,6 +66,11 @@ src/app/story/[slug]/opengraph-image.test.tsx
 src/app/story/[slug]/page.test.tsx
 src/app/story/[slug]/page.tsx
 src/app/terms/page.tsx
+src/components/admin/costs-analytics-panel/alerts.test.tsx
+src/components/admin/costs-analytics-panel/alerts.tsx
+src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx
+src/components/admin/costs-analytics-panel/forecast.test.tsx
+src/components/admin/costs-analytics-panel/forecast.tsx
 src/components/admin/elevenlabs-analytics-panel.test.tsx
 src/components/admin/story-card.tsx
 src/components/admin/story-translations-tab.test.tsx
@@ -84,6 +90,7 @@ src/config/recurring-costs.ts
 src/hooks/use-feature-flags.test.ts
 src/hooks/use-feature-flags.ts
 src/hooks/use-sse-stream.test.ts
+src/hooks/use-stories.ts
 src/hooks/use-stream-chat.test.ts
 src/hooks/use-voice-access.test.ts
 src/instrumentation.test.ts
@@ -91,6 +98,7 @@ src/lib/admin-api/stories.test.ts
 src/lib/admin-auth.test.ts
 src/lib/chat-stream-timeouts.ts
 src/lib/claude.test.ts
+src/lib/costs/manual-costs.ts
 src/lib/cron-job-lock.test.ts
 src/lib/elevenlabs-call-status.ts
 src/lib/embedding-cache.test.ts
@@ -100,6 +108,7 @@ src/lib/i18n/de.ts
 src/lib/i18n/en.ts
 src/lib/i18n/es.ts
 src/lib/i18n/fr.ts
+src/lib/i18n/provider.tsx
 src/lib/i18n/pt.ts
 src/lib/i18n/resolve.test.ts
 src/lib/i18n/translations.test.ts
@@ -109,10 +118,14 @@ src/lib/rate-limit.test.ts
 src/lib/rate-limit.ts
 src/lib/search.test.ts
 src/lib/sentry-before-send.test.ts
+src/lib/stories-data.test.ts
+src/lib/stories-data.ts
+src/lib/supabase.ts
 src/lib/translate-story.ts
 src/lib/translation-locales.ts
 src/lib/utils.test.ts
 src/lib/utils.ts
+src/test/__mocks__/server-only.ts
 src/test/i18n-mock.ts
 src/tests/hallucination-validator.test.ts
 src/tests/qa/llm-quality.test.ts
@@ -123,6 +136,9 @@ src/types/immersive.test.ts
 
 ```
 supabase/migrations/089_enable_rls_admin_audit_log.sql
+supabase/migrations/090_fix_rls_operational_tables.sql
+supabase/migrations/091_revoke_internal_function_access.sql
+supabase/migrations/092_revoke_internal_function_access_fix.sql
 ```
 
 ### Scripts
@@ -205,14 +221,6 @@ webhooks/translate
 
 ```
 
-## Changes Made This Run
-
-- No undocumented feature flags to add (gaps file empty for flags).
-- All 51 flagged API routes confirmed internal (admin panel, cron jobs, webhooks, MCP voice-agent tools, app-internal user APIs, health probes). None require user-facing documentation in `docs/project/features.md`.
-- No edits to `docs/project/features.md` or `CLAUDE.md` this cycle.
-
-Twenty-seventh consecutive clean run.
-
 ## Documentation File Ages
 
 | File | Last Modified |
@@ -220,6 +228,15 @@ Twenty-seventh consecutive clean run.
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-05-03 |
 | README.md | 2026-05-03 |
+
+## Changes Made This Run
+
+Status: GREEN. Twenty-seventh consecutive clean run. No documentation changes required.
+
+- Feature flags: gaps file reports zero undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) remain accounted for in `docs/project/features.md`.
+- API routes: all 51 flagged routes confirmed internal (admin APIs gated by `validateAdminAuth()`, cron endpoints, webhooks with HMAC verification, MCP voice-agent tools, internal health probes, and app-internal user-facing handlers consumed only by first-party React clients). None are intended for external consumption, so no public API documentation is warranted.
+- `CLAUDE.md` and `docs/project/features.md` are current.
+- No new user-facing features, feature flags, or migrations since last documentation refresh that introduce documentation obligations. Migrations 089-092 are RLS/security hardening on internal tables and functions — not user-visible behavior.
 
 ---
 
