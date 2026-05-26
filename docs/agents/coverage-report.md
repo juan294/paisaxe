@@ -1,31 +1,53 @@
-# Coverage Agent Report — 2026-05-22
+# Coverage Agent Report — 2026-05-26
 
 ## Status: GREEN
 
-Test suite fully green at 6,591 tests across 354 files (zero failures). Coverage at the May 20–21 plateau.
+Coverage improved across statements, branches, functions, and lines vs the May 22 baseline. One new test added (`stories-data.test.ts` +1) to cover the `?? supabase` fallback in the new `getClient()` helper introduced by commit `54707d54`. Suite is green in isolation; full coverage produced clean numbers after retrying with `--no-file-parallelism`.
 
 ## Overall Coverage
 
-| Metric     | This run | Prior (May 21) | Prior (May 11) |
-|------------|----------|----------------|----------------|
-| Statements | 98.66%   | 98.66%         | 98.58%         |
-| Branches   | 95.40%   | 95.40%         | 95.18%         |
-| Functions  | 98.75%   | 98.75%         | 98.65%         |
-| Lines      | 99.10%   | 99.10%         | 99.05%         |
+| Metric     | This run (May 26) | May 22 | May 11 |
+|------------|-------------------|--------|--------|
+| Statements | 98.70% (10531/10669) | 98.66% | 98.58% |
+| Branches   | 95.42% (6948/7281)   | 95.40% | 95.18% |
+| Functions  | 98.84% (2058/2082)   | 98.75% | 98.65% |
+| Lines      | 99.13% (10028/10115) | 99.10% | 99.05% |
 
-Coverage is identical to the May 20 / May 21 snapshots. No new tests were authored this cycle; the remaining uncovered lines are unchanged from the prior cycle and fall into the four documented categories below.
+Each metric is the new high-water mark for this codebase.
 
-## Tool Health Note
+## Changes This Cycle
 
-The initial `npx vitest run --coverage` invocation was killed by a worker-pool storm: 21 test files failed to start workers with `[vitest-pool-runner]: Timeout waiting for worker to respond`, plus 1 spurious timeout on `src/app/immersive/layout.test.tsx > renders children` that did not reproduce on the retry. Re-running with `--no-file-parallelism` completed cleanly in 263s with all 6,591 tests passing. This is consistent with the known concurrency-storm pattern recorded in auto-memory ([[feedback_background_agent_concurrency]]). Future agent runs of this script should consider passing `--no-file-parallelism` by default on macOS hosts when run alongside other background agents.
+### Source changes since May 22 (not authored by Coverage Agent)
+- `src/lib/stories-data.ts` (commit `54707d54`): added `getClient()` helper that returns the browser singleton when `typeof window !== "undefined"`, falling back to the module-level `supabase` server client. Prevents duplicate `GoTrueClient` instances sharing the same storage key as `AuthProvider`.
+- `src/lib/costs/manual-costs.ts`: added `import "server-only"` (commit `f197747b`).
+- `src/components/admin/costs-analytics-panel/alerts.tsx` + `forecast.tsx`: switched from barrel imports (`@/lib/costs`) to direct submodule imports (`@/lib/costs/tier-alerts`, `@/lib/costs/forecast`) to dodge a Turbopack module-factory error.
+- New `src/test/__mocks__/server-only.ts` test scaffold (no-op stub).
 
-## Coverage Plateau Confirmed (3rd Consecutive Cycle)
+### Tests authored this cycle
+- `src/lib/stories-data.test.ts`: +1 test. Covers the `createSupabaseBrowserClient() ?? supabase` fallback at `stories-data.ts:12` by mocking the browser client factory to return `null` once and asserting that `getStoriesFromDB` still flows through the module-level `supabase` mock. Also converted the `supabase-browser` mock to `vi.fn(...)` so it can be overridden per test. Coverage of `stories-data.ts` branches rose from 93.69% to 94.59%.
 
-98.66% statements / 95.40% branches remains the practical ceiling for vitest + jsdom on this codebase. The remaining uncovered lines fall entirely into four documented categories:
+## Tool Health Note (recurring)
+
+The first `npx vitest run --coverage` attempt completed but had 13 spurious "Test timed out in 5000ms" failures plus 5 worker-pool start failures. All 13 reproduced as PASS when re-run in isolation:
+
+```
+src/lib/posthog-query.test.ts
+src/components/auth/auth-provider.test.tsx
+src/components/immersive/accessibility.test.tsx
+src/components/admin/costs-analytics-panel/modals.test.tsx
+src/components/admin/marketing-dashboard/account-config-dialog.test.tsx (6 tests)
+src/components/admin/marketing-dashboard/create-draft-dialog.test.tsx (3 tests)
+```
+
+Root cause was the documented background-agent concurrency limit ([[feedback_background_agent_concurrency]]): concurrent `vitest` runs from `chapa`, `portfolio`, `termplex`, and `archy` projects were saturating CPU and the forks pool. Re-running with `--no-file-parallelism` once the other agents finished produced a clean run.
+
+**Recommendation for future Coverage Agent runs:** Wait for `pgrep -f "vitest run --coverage" | grep -v paisaxe` to be empty before launching, or prepend `--no-file-parallelism --pool=threads` to reduce fork pressure when other agents are active.
+
+## Coverage Plateau (~98.7% statements / 95.4% branches)
+
+The remaining uncovered lines fall into the same four documented categories as prior cycles:
 
 ### 1. Playwright-only components (unchanged)
-
-These render WebSocket / voice / agent-runner streams that cannot be exercised under jsdom. Playwright E2E coverage is the only path forward and is owned by the QA Agent.
 
 | File | Stmt % | Note |
 |------|--------|------|
@@ -34,33 +56,28 @@ These render WebSocket / voice / agent-runner streams that cannot be exercised u
 
 ### 2. V8 instrumentation quirks (unchanged)
 
-V8 coverage cannot reach these lines despite the tests exercising the surrounding logic:
-
-- `src/components/immersive/author-typewriter.tsx` lines 40-59, 67, 79-105 — `setInterval` callbacks scheduled across microtask + idle frames. Tests verify final state but V8 doesn't account the timer-frame statements.
+- `src/components/immersive/author-typewriter.tsx` lines 40-59, 67, 79-105 — `setInterval` callbacks scheduled across microtask + idle frames.
 - `src/hooks/use-stream-chat.ts` line 172 — closure inside `cleanup()` that V8 may not instrument when GC runs early.
-- `src/app/api/health/route.ts` line 223 — `Promise.all` catch branch on a path V8 may not instrument.
+- `src/app/api/health/route.ts` (`Promise.all` catch branch) — V8 instrumentation gap.
 
 ### 3. SSR / runtime guards genuinely unreachable in jsdom (unchanged)
 
-These guards protect against runtime environments jsdom cannot simulate:
-
-- `src/hooks/use-media-query.ts` line 15 — `typeof window === "undefined"` SSR guard. Unreachable because React DOM itself requires `window`.
-- `src/lib/request-context.ts` line 49 — `requestContextStorage.run(...)` reached only when `node:async_hooks` import succeeds, which is blocked in jsdom's ESM env.
+- `src/hooks/use-media-query.ts` line 15 — `typeof window === "undefined"` SSR guard. React DOM itself requires `window`.
+- `src/lib/request-context.ts` line 49 — `requestContextStorage.run(...)` requires `node:async_hooks` import to succeed, blocked in jsdom's ESM env.
 - `src/lib/feature-flags-server.ts` setTimeout abort callback (75% function coverage) — covered by AbortError dispatch path, but the setTimeout firing path itself never runs under fake-timer mocks.
-- `src/lib/sentry-before-send.ts` line 8 — `redactHeaders` no-op return when `headers` is undefined. Architecturally unreachable: caller at line 34 (`if (event.request.headers)`) guarantees a truthy headers value before invoking redactHeaders.
-- `src/lib/i18n/provider.tsx` lines 25-26 — `es:` and `en:` entries in the `localeLoaders` map. Dead-code: both locales are pre-populated in `translationCache` at module init, so the loader for `es`/`en` is never invoked.
+- `src/lib/sentry-before-send.ts` line 8 — `redactHeaders` no-op return when `headers` is undefined. Architecturally unreachable: caller at line 34 guarantees a truthy headers value.
+- `src/hooks/use-stories.ts` lines 58, 95, 332 — `if (typeof window === "undefined")` / `if (typeof window !== "undefined")` SSR guards in `loadFromStorage`, `saveToStorage`, `clearStoriesCache`. Cannot exercise the SSR side under jsdom.
+- `src/hooks/use-stories.ts` line 155 — `if (localStorageBootstrapped.current) return;` early-return guard. The useEffect runs once per hook instance under vitest (no Strict-Mode double-invocation), so the early-return branch is structurally unreachable.
+- **NEW**: `src/lib/stories-data.ts` line 14 — `return supabase;` (server-side else of `getClient()`). In jsdom, `typeof window !== "undefined"` is always true, so the else branch never runs. Architecturally unreachable in vitest/jsdom (same family as `use-media-query.ts:15` and `use-stories.ts:58/95/332`).
 
 ### 4. Architecturally unreachable defensive code (unchanged)
 
-These statements exist for type-safety or defensive programming but cannot be reached via the public API:
-
-- `src/lib/claude.ts` line 381 — `throw lastError || new Error("Max retries exceeded")` is unreachable: the retry loop always returns or throws inside the iteration. TypeScript requires the terminal throw for function-return inference.
-- `src/lib/chat-action-detection.ts` lines 357, 371-375, 417 — defensive branches inside the address deduplication merge loop that the existing fixture set never exercises (rare overlap patterns).
-- `src/lib/image-optimization.ts` lines 130-131 — `case "jpeg"` of the format switch. The pipeline only ever processes AVIF + WebP; jpeg is a defensive fallback.
+- `src/lib/claude.ts` line 381 — `throw lastError || new Error("Max retries exceeded")` is unreachable: the retry loop always returns or throws inside the iteration. TypeScript requires the terminal throw for return-type inference.
+- `src/lib/chat-action-detection.ts` lines 357, 371-375, 417 — defensive branches inside the address deduplication merge loop that the existing fixture set never exercises.
+- `src/lib/image-optimization.ts` lines 130-131 — `case "jpeg"` of the format switch. The pipeline only ever processes AVIF + WebP.
 - `src/components/admin/marketing-dashboard/post-row.tsx` line 18 — defensive guard when `post.id` is missing. Posts are always created with an id by the API.
-- `src/hooks/use-stories.ts` lines 215, 263 — `if (!enabled) return` guards. The `enabled` parameter defaults to `true` and no caller passes `false`. (Recommend removing in a separate cycle — flagged for Code Quality agent.)
-- `src/app/webhooks/translate/route.ts` line 206 — recovery branch in `UNKNOWN_SHAPE` handler. The entry-gate schema is identical to the second-parse schema, so the else-branch is dead code. (Recommend removing in a separate cycle — flagged for Code Quality agent.)
 - `src/app/api/admin/agent-config/route.ts` line 103 — `!agentParsed || !agentParsed.success` defensive re-check inside the else branch. The outer guard at line 89 has already excluded this case.
+- `src/components/admin/marketing-dashboard/story-editor-dialog/index.tsx` lines 40-84 — defensive fallback render path.
 
 ## Files Below 100% Statements (by category)
 
@@ -72,45 +89,40 @@ These statements exist for type-safety or defensive programming but cannot be re
 | Architectural dead code | post-row.tsx | 87.50 |
 | Architectural dead code | story-editor-dialog/index.tsx | 89.28 |
 | SSR guard | use-media-query.ts | 93.33 |
-| Architectural dead code | request-context.ts | 95.00 |
-| Architectural dead code | sentry-before-send.ts | 95.23 |
-| Architectural dead code | i18n/provider.tsx | 96.07 |
-| Architectural dead code | use-stories.ts | 96.18 |
+| SSR guard | request-context.ts | 95.00 |
+| SSR guard | sentry-before-send.ts | 95.23 |
 | Architectural dead code | image-optimization.ts | 96.42 |
+| Architectural dead code | language-switcher.tsx | 96.87 |
+| Architectural dead code | use-voice-session.ts | 97.05 |
 | Architectural dead code | feature-flags-server.ts | 97.56 |
+| SSR guard | use-stories.ts | 97.63 |
 | Architectural dead code | logger-sanitize.ts | 97.82 |
-| Architectural dead code | favorites/page.tsx | 98.30 |
-| Architectural dead code | health/route.ts | 98.24 |
-| Architectural dead code | agent-config/route.ts | 98.03 |
-| Architectural dead code | translate/route.ts | 98.94 |
+| Architectural dead code | account-config-dialog.tsx | 97.87 |
+| Architectural dead code | workflow-menu.tsx | 98.24 |
+| Architectural dead code | voice-chat.tsx | 98.43 |
+| SSR guard (line 14) | stories-data.ts | 98.94 |
 | V8 instrumentation | image-detection.ts | 99.15 |
 | Defensive throw | claude.ts | 99.47 |
-| Defensive | immersive/page-content.tsx (branch) | 100 (97.82 br) |
+| V8 instrumentation | story-viewer.tsx | 99.10 |
 
-All listed gaps are either (a) Playwright-only (out of vitest scope), (b) V8 instrumentation artefacts, or (c) defensive dead code documented above.
+All listed gaps are either (a) Playwright-only (out of vitest scope), (b) V8 instrumentation artefacts, or (c) defensive dead code / SSR guards documented above.
 
 ## Recommendations to Code Quality Agent
 
-Two dead-code branches can be safely removed (lossless cleanup; no test changes needed):
+Same as prior cycle (still open):
 
-1. **`src/hooks/use-stories.ts` lines 215 + 263** — the `enabled` parameter defaults to `true` and no caller passes `false`. Remove the parameter and the two `if (!enabled) return;` guards.
-2. **`src/app/webhooks/translate/route.ts` line 206** — the else-branch of `UNKNOWN_SHAPE` recovery is architecturally blocked by the identical entry-gate schema. Remove the dead else.
-3. **`src/lib/i18n/provider.tsx` lines 25-26** — `es:`/`en:` entries of `localeLoaders` are pre-cached and never invoked. Remove the dead entries (declared cache is already initialized at module top).
-4. **`src/app/api/admin/agent-config/route.ts` line 103** — defensive re-check is already covered by outer guard. Remove.
-
-These all dropped flags from prior cycles but remain open.
+1. `src/app/api/admin/agent-config/route.ts` line 103 — defensive re-check is already covered by outer guard at line 89. Remove to clean up branch coverage.
+2. `src/lib/chat-action-detection.ts` lines 357, 371-375, 417 — either widen the address-dedup fixture set or remove the unreachable branches.
+3. `src/lib/image-optimization.ts` lines 130-131 (`case "jpeg"`) — pipeline only ever processes AVIF/WebP; remove the jpeg case or convert it to a `default` that throws.
 
 ## Verification
 
 ```bash
 npx vitest run --coverage --no-file-parallelism
-# Test Files  354 passed (354)
-# Tests       6591 passed (6591)
-# Statements  98.66% (10533/10675)
-# Branches    95.40% (6949/7284)
-# Functions   98.75% (2057/2083)
-# Lines       99.10% (10030/10121)
-# Duration    262.83s
+# Statements   : 98.7%  (10531/10669)
+# Branches     : 95.42% (6948/7281)
+# Functions    : 98.84% (2058/2082)
+# Lines        : 99.13% (10028/10115)
 ```
 
-No source or test files were modified this cycle. No commits.
+Source changes this cycle: 1 test file (`src/lib/stories-data.test.ts`) — added one test + converted the `supabase-browser` mock to a `vi.fn()` to enable per-test override. No source files modified. No commits.

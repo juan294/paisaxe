@@ -16,6 +16,7 @@ import {
   isBuildPhase,
 } from "./stories-data";
 import { supabase } from "./supabase";
+import { createSupabaseBrowserClient } from "./supabase-browser";
 import { logger } from "@/lib/logger";
 
 // Mock supabase (server path)
@@ -30,7 +31,7 @@ vi.mock("./supabase", () => ({
 vi.mock("./supabase-browser", async () => {
   const { supabase } = await import("./supabase");
   return {
-    createSupabaseBrowserClient: () => supabase,
+    createSupabaseBrowserClient: vi.fn(() => supabase),
   };
 });
 
@@ -433,6 +434,23 @@ describe("stories-data", () => {
       const result = await getStoriesFromDB();
 
       expect(result).toEqual(FALLBACK_STORIES);
+    });
+
+    it("should fall back to module-level supabase when browser client factory returns null (line 12 ?? branch)", async () => {
+      // Covers `createSupabaseBrowserClient() ?? supabase` fallback: if the
+      // browser singleton has not been initialized, getClient() must still
+      // resolve to the module-level supabase mock so the DB call goes through.
+      vi.mocked(createSupabaseBrowserClient).mockReturnValueOnce(null as unknown as ReturnType<typeof createSupabaseBrowserClient>);
+      const mockOrder = vi.fn().mockResolvedValue({ data: [mockStoryRow], error: null });
+      const mockEqCuration = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqActive });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const result = await getStoriesFromDB();
+
+      expect(result.length).toBe(1);
+      expect(mockSupabaseFrom).toHaveBeenCalledWith("stories");
     });
   });
 
