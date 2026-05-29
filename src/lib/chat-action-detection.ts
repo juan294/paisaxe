@@ -367,8 +367,7 @@ export function detectAddresses(text: string): AddressMatch[] {
 
     // Check if this candidate overlaps or is adjacent to an already-added address
     const conflictsWithExisting = matches.some((existing) => {
-      const existingCandidate = candidates.find((c) => c.text === existing.text);
-      if (!existingCandidate) return false;
+      const existingCandidate = candidates.find((c) => c.text === existing.text)!;
 
       // Check if ranges overlap or are adjacent
       const overlaps =

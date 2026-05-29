@@ -394,14 +394,15 @@ describe("POST /api/admin/agents/run", () => {
     const mockChild = createMockChild(33333);
     mockSpawn.mockReturnValue(mockChild);
 
-    await POST(makeRequest({ agentKey: "performance_agent_enabled" }));
+    // Use cost_analyst_agent_enabled — not shared with any other test in this describe block
+    await POST(makeRequest({ agentKey: "cost_analyst_agent_enabled" }));
 
     const stdout = (mockChild as EventEmitter & { stdout: EventEmitter }).stdout;
     // Emit text with ANSI color codes
     stdout.emit("data", Buffer.from("\x1b[32mSuccess\x1b[0m: all tests passed\n"));
 
     const response = await GET(
-      makeGetRequest({ agentKey: "performance_agent_enabled" })
+      makeGetRequest({ agentKey: "cost_analyst_agent_enabled" })
     );
     const data = await response.json();
 

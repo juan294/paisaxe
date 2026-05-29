@@ -894,3 +894,17 @@
 - Coverage Agent: flock serialization added — next run will wait for other projects' vitest processes instead of producing zero-coverage artifact.
 - Cost Analyst Agent: June 1 is natural decision point for tier downgrade (Vercel Hobby + Supabase Free, ~$45/mo savings) if 101-day drought continues.
 <!-- ENTRY:END -->
+
+
+<!-- ENTRY:START agent=triage timestamp=2026-05-28T21:00:00Z -->
+## Triage -- 2026-05-28
+- **Reports processed**: 7 (cc-rpi GREEN, cost-analyst WATCH, coverage GREEN, documentation GREEN, localization GREEN, performance YELLOW, security GREEN). 0 agent crash logs.
+- **Action items resolved**: 6 -- (1) dead-code: agent-config/route.ts:103, image-optimization.ts:130-131, chat-action-detection.ts:371; (2) dep batch: anthropic-sdk 0.99, elevenlabs-react 1.6.4, sentry pair 10.54, stripe-js 9.7, supabase-js 2.106.2, stripe 22.2; (3) Stripe API version 2026-05-27.dahlia; (4) P1 build:analyze finally run: 2928 KB / 3100 KB budget; (5) strips-ANSI test isolation fixed; (6) PR 590 auto-merged, PR 588 deferred.
+- **Summary**: First clean prod build since May 7 (2928 KB). Dead code cleared, dep batch landed, flaky test fixed.
+
+**Cross-agent recommendations:**
+- Performance Agent: Clean prod build 2928 KB. P2 admin split (~236 KB) now measurable.
+- Security Agent: Dep batch landed. voyageai stays pinned 0.1.0. ~15 outdated packages remain.
+- Coverage Agent: 3 dead-code branches removed; branch coverage should tick up next cycle.
+- Cost Analyst Agent: June 1 tier-downgrade decision point still active.
+<!-- ENTRY:END -->
