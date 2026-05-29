@@ -158,6 +158,11 @@ fi
   echo "- Total CSS: ${TOTAL_CSS_KB} KB"
   echo "- Budget (split, since 2026-04-04): initial ${BUDGET_INITIAL_JS_KB} KB / total ${BUDGET_TOTAL_JS_KB} KB"
   echo ""
+  if [[ "$FRESH_BUILD" == "true" ]]; then
+    echo "FIRST LOAD JS (per-route split, from next build):"
+    echo "$BUILD_OUTPUT" | grep -E "First Load JS" | head -10
+    echo ""
+  fi
   echo "LARGEST JS CHUNKS:"
   echo "$LARGEST_CHUNKS"
   echo ""
