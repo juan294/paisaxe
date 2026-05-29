@@ -1,52 +1,55 @@
 # Triage Report
-> Generated on 2026-05-26 | 8 reports processed | 5 action items | 1 Dependabot PR
+> Generated on 2026-05-28 | 7 reports processed | 6 action items | 2 Dependabot PRs
 
 ## Agent Failures
 None — all agents ran successfully.
 
 ## Reports Reviewed
-| # | Report | Agent | Status | Action Items |
-|---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi | GREEN | None — already at HEAD (v1.18.0) |
-| 2 | cost-analyst-report.md | cost-analyst | WATCH | Manual: revenue drought investigation, Anthropic billing, build:analyze, June tier decision |
-| 3 | coverage-report.md | coverage | YELLOW (env) | Add flock serialization to coverage-agent.sh ✓ |
-| 4 | documentation-report.md | documentation | GREEN | None — 28th consecutive clean run |
-| 5 | localization-report.md | localization | GREEN | None — 58th consecutive clean run, 100% across 6 locales |
-| 6 | performance-report.md | performance | YELLOW | Tighten dev-server guard in performance-agent.sh ✓ |
-| 7 | qa-report.md | qa | YELLOW | Run npx playwright install ✓ |
-| 8 | security-report.md | security | YELLOW | Bump qs override + batch 7 production patches ✓ |
+| # | Report | Status | Action Items |
+|---|--------|--------|--------------|
+| 1 | cc-rpi-update-report.md | GREEN | None — already at v1.18.0 |
+| 2 | cost-analyst-report.md | WATCH | Manual: investigate 104-day revenue drought + 100-day voice silence |
+| 3 | documentation-report.md | GREEN | None — 27th consecutive clean run |
+| 4 | localization-report.md | GREEN | None — 54th consecutive clean run |
+| 5 | performance-report.md | YELLOW | P1 build:analyze run; dep batch paired with build |
+| 6 | security-report.md | GREEN | Dep batch (hygiene-only) |
+| 7 | coverage-report.md | GREEN | 3 dead-code branch removals |
 
-## Overall Status: YELLOW → GREEN (after fixes)
+## Overall Status: GREEN
 
 ## Action Items Completed
-| # | Item | Source Report | Tests Added | Status |
-|---|------|--------------|-------------|--------|
-| 1 | Bump `qs` override from `>=6.14.2` to `>=6.15.2` in `package.json` overrides — clears 2 moderate GHSA-q8mj-m7cp-5q26 advisories (`npm audit` now 0 vulns) | security | No (lockfile-only) | ✅ Done |
-| 2 | Batch 7 production patches: `@anthropic-ai/sdk` 0.96→0.98, `@elevenlabs/react` 1.6.0→1.6.3, `@stripe/react-stripe-js` 6.3→6.4, `@stripe/stripe-js` 9.5→9.6, `@supabase/supabase-js` 2.106.0→2.106.1, `posthog-js` 1.374→1.376, `postcss` 8.5.14→8.5.15 (excluded `voyageai` — breaking) | security | No | ✅ Done |
-| 3 | Add `flock 200` + `/tmp/paisaxe-vitest-coverage.lock` around Claude invocation in `scripts/coverage-agent.sh` — serializes concurrent vitest runs across host projects | coverage | No | ✅ Done |
-| 4 | Scope dev-server guard in `scripts/performance-agent.sh` from `lsof -ti :3000` to `pgrep -fl "next dev" \| grep "$PROJECT_DIR"` — prevents false-positive match on other projects | performance | No | ✅ Done |
-| 5 | Run `npx playwright install` — `chromium_headless_shell-1223` now present; journey suite unblocked | qa | No (infrastructure) | ✅ Done |
+| # | Item | Source | Status |
+|---|------|--------|--------|
+| 1 | Remove dead defensive re-check at `agent-config/route.ts:103` | coverage | Done |
+| 2 | Change dead `case "jpeg"` to `default: throw` in `image-optimization.ts:130-131` | coverage | Done |
+| 3 | Remove unreachable null guard at `chat-action-detection.ts:371` | coverage | Done |
+| 4 | Fix flaky `strips ANSI` test: move to `cost_analyst_agent_enabled` (was colliding with real PIDs) | pre-existing | Done |
+| 5 | Dep batch: anthropic-sdk 0.99, elevenlabs-react 1.6.4, sentry pair 10.54, stripe-js 9.7, supabase-js 2.106.2, stripe 22.2, Stripe API version 2026-05-27.dahlia | security + perf | Done |
+| 6 | P1 `npm run build:analyze`: first clean production build since May 7 — **2,928 KB / 3,100 KB budget** | performance | Done |
 
 ## Dependabot PRs
-| PR | Update Type | Disposition | Notes |
-|----|-------------|----|-------|
-| #588 — next 16.2.4→16.2.6, brace-expansion 5.0.5→5.0.6, protobufjs 7.5.5→7.6.1, qs 6.15.1→6.15.2 | Mixed minor/patch | attempt-fix | Triggered `@dependabot rebase` after qs override and dep batch landed on develop. next/brace-expansion bumps become no-ops after rebase (develop already at 16.2.6 / >=5.0.6). CI outcome pending. |
+| # | PR | Update Type | CI | Disposition |
+|---|----|----|----|----|
+| 1 | #590 dev-and-types group (5 dev dep updates) | minor/patch dev | GREEN | auto-merge |
+| 2 | #588 next/brace-expansion/protobufjs/qs | minor/patch | RED | deferred — stale, develop already has these fixes |
 
 ## Verification
-- [x] All tests passing (354 files, 6591 tests)
+- [x] All tests passing (354 files, 6592 tests)
 - [x] Typecheck clean
 - [x] Lint clean
-- [x] CI queued on develop after push (ca6a2d10)
-- [x] Playwright binaries restored (`chromium_headless_shell-1223` installed)
-- [x] `npm audit` reports 0 vulnerabilities
+- [ ] CI pending (post-push)
 
-## Manual Items (user-initiated, cannot automate)
-1. **Investigate 101-day revenue drought** — check Pelayo voice widget + Day Pass flow on paisaxe.es
-2. **Anthropic billing** — visit platform.claude.com/settings/billing ($25/mo config may be $40-60/mo actual)
-3. **`npm run build:analyze`** — 21+ cycles overdue; stop dev server first, `rm -rf .next`
-4. **June 1 tier decision** — evaluate Vercel Hobby + Supabase Free (~$45/mo savings) if drought continues
+## Bundle Analysis (P1 — first clean prod build since May 7)
+| Metric | May 7 (last prod) | May 28 (today) | Delta |
+|--------|-------------------|----------------|-------|
+| Total JS | 2,892 KB | 2,928 KB | +36 KB (dep batch) |
+| Budget | 3,100 KB | 3,100 KB | — |
+| Headroom | +208 KB | +172 KB | — |
 
 ## Carried Items
-- `src/app/api/admin/agent-config/route.ts:103` — defensive re-check architecturally unreachable; next dead-code removal candidate, deferred for dedicated Code Quality cycle
-- `voyageai` upgrade (0.1.0→0.2.1) — breaking client surface; deferred until RAG pipeline refactor
-- `npm run build:analyze` — 21+ cycles overdue; requires user to stop dev server (P1)
+- Revenue drought (104 days) + voice silence (100 days) — manual investigation required by owner
+- Anthropic billing check at platform.claude.com/settings/billing
+- June 1 tier-downgrade decision (Vercel/Supabase/ElevenLabs, ~$45-67/mo savings)
+- P2 admin route split (~228 KB in prod) — now measurable with fresh prod build
+- P2b browserslist trim — polyfills chunk ~108 KB
+- PR #588 — stale, should be closed
