@@ -152,6 +152,11 @@ fi
     echo "Bundle sizes below are from the dev server's .next cache — they may"
     echo "differ from a production build. Dependency and disk metrics are still accurate."
     echo ""
+    echo "BUDGET VERDICT SUPPRESSED: .next provenance is unverified (no fresh production build)."
+    echo "Report bundle sizes as informational only. Do NOT emit RED/YELLOW/GREEN for the bundle"
+    echo "size budget — that verdict requires a confirmed production build to be authoritative."
+    echo "Base the overall status verdict on dependency and disk metrics only."
+    echo ""
   fi
   echo "BUNDLE SIZES:"
   echo "- Total JS: ${TOTAL_JS_KB} KB (previous: ${PREV_TOTAL_JS_KB} KB, change: ${JS_CHANGE_KB} KB)"
@@ -183,7 +188,7 @@ fi
     echo "$HEAVY_DEPS"
     echo ""
   fi
-  if [[ -n "$VIOLATIONS" ]]; then
+  if [[ -n "$VIOLATIONS" ]] && [[ "$FRESH_BUILD" == "true" ]]; then
     echo "BUDGET VIOLATIONS:"
     echo -e "$VIOLATIONS"
     echo ""
