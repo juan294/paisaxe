@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-05-26 06:00:05
+> Auto-generated on 2026-06-04 06:00:02
 
 ## CLAUDE.md Status
 
@@ -13,7 +13,9 @@ These source files have been modified since CLAUDE.md was last updated and may n
 
 ```
 src/app/about/page.tsx
+src/app/api/admin/agent-config/route.ts
 src/app/api/admin/agent-reports/route.test.ts
+src/app/api/admin/agents/run/route.test.ts
 src/app/api/admin/analytics/route.test.ts
 src/app/api/admin/elevenlabs-analytics/route.test.ts
 src/app/api/admin/github-analytics/route.test.ts
@@ -96,6 +98,7 @@ src/hooks/use-voice-access.test.ts
 src/instrumentation.test.ts
 src/lib/admin-api/stories.test.ts
 src/lib/admin-auth.test.ts
+src/lib/chat-action-detection.ts
 src/lib/chat-stream-timeouts.ts
 src/lib/claude.test.ts
 src/lib/costs/manual-costs.ts
@@ -112,6 +115,7 @@ src/lib/i18n/provider.tsx
 src/lib/i18n/pt.ts
 src/lib/i18n/resolve.test.ts
 src/lib/i18n/translations.test.ts
+src/lib/image-optimization.ts
 src/lib/logger-sanitize.test.ts
 src/lib/logger.test.ts
 src/lib/rate-limit.test.ts
@@ -120,6 +124,7 @@ src/lib/search.test.ts
 src/lib/sentry-before-send.test.ts
 src/lib/stories-data.test.ts
 src/lib/stories-data.ts
+src/lib/stripe.ts
 src/lib/supabase.ts
 src/lib/translate-story.ts
 src/lib/translation-locales.ts
@@ -127,6 +132,7 @@ src/lib/utils.test.ts
 src/lib/utils.ts
 src/test/__mocks__/server-only.ts
 src/test/i18n-mock.ts
+src/test/setup.ts
 src/tests/hallucination-validator.test.ts
 src/tests/qa/llm-quality.test.ts
 src/types/immersive.test.ts
@@ -146,9 +152,11 @@ supabase/migrations/092_revoke_internal_function_access_fix.sql
 ```
 scripts/check-verification-coverage.ts
 scripts/cost-analyst-agent.sh
+scripts/coverage-agent.sh
 scripts/generate-icons.ts
 scripts/generate-stories.test.ts
 scripts/generate-stories.ts
+scripts/performance-agent.sh
 scripts/security-agent.sh
 scripts/seed-database.test.ts
 scripts/seed-database.ts
@@ -231,12 +239,25 @@ webhooks/translate
 
 ## Changes Made This Run
 
-Status: GREEN. Twenty-seventh consecutive clean run. No documentation changes required.
+Run date: 2026-06-04
+Status: GREEN — no documentation changes required. Clean run continues.
 
-- Feature flags: gaps file reports zero undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) remain accounted for in `docs/project/features.md`.
-- API routes: all 51 flagged routes confirmed internal (admin APIs gated by `validateAdminAuth()`, cron endpoints, webhooks with HMAC verification, MCP voice-agent tools, internal health probes, and app-internal user-facing handlers consumed only by first-party React clients). None are intended for external consumption, so no public API documentation is warranted.
-- `CLAUDE.md` and `docs/project/features.md` are current.
-- No new user-facing features, feature flags, or migrations since last documentation refresh that introduce documentation obligations. Migrations 089-092 are RLS/security hardening on internal tables and functions — not user-visible behavior.
+### Feature flags
+No changes. The gaps file reported zero undocumented feature flags. Verified all 17 visitor/admin feature flags in `src/types/feature-flags.ts` (`FeatureFlagKey`) are present in the Feature Flags Reference table in `docs/project/features.md`. The 10 agent flags (Agents tab) are also fully documented. No additions or edits needed.
+
+### API routes
+No changes. All 51 flagged routes were confirmed internal — none are meant for external consumption, so no documentation was added:
+- Admin APIs (`/api/admin/*`) — admin-auth gated, dashboard-only.
+- Chat (`/api/chat`, `/api/chat/stream`) — app-internal RAG endpoints (already described in features.md).
+- Checkout (`/api/checkout/*`) — app-internal Stripe flow.
+- Cron jobs (`/api/cron/*`, incl. new `github-traffic-sync`, `fail-stale-bookings`) — Vercel Cron authenticated, server-only.
+- App-internal user APIs (`/api/favorites`, `/api/feature-flags`, `/api/suggestions`, `/api/voice-access`).
+- Health probes (`/api/health`, `/api/health/live`, `/api/health/db`) — `/api/health` and `/api/health/live` already documented in features.md; `/api/health/db` is an internal QA-agent diagnostic probe (verified in source), not an external contract.
+- MCP voice-agent tools (`/api/mcp/*`) — invoked by the ElevenLabs/Pelayo agent, already documented under Premium Voice Agent.
+- Webhooks (`/api/webhooks/*`) — signature-verified inbound from external services, already documented in the Infrastructure section.
+
+### Source review
+No new user-facing features, feature flags, or migrations (089–092 are RLS/grant hardening — no documentation surface) introduced anything requiring a `features.md` update.
 
 ---
 
