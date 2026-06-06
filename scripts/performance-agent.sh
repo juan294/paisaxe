@@ -45,11 +45,13 @@ BUILD_OUTPUT=""
 DEV_SERVER_PID=""
 RESTART_DEV_SERVER=false
 
-# Detect if THIS project's dev server is running (scoped to PROJECT_DIR to avoid
-# matching other projects' next dev processes running on port 3000).
-DEV_SERVER_PID=$(pgrep -fl "next dev" 2>/dev/null | grep "$PROJECT_DIR" | awk '{print $1}' | head -1 || true)
+# Detect if THIS project's dev server is running on its pinned port (3006,
+# per commit 01079491). Port-based check is immune to sibling Next.js projects
+# running on other ports triggering false positives.
+DEV_SERVER_PORT=3006
+DEV_SERVER_PID=$(lsof -ti :${DEV_SERVER_PORT} -sTCP:LISTEN 2>/dev/null | head -1 || true)
 if [[ -n "$DEV_SERVER_PID" ]]; then
-  log_info "Dev server detected (PID $DEV_SERVER_PID) — stopping for production build..." | tee -a "$LOG_FILE"
+  log_info "Dev server detected on port ${DEV_SERVER_PORT} (PID $DEV_SERVER_PID) — stopping for production build..." | tee -a "$LOG_FILE"
   kill "$DEV_SERVER_PID" 2>/dev/null
   # Wait for the process to exit (up to 10 seconds)
   for i in $(seq 1 20); do
@@ -148,9 +150,9 @@ fi
   echo "========================================="
   echo ""
   if [[ "$FRESH_BUILD" == "false" ]]; then
-    echo "NOTE: Production build was skipped (dev server was running)."
-    echo "Bundle sizes below are from the dev server's .next cache — they may"
-    echo "differ from a production build. Dependency and disk metrics are still accurate."
+    echo "NOTE: Production build was skipped or failed — no fresh build available."
+    echo "Bundle sizes below are from cached .next artifacts, which may not reflect"
+    echo "the current source tree. Dependency and disk metrics are still accurate."
     echo ""
     echo "BUDGET VERDICT SUPPRESSED: .next provenance is unverified (no fresh production build)."
     echo "Report bundle sizes as informational only. Do NOT emit RED/YELLOW/GREEN for the bundle"
@@ -224,7 +226,7 @@ Current metrics:
 $(cat "$METRICS_FILE")
 
 Build output summary:
-$(if [[ "$FRESH_BUILD" == "true" ]]; then echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30; else echo "(No build output — dev server was running, used cached .next data)"; fi)
+$(if [[ "$FRESH_BUILD" == "true" ]]; then echo "$BUILD_OUTPUT" | grep -E "Route|○|ƒ|Size|First|modules" | head -30; else echo "(No build output — build was skipped or failed, used cached .next data)"; fi)
 
 $SHARED_CONTEXT_READ
 
