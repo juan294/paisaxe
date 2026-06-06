@@ -1,53 +1,69 @@
-# Performance Agent Report — 2026-06-04
+# Performance Agent Report — 2026-06-06
 
 ## Summary
 
-**Status: RED — total-JS budget BREACHED (confirmed, 2nd consecutive cycle).** The total JS is **3,398 KB against a 3,100 KB budget — a 298 KB (9.6%) overage.** This was first surfaced yesterday (Jun 3) by the only genuine production build in twelve cycles; today's run independently re-reads the same production artifacts and lands on the identical 3,398 KB, hardening the finding from "newly revealed" to "verified and stable."
+Status: GREEN (advisory). The two authoritative dimensions this cycle — production dependency count and disk usage — are both healthy: 35 / 40 production deps (5 headroom) and node_modules flat at 1,043 MB. Per the metrics script's provenance gate, the bundle-size budget verdict is suppressed this cycle (no fresh production build was made), so no RED/YELLOW/GREEN is emitted for total JS. The overall status is based on deps + disk only, exactly as the script instructs.
 
-### Provenance note — today's number is authoritative despite the dev-cache fallback
+This is the second consecutive cycle (Jun 5 / Jun 6) where the suppression logic — added by the Jun 4 triage fix `e586fdad` — works as designed. The honest position is unchanged: the 3,398 KB number is informational, not a pass/fail signal, until a fresh build is run.
 
-The metrics script again printed `Production build was skipped (dev server was running)` and reported 3,398 KB "from the dev cache." That label is misleading this cycle. The `.next/` directory was last written **Jun 3 10:03** — it still holds the real production build from yesterday's run, and no `next dev` process was active at read time. The dev server never recompiled those chunks. Confirmation:
+### New this cycle — the cached build is now DOUBLY stale (it predates the Jun 4 production dep batch)
 
-- All 64 emitted JS chunks are present (a dev cache only contains visited routes — it would show far fewer).
-- The top chunk hashes are byte-identical to yesterday's real-build report (`003bi2x1z1ykz.js` = 604,989 B, etc.).
-- No commit has landed on `develop` since `5f0c6a03` (May 29), so the bundle could not have changed.
+The prior report (Jun 5) asserted "No commit has landed on develop since `5f0c6a03` (May 29), so the bundle could not have changed." That claim was wrong. Five commits landed on Jun 4 that the Jun 5 report missed:
 
-So today's 3,398 KB is a **second independent read of the Jun 3 production artifacts**, not a fresh dev-cache undercount. The breach is real and stable.
+```
+01079491 2026-06-04 11:17  chore: pin dev server to port 3006
+e33f2f71 2026-06-04 10:17  chore(deps-dev): bump the dev-and-types group (#593)
+421e3994 2026-06-04 10:17  chore(deps): bump the production group with 11 updates (#592)
+c2a4671d 2026-06-04 10:15  chore: triage Jun 4
+e586fdad 2026-06-04 10:12  fix(agents): suppress bundle verdict when provenance unverified
+```
 
-### Chunk identification re-verified this cycle (signature grep)
+The `.next/` artifacts are dated **Jun 3 10:03:41** — they predate `421e3994` (#592), which bumped **11 production dependencies** on Jun 4. So the cached bundle was built against the *previous* versions of those 11 production deps. It no longer matches the current dependency tree. This strengthens, not weakens, the case for a fresh build: the 3,398 KB figure is now stale by a full production dep batch, and any attribution work against it is unreliable.
 
-| Chunk | Size | Signature found | Verdict |
-|---|---:|---|---|
-| `003bi2x1z1ykz.js` | 605 KB | `elevenlabs`/`11labs` matched | ElevenLabs SDK |
-| `0t~d~esdbfsi5.js` | 330 KB | `GoTrueClient`/`supabase` matched | Supabase JS client |
-| `0lyyno-gee1wu.js` | 221 KB | `posthog` matched | PostHog |
-| `0e_r8dj.mq~mp.js` | 212 KB | `micromark`/`mdast` matched | react-markdown family |
+### Provenance — what the 3,398 KB number actually is
 
-(The `@next/bundle-analyzer` treemap remains a no-op under Next 16's Turbopack/rolldown bundler — chunk contents are identified by grepping minified bytes for library signatures, as established last cycle.)
+The `.next/` directory holds the Jun 3 10:03 production build (verified, unchanged):
 
-| Signal | Value | Status |
-|---|---:|:---:|
-| Total JS (real prod build, re-confirmed) | 3,398 KB | RED — 298 KB over budget |
-| Total JS budget (total, incl. deferred) | 3,100 KB | Breached |
-| Initial JS (estimated, deferred chunks subtracted) | ~2,022 KB | Pass (estimate) |
-| Total CSS | 122 KB | Green |
-| Production deps | 35 / 40 | Green (5 headroom) |
-| node_modules disk | 1,043 MB | Watch (flat) |
+- `.next` mtime: Jun 3 10:03:41 — not rewritten since.
+- 64 JS chunks present (a dev cache only holds visited routes; it would show far fewer). This is a real-build signature.
+- Top chunks byte-identical to the recorded build: `003bi2x1z1ykz.js` = 604,989 B, `0t~d~esdbfsi5.js` = 330,132 B.
+
+So 3,398 KB is a real production figure — but from Jun 3, before the Jun 4 dep batch. Reported below as informational only. No budget pass/fail is asserted.
+
+### The "dev server was running" note is still a sibling-project false positive
+
+The metrics script again reported `Production build was skipped (dev server was running)`. Paisaxe's dev server was NOT running. Verified at read time:
+
+- Port 3006 (paisaxe's pinned dev port, per `01079491`) is free — no listener.
+- No `next-server` / `next dev` processes are running at all this cycle.
+
+A clean `npm run build:analyze` is available right now with nothing to stop. The script's dev-server detection matches any machine-wide `next-server` process rather than paisaxe's own port/path, which is why it false-triggers. This is now the 13th-plus consecutive cycle the fresh build has been deferred on a false premise.
 
 ## Key Metrics
 
-### Bundle (real production build, re-read)
+| Signal | Value | Authoritative? | Status |
+|---|---:|:---:|:---:|
+| Production deps | 35 / 40 | Yes | GREEN (5 headroom) |
+| Dev deps | 30 | Yes | Informational |
+| node_modules disk | 1,043 MB | Yes | GREEN (flat) |
+| .next disk | 60 MB | Yes | GREEN |
+| Total JS (Jun 3 artifacts, pre-dep-batch) | 3,398 KB | No — verdict suppressed | Informational only |
+| Total CSS | 122 KB | No (same build) | Informational |
+| JS chunk files | 64 | — | (real-build signature) |
+
+### Bundle (informational — Jun 3 production artifacts; NOT a fresh build, and now pre-dep-batch)
 
 ```
-Total JS (real prod, re-confirmed 2026-06-04):  3,398 KB  (3,479,884 bytes)
-Budget (split, since 2026-04-04):               2,100 KB initial / 3,100 KB total
-Overage on total budget:                        +298 KB  (9.6% over)
-Last genuine prod build (~May 21):              3,082 KB  → +316 KB growth
-Total CSS:                                      122 KB
-JS chunk files:                                 64
+Total JS (Jun 3 prod build, re-read 2026-06-06):  3,398 KB
+Budget (split, since 2026-04-04):                 2,100 KB initial / 3,100 KB total
+Total CSS:                                        122 KB
+JS chunk files:                                   64
+Verdict:                                          SUPPRESSED — provenance unverified + pre-dep-batch
 ```
 
-### Largest chunks (real prod build)
+No budget pass/fail is emitted. For reference only: were this a fresh build, 3,398 KB would sit 298 KB over the 3,100 KB total budget — but that comparison is not authoritative, and is now further undermined because the artifacts predate the Jun 4 production dep batch (#592).
+
+### Largest chunks (Jun 3 production artifacts; contents from prior signature grep)
 
 | Size | Chunk | Contents (evidence) | Loading |
 |---:|---|---|---|
@@ -55,14 +71,14 @@ JS chunk files:                                 64
 | 330 KB | `0t~d~esdbfsi5.js` | Supabase JS client (matched `GoTrueClient`) | First paint (auth session) |
 | 237 KB | `0422xq0sb~4g3.js` | React + Next framework vendor | First paint (required) |
 | 221 KB | `0lyyno-gee1wu.js` | PostHog (matched `posthog`) | Deferred analytics |
-| 212 KB | `0e_r8dj.mq~mp.js` | react-markdown / micromark / mdast | Deferred (`chat-message-list.tsx`) |
+| 212 KB | `0e_r8dj.mq~mp.js` | react-markdown / micromark / mdast | Deferred (chat rendering) |
 | 149 KB | `0a-pavpl4ggb0.js` | Unidentified app/shared chunk | First paint (likely) |
 | 132 KB | `09k9sarjqmw54.js` | react-markdown family (remark/rehype) | Deferred |
 | 118 KB | `0u4~hej3h-90o.js` | PostHog support | Deferred |
 | 113 KB | `03~yq9q893hmn.js` | Stable shared chunk | First paint |
 | 88 KB | `149pw4wm-wp~8.js` | react-markdown family | Deferred |
 
-Deferred chunks that still count toward the **total** budget: ElevenLabs 605 KB + PostHog (221 + 118 =) 339 KB + react-markdown family (212 + 132 + 88 =) 432 KB = **~1,376 KB of deferred weight.** Subtracting these, first-paint/initial JS is roughly **~2,022 KB**, under the 2,100 KB initial budget. The breach is on **total**, driven by deferred chunks, not on initial load. (Estimate: Next 16 Turbopack does not emit per-route "First Load JS" columns.)
+(The `@next/bundle-analyzer` treemap remains a no-op under Next 16's Turbopack/rolldown bundler. Chunk contents identified by grepping minified bytes for library signatures, as established in prior cycles. These signatures are from the Jun 3 build and may shift after the Jun 4 dep batch is built fresh.)
 
 ### Dependencies (heaviest on disk)
 
@@ -70,83 +86,84 @@ Deferred chunks that still count toward the **total** budget: ElevenLabs 605 KB 
 |---|---:|---|---|
 | next | 169 | Build/runtime | Required |
 | @next | 117 | Build/runtime | Required |
-| @sentry | 71 | Yes (browser bundle) | First-paint cost; 10.55 |
-| pdfjs-dist | 61 | No | devDependency |
-| pdf-parse | 57 | No | devDependency |
+| @sentry | 71 | Yes (browser bundle) | First-paint cost; 10.55 installed |
+| pdfjs-dist | 61 | No | devDependency — never client-shipped |
+| pdf-parse | 57 | No | devDependency — never client-shipped |
 | @opentelemetry | 41 | Server-only | Sentry transitive |
 | lucide-react | 39 | Yes (tree-shaken) | `optimizePackageImports` active (`next.config.ts:19`) |
-| posthog-js | 38 | Yes (deferred, ~339 KB) | `optimizePackageImports` active |
+| posthog-js | 38 | Yes (deferred, ~339 KB) | `optimizePackageImports` active (`next.config.ts:19`) |
 | @napi-rs | 30 | No | Native binding, server-only |
 | typescript | 24 | No | Dev/build-time only |
 | stripe | 19 | Server-only | Node SDK, 22.2.0 |
 | canvas | 19 | No | optionalDependency, server-only |
 | @rolldown | 19 | No | Turbopack bundler, build-time |
 | @img | 16 | No | sharp native bindings, server-only |
-| core-js | 15 | Build-time transitive | No client polyfills chunk ships (closed last cycle) |
+| core-js | 15 | Build-time transitive | No client polyfills chunk ships |
 
-Production dependency count is 35 / 40 (5 headroom), unchanged.
+Production dependency count is 35 / 40 (5 headroom), unchanged. `optimizePackageImports` confirmed active for `lucide-react` and `posthog-js` at `next.config.ts:19`; `cacheComponents` (PPR) at `next.config.ts:16`.
 
 ## Budget Status
 
 | Budget | Limit | Current | Status |
 |---|---:|---:|:---:|
-| **Total JS** | **3,100 KB** | **3,398 KB** | **FAIL — 298 KB over** |
-| Initial JS | 2,100 KB | ~2,022 KB (estimated) | Pass (estimate; not exactly measurable under Turbopack) |
-| Production deps | 40 | 35 | Pass |
+| Total JS | 3,100 KB | 3,398 KB (Jun 3 artifacts, pre-dep-batch, unverified) | SUPPRESSED — no fresh build |
+| Initial JS | 2,100 KB | ~2,022 KB (estimated, deferred subtracted) | Informational (estimate) |
+| Production deps | 40 | 35 | PASS |
+| node_modules disk | (soft) | 1,043 MB | PASS (flat) |
 | Total CSS | (no hard budget) | 122 KB | Healthy |
 
-The total-JS budget is exceeded. Per the script's violation logic (`performance-agent.sh:135-136`) this is a hard failure, not advisory. The breach is now confirmed across two consecutive reads of the production artifacts.
+The total-JS verdict is intentionally suppressed: per the script's provenance gate, a pass/fail on bundle size requires a confirmed fresh production build, which did not happen. The authoritative budgets (deps, disk) both pass.
 
 ## Top Optimization Opportunities (prioritized by impact)
 
-### 1. ElevenLabs SDK — 605 KB, serving 107 days of zero Paisaxe voice traffic (HIGHEST IMPACT)
+### 1. Run a fresh `npm run build:analyze` — unblocked, and now overdue for a concrete reason (HIGHEST PRIORITY, PROCESS)
 
-The single ElevenLabs chunk is **605 KB — 20% of the bundle by itself.** Removing it alone (3,398 → ~2,793 KB) brings the project comfortably back under the 3,100 KB budget in one move. It is already click-to-mount-deferred (P3, `bd833288`), so it does not touch first paint, but it **counts toward the total budget that is now breached.**
+This is the single action that converts every bundle number from "informational" to "authoritative" and restores a real verdict. The premise that has blocked it for 13-plus cycles — a running dev server — is false again this cycle: port 3006 is free and no `next-server` process is running. New this cycle: the cached build predates the Jun 4 production dep batch (#592, 11 updates), so the stale figure is no longer even a clean snapshot of current `develop`. A fresh build is needed to know whether the Jun 4 batch moved the bundle.
 
-Cost Analyst (2026-06-04) reports **Paisaxe voice silence at 107 days** (since Feb 17) and that the only ElevenLabs activity is a *personal* Coach/Archy agent — no Paisaxe agent traffic at all. Cost Analyst explicitly flags that shelving voice serves a **dual purpose**: it removes the 605 KB chunk (resolving this breach) AND advances the standing June tier-downgrade decision (~$45/mo savings). This is now both a budget lever and a cost lever, pointing the same direction.
+Secondary script fix: scope `performance-agent.sh`'s dev-server check to paisaxe's own port (3006) / project path rather than any machine-wide `next-server` process, so sibling Next.js projects stop false-triggering verdict suppression.
 
-Code path: the import lives behind the voice widget mount; removal means deleting the `@elevenlabs/react` dependency (`package.json:65`) and the voice-chat mount call once a shelving decision is made. **This is a product/business decision, not a pure-mechanical fix — it should be made jointly with the cost downgrade evaluation, not unilaterally.**
+### 2. ElevenLabs SDK — 605 KB, serving 109 days of zero Paisaxe voice traffic (HIGHEST IMPACT, IF A BREACH IS CONFIRMED)
 
-### 2. Re-baseline budget tracking on real builds, not the dev cache (PROCESS — still open)
+The single ElevenLabs chunk is 605 KB — 20% of the bundle by itself. It is already click-to-mount-deferred (`bd833288`), so it does not touch first paint, but it counts toward the total budget. If a fresh build confirms the total is over 3,100 KB, removing this chunk alone (3,398 to ~2,793 KB) brings the project back under budget in one move.
 
-The breach was invisible for twelve cycles because the script reported dev-cache undercounts as authoritative. This cycle got lucky: the dev server happened to be down at read time and the `.next/` cache held a real build. That luck is not a fix. Two concrete actions remain:
+Cost Analyst (2026-06-06) reports Paisaxe voice silence at 109 days (since Feb 17), with the only ElevenLabs activity coming from a personal Coach agent — zero Paisaxe agent traffic. Cost Analyst flags this as a dual lever: shelving voice removes the 605 KB chunk AND advances the standing June tier-downgrade decision (~$45/mo), pointing the same direction.
 
-- The next triage (with the dev server reliably stopped) should run `npm run build` so the agent records a real number to `.performance-history.json`. **Note the history file still shows 2,850 KB for both Jun 3 and Jun 4 — the real 3,398 KB build has never been written to it.** The history is therefore still tracking the dev-cache fiction; it needs a real entry to reset the trend line.
-- `performance-agent.sh` should suppress its GREEN/RED budget verdict (not just print a NOTE) when `.next` provenance cannot be confirmed as a fresh production build.
+This is a product/business decision, not a mechanical fix. Removal means deleting `@elevenlabs/react` (`package.json:65`) and the voice-chat mount call. Decide jointly with the cost downgrade evaluation, not unilaterally.
 
-### 3. Attribute the +316 KB growth (last genuine build ~May 21 → now) (MEDIUM)
+### 3. react-markdown family — ~432 KB across three deferred chunks (MEDIUM)
 
-Between the last recorded real build (3,082 KB, May 15–21) and the current 3,398 KB, the only landed change is `5f0c6a03` (May 29: browserslist trim + production dep batch — anthropic-sdk 0.100.1, sentry 10.55, lucide-react 1.17, posthog-js 1.376.4, stripe pair, supabase-js 2.106.2). The browserslist trim should have *reduced* size, so the dep batch is the prime suspect for +316 KB. The two client-side growers to check first are **@sentry/nextjs 10.55** (71 MB on disk, ships a browser bundle at first paint) and **posthog-js 1.376** (~339 KB deferred). Attribution must come from before/after real builds per dependency — the treemap is unavailable under Turbopack.
+react-markdown + remark/rehype/micromark/mdast totals ~432 KB across `0e_r8dj` (212 KB), `09k9` (132 KB), and `149pw4` (88 KB), all deferred to chat rendering. Options: (a) confirm a single lighter markdown renderer covers the chat's actual markdown surface (likely a small subset — bold/italic/links/lists), or (b) restrict the remark/rehype plugin set. A minimal markdown-to-JSX renderer could reclaim 150–250 KB. Investigate the chat's actual markdown feature usage before swapping. Lower priority until a fresh build confirms whether the total is genuinely over budget.
 
-### 4. react-markdown family — 432 KB across three deferred chunks (MEDIUM)
+### 4. Attribute bundle growth across the Jun 4 production dep batch (#592) (MEDIUM)
 
-react-markdown + remark/rehype/micromark/mdast totals **~432 KB** across `0e_r8dj` (212 KB), `09k9` (132 KB), and `149pw4` (88 KB), all deferred to chat rendering. A large block of deferred weight counting toward the breached total. Options: (a) confirm a single lighter markdown renderer covers the chat's actual markdown surface (likely a small subset — bold/italic/links/lists), or (b) restrict the remark/rehype plugin set. A minimal markdown-to-JSX renderer could reclaim 150–250 KB. Investigate the actual markdown features the chat uses before swapping.
+The Jun 4 production group bump (`421e3994`, 11 updates) has not been measured against the bundle — the cached build predates it. When a fresh build runs, compare total JS against the Jun 3 3,398 KB baseline to isolate the batch's effect. Prime suspects for first-paint weight: `@sentry/nextjs` (ships a browser bundle at first paint) and `posthog-js`. Attribution requires before/after real builds per dependency — the treemap is unavailable under Turbopack.
 
-### 5. browserslist trim — confirmed no-op on bundle size (CLOSED)
+### 5. Pending dep hygiene (LOW — no CVEs)
 
-`core-js` (15 MB) remains in `node_modules`, but the real build shows **no separate `polyfills`/`core-js` client chunk** among the 64 emitted chunks. Next 16 + Turbopack was already shipping minimal polyfills; the May 29 trim had no measurable bundle effect. Item stays closed.
+Security Agent (2026-06-06) lists 27 outdated packages, zero CVEs: next 16.2.7, sentry 10.56, supabase-js 2.107, posthog-js 1.380.1 among them. Hygiene-only — let grouped Dependabot carry them. Verify `next 16.2.7` on a preview before any main release. `voyageai` stays pinned at 0.1.0 (0.2.x broken ESM); `pdfjs-dist` is devDependency-only. This batch is not expected to move the bundle materially.
 
 ## Recommendations Summary
 
-1. **ElevenLabs 605 KB is the one lever that resolves the breach** — pursue the voice-shelving decision jointly with Cost Analyst's June tier-downgrade evaluation; removing `@elevenlabs/react` drops total to ~2,793 KB (under budget) and saves cost. Dual benefit.
-2. **Write a real build number to `.performance-history.json`** — it still records 2,850 KB for Jun 3/Jun 4; the real 3,398 KB has never been persisted, so the trend line is still fictional.
-3. **Stop emitting pass/fail verdicts from unverified `.next` provenance** in `performance-agent.sh`.
-4. **Attribute the +316 KB growth** to the May 29 dep batch via before/after real builds; check @sentry 10.55 and posthog-js first.
-5. **react-markdown (432 KB)** — evaluate a lighter renderer / trimmed plugin set for 150–250 KB of reclaimable deferred weight.
-6. **browserslist trim is a no-op** — stays closed.
+1. Run `npm run build:analyze` — unblocked (port 3006 free, no dev server running) and now overdue because the cached build predates the Jun 4 dep batch. Converts all bundle figures to authoritative and restores the budget verdict.
+2. Fix `performance-agent.sh` dev-server detection to scope to paisaxe (port 3006 / project path) so sibling Next.js projects stop false-triggering verdict suppression.
+3. ElevenLabs 605 KB remains the one lever that resolves a confirmed breach — pursue voice-shelving jointly with Cost Analyst's June tier-downgrade evaluation. Only act once a fresh build confirms the total is over budget.
+4. react-markdown (~432 KB) — evaluate a lighter renderer / trimmed plugin set for 150–250 KB of reclaimable deferred weight, after a fresh build confirms the budget picture.
+5. Attribute any bundle change to the Jun 4 production dep batch (#592) via the next fresh build; check @sentry and posthog-js first.
 
-## Comparison to Previous Run (2026-06-03)
+## Comparison to Previous Run (2026-06-05)
 
-| Metric | Jun 3 (real build, revealed) | Jun 4 (real artifacts, re-read) | Change |
+| Metric | Jun 5 (GREEN advisory) | Jun 6 (GREEN advisory) | Change |
 |---|---:|---:|:---:|
-| Total JS | 3,398 KB | 3,398 KB | unchanged (confirmed) |
-| vs last genuine build (3,082 KB, ~May 21) | +316 KB | +316 KB | stable |
+| Total JS | 3,398 KB | 3,398 KB (same Jun 3 artifacts) | unchanged |
 | Total CSS | 122 KB | 122 KB | unchanged |
 | Production deps | 35 / 40 | 35 / 40 | unchanged |
-| Budget verdict | RED (298 KB over, newly revealed) | RED (298 KB over, confirmed) | held |
-| Chunk signatures | identified by grep | re-verified by grep | confirmed |
-| History JSON entry | 2,850 KB (not updated) | 2,850 KB (still not updated) | still fictional |
+| node_modules disk | 1,043 MB | 1,043 MB | unchanged (flat) |
+| .next disk | 60 MB | 60 MB | unchanged |
+| Bundle verdict | SUPPRESSED | SUPPRESSED | unchanged |
+| Overall status | GREEN (deps + disk) | GREEN (deps + disk) | unchanged |
+| Build provenance | claimed "no commits since May 29" | corrected: 5 commits landed Jun 4; build predates dep batch #592 | corrected |
+| Dev-server trigger | sibling-project false positive | confirmed false positive (no next-server running at all) | confirmed |
 
-**Improvements:** The breach is now independently confirmed by a second read of the production artifacts — it is not a one-time measurement artifact. Chunk identification re-verified. No bundle growth this cycle (no new commits landed).
+Improvements: Corrected a factual error in the prior report — five commits (including the #592 production dep batch) landed Jun 4 and were missed. The cached build is now known to predate the current dependency tree, sharpening the case for a fresh build. Suppression logic continues to work as designed.
 
-**Regressions:** None new. The headline persists — total JS is **3,398 KB, 298 KB over the 3,100 KB budget**, stable. Status stays **RED**. The `.performance-history.json` trend line is still tracking the dev-cache 2,850 KB fiction and needs a real-build entry written.
+Regressions: None in measured metrics (deps and disk flat). The only open item that matters is process: run one fresh `build:analyze` to restore an authoritative verdict and measure the Jun 4 dep batch. It is not blocked.

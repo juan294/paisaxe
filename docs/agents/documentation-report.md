@@ -1,5 +1,14 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-06-04 06:00:02
+> Auto-generated on 2026-06-06 06:00:04
+
+## Changes Made This Run (2026-06-06)
+
+Status: GREEN — No documentation gaps found. No changes required.
+
+- Feature flags: All 17 flags in `src/types/feature-flags.ts` (`FeatureFlagKey`) verified present in the Feature Flags Reference of `docs/project/features.md`. All 10 agent flags (Agents tab) also verified. Zero undocumented flags — the gaps detector's `UNDOCUMENTED_FEATURE_FLAGS` list was empty, confirmed against source.
+- API routes: All 53 flagged routes confirmed internal or already documented. Admin APIs (`/api/admin/*`), internal frontend endpoints (chat, checkout, favorites, feature-flags, suggestions, voice-access), cron jobs (`/api/cron/*`), and internal health probes (`health/db`, `health/live`) are not external-consumption. MCP voice-agent tools (`mcp/places`, `mcp/weather`, `mcp/make-booking`, `mcp/make-booking/status`) are already documented in the Premium Voice Agent (Pelayo) section. Webhooks (`webhooks/*`) are already documented in the Infrastructure section. No new route documentation required.
+- Migrations: 089-092 are RLS enablement and internal-function access revocation (security hardening). No user-facing features or flags introduced — no `features.md` additions needed.
+- CLAUDE.md current (last modified 2026-05-03). features.md complete — no edits.
 
 ## CLAUDE.md Status
 
@@ -236,28 +245,6 @@ webhooks/translate
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-05-03 |
 | README.md | 2026-05-03 |
-
-## Changes Made This Run
-
-Run date: 2026-06-04
-Status: GREEN — no documentation changes required. Clean run continues.
-
-### Feature flags
-No changes. The gaps file reported zero undocumented feature flags. Verified all 17 visitor/admin feature flags in `src/types/feature-flags.ts` (`FeatureFlagKey`) are present in the Feature Flags Reference table in `docs/project/features.md`. The 10 agent flags (Agents tab) are also fully documented. No additions or edits needed.
-
-### API routes
-No changes. All 51 flagged routes were confirmed internal — none are meant for external consumption, so no documentation was added:
-- Admin APIs (`/api/admin/*`) — admin-auth gated, dashboard-only.
-- Chat (`/api/chat`, `/api/chat/stream`) — app-internal RAG endpoints (already described in features.md).
-- Checkout (`/api/checkout/*`) — app-internal Stripe flow.
-- Cron jobs (`/api/cron/*`, incl. new `github-traffic-sync`, `fail-stale-bookings`) — Vercel Cron authenticated, server-only.
-- App-internal user APIs (`/api/favorites`, `/api/feature-flags`, `/api/suggestions`, `/api/voice-access`).
-- Health probes (`/api/health`, `/api/health/live`, `/api/health/db`) — `/api/health` and `/api/health/live` already documented in features.md; `/api/health/db` is an internal QA-agent diagnostic probe (verified in source), not an external contract.
-- MCP voice-agent tools (`/api/mcp/*`) — invoked by the ElevenLabs/Pelayo agent, already documented under Premium Voice Agent.
-- Webhooks (`/api/webhooks/*`) — signature-verified inbound from external services, already documented in the Infrastructure section.
-
-### Source review
-No new user-facing features, feature flags, or migrations (089–092 are RLS/grant hardening — no documentation surface) introduced anything requiring a `features.md` update.
 
 ---
 

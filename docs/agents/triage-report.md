@@ -1,44 +1,60 @@
 # Triage Report
-> Generated on 2026-06-04 | 6 reports processed | 1 action item | 3 Dependabot PRs
+> Generated on 2026-06-06 | 6 reports processed | 2 action items | 0 Dependabot PRs
 
 ## Agent Failures
 None — all agents ran successfully.
 
 ## Reports Reviewed
+
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi | GREEN | None — already at v1.18.0 |
-| 2 | cost-analyst-report.md | cost-analyst | WATCH | Manual actions (user) — revenue/voice investigation, tier downgrade eval, Anthropic billing check |
-| 3 | documentation-report.md | documentation | GREEN | None — all routes confirmed internal |
-| 4 | localization-report.md | localization | GREEN | None — 100% coverage, 58th consecutive clean run |
-| 5 | performance-report.md | performance | **RED** | Fix `performance-agent.sh` provenance check (done) |
-| 6 | security-report.md | security | GREEN | None — 0 advisories, license clean |
+| 1 | cc-rpi-update-report.md | cc-rpi | GREEN | 0 |
+| 2 | cost-analyst-report.md | Cost Analyst | WATCH | 0 code (3 user) |
+| 3 | performance-report.md | Performance | GREEN (advisory) | 2 |
+| 4 | localization-report.md | Localization | GREEN | 0 |
+| 5 | documentation-report.md | Documentation | GREEN | 0 |
+| 6 | security-report.md | Security | GREEN | 0 |
 
-## Overall Status: YELLOW
-Performance is RED (bundle breach 3,398 KB / 3,100 KB, confirmed 2nd cycle). All others GREEN. Code fix applied. Business decisions flagged for user.
+## Overall Status: YELLOW (bundle breach confirmed)
 
 ## Action Items Completed
+
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Fix `performance-agent.sh`: suppress bundle budget verdict (BUDGET VIOLATIONS block + status) when `FRESH_BUILD=false` | performance-report.md | n/a (bash script) | ✅ Done — `e586fdad` |
+| 1 | Run `npm run build:analyze` — get authoritative bundle verdict | Performance | n/a | ✅ Done — 3,398 KB confirmed (67 chunks, 122 KB CSS) |
+| 2 | Fix `performance-agent.sh` dev-server detection (pgrep → lsof :3006) | Performance | n/a (bash script) | ✅ Done — commit `144ea892` |
 
 ## Dependabot PRs
-| # | PR | Update Type | Disposition | Notes |
-|---|----|----|----|----|
-| 1 | #592 — production group (11 updates) | minor/patch | auto-merge | All CI green, CLEAN |
-| 2 | #593 — dev-and-types group (3 updates) | minor/patch | auto-merge | All CI green, CLEAN |
-| 3 | #588 — next+brace-expansion+protobufjs+qs | minor/patch | closed | Targets `main` (wrong base), CI failing (npm audit + smoke), superseded by newer versions on `develop` |
+None — no open Dependabot PRs.
 
 ## Verification
-- [x] All tests passing (6592 tests, 354 files)
+- [x] All tests passing (6592/6592)
 - [x] Typecheck clean
 - [x] Lint clean
 - [ ] CI green (pending push)
 
+## Bundle Verdict (now authoritative)
+
+Fresh build completed 2026-06-06 12:36 (67 JS chunks, post Jun 4 dep batch #592):
+
+| Budget | Limit | Actual | Status |
+|--------|-------|--------|--------|
+| Total JS | 3,100 KB | **3,398 KB** | **RED — 298 KB over** |
+| Initial JS (est.) | 2,100 KB | ~2,022 KB | GREEN |
+| Production deps | 40 | 35 | GREEN |
+| node_modules | 1,100 MB | 1,043 MB | GREEN |
+
+Jun 4 dep batch (#592, 11 production deps) had zero bundle impact — 3,398 KB unchanged from Jun 3 baseline. The 605 KB ElevenLabs chunk remains the single lever that would resolve the breach (3,398 → ~2,793 KB).
+
 ## Flags for User (manual actions required)
-1. **Revenue/voice drought (P1 CRITICAL)** — 111-day revenue drought + 107-day Paisaxe voice silence. Manual check on paisaxe.es: Is Pelayo widget rendering? Is Day Pass flow functional?
-2. **Tier downgrade evaluation (P2)** — Vercel Hobby + Supabase Free + ElevenLabs voice shelving = ~$45/mo savings AND resolves the 605 KB bundle breach. June checkpoint has passed with drought ongoing.
-3. **Anthropic billing (P2)** — Check platform.claude.com/settings/billing. Config estimate $25/mo; actual may be $40–60/mo.
+
+| # | Item | Urgency |
+|---|------|---------|
+| 1 | Investigate 113-day revenue/voice drought on paisaxe.es | CRITICAL |
+| 2 | Tier-downgrade decision (Vercel Hobby + Supabase Free + voice shelving) | HIGH |
+| 3 | Release Twilio phone number (109 days idle, $1.15 charge due ~Jun 7) | TIME-SENSITIVE |
 
 ## Carried Items
-- Performance bundle breach (3,398 KB / 3,100 KB) — ElevenLabs 605 KB chunk is the sole lever. Removal is a product/business decision; tracked above as Flag #2.
+
+- **Revenue drought (113 days)** — persistent since Feb 13. Root cause unknown. Manual production verification on paisaxe.es remains the only path forward.
+- **Bundle breach (3,398 KB / 3,100 KB)** — re-confirmed authoritative today. No code fix possible without a product decision (voice shelving or react-markdown replacement).
