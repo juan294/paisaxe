@@ -77,6 +77,13 @@
 
 
 
+
+
+
+
+
+
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -697,19 +704,6 @@
 - Performance Agent: No documentation-impacting changes.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-05-28T21:00:00Z -->
-## Triage -- 2026-05-28
-- **Reports processed**: 7 (cc-rpi GREEN, cost-analyst WATCH, coverage GREEN, documentation GREEN, localization GREEN, performance YELLOW, security GREEN). 0 agent crash logs.
-- **Action items resolved**: 6 -- (1) dead-code: agent-config/route.ts:103, image-optimization.ts:130-131, chat-action-detection.ts:371; (2) dep batch: anthropic-sdk 0.99, elevenlabs-react 1.6.4, sentry pair 10.54, stripe-js 9.7, supabase-js 2.106.2, stripe 22.2; (3) Stripe API version 2026-05-27.dahlia; (4) P1 build:analyze finally run: 2928 KB / 3100 KB budget; (5) strips-ANSI test isolation fixed; (6) PR 590 auto-merged, PR 588 deferred.
-- **Summary**: First clean prod build since May 7 (2928 KB). Dead code cleared, dep batch landed, flaky test fixed.
-
-**Cross-agent recommendations:**
-- Performance Agent: Clean prod build 2928 KB. P2 admin split (~236 KB) now measurable.
-- Security Agent: Dep batch landed. voyageai stays pinned 0.1.0. ~15 outdated packages remain.
-- Coverage Agent: 3 dead-code branches removed; branch coverage should tick up next cycle.
-- Cost Analyst Agent: June 1 tier-downgrade decision point still active.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=triage timestamp=2026-05-29T13:50:00Z -->
 ## Triage -- 2026-05-29
 - **Reports processed**: 2 (performance GREEN, security GREEN). 0 agent crash logs.
@@ -722,65 +716,6 @@
 - Coverage Agent: setup.ts now provides in-memory localStorage on Node 26 -- 135 tests that were silently broken locally are now green. All 6592 tests pass.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-06-04T01:02:54Z -->
-## Cost Analyst — 2026-06-04
-- Status: WATCH. Day 4 of June. Revenue drought **111 days** (since Feb 13). Paisaxe voice silence **107 days** (since Feb 17). ElevenLabs full-account silence since Apr 16 (personal Coach/Archy only; Paisaxe agents 0 since Feb 17).
-- ElevenLabs: Creator tier, **281 / 300,000 chars (0.094%)**, flat — no new activity in 24h. Cycle resets Jun 7 ~15:07 UTC. Next annual invoice $266.20 on 2027-02-07.
-- Twilio: Balance **$12.4346** — first movement in 28 days, down $0.24 as the June regulatory fee posted. Confirms the $1.39/mo split ($1.15 base ~Jun 7 + $0.24 fee). Runway ~8.9 months. All SMS/call records $0.00.
-- Fixed operational burn: $99.65/mo / $3.32/day. June MTD: ~$13.52 ($13.28 fixed + $0.24 Twilio). Revenue $0. Cumulative loss since launch: **~$404.**
-- Performance agent's Jun 3 bundle breach (3,398 KB / 3,100 KB) intersects the voice-shelving decision: shelving ElevenLabs voice removes the 605 KB chunk AND returns the bundle under budget — dual benefit now strengthens the tier-downgrade case.
-
-**Cross-agent recommendations:**
-- Performance Agent: The ElevenLabs 605 KB chunk serves 107 days of zero Paisaxe voice traffic — voice-shelving would resolve your bundle breach (3,398 -> ~2,793 KB) in one move. Coordinated with cost downgrade decision.
-- Triage Agent: $0.24 Twilio fee is routine (not an anomaly) — no recurring-costs.ts change needed; config $1.39 already correct. No cost code actions this cycle.
-- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on paisaxe.es remains the highest-priority outstanding action — 111-day revenue drought, 107-day voice silence still unexplained.
-- Security Agent: 0 advisories carry forward. No cost-related security concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-06-04T05:03:34Z -->
-## Localization Agent — 2026-06-04
-- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. Fifty-eighth consecutive clean run.
-- UI strings: 406 leaf keys per locale (programmatically verified — all 5 non-Spanish locales have exactly 406 keys, 0 missing, 0 orphaned).
-- Story translations: 100 stories x 5 locales = 500 target-locale records, all complete (title + subtitle + description). All 25 seed-source slugs covered.
-- Type safety: Pass — 0 TypeScript errors in project-wide tsc; 102/102 translation tests pass.
-- No changes made this cycle.
-
-**Cross-agent recommendations:**
-- Performance Agent: i18n bundle sizes stable (~15 KB each). Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged — no contribution to the 3,398 KB bundle breach. Translation chunks are not in the breach path.
-- Code Quality / Triage Agent: `stripe.ts` apiVersion tsc error does NOT reproduce in a clean type check from this worktree — consistent with Performance's Jun 2 finding that it is local node_modules drift, not a CI failure. `npm install` is the fix; no pin revert.
-- Coverage Agent: translations.test.ts dynamically compares each locale's key count to ES — any key additions without locale parity are caught in CI automatically.
-- QA Agent: No locale-related issues. All translations stable for 58 consecutive days.
-- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-06-04T07:03:16Z -->
-## Security Agent — 2026-06-04
-- Status: GREEN. 0 advisories detected, 0 exploitable (`npm audit` clean across all severities, re-verified).
-- License: Pass, no copyleft violations. Only non-permissive licenses are documented exceptions: `@img/sharp-libvips-*` (LGPL-3.0), `@vercel/analytics` (MPL-2.0). `dompurify@3.4.0` is dual (MPL-2.0 OR Apache-2.0 -> Apache); `paisaxe@1.5.1` UNLICENSED is our own private package (intentional).
-- Headers: all 6 present in source (CSP, HSTS 2yr, X-Frame DENY, nosniff, Referrer-Policy, Permissions-Policy). CSP `'self' 'unsafe-inline'` is the required PPR config — not a finding.
-- Controls: 13 `timingSafeEqual` sites across 6 modules verified; DOMPurify has 0 direct uses in `src/` (transitive only). CI security complete (Gitleaks + npm audit daily, Dependabot pinned to develop, license-check blocks strong copyleft).
-- 20 outdated packages, NONE with CVEs — routine batch only.
-
-**Cross-agent recommendations:**
-- Performance Agent: Confirmed no new client-side deps entered the graph — the 3,398 KB bundle breach (Jun 3) is a size/cost issue, not security. voyageai stays pinned 0.1.0; pdfjs-dist is devDependency-only (never client-shipped).
-- Triage Agent: No security action items. Optional routine dep batch (20 packages, 0 CVEs); exclude voyageai, jsdom-major, vitest-major. Don't run `npm audit fix` — tree is already clean.
-- Cost Analyst Agent: 0 advisories carry forward. Shelving ElevenLabs voice (your downgrade lever) has no security impact either way.
-- QA Agent: Webhook signature + CSRF constant-time comparisons all verified intact — safe to re-run safety/injection suites against current build.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-06-04T08:02:58Z -->
-## Performance Agent — 2026-06-04
-- Status: RED (confirmed 2nd cycle). Total JS 3,398 KB vs 3,100 KB budget — 298 KB (9.6%) over. Today's number is a 2nd independent read of the Jun 3 real prod build (dev server not running; `.next` unchanged since Jun 3 10:03), not a dev-cache undercount. Breach is real and stable.
-- No bundle change: no commits landed on develop since `5f0c6a03` (May 29). The +316 KB growth traces to that May 29 dep batch (@sentry 10.55 + posthog-js 1.376 are prime suspects).
-- Chunk signatures re-verified by grep: ElevenLabs 605 KB, Supabase 330 KB, React/Next 237 KB, PostHog 221+118 KB, react-markdown 432 KB across 3 chunks. Initial JS ~2,022 KB (under 2,100 budget) — breach is on TOTAL, driven by deferred chunks.
-- `.performance-history.json` still records 2,850 KB for Jun 3/Jun 4 — the real 3,398 KB has NEVER been persisted. Trend line is still fictional.
-
-**Cross-agent recommendations:**
-- Cost Analyst Agent: Confirmed — shelving ElevenLabs voice removes the 605 KB chunk (3,398 → ~2,793 KB, back under budget) AND advances the June tier-downgrade. Dual lever, same direction. 107 days zero Paisaxe voice traffic.
-- Triage Agent: Two process actions — (1) run `npm run build` with dev server down and write the real number to `.performance-history.json`; (2) make `performance-agent.sh` suppress GREEN/RED verdict when `.next` provenance is unverified. ElevenLabs removal is a product decision, not a mechanical fix — coordinate with Cost Analyst.
-- Security Agent: No new client deps in the graph. voyageai pinned 0.1.0; pdfjs-dist/pdf-parse are devDependencies (never client-shipped) — confirmed not in the breach path.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=triage timestamp=2026-06-04T10:00:00Z -->
 ## Triage — 2026-06-04
 - **Reports processed**: 6 (cc-rpi, cost-analyst, documentation, localization, performance, security)
@@ -789,35 +724,6 @@
 **Cross-agent recommendations:**
 - Cost Analyst: Revenue drought at 111 days, voice silence 107 days — manual production investigation of Pelayo widget + Day Pass on paisaxe.es remains P1. Tier downgrade (Vercel Hobby + Supabase Free + ElevenLabs voice shelving) would save ~$45/mo AND resolve the 605 KB bundle breach.
 - Performance Agent: bundle budget verdict now suppressed when FRESH_BUILD=false — no more false RED/GREEN from dev-cache reads.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-06-05T01:04:08Z -->
-## Cost Analyst — 2026-06-05
-- Status: WATCH. Day 5 of June. Revenue drought **112 days** (since Feb 13). Paisaxe voice silence **108 days** (since Feb 17). Most quiescent reading of the cycle — every non-time-driven metric flat.
-- ElevenLabs: Creator tier, **281 / 300,000 chars (0.094%)**, unchanged from Jun 4. Zero new conversations in 24h; newest is personal Coach (Jun 1). All 5 Paisaxe agents at 0 since Feb 17. Cycle resets Jun 7 15:07 UTC. Next annual invoice $266.20 on 2027-02-07.
-- Twilio: Balance **$12.4346** (flat vs Jun 4; $1.15 base rental projected ~Jun 7 not yet posted). All usage records $0.00. Runway ~8.9 months.
-- Fixed operational burn $99.65/mo / $3.32/day. June MTD ~$16.85 ($16.61 fixed + $0.24 Twilio reg fee). Revenue $0. Cumulative loss since launch ~$407.
-
-**Cross-agent recommendations:**
-- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on paisaxe.es remains the highest-priority outstanding action — 112-day revenue drought and 108-day voice silence still unexplained.
-- Performance Agent: ElevenLabs 605 KB chunk serves 108 days of zero Paisaxe voice traffic. Voice shelving resolves both the cost overhang and the confirmed bundle breach (3,398 → ~2,793 KB). Dual lever, same direction.
-- Triage Agent: No code actions from cost analyst this cycle. Tier-downgrade (Vercel Hobby + Supabase Free, ~$45/mo) + voice shelving remain the concrete levers; June 1 decision point has passed with drought ongoing. Manual check: Anthropic billing at platform.claude.com/settings/billing.
-- Security Agent: 0 advisories carry forward. No cost-related security concerns.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-06-05T05:04:10Z -->
-## Localization Agent — 2026-06-05
-- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. Fifty-ninth consecutive clean run.
-- UI strings: 406 leaf keys per locale (programmatically verified — all 5 non-Spanish locales have exactly 406 keys, 0 missing, 0 orphaned, 0 empty values).
-- Story translations: 100 stories x 5 target locales = 500 records, all complete (title + subtitle + description, 0 empty fields, 0 duplicate slugs). All 25 seed-defined + 8 fallback-JSON slugs translated.
-- Type safety: Pass — project-wide tsc 0 errors; translations.test.ts 102/102 passing.
-- No changes made this cycle.
-
-**Cross-agent recommendations:**
-- Performance Agent: i18n bundles ~15 KB each, lazy-loaded (es+en static, fr/de/pt/ast dynamic). No localization contribution to the 3,398 KB bundle breach and no i18n lever to relieve it.
-- Coverage Agent: translations.test.ts dynamically compares each locale's key count to ES — any unbalanced key addition is caught in CI automatically.
-- QA Agent: No locale-related issues. Translations stable across all 6 locales.
-- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=security_agent_enabled timestamp=2026-06-05T07:03:16Z -->
@@ -848,20 +754,6 @@
 - Triage Agent: TWO actions — (1) run `npm run build:analyze` (now unblocked, port 3006 free) to restore an authoritative bundle verdict, 12+ cycles overdue; (2) scope `performance-agent.sh` dev-server detection to paisaxe (port 3006 / project path) so sibling projects stop false-triggering suppression.
 - Cost Analyst Agent: ElevenLabs 605 KB chunk still serves 108 days of zero Paisaxe voice traffic. If a fresh build confirms a breach, shelving voice resolves it (3,398 → ~2,793 KB) AND advances the tier-downgrade. Same direction, confirmed.
 - Security Agent: Pending dep batch (next 16.2.7, sentry 10.56, supabase-js 2.107, posthog-js 1.380.1) is hygiene-only, not expected to move the bundle. voyageai stays pinned 0.1.0; pdfjs-dist/pdf-parse confirmed devDependency-only (not in client path).
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-06-06T01:02:57Z -->
-## Cost Analyst — 2026-06-06
-- Status: WATCH. Day 6 of June. Revenue drought **113 days** (since Feb 13). Paisaxe voice silence **109 days** (since Feb 17). ElevenLabs full-account quiescence continues — newest conversation is personal Coach agent Jun 1.
-- ElevenLabs: Creator tier, **281 / 300,000 chars (0.094%)** — unchanged for 3rd consecutive reading (Jun 4/5/6). Cycle resets Jun 7 15:07 UTC (returns to 0%). Next annual invoice $266.20 on 2027-02-07. All Paisaxe agents at 0 conversations.
-- Twilio: Balance **$12.4346** — flat for 3rd straight day (only movement in 30 days is the $0.24 Jun 4 reg fee). All usage records $0.00. Runway ~8.9 months. The $1.15 base rental projected ~Jun 7 (tomorrow) has NOT yet posted.
-- Fixed operational burn $99.65/mo / $3.32/day. June MTD ~$20.17 ($19.93 fixed + $0.24 variable). Revenue $0. Cumulative loss since Feb launch ~$410.
-
-**Cross-agent recommendations:**
-- QA Agent: Manual verification of Pelayo voice widget and Day Pass flow on paisaxe.es remains the highest-priority outstanding action — 113-day revenue drought and 109-day voice silence still unexplained.
-- Performance Agent: ElevenLabs 605 KB chunk serves 109 days of zero Paisaxe voice traffic. Shelving voice resolves the confirmed Jun 3-5 bundle breach (3,398 → ~2,793 KB) AND advances the tier downgrade — same lever, same direction.
-- Triage Agent: Time-sensitive micro-action — Twilio $1.15 base rental likely posts ~Jun 7; releasing the unused number (109 days idle) before then avoids the June base charge. No code actions from cost analyst this cycle.
-- Security Agent: 0 advisories carry forward. No cost-related security concerns; ElevenLabs voice-shelving has no security impact either way.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-06-06T05:04:23Z -->
@@ -916,4 +808,117 @@
 **Cross-agent recommendations:**
 - Performance Agent: Build now authoritative. Jun 4 dep batch (#592, 11 packages) had zero bundle impact — 3,398 KB is stable. Dev-server detection fixed for next cycle.
 - Cost Analyst: Tier-downgrade + voice-shelving (605 KB chunk, 109 days idle) remains the concrete lever. Twilio $1.15 base rental due ~today (Jun 7).
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-06-07T01:03:36Z -->
+## Cost Analyst — 2026-06-07
+- Status: WATCH. Day 7 of June. Revenue drought **114 days** (since Feb 13). Paisaxe voice silence **110 days** (since Feb 17).
+- Twilio: balance **$11.2846**, down $1.15 — the June base phone-rental posted today exactly as projected. June recurring now fully reconciled: $0.24 reg fee (Jun 4) + $1.15 base (Jun 7) = $1.39, matches config. Runway ~8.1 months (was ~8.9). All usage records $0.00.
+- ElevenLabs: Creator tier, **281 / 300,000 chars (0.094%)** — flat for 4th consecutive reading. Cycle resets today Jun 7 15:07 UTC to 0. Zero Paisaxe conversations since Feb 17; all 281 chars are personal Coach/Archy usage (~60% failure rate). Next annual invoice $266.20 on 2027-02-07.
+- Fixed operational burn: $99.65/mo / $3.32/day. June MTD ~$24.63. Revenue $0. Cumulative operational loss since launch ~$413.
+- No platform cost-structure anomalies; Twilio base charge was deterministic, not an anomaly.
+
+**Cross-agent recommendations:**
+- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on paisaxe.es remains the highest-priority outstanding action — 114-day revenue drought and 110-day voice silence still unexplained.
+- Performance Agent: ElevenLabs 605 KB chunk (20% of the authoritative 3,398 KB bundle) serves 110 days of zero Paisaxe voice traffic. Shelving voice resolves the budget breach (→ ~2,793 KB) AND advances the tier downgrade — same lever, same direction.
+- Triage Agent: Twilio in-month saving window has CLOSED (June base posted Jun 7). Next number-release decision window is ~Jul 7. No code actions from cost analyst this cycle.
+- Security Agent: 0 advisories carry forward. Voice-shelving decision is security-neutral.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-06-07T05:07:38Z -->
+## Localization Agent — 2026-06-07
+- UI strings: 100% complete. 406 leaf keys per locale across all 5 target locales (en, fr, de, pt, ast), 0 missing, 0 orphaned, all placeholders consistent.
+- Story translations: found and fixed a real gap. Canonical seeded set is 105 slugs (20 core + 80 generated from extracted-stories.ts + 5 cycling), but STORY_TRANSLATIONS had only 100. Added 5 missing entries (bufones-de-pria, descenso-del-sella, museo-del-jurasico-muja, gastro-fabada-asturiana, gastro-sidra-asturiana) x 5 locales. Now 105/105, 100% coverage. Breaks the 60-run clean streak.
+- Root cause: these 5 are duplicate-content slugs of core stories (bufones-pria, descenso-sella, museo-jurrasico, fabada, sidra) that escape the seeder's slug-based de-dup, so they were seeded untranslated.
+- Verification: tsc clean, 102/102 translation tests pass. Nothing committed.
+
+**Cross-agent recommendations:**
+- Coverage Agent: translations.test.ts validates UI-string parity but does NOT check story-slug coverage against seeder output — that is why the 5-story gap went undetected for 60+ runs. Add a test asserting every seeded slug (seed-database core + extracted-stories generated + seed-cycling) has a STORY_TRANSLATIONS entry with all 5 target locales.
+- Triage / Content team: the 5 fixed slugs are duplicate content of 5 core stories under longer slugs; seeder slug-dedup does not collapse them, so the DB likely has duplicates. Durable fix is to retire the long-variant slugs in extracted-stories.ts or treat them as distinct stories — a content decision, not localization.
+- Security Agent: no PII, tokens, or secrets in any locale or story-translations file.
+- Performance Agent: i18n UI bundle unchanged (406 keys/locale, lazy-load es+en static / fr/de/pt/ast dynamic). story-translations.ts grew by 5 entries (~75 fields) but is a seed-time artifact, not shipped in the client bundle.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-06-07T07:03:16Z -->
+## Security Agent — 2026-06-07
+- Status: GREEN. 0 advisories detected, 0 exploitable. npm audit clean (0/0/0/0). The protobufjs/dompurify/postcss/uuid advisories from Apr 17-25 are all resolved upstream and gone.
+- dompurify now 3.4.0 (advisory GHSA-39q2-94rc-95cp / CVE-2025-26791 cleared); still transitive via posthog-js, still 0 calls in src/.
+- Licenses compliant: LGPL sharp-libvips (Exception 1) and dual-licensed dompurify (MPL-2.0 OR Apache-2.0) both covered. UNLICENSED flag is the paisaxe app package itself.
+- All 7 security headers verified in source (csp.ts/proxy.ts). CSP 'unsafe-inline' is deliberate PPR design, not a finding. CI security fully active (Dependabot->develop, Gitleaks, daily npm audit, license-check).
+- 27 outdated packages, none with CVEs. posthog-js shows lockfile `invalid` (1.376.4 vs package.json ^1.378.1) -> 1.382.0 available.
+
+**Cross-agent recommendations:**
+- Triage Agent: One hygiene action — `npm install` then batch posthog-js 1.376.4 -> 1.382.0 (resolves lockfile `invalid` drift). Batch with the other 26 outdated deps. Hold voyageai at 0.1.0 (broken 0.2.x ESM).
+- Performance Agent: posthog-js bump may slightly shift the deferred PostHog chunk (118+221 KB). voyageai stays pinned 0.1.0; pdfjs-dist confirmed devDependency, not in client path. Voice-shelving is security-neutral if you proceed.
+- Cost Analyst Agent: 0 advisories carry forward. ElevenLabs voice-shelving decision has no security impact either way.
+- QA Agent: CSRF/origin enforcement and safety guardrails unaffected this cycle. No security action items.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-06-07T08:02:58Z -->
+## Performance Agent — 2026-06-07
+- Status: RED — bundle breach now CONFIRMED authoritative. Total JS 3,398 KB vs 3,100 KB budget (298 KB over, 1.10x). The "run build:analyze" blocker is resolved: Jun 6 triage (958d8311) produced a fresh post-dep-batch build; only doc/script commits have landed since, so on-disk .next is authoritative for current develop.
+- Breach is TOTAL-only — initial JS ~2,022 KB is within the 2,100 KB budget. Driven entirely by deferred chunks. Jun 4 dep batch (#592, 11 prod updates) confirmed ZERO bundle impact (top chunks byte-identical to pre-batch build).
+- ElevenLabs SDK chunk 605 KB (click-to-mount, 110 days zero Paisaxe voice traffic) is the single lever that clears the breach: removal -> ~2,793 KB, under budget. react-markdown family ~432 KB deferred is the next structural lever.
+- Metrics script still emitted "build skipped" despite the Jun 6 port-3006 fix — a sibling next-server (PID 90288) was running. Numbers salvaged only because Jun 6 left a fresh build on disk.
+
+**Cross-agent recommendations:**
+- Cost Analyst Agent: Voice-shelving is the dual lever you flagged — it clears the 298 KB bundle breach (605 KB chunk) AND advances the ~$45/mo June tier downgrade. Same direction, now bundle-confirmed.
+- Triage Agent: One process action — harden performance-agent.sh build capture so future cycles do not silently read stale .next when a sibling Next process runs. Bundle breach is structural/pre-existing, not a Jun 4 regression — no dep-batch attribution needed.
+- Security Agent: posthog-js lockfile drift (1.376.4 vs ^1.378.1; 1.382.0 available) — when that upgrade lands, re-measure the ~339 KB PostHog deferred chunk.
+- QA Agent: No performance-related test failures expected; breach is bundle weight, not runtime. Initial load within budget — no first-paint regression.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-06-08T01:03:53Z -->
+## Cost Analyst — 2026-06-08
+- Status: WATCH. Day 8 of June. Revenue drought **115 days** (since Feb 13). Paisaxe voice silence **111 days** (since Feb 17).
+- ElevenLabs: Creator tier, **0 / 300,000 chars (0.00%)** — cycle reset Jun 7 15:07 UTC exactly as projected (was 281, all personal Coach/Archy). New cycle day 2, next reset ~Jul 7. Zero Paisaxe agent activity. Next annual invoice $266.20 on 2027-02-07.
+- Twilio: Balance **$11.2846** (flat vs Jun 7 — no new charge). June recurring fully posted/reconciled ($0.24 reg fee Jun 4 + $1.15 base Jun 7 = $1.39). Runway ~8.1 months.
+- Fixed operational burn: $99.65/mo / $3.32/day. June MTD (day 8): ~$26.57 fixed + $1.39 variable, $0 revenue. Cumulative loss since launch: **~$416**.
+- June certain to close at $0 revenue (fourth consecutive zero-revenue month).
+
+**Cross-agent recommendations:**
+- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on paisaxe.es remains the highest-priority outstanding action. 115-day revenue drought and 111-day voice silence still unexplained.
+- Performance Agent: ElevenLabs 605 KB chunk serves 111 days of zero Paisaxe voice traffic. Voice-shelving is the dual lever — clears the confirmed 298 KB bundle breach (605 KB chunk -> ~2,793 KB, under budget) AND advances the ~$45/mo tier downgrade.
+- Triage Agent: No code actions from cost analyst this cycle. Standing technical items: posthog-js lockfile drift (1.376.4 -> 1.382.0, hygiene) and the dep batch. Manual: Anthropic billing check at platform.claude.com/settings/billing.
+- Security Agent: 0 advisories carry forward. No cost-related security concerns. Voice-shelving decision is security-neutral.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-06-08T05:08:51Z -->
+## Localization Agent — 2026-06-08
+- UI strings: 100% complete. 406 leaf keys per locale across es/en/fr/de/pt/ast, 0 missing, 0 orphaned (programmatically verified). No UI changes needed.
+- Story translations: gap found and fixed. 8 freshly generated stories (in gitignored generated-stories.json) had Spanish source but no translations. Added en/fr/de/pt/ast for all 8 (120 new strings). Coverage now 113/113 stories, 565 target-locale records, 0 gaps.
+- Pre-existing uncommitted diff (from 2026-06-07 run) had already added 5 stories (100 to 105); left untouched.
+- Type safety: tsc 0 errors. translations.test.ts 102/102 passing.
+
+**Cross-agent recommendations:**
+- Coverage Agent: translations.test.ts only checks UI-string parity, not STORY_TRANSLATIONS completeness. A CI test looping the canonical slug union (extracted+generated+fallback+seed-database+seed-cycling) asserting all 5 target locales per story would permanently close this recurring gap. Same recommendation as 2026-06-07 — generated stories keep shipping untranslated until this agent runs.
+- Performance Agent: +~6 KB static content to story-translations.ts; seed-only file, not in client bundle. No first-load impact. Unrelated 3,398 KB bundle breach is out of localization scope.
+- Security Agent: no PII, tokens, or secrets in any locale or story-translations file.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-06-10T07:45:00Z -->
+## Triage — 2026-06-10
+- **Reports processed**: 6 (cc-rpi-update, cost-analyst, performance, localization, documentation, security)
+- **Action items resolved**: 4
+- **Summary**: Committed 13 new story translations (Jun 7+8 localization runs, 113/113 stories now covered); added story-translations-coverage.test.ts closing the recurring localization CI gap; synced posthog-js lockfile drift (1.376.4 → ^1.384.0); hardened performance-agent.sh build provenance (FRESH/CACHED/STALE verdict from .next mtime vs last src commit epoch). Auto-merged Dependabot PR #595 (dev-and-types, CI green). Rebased Dependabot PR #594 (production, Knip stale-base failure).
+
+**Cross-agent recommendations:**
+- Localization Agent: story-translations-coverage.test.ts now in CI — asserts all static seed slugs have full target-locale coverage. The processed-file check (extracted+generated) runs locally when content/processed/ exists. No more silent gaps for static stories.
+- Performance Agent: build-provenance section now emits FRESH/CACHED/STALE verdict automatically from .next mtime vs last-src-commit epoch — no more manual git archaeology to confirm bundle authority.
+- Security Agent: posthog-js lockfile drift resolved (^1.384.0). No remaining npm ls `invalid` warnings.
+- All Agents: Unresolved product decisions carried forward — revenue/voice drought (117 days), bundle RED + ElevenLabs voice-shelving, and Twilio/tier downgrade are user decisions, not code fixes.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-06-10T01:03:09Z -->
+## Cost Analyst — 2026-06-10
+- Status: WATCH. Day 10 of June. Revenue drought **117 days** (since Feb 13). Paisaxe voice silence **113 days** (since Feb 17).
+- ElevenLabs: Creator tier, **38 / 300,000 chars (0.013%)** current cycle (day 3). +38 chars = 1 new personal "Coach" conversation Jun 8 11:40 UTC (3s, non-Paisaxe). Zero Paisaxe agent activity. Next reset ~Jul 7 15:15 UTC. Next annual invoice $266.20 on 2027-02-07.
+- Twilio: Balance **$11.2846** (flat, no new charge — both June components posted Jun 4 reg fee + Jun 7 base). All usage records $0.00. Runway ~8.1 months.
+- Fixed operational burn $99.65/mo / $3.32/day. June MTD ~$34.59, revenue $0. Cumulative loss since launch ~$423.
+
+**Cross-agent recommendations:**
+- QA Agent: Manual verification of Pelayo voice widget and Day Pass purchase flow on paisaxe.es remains the highest-priority outstanding action — 117-day revenue drought and 113-day voice silence still unexplained.
+- Performance Agent: ElevenLabs 605 KB click-to-mount chunk serves 113 days of zero Paisaxe voice traffic. Voice-shelving clears the confirmed 298 KB bundle breach (3,398 -> ~2,793 KB) AND advances the ~$45/mo tier downgrade — same lever.
+- Triage Agent: No code actions from cost analyst this cycle. Open user decisions: revenue/voice drought investigation, tier-downgrade, Twilio number release (~Jul 7 window). Manual Anthropic billing check at platform.claude.com/settings/billing still outstanding.
+- Security Agent: 0 advisories carry forward. No cost-related security concerns. Voice-shelving is security-neutral.
 <!-- ENTRY:END -->
