@@ -2850,4 +2850,379 @@ export const STORY_TRANSLATIONS: StoryTranslations = {
       description: 'Percorrer el Camín de Santiagu en bicicleta ye una forma única de vivir esta esperiencia milenaria. D\'Asturies parten dos rutes históriques: el Camín Primitivu, la ruta xacobea más antigua que naz na Catedral d\'Uviéu, y el Camín del Norte, que percuerre la espectacular costa cantábrica ente cantiles, playes y villes marineres. Pa llograr la Compostela, los pelegrinos tienen de percorrer polo menos los caberos 200 quilómetros en bicicleta. Los albergues públicos acutaos pa pelegrinos ufierten servicios pensaos pa ciclistes: garax pa bicicletes, zona de taller con ferramientes, espaciu de llaváu y serviciu de llavandería. Una aventura qu\'amiesta cultura, historia, naturaleza y sostenibilidá.',
     },
   },
+
+  // ============================================
+  // SEEDED DUPLICATES (extracted-stories.ts variants of core slugs).
+  // These slugs are seeded into the DB under longer names and were missing
+  // translations. Added by Localization Agent 2026-06-07. See report for the
+  // de-duplication recommendation to the content team.
+  // ============================================
+
+  'bufones-de-pria': {
+    en: {
+      title: 'Bufones de Pría',
+      subtitle: 'Llanes',
+      description: 'Spectacular natural phenomenon where the sea bursts through chimneys in the rock with roars and columns of water.',
+    },
+    fr: {
+      title: 'Bufones de Pría',
+      subtitle: 'Llanes',
+      description: 'Spectaculaire phénomène naturel où la mer jaillit à travers des cheminées dans la roche avec des grondements et des colonnes d\'eau.',
+    },
+    de: {
+      title: 'Bufones de Pría',
+      subtitle: 'Llanes',
+      description: 'Spektakuläres Naturphänomen, bei dem das Meer mit Getöse und Wassersäulen durch Kamine im Felsen hervorbricht.',
+    },
+    pt: {
+      title: 'Bufones de Pría',
+      subtitle: 'Llanes',
+      description: 'Espetacular fenómeno natural onde o mar emerge através de chaminés na rocha com rugidos e colunas de água.',
+    },
+    ast: {
+      title: 'Bufones de Pría',
+      subtitle: 'Llanes',
+      description: 'Espectacular fenómenu natural onde la mar emerxe al traviés de chimenees na roca con ruxíos y columnes d\'agua.',
+    },
+  },
+
+  'descenso-del-sella': {
+    en: {
+      title: 'Sella River Descent',
+      subtitle: 'Arriondas-Ribadesella',
+      description: 'The most popular sporting festival of Asturias, a canoe descent down the Sella river held the first Saturday of every August.',
+    },
+    fr: {
+      title: 'Descente du Sella',
+      subtitle: 'Arriondas-Ribadesella',
+      description: 'La fête sportive la plus populaire des Asturies, une descente en canoë de la rivière Sella le premier samedi du mois d\'août.',
+    },
+    de: {
+      title: 'Sella-Abfahrt',
+      subtitle: 'Arriondas-Ribadesella',
+      description: 'Das beliebteste Sportfest Asturiens, eine Kanuabfahrt auf dem Fluss Sella am ersten Samstag im August.',
+    },
+    pt: {
+      title: 'Descida do Sella',
+      subtitle: 'Arriondas-Ribadesella',
+      description: 'A festa desportiva mais popular das Astúrias, uma descida de canoa pelo rio Sella no primeiro sábado de agosto.',
+    },
+    ast: {
+      title: 'Descensu del Sella',
+      subtitle: 'Arriondas-Ribesella',
+      description: 'La fiesta deportiva más popular d\'Asturies, un descensu en piragua pel ríu Sella cada primer sábadu d\'agostu.',
+    },
+  },
+
+  'museo-del-jurasico-muja': {
+    en: {
+      title: 'Jurassic Museum (MUJA)',
+      subtitle: 'Colunga',
+      description: 'Journey to the past in the shape of a dinosaur footprint. Full-scale replicas, authentic fossils and interactive activities for the whole family.',
+    },
+    fr: {
+      title: 'Musée du Jurassique (MUJA)',
+      subtitle: 'Colunga',
+      description: 'Voyage dans le passé en forme d\'empreinte de dinosaure. Répliques à l\'échelle, fossiles authentiques et activités interactives pour toute la famille.',
+    },
+    de: {
+      title: 'Juramuseum (MUJA)',
+      subtitle: 'Colunga',
+      description: 'Reise in die Vergangenheit in Form eines Dinosaurier-Fußabdrucks. Originalgetreue Repliken, echte Fossilien und interaktive Aktivitäten für die ganze Familie.',
+    },
+    pt: {
+      title: 'Museu do Jurássico (MUJA)',
+      subtitle: 'Colunga',
+      description: 'Viagem ao passado em forma de pegada de dinossauro. Réplicas à escala real, fósseis autênticos e atividades interativas para toda a família.',
+    },
+    ast: {
+      title: 'Muséu del Xurásicu (MUJA)',
+      subtitle: 'Colunga',
+      description: 'Viaxe al pasáu en forma de buelga de dinosauriu. Répliques a escala real, fósiles auténticos y actividaes interactives pa tola familia.',
+    },
+  },
+
+  'gastro-fabada-asturiana': {
+    en: {
+      title: 'Fabada Asturiana',
+      subtitle: 'All of Asturias',
+      description: 'The most emblematic dish: Granja beans with compango (chorizo, morcilla and ham). Slow-cooked over a low heat for hours.',
+    },
+    fr: {
+      title: 'Fabada Asturienne',
+      subtitle: 'Toutes les Asturies',
+      description: 'Le plat le plus emblématique : haricots de la Granja avec compango (chorizo, boudin noir et jambon). Mijoté à feu doux pendant des heures.',
+    },
+    de: {
+      title: 'Fabada Asturiana',
+      subtitle: 'Ganz Asturien',
+      description: 'Das emblematischste Gericht: Granja-Bohnen mit Compango (Chorizo, Blutwurst und Schinken). Stundenlang bei geringer Hitze geschmort.',
+    },
+    pt: {
+      title: 'Fabada Asturiana',
+      subtitle: 'Toda a Astúrias',
+      description: 'O prato mais emblemático: feijão da Granja com compango (chouriço, morcela e lacão). Cozinhado em lume brando durante horas.',
+    },
+    ast: {
+      title: 'Fabada Asturiana',
+      subtitle: 'Tola Asturies',
+      description: 'El platu más emblemáticu: fabes de la Granxa con compangu (chorizu, morciellu y lacón). Cocíu a fueu lento durante hores.',
+    },
+  },
+
+  'gastro-sidra-asturiana': {
+    en: {
+      title: 'Asturian Cider',
+      subtitle: 'Comarca de la Sidra',
+      description: 'An identity-defining drink poured from a height. Ritual, culture and tradition in every culín of this age-old beverage.',
+    },
+    fr: {
+      title: 'Cidre Asturien',
+      subtitle: 'Comarca de la Sidra',
+      description: 'Une boisson identitaire versée de haut. Rituel, culture et tradition dans chaque culín de cette boisson millénaire.',
+    },
+    de: {
+      title: 'Asturischer Apfelwein',
+      subtitle: 'Comarca de la Sidra',
+      description: 'Ein identitätsstiftendes Getränk, aus der Höhe eingeschenkt. Ritual, Kultur und Tradition in jedem Culín dieses jahrtausendealten Getränks.',
+    },
+    pt: {
+      title: 'Sidra Asturiana',
+      subtitle: 'Comarca de la Sidra',
+      description: 'Uma bebida identitária escanciada do alto. Ritual, cultura e tradição em cada culín desta bebida milenar.',
+    },
+    ast: {
+      title: 'Sidra Asturiana',
+      subtitle: 'Comarca de la Sidra',
+      description: 'Una bébora identitaria escanciada dende l\'altu. Ritual, cultura y tradición en cada culín d\'esta bébora milenaria.',
+    },
+  },
+
+  // ============================================
+  // GENERATED STORIES (8 stories from generate-stories.ts)
+  // ============================================
+
+  'castro-coana-asentamiento-prerromano': {
+    en: {
+      title: 'Castro de Coaña',
+      subtitle: 'Pre-Roman fortified settlement in the west',
+      description: 'Discover one of the best-preserved pre-Roman hillforts in Asturias, where ancient stones tell the stories of Celtic civilizations. This impressive archaeological site will transport you to the 8th century BC, offering spectacular views over the valley and a unique window into the lives of our ancestors.',
+    },
+    fr: {
+      title: 'Castro de Coaña',
+      subtitle: 'Site fortifié préromain de l\'ouest',
+      description: 'Découvrez l\'un des castros préromains les mieux conservés des Asturies, où des pierres millénaires racontent l\'histoire des civilisations celtes. Cet impressionnant site archéologique vous transportera au VIIIe siècle av. J.-C., offrant des vues spectaculaires sur la vallée et une fenêtre unique sur la vie de nos ancêtres.',
+    },
+    de: {
+      title: 'Castro de Coaña',
+      subtitle: 'Vorrömische Wehrsiedlung im Westen',
+      description: 'Entdecken Sie eine der am besten erhaltenen vorrömischen Wallburgen Asturiens, wo jahrtausendealte Steine die Geschichten keltischer Zivilisationen erzählen. Diese beeindruckende archäologische Stätte versetzt Sie ins 8. Jahrhundert v. Chr. und bietet spektakuläre Ausblicke auf das Tal sowie ein einzigartiges Fenster in das Leben unserer Vorfahren.',
+    },
+    pt: {
+      title: 'Castro de Coaña',
+      subtitle: 'Povoado fortificado pré-romano no ocidente',
+      description: 'Descubra um dos castros pré-romanos mais bem conservados das Astúrias, onde pedras milenares contam histórias de civilizações celtas. Este impressionante sítio arqueológico irá transportá-lo ao século VIII a.C., oferecendo vistas espetaculares sobre o vale e uma janela única para a vida dos nossos antepassados.',
+    },
+    ast: {
+      title: 'Castru de Cuaña',
+      subtitle: 'Asentamientu fortificáu prerromanu nel occidente',
+      description: 'Descubri ún de los castros prerromanos meyor calteníos d\'Asturies, onde les piedres milenaries cuenten histories de civilizaciones celtes. Esti impresionante xacimientu arqueolóxicu va tresportate al sieglu VIII e.C., ofreciendo vistes espectaculares al valle y una ventana única a la vida de los nuesos antepasaos.',
+    },
+  },
+
+  'senda-del-oso-teverga': {
+    en: {
+      title: 'Senda del Oso (Bear Trail)',
+      subtitle: 'Cycling and hiking route in the Biosphere Reserve',
+      description: 'Travel along this former railway line turned greenway where you can meet the bears Paca and Molina in their natural habitat. The route crosses tunnels, viaducts and centuries-old chestnut forests in the Las Ubiñas-La Mesa Biosphere Reserve, perfect for families and nature lovers.',
+    },
+    fr: {
+      title: 'Senda del Oso (Sentier de l\'Ours)',
+      subtitle: 'Itinéraire cyclable et pédestre dans la Réserve de Biosphère',
+      description: 'Parcourez cette ancienne voie ferrée transformée en voie verte où vous pourrez rencontrer les ourses Paca et Molina dans leur habitat naturel. L\'itinéraire traverse tunnels, viaducs et forêts de châtaigniers centenaires dans la Réserve de Biosphère de Las Ubiñas-La Mesa, parfait pour les familles et les amoureux de la nature.',
+    },
+    de: {
+      title: 'Senda del Oso (Bärenpfad)',
+      subtitle: 'Rad- und Wanderweg im Biosphärenreservat',
+      description: 'Folgen Sie dieser ehemaligen Bahntrasse, die zu einem Grünweg umgebaut wurde, und treffen Sie die Bärinnen Paca und Molina in ihrem natürlichen Lebensraum. Die Strecke führt durch Tunnel, über Viadukte und durch jahrhundertealte Kastanienwälder im Biosphärenreservat Las Ubiñas-La Mesa - perfekt für Familien und Naturliebhaber.',
+    },
+    pt: {
+      title: 'Senda del Oso (Trilho do Urso)',
+      subtitle: 'Rota ciclável e pedestre na Reserva da Biosfera',
+      description: 'Percorra esta antiga via férrea convertida em ecovia, onde poderá conhecer as ursas Paca e Molina no seu habitat natural. A rota atravessa túneis, viadutos e bosques de castanheiros centenários na Reserva da Biosfera de Las Ubiñas-La Mesa, sendo perfeita para famílias e amantes da natureza.',
+    },
+    ast: {
+      title: 'Senda del Osu',
+      subtitle: 'Ruta ciclista y senderista na Reserva de la Biosfera',
+      description: 'Recorri esta antigua vía de tren convertida en sendeiru verde onde vas poder conocer a les oses Paca y Molina nel so hábitat natural. La ruta cruza túneles, viaductos y viesques de castañales centenarios na Reserva de la Biosfera de Les Ubiñes-La Mesa, perfecta pa families y amantes de la naturaleza.',
+    },
+  },
+
+  'iglesia-santa-cristina-lena': {
+    en: {
+      title: 'Church of Santa Cristina de Lena',
+      subtitle: 'Jewel of Asturian pre-Romanesque art',
+      description: 'Visit this extraordinary 9th-century church, a UNESCO World Heritage Site, which represents the highest expression of Asturian pre-Romanesque art. Its unique architecture and its setting on the slopes of Mount Aramo make it an essential stop for understanding the spiritual history of Asturias.',
+    },
+    fr: {
+      title: 'Église de Santa Cristina de Lena',
+      subtitle: 'Joyau du préroman asturien',
+      description: 'Visitez cette extraordinaire église du IXe siècle, classée au patrimoine mondial de l\'UNESCO, qui représente l\'expression la plus aboutie de l\'art préroman asturien. Son architecture unique et son emplacement sur les pentes du mont Aramo en font une étape incontournable pour comprendre l\'histoire spirituelle des Asturies.',
+    },
+    de: {
+      title: 'Kirche Santa Cristina de Lena',
+      subtitle: 'Juwel der asturischen Vorromanik',
+      description: 'Besuchen Sie diese außergewöhnliche Kirche aus dem 9. Jahrhundert, ein UNESCO-Weltkulturerbe, das den Höhepunkt der asturischen vorromanischen Kunst darstellt. Ihre einzigartige Architektur und ihre Lage an den Hängen des Berges Aramo machen sie zu einem unverzichtbaren Halt, um die spirituelle Geschichte Asturiens zu verstehen.',
+    },
+    pt: {
+      title: 'Igreja de Santa Cristina de Lena',
+      subtitle: 'Joia do pré-românico asturiano',
+      description: 'Visite esta extraordinária igreja do século IX, Património Mundial da UNESCO, que representa a máxima expressão da arte pré-românica asturiana. A sua arquitetura única e a sua localização nas encostas do monte Aramo tornam-na uma paragem imprescindível para compreender a história espiritual das Astúrias.',
+    },
+    ast: {
+      title: 'Ilesia de Santa Cristina de Lena',
+      subtitle: 'Xoya del prerrománicu asturianu',
+      description: 'Visita esta estraordinaria ilesia del sieglu IX, Patrimoniu de la Humanidá pola UNESCO, que representa la máxima espresión del arte prerrománicu asturianu. La so arquitectura única y el so allugamientu nes llombes del monte Aramo conviértenla nuna parada imprescindible pa entender la historia espiritual d\'Asturies.',
+    },
+  },
+
+  'cuevas-arte-rupestre-oriente': {
+    en: {
+      title: 'Rock Art Caves',
+      subtitle: 'World Heritage in eastern Asturias',
+      description: 'Explore the fascinating caves with Palaeolithic paintings declared a UNESCO World Heritage Site. These underground galleries hold artistic testimonies more than 20,000 years old, revealing the life and beliefs of the region\'s first inhabitants in an exceptional state of preservation.',
+    },
+    fr: {
+      title: 'Grottes d\'Art Rupestre',
+      subtitle: 'Patrimoine mondial dans l\'est des Asturies',
+      description: 'Explorez les fascinantes grottes ornées de peintures paléolithiques classées au patrimoine mondial de l\'UNESCO. Ces galeries souterraines abritent des témoignages artistiques vieux de plus de 20 000 ans, révélant la vie et les croyances des premiers habitants de la région dans un état de conservation exceptionnel.',
+    },
+    de: {
+      title: 'Höhlen mit Felskunst',
+      subtitle: 'Weltkulturerbe im Osten Asturiens',
+      description: 'Erkunden Sie die faszinierenden Höhlen mit paläolithischen Malereien, die zum UNESCO-Weltkulturerbe erklärt wurden. Diese unterirdischen Galerien bergen über 20.000 Jahre alte künstlerische Zeugnisse und zeigen das Leben und die Glaubensvorstellungen der ersten Bewohner der Region in außergewöhnlichem Erhaltungszustand.',
+    },
+    pt: {
+      title: 'Grutas de Arte Rupestre',
+      subtitle: 'Património Mundial no oriente asturiano',
+      description: 'Explore as fascinantes grutas com pinturas paleolíticas declaradas Património Mundial da UNESCO. Estas galerias subterrâneas guardam testemunhos artísticos com mais de 20.000 anos, mostrando a vida e as crenças dos primeiros habitantes da região com uma conservação excecional.',
+    },
+    ast: {
+      title: 'Cueves d\'Arte Rupestre',
+      subtitle: 'Patrimoniu de la Humanidá nel oriente asturianu',
+      description: 'Esplora les fascinantes cueves con pintures paleolítiques declaraes Patrimoniu de la Humanidá pola UNESCO. Estes galeríes soterrañes alluguen testimonios artísticos de va más de 20.000 años, amosando la vida y les creyencies de los primeros habitantes de la rexón con una caltenencia escepcional.',
+    },
+  },
+
+  'playas-salvajes-cudillero': {
+    en: {
+      title: 'Rocky Beaches of Cudillero',
+      subtitle: 'Rugged coast of western Asturias',
+      description: 'Witness the raw power of the Atlantic from these spectacular cliffs where the roaring sea hurls mountains of foam into the sky. The rocky beaches of Cudillero offer a unique natural spectacle, with small hidden coves and fishing villages that keep their seafaring charm intact.',
+    },
+    fr: {
+      title: 'Plages Rocheuses de Cudillero',
+      subtitle: 'Côte sauvage de l\'ouest des Asturies',
+      description: 'Contemplez la puissance brute de l\'Atlantique depuis ces falaises spectaculaires où la mer rugissante projette des montagnes d\'écume vers le ciel. Les plages rocheuses de Cudillero offrent un spectacle naturel unique, avec de petites criques cachées et des villages de pêcheurs qui conservent intact leur charme marin.',
+    },
+    de: {
+      title: 'Felsenstrände von Cudillero',
+      subtitle: 'Wilde Küste im Westen Asturiens',
+      description: 'Erleben Sie die rohe Kraft des Atlantiks von diesen spektakulären Klippen aus, wo das tosende Meer Berge aus Gischt in den Himmel schleudert. Die Felsenstrände von Cudillero bieten ein einzigartiges Naturschauspiel, mit kleinen versteckten Buchten und Fischerdörfern, die ihren maritimen Charme bewahrt haben.',
+    },
+    pt: {
+      title: 'Praias Rochosas de Cudillero',
+      subtitle: 'Costa brava do ocidente asturiano',
+      description: 'Contemple o poder do Atlântico em estado puro a partir destas falésias espetaculares, onde o mar rugidor lança montanhas de espuma ao céu. As praias rochosas de Cudillero oferecem um espetáculo natural único, com pequenas enseadas escondidas e aldeias piscatórias que mantêm intacto o seu encanto marinheiro.',
+    },
+    ast: {
+      title: 'Playes Rocoses de Cudillero',
+      subtitle: 'Costa brava del occidente asturianu',
+      description: 'Contempla\'l poder del Atlánticu n\'estáu puru dende estos espectaculares cantiles onde\'l mar ruxidor llanza montañes d\'espluma al cielu. Les playes rocoses de Cudillero ofrecen un espectáculu natural únicu, con pequeñes calietes escondíes y pueblos pesqueros que caltienen intactu\'l so encantu marineru.',
+    },
+  },
+
+  'huellas-dinosaurios-costa-jurasica': {
+    en: {
+      title: 'Dinosaur Footprints',
+      subtitle: 'Jurassic coast from Villaviciosa to Ribadesella',
+      description: 'Walk literally in the footsteps left by dinosaurs millions of years ago along this fascinating Jurassic coast. From Villaviciosa to Ribadesella, the coastline reveals an open-air palaeontological museum where every tide uncovers new traces of these prehistoric giants.',
+    },
+    fr: {
+      title: 'Empreintes de Dinosaures',
+      subtitle: 'Côte jurassique de Villaviciosa à Ribadesella',
+      description: 'Marchez littéralement sur les traces laissées par les dinosaures il y a des millions d\'années le long de cette fascinante côte jurassique. De Villaviciosa à Ribadesella, le littoral révèle un musée paléontologique à ciel ouvert où chaque marée dévoile de nouveaux vestiges de ces géants préhistoriques.',
+    },
+    de: {
+      title: 'Dinosaurierspuren',
+      subtitle: 'Jurassische Küste von Villaviciosa bis Ribadesella',
+      description: 'Wandeln Sie buchstäblich auf den Spuren, die Dinosaurier vor Millionen von Jahren an dieser faszinierenden jurassischen Küste hinterlassen haben. Von Villaviciosa bis Ribadesella offenbart die Küste ein paläontologisches Freilichtmuseum, in dem jede Flut neue Überreste dieser prähistorischen Giganten freilegt.',
+    },
+    pt: {
+      title: 'Pegadas de Dinossauros',
+      subtitle: 'Costa jurássica de Villaviciosa a Ribadesella',
+      description: 'Caminhe literalmente sobre as pegadas deixadas pelos dinossauros há milhões de anos nesta fascinante costa jurássica. De Villaviciosa a Ribadesella, a costa revela um museu paleontológico ao ar livre onde cada maré descobre novos vestígios destes gigantes pré-históricos.',
+    },
+    ast: {
+      title: 'Buelgues de Dinosaurios',
+      subtitle: 'Costa xurásica de Villaviciosa a Ribeseya',
+      description: 'Camina lliteralmente sobre les buelgues dexaes polos dinosaurios va millones d\'años nesta fascinante costa xurásica. Dende Villaviciosa hasta Ribeseya, la costa revela un muséu paleontolóxicu al aire llibre onde cada marea descubre nuevos vestixos d\'estos xigantes prehistóricos.',
+    },
+  },
+
+  'palacio-selgas-occidente': {
+    en: {
+      title: 'Selgas Palace',
+      subtitle: 'The little Asturian Versailles',
+      description: 'Step into this magnificent 19th-century palace known as the \'Asturian Versailles\', with its impressive gardens, a library of more than 20,000 volumes and an exceptional art collection that includes works by Goya. A testament to the splendour of the Asturian industrial bourgeoisie, surrounded by idyllic landscapes.',
+    },
+    fr: {
+      title: 'Palais de Selgas',
+      subtitle: 'Le petit Versailles asturien',
+      description: 'Pénétrez dans ce magnifique palais du XIXe siècle surnommé le « Versailles asturien », avec ses jardins impressionnants, sa bibliothèque de plus de 20 000 volumes et une exceptionnelle collection d\'art comprenant des œuvres de Goya. Un témoignage de la splendeur de la bourgeoisie industrielle asturienne, entouré de paysages idylliques.',
+    },
+    de: {
+      title: 'Selgas-Palast',
+      subtitle: 'Das kleine asturische Versailles',
+      description: 'Betreten Sie diesen prachtvollen Palast aus dem 19. Jahrhundert, der als das „asturische Versailles" bekannt ist, mit seinen beeindruckenden Gärten, einer Bibliothek mit mehr als 20.000 Bänden und einer außergewöhnlichen Kunstsammlung, die Werke von Goya umfasst. Ein Zeugnis der Pracht des asturischen Industriebürgertums, umgeben von idyllischen Landschaften.',
+    },
+    pt: {
+      title: 'Palácio de Selgas',
+      subtitle: 'O pequeno Versalhes asturiano',
+      description: 'Entre neste magnífico palácio do século XIX conhecido como o \'Versalhes asturiano\', com os seus impressionantes jardins, uma biblioteca de mais de 20.000 volumes e uma excecional coleção de arte que inclui obras de Goya. Um testemunho do esplendor da burguesia industrial asturiana rodeado de paisagens idílicas.',
+    },
+    ast: {
+      title: 'Palaciu de Selgas',
+      subtitle: 'El pequeñu Versalles asturianu',
+      description: 'Adéntrate nesti magníficu palaciu del sieglu XIX conocíu como\'l \'Versalles asturianu\', colos sos impresionantes xardinos, biblioteca de más de 20.000 volúmenes y una escepcional coleición d\'arte qu\'inclúi obres de Goya. Un testimoniu del esplendor de la burguesía industrial asturiana arrodiáu de paisaxes idílicos.',
+    },
+  },
+
+  'ruta-cares-picos-europa': {
+    en: {
+      title: 'Cares Route',
+      subtitle: 'The divine gorge of the Picos de Europa',
+      description: 'Discover one of the most spectacular hiking routes in Spain, carved into the living rock between vertical walls more than 1,000 metres high. The Cares Route guides you through a breathtaking gorge along a path hewn into the mountain, offering views that take your breath away and the feeling of walking through a lost world.',
+    },
+    fr: {
+      title: 'Route du Cares',
+      subtitle: 'La gorge divine des Pics d\'Europe',
+      description: 'Découvrez l\'un des sentiers de randonnée les plus spectaculaires d\'Espagne, taillé dans la roche vive entre des parois verticales de plus de 1 000 mètres de haut. La Route du Cares vous guide à travers une gorge impressionnante le long d\'un chemin creusé dans la montagne, offrant des vues à couper le souffle et la sensation de marcher dans un monde perdu.',
+    },
+    de: {
+      title: 'Cares-Route',
+      subtitle: 'Die göttliche Schlucht der Picos de Europa',
+      description: 'Entdecken Sie einen der spektakulärsten Wanderwege Spaniens, in den lebenden Fels zwischen über 1.000 Meter hohen senkrechten Wänden gehauen. Die Cares-Route führt Sie durch eine beeindruckende Schlucht entlang eines in den Berg gegrabenen Pfades und bietet atemberaubende Ausblicke und das Gefühl, durch eine verlorene Welt zu wandern.',
+    },
+    pt: {
+      title: 'Rota do Cares',
+      subtitle: 'A garganta divina dos Picos da Europa',
+      description: 'Descubra uma das rotas de caminhada mais espetaculares de Espanha, talhada na rocha viva entre paredes verticais com mais de 1.000 metros de altura. A Rota do Cares guia-o por uma garganta impressionante ao longo de um trilho escavado na montanha, oferecendo vistas de tirar o fôlego e a sensação de caminhar por um mundo perdido.',
+    },
+    ast: {
+      title: 'Ruta del Cares',
+      subtitle: 'La garganta divina de los Picos d\'Europa',
+      description: 'Descubri una de les rutes de senderismu más espectaculares d\'España, tallada na roca viva ente paredes verticales de más de 1.000 metros d\'altura. La Ruta del Cares guíate per una garganta impresionante siguiendo un sendeiru caváu na montaña, ofreciendo vistes que quiten l\'aliendu y la sensación de caminar per un mundu perdíu.',
+    },
+  },
 };
