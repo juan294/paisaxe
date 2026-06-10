@@ -1,14 +1,16 @@
 # Security Report — Paisaxe
 
-**Date:** 2026-06-06
+**Date:** 2026-06-07
 **Agent:** Security Agent
-**Scope:** Dependency vulnerabilities, license compliance, security headers, CI/CD automation, outdated packages
+**Scope:** Dependency advisories, license compliance, CI/CD security automation, security headers, outdated packages
 
 ---
 
 ## 1. Health Status: GREEN
 
-0 advisories detected, 0 exploitable. Clean `npm audit` (production and dev). All security headers present and correct in source and live response. License policy compliant — no strong copyleft, both weak-copyleft packages documented. CI/CD security automation fully active (Gitleaks, npm audit daily, license-check, Vercel env safety).
+Zero advisories detected, zero exploitable. The dependency tree is clean (`npm audit` reports 0 vulnerabilities across all severities). The two transitive advisories from the Apr 17 / Apr 25 cycles (protobufjs Critical, dompurify Moderate, postcss/uuid chains) have all been resolved upstream and no longer appear. License posture is compliant, all seven security headers are present and correct in source, and CI/CD security automation (Dependabot, Gitleaks, npm audit, license-check) is fully active.
+
+GREEN holds. The dompurify chain that drove prior YELLOW reports is now at 3.4.0 (advisory cleared).
 
 ---
 
@@ -16,131 +18,138 @@
 
 **0 advisories detected, 0 exploitable.**
 
-The dependency tree is clean. `npm audit` returns "found 0 vulnerabilities" across both production and dev scopes — there is no Critical/High/Moderate/Low advisory to triage this cycle, and nothing to fix via `npm audit fix`.
-
-Defensive posture is strong and unchanged from the last clean cycle:
-
-- **CSP** is correctly tuned for PPR (`'self' 'unsafe-inline'`, no `'strict-dynamic'`, no nonce dependency), with XSS defense moved to output sanitization in the react-markdown render sinks. Confirmed identical in source (`src/lib/proxy/csp.ts`) and live header.
-- **All seven security headers** (HSTS preload, X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy, plus CSP with `frame-ancestors 'none'` and `object-src 'none'`) are present.
-- **License compliance** holds: no GPL/AGPL/SSPL anywhere. The two weak-copyleft packages (sharp-libvips LGPL, dompurify's MPL option) are documented or dual-licensed under a permissive option.
-- **CI/CD security** is comprehensive: Gitleaks secret scanning, `npm audit --audit-level=moderate` on every PR plus a daily schedule, a dedicated license-check workflow, and a Vercel env-safety guard.
-
-The only open items are routine dependency hygiene (27 outdated packages, none carrying a CVE) and standing dev-tooling drift, neither of which affects production security.
+- **Vulnerabilities:** 0 critical / 0 high / 0 moderate / 0 low. `npm audit` output: "found 0 vulnerabilities".
+- **Exploitability:** Not applicable — no advisories to assess. There is no attack surface from the dependency graph this cycle.
+- **Licenses:** Compliant. No strong copyleft (GPL/AGPL/SSPL). Two weak-copyleft packages (LGPL-3.0 via sharp's native binary, and a dual-licensed MPL-2.0-OR-Apache-2.0 package) are both covered — one by a documented exception, one by license choice. The `UNLICENSED` flag is the Paisaxe app package itself (expected for a private project).
+- **Security headers:** All seven present and verified in source (`src/lib/proxy/csp.ts`, applied via `src/proxy.ts`). HSTS preload, X-Frame-Options DENY, CSP with `object-src 'none'` and `frame-ancestors 'none'`.
+- **CI/CD:** Dependabot (pinned to develop), Gitleaks, npm audit (daily cron + per-PR), and license-check all active. No gaps.
+- **Outdated packages:** 27 packages behind, all production-safe minor/patch bumps or dev-only. None carry CVEs. None are security-driving.
 
 ---
 
 ## 3. Vulnerability Table
 
 | Severity | Package | Advisory (GHSA / CVE) | Attack Vector | Fixable | Risk Assessment |
-|----------|---------|------------------------|---------------|---------|-----------------|
-| — | — | — | — | — | **No advisories. `npm audit` reports 0 vulnerabilities (Critical 0, High 0, Moderate 0, Low 0).** |
+|----------|---------|----------------------|---------------|---------|-----------------|
+| — | — | — | — | — | No advisories this cycle. `npm audit` reports 0 vulnerabilities. |
 
-There are no GHSA/CVE identifiers to cross-reference this cycle. The advisory chains active in late April — `protobufjs` (GHSA-xq3m-2v4x-88gg, Critical, transitive via posthog-js) and `dompurify` (GHSA-39q2-94rc-95cp, Moderate) — were both resolved by `npm audit fix` (commit `e66e510`, reported 2026-04-20), and the later postcss/uuid chains (Apr 25) have likewise cleared. None reappear in the current tree.
+**Recently-resolved advisories (for continuity — no longer present):**
+
+| Severity | Package | Advisory | Status |
+|----------|---------|----------|--------|
+| Critical | protobufjs | GHSA-xq3m-2v4x-88gg (prototype-pollution family) | Resolved — upgraded to >=7.5.5 (commit `e66e510`, Apr 20). Cleared. |
+| Moderate | dompurify | GHSA-39q2-94rc-95cp (CVE-2025-26791, mXSS via nesting) | Resolved — now 3.4.0 (>3.3.3). Cleared. |
+| Moderate | postcss | GHSA-qx2v-qp2m-jg93 (CVE-2023-44270, line-break parsing) | Resolved — override / upgrade applied. Cleared. |
+| Moderate | uuid | GHSA-w5hq-g745-h8pq | Resolved — resend pin synced. Cleared. |
 
 ---
 
-## 4. Detailed Exploitability Analysis
+## 4. Detailed Exploitability Analysis (High / Critical)
 
-No high or critical advisories are present, so there is no per-finding exploitability analysis required this cycle.
+No high or critical advisories are present this cycle, so there is nothing to analyze. For the record, the controls that previously contained transitive advisories remain in place:
 
-For completeness, the standing exploitability posture of the codebase (independent of advisories) remains:
-
-- **XSS via markdown render**: Mitigated at the sink, not via CSP nonces. `voice-chat.tsx` uses explicit component overrides with no raw-HTML passthrough; `safe-markdown.tsx` uses an `allowedElements` allowlist with `unwrapDisallowed`. Registry tracked in `docs/project/markdown-render-sinks.md`, regression-guarded by `e2e/xss-canary.spec.ts`. The `'unsafe-inline'` in CSP is a deliberate PPR trade-off, not a gap.
-- **Clickjacking**: Blocked by `frame-ancestors 'none'` (CSP) and `X-Frame-Options: DENY` (defense in depth).
-- **Webhook forgery / timing attacks**: Previously verified — all webhook signature comparisons use `timingSafeEqual`. No dependency change this cycle touched that path.
-- **CSRF**: Double-submit token enforcement plus Origin checking (SE-M2 hardening) confirmed working by the QA agent since 2026-03-23.
+- **dompurify is never called by application code.** `grep` over `src/` returns zero matches for `dompurify` / `DOMPurify`. It is pulled in transitively by `posthog-js` (`paisaxe -> posthog-js@1.376.4 -> dompurify@3.4.0`) and used only inside PostHog's internal analytics. Even if a future dompurify advisory lands, there is no user-controlled input path through our code. Primary XSS defense in this app is output sanitization in the react-markdown render sinks (`voice-chat.tsx`, `safe-markdown.tsx`), enforced by `e2e/xss-canary.spec.ts` — not CSP, by deliberate PPR-compatibility design.
+- **protobufjs was telemetry-only.** It served internal OpenTelemetry serialization, not user input — never exploitable in this codebase even while the advisory was open.
 
 ---
 
 ## 5. Prioritized Remediation Steps
 
-No security remediation is required this cycle. The following are routine, low-urgency hygiene items:
+No security-driven remediation is required this cycle.
 
-1. **(Optional, hygiene) Batch the production dependency updates.** 27 packages are behind latest, none with a CVE. The Dependabot weekly grouped PRs (`production` + `dev-and-types`) already handle this automatically; no manual `npm audit fix` is needed because there is nothing to fix.
+**Hygiene (low priority, batchable with the next dependency cycle):**
+
+1. **Sync posthog-js lockfile drift.** `npm ls` reports `posthog-js@1.376.4 invalid: "^1.378.1" from the root project` — the installed version is behind the package.json range, and the outdated list shows a further bump available (1.376.4 -> 1.382.0). Run `npm install` to reconcile, then batch the minor bump:
    ```bash
-   # Verify clean state (already clean)
-   npm audit --omit=dev --audit-level=moderate
-   # Let Dependabot's grouped PRs land, or manually:
-   npm update
+   npm install
+   npm install posthog-js@latest
    ```
-2. **(No action) `voyageai` stays pinned at 0.1.0.** Dependabot explicitly ignores `>= 0.2.0` because the 0.2.x ESM build has bare directory imports Turbopack cannot resolve. The 0.1.0 -> 0.3.1 "outdated" entry is expected and must not be force-bumped without verifying the ESM fix landed upstream.
-3. **(No action) `jsdom` (29.1.1 -> 27.0.1) and `vitest` (4.1.7 -> 3.2.6)** show a *lower* "latest" than installed — a dist-tag artifact, not a real downgrade target. Both are dev-only (testing). Leave as-is.
+   This is hygiene, not a vulnerability fix — current posthog-js carries no open advisory.
+
+2. **Batch the 27 outdated packages** (see Section 9) into a single Dependabot-grouped PR rather than one-by-one. All are minor/patch or dev-only.
+
+3. **Hold voyageai at 0.1.0.** Do NOT include `voyageai` in any upgrade batch — 0.2.x has a broken ESM build (Turbopack cannot resolve its bare dir imports). This is already pinned in `.github/dependabot.yml`.
 
 ---
 
 ## 6. License Compliance
 
-**Policy:** permissive-only (MIT, Apache-2.0, BSD, ISC). **Result: compliant.** `COPYLEFT LICENSES FOUND: false`. No GPL, AGPL, or SSPL present anywhere in the tree.
+**Status: Compliant.** No strong copyleft. CI `license-check.yml` blocks GPL-2.0, GPL-3.0, AGPL-1.0/3.0, EUPL-1.1/1.2, SSPL-1.0, BSL-1.1, CPAL-1.0, OSL-3.0, CPOL-1.02 on every PR.
 
-Flagged packages by name and disposition:
+Flagged packages by name (MPL / LGPL / GPL / UNLICENSED scan):
 
-| Package | License | Disposition |
-|---------|---------|-------------|
-| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | **Documented exception** (`license-exceptions.md` Exception 1). Weak copyleft; pre-built native binary, dynamically linked via `sharp` (Apache-2.0), unmodified, SaaS deployment — no copyleft obligation. |
-| `dompurify@3.4.0` | (MPL-2.0 OR Apache-2.0) | **Dual-licensed — elect Apache-2.0.** No exception needed; the Apache-2.0 option is fully permissive. (`license-exceptions.md` Exception 2 documents `@vercel/analytics` MPL-2.0 separately; dompurify's MPL surfaces only as the OR clause and carries no obligation under the Apache-2.0 election.) |
-| `paisaxe@1.5.1` | UNLICENSED | **Intentional — this is our own private package.** Marked UNLICENSED to prevent accidental npm publication. Not a third-party risk. |
-| `expand-template@2.0.3` | (MIT OR WTFPL) | Dual-licensed — elect MIT. Permissive, no obligation. |
-| `@babel/template@7.28.6` | MIT | False-positive flag (scanner heuristic). MIT is permissive. |
-| `simple-concat@1.0.1` | MIT | False-positive flag. MIT is permissive. |
-| `simple-get@4.0.1` | MIT | False-positive flag. MIT is permissive. |
+| Package | License | Assessment |
+|---------|---------|------------|
+| `@img/sharp-libvips-darwin-arm64@1.2.4` | LGPL-3.0-or-later | **Approved exception.** Documented in `docs/project/license-exceptions.md` (Exception 1). Weak copyleft; dynamically linked pre-built native binary under `sharp` (Apache-2.0), no modifications, SaaS deployment — no copyleft obligation triggered. |
+| `dompurify@3.4.0` | (MPL-2.0 OR Apache-2.0) | **No concern.** Dual-licensed — Apache-2.0 may be elected, sidestepping MPL entirely. Transitive via posthog-js. (Note: `@vercel/analytics` MPL-2.0 is separately covered by Exception 2.) |
+| `paisaxe@1.5.1` | UNLICENSED | **Expected.** This is the Paisaxe application package itself — a private, proprietary project. Not a third-party dependency. No action. |
+| `expand-template@2.0.3` | (MIT OR WTFPL) | No concern. MIT may be elected. |
+| `@babel/template@7.28.6` | MIT | False positive (matched on the `template` substring). MIT — permissive. |
+| `simple-concat@1.0.1` | MIT | False positive (string-match). MIT — permissive. |
+| `simple-get@4.0.1` | MIT | False positive (string-match). MIT — permissive. |
 
-License distribution summary: MIT 389, Apache-2.0 36, BSD-3-Clause 19, ISC 17, BSD-2-Clause 8, plus permissive long-tail (BlueOak-1.0.0, FSL-1.1-MIT, 0BSD, Unlicense, MIT-0, CC-BY-4.0, and the dual-license OR clauses above). The single LGPL entry is the documented sharp-libvips exception.
+The remaining license distribution is overwhelmingly permissive: MIT (389), Apache-2.0 (36), BSD-3-Clause (19), ISC (17), BSD-2-Clause (8), BlueOak-1.0.0 (5), plus a handful of dual-licensed permissive packages. The scan reports `COPYLEFT LICENSES FOUND: false`.
 
 ---
 
 ## 7. Security Headers Status
 
-All confirmed present in the live response and matching source (`src/lib/proxy/csp.ts`, `next.config.ts`):
+All seven headers present and verified in source (`src/lib/proxy/csp.ts` builds the CSP; `src/proxy.ts` applies the header set; tested by `src/lib/security-headers.test.ts` and `src/proxy.test.ts`).
 
 | Header | Value | Status |
 |--------|-------|--------|
-| Content-Security-Policy | `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com; ...; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` | Pass |
-| Strict-Transport-Security | `max-age=63072000; includeSubDomains; preload` | Pass |
+| Strict-Transport-Security | `max-age=63072000; includeSubDomains; preload` | Pass — 2-year max-age, preload-eligible |
 | X-Frame-Options | `DENY` | Pass |
 | X-Content-Type-Options | `nosniff` | Pass |
 | Referrer-Policy | `strict-origin-when-cross-origin` | Pass |
-| Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` | Pass |
+| Permissions-Policy | `camera=(), geolocation=(), microphone=(self)` | Pass — mic scoped to self for ElevenLabs voice |
+| Content-Security-Policy | see below | Pass |
+| (frame protection) | `frame-ancestors 'none'` + `object-src 'none'` in CSP | Pass |
 
-CSP notes:
-- `'unsafe-inline'` in `script-src` is a **deliberate PPR design choice** (documented at `csp.ts:1-21`), not a weakness — nonces would force dynamic rendering on CSP-sensitive routes and conflict with `cacheComponents`/PPR static shells. XSS is defended at the markdown render sinks instead.
-- `'strict-dynamic'` is correctly **absent** (per CLAUDE.md, it would override `'self'` and break all scripts on prerendered pages).
-- `frame-ancestors 'none'` and `object-src 'none'` lock down framing and plugin embedding.
-- Source verified by `src/lib/security-headers.test.ts` and `src/proxy.test.ts`.
+**CSP:** `default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://api.elevenlabs.io wss://api.us.elevenlabs.io https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.stripe.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src https://js.stripe.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`
+
+The `'unsafe-inline'` in script-src is a deliberate, documented design choice for PPR/`cacheComponents` compatibility (prerendered static shells carry no nonce). `'strict-dynamic'` and nonce-only CSP are explicitly avoided per CLAUDE.md and the file header in `csp.ts`. XSS defense is shifted to react-markdown output sanitization at the render sinks, with `e2e/xss-canary.spec.ts` as the regression gate. This is correct for the architecture and is not a finding. `'unsafe-eval'` is added only in `development`.
 
 ---
 
-## 8. CI/CD Automation Status
+## 8. CI/CD Security Automation Status
 
 | Control | Status | Detail |
 |---------|--------|--------|
-| Dependabot | Active | `.github/dependabot.yml` — weekly (Monday), targets `develop`, grouped `production` + `dev-and-types` PRs, limit 10. Explicitly ignores `voyageai >= 0.2.0` (broken ESM). GitHub Actions ecosystem also tracked. |
-| npm audit in CI | Active | `security.yml` — `npm audit --omit=dev --audit-level=moderate` on every push/PR to develop & main, **plus a daily 8:00 UTC schedule** (reduced CVE detection latency from ~6 days to <24h). Informational full audit also runs. |
-| Gitleaks | Active | `security.yml` — Gitleaks 8.21.2, `detect --source . --verbose`, full-depth checkout. |
-| License check | Active | `license-check.yml` — blocks strong copyleft (GPL/AGPL/SSPL); warns on weak copyleft (LGPL/MPL) per documented policy. |
-| Vercel env safety | Active | `security.yml` — asserts the legacy agent-runner override key is absent from Vercel production env before deploy. |
-| Renovate | Not configured | Intentional — Dependabot covers this role. No gap. |
+| Dependabot | Active | `.github/dependabot.yml` — npm + github-actions, weekly Monday, **target-branch: develop** (never main — correct, respects production safety). Grouped production / dev-and-types PRs. voyageai >=0.2.0 ignored. |
+| Renovate | Not configured | Intentional — Dependabot covers the need. No gap. |
+| Gitleaks | Active | `security.yml` — full-history secret scan (`fetch-depth: 0`), Gitleaks 8.21.2, on push + PR. |
+| npm audit | Active | `security.yml` — production deps, fails at moderate threshold, **daily 08:00 UTC cron** (latency reduced from ~6 days to <24h) plus per-PR. Informational full audit always runs. |
+| license-check | Active | `license-check.yml` — `license-checker --production`, blocks all strong copyleft on every PR. |
+| Vercel env safety | Active | `security.yml` — asserts the legacy agent-runner override key is absent from Vercel env before deploy. |
 
-No CI/CD security gaps. Gitleaks is present and running, closing out the "Gitleaks CI gap" flagged in earlier QA cycles.
+No CI/CD security gaps. The "Gitleaks CI gap" that QA flagged in earlier cycles was closed; Gitleaks is confirmed present and running here.
 
 ---
 
 ## 9. Outdated Packages with Security Implications
 
-27 packages outdated; **none carry a known CVE** (corroborated by the clean `npm audit`). No security-driven upgrade is required. Notable entries:
+27 packages behind. **None carry a known CVE or open advisory.** Production-relevant entries, ordered by recommended priority:
 
-- **Production (minor/patch, hygiene only):** `@anthropic-ai/sdk` 0.100.1 -> 0.101.0, `next` 16.2.6 -> 16.2.7, `@sentry/core` & `@sentry/nextjs` 10.55.0 -> 10.56.0, `@supabase/supabase-js` 2.106.2 -> 2.107.0, `@stripe/react-stripe-js` 6.4.0 -> 6.6.0, `posthog-js` 1.376.4 -> 1.381.0, `react`/`react-dom` 19.2.6 -> 19.2.7, several `@radix-ui/*` minors. All deferred to Dependabot's grouped PRs.
-- **`posthog-js` 1.376.4 -> 1.381.0:** Worth prioritizing in the next batch only because posthog-js was the source of the (now-resolved) protobufjs/dompurify transitive advisories in April — keeping it current minimizes the re-exposure window. No current advisory.
-- **`pdfjs-dist` 5.7.284 -> 6.0.227 (major):** A devDependency / build-pipeline only — confirmed not shipped to the client bundle (per Performance agent, Jun 4). No client-side exposure regardless of version.
-- **`voyageai` 0.1.0 -> 0.3.1:** Pinned by policy (Dependabot ignore). Do NOT bump — 0.2.x ESM build is broken under Turbopack. No security implication.
-- **`jsdom` 29 -> 27, `vitest` 4 -> 3:** Dev/test only, dist-tag artifacts. No security relevance.
+| Package | Current -> Latest | Type | Note |
+|---------|------------------|------|------|
+| posthog-js | 1.376.4 -> 1.382.0 | prod | Highest priority — also fixes the lockfile `invalid` drift vs package.json `^1.378.1`. No advisory; hygiene. |
+| next | 16.2.6 -> 16.2.7 | prod | Patch. Framework patch — verify on preview before any release (deployment-safety rule). |
+| @anthropic-ai/sdk | 0.100.1 -> 0.102.0 | prod | Minor. |
+| @supabase/supabase-js | 2.106.2 -> 2.107.0 | prod | Patch. |
+| @sentry/core, @sentry/nextjs | 10.55.0 -> 10.56.0 | prod | Patch — error-tracking pipeline. |
+| @stripe/react-stripe-js | 6.4.0 -> 6.6.0 | prod | Minor — payments surface; verify checkout after bump. |
+| @radix-ui/* (dialog, label, select, slot, tooltip) | various patch/minor | prod | UI primitives. |
+| pdfjs-dist | 5.7.284 -> 6.0.227 | dev/build | Major. Confirmed devDependency (per Performance Agent) — never shipped to client. Low urgency. |
+| voyageai | 0.1.0 -> 0.3.1 | prod | **DO NOT upgrade** — 0.2.x+ ESM build is broken under Turbopack. Pinned in dependabot. |
+| jsdom | 29.1.1 -> 27.0.1 | dev | Dev-only test env. The "downgrade" reflects a pre-release/channel mismatch — no security impact. |
+| vitest, @vitest/* | 4.1.x -> 3.2.6 / patch | dev | Dev-only test runner. No security impact. |
+| knip, tsx, eslint plugins, @types/* | various | dev | Dev tooling. No security impact. |
+
+**Assessment:** No outdated package is exploitable or advisory-bearing. The single hygiene item worth pulling forward is the posthog-js sync (resolves the lockfile `invalid` state). Everything else is safe to batch on the normal Dependabot cadence. Framework (next) and payments (Stripe) bumps require preview verification, not a CI-green-and-merge.
 
 ---
 
-## Cross-Agent Notes
+## Summary
 
-- **Performance Agent:** No new client-side dependencies entered the graph this cycle; the confirmed 3,398 KB bundle breach is a size issue, not a security one. `voyageai` stays pinned at 0.1.0. `pdfjs-dist`/`pdf-parse` confirmed devDependency-only — not in the client breach path. Shelving the ElevenLabs voice chunk (605 KB) has no security impact either direction.
-- **Cost Analyst Agent:** 0 advisories — no security cost or risk contribution to the 113-day revenue drought. ElevenLabs voice shelving is security-neutral.
-- **QA Agent:** Safety guardrails (CSRF + Origin enforcement) remain correct and should not be weakened by any test-harness fix. 0 advisories means no security action items blocking QA this cycle.
-- **Coverage Agent:** Webhook `timingSafeEqual` paths and CSRF error branches remain the security-critical coverage targets; no regression risk introduced this cycle.
-
----
+GREEN. Zero advisories, zero exploitable, fully license-compliant, all security headers correct in source, and complete CI/CD security automation. The only open items are dependency hygiene (posthog-js lockfile drift + a batchable 27-package update set), none of which are security-driving. No security blockers for the long-discussed tier-downgrade / voice-shelving decision — voice shelving is security-neutral.
