@@ -85,7 +85,7 @@
     "next": "^16.2.7",
     "next-themes": "^0.4.6",
     "pino": "^10.3.1",
-    "posthog-js": "^1.378.1",
+    "posthog-js": "^1.384.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",

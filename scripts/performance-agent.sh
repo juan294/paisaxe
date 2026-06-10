@@ -132,6 +132,17 @@ fi
 JS_CHANGE_KB=$((TOTAL_JS_KB - PREV_TOTAL_JS_KB))
 DEPS_CHANGE=$((PROD_DEPS - PREV_PROD_DEPS))
 
+# Build provenance — record .next mtime and last commit touching src/ or package.json
+# so Claude can verify bundle authority without manual git archaeology.
+NEXT_MTIME=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" .next 2>/dev/null || echo "unknown")
+NEXT_MTIME_EPOCH=$(stat -f "%m" .next 2>/dev/null || echo "0")
+LAST_SOURCE_COMMIT=$(git log -1 --format="%H %ai %s" -- src/ package.json package-lock.json 2>/dev/null || echo "unknown")
+LAST_SOURCE_COMMIT_EPOCH=$(git log -1 --format="%ct" -- src/ package.json package-lock.json 2>/dev/null || echo "0")
+BUILD_IS_STALE="false"
+if [[ "$FRESH_BUILD" == "false" && "$NEXT_MTIME_EPOCH" -lt "$LAST_SOURCE_COMMIT_EPOCH" ]]; then
+  BUILD_IS_STALE="true"
+fi
+
 # Determine budget violations
 VIOLATIONS=""
 if [[ $TOTAL_JS_KB -gt $BUDGET_TOTAL_JS_KB ]]; then
@@ -149,15 +160,26 @@ fi
   echo "PERFORMANCE METRICS ($(date '+%Y-%m-%d'))"
   echo "========================================="
   echo ""
-  if [[ "$FRESH_BUILD" == "false" ]]; then
-    echo "NOTE: Production build was skipped or failed — no fresh build available."
-    echo "Bundle sizes below are from cached .next artifacts, which may not reflect"
-    echo "the current source tree. Dependency and disk metrics are still accurate."
+  echo "BUILD PROVENANCE:"
+  echo "- .next directory mtime: ${NEXT_MTIME}"
+  echo "- Last commit touching src/ or package.json: ${LAST_SOURCE_COMMIT}"
+  if [[ "$FRESH_BUILD" == "true" ]]; then
+    echo "- Build status: FRESH (produced this run — bundle numbers are authoritative)"
+  elif [[ "$BUILD_IS_STALE" == "true" ]]; then
+    echo "- Build status: STALE — .next predates last source/dep commit. Bundle numbers are NOT authoritative."
+    echo "  BUDGET VERDICT SUPPRESSED: cached build is older than the source tree."
+    echo "  Base the overall status verdict on dependency and disk metrics only."
+  else
+    echo "- Build status: CACHED — .next postdates last source/dep commit. Bundle numbers are authoritative for current source tree."
+  fi
+  echo ""
+  if [[ "$FRESH_BUILD" == "false" && "$BUILD_IS_STALE" == "true" ]]; then
+    echo "NOTE: Production build was skipped or failed — cached .next is older than source."
+    echo "Bundle sizes below are informational only."
     echo ""
-    echo "BUDGET VERDICT SUPPRESSED: .next provenance is unverified (no fresh production build)."
-    echo "Report bundle sizes as informational only. Do NOT emit RED/YELLOW/GREEN for the bundle"
-    echo "size budget — that verdict requires a confirmed production build to be authoritative."
-    echo "Base the overall status verdict on dependency and disk metrics only."
+  elif [[ "$FRESH_BUILD" == "false" ]]; then
+    echo "NOTE: Production build was skipped (used existing .next). Bundle sizes are authoritative"
+    echo "for the current source tree (build postdates all source/dep changes)."
     echo ""
   fi
   echo "BUNDLE SIZES:"
@@ -190,7 +212,7 @@ fi
     echo "$HEAVY_DEPS"
     echo ""
   fi
-  if [[ -n "$VIOLATIONS" ]] && [[ "$FRESH_BUILD" == "true" ]]; then
+  if [[ -n "$VIOLATIONS" ]] && [[ "$FRESH_BUILD" == "true" || "$BUILD_IS_STALE" == "false" ]]; then
     echo "BUDGET VIOLATIONS:"
     echo -e "$VIOLATIONS"
     echo ""
