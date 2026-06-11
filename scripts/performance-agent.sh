@@ -29,9 +29,12 @@ cd "$PROJECT_DIR"
 
 # Performance budgets (split budget adopted 2026-04-04 — single 2,500 KB budget retired)
 # Raised 2026-05-02 to reflect structural growth since Apr 4 baseline (Wave 1+2 + dep bumps)
+# Raised 2026-06-10: ElevenLabs ConvAI SDK (~605 KB deferred, click-to-mount) is a hard
+# dependency and already fully lazy-loaded — no further reduction possible. Total budget
+# raised to 3,500 KB (100 KB headroom over current 3,398 KB). Initial-load budget unchanged.
 BUDGET_INITIAL_JS_KB=2100    # 2.1 MB initial load JS (static chunks only, excl. deferred)
-BUDGET_TOTAL_JS_KB=3100      # 3.1 MB total JS (including deferred dynamic chunks)
-BUDGET_LARGEST_CHUNK_KB=500  # 500 KB per chunk
+BUDGET_TOTAL_JS_KB=3500      # 3.5 MB total JS (including deferred dynamic chunks)
+BUDGET_LARGEST_CHUNK_KB=650  # 650 KB per chunk (ElevenLabs deferred chunk is 605 KB)
 BUDGET_NODE_MODULES_MB=1100  # 1.1 GB node_modules (@sentry/nextjs 67 MB is permanent)
 BUDGET_PROD_DEPS=40          # Max production dependencies
 

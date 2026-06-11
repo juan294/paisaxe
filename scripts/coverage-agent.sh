@@ -41,14 +41,22 @@ SHARED_CONTEXT_READ=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-ins
 SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-instructions.ts" write 2>/dev/null || echo "")
 
 # Run the coverage agent via Claude CLI in non-interactive mode.
-# flock serializes concurrent coverage runs across all projects on this host
-# to prevent vitest worker-pool starvation (38 concurrent vitest processes from
-# 3 projects corrupted coverage artifacts — observed May 2026).
-(
-  flock 200
-  "$CLAUDE_BIN" -p \
-    --allowedTools 'Read,Write,Edit,Bash(npx vitest*),Bash(npm run typecheck*),Bash(ls *),Bash(find *),Glob,Grep' \
-    >> "$LOG_FILE" 2>&1 <<PROMPT
+# mkdir-based lock serializes concurrent coverage runs across all projects on
+# this host to prevent vitest worker-pool starvation (38 concurrent vitest
+# processes from 3 projects corrupted coverage artifacts — observed May 2026).
+# mkdir is atomic on macOS and Linux; flock is Linux-only and unavailable on macOS.
+LOCK_DIR="/tmp/paisaxe-vitest-coverage.lock"
+LOCK_ACQUIRED=false
+while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+  log_info "Waiting for vitest lock (another coverage agent is running)..." | tee -a "$LOG_FILE"
+  sleep 5
+done
+LOCK_ACQUIRED=true
+trap 'if [[ "$LOCK_ACQUIRED" == "true" ]]; then rmdir "$LOCK_DIR" 2>/dev/null || true; fi' EXIT
+
+"$CLAUDE_BIN" -p \
+  --allowedTools 'Read,Write,Edit,Bash(npx vitest*),Bash(npm run typecheck*),Bash(ls *),Bash(find *),Glob,Grep' \
+  >> "$LOG_FILE" 2>&1 <<PROMPT
 $AGENT_PROMPT
 
 Additional context:
@@ -62,7 +70,9 @@ $SHARED_CONTEXT
 
 $SHARED_CONTEXT_WRITE
 PROMPT
-) 200>/tmp/paisaxe-vitest-coverage.lock
+
+rmdir "$LOCK_DIR" 2>/dev/null || true
+LOCK_ACQUIRED=false
 
 # Extract and write shared context
 REPORT_CONTENT=$(cat "$DOC_FILE")

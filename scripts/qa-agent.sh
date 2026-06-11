@@ -98,6 +98,8 @@ log_info "=== Phase 0: Integration Health Checks ===" | tee -a "$LOG_FILE"
 HEALTH_CHECKS_PASSED=0
 HEALTH_CHECKS_FAILED=0
 HEALTH_CHECK_DETAILS=""
+# Declare CI_E2E_STATUS/RUN_ID early so they are never unbound under set -u
+# (Phase 0.5 re-assigns them after Phase 0 health metrics are written)
 CI_E2E_STATUS="unknown"
 CI_E2E_RUN_ID=""
 
@@ -177,17 +179,17 @@ HEALTH_METRICS_FILE="$PROJECT_DIR/.qa-health-metrics.tmp"
   echo "INTEGRATION HEALTH CHECKS:"
   echo "- Passed: $HEALTH_CHECKS_PASSED"
   echo "- Failed: $HEALTH_CHECKS_FAILED"
-  echo "- CI E2E Status: $CI_E2E_STATUS"
+  echo "- CI E2E Status: ${CI_E2E_STATUS:-unknown}"
   if [[ -n "$HEALTH_CHECK_DETAILS" ]]; then
     echo ""
     echo "FAILURE DETAILS:"
     echo -e "$HEALTH_CHECK_DETAILS"
   fi
-  if [[ "$CI_E2E_STATUS" == "FAIL" ]]; then
+  if [[ "${CI_E2E_STATUS:-unknown}" == "FAIL" ]]; then
     echo ""
-    echo "CI E2E REGRESSION: E2E tests are failing on develop (run $CI_E2E_RUN_ID)."
+    echo "CI E2E REGRESSION: E2E tests are failing on develop (run ${CI_E2E_RUN_ID:-})."
     echo "This blocks production releases. Investigate immediately:"
-    echo "  gh run view $CI_E2E_RUN_ID --log-failed"
+    echo "  gh run view ${CI_E2E_RUN_ID:-} --log-failed"
   fi
 } > "$HEALTH_METRICS_FILE"
 
