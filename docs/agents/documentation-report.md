@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-06-10 06:00:04
+> Auto-generated on 2026-06-11 06:08:26
 
 ## CLAUDE.md Status
 
@@ -114,6 +114,7 @@ src/lib/i18n/fr.ts
 src/lib/i18n/provider.tsx
 src/lib/i18n/pt.ts
 src/lib/i18n/resolve.test.ts
+src/lib/i18n/story-translations-coverage.test.ts
 src/lib/i18n/translations.test.ts
 src/lib/image-optimization.ts
 src/lib/logger-sanitize.test.ts
@@ -157,6 +158,7 @@ scripts/generate-icons.ts
 scripts/generate-stories.test.ts
 scripts/generate-stories.ts
 scripts/performance-agent.sh
+scripts/qa-agent.sh
 scripts/security-agent.sh
 scripts/seed-database.test.ts
 scripts/seed-database.ts
@@ -237,26 +239,14 @@ webhooks/translate
 | CLAUDE.md | 2026-05-03 |
 | README.md | 2026-05-03 |
 
-## Changes Made This Run
+## Changes Made This Run (2026-06-11)
 
-Status: GREEN — No documentation gaps found. Twenty-seventh consecutive clean run. No edits required.
+No documentation changes were required this run. Verification details:
 
-### Feature Flags
-No undocumented flags. Verified all 17 visitor/admin feature flags in `src/types/feature-flags.ts` against the Feature Flags Reference in `docs/project/features.md` — zero gaps. Verified all 10 agent flags (master `automated_agents` + 9 in `scripts/agent-config.defaults.json`) against the Agent Flags table — zero gaps.
-
-### API Routes
-All 53 flagged routes confirmed internal — no documentation added. Breakdown:
-- `admin/*` — admin-only, require `validateAdminAuth()` session + admin role.
-- `cron/*` — internal scheduled jobs, gated by cron secret.
-- `webhooks/*` (elevenlabs, stripe, supabase, translate) — inbound from external services, already documented in the Infrastructure > Webhooks table.
-- `mcp/*` (places, weather, make-booking, make-booking/status) — Pelayo voice-agent tools, already documented in the Premium Voice Agent section.
-- `chat`, `chat/stream`, `favorites`, `feature-flags`, `suggestions`, `voice-access`, `checkout/*` — app-internal frontend endpoints, not third-party APIs.
-- `health/live`, `health`, `health/db` — internal liveness/diagnostics probes (live + diagnostics documented in Infrastructure).
-
-No external-consumption (public third-party) API exists, so no route documentation is required.
-
-### Source Changes Reviewed
-Migrations 089-092 (RLS hardening / internal function access) and the new static `about` page introduce no new user-facing features or feature flags. `features.md` and `CLAUDE.md` remain complete — no additions needed.
+- **Feature flags**: The gaps file listed zero undocumented flags. Verified independently against source: `src/types/feature-flags.ts` defines exactly 17 `FeatureFlagKey` values, all present in the Feature Flags Reference tables in `docs/project/features.md`. `scripts/agent-config.defaults.json` defines 9 agent flags plus the master toggle (10 total), all documented in the Agent Flags table. Zero gaps.
+- **API routes**: All 51 flagged routes confirmed internal — admin panel APIs (`admin/*`), cron endpoints (`cron/*`), webhook receivers (`webhooks/*`), MCP voice-agent tools (`mcp/*`), app-internal user APIs (chat, checkout, favorites, feature-flags, suggestions, voice-access), and health probes (`health/*`). None are intended for external consumption; no new documentation required. The webhook and MCP endpoints that matter to operators are already documented in features.md (Infrastructure and Premium Voice Agent sections).
+- **Recent source changes**: No commits touching `src/app/api` or feature flag sources since 2026-06-09. Recent modified files are tests, agent scripts, i18n/story-translation content (covered by the Localization agent), and RLS hardening migrations (089-092) — none introduce user-facing features or flags.
+- **features.md**: Complete. No additions, deletions, or restructuring performed.
 
 ---
 

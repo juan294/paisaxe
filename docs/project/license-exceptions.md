@@ -41,18 +41,29 @@ This exception should be revisited if:
 
 ---
 
-## Exception 2: `@vercel/analytics` (MPL-2.0)
+## Resolved Exception 2: `@vercel/analytics` (formerly MPL-2.0)
 
 | Field | Value |
 |-------|-------|
 | Package | `@vercel/analytics@2.0.1` |
-| License | MPL-2.0 (Mozilla Public License 2.0) |
+| Current license | MIT |
+| Previous license | MPL-2.0 (Mozilla Public License 2.0) |
 | Added | 2026-04-12 |
 | Identified by | Security agent license scan (2026-04-12) |
+| Resolved | 2026-06-11 — upstream package now ships under MIT |
 
-### Why this is acceptable
+### Resolution
 
-The MPL-2.0 is a **file-level weak copyleft** license. Its obligations apply only to modifications made to the MPL-licensed files themselves — not to the consuming application.
+This is no longer an active exception. The installed `@vercel/analytics@2.0.1`
+package now declares an MIT license, so it fits the standard permissive-only
+policy and no longer requires weak-copyleft review.
+
+### Historical assessment
+
+When this package was MPL-2.0, the license was acceptable because MPL-2.0 is a
+**file-level weak copyleft** license. Its obligations applied only to
+modifications made to the MPL-licensed files themselves, not to the consuming
+application.
 
 Neither condition that would trigger copyleft obligations applies here:
 
@@ -60,18 +71,13 @@ Neither condition that would trigger copyleft obligations applies here:
 - **File-level scope** — MPL-2.0 copyleft does not extend to files in the consuming project, only to changes within the MPL-licensed files.
 - **SaaS deployment** — Paisaxe is deployed as a hosted web service. No binary distribution occurs.
 
-Under these conditions, the MPL-2.0 imposes **no copyleft obligations** on Paisaxe's application code.
+Under those conditions, the MPL-2.0 imposed **no copyleft obligations** on Paisaxe's application code.
 
 ### CI enforcement
 
-The CI license-check workflow (`license-check.yml`) blocks strong copyleft (GPL/AGPL/SSPL) but permits weak copyleft (LGPL, MPL) with a warning, consistent with this policy exception.
-
-### Review schedule
-
-This exception should be revisited if:
-
-- `@vercel/analytics` source files are modified directly
-- The application is redistributed as a binary
+The CI license-check workflow (`license-check.yml`) blocks strong copyleft
+(GPL/AGPL/SSPL). `@vercel/analytics` should no longer appear in weak-copyleft
+warnings while it remains MIT-licensed.
 
 ---
 
