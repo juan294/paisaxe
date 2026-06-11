@@ -23,7 +23,13 @@ export function useStoryKeyboardNav({
   useEffect(() => {
     if (chatOpen) return;
 
+    const handledEvents = new WeakSet<KeyboardEvent>();
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (handledEvents.has(e)) {
+        return;
+      }
+
       const tag = (e.target as HTMLElement)?.tagName;
       if (
         tag === "INPUT" ||
@@ -35,17 +41,24 @@ export function useStoryKeyboardNav({
       }
 
       if (e.key === "ArrowRight" || e.key === " ") {
+        handledEvents.add(e);
         e.preventDefault();
         onNext();
       } else if (e.key === "ArrowLeft") {
+        handledEvents.add(e);
         e.preventDefault();
         onPrev();
       } else if (e.key === "i") {
+        handledEvents.add(e);
         onToggleInfo();
       }
     };
 
+    document.addEventListener("keydown", handleKeyDown, { capture: true });
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, { capture: true });
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [chatOpen, onNext, onPrev, onToggleInfo]);
 }
