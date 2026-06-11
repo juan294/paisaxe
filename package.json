@@ -112,7 +112,7 @@
     "@typescript-eslint/eslint-plugin": "^8.60.1",
     "@vitejs/plugin-react": "^6.0.2",
     "@vitest/coverage-v8": "^4.1.8",
-    "@vitest/eslint-plugin": "^1.6.19",
+    "@vitest/eslint-plugin": "^1.6.20",
     "dotenv": "^17.4.2",
     "eslint": "^9.39.4",
     "eslint-plugin-react": "^7.37.5",
