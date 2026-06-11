@@ -10,11 +10,7 @@
   ],
   "project": ["src/**/*.{ts,tsx}"],
   "ignore": [
-    "src/test/**",
-    "src/components/ui/**"
-  ],
-  "ignoreDependencies": [
-    "@types/*"
+    "src/test/**"
   ],
   "ignoreExportsUsedInFile": true,
   "ignoreBinaries": [
@@ -30,7 +26,8 @@
     "OSL-3.0",
     "CPOL-1.02",
     "du",
-    "elevenlabs"
+    "elevenlabs",
+    "cloudflared"
   ],
   "paths": {
     "@/*": ["./src/*"]
