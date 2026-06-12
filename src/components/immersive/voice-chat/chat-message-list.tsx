@@ -7,11 +7,8 @@ import { ChatMessageSkeleton } from "@/components/immersive/skeleton-chat-messag
 import { ChatUpsellCTA } from "@/components/immersive/chat-upsell-cta";
 import { useTranslation } from "@/lib/i18n";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
-import dynamic from "next/dynamic";
+import { ChatMarkdown } from "./chat-markdown";
 import type { StreamChatMessage } from "@/hooks/use-stream-chat";
-
-// #334: dynamic import defers react-markdown (~50KB) until this component is mounted
-const ReactMarkdown = dynamic(() => import("react-markdown"), { ssr: false });
 
 interface ChatMessageListProps {
   messages: StreamChatMessage[];
@@ -68,22 +65,7 @@ export function ChatMessageList({
             {msg.role === "user" ? (
               msg.content
             ) : (
-              <ReactMarkdown
-                components={{
-                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                  ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                  li: ({ children }) => <li>{children}</li>,
-                  a: ({ href, children }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">
-                      {children}
-                    </a>
-                  ),
-                }}
-              >
-                {msg.content}
-              </ReactMarkdown>
+              <ChatMarkdown content={msg.content} />
             )}
             {msg.images && msg.images.length > 0 && (
               <div className="mt-3 space-y-3">

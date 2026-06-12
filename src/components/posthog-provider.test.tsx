@@ -339,8 +339,8 @@ describe("PostHog production initialization (non-localhost)", () => {
         person_profiles: "never",
         persistence: "memory",
         capture_pageview: false,
-        capture_pageleave: true,
-        autocapture: true,
+        capture_pageleave: false,
+        autocapture: false,
       }));
     });
 

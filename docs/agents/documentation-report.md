@@ -1,5 +1,15 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-06-11 06:08:26
+> Auto-generated on 2026-06-12 06:04:01
+
+## Changes Made This Run
+
+**Status: GREEN — No documentation changes needed.**
+
+- Feature flags: The gaps file reported zero undocumented feature flags. Verified against source: all 17 flags in `FeatureFlagKey` (src/types/feature-flags.ts) and all 10 agent flags (master + 9 in scripts/agent-config.defaults.json) are documented in the Feature Flags Reference of `docs/project/features.md`. Zero gaps.
+- API routes: All 51 flagged routes confirmed internal — admin APIs (`/api/admin/*`), cron endpoints (`/api/cron/*`), webhooks (`/api/webhooks/*`, already documented in features.md Infrastructure), MCP voice-agent tools (`/api/mcp/*`, already documented under Custom MCP tools), health probes (`/api/health/*`, already documented), and app-internal user routes consumed only by the frontend (chat, favorites, suggestions, voice-access, checkout, feature-flags). No external-consumption routes require new documentation.
+- Source changes since last run: only two commits touch src/ (dependency batch #597 and triage hygiene 5f3b1d18 — story translations, coverage test, posthog-js lockfile sync). Neither introduces new flags, routes, or user-facing features.
+- `docs/project/features.md`: Complete — no additions made.
+- CLAUDE.md: Current (last modified 2026-05-03; no user-facing architecture changes since).
 
 ## CLAUDE.md Status
 
@@ -93,6 +103,8 @@ src/hooks/use-feature-flags.test.ts
 src/hooks/use-feature-flags.ts
 src/hooks/use-sse-stream.test.ts
 src/hooks/use-stories.ts
+src/hooks/use-story-keyboard-nav.test.ts
+src/hooks/use-story-keyboard-nav.ts
 src/hooks/use-stream-chat.test.ts
 src/hooks/use-voice-access.test.ts
 src/instrumentation.test.ts
@@ -238,15 +250,6 @@ webhooks/translate
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-05-03 |
 | README.md | 2026-05-03 |
-
-## Changes Made This Run (2026-06-11)
-
-No documentation changes were required this run. Verification details:
-
-- **Feature flags**: The gaps file listed zero undocumented flags. Verified independently against source: `src/types/feature-flags.ts` defines exactly 17 `FeatureFlagKey` values, all present in the Feature Flags Reference tables in `docs/project/features.md`. `scripts/agent-config.defaults.json` defines 9 agent flags plus the master toggle (10 total), all documented in the Agent Flags table. Zero gaps.
-- **API routes**: All 51 flagged routes confirmed internal — admin panel APIs (`admin/*`), cron endpoints (`cron/*`), webhook receivers (`webhooks/*`), MCP voice-agent tools (`mcp/*`), app-internal user APIs (chat, checkout, favorites, feature-flags, suggestions, voice-access), and health probes (`health/*`). None are intended for external consumption; no new documentation required. The webhook and MCP endpoints that matter to operators are already documented in features.md (Infrastructure and Premium Voice Agent sections).
-- **Recent source changes**: No commits touching `src/app/api` or feature flag sources since 2026-06-09. Recent modified files are tests, agent scripts, i18n/story-translation content (covered by the Localization agent), and RLS hardening migrations (089-092) — none introduce user-facing features or flags.
-- **features.md**: Complete. No additions, deletions, or restructuring performed.
 
 ---
 

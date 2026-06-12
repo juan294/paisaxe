@@ -51,7 +51,8 @@ COPYLEFT_CHECK=$(npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL
 # Check for outdated packages
 log_info "Checking for outdated packages..." | tee -a "$LOG_FILE"
 OUTDATED_OUTPUT=$(npm outdated --json 2>/dev/null || echo "{}")
-OUTDATED_COUNT=$(echo "$OUTDATED_OUTPUT" | jq 'keys | length' 2>/dev/null || echo "0")
+FILTERED_OUTDATED_OUTPUT=$(printf '%s' "$OUTDATED_OUTPUT" | npx tsx scripts/lib/filter-npm-outdated.ts json 2>/dev/null || printf '%s' "$OUTDATED_OUTPUT")
+OUTDATED_COUNT=$(echo "$FILTERED_OUTDATED_OUTPUT" | jq 'keys | length' 2>/dev/null || echo "0")
 
 # Check for packages with security updates available
 SECURITY_UPDATES=$(echo "$AUDIT_OUTPUT" | jq -r '.vulnerabilities | to_entries | map(select(.value.fixAvailable == true)) | length' 2>/dev/null || echo "0")
@@ -104,7 +105,7 @@ fi
   fi
   echo ""
   echo "OUTDATED PACKAGES: $OUTDATED_COUNT"
-  echo "$OUTDATED_OUTPUT" | jq -r 'to_entries | .[] | "\(.key): \(.value.current) -> \(.value.latest)"' 2>/dev/null || true
+  printf '%s' "$FILTERED_OUTDATED_OUTPUT" | npx tsx scripts/lib/filter-npm-outdated.ts list 2>/dev/null || true
   echo ""
   echo "CI/CD SECURITY AUTOMATION:"
   echo "- Dependabot configured: $DEPENDABOT_EXISTS"
