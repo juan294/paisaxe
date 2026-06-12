@@ -5,12 +5,12 @@
  * compatibility. Nonces would require dynamic rendering on CSP-sensitive
  * routes, conflicting with cacheComponents/PPR static shells.
  *
- * Primary XSS defense is enforced by output sanitization in the react-markdown
- * configuration:
- * - src/components/immersive/voice-chat.tsx — explicit components overrides
- *   and no raw HTML passthrough
- * - src/components/admin/agents-dashboard/safe-markdown.tsx — allowedElements
- *   allowlist with unwrapDisallowed
+ * Primary XSS defense is enforced by output sanitization in the markdown
+ * renderers:
+ * - src/components/immersive/voice-chat/chat-markdown.tsx — safe-link
+ *   allowlist and no raw HTML passthrough
+ * - src/components/admin/agents-dashboard/safe-markdown.tsx — no raw HTML
+ *   or link rendering
  *
  * See docs/project/markdown-render-sinks.md for the full registry. New
  * markdown renderers must be added there and covered by e2e/xss-canary.spec.ts.

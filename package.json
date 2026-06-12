@@ -88,7 +88,6 @@
     "posthog-js": "^1.384.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-markdown": "^10.1.0",
     "resend": "^6.12.4",
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",

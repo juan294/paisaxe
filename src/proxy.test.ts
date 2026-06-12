@@ -915,6 +915,33 @@ describe("Auth session refresh - setAll cookie callback", () => {
     // Verify capturedCookiesConfig was set (meaning createServerClient was called)
     expect(capturedCookiesConfig).not.toBeNull();
   });
+
+  it("uses the Supabase SSR 0.12 cookie adapter shape during session refresh", async () => {
+    mockGetUser.mockImplementation(async () => {
+      expect(capturedCookiesConfig?.getAll()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "sb-test-project-auth-token",
+            value: "some-jwt-value",
+          }),
+        ])
+      );
+
+      capturedCookiesConfig?.setAll?.([
+        { name: "sb-test-project-auth-token", value: "refreshed-jwt-value", options: { path: "/" } },
+      ]);
+
+      return { data: { user: { id: "user-1" } }, error: null };
+    });
+
+    const request = new NextRequest("http://localhost:3000/immersive", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
+    const response = await proxy(request);
+
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+    expect(response.cookies.get("sb-test-project-auth-token")?.value).toBe("refreshed-jwt-value");
+  });
 });
 
 describe("Auth session refresh - error logging", () => {
