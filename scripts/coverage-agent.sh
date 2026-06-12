@@ -47,6 +47,10 @@ SHARED_CONTEXT_WRITE=$(npx tsx "$PROJECT_DIR/scripts/lib/print-shared-context-in
 # mkdir is atomic on macOS and Linux; flock is Linux-only and unavailable on macOS.
 LOCK_DIR="/tmp/paisaxe-vitest-coverage.lock"
 LOCK_ACQUIRED=false
+if [[ -e "$LOCK_DIR" || -L "$LOCK_DIR" ]] && [[ ! -d "$LOCK_DIR" ]]; then
+  log_warn "Removing invalid vitest lock path at $LOCK_DIR" | tee -a "$LOG_FILE"
+  rm -f "$LOCK_DIR"
+fi
 while ! mkdir "$LOCK_DIR" 2>/dev/null; do
   log_info "Waiting for vitest lock (another coverage agent is running)..." | tee -a "$LOG_FILE"
   sleep 5

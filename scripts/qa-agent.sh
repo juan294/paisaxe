@@ -57,7 +57,8 @@ ENABLE_GAP_ANALYSIS=$(get_agent_config "qa_agent_enabled" "enableGapAnalysis" ||
 log_info "Configuration: $TESTS_PER_CATEGORY tests/category, journeyTests=$ENABLE_JOURNEY_TESTS, githubIssues=$ENABLE_GITHUB_ISSUES, gapAnalysis=$ENABLE_GAP_ANALYSIS" | tee -a "$LOG_FILE"
 
 # Check if server is already running (any HTTP response = server is up)
-PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3000/api/health 2>/dev/null || echo "000")
+PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3000/api/health 2>/dev/null || true)
+[[ -z "$PRECHECK_CODE" ]] && PRECHECK_CODE="000"
 if [[ "$PRECHECK_CODE" != "000" ]]; then
   log_info "Dev server already running on port 3000 (HTTP $PRECHECK_CODE)" | tee -a "$LOG_FILE"
 else
@@ -74,7 +75,8 @@ else
   MAX_WAIT=240
   WAITED=0
   while true; do
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3000/api/health" 2>/dev/null || echo "000")
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3000/api/health" 2>/dev/null || true)
+    [[ -z "$HTTP_CODE" ]] && HTTP_CODE="000"
     [[ "$HTTP_CODE" != "000" ]] && break
     if [[ $WAITED -ge $MAX_WAIT ]]; then
       log_error "Server failed to start within ${MAX_WAIT}s" | tee -a "$LOG_FILE"
@@ -105,7 +107,7 @@ CI_E2E_RUN_ID=""
 
 # Check 1: App Health Endpoint
 log_info "Checking app health..." | tee -a "$LOG_FILE"
-HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3000/api/health" 2>&1)
+HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3000/api/health" 2>&1 || true)
 if echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
   log_success "App health: OK" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
@@ -117,7 +119,7 @@ fi
 
 # Check 2: Database Connectivity (production endpoint)
 log_info "Checking database connectivity..." | tee -a "$LOG_FILE"
-DB_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/health/db" 2>&1)
+DB_RESPONSE=$(curl -s --max-time 15 "https://paisaxe.es/api/health/db" 2>&1 || true)
 if echo "$DB_RESPONSE" | grep -q '"success":true'; then
   DB_LATENCY=$(echo "$DB_RESPONSE" | grep -oE '"latencyMs":[0-9]+' | cut -d':' -f2 || echo "unknown")
   log_success "Database connectivity: OK (latency: ${DB_LATENCY}ms)" | tee -a "$LOG_FILE"
@@ -135,7 +137,7 @@ fi
 # The /api/checkout/health endpoint requires admin authentication (Supabase session cookies).
 # From an unauthenticated context we can only verify the route is reachable and auth is enforced.
 log_info "Checking Stripe endpoint reachability..." | tee -a "$LOG_FILE"
-STRIPE_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://paisaxe.es/api/checkout/health" 2>&1)
+STRIPE_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://paisaxe.es/api/checkout/health" 2>&1 || true)
 if [[ "$STRIPE_HTTP_CODE" == "401" ]]; then
   log_success "Stripe endpoint: reachable, auth enforced (HTTP 401 — expected without admin session)" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
