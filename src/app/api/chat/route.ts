@@ -18,6 +18,10 @@ import {
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
 import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
+import {
+  isChatStreamStageTimeout,
+  withChatStreamStageTiming,
+} from "@/lib/chat-stream-timeouts";
 
 /**
  * Extended response type with security metadata
@@ -135,27 +139,83 @@ export async function POST(request: NextRequest) {
 
     // === MAIN PROCESSING ===
 
-    // Parallelize the embedding call with the feature flag lookup — they are
-    // independent and can be inflight simultaneously. The search step still
-    // has to wait for the embedding (data dependency), but the flag check does not.
-    const [queryEmbedding, asturianEnabled] = await Promise.all([
-      generateEmbedding(cleanMessage),
-      isFeatureFlagEnabled("asturianu_touches"),
-    ]);
+    // Keep the feature-flag lookup concurrent with retrieval, but cap every
+    // pre-response stage so this legacy JSON route cannot hang indefinitely.
+    const asturianEnabledPromise = isFeatureFlagEnabled("asturianu_touches");
+    void asturianEnabledPromise.catch(() => {});
 
-    // Search for relevant content (with reranking via query text)
-    const { chunks, images } = await search(queryEmbedding, 3, cleanMessage);
+    let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
+    let images: Awaited<ReturnType<typeof search>>["images"] = [];
+    try {
+      const queryEmbedding = await withChatStreamStageTiming(
+        "embedding",
+        generateEmbedding(cleanMessage)
+      );
+      ({ chunks, images } = await withChatStreamStageTiming(
+        "search",
+        search(queryEmbedding, 3, cleanMessage)
+      ));
+    } catch (searchErr) {
+      if (!isChatStreamStageTimeout(searchErr)) {
+        throw searchErr;
+      }
+
+      logger.warn("[CHAT_SEARCH_UNAVAILABLE]", {
+        error: searchErr,
+        stage: searchErr.stage,
+      });
+      return NextResponse.json(
+        { error: "search_unavailable" },
+        {
+          status: 503,
+          headers: {
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+          },
+        }
+      );
+    }
 
     // If context is provided (e.g., from immersive mode), prepend it
     const enrichedMessage = buildEnrichedChatMessage(cleanMessage, context);
 
+    let asturianEnabled = false;
+    try {
+      asturianEnabled = await withChatStreamStageTiming("featureFlag", asturianEnabledPromise);
+    } catch (flagErr) {
+      logger.warn("[CHAT_FEATURE_FLAG_FALLBACK]", { error: flagErr });
+    }
+
     // Generate response using Claude with context
-    const responseText = await generateChatResponse(
-      enrichedMessage,
-      chunks,
-      asturianEnabled,
-      messageIndex
-    );
+    let responseText: string;
+    try {
+      responseText = await withChatStreamStageTiming(
+        "response",
+        generateChatResponse(
+          enrichedMessage,
+          chunks,
+          asturianEnabled,
+          messageIndex
+        )
+      );
+    } catch (responseErr) {
+      if (!isChatStreamStageTimeout(responseErr)) {
+        throw responseErr;
+      }
+
+      logger.warn("[CHAT_RESPONSE_TIMEOUT]", {
+        error: responseErr,
+        stage: responseErr.stage,
+      });
+      return NextResponse.json(
+        { error: "response_timeout" },
+        {
+          status: 504,
+          headers: {
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+          },
+        }
+      );
+    }
 
     // === SECURITY POST-PROCESSING ===
 
