@@ -69,4 +69,14 @@ describe("verification coverage config", () => {
     );
     expect(workflow).toContain("npm run check-verification-coverage");
   });
+
+  it("uses the body-parsing readiness monitor for Vercel health smoke checks", () => {
+    const ciWorkflow = readText(".github/workflows/ci.yml");
+    const previewSmokeWorkflow = readText(".github/workflows/preview-smoke.yml");
+
+    expect(ciWorkflow).toContain('node scripts/check-health-readiness.mjs "$PREVIEW_URL"');
+    expect(previewSmokeWorkflow).toContain(
+      'node scripts/check-health-readiness.mjs "$PREVIEW_URL" --require-sentry'
+    );
+  });
 });

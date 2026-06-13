@@ -170,6 +170,14 @@ jobs:
       statuses: read
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
       - name: Wait for Vercel preview deployment
         id: vercel-wait
         env:
@@ -235,21 +243,4 @@ jobs:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
-          echo "Testing: $PREVIEW_URL/api/health"
-          response=$(curl -sS \
-            -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
-            "$PREVIEW_URL/api/health" \
-            -o /tmp/health.json -w "%{http_code}")
-          if [ "$response" != "200" ]; then
-            echo "Health check failed: HTTP $response"
-            cat /tmp/health.json
-            exit 1
-          fi
-          status=$(python3 -c 'import json; print(json.load(open("/tmp/health.json"))["status"])')
-          if [ "$status" != "healthy" ]; then
-            echo "Health check failed: status=$status (expected healthy)"
-            cat /tmp/health.json
-            exit 1
-          fi
-          echo "Health check passed (HTTP 200, status=healthy)"
-          cat /tmp/health.json
+          node scripts/check-health-readiness.mjs "$PREVIEW_URL"
