@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import PricingPage from "./page";
+import PricingLoading from "./loading";
 import { Suspense, type ReactElement } from "react";
 
 // Mock hooks
@@ -124,6 +125,14 @@ describe("PricingPage", () => {
     });
 
     expect(() => render(<PricingPage />)).not.toThrow();
+  });
+
+  it("uses the pricing loading skeleton as the Suspense fallback", () => {
+    const routeShell = PricingPage() as ReactElement;
+
+    expect(routeShell.type).toBe(Suspense);
+    const fallback = (routeShell.props as { fallback: ReactElement }).fallback;
+    expect(fallback.type).toBe(PricingLoading);
   });
 
   it("should show disabled button with spinner during loading", () => {
