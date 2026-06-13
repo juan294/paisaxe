@@ -27,6 +27,16 @@ vi.mock("./supabase", () => ({
   })),
 }));
 
+function withRpc<T extends object>(mockSupabase: T): T & { rpc: ReturnType<typeof vi.fn> } {
+  if (!("rpc" in mockSupabase)) {
+    Object.assign(mockSupabase, {
+      rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
+    });
+  }
+
+  return mockSupabase as T & { rpc: ReturnType<typeof vi.fn> };
+}
+
 describe("translate-story", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -244,7 +254,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const result = await translateStory("non-existent-id");
 
@@ -285,7 +295,7 @@ describe("translate-story", () => {
           return {};
         }),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const mockTranslations = {
         en: { title: "Lakes", subtitle: "Paradise", description: "Two lakes." },
@@ -311,6 +321,98 @@ describe("translate-story", () => {
       expect(callAnthropicAPI).toHaveBeenCalled();
       expect(result.success).toBe(true);
       expect(result.results?.en?.success).toBe(true);
+    });
+
+    it("patches generated translation metadata without sending unrelated metadata fields", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const { callAnthropicAPI } = await import("./claude");
+
+      const mockStory = {
+        id: "test-story-id",
+        title: "Lagos de Covadonga",
+        subtitle: "Paraíso glaciar",
+        description: "Dos lagos de origen glaciar.",
+        metadata: {
+          mood_tags: ["nature"],
+          editorial_notes: { owner: "content-team" },
+          translations: {
+            fr: { title: "Ancien", subtitle: "Ancien", description: "Ancien" },
+          },
+          translation_status: {
+            fr: { status: "complete", updatedAt: "2026-01-01T00:00:00.000Z" },
+          },
+        },
+      };
+
+      const updateMock = vi.fn().mockResolvedValue({ error: null });
+      const rpcMock = vi.fn().mockResolvedValue({ data: true, error: null });
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: mockStory, error: null }),
+            })),
+          })),
+          update: updateMock,
+        })),
+        rpc: rpcMock,
+      };
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
+
+      const englishTranslation = {
+        en: { title: "Lakes", subtitle: "Paradise", description: "Two lakes." },
+      };
+
+      vi.mocked(callAnthropicAPI).mockResolvedValue({
+        content: [{ type: "text", text: JSON.stringify(englishTranslation) }],
+        id: "test",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4-20250514",
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 100, output_tokens: 200 },
+      } as never);
+
+      const result = await translateStory("test-story-id", { locales: ["en"] });
+
+      expect(result.success).toBe(true);
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(rpcMock).toHaveBeenCalledTimes(2);
+      expect(rpcMock).toHaveBeenNthCalledWith(
+        1,
+        "patch_story_translation_metadata",
+        expect.objectContaining({
+          p_story_id: "test-story-id",
+          p_translations: {},
+          p_set_last_translated_at: false,
+        })
+      );
+      expect(rpcMock.mock.calls[0]?.[1].p_translation_status).toEqual({
+        en: {
+          status: "translating",
+          updatedAt: expect.any(String),
+        },
+      });
+      expect(rpcMock).toHaveBeenNthCalledWith(
+        2,
+        "patch_story_translation_metadata",
+        expect.objectContaining({
+          p_story_id: "test-story-id",
+          p_translations: englishTranslation,
+          p_set_last_translated_at: true,
+          p_last_translated_at: expect.any(String),
+        })
+      );
+      expect(rpcMock.mock.calls[1]?.[1].p_translation_status).toEqual({
+        en: {
+          status: "complete",
+          updatedAt: expect.any(String),
+        },
+      });
+      expect(rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("metadata");
+      expect(rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("mood_tags");
+      expect(rpcMock.mock.calls[1]?.[1]).not.toHaveProperty("editorial_notes");
     });
 
     it("should only translate specified locales when provided", async () => {
@@ -341,7 +443,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const mockTranslations = {
         en: { title: "Test", subtitle: "Sub", description: "Desc." },
@@ -407,7 +509,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       // Request EN translation without forceRetranslate
       const result = await translateStory("test-story-id", { locales: ["en"] });
@@ -430,7 +532,16 @@ describe("translate-story", () => {
         metadata: {},
       };
 
-      let updateCallCount = 0;
+      let rpcCallCount = 0;
+      const rpcMock = vi.fn(() => {
+        rpcCallCount++;
+        if (rpcCallCount === 1) {
+          // First RPC: mark as translating — succeeds
+          return Promise.resolve({ data: true, error: null });
+        }
+        // Second RPC: save translations — fails
+        return Promise.resolve({ data: null, error: { message: "Database write timeout" } });
+      });
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({
@@ -438,18 +549,13 @@ describe("translate-story", () => {
               single: vi.fn().mockResolvedValue({ data: mockStory, error: null }),
             })),
           })),
-          update: vi.fn(() => {
-            updateCallCount++;
-            if (updateCallCount === 1) {
-              // First update: mark as translating — succeeds
-              return { eq: vi.fn().mockResolvedValue({ error: null }) };
-            }
-            // Second update: save translations — fails
-            return { eq: vi.fn().mockResolvedValue({ error: { message: "Database write timeout" } }) };
-          }),
+          update: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          })),
         })),
+        rpc: rpcMock,
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const mockTranslations = {
         en: { title: "Lakes", subtitle: "Paradise", description: "Two lakes." },
@@ -486,7 +592,7 @@ describe("translate-story", () => {
         metadata: {},
       };
 
-      const updateMock = vi.fn().mockResolvedValue({ error: null });
+      const rpcMock = vi.fn().mockResolvedValue({ data: true, error: null });
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({
@@ -495,11 +601,12 @@ describe("translate-story", () => {
             })),
           })),
           update: vi.fn(() => ({
-            eq: updateMock,
+            eq: vi.fn().mockResolvedValue({ error: null }),
           })),
         })),
+        rpc: rpcMock,
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       vi.mocked(callAnthropicAPI).mockRejectedValue(new Error("API rate limit exceeded"));
 
@@ -513,8 +620,8 @@ describe("translate-story", () => {
       expect(result.results?.en?.error).toBe("API rate limit exceeded");
       expect(result.results?.fr?.success).toBe(false);
       expect(result.results?.fr?.error).toBe("API rate limit exceeded");
-      // Should have called update to mark locales as failed (beyond the initial "mark as translating" call)
-      expect(updateMock).toHaveBeenCalledTimes(2);
+      // Should patch once for "translating" and once for the failed statuses.
+      expect(rpcMock).toHaveBeenCalledTimes(2);
     });
 
     it("should use 'Unknown error' when catch receives a non-Error object", async () => {
@@ -542,7 +649,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       // Throw a string instead of an Error object
       vi.mocked(callAnthropicAPI).mockRejectedValue("network timeout");
@@ -587,7 +694,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const mockTranslations = {
         de: { title: "Deutsch", subtitle: "Unter", description: "Beschr." },
@@ -646,7 +753,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       // API only returns "en", missing "fr"
       const mockTranslations = {
@@ -700,7 +807,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       // Return response with no text block (e.g., tool_use only)
       vi.mocked(callAnthropicAPI).mockResolvedValue({
@@ -746,7 +853,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       // Return invalid JSON text that will fail to parse
       vi.mocked(callAnthropicAPI).mockResolvedValue({
@@ -796,7 +903,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const mockTranslations = {
         en: { title: "Test", subtitle: "", description: "" },
@@ -846,7 +953,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       // Return valid JSON but with success=false and no error field.
       // parseTranslationResponse returns success=true for valid JSON though,
@@ -892,7 +999,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const result = await translateStory("non-existent-id");
 
@@ -935,7 +1042,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const mockTranslations = {
         en: { title: "New", subtitle: "New", description: "New" },
@@ -974,7 +1081,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const translation: StoryTranslation = {
         title: "Test Title",
@@ -1005,7 +1112,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const translation: StoryTranslation = {
         title: "Lakes of Covadonga",
@@ -1018,8 +1125,69 @@ describe("translate-story", () => {
       expect(result.success).toBe(true);
     });
 
+    it("patches manual translation edits without sending unrelated metadata fields", async () => {
+      const { createAdminClient } = await import("./supabase");
+      const rpcMock = vi.fn().mockResolvedValue({ data: true, error: null });
+      const updateMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
+      const mockSupabase = {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: {
+                  metadata: {
+                    mood_tags: ["coast"],
+                    content_owner: "editorial",
+                    translations: {
+                      fr: { title: "Titre", subtitle: "Sous", description: "Description" },
+                    },
+                    translation_status: {
+                      fr: { status: "complete", updatedAt: "2026-01-01T00:00:00.000Z" },
+                    },
+                  },
+                },
+                error: null,
+              }),
+            })),
+          })),
+          update: updateMock,
+        })),
+        rpc: rpcMock,
+      };
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
+
+      const translation: StoryTranslation = {
+        title: "Lakes of Covadonga",
+        subtitle: "Glacial paradise",
+        description: "Two glacial lakes.",
+      };
+
+      const result = await updateStoryTranslation("story-1", "en", translation);
+
+      expect(result.success).toBe(true);
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(rpcMock).toHaveBeenCalledWith("patch_story_translation_metadata", {
+        p_story_id: "story-1",
+        p_translations: { en: translation },
+        p_translation_status: {
+          en: {
+            status: "complete",
+            updatedAt: expect.any(String),
+          },
+        },
+        p_last_translated_at: null,
+        p_set_last_translated_at: false,
+      });
+      expect(rpcMock.mock.calls[0]?.[1]).not.toHaveProperty("metadata");
+      expect(rpcMock.mock.calls[0]?.[1]).not.toHaveProperty("mood_tags");
+      expect(rpcMock.mock.calls[0]?.[1]).not.toHaveProperty("content_owner");
+    });
+
     it("should return error when update fails", async () => {
       const { createAdminClient } = await import("./supabase");
+      const rpcMock = vi.fn().mockResolvedValue({ data: null, error: { message: "Update failed" } });
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({
@@ -1034,8 +1202,9 @@ describe("translate-story", () => {
             eq: vi.fn().mockResolvedValue({ error: { message: "Update failed" } }),
           })),
         })),
+        rpc: rpcMock,
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const translation: StoryTranslation = {
         title: "Test",
@@ -1060,7 +1229,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const translation: StoryTranslation = {
         title: "Test",
@@ -1091,7 +1260,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const translation: StoryTranslation = {
         title: "Test",
@@ -1116,7 +1285,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const result = await getStoryTranslations("non-existent");
 
@@ -1153,7 +1322,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const result = await getStoryTranslations("story-1");
 
@@ -1175,7 +1344,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const result = await getStoryTranslations("non-existent");
 
@@ -1202,7 +1371,7 @@ describe("translate-story", () => {
           })),
         })),
       };
-      vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+      vi.mocked(createAdminClient).mockReturnValue(withRpc(mockSupabase) as never);
 
       const result = await getStoryTranslations("story-1");
 
