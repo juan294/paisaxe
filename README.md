@@ -128,6 +128,7 @@ An AI-powered tourism experience for Asturias, Spain. Explore the region through
 |---------|-------------|
 | `npm run dev` | Start development server |
 | `npm run build` | Create production build |
+| `npm run build:analyze` | Create a webpack analyzer build and write bundle reports under `.next/analyze/` |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint for `src/` and TypeScript scripts |
 | `npm run lint:scripts` | Run ESLint for `scripts/` |
