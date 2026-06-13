@@ -94,6 +94,10 @@ function main(): void {
     "prelaunch:live must require the live integration gate"
   );
   assert(
+    pkg.scripts.prelaunch === "tsx scripts/run-prelaunch-gate.ts",
+    "prelaunch must run the safe local release gate"
+  );
+  assert(
     stripeWorkflow.includes("require_live_gate") &&
       stripeWorkflow.includes("REQUIRE_LIVE_INTEGRATION") &&
       stripeWorkflow.includes("Live gate requires all Stripe/Supabase QA secrets"),

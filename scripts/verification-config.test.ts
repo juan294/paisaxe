@@ -61,6 +61,7 @@ describe("verification coverage config", () => {
     const pkg = readJson<{ scripts: Record<string, string> }>("package.json");
     const workflow = readText(".github/workflows/e2e-stripe-integration.yml");
 
+    expect(pkg.scripts.prelaunch).toBe("tsx scripts/run-prelaunch-gate.ts");
     expect(pkg.scripts["prelaunch:live"]).toBe(
       "REQUIRE_LIVE_INTEGRATION=true npm run test:e2e:stripe"
     );
@@ -76,6 +77,7 @@ describe("verification coverage config", () => {
     expect(pkg.scripts["check-verification-coverage"]).toBe(
       "tsx scripts/check-verification-coverage.ts"
     );
+    expect(pkg.scripts.prelaunch).toContain("run-prelaunch-gate");
     expect(workflow).toContain("npm run check-verification-coverage");
   });
 

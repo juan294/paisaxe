@@ -24,12 +24,12 @@ Run all quality checks sequentially:
 npm run test           # All tests must pass
 npm run typecheck      # No TypeScript errors in app, scripts, E2E, or Edge functions
 npm run lint           # No linting errors in src/ or scripts/
-npm run check-verification-coverage  # Verification wiring is intact
-npm run build          # Production build succeeds
+npm run prelaunch      # Safe local release gate: verification wiring, env docs, migrations, build, browser E2E
 npm run prelaunch:live # Real Stripe/Supabase QA happy path; fails if credentials are missing
 ```
 
 **Expected results:**
+- Local pre-launch gate: runs verification coverage, env docs, migrations, build, and browser E2E without invoking live services
 - Tests: All passing (currently ~6,347 tests)
 - TypeScript: Exit code 0, no output
 - Lint: Exit code 0, no output
@@ -119,9 +119,13 @@ Check critical flags at https://paisaxe.es/api/feature-flags:
 | Tests | `npm run test` | All pass |
 | Types | `npm run typecheck` | No errors |
 | Lint | `npm run lint` | No errors |
+| Local release gate | `npm run prelaunch` | Safe local gate passes; live integration remains explicit |
 | Verification wiring | `npm run check-verification-coverage` | Explicit coverage check passes |
+| Env docs | `npm run check-env` | Required env vars are documented |
+| Migrations | `npm run check-migrations` | Migration checks pass |
 | Live integration | `npm run prelaunch:live` | Real Stripe happy path passes; no skipped critical path |
 | Build | `npm run build` | Completes |
+| Browser E2E | `npm run test:e2e` | Desktop, mobile, and QA journey projects pass |
 | Health | `curl .../api/health` | HTTP 200, `status: healthy`, and `sentry.status: configured` |
 | Site | `curl -w "%{http_code}" .../` | 200 (after launch) |
 
