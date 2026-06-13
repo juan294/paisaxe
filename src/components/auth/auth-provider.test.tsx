@@ -218,9 +218,36 @@ describe("AuthProvider", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 20));
 
+    expect(mockCreateSupabaseBrowserClient).not.toHaveBeenCalled();
     expect(mockGetSession).not.toHaveBeenCalled();
     expect(mockGetUser).not.toHaveBeenCalled();
-    expect(mockOnAuthStateChange).toHaveBeenCalled();
+    expect(mockOnAuthStateChange).not.toHaveBeenCalled();
+  });
+
+  it("loads the Supabase client on demand when a deferred route starts sign-in", async () => {
+    const { result } = renderHook(() => useAuthContext(), {
+      wrapper: ({ children }) => (
+        <AuthProvider deferInitialAuth>{children}</AuthProvider>
+      ),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(mockCreateSupabaseBrowserClient).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.signInWithGoogle();
+    });
+
+    expect(mockCreateSupabaseBrowserClient).toHaveBeenCalledTimes(1);
+    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: expect.stringContaining("/auth/callback"),
+      },
+    });
   });
 
   it("runs the Supabase session bootstrap when a deferred route later requires auth", async () => {

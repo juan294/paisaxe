@@ -6,11 +6,11 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { getSiteUrl, getSupabaseAnonKey } from "@/lib/env";
-import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
+import type { Session, AuthChangeEvent, SupabaseClient } from "@supabase/supabase-js";
 import { mapSupabaseUser, type AuthUser, type AuthContextValue } from "@/types/auth";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -25,26 +25,42 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(!deferInitialAuth);
 
-  const [supabase] = useState(() => createSupabaseBrowserClient());
-  const siteUrl = getSiteUrl();
+  const supabaseRef = useRef<SupabaseClient | null | undefined>(undefined);
+  const getSupabaseClient = useCallback(async () => {
+    if (supabaseRef.current !== undefined) return supabaseRef.current;
+
+    const { createSupabaseBrowserClient } = await import("@/lib/supabase-browser");
+    const supabase = createSupabaseBrowserClient();
+    supabaseRef.current = supabase;
+    return supabase;
+  }, []);
 
   useEffect(() => {
-    if (!supabase) {
+    if (deferInitialAuth) {
       setIsLoading(false);
       return;
     }
 
     let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
 
-    // Get initial session using getUser() to validate with server
-    // This ensures client and server auth state stay in sync
-    const initializeAuth = async () => {
+    const startAuth = async () => {
       // Skip auth with dummy credentials (CI/E2E) — real Supabase anon keys
       // are JWTs starting with 'eyJ'. Calling getUser() with dummy credentials
       // hangs on NXDOMAIN DNS resolution.
       const anonKey = getSupabaseAnonKey();
       if (!anonKey || !anonKey.startsWith("eyJ")) {
         if (!cancelled) setIsLoading(false);
+        return;
+      }
+
+      const supabase = await getSupabaseClient().catch((error: unknown) => {
+        console.error("Error initializing auth:", error);
+        return null;
+      });
+      if (cancelled) return;
+      if (!supabase) {
+        setIsLoading(false);
         return;
       }
 
@@ -76,42 +92,32 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
       } finally {
         if (!cancelled) setIsLoading(false);
       }
+
+      if (cancelled) return;
+
+      // Listen for auth changes after the validated bootstrap completes.
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (_event: AuthChangeEvent, newSession: Session | null) => {
+          if (cancelled) return;
+          setSession(newSession);
+          setUser(mapSupabaseUser(newSession?.user ?? null));
+          setIsLoading(false);
+        }
+      );
+      unsubscribe = () => subscription.unsubscribe();
     };
 
-    if (deferInitialAuth) {
-      setIsLoading(false);
-    } else {
-      setIsLoading(true);
-      void initializeAuth();
-    }
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, newSession: Session | null) => {
-        if (cancelled) return;
-        setSession(newSession);
-        setUser(mapSupabaseUser(newSession?.user ?? null));
-        setIsLoading(false);
-      }
-    );
+    setIsLoading(true);
+    void startAuth();
 
     return () => {
       cancelled = true;
-      subscription.unsubscribe();
+      unsubscribe?.();
     };
-  }, [deferInitialAuth, supabase]);
+  }, [deferInitialAuth, getSupabaseClient]);
 
   const signInWithGoogle = useCallback(async (redirectPath?: string) => {
-    if (!supabase) {
-      // #556: env vars may be missing client-side (e.g. NEXT_PUBLIC_SUPABASE_*
-      // not inlined). Never throw inside a click handler — the user-visible
-      // symptom would be a dead button with no feedback.
-      console.error(
-        "Supabase client unavailable — cannot sign in. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.",
-      );
-      return;
-    }
-
+    const siteUrl = getSiteUrl();
     const baseRedirectTo = typeof window !== "undefined"
       ? `${window.location.origin}/auth/callback`
       : siteUrl
@@ -121,6 +127,17 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
     const redirectTo = redirectPath
       ? `${baseRedirectTo}?next=${encodeURIComponent(redirectPath)}`
       : baseRedirectTo;
+
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      // #556: env vars may be missing client-side (e.g. NEXT_PUBLIC_SUPABASE_*
+      // not inlined). Never throw inside a click handler — the user-visible
+      // symptom would be a dead button with no feedback.
+      console.error(
+        "Supabase client unavailable — cannot sign in. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.",
+      );
+      return;
+    }
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -133,9 +150,10 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
       console.error("Error signing in with Google:", error);
       throw error;
     }
-  }, [siteUrl, supabase]);
+  }, [getSupabaseClient]);
 
   const signOut = useCallback(async () => {
+    const supabase = await getSupabaseClient();
     if (!supabase) {
       console.error("Supabase client unavailable — cannot sign out.");
       return;
@@ -145,7 +163,7 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
       console.error("Error signing out:", error);
       throw error;
     }
-  }, [supabase]);
+  }, [getSupabaseClient]);
 
   const value: AuthContextValue = {
     user,
