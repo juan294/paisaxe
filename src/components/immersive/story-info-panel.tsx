@@ -58,13 +58,17 @@ export function StoryInfoPanel({
   return (
     <article
       data-testid="story-info-panel"
+      aria-hidden={showInfo ? undefined : true}
+      inert={showInfo ? undefined : true}
       onClick={(e) => {
         e.stopPropagation();
         onToggleInfo?.();
       }}
       className={cn(
         "absolute bottom-0 left-0 right-0 p-8 pb-[max(2rem,env(safe-area-inset-bottom))] md:p-12 z-10 transition-all duration-500 motion-reduce:transition-none",
-        showInfo ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 motion-reduce:translate-y-0"
+        showInfo
+          ? "opacity-100 translate-y-0"
+          : "pointer-events-none opacity-0 translate-y-8 motion-reduce:translate-y-0"
       )}
     >
       {/* Badges */}

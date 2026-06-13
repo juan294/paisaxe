@@ -4,13 +4,14 @@ import { Suspense } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
+import PricingLoading from "./loading";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin } from "lucide-react";
 
 export default function PricingPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PricingLoading />}>
       <PricingPageContent />
     </Suspense>
   );
