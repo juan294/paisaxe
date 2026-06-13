@@ -53,6 +53,8 @@ import { generateEmbedding } from "@/lib/embeddings";
 import { search } from "@/lib/search";
 import { validateChatRequest } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
+import { CHAT_STREAM_STAGE_TIMEOUTS_MS } from "@/lib/chat-stream-timeouts";
 import { detectInjectionAttempt, sanitizeInput, detectPromptLeakage } from "@/lib/chat-safety";
 
 describe("POST /api/chat", () => {
@@ -73,6 +75,7 @@ describe("POST /api/chat", () => {
       sanitizedMessage: "Test message",
       sanitizedContext: undefined,
     });
+    vi.mocked(isFeatureFlagEnabled).mockResolvedValue(false);
   });
 
   it("should return a successful chat response", async () => {
@@ -391,6 +394,156 @@ describe("POST /api/chat", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("X-RateLimit-Remaining")).toBe("7");
+  });
+
+  describe("Stage timeouts (PE-M2)", () => {
+    async function expectRequestResolvesAfterTimeout(
+      responsePromise: Promise<Response>
+    ): Promise<Response | "pending"> {
+      return Promise.race([
+        responsePromise,
+        Promise.resolve("pending" as const),
+      ]);
+    }
+
+    it("returns 503 when embedding exceeds the shared stage timeout", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.mocked(validateChatRequest).mockReturnValue({
+          valid: true,
+          sanitizedMessage: "Tell me about Asturias",
+          sanitizedContext: undefined,
+        });
+        vi.mocked(generateEmbedding).mockReturnValue(new Promise(() => {}));
+
+        const request = new NextRequest("http://localhost:3000/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message: "Tell me about Asturias" }),
+        });
+
+        const responsePromise = POST(request);
+        await vi.advanceTimersByTimeAsync(CHAT_STREAM_STAGE_TIMEOUTS_MS.embedding + 1);
+
+        const response = await expectRequestResolvesAfterTimeout(responsePromise);
+        expect(response).not.toBe("pending");
+        expect((response as Response).status).toBe(503);
+        expect(await (response as Response).json()).toEqual({ error: "search_unavailable" });
+        expect(logger.warn).toHaveBeenCalledWith(
+          "[CHAT_STREAM_STAGE_TIMEOUT]",
+          expect.objectContaining({ stage: "embedding" })
+        );
+        expect(search).not.toHaveBeenCalled();
+        expect(generateChatResponse).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("returns 503 when search exceeds the shared stage timeout", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.mocked(validateChatRequest).mockReturnValue({
+          valid: true,
+          sanitizedMessage: "Tell me about Asturias",
+          sanitizedContext: undefined,
+        });
+        vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+        vi.mocked(search).mockReturnValue(new Promise(() => {}));
+
+        const request = new NextRequest("http://localhost:3000/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message: "Tell me about Asturias" }),
+        });
+
+        const responsePromise = POST(request);
+        await vi.advanceTimersByTimeAsync(CHAT_STREAM_STAGE_TIMEOUTS_MS.search + 1);
+
+        const response = await expectRequestResolvesAfterTimeout(responsePromise);
+        expect(response).not.toBe("pending");
+        expect((response as Response).status).toBe(503);
+        expect(await (response as Response).json()).toEqual({ error: "search_unavailable" });
+        expect(logger.warn).toHaveBeenCalledWith(
+          "[CHAT_STREAM_STAGE_TIMEOUT]",
+          expect.objectContaining({ stage: "search" })
+        );
+        expect(generateChatResponse).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("falls back to asturianEnabled=false when feature flag lookup times out", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.mocked(validateChatRequest).mockReturnValue({
+          valid: true,
+          sanitizedMessage: "Tell me about Asturias",
+          sanitizedContext: undefined,
+        });
+        vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+        vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+        vi.mocked(isFeatureFlagEnabled).mockReturnValue(new Promise(() => {}));
+        vi.mocked(generateChatResponse).mockResolvedValue("Response");
+        vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+
+        const request = new NextRequest("http://localhost:3000/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message: "Tell me about Asturias" }),
+        });
+
+        const responsePromise = POST(request);
+        await vi.advanceTimersByTimeAsync(CHAT_STREAM_STAGE_TIMEOUTS_MS.featureFlag + 1);
+
+        const response = await expectRequestResolvesAfterTimeout(responsePromise);
+        expect(response).not.toBe("pending");
+        expect((response as Response).status).toBe(200);
+        expect(generateChatResponse).toHaveBeenCalledWith(
+          "Tell me about Asturias",
+          expect.any(Array),
+          false,
+          undefined
+        );
+        expect(logger.warn).toHaveBeenCalledWith(
+          "[CHAT_STREAM_STAGE_TIMEOUT]",
+          expect.objectContaining({ stage: "featureFlag" })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("returns 504 when Claude response generation exceeds the upstream timeout", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.mocked(validateChatRequest).mockReturnValue({
+          valid: true,
+          sanitizedMessage: "Tell me about Asturias",
+          sanitizedContext: undefined,
+        });
+        vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+        vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+        vi.mocked(generateChatResponse).mockReturnValue(new Promise(() => {}));
+
+        const request = new NextRequest("http://localhost:3000/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message: "Tell me about Asturias" }),
+        });
+
+        const responsePromise = POST(request);
+        await vi.advanceTimersByTimeAsync(CHAT_STREAM_STAGE_TIMEOUTS_MS.response + 1);
+
+        const response = await expectRequestResolvesAfterTimeout(responsePromise);
+        expect(response).not.toBe("pending");
+        expect((response as Response).status).toBe(504);
+        expect(await (response as Response).json()).toEqual({ error: "response_timeout" });
+        expect(logger.warn).toHaveBeenCalledWith(
+          "[CHAT_STREAM_STAGE_TIMEOUT]",
+          expect.objectContaining({ stage: "response" })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("Security", () => {
