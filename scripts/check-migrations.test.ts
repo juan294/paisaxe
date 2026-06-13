@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from "fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
@@ -72,5 +72,26 @@ describe("validateMigrations", () => {
     const result = validateMigrations({ root: process.cwd() });
 
     expect(result.errors).toEqual([]);
+  });
+
+  it("keeps the Stripe webhook route aligned with the stripe_webhook_events schema", () => {
+    const schema = readFileSync(
+      "supabase/migrations/077_stripe_webhook_events.sql",
+      "utf8"
+    );
+    const rpc = readFileSync(
+      "supabase/migrations/084_fix_grant_day_pass_atomicity.sql",
+      "utf8"
+    );
+    const route = readFileSync("src/app/api/webhooks/stripe/route.ts", "utf8");
+
+    expect(schema).toMatch(/event_id\s+TEXT\s+UNIQUE\s+NOT\s+NULL/i);
+    expect(schema).not.toMatch(/\bstripe_event_id\b/i);
+    expect(schema).not.toMatch(/\bevent_type\b/i);
+    expect(schema).not.toMatch(/\bpayload\b/i);
+    expect(rpc).toMatch(/INSERT\s+INTO\s+public\.stripe_webhook_events\s*\(\s*event_id\s*\)/i);
+    expect(route).not.toMatch(/\bstripe_event_id\b/);
+    expect(route).not.toMatch(/\bevent_type\b/);
+    expect(route).not.toMatch(/\bpayload\b/);
   });
 });
