@@ -16,65 +16,17 @@ import {
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
 import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
-import { CHAT_STREAM_STAGE_TIMEOUTS_MS, type ChatStreamStage } from "@/lib/chat-stream-timeouts";
+import {
+  isChatStreamStageTimeout,
+  withChatStreamStageTiming,
+} from "@/lib/chat-stream-timeouts";
 import { encodeSseEvent } from "@/types/sse";
-
-class ChatStreamStageTimeoutError extends Error {
-  constructor(
-    readonly stage: ChatStreamStage,
-    readonly timeoutMs: number
-  ) {
-    super(`${stage} timed out after ${timeoutMs}ms`);
-    this.name = "ChatStreamStageTimeoutError";
-  }
-}
 
 function isAbortError(error: unknown): boolean {
   return (
     (error instanceof DOMException && error.name === "AbortError") ||
     (error instanceof Error && error.name === "AbortError")
   );
-}
-
-function isChatStreamStageTimeout(error: unknown): error is ChatStreamStageTimeoutError {
-  return error instanceof ChatStreamStageTimeoutError;
-}
-
-async function withStageTiming<T>(
-  stage: ChatStreamStage,
-  promise: Promise<T>
-): Promise<T> {
-  const startedAt = Date.now();
-  const timeoutMs = CHAT_STREAM_STAGE_TIMEOUTS_MS[stage];
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let timedOut = false;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      timedOut = true;
-      reject(new ChatStreamStageTimeoutError(stage, timeoutMs));
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } catch (error) {
-    if (isChatStreamStageTimeout(error)) {
-      logger.warn("[CHAT_STREAM_STAGE_TIMEOUT]", {
-        stage,
-        timeoutMs,
-      });
-    }
-    throw error;
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-    logger.info("[CHAT_STREAM_STAGE_TIMING]", {
-      stage,
-      durationMs: Date.now() - startedAt,
-      timeoutMs,
-      timedOut,
-    });
-  }
 }
 
 /**
@@ -194,11 +146,11 @@ export async function POST(request: NextRequest) {
     let chunks: Awaited<ReturnType<typeof search>>["chunks"] = [];
     let images: Awaited<ReturnType<typeof search>>["images"] = [];
     try {
-      const queryEmbedding = await withStageTiming(
+      const queryEmbedding = await withChatStreamStageTiming(
         "embedding",
         generateEmbedding(cleanMessage)
       );
-      ({ chunks, images } = await withStageTiming(
+      ({ chunks, images } = await withChatStreamStageTiming(
         "search",
         search(queryEmbedding, 3, cleanMessage)
       ));
@@ -232,7 +184,7 @@ export async function POST(request: NextRequest) {
 
     let asturianEnabled = false;
     try {
-      asturianEnabled = await withStageTiming("featureFlag", asturianEnabledPromise);
+      asturianEnabled = await withChatStreamStageTiming("featureFlag", asturianEnabledPromise);
     } catch (flagErr) {
       logger.warn("[CHAT_STREAM_FEATURE_FLAG_FALLBACK]", { error: flagErr });
     }
