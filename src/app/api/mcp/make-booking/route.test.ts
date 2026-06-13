@@ -15,11 +15,13 @@ vi.mock("@/lib/feature-flags-server", () => ({
 const mockInsert = vi.fn();
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
+const mockDbSelect = vi.fn();
 vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(() => ({
     from: vi.fn(() => ({
       insert: mockInsert,
       update: mockUpdate,
+      select: mockDbSelect,
     })),
   })),
 }));
@@ -44,6 +46,11 @@ describe("/api/mcp/make-booking", () => {
     // Default: DB update succeeds
     mockUpdate.mockReturnValue({
       eq: vi.fn().mockResolvedValue({ error: null }),
+    });
+    mockDbSelect.mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }),
     });
     process.env = { ...originalEnv };
     process.env.MCP_API_SECRET = MCP_SECRET;
@@ -362,6 +369,61 @@ describe("/api/mcp/make-booking", () => {
       expect(response.status).toBe(409);
       expect(data.success).toBe(false);
       expect(data.message).toContain("already being processed");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("#605 BE-H1: duplicate idempotency key returns the prior pending booking state", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { code: "23505", message: "duplicate key value violates unique constraint" },
+        }),
+      });
+      mockDbSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValueOnce({
+          maybeSingle: vi.fn().mockResolvedValueOnce({
+            data: {
+              id: "existing-pending-row",
+              conversation_id: "conv_existing_pending",
+              status: "pending",
+              venue_name: "Casa Gerardo",
+              outcome_message: null,
+            },
+            error: null,
+          }),
+        }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "booking-dup-pending",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe("pending");
+      expect(data.call_sid).toBe("conv_existing_pending");
+      expect(data.message).toContain("already in progress");
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -831,6 +893,50 @@ describe("/api/mcp/make-booking", () => {
       );
     });
 
+    it("#628 QA-H1: accepted ElevenLabs response without an identifier is not reported as initiated", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ status: "ok" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "accepted-without-identifier",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("failed");
+      expect(data.status).not.toBe("initiated");
+      expect(data.call_sid).toBeUndefined();
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          outcome_message: expect.stringContaining("missing conversation_id"),
+        })
+      );
+    });
+
     it("should handle ElevenLabs API error with message field (not detail)", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
@@ -1268,7 +1374,7 @@ describe("/api/mcp/make-booking", () => {
       );
     });
 
-    it("should skip pending booking insert when no conversationId or callSid", async () => {
+    it("should fail pending booking when no conversationId or callSid is returned", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
@@ -1299,14 +1405,19 @@ describe("/api/mcp/make-booking", () => {
       const response = await POST(request);
       const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("failed");
       // BE-B6: insert is always called before the call (with status=initiating)
       expect(mockInsert).toHaveBeenCalledWith(
         expect.objectContaining({ status: "initiating" })
       );
-      // update should NOT be called since there was no conversationId or callSid to set
-      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          outcome_message: expect.stringContaining("missing conversation_id"),
+        })
+      );
     });
 
     it("should return 400 with Zod errors when venue_name and phone_number are missing (Zod validates before feature flag check)", async () => {

@@ -44,11 +44,35 @@ interface MakeBookingResponse {
   success: boolean;
   message: string;
   call_sid?: string;
-  status?: "initiated" | "queued" | "failed" | "not_configured" | "duplicate" | "degraded";
+  status?:
+    | "initiated"
+    | "queued"
+    | "failed"
+    | "not_configured"
+    | "duplicate"
+    | "degraded"
+    | "initiating"
+    | "pending"
+    | "confirmed"
+    | "denied"
+    | "no_answer";
   estimated_wait?: string;
   fallback_action?: string;
   recovery_action?: string;
 }
+
+interface PendingBookingSnapshot {
+  conversation_id: string | null;
+  status: NonNullable<MakeBookingResponse["status"]> | string | null;
+  venue_name: string | null;
+  outcome_message: string | null;
+}
+
+const ACTIVE_BOOKING_STATUSES = new Set<string>([
+  "initiating",
+  "pending",
+  "confirmed",
+]);
 
 function buildClaimPersistenceFailureResponse(): NextResponse<MakeBookingResponse> {
   return NextResponse.json<MakeBookingResponse>(
@@ -59,6 +83,44 @@ function buildClaimPersistenceFailureResponse(): NextResponse<MakeBookingRespons
     },
     { status: 500 }
   );
+}
+
+function buildPriorBookingStateResponse(
+  booking: PendingBookingSnapshot
+): NextResponse<MakeBookingResponse> {
+  const status =
+    (booking.status as MakeBookingResponse["status"] | null) ?? "pending";
+  const venueName = booking.venue_name ?? "the venue";
+
+  return NextResponse.json<MakeBookingResponse>({
+    success: ACTIVE_BOOKING_STATUSES.has(status),
+    message:
+      booking.outcome_message ??
+      `A booking request for ${venueName} is already in progress with status ${status}.`,
+    call_sid: booking.conversation_id ?? undefined,
+    status,
+  });
+}
+
+async function getPriorBookingByIdempotencyKey(
+  idempotencyKey: string
+): Promise<PendingBookingSnapshot | null> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("pending_bookings")
+    .select("conversation_id, status, venue_name, outcome_message")
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle();
+
+  if (error) {
+    logger.error("[MAKE_BOOKING_IDEMPOTENCY_LOOKUP_FAILED]", {
+      idempotency_key: idempotencyKey,
+      error,
+    });
+    return null;
+  }
+
+  return (data as PendingBookingSnapshot | null) ?? null;
 }
 
 function buildConversationPersistenceFailureResponse(
@@ -297,8 +359,14 @@ async function initiateCall(
 
     return {
       success: true,
-      callSid: data.callSid,
-      conversationId: data.conversation_id,
+      callSid:
+        typeof data.callSid === "string" && data.callSid.trim()
+          ? data.callSid
+          : undefined,
+      conversationId:
+        typeof data.conversation_id === "string" && data.conversation_id.trim()
+          ? data.conversation_id
+          : undefined,
     };
   } catch (error) {
     logger.error("[MAKE_BOOKING_CALL_INITIATION_FAILED]", { error });
@@ -444,6 +512,11 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       if (insertError) {
         if ((insertError as { code?: string }).code === "23505") {
+          const priorBooking = await getPriorBookingByIdempotencyKey(idempotencyKey);
+          if (priorBooking) {
+            return buildPriorBookingStateResponse(priorBooking);
+          }
+
           logger.error("[MAKE_BOOKING_IDEMPOTENCY_CONFLICT]", {
             idempotency_key: idempotencyKey,
             error: insertError,
@@ -491,51 +564,68 @@ export async function POST(request: Request): Promise<NextResponse> {
       // The webhook handler will look up the booking by conversation_id.
       const conversationId = result.conversationId || result.callSid;
 
-      if (conversationId) {
-        try {
-          const supabase = createAdminClient();
-          const { error: updateError } = await supabase
-            .from("pending_bookings")
-            .update({
-              conversation_id: conversationId,
-              status: "pending",
-            })
-            .eq("id", pendingRowId);
+      if (!conversationId) {
+        await markPendingBookingFailed(
+          pendingRowId,
+          idempotencyKey,
+          "Call initiation failed: ElevenLabs response missing conversation_id or callSid.",
+          { response_status: "missing_identifier" }
+        );
+        return NextResponse.json<MakeBookingResponse>(
+          {
+            success: false,
+            message:
+              "Could not call the venue: ElevenLabs response missing conversation_id or callSid.",
+            status: "failed",
+            fallback_action: `Tell the user they can call the restaurant directly at ${phone_number}.`,
+          },
+          { status: 500 }
+        );
+      }
 
-          if (updateError) {
-            logger.error("[MAKE_BOOKING_PENDING_UPDATE_FAILED]", {
-              pending_booking_id: pendingRowId,
-              idempotency_key: idempotencyKey,
-              conversation_id: conversationId,
-              error: updateError,
-            });
-            await markPendingBookingFailed(
-              pendingRowId,
-              idempotencyKey,
-              `Call initiated but conversation_id persistence failed for ${conversationId}. Manual recovery required.`,
-              { conversation_id: conversationId }
-            );
-            return buildConversationPersistenceFailureResponse(
-              result.callSid || result.conversationId
-            );
-          }
-        } catch (dbError) {
-          logger.error("[MAKE_BOOKING_PENDING_UPDATE_DB_ERROR]", {
+      try {
+        const supabase = createAdminClient();
+        const { error: updateError } = await supabase
+          .from("pending_bookings")
+          .update({
+            conversation_id: conversationId,
+            status: "pending",
+          })
+          .eq("id", pendingRowId);
+
+        if (updateError) {
+          logger.error("[MAKE_BOOKING_PENDING_UPDATE_FAILED]", {
             pending_booking_id: pendingRowId,
             idempotency_key: idempotencyKey,
             conversation_id: conversationId,
-            error: dbError,
+            error: updateError,
           });
           await markPendingBookingFailed(
             pendingRowId,
             idempotencyKey,
-            `Call initiated but conversation_id persistence threw for ${conversationId}. Manual recovery required.`,
+            `Call initiated but conversation_id persistence failed for ${conversationId}. Manual recovery required.`,
             { conversation_id: conversationId }
           );
           return buildConversationPersistenceFailureResponse(
             result.callSid || result.conversationId
           );
         }
+      } catch (dbError) {
+        logger.error("[MAKE_BOOKING_PENDING_UPDATE_DB_ERROR]", {
+          pending_booking_id: pendingRowId,
+          idempotency_key: idempotencyKey,
+          conversation_id: conversationId,
+          error: dbError,
+        });
+        await markPendingBookingFailed(
+          pendingRowId,
+          idempotencyKey,
+          `Call initiated but conversation_id persistence threw for ${conversationId}. Manual recovery required.`,
+          { conversation_id: conversationId }
+        );
+        return buildConversationPersistenceFailureResponse(
+          result.callSid || result.conversationId
+        );
       }
 
       // Check if SMS confirmation is enabled
