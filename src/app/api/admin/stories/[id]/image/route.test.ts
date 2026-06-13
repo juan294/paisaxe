@@ -73,6 +73,29 @@ function createMockFile(content: string | Uint8Array, name: string, type: string
   return file;
 }
 
+function setupStoryUpdateMock(imagePath = "https://example.com/image.jpg") {
+  const mockSingle = vi.fn().mockResolvedValue({
+    data: { id: "story-123", image_path: imagePath, image_source: null },
+    error: null,
+  });
+  const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+  const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+  const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+  const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+
+  vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+  return { mockUpdate };
+}
+
+function createJsonImageRequest(imageUrl: string) {
+  return new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ imageUrl }),
+  });
+}
+
 describe("PUT /api/admin/stories/[id]/image", () => {
   const mockParams = { params: Promise.resolve({ id: "story-123" }) };
 
@@ -815,6 +838,31 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       fetchSpy.mockRestore();
     });
 
+    it("should reject a public hostname when any DNS answer is private before fetch", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      dns.lookup.mockResolvedValueOnce([
+        { address: "93.184.216.34", family: 4 },
+        { address: "169.254.169.254", family: 4 },
+      ]);
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: true,
+        headers: new Headers({}),
+        body: new ReadableStream<Uint8Array>(),
+      } as unknown as Response);
+
+      const response = await PUT(
+        createJsonImageRequest("https://cdn.example.com/image.jpg"),
+        mockParams
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Private or reserved IP addresses are not allowed");
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+    });
+
     it("should reject external image URLs when hostname DNS validation fails", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
       dns.lookup.mockRejectedValueOnce(new Error("ENOTFOUND"));
@@ -836,18 +884,9 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       fetchSpy.mockRestore();
     });
 
-    it("should disable automatic redirects when fetching external images for blur generation", async () => {
+    it("should disable automatic redirects and reject redirect responses when fetching external images for blur generation", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
-
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: { id: "story-123", image_path: "https://example.com/image.jpg", image_source: null },
-        error: null,
-      });
-      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
-      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
-      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+      const { mockUpdate } = setupStoryUpdateMock();
 
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
         ok: false,
@@ -855,20 +894,52 @@ describe("PUT /api/admin/stories/[id]/image", () => {
         headers: new Headers({ location: "https://127.0.0.1/private.jpg" }),
       } as Response);
 
-      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageUrl: "https://example.com/image.jpg" }),
-      });
+      const response = await PUT(
+        createJsonImageRequest("https://example.com/image.jpg"),
+        mockParams
+      );
+      const data = await response.json();
 
-      const response = await PUT(request, mockParams);
-
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Remote image redirects are not allowed");
       expect(fetchSpy).toHaveBeenCalledWith(
         "https://example.com/image.jpg",
         expect.objectContaining({ redirect: "manual" })
       );
-      expect(mockUpdate).toHaveBeenCalledWith({ image_path: "https://example.com/image.jpg" });
+      expect(mockUpdate).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+    });
+
+    it("should reject oversized streamed image bodies when content-length is missing", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      const { mockUpdate } = setupStoryUpdateMock();
+
+      const chunk = new Uint8Array(1024 * 1024);
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (let i = 0; i < 11; i += 1) {
+            controller.enqueue(chunk);
+          }
+          controller.close();
+        },
+      });
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: true,
+        headers: new Headers({}),
+        body: stream,
+        arrayBuffer: vi.fn().mockRejectedValue(new Error("arrayBuffer should not be used")),
+      } as unknown as Response);
+
+      const response = await PUT(
+        createJsonImageRequest("https://example.com/streamed-huge.jpg"),
+        mockParams
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Image too large (max 10MB)");
+      expect(mockUpdate).not.toHaveBeenCalled();
 
       fetchSpy.mockRestore();
     });
