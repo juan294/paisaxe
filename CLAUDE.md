@@ -89,7 +89,10 @@ git log main..develop --oneline
 gh run list --branch develop --limit 3
 
 # Run the full local test suite
-npm run test && npm run typecheck && npm run lint && npm run test:e2e
+npm run test && npm run typecheck && npm run lint && npm run prelaunch
+
+# Explicit live integration gate (requires Stripe/Supabase QA credentials)
+npm run prelaunch:live
 ```
 
 Present the summary to the user:
