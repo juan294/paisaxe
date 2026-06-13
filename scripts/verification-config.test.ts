@@ -35,6 +35,15 @@ describe("verification coverage config", () => {
     expect(pkg.scripts.lint).toContain("npm run lint:scripts");
   });
 
+  it("uses webpack for bundle analyzer builds", () => {
+    const pkg = readJson<{ scripts: Record<string, string> }>("package.json");
+
+    expect(pkg.scripts.analyze).toBe(
+      "ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build --webpack"
+    );
+    expect(pkg.scripts["build:analyze"]).toBe(pkg.scripts.analyze);
+  });
+
   it("keeps tsconfig exclusions paired with dedicated verification surfaces", () => {
     const rootTsconfig = readJson<{ exclude: string[] }>("tsconfig.json");
     const scriptsTsconfig = readJson<{ exclude: string[] }>("scripts/tsconfig.json");
