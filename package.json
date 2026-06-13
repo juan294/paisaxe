@@ -9,8 +9,8 @@
   "scripts": {
     "dev": "NODE_OPTIONS='--disable-warning=ExperimentalWarning' next dev --port 3006",
     "build": "next build",
-    "analyze": "ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build",
-    "build:analyze": "ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build",
+    "analyze": "ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build --webpack",
+    "build:analyze": "ANALYZE=true NODE_OPTIONS='--disable-warning=ExperimentalWarning' next build --webpack",
     "start": "next start",
     "lint": "npm run lint:src && npm run lint:scripts",
     "lint:src": "eslint src/",
