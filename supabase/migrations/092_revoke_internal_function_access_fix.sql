@@ -6,7 +6,7 @@
 
 -- Internal SMS queue functions
 REVOKE EXECUTE ON FUNCTION public.claim_booking_sms_job(p_event_key text, p_lease_seconds integer) FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.complete_booking_sms_job(p_event_key text, p_provider_sid text) FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.complete_booking_sms_job(p_event_key text, p_provider_sid text, p_outcome_message text) FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.fail_booking_sms_job(p_event_key text, p_error text) FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.enqueue_booking_sms_job(p_event_key text, p_booking_id uuid, p_to_phone text, p_message text) FROM anon, authenticated;
 
