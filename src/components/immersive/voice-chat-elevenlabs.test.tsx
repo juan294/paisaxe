@@ -8,6 +8,7 @@ const mockStartSession = vi.fn();
 const mockEndSession = vi.fn();
 const mockUseConversation = vi.fn();
 const mockIncrementConversation = vi.fn();
+const mockSetMuted = vi.fn();
 
 vi.mock("@elevenlabs/react", () => ({
   useConversation: (options: {
@@ -96,6 +97,7 @@ describe("VoiceChatElevenLabs", () => {
         isSpeaking: false,
         startSession: mockStartSession,
         endSession: mockEndSession,
+        setMuted: mockSetMuted,
       };
     });
 
@@ -215,6 +217,7 @@ describe("VoiceChatElevenLabs", () => {
           isSpeaking: false,
           startSession: mockStartSession,
           endSession: mockEndSession,
+          setMuted: mockSetMuted,
         };
       });
 
@@ -261,6 +264,7 @@ describe("VoiceChatElevenLabs", () => {
           isSpeaking: false,
           startSession: mockStartSession,
           endSession: mockEndSession,
+          setMuted: mockSetMuted,
         };
       });
 
@@ -502,6 +506,7 @@ describe("VoiceChatElevenLabs", () => {
           isSpeaking: false,
           startSession: mockStartSession,
           endSession: mockEndSession,
+          setMuted: mockSetMuted,
         };
       });
 
@@ -519,11 +524,17 @@ describe("VoiceChatElevenLabs", () => {
 
       // Click to mute
       fireEvent.click(muteButton);
+      expect(mockSetMuted).toHaveBeenLastCalledWith(true);
 
       // Now should show "Activar sonido" label
+      const unmuteButton = screen.getByRole("button", { name: /Activar sonido/i });
+      expect(unmuteButton).toBeInTheDocument();
+
+      fireEvent.click(unmuteButton);
+      expect(mockSetMuted).toHaveBeenLastCalledWith(false);
       expect(
-        screen.getByRole("button", { name: /Activar sonido/i })
-      ).toBeInTheDocument();
+        screen.queryByRole("button", { name: /Activar sonido/i })
+      ).not.toBeInTheDocument();
     });
   });
 

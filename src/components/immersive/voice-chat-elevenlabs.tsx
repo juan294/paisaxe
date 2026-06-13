@@ -244,7 +244,9 @@ export function VoiceChatElevenLabs({
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
+    const nextMuted = !isMuted;
+    conversation.setMuted(nextMuted);
+    setIsMuted(nextMuted);
   };
 
   // Get status text

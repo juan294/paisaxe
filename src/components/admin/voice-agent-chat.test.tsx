@@ -4,14 +4,11 @@ import userEvent from "@testing-library/user-event";
 import { VoiceAgentChat } from "./voice-agent-chat";
 
 // Mock the ElevenLabs SDK
+const mockUseConversation = vi.fn();
+const mockSetMuted = vi.fn();
+
 vi.mock("@elevenlabs/react", () => ({
-  useConversation: () => ({
-    status: "disconnected",
-    isSpeaking: false,
-    startSession: vi.fn(),
-    endSession: vi.fn(),
-    sendUserMessage: vi.fn(),
-  }),
+  useConversation: () => mockUseConversation(),
 }));
 
 // Mock navigator.mediaDevices
@@ -26,6 +23,14 @@ Object.defineProperty(navigator, "mediaDevices", {
 describe("VoiceAgentChat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseConversation.mockReturnValue({
+      status: "disconnected",
+      isSpeaking: false,
+      startSession: vi.fn(),
+      endSession: vi.fn(),
+      sendUserMessage: vi.fn(),
+      setMuted: mockSetMuted,
+    });
     mockGetUserMedia.mockRejectedValue(new Error("Permission denied"));
   });
 
@@ -114,5 +119,25 @@ describe("VoiceAgentChat", () => {
     await user.click(screen.getByText("Iris"));
 
     expect(screen.getByPlaceholderText("Message Iris...")).toBeInTheDocument();
+  });
+
+  it("calls the ElevenLabs mute control when toggling mute during a call", async () => {
+    const user = userEvent.setup();
+    mockUseConversation.mockReturnValue({
+      status: "connected",
+      isSpeaking: false,
+      startSession: vi.fn(),
+      endSession: vi.fn(),
+      sendUserMessage: vi.fn(),
+      setMuted: mockSetMuted,
+    });
+
+    render(<VoiceAgentChat agentIds={{ xander: "agent-admin" }} />);
+
+    await user.click(screen.getByRole("button", { name: "Mute microphone" }));
+    expect(mockSetMuted).toHaveBeenLastCalledWith(true);
+
+    await user.click(screen.getByRole("button", { name: "Unmute microphone" }));
+    expect(mockSetMuted).toHaveBeenLastCalledWith(false);
   });
 });
