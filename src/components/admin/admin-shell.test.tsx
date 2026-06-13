@@ -44,6 +44,30 @@ vi.mock("@/hooks/use-admin-role", () => ({
   useAdminRole: () => mockUseAdminRole(),
 }));
 
+const adminTabsMockState = vi.hoisted(() => {
+  const allTabs = [
+    { value: "analytics", label: "Analytics" },
+    { value: "stories", label: "Stories" },
+    { value: "features", label: "Features" },
+    { value: "marketing", label: "Marketing" },
+    { value: "suggestions", label: "Suggestions" },
+    { value: "agents", label: "Agents" },
+  ];
+
+  return {
+    allTabs,
+    tabs: [...allTabs],
+  };
+});
+
+const resetAdminTabsMock = () => {
+  adminTabsMockState.tabs.splice(
+    0,
+    adminTabsMockState.tabs.length,
+    ...adminTabsMockState.allTabs
+  );
+};
+
 // Mock StoriesTabPanel — stories tab is now a self-contained sub-component
 vi.mock("@/components/admin/stories-tab-panel", () => ({
   StoriesTabPanel: () => <div data-testid="stories-tab-panel">Stories Panel</div>,
@@ -59,34 +83,18 @@ vi.mock("@/components/admin/admin-tabs", () => ({
     onTabChange: (tab: string) => void;
   }) => (
     <div data-testid="admin-tabs">
-      <button onClick={() => onTabChange("analytics")} data-active={activeTab === "analytics"}>
-        Analytics
-      </button>
-      <button onClick={() => onTabChange("stories")} data-active={activeTab === "stories"}>
-        Stories
-      </button>
-      <button onClick={() => onTabChange("features")} data-active={activeTab === "features"}>
-        Features
-      </button>
-      <button onClick={() => onTabChange("marketing")} data-active={activeTab === "marketing"}>
-        Marketing
-      </button>
-      <button onClick={() => onTabChange("suggestions")} data-active={activeTab === "suggestions"}>
-        Suggestions
-      </button>
-      <button onClick={() => onTabChange("agents")} data-active={activeTab === "agents"}>
-        Agents
-      </button>
+      {adminTabsMockState.tabs.map((tab) => (
+        <button
+          key={tab.value}
+          onClick={() => onTabChange(tab.value)}
+          data-active={activeTab === tab.value}
+        >
+          {tab.label}
+        </button>
+      ))}
     </div>
   ),
-  TABS: [
-    { value: "analytics", label: "Analytics" },
-    { value: "stories", label: "Stories" },
-    { value: "features", label: "Features" },
-    { value: "marketing", label: "Marketing" },
-    { value: "suggestions", label: "Suggestions" },
-    { value: "agents", label: "Agents" },
-  ],
+  TABS: adminTabsMockState.tabs,
 }));
 
 // Mock tab panel components
@@ -140,6 +148,7 @@ function setupAdminAuth() {
 describe("AdminShell", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetAdminTabsMock();
     // Default: no tab param in URL → defaults to "analytics"
     mockSearchParamsGet.mockReturnValue(null);
   });
@@ -386,6 +395,33 @@ describe("AdminShell", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+    });
+
+    it("normalizes invalid tab query values to the default analytics tab", async () => {
+      mockSearchParamsGet.mockReturnValue("not-a-real-tab");
+
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+        expect(screen.queryByTestId("agents-dashboard")).not.toBeInTheDocument();
+      });
+    });
+
+    it("does not render the production-hidden agents panel from a deep link", async () => {
+      adminTabsMockState.tabs.splice(
+        0,
+        adminTabsMockState.tabs.length,
+        ...adminTabsMockState.allTabs.filter((tab) => tab.value !== "agents")
+      );
+      mockSearchParamsGet.mockReturnValue("agents");
+
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+        expect(screen.queryByTestId("agents-dashboard")).not.toBeInTheDocument();
       });
     });
 
