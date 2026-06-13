@@ -68,6 +68,62 @@ describe("validateMigrations", () => {
     expect(result.errors).toEqual([]);
   });
 
+  it("fails when SMS completion revokes reference the dropped two-argument signature", () => {
+    const root = createMigrationFixture({
+      "001_create_complete_booking_sms_job.sql": `
+        CREATE OR REPLACE FUNCTION public.complete_booking_sms_job(
+          p_event_key text,
+          p_provider_sid text DEFAULT NULL,
+          p_outcome_message text DEFAULT NULL
+        ) RETURNS boolean
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = ''
+        AS $$
+        BEGIN
+          RETURN true;
+        END;
+        $$;
+      `,
+      "002_revoke_internal_function_access.sql": `
+        REVOKE ALL ON FUNCTION public.complete_booking_sms_job(
+          p_event_key text,
+          p_provider_sid text
+        ) FROM PUBLIC;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toContain(
+      "Internal function revokes must target public.complete_booking_sms_job(text, text, text), not the dropped two-argument signature"
+    );
+  });
+
+  it("fails when SECURITY DEFINER translation functions keep public in search_path", () => {
+    const root = createMigrationFixture({
+      "001_translation_function.sql": `
+        CREATE OR REPLACE FUNCTION public.fail_stale_story_translations(
+          p_cutoff timestamptz
+        ) RETURNS integer
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = public, extensions
+        AS $$
+        BEGIN
+          RETURN 0;
+        END;
+        $$;
+      `,
+    });
+
+    const result = validateMigrations({ root });
+
+    expect(result.errors).toContain(
+      "SECURITY DEFINER translation function public.fail_stale_story_translations must use SET search_path = ''"
+    );
+  });
+
   it("validates repository migrations including sensitive table and credential checks", () => {
     const result = validateMigrations({ root: process.cwd() });
 

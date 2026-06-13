@@ -40,6 +40,15 @@ const SENSITIVE_SERVICE_ROLE_TABLES = [
   "stripe_webhook_events",
 ];
 
+const TRANSLATION_SECURITY_DEFINER_FUNCTIONS = [
+  "trigger_translation_webhook",
+  "fail_stale_story_translations",
+  "fail_stale_story_translations_locked",
+];
+
+const COMPLETE_BOOKING_SMS_JOB_SIGNATURE_ERROR =
+  "Internal function revokes must target public.complete_booking_sms_job(text, text, text), not the dropped two-argument signature";
+
 function parseMigrations(migrationsDir: string): {
   migrations: MigrationFile[];
   errors: string[];
@@ -190,6 +199,68 @@ function checkMarketingCredentialShape(sql: string): string[] {
   ];
 }
 
+function getFunctionHeader(sql: string, functionName: string): string | null {
+  const match = new RegExp(
+    `create\\s+(?:or\\s+replace\\s+)?function\\s+public\\.${escapeRegExp(functionName)}\\s*\\(`
+  ).exec(sql);
+
+  if (!match) return null;
+
+  const headerEnd = sql.indexOf(" as $$", match.index);
+  return headerEnd === -1 ? sql.slice(match.index) : sql.slice(match.index, headerEnd);
+}
+
+function checkTranslationFunctionSearchPaths(migrations: MigrationFile[]): string[] {
+  const errors: string[] = [];
+  const latestHeaders = new Map<string, string>();
+
+  for (const migration of migrations) {
+    const sql = normalizeSql(readFileSync(migration.path, "utf8"));
+
+    for (const functionName of TRANSLATION_SECURITY_DEFINER_FUNCTIONS) {
+      const header = getFunctionHeader(sql, functionName);
+      if (!header) continue;
+
+      latestHeaders.set(functionName, header);
+    }
+  }
+
+  for (const [functionName, header] of latestHeaders) {
+    if (!header.includes("security definer")) continue;
+
+    if (!header.includes("set search_path = ''")) {
+      errors.push(
+        `SECURITY DEFINER translation function public.${functionName} must use SET search_path = ''`
+      );
+    }
+  }
+
+  return errors;
+}
+
+function checkCompleteBookingSmsJobSignatureReferences(migrations: MigrationFile[]): string[] {
+  const badTwoArgGrantOrRevokePattern =
+    /\b(?:revoke|grant)\b[^;]*\bon\s+function\s+public\.complete_booking_sms_job\s*\(\s*(?:p_event_key\s+)?text\s*,\s*(?:p_provider_sid\s+)?text\s*\)/;
+  let threeArgReplacementExists = false;
+
+  for (const migration of migrations) {
+    const sql = normalizeSql(readFileSync(migration.path, "utf8"));
+
+    if (
+      sql.includes("create or replace function public.complete_booking_sms_job") &&
+      sql.includes("p_outcome_message text")
+    ) {
+      threeArgReplacementExists = true;
+    }
+
+    if (threeArgReplacementExists && badTwoArgGrantOrRevokePattern.test(sql)) {
+      return [COMPLETE_BOOKING_SMS_JOB_SIGNATURE_ERROR];
+    }
+  }
+
+  return [];
+}
+
 export function validateMigrations(
   options: MigrationValidationOptions = {}
 ): MigrationValidationResult {
@@ -204,6 +275,8 @@ export function validateMigrations(
   errors.push(...checkForUnexpectedGaps(migrations));
   errors.push(...checkSensitiveTablePosture(migrationSql));
   errors.push(...checkMarketingCredentialShape(migrationSql));
+  errors.push(...checkTranslationFunctionSearchPaths(migrations));
+  errors.push(...checkCompleteBookingSmsJobSignatureReferences(migrations));
 
   return {
     migrationCount: migrations.length,

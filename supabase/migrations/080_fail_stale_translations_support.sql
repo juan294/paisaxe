@@ -3,7 +3,7 @@ CREATE OR REPLACE FUNCTION public.fail_stale_story_translations(
 ) RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = ''
 AS $$
 DECLARE
   v_now timestamptz := now();
