@@ -540,7 +540,7 @@ Runs on every push and PR to `develop` and `main`:
          All five must pass to merge to main              └───────────────┘
 ```
 
-The `develop-smoke` job runs only on direct pushes to `develop` (not on PRs) and probes `/api/health/live` + `/api/health` on the Vercel preview. It uses `continue-on-error: true` so it never blocks the push, but a failure signals a runtime regression not caught by unit or E2E tests.
+The `develop-smoke` job runs only on direct pushes to `develop` (not on PRs). It probes `/api/health/live` for liveness, then runs `scripts/check-health-readiness.mjs` against `/api/health` so degraded JSON bodies fail the smoke even though the endpoint returns HTTP 200. It uses `continue-on-error: true` so it never blocks the push, but a failure signals a runtime regression not caught by unit or E2E tests.
 
 ### E2E CI (`e2e.yml`)
 
