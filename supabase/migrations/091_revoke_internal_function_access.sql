@@ -14,8 +14,8 @@
 REVOKE ALL ON FUNCTION public.claim_booking_sms_job(p_event_key text, p_lease_seconds integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claim_booking_sms_job(p_event_key text, p_lease_seconds integer) TO service_role;
 
-REVOKE ALL ON FUNCTION public.complete_booking_sms_job(p_event_key text, p_provider_sid text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.complete_booking_sms_job(p_event_key text, p_provider_sid text) TO service_role;
+REVOKE ALL ON FUNCTION public.complete_booking_sms_job(p_event_key text, p_provider_sid text, p_outcome_message text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.complete_booking_sms_job(p_event_key text, p_provider_sid text, p_outcome_message text) TO service_role;
 
 REVOKE ALL ON FUNCTION public.fail_booking_sms_job(p_event_key text, p_error text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.fail_booking_sms_job(p_event_key text, p_error text) TO service_role;
