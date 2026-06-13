@@ -10,6 +10,8 @@ Two endpoints serve different consumers:
 
 **`GET /api/health`** — public release diagnostics endpoint. Always returns HTTP 200 with `{ "status": "healthy" | "degraded", "timestamp": "...", "cron_auth": { "status": "ok" | "misconfigured" }, "sentry": { "status": "configured" | "unconfigured" }, "rate_limit": { "status": "ok" | "degraded", "backend": "upstash" | "memory" | "blocked", "reason"?: "upstash_missing" | "upstash_unavailable" } }`. The body status becomes `"degraded"` when Supabase connectivity fails, approved stories are unavailable, database usage reaches the 80% warning threshold, `NEXT_PUBLIC_SENTRY_DSN` is missing in Vercel production, or the rate-limit backend is misconfigured in production. Public diagnostics are intentionally minimized; inspect server logs or private tooling for root cause details.
 
+Readiness monitors must parse the `/api/health` JSON body, not just the HTTP status. The shared CI monitor is `node scripts/check-health-readiness.mjs <base-url>`; it fails unless `/api/health` returns HTTP 200 and `status: "healthy"`. Use `--require-sentry` for release gates that must also prove `sentry.status: "configured"`.
+
 ## Pre-Launch Checklist
 
 Run this checklist before every production release. Invoke with: "Run the pre-launch checklist from operations.md"
@@ -303,7 +305,7 @@ Runs the real Stripe test-mode checkout path on nightly schedule, manual dispatc
 
 ### Preview Smoke Test (`preview-smoke.yml`)
 
-On PRs targeting `main`, waits for the Vercel preview deployment and hits `/api/health` and the homepage against real env vars. This is a **required status check** — `Smoke test Vercel preview` must pass before any merge to `main`. It catches runtime failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js 16.2.1 incident).
+On PRs targeting `main`, waits for the Vercel preview deployment and runs `scripts/check-health-readiness.mjs "$PREVIEW_URL" --require-sentry` against real env vars before hitting the homepage. This is a **required status check** — `Smoke test Vercel preview` must pass before any merge to `main`. It catches runtime failures that dummy-key CI builds cannot detect (e.g. the 2026-03-24 Next.js 16.2.1 incident).
 
 ### Quality & Security Workflows
 

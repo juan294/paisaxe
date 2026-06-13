@@ -19,6 +19,8 @@
 
 **Trigger:** `GET https://paisaxe.es/api/health` returns `status != "healthy"` in the JSON body (the endpoint always returns HTTP 200; degraded state is signalled via the body only).
 
+**Automated monitor:** CI uses `node scripts/check-health-readiness.mjs <base-url>` to parse `/api/health` and fail on any non-healthy body. The required `Smoke test Vercel preview` gate adds `--require-sentry`, so missing Sentry configuration is treated as release-blocking even though `/api/health/live` still returns liveness.
+
 **Steps:**
 
 1. Check Vercel deployment status: `vercel ls --limit 5`
@@ -178,7 +180,7 @@ This job uses `continue-on-error: true` so it never blocks the push, but a failu
 1. Check which step failed: `gh run list --branch develop --limit 3`, then `gh run view <run-id> --log-failed`
 2. Identify the failing probe:
    - `Smoke check - liveness endpoint` (`/api/health/live`) — the process is not serving requests (startup crash, build error, or Vercel config issue)
-   - `Smoke check - health endpoint` (`/api/health`) — the app started but a backend dependency (Supabase, Anthropic, etc.) is unreachable or returning `status != "healthy"`
+   - `Smoke check - health endpoint` (`/api/health`) — `scripts/check-health-readiness.mjs` parsed the body and found a non-200 response, invalid JSON, or `status != "healthy"`
 3. Check the Vercel preview URL from the workflow output and hit it manually to confirm the failure.
 4. Fix on `develop`, push, and verify the next smoke run passes before creating a release PR to `main`.
 5. If the failure is from a Dependabot dependency bump: check the dep changelog for breaking changes, then pin or revert as needed.
