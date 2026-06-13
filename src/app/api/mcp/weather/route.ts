@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { getClientIp } from "@/lib/request-utils";
-import { weatherQuerySchema } from "@/lib/schemas";
+import { weatherPostRequestSchema, weatherQuerySchema } from "@/lib/schemas";
 
 /**
  * MCP-compatible Weather API endpoint for ElevenLabs voice agents.
@@ -213,25 +213,17 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   try {
     const body = await request.json();
+    const paramsParsed = weatherPostRequestSchema.safeParse(body);
 
-    // Support both flat format { city: "..." } and MCP format { tool, arguments: { city } }
-    let city: string | undefined;
-
-    if (body.city) {
-      // Flat format from ElevenLabs webhook
-      city = body.city;
-    } else if (body.arguments?.city) {
-      // MCP tool call format
-      city = body.arguments.city;
-    }
-
-    if (!city) {
+    if (!paramsParsed.success) {
+      const firstIssue = paramsParsed.error.issues[0];
       return NextResponse.json(
-        { error: "City parameter is required" },
+        { error: firstIssue?.message ?? "Invalid query parameters" },
         { status: 400 }
       );
     }
 
+    const { city } = paramsParsed.data;
     const weather = await fetchWeather(city);
     return NextResponse.json(weather);
   } catch (err) {
