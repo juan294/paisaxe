@@ -417,8 +417,10 @@ AI code review on every PR. Also responds to `@claude` mentions.
 ### Health Check Endpoint
 
 **Endpoints**:
-- `GET /api/health/live` — liveness probe; always returns HTTP 200 with `{ "status": "ok" }`. Used by Upptime for uptime monitoring.
-- `GET /api/health` — diagnostics endpoint; always returns HTTP 200. The JSON body signals health state: `{ "status": "healthy"|"degraded", "timestamp": "...", "rate_limit": { "status": "ok"|"degraded", "backend": "upstash"|"memory"|"blocked" }, ... }`. Reports "degraded" if Supabase connection fails, approved stories are unavailable, or database usage exceeds 80% of the Pro tier limit. Used by the preview smoke CI as the diagnostics gate.
+- `GET /api/health/live` — liveness probe; always returns HTTP 200 with `{ "status": "live", "timestamp": "..." }`. Used by Upptime for uptime monitoring.
+- `GET /api/health` — diagnostics endpoint; always returns HTTP 200. The JSON body signals health state: `{ "status": "healthy"|"degraded", "timestamp": "...", "sentry": { "status": "configured"|"unconfigured" }, "rate_limit": { "status": "ok"|"degraded", "backend": "upstash"|"memory"|"blocked" }, ... }`. Reports "degraded" if Supabase connection fails, approved stories are unavailable, database usage exceeds 80% of the Pro tier limit, Sentry is missing in production, or the production rate-limit backend is degraded. Used by readiness smoke CI as the diagnostics gate.
+
+**Readiness monitor**: `node scripts/check-health-readiness.mjs <base-url>` parses `/api/health` and fails on non-200 HTTP status or any JSON body where `status !== "healthy"`. The release preview gate passes `--require-sentry`, which also fails when `sentry.status !== "configured"`. `/api/health/live` must not be used as a readiness gate because it only proves the process can answer requests.
 
 **Sub-endpoint**: `GET /api/health/db` — database connectivity only (used internally by health checks and preview smoke tests).
 
