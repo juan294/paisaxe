@@ -173,8 +173,9 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
-    // The SDK handles muting internally based on state
+    const nextMuted = !isMuted;
+    conversation.setMuted(nextMuted);
+    setIsMuted(nextMuted);
   };
 
   // Text mode fallback
@@ -343,6 +344,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
                   <>
                     <button
                       onClick={toggleMute}
+                      aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
                       className={cn(
                         "flex h-8 w-8 items-center justify-center border transition-all",
                         isMuted
