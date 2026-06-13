@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { validateMcpSecret } from "@/lib/mcp-auth";
 import { getClientIp } from "@/lib/request-utils";
-import { placesQuerySchema } from "@/lib/schemas";
+import { placesPostRequestSchema, placesQuerySchema } from "@/lib/schemas";
 
 /**
  * MCP-compatible Places API endpoint for ElevenLabs voice agents.
@@ -363,30 +363,17 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   try {
     const body = await request.json();
+    const paramsParsed = placesPostRequestSchema.safeParse(body);
 
-    // Support both flat format and MCP format
-    let query: string | undefined;
-    let type: string | undefined;
-    let city: string | undefined;
-
-    if (body.query) {
-      // Flat format from ElevenLabs webhook
-      query = body.query;
-      type = body.type;
-      city = body.city;
-    } else if (body.arguments?.query) {
-      // MCP tool call format
-      query = body.arguments.query;
-      type = body.arguments.type;
-      city = body.arguments.city;
-    }
-
-    if (!query) {
+    if (!paramsParsed.success) {
+      const firstIssue = paramsParsed.error.issues[0];
       return NextResponse.json(
-        { error: "Query parameter is required" },
+        { error: firstIssue?.message ?? "Invalid query parameters" },
         { status: 400 }
       );
     }
+
+    const { query, type, city } = paramsParsed.data;
 
     const results = await searchPlaces(query, type, city);
     return NextResponse.json(results);

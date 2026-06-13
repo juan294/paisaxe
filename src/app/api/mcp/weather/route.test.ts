@@ -231,6 +231,36 @@ describe("/api/mcp/weather", () => {
       expect(response.status).toBe(400);
     });
 
+    it.each([
+      {
+        name: "oversized flat city",
+        body: { city: "a".repeat(201) },
+      },
+      {
+        name: "malformed flat city",
+        body: { city: { name: "Oviedo" } },
+      },
+      {
+        name: "oversized MCP-nested city",
+        body: { arguments: { city: "a".repeat(201) } },
+      },
+      {
+        name: "malformed MCP-nested city",
+        body: { arguments: { city: ["Oviedo"] } },
+      },
+    ])("should reject $name before fetching weather", async ({ body }) => {
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify(body),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(400);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it("should support flat format from ElevenLabs", async () => {
       const mockWeatherResponse = {
         name: "Oviedo",

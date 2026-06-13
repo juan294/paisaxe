@@ -275,6 +275,41 @@ export const placesQuerySchema = z.object({
   city: z.string().max(200).optional(),
 });
 
+function unwrapMcpArguments(body: unknown): unknown {
+  if (body && typeof body === "object" && !Array.isArray(body) && "arguments" in body) {
+    return (body as { arguments?: unknown }).arguments;
+  }
+
+  return body;
+}
+
+function normalizeMcpParams(
+  body: unknown,
+  requiredField: string,
+  optionalFields: string[] = []
+): Record<string, unknown> {
+  const input = unwrapMcpArguments(body);
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { [requiredField]: "" };
+  }
+
+  const params = input as Record<string, unknown>;
+  const normalized: Record<string, unknown> = {
+    [requiredField]: params[requiredField] ?? "",
+  };
+
+  for (const field of optionalFields) {
+    normalized[field] = params[field] ?? undefined;
+  }
+
+  return normalized;
+}
+
+export const placesPostRequestSchema = z.preprocess(
+  (body) => normalizeMcpParams(body, "query", ["type", "city"]),
+  placesQuerySchema
+);
+
 // ---------------------------------------------------------------------------
 // mcp/weather GET query params
 // ---------------------------------------------------------------------------
@@ -286,3 +321,8 @@ export const weatherQuerySchema = z.object({
     .max(200)
     .describe("city"),
 });
+
+export const weatherPostRequestSchema = z.preprocess(
+  (body) => normalizeMcpParams(body, "city"),
+  weatherQuerySchema
+);

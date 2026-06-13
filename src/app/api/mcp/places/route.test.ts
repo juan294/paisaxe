@@ -345,6 +345,52 @@ describe("/api/mcp/places", () => {
       expect(response.status).toBe(400);
     });
 
+    it.each([
+      {
+        name: "oversized flat query",
+        body: { query: "a".repeat(201) },
+      },
+      {
+        name: "malformed flat query",
+        body: { query: { value: "sidra" } },
+      },
+      {
+        name: "oversized flat city",
+        body: { query: "sidra", city: "a".repeat(201) },
+      },
+      {
+        name: "malformed flat city",
+        body: { query: "sidra", city: ["Oviedo"] },
+      },
+      {
+        name: "oversized MCP-nested query",
+        body: { arguments: { query: "a".repeat(201) } },
+      },
+      {
+        name: "malformed MCP-nested query",
+        body: { arguments: { query: ["sidra"] } },
+      },
+      {
+        name: "oversized MCP-nested city",
+        body: { arguments: { query: "sidra", city: "a".repeat(201) } },
+      },
+      {
+        name: "malformed MCP-nested city",
+        body: { arguments: { query: "sidra", city: { name: "Oviedo" } } },
+      },
+    ])("should reject $name before searching", async ({ body }) => {
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify(body),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(400);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it("should support flat format from ElevenLabs", async () => {
       const mockPlacesResponse = createPlacesApiResponse([
         {
