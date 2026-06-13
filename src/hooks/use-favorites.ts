@@ -98,15 +98,18 @@ export function useFavorites(): UseFavoritesReturn {
       // Sync to cloud
       try {
         if (isCurrentlyFavorite) {
-          await fetch(`/api/favorites?storyId=${storyId}`, {
+          const response = await fetch(`/api/favorites?storyId=${storyId}`, {
             method: "DELETE",
             headers: {
               Authorization: `Bearer ${session.access_token}`,
               ...csrfHeaders(),
             },
           });
+          if (!response.ok) {
+            throw new Error(`Failed to remove favorite: ${response.status}`);
+          }
         } else {
-          await fetch("/api/favorites", {
+          const response = await fetch("/api/favorites", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -115,6 +118,9 @@ export function useFavorites(): UseFavoritesReturn {
             },
             body: JSON.stringify({ storyIds: [storyId] }),
           });
+          if (!response.ok) {
+            throw new Error(`Failed to add favorite: ${response.status}`);
+          }
         }
       } catch (error) {
         console.error("Error syncing favorite to cloud:", error);

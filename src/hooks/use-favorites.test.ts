@@ -403,6 +403,43 @@ describe("useFavorites", () => {
       consoleSpy.mockRestore();
     });
 
+    it("should revert state and localStorage when add returns a non-ok response", async () => {
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          return { ok: true, json: async () => [] };
+        }
+        return { ok: false, status: 500 };
+      });
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      expect(result.current.favorites).not.toContain("story-1");
+
+      const lastSetCall = localStorageMock.setItem.mock.calls
+        .filter((call: unknown[]) => call[0] === "paisaxe_favorites")
+        .pop();
+      expect(JSON.parse(lastSetCall![1])).toEqual([]);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error syncing favorite to cloud:",
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
     it("should revert localStorage when cloud sync fails on remove", async () => {
       const consoleSpy = vi
         .spyOn(console, "error")
@@ -442,6 +479,49 @@ describe("useFavorites", () => {
         .pop();
       const savedFavorites = JSON.parse(lastSetCall![1]);
       expect(savedFavorites).toContain("story-1");
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should revert state and localStorage when remove returns a non-ok response", async () => {
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+        if (!options?.method || options.method === "GET") {
+          return { ok: true, json: async () => ["story-1"] };
+        }
+        if (options.method === "DELETE") {
+          return { ok: false, status: 500 };
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+
+      localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
+
+      const { result } = renderHook(() => useFavorites());
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+        expect(result.current.favorites).toContain("story-1");
+      });
+
+      await act(async () => {
+        await result.current.toggleFavorite("story-1");
+      });
+
+      expect(result.current.favorites).toContain("story-1");
+
+      const lastSetCall = localStorageMock.setItem.mock.calls
+        .filter((call: unknown[]) => call[0] === "paisaxe_favorites")
+        .pop();
+      expect(JSON.parse(lastSetCall![1])).toEqual(["story-1"]);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error syncing favorite to cloud:",
+        expect.any(Error)
+      );
 
       consoleSpy.mockRestore();
     });
