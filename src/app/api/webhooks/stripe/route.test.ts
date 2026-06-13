@@ -445,10 +445,9 @@ describe("POST /api/webhooks/stripe", () => {
     });
   });
 
-  // ─── BE-L2: Stripe webhook audit trail ────────────────────────────────────
-  describe("BE-L2: audit trail in stripe_webhook_events", () => {
-
-    it("inserts an audit row for each verified checkout event", async () => {
+  // ─── BE-M1: Stripe webhook dedupe ownership ───────────────────────────────
+  describe("BE-M1: stripe_webhook_events schema ownership", () => {
+    it("lets the RPC claim stripe_webhook_events.event_id for checkout events", async () => {
       vi.mocked(verifyWebhookSignature).mockReturnValue(
         createCheckoutSessionEvent("user-123", "pi_audit_test", "evt_audit_1")
       );
@@ -458,23 +457,22 @@ describe("POST /api/webhooks/stripe", () => {
         createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
       );
 
-      expect(mockAuditFrom).toHaveBeenCalledWith("stripe_webhook_events");
-      expect(mockAuditInsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          stripe_event_id: "evt_audit_1",
-          event_type: "checkout.session.completed",
-        })
-      );
+      expect(mockAuditFrom).not.toHaveBeenCalled();
+      expect(mockAuditInsert).not.toHaveBeenCalled();
+      expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
+        p_event_id: "evt_audit_1",
+        p_user_id: "user-123",
+        p_payment_provider_id: "pi_audit_test",
+        p_expires_at: "2024-01-02T00:00:00.000Z",
+        p_amount_paid: 199,
+      });
     });
 
-    it("returns 200 immediately on duplicate event (unique constraint violation)", async () => {
+    it("returns duplicate when the RPC reports the event_id was already claimed", async () => {
       vi.mocked(verifyWebhookSignature).mockReturnValue(
         createCheckoutSessionEvent("user-123", "pi_dup", "evt_duplicate_audit")
       );
-      // Simulate unique constraint violation (Postgres code 23505)
-      mockAuditInsert.mockResolvedValue({
-        error: { code: "23505", message: "duplicate key value violates unique constraint" },
-      });
+      mockRpc.mockResolvedValue({ data: "duplicate", error: null });
 
       const response = await POST(
         createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
@@ -482,17 +480,23 @@ describe("POST /api/webhooks/stripe", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.received).toBe(true);
-      // The rpc should NOT have been called — early return on duplicate
-      expect(mockRpc).not.toHaveBeenCalled();
+      expect(data).toEqual({ status: "duplicate" });
+      expect(mockAuditFrom).not.toHaveBeenCalled();
+      expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
+        p_event_id: "evt_duplicate_audit",
+        p_user_id: "user-123",
+        p_payment_provider_id: "pi_dup",
+        p_expires_at: "2024-01-02T00:00:00.000Z",
+        p_amount_paid: 199,
+      });
     });
 
-    it("logs STRIPE_WEBHOOK_AUDIT_FAILED but still processes the event when audit insert fails with non-unique error", async () => {
+    it("does not log non-duplicate audit errors for normal checkout events", async () => {
       vi.mocked(verifyWebhookSignature).mockReturnValue(
         createCheckoutSessionEvent("user-123", "pi_audit_fail", "evt_audit_fail")
       );
       mockAuditInsert.mockResolvedValue({
-        error: { code: "08006", message: "connection failure" },
+        error: { code: "42703", message: "column stripe_event_id does not exist" },
       });
       mockRpc.mockResolvedValue({ data: "granted", error: null });
 
@@ -501,11 +505,10 @@ describe("POST /api/webhooks/stripe", () => {
       );
 
       expect(response.status).toBe(200);
-      // Event was still processed despite audit failure
       expect(mockRpc).toHaveBeenCalled();
-      expect(logger.error).toHaveBeenCalledWith(
+      expect(logger.error).not.toHaveBeenCalledWith(
         "[STRIPE_WEBHOOK_AUDIT_FAILED]",
-        expect.objectContaining({ eventId: "evt_audit_fail" })
+        expect.anything()
       );
     });
   });
