@@ -11,6 +11,9 @@ import { getEnvironment } from "@/lib/environment";
 export async function getAllFeatureFlagsServer(): Promise<
   Partial<Record<FeatureFlagKey, boolean>>
 > {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
@@ -23,6 +26,7 @@ export async function getAllFeatureFlagsServer(): Promise<
     const response = await fetch(
       `${supabaseUrl}/rest/v1/feature_flags?environment=eq.${environment}&select=flag_key,enabled`,
       {
+        signal: controller.signal,
         headers: {
           apikey: supabaseKey,
           Authorization: `Bearer ${supabaseKey}`,
@@ -46,6 +50,8 @@ export async function getAllFeatureFlagsServer(): Promise<
   } catch (error) {
     console.warn("Error fetching all feature flags:", error);
     return {};
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
