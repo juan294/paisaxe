@@ -98,6 +98,7 @@ test.describe("QA Journey: Anonymous User", () => {
     const firstTitle = await title.textContent();
 
     // Navigate with right arrow key
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("ArrowRight");
     await expect(title).not.toHaveText(firstTitle!, {
       timeout: 3000,
@@ -107,6 +108,7 @@ test.describe("QA Journey: Anonymous User", () => {
     expect(secondTitle).not.toBe(firstTitle);
 
     // Navigate with left arrow key
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("ArrowLeft");
     await expect(title).not.toHaveText(secondTitle!, {
       timeout: 3000,
@@ -191,12 +193,14 @@ test.describe("QA Journey: Anonymous User", () => {
     await expect(bottomPanel).toHaveClass(/opacity-100/);
 
     // Press 'i' to hide info
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("i");
 
     // Bottom panel should be hidden (wait for CSS transition to complete)
     await expect(bottomPanel).toHaveClass(/opacity-0/, { timeout: 5000 });
 
     // Press 'i' again to show info
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("i");
 
     // Bottom panel should be visible again
@@ -218,6 +222,7 @@ test.describe("QA Journey: Anonymous User", () => {
     // Navigate through 3 more stories, waiting for title to actually change
     for (let i = 0; i < 3; i++) {
       const prevTitle = titles[titles.length - 1];
+      await page.evaluate(() => window.focus());
       await page.keyboard.press("ArrowRight");
       await expect(title).not.toHaveText(prevTitle!, { timeout: 5000 });
       const currentTitle = await title.textContent();
