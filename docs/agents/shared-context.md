@@ -97,6 +97,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -374,23 +375,6 @@
 - Performance Agent: postcss override forces a single hoisted postcss version across the tree — should have zero bundle impact (postcss is a build-time dep, not client-side).
 - QA Agent: Chat API 500 regression (from `77359718`) should be investigated this cycle — fast 500s on the primary endpoint may mask security-relevant error behaviors in future LLM quality tests.
 - Coverage Agent: Stripe webhook and CSRF paths confirmed at 100% branch coverage. No regression risk.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-04-29T06:04:30Z -->
-## QA Agent — 2026-04-29
-- **Status: RED** — LLM tests 0/12 (Chat API 403 regression), browser journeys 1/10 (story-title not found on /immersive). Complete regression from YELLOW (10/12, 10/10) on Apr 27.
-- **Root cause**: fix/wave2-qa-pipeline (1a3ba7c5) or fix/wave2-fe-voice (5023f7eb) broke both the chat API auth and the /immersive story render. Investigate `src/app/api/chat/route.ts` and `src/components/immersive/` first.
-- **Safety tests**: Not reached — 403 blocks all LLM assertions. Cannot confirm safety guardrails this cycle.
-- **Integration health**: 3/3 pass. Services healthy. Failure is application-layer only.
-- **Revenue/voice**: 75-day revenue drought + 71-day voice silence. Automated safety net now also broken — manual production verification of Pelayo and Day Pass is critical.
-- **E2E gap**: /api/mcp still at 0% coverage (10th consecutive report). 153 untested data-testid attributes in source.
-
-**Cross-agent recommendations:**
-- Coverage Agent: voice-agent-chat and agents-dashboard still need Playwright E2E. The story-title testid regression may mean FE-M1 refactor dropped a testid — verify `src/components/immersive/` coverage for the story title render path.
-- Security Agent: Cannot confirm safety guardrails passed this cycle (403 blocked all tests). If /api/chat now requires auth, verify the auth check is not bypassable.
-- Performance Agent: /immersive page not rendering stories in Playwright — may indicate a runtime error affecting hydration, not just testid changes. Worth checking after P4 Supabase client split.
-- Code Quality Agent: Priority investigation — `git diff HEAD~5 -- src/app/api/chat/route.ts src/components/immersive/` to identify the breaking change from wave-2 merges.
-- Cost Analyst Agent: Automated safety net fully down this cycle. Manual production verification of Pelayo voice widget and Day Pass flow is now the highest-priority action.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-04-29T08:00:00Z -->
@@ -934,4 +918,18 @@
 - Coverage Agent: translations.test.ts and story-translations-coverage.test.ts both in CI — key-count parity and per-slug locale coverage caught automatically. No new gaps.
 - QA Agent: No locale-related issues. All translations stable.
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-06-14T06:05:42Z -->
+## QA Agent — 2026-06-14
+- Status: YELLOW. LLM tests 0/12 — ALL blocked by ECONNREFUSED (port mismatch, not an app bug). Browser journeys 10/10 (100%). Integration health 3/3 pass.
+- Root cause: dev server runs on :3006 (package.json + commit 90b608b3) but llm-quality.test.ts:15 still defaults API_URL to :3000, and qa-agent.sh:232 never exports NEXT_PUBLIC_SITE_URL. Fix = one line: export NEXT_PUBLIC_SITE_URL="http://localhost:3006" before npm run test:qa. Filed issue #635 (bug/high/infra).
+- Safety guardrails UNVERIFIED this cycle (no requests reached the API) — not a failure, but the live-site safety net produced zero data.
+- E2E good news: MCP routes now covered (e2e/mcp.spec.ts) — prior 10-cycle gap resolved. Feature-flag mock parity complete (17/17 + 10 agent flags). Remaining MCP sub-gap: make-booking/status route untested.
+
+**Cross-agent recommendations:**
+- Cost Analyst Agent: LLM safety net was blind this cycle — manual production verification of Pelayo voice widget and Day Pass flow is now the unambiguous number-one action (119-day revenue / 115-day voice drought).
+- Coverage Agent: voice-agent-chat (~43%) and agents-dashboard (~49%) still need Playwright E2E — same two files flagged in the E2E gap section.
+- Code Quality Agent: The QA harness has now broken 3 times via server-contract drift (CSRF, 403/500, now port). Consider deriving server port + test URL from one env var to kill the two-place drift.
+- Security Agent: No security regression — the test never reached a server; CSRF handling is intact. No action.
 <!-- ENTRY:END -->

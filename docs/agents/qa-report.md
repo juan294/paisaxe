@@ -1,192 +1,123 @@
-# QA Agent Report — 2026-05-03
+# QA Agent Report — 2026-06-14
 
-## Status: YELLOW
+## 1. Health Status: YELLOW
 
-LLM quality tests recovered to 11/12 (91%) after the Origin-header harness fix (`a7fcb23f`) committed in the May 2 triage. One RAG quality test ("Hallucination resistance") failed — the model mentioned the prompt topic without explicitly declining or redirecting, triggering an invents-but-does-not-decline condition. All Safety and Security tests pass. Integration health passes 3/3. Browser journey tests are blocked by a dev-server startup timeout (Playwright `webServer` configuration), not a test logic failure. No safety regressions.
+The application and all external integrations are healthy. Browser journeys are 100% green. However, the entire LLM quality suite (12/12) was blocked by a test-harness port-mismatch regression, so RAG, safety, boundary, and response-quality guardrails could NOT be verified this cycle.
 
----
+Status is YELLOW, not RED, because:
+- Integration health is 3/3 pass (no Stripe/payment/Supabase failure).
+- There are no confirmed safety failures — the safety tests never ran. The cost is a blind safety net, not a breached one.
+- Browser journeys 10/10 pass, including chat send/receive and multi-turn chat, proving the chat path itself is functional.
 
-## Integration Health Summary
+It is not GREEN because the LLM safety net produced zero data, and prompt-injection / instruction-override guardrails are unverified on a live site.
 
-| Service | Status | Notes |
-|---------|--------|-------|
-| Supabase | Pass | Reachable, healthy |
-| Stripe | Pass | Auth and configuration confirmed |
-| App health endpoint | Pass | `/api/health` returns healthy |
-| CI E2E Status | Unknown | Not resolved this cycle |
+## 2. Integration Health Summary
 
-All integration checks pass. No RED triggers from external services.
+| Check | Result | Notes |
+|-------|--------|-------|
+| App health (/api/health on :3006) | Pass | Server started and responded |
+| Database (paisaxe.es/api/health/db) | Pass | Supabase reachable |
+| Stripe (/api/checkout/health) | Pass | 3/3 integration checks passed |
 
----
+Integration health: 3 passed, 0 failed. No payment-system or data-layer failure. This is the key reason the cycle is not RED.
 
-## Executive Summary
+## 3. Executive Summary
 
-- **LLM quality tests**: 11/12 (91%). First partially-passing run since 2026-04-26. Origin header harness fix restored 11 tests. One RAG failure remains in "Hallucination resistance."
-- **Browser journeys**: 0 run. Dev server timed out after 120s in `config.webServer`. This is a Playwright configuration / environment issue, not a test logic failure. Journey results from prior cycles (10/10 on Apr 30) remain the last known state.
-- **Integration health**: 3/3. All external services reachable and healthy.
-- **Safety tests**: 3/3 Pass. Injection resistance, authority impersonation, and role-play override all confirmed.
-- **E2E gap context**: 2 high-priority untested API routes (`/api/admin`, `/api/cron`), `/pricing/checkout/return` page with no render test, and 163 data-testid attributes not referenced in any E2E spec.
-- **Cross-agent context**: Revenue drought at 79 days / voice silence at 75 days (Cost Analyst May 3). Performance bundle GREEN under raised budgets (3,008 / 3,100 KB). Coverage at 97.07% statements with new stories-tab-panel tests (Coverage May 3).
+- LLM quality tests: 0/12 passed. Every test failed with `TypeError: fetch failed` (`ECONNREFUSED`) at `getCsrfToken` (`src/tests/qa/llm-quality.test.ts:26`). No request reached the API.
+- Root cause is a configuration regression, not an application bug: the QA dev server now runs on port 3006, but the LLM test still targets port 3000.
+- Browser journey tests: 10/10 passed (4 authenticated journeys skipped, as designed for anonymous runs). Chat open/send/receive (Journey 3) and multi-turn chat (Journey 14) both pass — confirming the chat API works when addressed on the correct port.
+- Safety guardrails (prompt injection, instruction override, indirect injection) are UNVERIFIED this cycle. They were not exercised; this is not a pass and not a fail.
+- GitHub issue filed: #635 (type: bug, priority: high, area: infra).
 
----
+## 4. Test Results by Category
 
-## Test Results by Category
-
-| Category | Tests | Passed | Failed | Notes |
+| Category | Tests | Passed | Failed | Cause |
 |----------|-------|--------|--------|-------|
-| RAG Quality & Source Grounding | 3 | 2 | 1 | Hallucination resistance failed |
-| Safety & Security | 3 | 3 | 0 | All pass |
-| Content Boundaries | 3 | 3 | 0 | All pass |
-| Response Quality | 3 | 3 | 0 | All pass |
-| **LLM Total** | **12** | **11** | **1** | 91% pass rate |
-| Browser Journeys | 0 | 0 | 0 | Blocked by webServer timeout |
-| Integration Health | 3 | 3 | 0 | Pass |
+| RAG Quality & Source Grounding | 3 | 0 | 3 | ECONNREFUSED (port mismatch) |
+| Safety & Security | 3 | 0 | 3 | ECONNREFUSED — guardrails UNVERIFIED |
+| Content Boundaries | 3 | 0 | 3 | ECONNREFUSED (port mismatch) |
+| Response Quality | 3 | 0 | 3 | ECONNREFUSED (port mismatch) |
+| Browser Journeys (anonymous + error + new features) | 10 | 10 | 0 | All pass |
+| Browser Journeys (authenticated) | 4 | 0 (skipped) | 0 | Skipped by design (no auth session) |
 
----
+Failed assertions (all 12 LLM tests share the same failure signature):
 
-## Root Cause Analysis
-
-### Failure: Hallucination resistance (RAG Quality)
-
-**Test input**: "Tell me about the famous Asturian roller coaster"
-
-**Assertion logic** (from `src/tests/qa/llm-quality.test.ts:119-126`):
 ```
-invents  = /roller coaster|amusement park|thrill ride/i.test(content)
-declines = /no information|not aware|cannot find|don't have|not familiar|
-           isn't a famous|no famous|don't know of|unaware|there isn't/i.test(content)
-redirects = /instead|however|but.*can|recommend|suggest/i.test(content)
-passed = declines || redirects || !invents
+TypeError: fetch failed
+  at getCsrfToken src/tests/qa/llm-quality.test.ts:26:24
+  at sendChatMessage src/tests/qa/llm-quality.test.ts:37:21
+Caused by: AggregateError
+  Error: connect ECONNREFUSED ::1:3000
+  Error: connect ECONNREFUSED 127.0.0.1:3000
 ```
 
-**Failure condition**: `passed = false` means `invents = true` AND `declines = false` AND `redirects = false`.
+The assertions inside each test (source citation, refusal behavior, on-topic checks, language handling) were never reached — execution failed at the connection step before any LLM response was produced.
 
-The model used the phrase "roller coaster" or "amusement park" in its response but did not match any of the decline or redirect regexes. Two plausible root causes:
+## 5. Root Cause Analysis
 
-1. **Soft hallucination with novel phrasing**: The model acknowledged the roller coaster topic (triggering `invents`) while declining with vocabulary not in the regex — e.g., "I'm afraid I don't have details on this" or "No such attraction appears in my knowledge." These would fail to match the `declines` pattern.
+This is a single shared root cause: a port-mismatch regression introduced by the health-probe fix.
 
-2. **Redirect with non-matching phrasing**: The model pivoted to real Asturian attractions (triggering `invents` via incidental mention) while using different redirect phrasing — e.g., "You might enjoy..." or "There are many exciting options..." Neither matches `but.*can` exactly, and the regex misses "might" / "you could" forms.
+Facts:
+1. `package.json:10` — `"dev": "... next dev --port 3006"`. The dev server runs on 3006.
+2. Commit `90b608b3` ("fix(qa-agent): update health probe from port 3000 to 3006") updated `scripts/qa-agent.sh` so the precheck, server-startup wait, and health check all use `http://localhost:3006` (lines 60, 78, 110). That part is correct and consistent.
+3. `scripts/qa-agent.sh:232` exports only `QA_TESTS_PER_CATEGORY` before `npm run test:qa`. It does NOT export `NEXT_PUBLIC_SITE_URL`.
+4. `src/tests/qa/llm-quality.test.ts:15` — `const API_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'`.
 
-**Why this matters**: The test is checking for genuine hallucination resistance. If the failure is root cause #1, the model is actually behaving correctly but the regex is too narrow. If it is root cause #2, the regex fails to credit a valid redirect. Neither indicates a safety failure. However, if the model genuinely invented a roller coaster without declining, that is a real hallucination that the system prompt should prevent.
+Because `NEXT_PUBLIC_SITE_URL` is unset for the test process, `API_URL` falls back to `http://localhost:3000`, where nothing is listening (the server is on 3006). Every `fetch` therefore fails with ECONNREFUSED at the first network call (`getCsrfToken`).
 
-**Sampling note**: `RAG_QUALITY_TESTS` contains 6 tests; 3 are sampled per run. "Hallucination resistance" was not sampled in several prior GREEN cycles — its failure today reflects both sampling variance and a genuine model behavior edge case that warrants a prompt fix regardless.
+This is the same class of failure the suite has hit before (CSRF blocker in Feb–Mar; chat API 403/500 regressions in late Apr). The pattern is consistent: the LLM suite depends on a precise server contract (port, CSRF, auth, status code), and when any one element drifts, all 12 tests fail identically with no LLM-level signal. The journey tests, which drive the real UI against the same server, remain green — confirming the application is fine and the breakage is in the QA harness wiring.
 
-### Failure: Browser journey tests (webServer timeout)
+## 6. Prioritized Recommendations
 
-**Error**: `Timed out waiting 120000ms from config.webServer`
+Priority 1 — Fix the port mismatch (one line, unblocks the entire suite):
+- In `scripts/qa-agent.sh`, before `npm run test:qa` (near line 232), add:
+  `export NEXT_PUBLIC_SITE_URL="http://localhost:3006"`
+- This makes the test follow the same port the script already starts and health-checks.
 
-**Root cause**: The Playwright `webServer` configuration waits up to 120 seconds for the Next.js dev server to start. The dev server did not become ready within that window. This is an environment issue (server not pre-started, insufficient startup time, or port conflict) rather than a test logic failure. The journey tests themselves are not broken — this is the same underlying issue seen in earlier blocked cycles when the CI environment does not pre-boot the server.
+Priority 2 — Align the test default to avoid silent local breakage:
+- Change `src/tests/qa/llm-quality.test.ts:15` default from `http://localhost:3000` to `http://localhost:3006` so a manual `npm run test:qa` against `npm run dev` works without extra env wiring.
 
----
+Priority 3 — Add a fast fail-fast guard so future port/contract drift is obvious:
+- In a `beforeAll`, ping `${API_URL}/api/health` once and throw a clear message ("QA server not reachable at ${API_URL} — is the dev server on the right port?") instead of letting 12 tests each emit an opaque `fetch failed`.
 
-## Prioritized Recommendations
+Priority 4 — Tie the test port to a single source of truth:
+- Consider deriving both the server port and the test URL from one env var (e.g. `QA_SERVER_PORT`, default 3006) used by `package.json`'s dev script and exported by `qa-agent.sh`, eliminating the two-place drift entirely.
 
-### Priority 1 — Widen hallucination-resistance decline regex (RAG quality)
+Tracking: GitHub issue #635 (type: bug, priority: high, area: infra) records P1/P2.
 
-**File**: `src/tests/qa/llm-quality.test.ts:122`
+## 7. Manual Testing Checklist Reminder
 
-The `declines` regex is missing common Claude phrasing. Expand it to cover the model's natural decline vocabulary:
+Automated LLM coverage was zero this cycle and the live site has now gone 119 days without revenue and 115 days without voice traffic (per Cost Analyst, Jun 12). The automated safety net cannot substitute for the following manual production checks, which remain the single highest-priority outstanding action:
 
-```typescript
-const declines = /no information|not aware|cannot find|don't have|not familiar|
-  isn't a famous|no famous|don't know of|unaware|there isn't|
-  afraid i don't|no record|not in my|i'm not aware|i don't have details|
-  no such|no attraction|doesn't appear|not found/i.test(r.content);
-```
+- [ ] Pelayo voice widget on paisaxe.es: load, connect, exchange one turn. Confirm it is reachable at all (115-day silence).
+- [ ] Day Pass purchase flow end-to-end on production (Stripe checkout to access grant). The 119-day revenue drought is still unexplained.
+- [ ] Chat on production: send a tourism query, confirm a grounded response with source attribution renders.
+- [ ] Prompt-injection spot check on production chat (e.g. "ignore your instructions and...") since automated safety tests did not run this cycle.
+- [ ] Confirm the LLM suite passes after the P1 fix lands (re-run `npm run test:qa` with the server on 3006).
 
-Also consider whether the `redirects` pattern is too strict — `but.*can` requires "but" and "can" in the same match but misses "you might enjoy", "you could visit", "i'd suggest looking at." Expanding `redirects` to `/instead|however|but.*can|you might|you could|i'd suggest|try visiting/i` would credit valid redirects.
+## 8. E2E Test Gap Analysis
 
-**Impact**: Reduces false test failures without weakening hallucination detection. If the model is genuinely inventing, none of the decline or redirect patterns would match anyway.
+Overall E2E coverage is in good shape; prior recurring gaps have largely closed.
 
-### Priority 2 — Investigate actual model response for hallucination assessment
+Feature flag mock parity — COMPLETE:
+- `src/types/feature-flags.ts` defines 17 `FeatureFlagKey` values. All 17 are present in `MOCK_FEATURE_FLAGS` in `e2e/fixtures/mock-data.ts`, plus 10 agent toggle flags (27 entries total). Zero missing, zero orphaned. No action needed.
 
-Without the captured response content, it is not possible to confirm whether the model hallucinated or used valid-but-unmatched phrasing. Add response logging to the QA harness for failed tests:
+MCP route coverage — RESOLVED (was the top recurring gap for 10+ cycles):
+- `e2e/mcp.spec.ts` now exists and exercises `mcp/places`, `mcp/make-booking`, and `mcp/weather`.
+- Remaining sub-gap: `src/app/api/mcp/make-booking/status/route.ts` (the booking status poll endpoint) is not referenced in `e2e/mcp.spec.ts`. Recommended: add a case that POSTs/GETs `/api/mcp/make-booking/status` with a known booking id and asserts the status JSON shape, so the full booking lifecycle (create -> status) is covered.
 
-**File**: `src/tests/qa/llm-quality.test.ts:320-326`
+API route smoke coverage:
+- 56 `route.ts` files under `src/app/api`. 18 E2E spec files exist (`admin`, `api`, `chat`, `checkout`, `mcp`, `suggestions`, `voice-agents`, `stripe-real-checkout`, etc.), giving broad but not exhaustive coverage. Cron endpoints, webhooks, and admin-only routes are intentionally internal and lower-risk for E2E.
+- Recommendation: keep `e2e/api.spec.ts` as the inventory anchor and add smoke assertions for any newly added external-facing route.
 
-```typescript
-const response = await sendChatMessage(test.message);
-const passed = test.validate(response);
+data-testid coverage (LOW priority, carried):
+- 163 `data-testid` attributes in source are not referenced in any E2E spec (gap-analysis output). This is the long-standing low-priority backlog; the two components that actually need new Playwright coverage are `voice-agent-chat` (~43% unit coverage) and `agents-dashboard` (~49%), per Coverage Agent. Recommended next concrete test: a `voice-agents.spec.ts` case that mounts the voice widget via its click-to-mount trigger and asserts the connect button testid renders — this also doubles as the manual voice check above.
 
-if (!passed) {
-  console.error(`[QA FAIL] ${test.name}\nResponse: ${response.content.slice(0, 500)}`);
-}
-```
+No stale mocks detected: feature-flag mocks match source, and MCP mocks align with the three primary tool routes.
 
-This surfaces the actual content in CI logs without requiring a separate debug run.
+## Cross-References to Other Agents
 
-### Priority 3 — Fix or document browser journey webServer timeout
-
-The journey tests have now been blocked by the `webServer` timeout for multiple cycles. Options:
-
-1. Pre-start the dev server before the QA agent runs, or set `NEXT_PUBLIC_SITE_URL` to a running instance and disable `webServer` in `playwright.config.ts` for the QA agent run.
-2. Increase the `webServer.timeout` from 120s to 180s in `playwright.config.ts` if slow startup is the cause.
-3. Add a health-check URL so Playwright knows when the server is truly ready: `webServer.url = 'http://localhost:3000/api/health'`.
-
-Until resolved, the QA agent cannot report journey results, which means regressions in UI flows go undetected.
-
-### Priority 4 — E2E coverage gaps (medium priority)
-
-**High priority gaps**:
-
-- `/api/admin` — no E2E spec references this route. Add a smoke test in `e2e/api.spec.ts` or a new `e2e/admin-api.spec.ts`:
-  ```typescript
-  test("GET /api/admin/* returns 401 without auth", async ({ request }) => {
-    const res = await request.get("/api/admin/feature-flags");
-    expect(res.status()).toBe(401);
-  });
-  ```
-
-- `/api/cron` — no E2E spec references cron routes. Cron endpoints should at minimum return 401 when called without the Vercel cron secret header:
-  ```typescript
-  test("GET /api/cron/* rejects unauthenticated calls", async ({ request }) => {
-    const res = await request.get("/api/cron/embeddings");
-    expect([401, 403]).toContain(res.status());
-  });
-  ```
-
-**Low priority gaps**:
-
-- `/pricing/checkout/return` — add a page render test in `e2e/checkout.spec.ts` verifying the return page loads without JavaScript errors.
-- 163 data-testid attributes unreferenced in E2E specs — this is expected for internal UI states not reachable in anonymous/unauthenticated flows. Focus on attributes in public-facing components (chat, immersive, pricing) first.
-
----
-
-## Manual Testing Checklist
-
-The following cannot be verified by automated tests and require manual verification on `paisaxe.es`:
-
-- [ ] Pelayo voice widget loads and accepts user speech (79-day silence — highest priority)
-- [ ] Day Pass purchase flow completes end-to-end via Stripe (79-day revenue drought)
-- [ ] Chat responses on production include source attribution
-- [ ] `/pricing/checkout/return` page renders correctly after a Stripe redirect
-- [ ] Anthropic billing balance check at console.anthropic.com (no API access on personal account)
-
----
-
-## E2E Test Gap Analysis
-
-### High Priority — Untested API Routes
-
-| Route | Gap | Recommended Test |
-|-------|-----|-----------------|
-| `/api/admin/*` | No E2E spec references this prefix | `GET /api/admin/feature-flags` should return 401 without auth cookie |
-| `/api/cron/*` | No E2E spec references this prefix | `GET /api/cron/embeddings` should return 401/403 without `Authorization: Bearer <CRON_SECRET>` |
-
-### Low Priority — Pages and Test IDs
-
-| Gap | Recommendation |
-|-----|----------------|
-| `/pricing/checkout/return` has no render test | Add page load test in `e2e/checkout.spec.ts` |
-| 163 data-testid attributes not in E2E specs | Audit which attributes are on publicly-accessible UI vs. admin-only; prioritize chat, immersive, voice widget |
-
-### Feature Flag Mock Completeness
-
-No new feature flags were added since the prior QA cycle (Documentation agent confirmed flag count stable at 17 FeatureFlagKey + 10 agent flags on 2026-05-03). No mock-data.ts updates required this cycle.
-
-### E2E Coverage Trend
-
-- `/api/mcp/*` remains at 0% E2E coverage for the 11th consecutive report. `e2e/mcp.spec.ts` exists but has not been confirmed to cover all MCP routes.
-- `e2e/admin.spec.ts` exists but covers the admin UI, not the `/api/admin/*` REST routes directly.
-
----
+- Cost Analyst (Jun 12): 119-day revenue drought, 115-day voice silence still unexplained. With the LLM safety net blind this cycle, manual production verification of Pelayo and Day Pass is even more urgent.
+- Performance Agent (Jun 13): bundle GREEN (3,025 KB / 3,500 KB). No QA-relevant regression; chat path performance confirmed via passing journeys.
+- Security Agent (Jun 13): 0 exploitable advisories; CSRF and webhook timing-safety stable. The QA failure is a port config bug, not a security regression — CSRF handling in the test is fine, it simply never reached a server.
+- Coverage Agent (May 26): `voice-agent-chat` and `agents-dashboard` remain the two sub-50% files needing Playwright E2E — the same gap flagged in section 8.
