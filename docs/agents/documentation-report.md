@@ -1,181 +1,24 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-06-12 06:04:01
-
-## Changes Made This Run
-
-**Status: GREEN — No documentation changes needed.**
-
-- Feature flags: The gaps file reported zero undocumented feature flags. Verified against source: all 17 flags in `FeatureFlagKey` (src/types/feature-flags.ts) and all 10 agent flags (master + 9 in scripts/agent-config.defaults.json) are documented in the Feature Flags Reference of `docs/project/features.md`. Zero gaps.
-- API routes: All 51 flagged routes confirmed internal — admin APIs (`/api/admin/*`), cron endpoints (`/api/cron/*`), webhooks (`/api/webhooks/*`, already documented in features.md Infrastructure), MCP voice-agent tools (`/api/mcp/*`, already documented under Custom MCP tools), health probes (`/api/health/*`, already documented), and app-internal user routes consumed only by the frontend (chat, favorites, suggestions, voice-access, checkout, feature-flags). No external-consumption routes require new documentation.
-- Source changes since last run: only two commits touch src/ (dependency batch #597 and triage hygiene 5f3b1d18 — story translations, coverage test, posthog-js lockfile sync). Neither introduces new flags, routes, or user-facing features.
-- `docs/project/features.md`: Complete — no additions made.
-- CLAUDE.md: Current (last modified 2026-05-03; no user-facing architecture changes since).
+> Auto-generated on 2026-06-14 06:00:01
 
 ## CLAUDE.md Status
 
-Last modified: **2026-05-03**
+Last modified: **2026-06-13**
 
 ## Files Modified Since Documentation Update
 
 These source files have been modified since CLAUDE.md was last updated and may need documentation updates.
 
-### Source Files (src/)
+No source files modified since documentation update.
 
-```
-src/app/about/page.tsx
-src/app/api/admin/agent-config/route.ts
-src/app/api/admin/agent-reports/route.test.ts
-src/app/api/admin/agents/run/route.test.ts
-src/app/api/admin/analytics/route.test.ts
-src/app/api/admin/elevenlabs-analytics/route.test.ts
-src/app/api/admin/github-analytics/route.test.ts
-src/app/api/admin/stories/[id]/image/route.test.ts
-src/app/api/chat/stream/route.test.ts
-src/app/api/chat/stream/route.ts
-src/app/api/cron/content-discovery/route.test.ts
-src/app/api/cron/fail-stale-translations/route.test.ts
-src/app/api/cron/github-traffic-sync/route.test.ts
-src/app/api/cron/retry-booking-sms/route.test.ts
-src/app/api/cron/subscription-optimizer/route.test.ts
-src/app/api/health/db/route.test.ts
-src/app/api/health/db/route.ts
-src/app/api/health/route.test.ts
-src/app/api/health/route.ts
-src/app/api/mcp/make-booking/route.test.ts
-src/app/api/webhooks/elevenlabs/route.test.ts
-src/app/api/webhooks/elevenlabs/route.ts
-src/app/api/webhooks/translate/route.test.ts
-src/app/api/webhooks/translate/route.ts
-src/app/auth/callback/route.test.ts
-src/app/error.tsx
-src/app/favorites/page.test.tsx
-src/app/favorites/page.tsx
-src/app/global-error.tsx
-src/app/immersive/immersive-data-loader.tsx
-src/app/immersive/immersive-page-content.test.tsx
-src/app/immersive/immersive-page-content.tsx
-src/app/immersive/page.test.tsx
-src/app/immersive/page.tsx
-src/app/layout.test.tsx
-src/app/layout.tsx
-src/app/loading.test.tsx
-src/app/loading.tsx
-src/app/not-found.tsx
-src/app/page.test.tsx
-src/app/page.tsx
-src/app/pricing/checkout/page.test.tsx
-src/app/pricing/checkout/page.tsx
-src/app/pricing/checkout/return/page.test.tsx
-src/app/pricing/checkout/return/page.tsx
-src/app/pricing/page.test.tsx
-src/app/pricing/page.tsx
-src/app/pricing/success/page.test.tsx
-src/app/pricing/success/page.tsx
-src/app/privacy/page.tsx
-src/app/providers.test.tsx
-src/app/providers.tsx
-src/app/story/[slug]/opengraph-image.test.tsx
-src/app/story/[slug]/page.test.tsx
-src/app/story/[slug]/page.tsx
-src/app/terms/page.tsx
-src/components/admin/costs-analytics-panel/alerts.test.tsx
-src/components/admin/costs-analytics-panel/alerts.tsx
-src/components/admin/costs-analytics-panel/costs-analytics-panel.test.tsx
-src/components/admin/costs-analytics-panel/forecast.test.tsx
-src/components/admin/costs-analytics-panel/forecast.tsx
-src/components/admin/elevenlabs-analytics-panel.test.tsx
-src/components/admin/story-card.tsx
-src/components/admin/story-translations-tab.test.tsx
-src/components/admin/story-translations-tab.tsx
-src/components/auth/auth-provider.test.tsx
-src/components/auth/auth-provider.tsx
-src/components/immersive/accessibility.test.tsx
-src/components/immersive/category-filter-badge.test.tsx
-src/components/immersive/category-filter-badge.tsx
-src/components/immersive/chat-actions.test.tsx
-src/components/immersive/story-progress-bar.test.tsx
-src/components/immersive/story-progress-bar.tsx
-src/components/immersive/story-viewer.test.tsx
-src/components/premium/voice-purchase-cta.test.tsx
-src/components/premium/voice-purchase-cta.tsx
-src/config/recurring-costs.ts
-src/hooks/use-feature-flags.test.ts
-src/hooks/use-feature-flags.ts
-src/hooks/use-sse-stream.test.ts
-src/hooks/use-stories.ts
-src/hooks/use-story-keyboard-nav.test.ts
-src/hooks/use-story-keyboard-nav.ts
-src/hooks/use-stream-chat.test.ts
-src/hooks/use-voice-access.test.ts
-src/instrumentation.test.ts
-src/lib/admin-api/stories.test.ts
-src/lib/admin-auth.test.ts
-src/lib/chat-action-detection.ts
-src/lib/chat-stream-timeouts.ts
-src/lib/claude.test.ts
-src/lib/costs/manual-costs.ts
-src/lib/cron-job-lock.test.ts
-src/lib/elevenlabs-call-status.ts
-src/lib/embedding-cache.test.ts
-src/lib/health-timeouts.ts
-src/lib/i18n/ast.ts
-src/lib/i18n/de.ts
-src/lib/i18n/en.ts
-src/lib/i18n/es.ts
-src/lib/i18n/fr.ts
-src/lib/i18n/provider.tsx
-src/lib/i18n/pt.ts
-src/lib/i18n/resolve.test.ts
-src/lib/i18n/story-translations-coverage.test.ts
-src/lib/i18n/translations.test.ts
-src/lib/image-optimization.ts
-src/lib/logger-sanitize.test.ts
-src/lib/logger.test.ts
-src/lib/rate-limit.test.ts
-src/lib/rate-limit.ts
-src/lib/search.test.ts
-src/lib/sentry-before-send.test.ts
-src/lib/stories-data.test.ts
-src/lib/stories-data.ts
-src/lib/stripe.ts
-src/lib/supabase.ts
-src/lib/translate-story.ts
-src/lib/translation-locales.ts
-src/lib/utils.test.ts
-src/lib/utils.ts
-src/test/__mocks__/server-only.ts
-src/test/i18n-mock.ts
-src/test/setup.ts
-src/tests/hallucination-validator.test.ts
-src/tests/qa/llm-quality.test.ts
-src/types/immersive.test.ts
-```
-
-### Database Migrations
-
-```
-supabase/migrations/089_enable_rls_admin_audit_log.sql
-supabase/migrations/090_fix_rls_operational_tables.sql
-supabase/migrations/091_revoke_internal_function_access.sql
-supabase/migrations/092_revoke_internal_function_access_fix.sql
-```
+No new migrations since documentation update.
 
 ### Scripts
 
 ```
 scripts/check-verification-coverage.ts
-scripts/cost-analyst-agent.sh
-scripts/coverage-agent.sh
-scripts/generate-icons.ts
-scripts/generate-stories.test.ts
-scripts/generate-stories.ts
-scripts/performance-agent.sh
-scripts/qa-agent.sh
-scripts/security-agent.sh
-scripts/seed-database.test.ts
-scripts/seed-database.ts
-scripts/seed-images.ts
-scripts/setup-elevenlabs-agents.ts
+scripts/run-prelaunch-gate.test.ts
+scripts/run-prelaunch-gate.ts
 scripts/verification-config.test.ts
 ```
 
@@ -243,13 +86,25 @@ webhooks/translate
 
 ```
 
+## Changes Made This Run
+
+Status: GREEN — No documentation gaps found. Twenty-eighth consecutive clean run.
+
+Feature flags: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. The gaps scan reported zero undocumented flags, confirmed against the canonical `FeatureFlagKey` union in `src/types/feature-flags.ts`. Zero gaps.
+
+API routes: All 53 flagged routes confirmed internal — admin APIs (`/api/admin/*`), cron endpoints (`/api/cron/*`), webhooks (`/api/webhooks/*`, already documented), MCP voice-agent tools (`/api/mcp/*`, already documented), internal health probes (`/api/health/*`, documented), and app-internal user APIs (`chat`, `feature-flags`, `favorites`, `suggestions`, `voice-access`, `checkout/*`). Spot-checked `voice-access`, `feature-flags`, and `checkout/day-pass` — all are auth-gated, origin-locked routes consumed by the Paisaxe frontend, not external-consumption APIs. No new documentation required.
+
+Source changes: No source files modified since the last documentation update (CLAUDE.md last modified 2026-06-13). No new migrations. No new user-facing features or flags.
+
+No edits made to `features.md` or `CLAUDE.md` this cycle — documentation is complete and accurate.
+
 ## Documentation File Ages
 
 | File | Last Modified |
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
-| CLAUDE.md | 2026-05-03 |
-| README.md | 2026-05-03 |
+| CLAUDE.md | 2026-06-13 |
+| README.md | 2026-06-13 |
 
 ---
 

@@ -1,126 +1,116 @@
-# Performance Agent Report — 2026-06-11
+# Performance Agent Report — 2026-06-13
 
 ## Summary
 
-Status: GREEN (fully authoritative — first fresh-build verdict since Jun 6). The metrics script correctly flagged the cached Jun 6 build STALE (it predates this morning's production dep batch #597, 19 packages), and this cycle the staleness was material, not cosmetic: local `node_modules` was also behind the lockfile (next 16.2.7 vs 16.2.9 pinned, @supabase/ssr 0.10.3 vs 0.12.0, Sentry 10.55 vs 10.57). The agent therefore ran the pending `npm install` (the top hygiene action flagged by Security and Triage on Jun 10-11) and a fresh production build, restoring authoritative numbers.
+Status: GREEN, authoritative. Build provenance is CACHED-but-authoritative: `.next` mtime (07:40:34) postdates the last source/dep commit (`74e73938`, 07:38:37), so the on-disk bundle reflects the current source tree exactly. No rebuild was required.
 
-Result: the 19-package production batch is effectively bundle-neutral. Total JS moved 3,398 KB -> **3,393 KB (-5 KB)**, now **107 KB under the 3,500 KB budget**. The two chunks that were expected to move did, by small amounts: Supabase +1.8 KB (ssr 0.10.3->0.12.0 + supabase-js 2.106.2->2.108.1) and PostHog +6.9 KB (posthog-js 1.376.4->1.384.0); small shrinkage elsewhere more than offset both. The "minor bumps must be measured, not assumed" concern from the Jun 10 report is now answered with a measurement: they were fine.
+This is the strongest bundle position in months. Total JS fell to **3,025 KB**, now **475 KB under the 3,500 KB total budget** — a -162 KB cut this cycle on top of last cycle's -206 KB react-markdown removal. Over two cycles the bundle has dropped 3,393 KB (Jun 11) -> 3,187 KB (Jun 12) -> **3,025 KB (Jun 13)**, a cumulative -368 KB (-11%).
 
-Second resolution this cycle: the unidentified 149 KB first-paint chunk (carried as an open item for 8+ cycles, formerly `0a-pavpl4ggb0.js`, now `0y03utgnbz7gz.js`, byte-identical at 149,221 B across builds) is now **identified as the Next.js App Router client runtime** — RSC client, router, prefetch and segment-cache machinery (`createHrefFromUrl`, `app-pages-browser`, `server-patch`, segment RSC strings; zero third-party library signatures). It is required framework code, not app code and not vendorable or deferrable. The item is closed: no optimization is available at the application level.
+Two distinct wins landed this cycle, both from the global-shell remediation (`986bc0e1`, #600 #612):
 
-Actions taken by this agent: `npm install` (sync to committed lockfile, materializing #597 locally — found 0 vulnerabilities) and `npm run build` (fresh production artifacts). No source changes.
+1. **`global-error.tsx` i18n purge (drives the -162 KB total reduction).** The global error shell — which replaces the root layout and ships as its own entry bundle — was statically importing all six full translation files (`es/en/fr/de/pt/ast`, ~406 keys each) plus the `resolveTranslation` machinery. It only renders four strings (title, description, retry, go-home). The fix replaces the full-translation import with a tiny inline `errorCopy` map (4 strings x 6 locales). This eliminated a duplicated, first-paint-adjacent copy of the entire i18n bundle.
+
+2. **`auth-provider.tsx` Supabase lazy-load (improves initial-load, total-neutral).** The Supabase browser client (the 330 KB `GoTrueClient` chunk) is now dynamically imported via `await import("@/lib/supabase-browser")` inside `getSupabaseClient()` (auth-provider.tsx:32) and gated behind a real anon-key check (skipped entirely with dummy/CI credentials). It previously sat on the synchronous first-paint path. This moves 330 KB off first paint without changing total weight.
+
+Combined with react-markdown's full removal last cycle (confirmed: zero `micromark`/`mdast`/`remark` signatures across all chunks, zero `ReactMarkdown` imports in `src/`), the three heaviest vendor chunks — ElevenLabs (605 KB), Supabase (330 KB), PostHog (344 KB) — are now all OFF the synchronous first-paint path. That is ~1,279 KB (42% of the bundle) deferred or click-to-mount.
+
+Actions taken by this agent: read-only analysis only. No source changes, no rebuild (existing artifacts are authoritative per provenance).
 
 ## Key Metrics
 
 | Signal | Value | Authoritative? | Status |
 |---|---:|:---:|:---:|
-| Total JS | 3,393 KB | Yes (fresh Jun 11 build, post-#597) | PASS — 107 KB under 3,500 KB |
-| Initial JS (deferred subtracted) | ~2,011 KB | Estimate | Within 2,100 KB budget (~89 KB headroom) |
-| Largest chunk (ElevenLabs) | 605 KB | Yes | Within 650 KB per-chunk budget (44 KB headroom) |
+| Total JS | 3,025 KB | Yes (cached build postdates last src commit) | PASS — 475 KB under 3,500 KB |
+| Shared first-load shell (`rootMainFiles`) | 532 KB | Yes (from build-manifest) | Healthy framework baseline |
+| Initial JS (split budget half) | est. well under 2,100 KB | Estimate (see note) | PASS — heaviest vendors now deferred |
+| Largest chunk (ElevenLabs) | 605 KB | Yes | Within 650 KB per-chunk budget (45 KB headroom) |
 | Total CSS | 122 KB | Yes | Healthy (no hard budget) |
-| JS chunk files | 64 | Yes | Unchanged |
-| Production deps | 35 / 40 | Yes | GREEN (5 headroom) |
+| Production deps | 34 / 40 | Yes | PASS (6 headroom) |
 | Dev deps | 30 | Yes | Informational |
-| node_modules disk | 1,030 MB | Yes (post-install) | GREEN (1,013 pre-install; within normal range) |
-| .next disk | 60 MB | Yes | GREEN |
+| node_modules disk | 1,018 MB | Yes | GREEN (within normal range) |
+| .next disk | 84 MB | Yes | GREEN |
 
-### Largest chunks (fresh Jun 11 production build)
+Note on Initial JS: this is a Turbopack production build (a `turbopack-*` chunk is present in `rootMainFiles`, and `build:analyze` uses `--webpack`). The webpack-style `app-build-manifest.json` with per-route first-load totals is absent from the on-disk artifacts, so the precise initial-load number cannot be derived without a `npm run build:analyze` (webpack) run. What IS measurable: the shared shell every route loads (`rootMainFiles`) is 532 KB, and the three heaviest vendor chunks are all confirmed deferred. A realistic per-page first load is roughly the shell (532 KB) + shared app chunk (112 KB) + the route's own chunk — on the order of ~700-900 KB, comfortably under the 2,100 KB initial budget. The old "total minus deferred" estimate is no longer reliable: react-markdown's removal invalidated that subtraction. If an exact initial figure is needed for the split budget, run `build:analyze`.
 
-| Size | Chunk | Contents (evidence) | Loading | vs Jun 6 |
-|---:|---|---|---|---:|
-| 605 KB | `244bxdtp1a5ia.js` | ElevenLabs SDK (`elevenlabs`, `convai` signatures) | Deferred — click-to-mount (`bd833288`) | +0.5 KB |
-| 332 KB | `3szfbb85tmc06.js` | Supabase client (`GoTrueClient` signature) | First paint (auth session) | +1.8 KB |
-| 237 KB | `2jglji8gqc2sh.js` | React + Next framework vendor | First paint (required) | identical |
-| 228 KB | `0pd1uh9e-xev8.js` | PostHog (`posthog` signature) | Deferred analytics | +6.9 KB |
-| 212 KB | `2yobf1f26xfes.js` | react-markdown / micromark / mdast | Deferred (chat rendering) | identical |
-| 149 KB | `0y03utgnbz7gz.js` | **Next.js App Router client runtime** (RSC/router/prefetch — identified this cycle) | First paint (required framework) | identical |
-| 132 KB | `3e8nmwgwkiq-t.js` | react-markdown family (remark/rehype) | Deferred | identical |
-| 118 KB | `3cnlbapfh5tyx.js` | PostHog support | Deferred | identical |
-| 113 KB | `0cz1d0mv5g_q7.js` | Stable shared app chunk (no vendor signatures) | First paint | identical |
-| 87 KB | `3yw7iexa-ylic.js` | react-markdown family | Deferred | -0.4 KB |
+### Largest chunks (authoritative cached build)
 
-Deferred weight: ElevenLabs 605 + PostHog 346 + react-markdown family 431 = ~1,382 KB — 41% of the bundle never touches first paint.
+| Size | Chunk | Contents (evidence) | Loading | Notes |
+|---:|---|---|---|---|
+| 605 KB | `3l7h0thz1bbdh.js` | ElevenLabs SDK (`elevenlabs`/`convai` confirmed) | Deferred — click-to-mount (`bd833288`) | Tightest per-chunk margin |
+| 330 KB | `0cx7amjxnog2y.js` | Supabase client (`GoTrueClient` confirmed) | **Now deferred** — lazy `import()` in auth-provider | Moved off first paint this cycle |
+| 237 KB | `0273rfe8p5u4v.js` | React + Next framework vendor (`react-dom`/`scheduler`) | First paint (`rootMainFiles`, required) | Identical |
+| 227 KB | `0gcbkw8dl4r9-.js` | PostHog core (`posthog` confirmed) | Deferred — post-hydration, prod-only | Identical |
+| 148 KB | `3c-18qv58e7zi.js` | Next.js App Router client runtime (`createHrefFromUrl` confirmed) | First paint (`rootMainFiles`, required framework) | Identified prior cycle; no app-level lever |
+| 117 KB | `2f1alz9dhg520.js` | PostHog support (no rrweb/replay/surveys signatures) | Deferred | Identical |
+| 112 KB | `0cz1d0mv5g_q7.js` | Shared app chunk (no vendor signatures) | First paint | ~Identical |
+| 76 KB | `3uwi2y7pkzyjg.js` | Shared runtime | First paint (`rootMainFiles`) | — |
+| 67 KB | `14q503fs3fh64.js` | Route chunk | Per-route | — |
+| 56 KB | `3g-njyekx_z2d.js` | Route chunk | Per-route | — |
 
-### Dependencies (heaviest on disk — unchanged ranking)
+Deferred / lazy weight: ElevenLabs 605 + Supabase 330 + PostHog 344 = ~1,279 KB — about 42% of the bundle never loads on synchronous first paint.
 
-pdfjs-dist (61 MB) and pdf-parse (57 MB) remain devDependencies, never client-shipped. lucide-react and posthog-js remain covered by `optimizePackageImports` (`next.config.ts`). voyageai stays pinned at 0.1.0 (0.2.x broken ESM) — exclude from any batch. Installed versions now match the lockfile across the board: next 16.2.9, @supabase/ssr 0.12.0, @supabase/supabase-js 2.108.1, @sentry/nextjs 10.57.0, @elevenlabs/react 1.6.5, posthog-js 1.384.0.
+### Dependencies
+
+Production deps at 34 / 40 (react-markdown's removal already reflected; 6 headroom). pdfjs-dist and pdf-parse remain `devDependencies` (never client-shipped). `lucide-react` and `posthog-js` remain covered by `optimizePackageImports` in `next.config.ts:19`. `voyageai` stays pinned at 0.1.0 (0.2.x has broken ESM) — exclude from any dep batch.
 
 ## Budget Status
 
 | Budget | Limit | Current | Status |
 |---|---:|---:|:---:|
-| Total JS | 3,500 KB (raised Jun 10, `93e7546e`) | 3,393 KB | PASS (authoritative) — 107 KB headroom |
-| Initial JS | 2,100 KB | ~2,011 KB (estimate) | PASS — ~89 KB headroom |
-| Per-chunk | 650 KB | 605 KB max | PASS — 44 KB headroom |
-| Production deps | 40 | 35 | PASS (5 headroom) |
-| node_modules disk | (soft) | 1,030 MB | PASS |
+| Total JS | 3,500 KB | 3,025 KB | PASS — 475 KB headroom |
+| Initial JS | 2,100 KB | est. ~700-900 KB first load (shell 532 KB) | PASS — heaviest vendors deferred |
+| Per-chunk | 650 KB | 605 KB max (ElevenLabs) | PASS — 45 KB headroom (tightest budget) |
+| Production deps | 40 | 34 | PASS — 6 headroom |
+| node_modules disk | (soft) | 1,018 MB | PASS |
 | Total CSS | (no hard budget) | 122 KB | Healthy |
 
-No budgets exceeded. All bundle verdicts are authoritative this cycle (fresh build on synced node_modules including #597).
+No budgets exceeded. Per-chunk (ElevenLabs at 605/650) remains the thinnest margin of the three bundle budgets.
 
 ## Top Optimization Opportunities (prioritized by impact)
 
-### 1. react-markdown family — ~431 KB across three deferred chunks (HIGHEST ACTIONABLE)
+The bundle is now genuinely lean at the application level. With react-markdown gone and PostHog already minimally configured, there is no large reducible *app-level* weight remaining. The biggest levers are now product decisions or precision-measurement, not engineering cleanups.
 
-Unchanged by #597 and still the largest reducible weight (212 + 132 + 87 KB, all deferred to chat rendering). The chat surface almost certainly uses a small markdown subset (bold, italic, links, lists, code spans). Two paths:
+### 1. ElevenLabs voice-shelving — 605 KB, product lever only (HIGHEST IMPACT, NON-ENGINEERING)
 
-- (a) Restrict the remark/rehype plugin set to only what the chat renders — drop unused GFM/raw-HTML/math plugins. `rehype-raw` in particular pulls in a full HTML parser.
-- (b) Swap to a minimal markdown-to-JSX renderer if the feature surface is genuinely small.
+The single largest chunk (605 KB) is already deferred to click-to-mount, so it costs nothing at first paint. The only way to remove it from the bundle is the product decision to shelve voice. Cost Analyst (Jun 12) reports 115 days of zero Paisaxe voice traffic and frames shelving as a ~$45/mo tier-downgrade lever. If voice is shelved, total drops to ~2,420 KB and the budget should be re-lowered to ~3,100 KB (as proposed in prior reports). This is a user/product decision; no agent action.
 
-Either could reclaim 150–250 KB, roughly tripling the 107 KB headroom. Audit the chat component's `react-markdown` props and plugin list first:
+### 2. Initial-load precision — run `build:analyze` to verify the split budget's initial half (LOW EFFORT, MEASUREMENT)
 
-```tsx
-// If chat only needs GFM tables/strikethrough/links, keep remark-gfm and
-// drop everything else; avoid rehype-raw unless raw HTML in Claude
-// responses is actually required.
-<ReactMarkdown remarkPlugins={[remarkGfm]} /* no rehypeRaw, no remark-math */>
-  {content}
-</ReactMarkdown>
-```
+The split budget (initial 2,100 / total 3,500) has been in force since 2026-04-04, but the initial half cannot be verified from the current Turbopack cached artifacts — `app-build-manifest.json` with per-route first-load totals is absent. The total half is authoritative and green (475 KB headroom); the initial half is only estimable. One webpack `npm run build:analyze` run would produce the authoritative per-route first-load numbers and let the initial budget be checked precisely rather than estimated. Worth doing once to confirm the post-remediation initial-load picture, especially since two first-paint reductions just landed.
 
-### 2. PostHog configuration audit — ~346 KB deferred, grew +7 KB this cycle (LOW–MEDIUM)
+### 3. PostHog — already optimal, no further structural lever (NO ACTION)
 
-posthog-js 1.384.0 added ~7 KB to the main PostHog chunk (228 KB; support chunk 118 KB unchanged). Already deferred and tree-shaken via `optimizePackageImports`, so first paint is unaffected — but PostHog is now the second-largest vendor weight after ElevenLabs and creeps a few KB per upgrade. The lever is configuration: if session replay or autocapture are not actively used, a lighter init (autocapture off, replay lazy-loaded only when sampled) trims the deferred weight. Measurement baseline is now current (1.384.0), so this audit can proceed any time.
+For the record, so future cycles don't re-flag it: PostHog (344 KB across two chunks) is already (a) lazy-loaded via dynamic `import()` after hydration, (b) production-only, and (c) minimally configured — `autocapture: false`, `capture_pageview: false`, `capture_pageleave: false`, `person_profiles: "never"`, `persistence: "memory"` (posthog-provider.tsx:88-96). The 117 KB support chunk contains no rrweb / session-recording / surveys / web-vitals / toolbar signatures, so there is no replay weight to cut. The only remaining lever would be dropping PostHog entirely — not warranted. Treat this chunk as settled.
 
-### 3. Voice-shelving remains a product lever only (INFORMATIONAL)
+### 4. Per-chunk headroom watch — `@elevenlabs/react` bumps (WATCH)
 
-ElevenLabs chunk: 605 KB, deferred click-to-mount, 114 days of zero Paisaxe voice traffic per Cost Analyst (Jun 11). The Jun 10 budget raise deliberately keeps voice; shelving stands purely on the cost case (~$45/mo tier downgrade). If the decision flips, removal drops the total to ~2,788 KB and the budget should be lowered back to ~3,100 KB.
+The ElevenLabs SDK (605 / 650 KB) leaves only 45 KB of per-chunk headroom — the tightest of all budgets. Security (Jun 13) notes `@elevenlabs/react` 1.6.7 is available. Any bump beyond patch level should get a fresh-build measurement BEFORE merge, not after — a minor feature release could plausibly consume the remaining 45 KB. Pair this with the sharp 0.35.1 bump Security also flagged (per-chunk headroom is thin).
 
-### 4. Per-chunk headroom is the tightest budget — watch ElevenLabs SDK growth (WATCH)
+### 5. Supabase first-paint deferral — CLOSED THIS CYCLE (for the record)
 
-44 KB headroom (605 / 650 KB) is the thinnest margin of the three bundle budgets. The ElevenLabs SDK grew +0.5 KB on a patch bump (1.6.4 -> 1.6.5); a minor-version feature release could plausibly consume tens of KB. Any `@elevenlabs/react` bump beyond patch level should get a fresh-build measurement before merge, not after.
-
-### 5. CLOSED THIS CYCLE — for the record
-
-- **149 KB unidentified chunk (carried 8+ cycles)**: identified as Next.js App Router client runtime. Required framework code; no app-level action exists. Item closed.
-- **Pending dep materialization (Jun 10 item 2)**: `npm install` run, #597 materialized, fresh build measured. Net bundle impact of posthog-js 1.384.0 + Supabase pair + 17 other production bumps: -5 KB total. Item closed.
+The 330 KB Supabase/`GoTrueClient` chunk was the largest first-paint vendor weight in every prior report. The global-shell remediation moved it to a post-hydration dynamic import (auth-provider.tsx:32), gated behind a real anon-key check. It no longer blocks first paint. This was a long-standing implicit opportunity; it is now resolved as a side effect of the auth-provider refactor.
 
 ## Recommendations Summary
 
-1. Status GREEN, fully authoritative: 3,393 KB / 3,500 KB (107 KB headroom) on a fresh post-#597 build. The 19-package production batch cost nothing (-5 KB net).
-2. The long-standing P1 mystery chunk is Next.js framework runtime — stop tracking it as an optimization target.
-3. react-markdown plugin-set reduction (~150–250 KB potential) is the only remaining structural lever worth engineering effort while voice is retained.
-4. Treat `@elevenlabs/react` minor bumps as measure-before-merge: per-chunk headroom is only 44 KB.
-5. Local environment is now synced (npm install done, 0 vulnerabilities) — Triage's and Security's top hygiene action is complete; local test/build baselines can be re-run on current deps.
+1. Status GREEN, authoritative: 3,025 KB / 3,500 KB (475 KB headroom) — best position in months, -368 KB over two cycles.
+2. The three heaviest vendor chunks (ElevenLabs, Supabase, PostHog = 1,279 KB) are now all deferred or click-to-mount. First paint is dominated by the 532 KB framework shell.
+3. No large app-level reducible weight remains. PostHog is settled (already lazy + minimal); react-markdown is gone.
+4. Remaining levers are non-engineering: ElevenLabs voice-shelving (product/cost decision) and one `build:analyze` run to verify the initial-load budget half precisely.
+5. Watch `@elevenlabs/react` bumps — 45 KB per-chunk headroom is the tightest margin; measure before merge.
 
-## Comparison to Previous Run (2026-06-10)
+## Comparison to Previous Run
 
-| Metric | Jun 10 (advisory, Jun 6 artifacts) | Jun 11 (fresh build, post-#597) | Change |
-|---|---:|---:|:---:|
-| Total JS | 3,398 KB | 3,393 KB | -5 KB |
-| Total budget | 3,500 KB | 3,500 KB | unchanged |
-| Bundle verdict | PASS (advisory) | PASS (authoritative) | provenance restored |
-| Largest chunk (ElevenLabs) | 605 KB | 605 KB | +0.5 KB |
-| Supabase chunk | 330 KB | 332 KB | +1.8 KB (ssr 0.12.0 + js 2.108.1) |
-| PostHog chunks | 339 KB | 346 KB | +6.9 KB (1.384.0) |
-| react-markdown family | 432 KB | 431 KB | -0.4 KB |
-| Initial JS (est.) | ~2,022 KB | ~2,011 KB | -11 KB |
-| Total CSS | 122 KB | 122 KB | unchanged |
-| Production deps | 35 / 40 | 35 / 40 | unchanged |
-| node_modules disk | 1,043 MB | 1,030 MB | -13 MB (lockfile sync) |
-| Unidentified 149 KB chunk | open (8+ cycles) | identified: Next App Router runtime | closed |
-| Build provenance | STALE (verified immaterial) | FRESH | authoritative |
+| Metric | Jun 11 (fresh build) | Jun 12 (react-markdown removed) | Jun 13 (this run) | Net change |
+|---|---:|---:|---:|:---:|
+| Total JS | 3,393 KB | 3,187 KB | 3,025 KB | -368 KB (2 cycles) |
+| Total budget | 3,500 KB | 3,500 KB | 3,500 KB | unchanged |
+| Total headroom | 107 KB | 313 KB | 475 KB | +368 KB |
+| ElevenLabs chunk | 605 KB | 605 KB | 605 KB | unchanged (deferred) |
+| Supabase chunk | 332 KB (first paint) | 330 KB (first paint) | 330 KB (**deferred**) | moved off first paint |
+| PostHog chunks | 346 KB | ~344 KB | 344 KB | ~unchanged (deferred) |
+| react-markdown family | 431 KB | removed | absent | -431 KB |
+| Total CSS | 122 KB | 122 KB | 122 KB | unchanged |
+| Production deps | 35 / 40 | 34 / 40 | 34 / 40 | -1 (react-markdown) |
+| Build provenance | FRESH | n/a | CACHED-authoritative | — |
 
-Improvements: authoritative measurement restored; #597 measured at -5 KB net; the oldest open item on the books (149 KB chunk identification) closed; local node_modules synced to lockfile (-13 MB).
-
-Regressions: none. PostHog +6.9 KB and Supabase +1.8 KB are absorbed by shrinkage elsewhere; every budget passes with more headroom than the advisory estimate.
+Improvements: -162 KB this cycle (global-error i18n purge); Supabase 330 KB moved off first paint (auth-provider lazy-load); cumulative -368 KB / +368 KB headroom over two cycles. Regressions: none.
