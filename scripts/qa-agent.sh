@@ -57,10 +57,10 @@ ENABLE_GAP_ANALYSIS=$(get_agent_config "qa_agent_enabled" "enableGapAnalysis" ||
 log_info "Configuration: $TESTS_PER_CATEGORY tests/category, journeyTests=$ENABLE_JOURNEY_TESTS, githubIssues=$ENABLE_GITHUB_ISSUES, gapAnalysis=$ENABLE_GAP_ANALYSIS" | tee -a "$LOG_FILE"
 
 # Check if server is already running (any HTTP response = server is up)
-PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3000/api/health 2>/dev/null || true)
+PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3006/api/health 2>/dev/null || true)
 [[ -z "$PRECHECK_CODE" ]] && PRECHECK_CODE="000"
 if [[ "$PRECHECK_CODE" != "000" ]]; then
-  log_info "Dev server already running on port 3000 (HTTP $PRECHECK_CODE)" | tee -a "$LOG_FILE"
+  log_info "Dev server already running on port 3006 (HTTP $PRECHECK_CODE)" | tee -a "$LOG_FILE"
 else
   log_info "Starting Next.js dev server..." | tee -a "$LOG_FILE"
 
@@ -75,7 +75,7 @@ else
   MAX_WAIT=240
   WAITED=0
   while true; do
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3000/api/health" 2>/dev/null || true)
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "http://localhost:3006/api/health" 2>/dev/null || true)
     [[ -z "$HTTP_CODE" ]] && HTTP_CODE="000"
     [[ "$HTTP_CODE" != "000" ]] && break
     if [[ $WAITED -ge $MAX_WAIT ]]; then
@@ -107,7 +107,7 @@ CI_E2E_RUN_ID=""
 
 # Check 1: App Health Endpoint
 log_info "Checking app health..." | tee -a "$LOG_FILE"
-HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3000/api/health" 2>&1 || true)
+HEALTH_RESPONSE=$(curl -s --max-time 10 "http://localhost:3006/api/health" 2>&1 || true)
 if echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
   log_success "App health: OK" | tee -a "$LOG_FILE"
   HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
