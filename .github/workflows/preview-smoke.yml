@@ -90,6 +90,10 @@ jobs:
         run: |
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
           if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
+            if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+              echo "::notice::Skipping protected preview health check because Actions secrets are unavailable to Dependabot PRs."
+              exit 0
+            fi
             echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
             exit 1
           fi
@@ -119,6 +123,14 @@ jobs:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
+          if [ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
+            if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+              echo "::notice::Skipping protected preview homepage check because Actions secrets are unavailable to Dependabot PRs."
+              exit 0
+            fi
+            echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
+            exit 1
+          fi
           echo "Testing: $PREVIEW_URL"
           response=$(curl -sfL -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" "$PREVIEW_URL" -o /dev/null -w "%{http_code}")
           if [ "$response" != "200" ]; then
