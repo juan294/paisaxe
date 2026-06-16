@@ -173,6 +173,31 @@ describe("AuthProvider", () => {
     expect(screen.getByText("child content")).toBeInTheDocument();
   });
 
+  it("stops loading and logs when the supabase client fails to initialize", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockCreateSupabaseBrowserClient.mockImplementation(() => {
+      throw new Error("client init failed");
+    });
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("false");
+    });
+    expect(screen.getByTestId("user").textContent).toBe("none");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Error initializing auth:",
+      expect.any(Error)
+    );
+    expect(mockGetSession).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
   it("provides user and session after getSession resolves", async () => {
     render(
       <AuthProvider>

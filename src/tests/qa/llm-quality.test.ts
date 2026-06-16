@@ -21,6 +21,24 @@ interface ChatResponse {
   sources?: Array<{ title: string; page?: number }>;
 }
 
+// Preflight: verify the server is reachable before any LLM test runs.
+// If it isn't, all 12 tests fail with opaque ECONNREFUSED — this converts that
+// into a single early failure pointing directly at the harness bug (issue #635).
+beforeAll(async () => {
+  try {
+    const res = await fetch(`${API_URL}/api/health`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) {
+      throw new Error(`Health check returned HTTP ${res.status}`);
+    }
+  } catch {
+    throw new Error(
+      `QA HARNESS: no server reachable at ${API_URL} — ` +
+        'start the app before running npm run test:qa, or set NEXT_PUBLIC_SITE_URL. ' +
+        'See issue #635 for the permanent fix (webServer config).',
+    );
+  }
+});
+
 // Obtain CSRF token by requesting a page and reading the __csrf cookie
 async function getCsrfToken(): Promise<string> {
   const pageResponse = await fetch(`${API_URL}/`, { redirect: 'follow' });
