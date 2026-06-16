@@ -427,6 +427,53 @@ describe("/api/mcp/make-booking", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it("treats a duplicate as in-progress when the prior-booking lookup itself errors", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { code: "23505", message: "duplicate key value violates unique constraint" },
+        }),
+      });
+      mockDbSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValueOnce({
+          maybeSingle: vi.fn().mockResolvedValueOnce({
+            data: null,
+            error: { message: "idempotency lookup failed" },
+          }),
+        }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "booking-dup-lookup-error",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(data.success).toBe(false);
+      expect(data.message).toContain("already being processed");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it("should fail before the call when the idempotency claim cannot be persisted", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";

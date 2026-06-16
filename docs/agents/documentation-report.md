@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-06-14 06:00:01
+> Auto-generated on 2026-06-16 06:00:10
 
 ## CLAUDE.md Status
 
@@ -9,14 +9,22 @@ Last modified: **2026-06-13**
 
 These source files have been modified since CLAUDE.md was last updated and may need documentation updates.
 
-No source files modified since documentation update.
+### Source Files (src/)
+
+```
+src/app/api/mcp/make-booking/route.test.ts
+src/components/auth/auth-provider.test.tsx
+src/components/markdown/basic-markdown.test.tsx
+```
 
 No new migrations since documentation update.
 
 ### Scripts
 
 ```
+scripts/agents/cc-rpi-update.sh
 scripts/check-verification-coverage.ts
+scripts/qa-agent.sh
 scripts/run-prelaunch-gate.test.ts
 scripts/run-prelaunch-gate.ts
 scripts/verification-config.test.ts
@@ -86,18 +94,6 @@ webhooks/translate
 
 ```
 
-## Changes Made This Run
-
-Status: GREEN — No documentation gaps found. Twenty-eighth consecutive clean run.
-
-Feature flags: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. The gaps scan reported zero undocumented flags, confirmed against the canonical `FeatureFlagKey` union in `src/types/feature-flags.ts`. Zero gaps.
-
-API routes: All 53 flagged routes confirmed internal — admin APIs (`/api/admin/*`), cron endpoints (`/api/cron/*`), webhooks (`/api/webhooks/*`, already documented), MCP voice-agent tools (`/api/mcp/*`, already documented), internal health probes (`/api/health/*`, documented), and app-internal user APIs (`chat`, `feature-flags`, `favorites`, `suggestions`, `voice-access`, `checkout/*`). Spot-checked `voice-access`, `feature-flags`, and `checkout/day-pass` — all are auth-gated, origin-locked routes consumed by the Paisaxe frontend, not external-consumption APIs. No new documentation required.
-
-Source changes: No source files modified since the last documentation update (CLAUDE.md last modified 2026-06-13). No new migrations. No new user-facing features or flags.
-
-No edits made to `features.md` or `CLAUDE.md` this cycle — documentation is complete and accurate.
-
 ## Documentation File Ages
 
 | File | Last Modified |
@@ -105,6 +101,15 @@ No edits made to `features.md` or `CLAUDE.md` this cycle — documentation is co
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-06-13 |
 | README.md | 2026-06-13 |
+
+## Changes Made This Run
+
+Status: GREEN — No documentation changes needed.
+
+- Feature flags: `UNDOCUMENTED_FEATURE_FLAGS` is empty. All 17 flags in `src/types/feature-flags.ts` (`FeatureFlagKey`) are present in the Feature Flags Reference of `docs/project/features.md` (Discovery 7 + Experience 4 + Social 2 + Voice 3 + System 1 = 17), plus 10 agent flags (Agents tab). Zero gaps. No additions made.
+- API routes: All 51 flagged routes confirmed internal — admin APIs (cookie + RBAC gated), `chat`/`chat/stream`, Pelayo MCP voice-agent tools (`mcp/*`, including `make-booking/status` = `check_booking_status`), webhooks (`webhooks/*`), cron endpoints (`cron/*`), Stripe checkout, app-internal user APIs (`favorites`, `feature-flags`, `suggestions`, `voice-access`), and health probes (`health/db`, `health/live`). None are meant for external consumption, so none require new documentation.
+- Modified source since last doc update (`make-booking/route.test.ts`, `auth-provider.test.tsx`, `basic-markdown.test.tsx`) are test-only files introducing no new user-facing features or flags. No new migrations.
+- `features.md` and `CLAUDE.md` are complete and current. No content added, deleted, or restructured this run.
 
 ---
 
