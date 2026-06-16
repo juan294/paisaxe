@@ -116,7 +116,7 @@
     "pdfjs-dist": "^5.7.284",
     "postcss": "^8.5.10",
     "tailwindcss": "^4.2.2",
-    "tsx": "^4.19.4",
+    "tsx": "^4.22.4",
     "twitter-api-v2": "^1.29.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.4"
