@@ -13,7 +13,7 @@ if (LOCATION_CONFIG.alternateDomain) {
 }
 
 if (process.env.NODE_ENV === "development") {
-  ALLOWED_ORIGINS.push("http://localhost:3000");
+  ALLOWED_ORIGINS.push("http://localhost:3006");
 }
 
 // Allow the E2E test server origin (set in playwright.config.ts webServer.env).

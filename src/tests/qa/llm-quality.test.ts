@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { appendFileSync, existsSync } from 'fs';
 
-const API_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3006';
 const TESTS_PER_CATEGORY = parseInt(process.env.QA_TESTS_PER_CATEGORY || '3', 10);
 const REPORT_FILE = process.env.QA_REPORT_FILE;
 

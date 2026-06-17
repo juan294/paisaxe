@@ -31,7 +31,7 @@ vi.mock("child_process", async (importOriginal) => {
 });
 
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { POST, GET, DELETE } from "./route";
+import { POST, GET, DELETE, resetRunningAgentsForTests } from "./route";
 
 const LEGACY_RUNNER_OVERRIDE = ["ALLOW", "AGENT", "RUN"].join("_");
 const originalVercelEnv = process.env.VERCEL_ENV;
@@ -55,10 +55,12 @@ function resetToLocalRuntime() {
   restoreAgentRunnerEnv();
   delete process.env.VERCEL_ENV;
   delete process.env[LEGACY_RUNNER_OVERRIDE];
+  resetRunningAgentsForTests();
+  vi.useRealTimers();
 }
 
 function makeRequest(body: unknown): NextRequest {
-  return new NextRequest("http://localhost:3000/api/admin/agents/run", {
+  return new NextRequest("http://localhost:3006/api/admin/agents/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -66,7 +68,7 @@ function makeRequest(body: unknown): NextRequest {
 }
 
 function makeGetRequest(params?: Record<string, string>): NextRequest {
-  const url = new URL("http://localhost:3000/api/admin/agents/run");
+  const url = new URL("http://localhost:3006/api/admin/agents/run");
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       url.searchParams.set(k, v);
@@ -76,7 +78,7 @@ function makeGetRequest(params?: Record<string, string>): NextRequest {
 }
 
 function makeDeleteRequest(body: unknown): NextRequest {
-  return new NextRequest("http://localhost:3000/api/admin/agents/run", {
+  return new NextRequest("http://localhost:3006/api/admin/agents/run", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -127,7 +129,7 @@ describe("POST /api/admin/agents/run", () => {
     });
 
     const request = new NextRequest(
-      "http://localhost:3000/api/admin/agents/run",
+      "http://localhost:3006/api/admin/agents/run",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -797,7 +799,7 @@ describe("DELETE /api/admin/agents/run", () => {
     });
 
     const request = new NextRequest(
-      "http://localhost:3000/api/admin/agents/run",
+      "http://localhost:3006/api/admin/agents/run",
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },

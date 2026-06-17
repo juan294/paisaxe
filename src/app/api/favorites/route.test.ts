@@ -54,7 +54,7 @@ describe("Favorites API", () => {
     body?: object;
     searchParams?: Record<string, string>;
   } = {}) => {
-    const url = new URL("http://localhost:3000/api/favorites");
+    const url = new URL("http://localhost:3006/api/favorites");
     if (options.searchParams) {
       Object.entries(options.searchParams).forEach(([key, value]) => {
         url.searchParams.set(key, value);
