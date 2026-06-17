@@ -33,6 +33,11 @@ interface RunningAgent {
 /** In-memory tracking of running agent processes. */
 const runningAgents = new Map<string, RunningAgent>();
 
+/** Test-only: clear all agent state between test cases. */
+export function resetRunningAgentsForTests() {
+  runningAgents.clear();
+}
+
 /** Strip ANSI escape codes from a string. */
 function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");

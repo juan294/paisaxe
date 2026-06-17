@@ -230,6 +230,7 @@ fi
 log_info "=== Phase 1: LLM Quality Tests ===" | tee -a "$LOG_FILE"
 
 export QA_TESTS_PER_CATEGORY="$TESTS_PER_CATEGORY"
+export NEXT_PUBLIC_SITE_URL="http://localhost:3006"
 
 # Run vitest and capture both output and exit code
 TEST_OUTPUT=$(npm run test:qa 2>&1) || TEST_EXIT_CODE=$?

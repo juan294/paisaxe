@@ -51,7 +51,7 @@ describe("Auth Callback Route", () => {
   });
 
   const createRequest = (searchParams: Record<string, string> = {}) => {
-    const url = new URL("http://localhost:3000/auth/callback");
+    const url = new URL("http://localhost:3006/auth/callback");
     Object.entries(searchParams).forEach(([key, value]) => {
       url.searchParams.set(key, value);
     });
@@ -132,7 +132,7 @@ describe("Auth Callback Route", () => {
 
       expect(response.status).toBe(307);
       expect(response.headers.get("location")).toBe(
-        "http://localhost:3000/pricing/checkout?returnTo=oviedo-walking-tour"
+        "http://localhost:3006/pricing/checkout?returnTo=oviedo-walking-tour"
       );
     });
 
@@ -186,7 +186,7 @@ describe("Auth Callback Route", () => {
 
       expect(response.status).toBe(307);
       expect(response.headers.get("location")).toBe(
-        "http://localhost:3000/login?error=session_exchange_failed"
+        "http://localhost:3006/login?error=session_exchange_failed"
       );
       expect(logger.error).toHaveBeenCalledWith(
         "[AUTH_CALLBACK_FAILURE]",
@@ -204,7 +204,7 @@ describe("Auth Callback Route", () => {
       expect(response.status).toBe(307);
       // Should redirect to exactly /immersive (the fallback)
       const location = response.headers.get("location") || "";
-      expect(location).toBe("http://localhost:3000/immersive");
+      expect(location).toBe("http://localhost:3006/immersive");
       expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
     });
 
