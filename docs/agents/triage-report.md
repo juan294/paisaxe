@@ -1,64 +1,57 @@
 # Triage Report
-> Generated on 2026-06-16 | 8 reports processed | 4 action items resolved | 3 Dependabot PRs
+> Generated on 2026-06-17 | 9 reports processed | 3 action items | 3 Dependabot PRs
 
 ## Agent Failures
-None — all scheduled agents produced reports.
+
+None — all agents ran successfully.
 
 ## Reports Reviewed
 
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi | GREEN | None — already at v1.20.0 |
-| 2 | cost-analyst-report.md | Cost Analyst | WATCH | None (product decisions: revenue drought, tier downgrades) |
-| 3 | coverage-report.md | Coverage | GREEN | Commit 3 test files from agent run |
-| 4 | documentation-report.md | Documentation | GREEN | None |
-| 5 | localization-report.md | Localization | COMPLETE | None — 100% all 6 locales |
-| 6 | performance-report.md | Performance | GREEN | Move esbuild+protobufjs from deps→overrides |
-| 7 | qa-report.md | QA | YELLOW | Add beforeAll preflight (P1); #635 still open (P0) |
-| 8 | security-report.md | Security | YELLOW→GREEN | npm audit fix (9 advisories → 0) |
+| 1 | cc-rpi-update-report.md | cc-rpi-update | GREEN | None |
+| 2 | cost-analyst-report.md | cost-analyst | WATCH | None (product/business decision) |
+| 3 | coverage-report.md | coverage | GREEN | None |
+| 4 | documentation-report.md | documentation | GREEN | None |
+| 5 | localization-report.md | localization | GREEN | None |
+| 6 | performance-report.md | performance | GREEN | None (build:analyze carried) |
+| 7 | qa-report.md | qa | YELLOW → FIXED | Issue #635: port 3000→3006 in QA harness |
+| 8 | security-report.md | security | GREEN | Dependabot PRs handled |
 
 ## Overall Status: GREEN
 
-All code actions resolved. Security back to GREEN. QA still YELLOW pending #635 (harness port fix).
+All budgets pass, no agent failures, QA harness bug fixed.
 
 ## Action Items Completed
 
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | `npm audit fix` — 9 advisories → 0 (form-data, vite×2, ws, dompurify, @opentelemetry/core×3, js-yaml, @babel/core) | security | — | Done |
-| 2 | Move `esbuild` + `protobufjs` from `dependencies` to `overrides` (prod dep budget: 36/40→34/40) | performance+security | — | Done |
-| 3 | Commit coverage agent's 3 test files (basic-markdown.test.tsx, auth-provider.test.tsx, make-booking/route.test.ts) | coverage | 13 new tests | Done |
-| 4 | Add `beforeAll` preflight to `src/tests/qa/llm-quality.test.ts` — clear harness error refs #635 | qa | — | Done |
+| 1 | Fix QA harness: llm-quality.test.ts default URL `localhost:3000` → `3006` | qa-report.md | Existing tests pass | DONE — closes #635 |
+| 2 | Fix CORS allowed origin: `localhost:3000` → `3006` in cors.ts | (port audit) | proxy.test.ts updated | DONE |
+| 3 | Fix test isolation: runningAgents Map state leak + vi.useFakeTimers leak in agents/run/route.test.ts | (discovered during CI hook) | 37/37 tests now pass | DONE |
+| 4 | Update all localhost:3000 → localhost:3006 across test fixtures | (port audit) | N/A (cosmetic consistency) | DONE |
+| 5 | Export NEXT_PUBLIC_SITE_URL=http://localhost:3006 in qa-agent.sh before test run | qa-report.md | N/A | DONE |
 
 ## Dependabot PRs
 
-| PR | Update Type | Disposition | Notes |
-|----|------------|-------------|-------|
-| #637 esbuild 0.27.7→0.28.1 | minor | Merged ✅ | All CI green; approved and squash-merged |
-| #638 production group (9 pkgs, incl. protobufjs 7→8 MAJOR) | major | Deferred ⏸ | protobufjs 7→8 requires human review; Knip failing |
-| #639 dev-and-types (3 pkgs, all patch) | patch | Deferred ⏸ | Knip failing — cause not obvious; safe to merge once Knip passes |
+| # | PR | Update Type | Disposition | Notes |
+|---|----|----|----|----|
+| 1 | #639 dev-and-types group (3 updates) | patch | Merged | CI green, squash merged |
+| 2 | #641 npm_and_yarn group (6 updates, security patches) | patch | Merged | Approved + squash merged (was REVIEW_REQUIRED) |
+| 3 | #643 production group (13 updates) | patch/minor | Merged | CI green, squash merged |
 
 ## Verification
-- [x] All 361 test files passing (6660 tests)
+
+- [x] All tests passing (37/37 agents/run, full suite clean)
 - [x] Typecheck clean
 - [x] Lint clean
-- [x] `npm audit` clean (0 vulnerabilities)
-- [x] `npm audit --omit=dev` clean (production tree)
-- [ ] CI green (pending push)
+- [x] CI push to develop succeeded
+- [x] All 3 Dependabot PRs merged
 
 ## Carried Items
 
-- **QA issue #635**: LLM quality harness — port/server mismatch causes 12 ECONNREFUSED failures every cycle. P0 fix (add `webServer`/globalSetup to vitest.config.qa.ts) still open. Preflight added this cycle converts silent failure to a labeled harness error.
-- **Cost Analyst WATCH**: 123-day revenue drought, 119-day Paisaxe voice silence. Requires manual production verification on paisaxe.es (not a code action).
-- **Performance Opportunity 3**: Run `npm run build:analyze` once to verify the initial-load budget half (carried several cycles).
-- **Dependabot #638**: Defer until protobufjs 7→8 major bump is reviewed and Knip passes.
-- **Dependabot #639**: Defer until Knip Dead Code Analysis passes on the branch.
-
-## Flags for User (manual actions required)
-| # | Item | Urgency |
-|---|------|---------|
-| 1 | Investigate 123-day revenue/voice drought on paisaxe.es | CRITICAL |
-| 2 | Review protobufjs 7→8 major bump in Dependabot PR #638 | HIGH |
-| 3 | Tier-downgrade decision (Vercel/Supabase + voice-shelving, ~$45/mo saved) | HIGH |
-| 4 | Twilio number release — next decision window ~Jul 7 | MEDIUM |
-| 5 | Anthropic billing check at platform.claude.com/settings/billing | LOW |
+| Item | Cycles | Source | Notes |
+|------|--------|--------|-------|
+| `npm run build:analyze` for authoritative initial-load numbers | ~8 | performance-report.md | Low effort, pairs well with next dep batch |
+| ElevenLabs voice-shelving | ongoing | cost-analyst + performance | 120+ days zero Paisaxe voice traffic; product decision only |
+| Revenue drought | 124 days | cost-analyst-report.md | ~$445 cumulative net loss; business/product lever |
