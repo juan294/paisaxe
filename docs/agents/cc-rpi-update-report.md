@@ -1,3 +1,3 @@
-The cc-rpi blueprint HEAD (`f7e59e07`, v1.20.0) exactly matches the last sync commit. There are no new commits since the last sync.
+The cc-rpi HEAD commit matches `lastSyncCommit` exactly — no new commits since the last sync on 2026-06-15.
 
 cc-rpi sync: already up to date as of v1.20.0.

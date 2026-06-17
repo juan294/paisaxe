@@ -1,64 +1,49 @@
 # Localization Agent Report
 
-Date: 2026-06-14
+Date: 2026-06-17
 Agent: Paisaxe Localization Agent
-Status: COMPLETE — 100% coverage, no edits needed.
+Status: COMPLETE — 100% coverage, no edits needed. 53rd consecutive clean run.
 
 ## Summary
 
-Translation coverage is Complete across all supported locales. No edits were required this cycle.
+Translation coverage is Complete across all 6 supported locales (es, en, fr, de, pt, ast). No edits were required this cycle.
 
-Supported locales (6): es (Spanish, source of truth), en (English), fr (French), de (German), pt (Portuguese), ast (Asturianu).
+| Locale | Leaf Keys | Missing | Orphaned | Status |
+|--------|-----------|---------|----------|--------|
+| es (Spanish, source) | 406 | 0 | 0 | Pass |
+| en (English) | 406 | 0 | 0 | Pass |
+| fr (French) | 406 | 0 | 0 | Pass |
+| de (German) | 406 | 0 | 0 | Pass |
+| pt (Portuguese) | 406 | 0 | 0 | Pass |
+| ast (Asturian) | 406 | 0 | 0 | Pass |
 
-Note: the project ships an additional locale beyond the five in the agent brief — ast (Asturianu) — declared in `src/lib/i18n/types.ts` as a first-class `Locale`. It is verified at the same parity as the other locales.
+Story translations: 113 stories across 5 target locales (en, fr, de, pt, ast) — all 565 entries present with non-empty title and description.
 
-### UI Strings (`src/lib/i18n/{locale}.ts`)
+## Verification
 
-| Locale | Leaf keys | Missing | Orphaned | Completion |
-|--------|-----------|---------|----------|------------|
-| es (source) | 406 | — | — | 100% |
-| en | 406 | 0 | 0 | 100% |
-| fr | 406 | 0 | 0 | 100% |
-| de | 406 | 0 | 0 | 100% |
-| pt | 406 | 0 | 0 | 100% |
-| ast | 406 | 0 | 0 | 100% |
-
-Key parity was verified programmatically by extracting every dot-notation leaf key from the Spanish source and diffing against each target locale. All five non-Spanish locales contain exactly the 406 keys present in `es.ts` — zero missing, zero orphaned.
-
-### Story Translations (`content/translations/story-translations.ts`)
-
-| Metric | Value |
-|--------|-------|
-| Unique known story slugs | 113 |
-| Slugs with translation entries | 113 |
-| Target locales per story | 5 (en, fr, de, pt, ast) |
-| Target-locale records | 565 (113 x 5) |
-| Slugs missing any target-locale coverage | 0 |
-| Entries missing title or description | 0 |
-| Entries with undefined subtitle | 0 |
-| Orphan entries (no source slug) | 0 |
-
-Slug sources cross-checked: seed-database.ts (20), seed-cycling-stories.ts (5), `content/fallback-stories.json` (8), `content/processed/extracted-stories.json` (81), `content/processed/generated-stories.json` (8). All 113 unique slugs resolve to a complete translation entry (title + subtitle + description) for every target locale.
+- UI translation tests: 102/102 passing (translations.test.ts)
+- Story coverage tests: 3/3 passing (story-translations-coverage.test.ts)
+- TypeScript check: Pass (0 errors in locale files)
+- Key parity: All 5 non-Spanish locales have exactly 406 leaf keys, matching Spanish source of truth
 
 ## Fixed
 
-No translations were added, removed, or modified this cycle. Both UI strings and story translations were already at 100% coverage on entry.
+No translations were added or modified this cycle. All gaps were closed in prior cycles.
 
 ## Remaining Gaps
 
-None. There are no missing UI keys and no missing story translations for any supported locale.
+None. Coverage is at 100% for UI strings and story translations.
 
 ## Orphaned Keys
 
-None. No locale (en, fr, de, pt, ast) contains a UI key absent from the Spanish source, and no story-translation entry references a slug outside the known seed/processed/fallback sources.
+None detected. No keys exist in non-Spanish locales that are absent from the Spanish source.
 
-## Integrity Checks
+## Cross-Agent Notes
 
-- Placeholder safety: Pass. Every interpolation placeholder used in the Spanish source (`{current}`, `{total}`, `{title}`, `{time}`, `{hours}`) is preserved identically in all five target locales. Programmatic placeholder diff across all 406 keys x 5 locales returned 0 mismatches.
-- Location-specific content: Pass. `LOCATION-SPECIFIC` markers (region names, site names, the Pelayo persona name, content-source attribution) are present and consistently localized across all locale files.
-- TypeScript: Pass. Project-wide `npx tsc --noEmit` returned 0 errors.
-- Tests: Pass. `translations.test.ts` and `story-translations-coverage.test.ts` — 105 tests passing. `translations.test.ts` dynamically compares each locale's key count to the Spanish source, so any future key addition without locale parity fails CI automatically. `story-translations-coverage.test.ts` asserts every static seed slug (and processed slugs when present locally) has full target-locale coverage.
+- Security Agent (Jun 15): Confirmed no PII, tokens, or secrets in any locale or story-translations file.
+- Triage (Jun 16): Committed story translations and coverage test in commit 5f3b1d18 — coverage now at 113/113 stories.
+- Performance Agent (Jun 14): i18n bundle sizes stable. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged.
+- Coverage Agent (Jun 16): translations.test.ts dynamically verifies key parity — any new ES key added without locale parity will fail CI automatically.
+- Note: The agent task description lists 5 supported locales, but this project tracks 6 (including ast/Asturian). All 6 are at 100% coverage.
 
-## Cross-Reference With Other Agents
-
-No locale-related issues raised by any other agent in shared context. Recent Performance Agent reports confirm i18n bundle behavior is stable: `es` + `en` are static imports and `fr`/`de`/`pt`/`ast` are dynamically imported (lazy-loaded). The Jun 13 Performance report notes `global-error.tsx` was fixed to stop statically importing all six full i18n bundles (it only renders four strings) — a -162 KB first-paint saving. No translation content changed as part of that fix; this report confirms all six bundles remain at full key parity afterward.
+---

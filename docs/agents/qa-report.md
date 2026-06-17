@@ -1,15 +1,15 @@
-# QA Agent Report — 2026-06-16
+# QA Agent Report — 2026-06-17
 
 ## 1. Health Status: YELLOW
 
 | Signal | Result |
 |--------|--------|
-| LLM quality tests | 0 / 12 — all failed (infrastructure, not assertion) |
+| LLM quality tests | 0 / 12 — all skipped (harness preflight, not assertion) |
 | Browser journey tests | 10 / 10 passed (4 auth journeys skipped) |
 | Integration health | 3 / 3 passed |
 | Safety guardrails | Not verified this cycle (tests never reached the server) |
 
-Status is YELLOW, not RED. The 12 LLM failures are a single harness/config defect (no server on the expected port), not safety-guardrail failures and not an application regression. Integration health is fully green, and every browser journey passes. However, this is now the **third consecutive cycle** in which the LLM quality safety net has produced no usable data — the inability to confirm safety/boundary/RAG behavior is a real and widening gap, which is why this is not GREEN.
+Status is YELLOW, not RED. The LLM test suite failure is a single harness/config defect (no server on the expected port), not a safety-guardrail failure and not an application regression. Integration health is fully green, and every browser journey passes. However, this is now the **fourth consecutive cycle** in which the LLM quality safety net has produced no usable data. The inability to confirm safety, boundary, RAG, and quality behavior is a real and widening gap.
 
 Status would escalate to RED if: (a) any safety assertion actually failed, or (b) an integration health check (Stripe/Supabase) failed. Neither occurred this cycle.
 
@@ -18,7 +18,7 @@ Status would escalate to RED if: (a) any safety assertion actually failed, or (b
 | Service | Status | Notes |
 |---------|--------|-------|
 | Supabase / App | Pass | 3/3 integration checks passed; app and DB healthy |
-| Stripe / Payments | Pass | No auth failure this cycle (contrast with 2026-03-23 `Authentication required`) |
+| Stripe / Payments | Pass | No auth failure this cycle |
 | External APIs | Pass | All reachable |
 
 CI E2E status: unknown (not reported this run).
@@ -27,95 +27,106 @@ No integration failures. Per the RED rules, integration health does not force RE
 
 ## 3. Executive Summary
 
-- **All 12 LLM quality tests failed with `TypeError: fetch failed` / `ECONNREFUSED ::1:3000` and `127.0.0.1:3000`.** Every failure is identical: the test helper `getCsrfToken()` (`src/tests/qa/llm-quality.test.ts:26`) tries to `fetch(${API_URL}/)` and the connection is refused because **no server is listening on port 3000**.
-- **Root cause is a known, already-filed harness bug: GitHub issue #635** (OPEN, `type: bug`, `priority: high`, `area: infra`) — "QA: LLM quality tests fail with ECONNREFUSED — port 3006 server vs port 3000 test default". No new issue needed; this report adds the third data point.
-- **Browser journeys are stable: 10/10 passing**, 4 authenticated journeys skipped (require auth state). This confirms the chat panel, story navigation, health endpoint, and suggestion flow all render and function in a real browser.
-- **No safety regression — but no safety confirmation either.** Because the connection was refused, the safety/boundary/RAG/quality assertions never executed. The guardrails themselves are not implicated; we simply have no signal on them for the third cycle running (Security agent flagged the same on Jun 14 and Jun 15).
-- **E2E coverage improved:** `e2e/mcp.spec.ts` now exists, closing the long-standing `/api/mcp/*` 0%-coverage gap reported for ~10 consecutive QA cycles. Feature flag mocks are complete (all 17 `FeatureFlagKey` + 10 agent flags present).
+- **All 12 LLM quality tests failed at preflight.** The `beforeAll` harness check (`src/tests/qa/llm-quality.test.ts:27`) attempts to reach `GET /api/health` on `http://localhost:3000` and throws `QA HARNESS: no server reachable at http://localhost:3000` before any test body executes. All 12 tests are skipped, not individually failed.
+- **Root cause is the known, already-filed harness bug: GitHub issue #635** (OPEN, `type: bug`, `priority: high`, `area: infra`). This is the fourth consecutive cycle with this failure. The Jun 16 triage added the clearer preflight error message; the permanent fix (webServer config) is still pending.
+- **Browser journeys are stable: 10/10 passing**, 4 authenticated journeys skipped (require auth state). Chat panel, story navigation, health endpoint, suggestion flow, and multi-turn chat all verified in a real browser.
+- **No safety regression — but no safety confirmation either.** The guardrails themselves are not implicated; there is simply no signal on them for the fourth cycle running. Security agent (Jun 15, Jun 16) flagged the same gap: "Re-confirm safety guardrails once #635 lands."
+- **E2E coverage gap is low-priority this cycle.** The test gap analysis reports 163 `data-testid` attributes in source that are not referenced in any E2E spec. No high or medium priority gaps were identified.
+- **Cost Analyst context**: 124-day revenue drought and 120-day voice silence remain unexplained. Manual production verification of the Pelayo voice widget and Day Pass purchase flow on paisaxe.es is the highest-priority outstanding action across agents.
 
 ## 4. Test Results by Category
 
-| Category | Tests | Passed | Failed | Reason |
-|----------|-------|--------|--------|--------|
-| RAG Quality & Source Grounding | 3 | 0 | 3 | ECONNREFUSED — no server on :3000 |
-| Safety & Security | 3 | 0 | 3 | ECONNREFUSED — server never reached |
-| Content Boundaries | 3 | 0 | 3 | ECONNREFUSED — server never reached |
-| Response Quality | 3 | 0 | 3 | ECONNREFUSED — server never reached |
-| **LLM total** | **12** | **0** | **12** | **Harness/port defect (#635)** |
-| Browser journeys (Playwright) | 14 | 10 | 0 | 4 skipped (auth-gated) |
+| Category | Tests | Passed | Skipped | Reason |
+|----------|-------|--------|---------|--------|
+| RAG Quality & Source Grounding | 3 | 0 | 3 | Harness preflight failed — no server on :3000 |
+| Safety & Security | 3 | 0 | 3 | Harness preflight failed — server never reached |
+| Content Boundaries | 3 | 0 | 3 | Harness preflight failed — server never reached |
+| Response Quality | 3 | 0 | 3 | Harness preflight failed — server never reached |
+| **LLM total** | **12** | **0** | **12** | **Harness port defect (#635)** |
+| Browser journeys (Playwright) | 14 | 10 | 0 | 4 skipped (auth-gated journeys 9-12) |
 
-Failed assertions (the actual error, identical across all 12):
+Failed test output (the actual error, same as prior cycles — now with cleaner preflight message):
 
 ```
-TypeError: fetch failed
-  ❯ getCsrfToken src/tests/qa/llm-quality.test.ts:26:24
-  ❯ sendChatMessage src/tests/qa/llm-quality.test.ts:37:21
-Caused by: AggregateError
-  - connect ECONNREFUSED ::1:3000
-  - connect ECONNREFUSED 127.0.0.1:3000
+FAIL src/tests/qa/llm-quality.test.ts
+Error: QA HARNESS: no server reachable at http://localhost:3000 — start
+the app before running npm run test:qa, or set NEXT_PUBLIC_SITE_URL.
+See issue #635 for the permanent fix (webServer config).
+  at src/tests/qa/llm-quality.test.ts:34:11
 ```
 
 ## 5. Root Cause Analysis
 
-**Single root cause for all 12 failures — environment, not code or model behavior.**
+**Single root cause for all 12 skips — environment configuration, not code or model behavior.**
 
 1. `src/tests/qa/llm-quality.test.ts:15` resolves the target as:
    `const API_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';`
    With `NEXT_PUBLIC_SITE_URL` unset in the agent environment, it falls back to `http://localhost:3000`.
 
-2. `vitest.config.qa.ts` has **no `webServer` / global-setup hook** — unlike Playwright, the QA vitest config does not start a Next.js server. It assumes one is already running on port 3000.
+2. `vitest.config.qa.ts` has no `webServer` / global-setup hook — unlike Playwright, the QA vitest config does not start a Next.js server. It assumes one is already running on port 3000.
 
-3. The agent run did not have a dev/prod server listening on 3000 (the project's E2E server runs on a different port — Playwright uses `3100` by default per `playwright.config.ts:6`, and issue #635 references `3006`). Result: every `fetch` is refused at the TCP layer before any HTTP request is made.
+3. The agent run does not have a dev/prod server listening on 3000. The Playwright journey suite passes precisely because `playwright.config.ts` auto-starts its own `webServer`. The QA LLM suite has no equivalent.
 
-4. The Playwright journey suite passes precisely **because** `playwright.config.ts` auto-starts its own `webServer` (`npm run dev/start -- --port ${e2ePort}`). The QA LLM suite has no equivalent, so it is the only suite that fails.
+4. The Jun 16 triage added a preflight `beforeAll` that converts the 12 opaque ECONNREFUSED stacks into a single, actionable harness error pointing at issue #635. The underlying problem is unchanged.
 
-This is exactly the failure mode tracked in **issue #635** and corroborated by the Security agent's notes (2026-06-14: "Port-mismatch (#635) is a harness config bug, not a security regression — CSRF intact, no test reached a server"; 2026-06-15: "Safety guardrails unverified 2 cycles running"). This run makes it three.
+**Not the cause:** prompt quality, RAG retrieval, model behavior, CSRF protection, Stripe, or Supabase.
 
-**Not the cause:** prompt quality, RAG retrieval, model behavior, CSRF protection (the CSRF logic is never reached), Stripe, or Supabase.
+**Consecutive cycle count**: 4 (Jun 14, Jun 15, Jun 16, Jun 17 — all the same root cause).
 
 ## 6. Prioritized Recommendations
 
-**P0 — Fix the QA harness port/server (resolves all 12 failures at once). Ref: #635.**
+**P0 — Fix the QA harness port/server (resolves all 12 skips at once). Ref: #635.**
+
 Pick one of:
-- **Option A (preferred): add a `webServer`-equivalent to the QA run.** Give `vitest.config.qa.ts` a `globalSetup` that boots `npm run start -- --port 3000` (and tears it down), mirroring how Playwright manages its server. This makes the suite self-contained like the journey suite.
-- **Option B: align the URL with the running server.** In the agent script, export `NEXT_PUBLIC_SITE_URL=http://localhost:<the-port-the-agent-starts>` before `npm run test:qa`, and ensure the agent actually starts a server on that port. The port the harness uses (3006 per #635) must match the URL.
-- **Option C (minimum viable signal): run LLM QA against a known-good deployed preview.** Set `NEXT_PUBLIC_SITE_URL` to a Vercel preview/staging URL so the suite tests a real running app instead of needing a local server. (Watch rate limits — `sendChatMessage` already retries on 429.)
+- **Option A (preferred): add a `webServer`-equivalent to the QA run.** Give `vitest.config.qa.ts` a `globalSetup` that starts `npm run build && npm run start -- --port 3000` before tests and tears it down after. This makes the suite self-contained, matching how Playwright manages its server.
+- **Option B (quick workaround): set `NEXT_PUBLIC_SITE_URL` to a deployed URL.** Point the QA agent at the staging or production deployment (`https://paisaxe.es`). No server startup needed; tests run against live infrastructure. Downside: mutates real data, incurs Anthropic API costs per CI run.
+- **Option C (minimal, avoids build cost): run `npm run dev -- --port 3000` in the background before `npm run test:qa`.** Modify the agent shell script to start the dev server, wait for the health endpoint, run the suite, then kill the server. Works today with no code changes to the test harness.
 
-**P1 — Make the harness fail loud and early.** Add a `beforeAll` preflight in the QA suite that pings `${API_URL}/api/health` and emits a clear `QA HARNESS: no server reachable at <url> — see issue #635` message instead of 12 opaque `fetch failed` stacks. This converts 3 cycles of silent blindness into an immediate, actionable signal.
+Until one of these is implemented, the safety net remains dark.
 
-**P2 — Manual production verification remains the top operational priority.** With the automated LLM net blind for a third cycle AND a 123-day revenue drought / 119-day Paisaxe voice silence (Cost Analyst, 2026-06-16), the only current confirmation that production chat, the Pelayo voice widget, and the Day Pass purchase flow actually work is manual. This is doubly urgent precisely because the automated safety net is down. See checklist below.
+**P1 — Manual production verification of Pelayo and Day Pass (not a code task).**
 
-**P3 — Once #635 is fixed, immediately re-run and confirm safety guardrails** (injection resistance, PII extraction refusal, indirect injection, on-topic boundaries). These are the assertions that have gone unverified for three cycles.
+The Cost Analyst reports 124 days without revenue and 120 days without voice usage. This is the 4th consecutive QA cycle flagging this. Manual verification on paisaxe.es is the only way to determine whether the Pelayo voice widget and the Day Pass checkout flow are working for real users.
 
-## 7. Manual Testing Checklist Reminder
+**P2 — Expand E2E coverage for authenticated user journeys.**
 
-Automated tests cannot cover these — verify manually on production (paisaxe.es):
+Journeys 9-12 (add/verify favorites, localStorage persistence, navigation) are skipped in every cycle because they require authenticated state. Adding an auth fixture to `e2e/qa-journey.spec.ts` would bring the covered journey count from 10 to 14.
 
-- [ ] **Day Pass purchase flow** — complete a real Stripe checkout end-to-end (highest priority: 123-day revenue drought).
-- [ ] **Pelayo voice widget** — load, connect, and hold a short conversation (119-day voice silence; confirm the click-to-mount ElevenLabs chunk loads).
-- [ ] **Text chat on production** — send a query, confirm a grounded response with source attribution renders.
-- [ ] **Safety spot-check** — manually attempt one prompt-injection and one off-topic query against production chat while #635 keeps the automated safety tests offline.
-- [ ] **Authenticated journeys** — the 4 skipped Playwright auth journeys (favorites add/persist/navigate) should be spot-checked with a real signed-in session.
+**P3 — Reduce untagged `data-testid` gap.**
+
+163 `data-testid` attributes in source are not referenced in any E2E spec. This is low-priority but represents components with no E2E-level verification. Prioritize coverage for: voice agent chat widget, story editor dialog (save/approve/curate handlers), and agents dashboard — all flagged by the Coverage agent as Playwright-only targets.
+
+## 7. Manual Testing Checklist
+
+The following cannot be automated and require manual verification on the live site (paisaxe.es):
+
+- [ ] Pelayo voice widget loads and initiates a conversation
+- [ ] Day Pass purchase flow completes end-to-end (Stripe checkout to access grant)
+- [ ] Admin dashboard loads and displays data for an authenticated admin user
+- [ ] Chat API returns responses with source attribution (confirms RAG pipeline is live)
+- [ ] Story navigation (arrows, keyboard) works on mobile viewport
+- [ ] Booking flow via Pelayo completes without error (ElevenLabs + make_booking webhook)
 
 ## 8. E2E Test Gap Analysis
 
-**Improvements since prior cycles:**
-- **`/api/mcp/*` coverage gap closed.** `e2e/mcp.spec.ts` now exists. The three MCP routes (`make-booking`, `places`, `weather`) previously flagged at 0% E2E for ~10 consecutive QA cycles now have a spec. Recommend a quick confirmation that all three routes are actually exercised by it.
-- **Feature flag mocks complete.** All 17 `FeatureFlagKey` values (`src/types/feature-flags.ts:1-17`) are present in `MOCK_FEATURE_FLAGS` (`e2e/fixtures/mock-data.ts:40`), plus 10 agent flags. **Zero drift.** No stale or missing flag mocks.
+**Overall gap severity: LOW** — No new high or medium priority gaps identified this cycle.
 
-**Remaining gaps (LOW priority):**
-- **163 `data-testid` attributes in source are not referenced by any E2E spec.** These are predominantly admin-dashboard and editor controls reachable only by authenticated/admin sessions. Highest-value targets for new coverage (consistent with Coverage agent 2026-06-16, which flags these as Playwright-only):
-  - `voice-agent-chat` (~45% unit coverage) — add a journey: open the voice widget, assert connect state via its testid, send/receive one turn.
-  - `agents-dashboard/index` (~49%) — admin-only; add an authenticated journey that loads the dashboard and asserts a tab/panel testid renders.
-  - `story-editor-dialog/index.tsx` save/approve/curate handlers — E2E-only; add an admin journey that opens the editor and exercises save.
+### Identified gaps
 
-**Suggested concrete tests:**
-- QA LLM suite preflight: `await fetch(${API_URL}/api/health)` in `beforeAll`, assert HTTP 200, else throw a labeled harness error referencing #635 (selector: `/api/health`).
-- MCP spec assertion check: verify `e2e/mcp.spec.ts` covers POST `/api/mcp/make-booking`, `/api/mcp/places`, `/api/mcp/weather` (routes: `src/app/api/mcp/{make-booking,places,weather}/route.ts`).
-- Voice widget journey: navigate to a page mounting the widget, click the mount trigger, assert the `voice-agent-chat` container testid becomes visible.
+**Authenticated user journeys (medium-priority):**
+- Journeys 9-12 in `e2e/qa-journey.spec.ts` are marked with `-` (skipped). These cover: favorites page access, add-favorite via API, localStorage persistence across navigation, navigate favorites to immersive. All require auth state. Recommended fix: add a `storageState` fixture with a pre-authenticated session.
 
-## 9. Cross-Agent Notes Incorporated
+**data-testid coverage (low-priority):**
+- 163 `data-testid` attributes in source are not referenced in any E2E spec. Priority targets for new E2E tests, in order of risk:
+  1. `data-testid="voice-agent-chat"` — voice agent chat widget (voice-agent-chat.tsx is at ~45% unit coverage; no E2E)
+  2. `data-testid="agents-dashboard"` — agents dashboard (agents-dashboard at ~49% unit coverage; no E2E)
+  3. `data-testid="story-editor-*"` — story editor save/approve/curate handlers (E2E-only per Coverage agent)
 
-- **Security (2026-06-14/15):** confirmed #635 is a harness config bug, CSRF intact, no server reached — consistent with this run's root cause. Safety guardrails unverified for a 3rd cycle.
-- **Coverage (2026-06-16):** suite green at 98.67% statements; `basic-markdown.tsx` (react-markdown replacement) now 100% incl. XSS link-safety branches. `voice-agent-chat` and `agents-dashboard` remain Playwright-only targets.
-- **Cost Analyst (2026-06-16):** 123-day revenue drought, 119-day voice silence — reinforces the P2 manual-verification priority.
+**Feature flag mock completeness (Pass):**
+- All 17 `FeatureFlagKey` values and 10 agent flags are confirmed present in source. No gaps.
+
+**API routes without E2E smoke tests (carried, medium-priority):**
+- `/api/mcp/*` — `e2e/mcp.spec.ts` now exists (closed in Jun 16 report), but depth of coverage is unverified.
+- Remaining routes without dedicated smoke tests should be audited when #635 is resolved and the full LLM suite runs cleanly.
+
+---
