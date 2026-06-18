@@ -1,5 +1,12 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-06-17 06:00:03
+> Auto-generated on 2026-06-18 06:00:03
+
+## Changes Made This Run
+
+No changes made to documentation files this run.
+
+- **Feature flags**: All 17 FeatureFlagKey values verified against `docs/project/features.md`. Zero gaps. Source: `src/types/feature-flags.ts`.
+- **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, app-internal user APIs, internal health probes). The `health/db` endpoint (`GET /api/health/db`) is an internal diagnostic probe used by the QA agent, not for external consumption. No new documentation warranted.
 
 ## CLAUDE.md Status
 
@@ -12,9 +19,18 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
+src/app/api/admin/agents/run/route.test.ts
+src/app/api/admin/agents/run/route.ts
+src/app/api/admin/feature-flags/[key]/route.test.ts
+src/app/api/admin/stories/[id]/image/route.test.ts
+src/app/api/chat/route.test.ts
+src/app/api/favorites/route.test.ts
 src/app/api/mcp/make-booking/route.test.ts
+src/app/auth/callback/route.test.ts
 src/components/auth/auth-provider.test.tsx
 src/components/markdown/basic-markdown.test.tsx
+src/lib/proxy/cors.ts
+src/proxy.test.ts
 src/tests/qa/llm-quality.test.ts
 ```
 
@@ -103,29 +119,7 @@ webhooks/translate
 | CLAUDE.md | 2026-06-13 |
 | README.md | 2026-06-13 |
 
-## Changes Made This Run
-
-**Status: GREEN** — No documentation gaps found. Twenty-eighth consecutive clean run.
-
-**Feature flags**: No undocumented flags. All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
-
-**API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, internal health probes, app-internal user APIs). No external-consumption routes require new documentation. Details:
-- `admin/*` routes: internal admin panel APIs (auth-gated, not for external consumption)
-- `cron/*` routes: Vercel cron job endpoints (internal, cron-secret gated)
-- `webhooks/*` routes: already documented in `features.md` Infrastructure section
-- `mcp/*` routes: already documented in `features.md` Premium Voice Agent section
-- `health/live` and `health/db`: `/api/health/live` already documented in Infrastructure section; `health/db` is an internal probe
-- `chat` and `chat/stream`: internal APIs backing the Visitor Experience chat feature
-- `checkout/*`, `favorites`, `feature-flags`, `suggestions`, `voice-access`: internal app APIs
-
-**No changes made to `docs/project/features.md`** — documentation is complete and current.
-
-**Cross-agent recommendations:**
-- Coverage Agent: No documentation-related coverage gaps. All feature descriptions align with test coverage targets.
-- Security Agent: No documentation changes needed this cycle. Twenty-eighth consecutive GREEN.
-- QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 in `FeatureFlagKey` + 10 agent flags.
-- Cost Analyst Agent: No cost-related documentation concerns.
-- Performance Agent: No documentation-impacting changes. Modified files are test-only.
+---
 
 ---
 
