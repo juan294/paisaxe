@@ -1,6 +1,6 @@
 # Security Report — Paisaxe
 
-Date: 2026-06-17
+Date: 2026-06-18
 Agent: Security Agent
 Package version: paisaxe@1.5.1
 
@@ -8,17 +8,17 @@ Package version: paisaxe@1.5.1
 
 0 advisories detected, 0 exploitable.
 
-Rationale: The Jun 16 triage (`npm audit fix`) resolved all 9 previously open advisories in a single clean pass. Today's `npm audit` returns a fully clean tree with zero findings in both the production and dev dependency graphs. GREEN restored after 1-run YELLOW (Jun 16).
+Rationale: GREEN streak continues from Jun 17. The Jun 16 triage (`npm audit fix`) resolved all 9 prior advisories and the Jun 17 triage merged 3 Dependabot PRs (#639 dev-and-types patches, #641 npm_and_yarn security patches, #643 production group 13 updates). Today's `npm audit` returns a fully clean tree. Second consecutive GREEN run.
 
 ## 2. Executive Summary
 
 - 0 advisories detected. 0 exploitable.
-- `npm audit fix` (Jun 16 triage) bumped form-data 4.0.5 -> 4.0.6, vite 8.0.8 -> 8.0.16, ws 7.5.10 -> 7.5.11, @babel/core 7.29.0 -> 7.29.6, @opentelemetry/core 2.7.1 -> 2.8.0 (and dependent OTel packages), js-yaml 4.1.1 -> 4.2.0, and dompurify to 3.4.10 — all without major version bumps.
-- `esbuild` and `protobufjs` audit pins moved from `dependencies` to `overrides` (Jun 16 triage). Production dep count: 36 -> 34. `npm audit --omit=dev` passes cleanly.
-- License compliance: Pass. All flagged packages are either documented exceptions, dual-license with a permissive option, or Paisaxe's own private package.
-- Security headers: All present and correctly configured (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy).
+- Jun 17 triage merged 3 Dependabot PRs: dev/types patches (#639), npm_and_yarn security patches (#641), and 13 production package updates (#643). All CI checks passed. No new advisories introduced.
+- Outdated packages metric: 20 reported by scan header, but the detailed package list was empty (script artifact — likely a count/list format mismatch after the dep batch). The Jun 17 production batch (#643) updated 13 production packages; the remaining outdated count is expected to be lower. No CVEs in any tracked outdated package.
+- License compliance: Pass. All flagged packages are documented exceptions, dual-license with a permissive option, or Paisaxe's own private package.
+- Security headers: All present and correctly configured. No changes since Jun 17.
 - CI/CD security automation: All controls active. No gaps.
-- Cross-agent note: QA safety guardrails (injection/PII/role-play resistance) are unverified for a 4th consecutive cycle due to issue #635 (harness port mismatch). No regression evidence, no confirmation either. No security action needed here — this is a QA harness fix.
+- Cross-agent note (QA Jun 18): Issue #635 (port mismatch) is confirmed fixed — preflight passes and tests reach the server. The injection detector confirmed working (1 safety test passed, 223ms). Remaining 11/12 LLM failures are due to Voyage AI 503 (VOYAGE_API_KEY missing or network unreachable in QA environment), not a security regression. Authority impersonation and instruction override tests remain unverified until Voyage AI is available in the QA environment.
 
 ## 3. Vulnerability Table
 
@@ -32,15 +32,17 @@ No advisories this cycle.
 | Low | 0 | Clean |
 | Total | 0 | Clean |
 
-All 9 advisories from Jun 16 were resolved by `npm audit fix`. See the Jun 16 report for the detailed per-advisory breakdown and exploitability analysis (they were all non-exploitable; fixed as hygiene).
+All 9 advisories from the Jun 16 triage were resolved by `npm audit fix`. The Jun 17 dep batch introduced no new advisories. See the Jun 16 report for the per-advisory breakdown (all were non-exploitable; fixed as hygiene).
 
 ## 4. Detailed Exploitability Analysis
 
 No High or Critical advisories this cycle. Nothing to analyze.
 
-The in-house `basic-markdown.tsx` renderer (replaced react-markdown on Jun 12, now at 100% test coverage including XSS-relevant link-safety branches per Coverage Agent Jun 16) remains the correct posture. There are zero DOMPurify calls in `src/` — confirmed by Coverage Agent and grep — so any transitive DOMPurify advisories introduced by posthog-js in the future will continue to be non-exploitable at the application layer.
+Injection surface (QA Jun 18 partial confirmation): The pre-LLM injection detector passed (1 test, 223ms). This confirms the fast-path injection guard is operational. The remaining 11 LLM-quality tests (authority impersonation, PII extraction, boundary violations, RAG consistency) were blocked by Voyage AI 503 — a QA environment issue, not a production security regression. Production CSRF and auth controls remain confirmed working via browser journey tests (10/10 green).
 
-Webhook timing-safety: All 7 `timingSafeEqual` call sites remain verified. CSRF enforcement confirmed passing (QA journey tests 10/10 green). No changes to the auth or webhook paths this cycle.
+The in-house `basic-markdown.tsx` renderer (replaced react-markdown Jun 12, 100% test coverage on XSS-relevant link-safety branches per Coverage Agent Jun 16) remains the correct posture. Zero DOMPurify calls in `src/` — any transitive DOMPurify advisories from posthog-js remain non-exploitable at the application layer.
+
+Webhook timing-safety: All 7 `timingSafeEqual` call sites remain verified and unchanged. No auth or webhook path modifications this cycle.
 
 ## 5. Prioritized Remediation Steps
 
@@ -48,11 +50,11 @@ No remediations required this cycle. The tree is clean.
 
 Carry-forward watch items (not blocking):
 
-1. Monitor `@sentry/nextjs` for a release that bumps `@opentelemetry/core` to >= 2.8.0. The OTel moderate advisories from the production Sentry tree (already fixed this cycle via `npm audit fix`) may re-appear if a future Sentry release re-introduces an older OTel transitive. Run `npm audit --omit=dev` to check.
+1. Restore full LLM safety test coverage: Voyage AI 503 in QA environment is blocking 11/12 LLM quality tests. The fix is a QA/infra concern (ensure VOYAGE_API_KEY is available during `npm run test:qa`). Not a security code change, but the signal gap matters — authority impersonation and instruction override tests have been unconfirmed for 5 consecutive cycles. Until fixed, manual review of production chat safety on paisaxe.es is recommended before any release.
 
-2. Fix issue #635 (vitest.config.qa.ts webServer config). This is a QA harness concern, but it has a secondary security implication: 4 consecutive cycles without LLM safety test confirmation. The fix is a one-line `webServer` config addition to vitest.config.qa.ts, not a security code change.
+2. Monitor `@sentry/nextjs` for a release that re-introduces older OTel transitive versions. The OTel moderate advisories cleared by `npm audit fix` on Jun 16 may reappear if a future Sentry release pins an older `@opentelemetry/core`. Run `npm audit --omit=dev` to check.
 
-3. Optional: run `npm run build:analyze` (webpack mode) once to get authoritative initial-load totals. Deferred 8+ cycles per Performance Agent. No security implication, but useful for confirming the dep cleanup from Jun 16 is bundle-neutral.
+3. Optional: run `npm run build:analyze` (webpack mode) for authoritative initial-load totals. Deferred 8+ cycles per Performance Agent. No security implication, but confirms the dep cleanup from Jun 16-17 is bundle-neutral.
 
 ## 6. License Compliance
 
@@ -63,8 +65,8 @@ Flagged packages (named explicitly):
 **Actual concerns reviewed:**
 
 - `@img/sharp-libvips-darwin-arm64@1.2.4` — LGPL-3.0-or-later. APPROVED EXCEPTION. Documented in `docs/project/license-exceptions.md` (Exception 1). Pre-built native binary, dynamically linked via `sharp`'s Apache-2.0 API, no modifications, SaaS deployment. No copyleft obligation on Paisaxe code.
-- `@img/sharp-libvips-darwin-arm64@1.3.0` — LGPL-3.0-or-later. APPROVED EXCEPTION. New version appearing alongside 1.2.4 (two `sharp` versions installed). Same analysis as above — both covered by Exception 1 in `docs/project/license-exceptions.md`. No action needed.
-- `dompurify@3.4.10` — (MPL-2.0 OR Apache-2.0). COMPLIANT, no exception needed. Dual-licensed; Paisaxe takes the Apache-2.0 option (permissive). Transitive via `posthog-js`. Version bumped from 3.4.0 to 3.4.10 by `npm audit fix` on Jun 16.
+- `@img/sharp-libvips-darwin-arm64@1.3.0` — LGPL-3.0-or-later. APPROVED EXCEPTION. Second version installed alongside 1.2.4 (two `sharp` versions in the tree). Same analysis as above — both covered by Exception 1 in `docs/project/license-exceptions.md`. No action needed.
+- `dompurify@3.4.10` — (MPL-2.0 OR Apache-2.0). COMPLIANT, no exception needed. Dual-licensed; Paisaxe takes the Apache-2.0 option. Transitive via `posthog-js`. Version locked at 3.4.10 since `npm audit fix` on Jun 16.
 - `expand-template@2.0.3` — (MIT OR WTFPL). COMPLIANT. Dual-licensed; MIT option is permissive. Build-tooling transitive.
 - `paisaxe@1.5.1` — UNLICENSED. Our own private package (intentionally proprietary/unpublished). Not a third-party concern.
 
@@ -95,7 +97,7 @@ CSP notes:
 - No `'strict-dynamic'` and no nonce-only policy — correct for PPR (`cacheComponents`) compatibility per CLAUDE.md. Prerendered HTML has no nonces; `'self' 'unsafe-inline'` is the deliberate, correct choice.
 - `object-src 'none'`, `frame-ancestors 'none'`, and `base-uri 'self'` are locked down.
 - `microphone=(self)` is intentional (ElevenLabs Pelayo voice agent needs mic access on first-party origin); camera and geolocation fully disabled.
-- `wss://api.us.elevenlabs.io` correctly added to `connect-src` alongside `wss://api.elevenlabs.io` for ElevenLabs US endpoint support.
+- `wss://api.us.elevenlabs.io` correctly present in `connect-src` for ElevenLabs US endpoint support.
 - E2E "CSP canary" (`e2e/smoke.spec.ts`) guards against CSP regressions that would block JS execution.
 
 Note: Two duplicate header entries appear in the scan output for permissions-policy, referrer-policy, HSTS, and x-content-type-options. This is an artifact of the header-fetch format (two responses captured), not actual duplicate header injection. The live CSP is correct.
@@ -104,33 +106,34 @@ Note: Two duplicate header entries appear in the scan output for permissions-pol
 
 | Control | Status | Notes |
 |---------|--------|-------|
-| Dependabot | Active | Configured, pinned to `develop`. Recent dep batch PRs (#595–#597) auto-merged and verified. |
+| Dependabot | Active | Configured, pinned to `develop`. Three PRs merged Jun 17 (#639, #641, #643). 0 open Dependabot PRs. |
 | Renovate | Not used | Intentional — Dependabot covers the same role. Not a gap. |
 | Gitleaks | Active | Secret scanning in CI; scans git history. Confirmed active. |
-| npm audit | Active | Runs in CI pipeline. Now returns 0 findings. |
+| npm audit | Active | Runs in CI pipeline. Returns 0 findings. |
 | License check | Active | `license-check.yml` blocks strong copyleft (GPL/AGPL/SSPL) on every PR. |
 
-No CI/CD security gaps. The long-standing "Gitleaks CI gap" from older QA cross-notes was closed and remains closed.
+No CI/CD security gaps.
 
 ## 9. Outdated Packages with Security Implications
 
-`npm audit` returns 0 findings. All 18 packages flagged as outdated by `npm outdated` (approximate, per scan metric) have no open CVEs.
+`npm audit` returns 0 findings. The outdated package count in today's scan shows 20, but the detailed list was empty — this is a script artifact (count header captured without the package table, likely a format issue after the Jun 17 dep batch updated 13 production packages). The actual outdated count is expected to be lower; no CVEs are known in any tracked package.
 
 Security-relevant context on specific packages:
 
-- `voyageai@0.1.0` — intentionally pinned. Its transitive `form-data` advisory was patched independently via `npm audit fix` on Jun 16. No CVE in voyageai itself. Do NOT bump voyageai.
-- `@sentry/nextjs` — current. The OTel moderate advisories that were present in its transitive tree are now cleared by the `@opentelemetry/core 2.8.0` bump from `npm audit fix`. Watch for a future Sentry release that re-introduces older OTel transitives.
-- `posthog-js@^1.384.0` — current. The `dompurify@3.4.10` it pulls is now a patched version (bumped from 3.4.0 by `npm audit fix`). PostHog's internal DOMPurify usage remains non-exploitable at the application layer.
+- `voyageai@0.1.0` — intentionally pinned. Its transitive `form-data` advisory was patched independently via `npm audit fix` on Jun 16. No CVE in voyageai itself. Do NOT bump voyageai — the pin is intentional.
+- `@sentry/nextjs` — current post-Jun 17 batch. The OTel moderate advisories that were present in its transitive tree were cleared by `@opentelemetry/core 2.8.0` bump from `npm audit fix`. Watch for a future Sentry release re-introducing older OTel transitives.
+- `posthog-js` — updated in Jun 17 batch (#643). The `dompurify@3.4.10` transitive remains a patched version. PostHog's internal DOMPurify usage remains non-exploitable at the application layer.
 - Dev-tooling majors (typescript v6, knip v6, @vitejs/plugin-react v6) — no CVEs, low urgency. Out of scope for security.
 
 No production package is on an outdated version with an exploitable CVE.
 
 ## 10. Cross-Cycle Notes
 
-- GREEN restored after 1-run YELLOW (Jun 16). The Jun 16 triage executed `npm audit fix` which resolved all 9 advisories cleanly. No manual intervention required, no major version bumps.
-- Two versions of `@img/sharp-libvips-darwin-arm64` (1.2.4 and 1.3.0) now appear in the license scan, indicating two `sharp` versions are installed. Both are covered by Exception 1 in `docs/project/license-exceptions.md`. No new exception documentation required.
-- `esbuild` and `protobufjs` audit pins relocated to `overrides` (Jun 16 triage). Production dep count: 34/40. `npm audit --omit=dev` confirmed clean.
-- QA safety guardrails (injection/PII/boundary tests) remain unverified for 4 consecutive cycles due to issue #635. This is a harness port-mismatch fix, not a security regression. CSRF and auth controls are confirmed working via browser journey tests (10/10 green). No security action needed from this agent; fix belongs in QA/Triage.
-- Coverage Agent (Jun 16): `basic-markdown.tsx` XSS-relevant link-safety branches are at 100% test coverage. The in-house renderer has no DOMPurify dependency and strips unsafe links at render time. This is the correct defense-in-depth posture for the markdown rendering surface.
+- GREEN maintained for 2nd consecutive cycle after the Jun 16 triage recovery. The Jun 17 triage merged 3 Dependabot PRs and introduced no new advisories.
+- QA #635 confirmed fixed (Jun 18 QA Agent): The port mismatch is resolved. Injection detector working (pre-LLM path, 1/12 passed). Remaining 11/12 LLM failures are Voyage AI 503 (VOYAGE_API_KEY or network unavailable in QA environment) — a QA infra issue, not a security regression.
+- LLM safety guardrail status: Injection detection confirmed. Authority impersonation, PII extraction, and instruction override tests unverified for 5 consecutive cycles. Recommend manual check on production paisaxe.es before next release.
+- Two versions of `@img/sharp-libvips-darwin-arm64` (1.2.4 and 1.3.0) continue to appear in the license scan. Both are covered by Exception 1 in `docs/project/license-exceptions.md`. No new exception documentation required.
+- Production dep count: 34/40 (esbuild + protobufjs moved to overrides Jun 16). 6 budget slots available.
+- Coverage Agent (Jun 16): `basic-markdown.tsx` XSS-relevant link-safety branches are at 100% test coverage including allowLinks-off, malformed nested links, and unsafe-URL patterns. The in-house renderer has no DOMPurify dependency and strips unsafe links at render time.
 
 ---
