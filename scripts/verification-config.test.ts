@@ -90,4 +90,19 @@ describe("verification coverage config", () => {
       'node scripts/check-health-readiness.mjs "$PREVIEW_URL" --require-sentry'
     );
   });
+
+  it("preflights Voyage AI before running QA LLM tests", () => {
+    const qaAgent = readText("scripts/qa-agent.sh");
+
+    expect(qaAgent).toContain("VOYAGE_API_KEY_VALUE");
+    expect(qaAgent).toContain("Checking Voyage AI embedding availability");
+    expect(qaAgent).toContain("QA PREFLIGHT: Voyage AI embedding availability failed");
+  });
+
+  it("includes chat API response bodies in QA LLM failures", () => {
+    const llmQualityTest = readText("src/tests/qa/llm-quality.test.ts");
+
+    expect(llmQualityTest).toContain("formatChatApiError");
+    expect(llmQualityTest).toContain("errorBody.error");
+  });
 });

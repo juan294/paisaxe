@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { spawn, ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import path from "path";
-import type { AgentLogLine } from "@/types/agents-dashboard";
 import { logger } from "@/lib/logger";
+import { runningAgents, type RunningAgent } from "./state";
 
 /** Map agent flag keys to their script filenames (all live in scripts/). */
 const AGENT_SCRIPTS: Record<string, string> = {
@@ -18,25 +18,6 @@ const AGENT_SCRIPTS: Record<string, string> = {
 
 const MAX_LOG_LINES = 500;
 const FINISHED_AGENT_TTL_MS = 60 * 60 * 1000;
-
-interface RunningAgent {
-  pid: number;
-  startedAt: string;
-  logs: AgentLogLine[];
-  process: ChildProcess;
-  finished: boolean;
-  exitCode: number | null;
-  stoppedByUser: boolean;
-  finishedAt: number | null;
-}
-
-/** In-memory tracking of running agent processes. */
-const runningAgents = new Map<string, RunningAgent>();
-
-/** Test-only: clear all agent state between test cases. */
-export function resetRunningAgentsForTests() {
-  runningAgents.clear();
-}
 
 /** Strip ANSI escape codes from a string. */
 function stripAnsi(str: string): string {

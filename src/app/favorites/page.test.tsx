@@ -170,6 +170,24 @@ describe("FavoritesPage", () => {
         expect(link.closest("a")).toHaveAttribute("href", "/immersive");
       });
     });
+
+    it("shows generic empty description when authenticated user has no favorites (requiresAuth=false, line 126 false branch)", async () => {
+      // requiresAuth=false means the user is logged in — they just haven't saved anything yet.
+      // The page should show the generic "nothing here yet" copy, not the sign-in CTA.
+      mockUseFavorites.mockReturnValue({
+        favorites: [],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+        requiresAuth: false,
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(mockT("favorites.empty_description"))).toBeInTheDocument();
+      });
+      expect(screen.queryByText(mockT("favorites.sign_in_to_save"))).not.toBeInTheDocument();
+    });
   });
 
   describe("with favorites", () => {
@@ -914,6 +932,68 @@ describe("FavoritesPage", () => {
         // With isIntersecting: false, the GalleryItem should remain in placeholder state
         // (isVisible stays false), so no image is rendered
         expect(screen.queryByAltText("Lagos de Covadonga")).not.toBeInTheDocument();
+      } finally {
+        global.IntersectionObserver = originalIO;
+      }
+    });
+
+    it("triggers GalleryItem cleanup (unobserve) when component unmounts (lines 213-215)", () => {
+      const unobserveSpy = vi.fn();
+      const originalIO = global.IntersectionObserver;
+
+      try {
+        class TrackingUnobserveObserver implements IntersectionObserver {
+          readonly root: Element | null = null;
+          readonly rootMargin: string = "";
+          readonly scrollMargin: string = "";
+          readonly thresholds: ReadonlyArray<number> = [];
+
+          constructor(
+            private callback: IntersectionObserverCallback,
+            _options?: IntersectionObserverInit
+          ) {}
+
+          observe(target: Element): void {
+            // Fire isIntersecting: false so the observer is NOT disconnected on first intersection.
+            // This keeps the observer alive so unobserve() gets called on unmount.
+            this.callback(
+              [
+                {
+                  isIntersecting: false,
+                  target,
+                  boundingClientRect: target.getBoundingClientRect(),
+                  intersectionRatio: 0,
+                  intersectionRect: target.getBoundingClientRect(),
+                  rootBounds: null,
+                  time: Date.now(),
+                },
+              ],
+              this
+            );
+          }
+
+          unobserve(): void {
+            unobserveSpy();
+          }
+          disconnect(): void {}
+          takeRecords(): IntersectionObserverEntry[] {
+            return [];
+          }
+        }
+
+        global.IntersectionObserver = TrackingUnobserveObserver as unknown as typeof IntersectionObserver;
+
+        mockUseFavorites.mockReturnValue({
+          favorites: ["story-1"],
+          toggleFavorite: mockToggleFavorite,
+          isLoading: false,
+        });
+
+        const { unmount } = render(<FavoritesPage />);
+        unmount();
+
+        // React calls the useEffect cleanup on unmount, which calls observer.unobserve(currentRef)
+        expect(unobserveSpy).toHaveBeenCalled();
       } finally {
         global.IntersectionObserver = originalIO;
       }

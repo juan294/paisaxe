@@ -345,6 +345,19 @@ describe("/api/mcp/places", () => {
       expect(response.status).toBe(400);
     });
 
+    it("returns 400 when POST body is an array (normalizeMcpParams null-guard, schemas.ts line 293)", async () => {
+      // When body is an array, normalizeMcpParams hits the `Array.isArray(input)` branch
+      // and returns { query: "" }, which fails the min(1) Zod check → 400.
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify([]),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(400);
+    });
+
     it.each([
       {
         name: "oversized flat query",

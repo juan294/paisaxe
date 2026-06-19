@@ -19,6 +19,46 @@ QA_TEST_USER_PASSWORD="${QA_TEST_USER_PASSWORD:-}"
 
 mkdir -p "$LOG_DIR"
 
+trim_value() {
+  local value="${1:-}"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+read_env_file_value() {
+  local key="$1"
+  local env_file="$PROJECT_DIR/.env.local"
+  local line=""
+  local value=""
+
+  [[ -f "$env_file" ]] || return 0
+
+  line=$(grep -E "^[[:space:]]*${key}=" "$env_file" | tail -n 1 || true)
+  [[ -n "$line" ]] || return 0
+
+  value="$(trim_value "${line#*=}")"
+  if [[ "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+
+  trim_value "$value"
+}
+
+get_config_value() {
+  local key="$1"
+  local value=""
+
+  value="$(trim_value "${!key:-}")"
+  if [[ -z "$value" ]]; then
+    value="$(read_env_file_value "$key")"
+  fi
+
+  trim_value "$value"
+}
+
 # Source shared utilities and check feature flags
 source "$PROJECT_DIR/scripts/lib/agent-utils.sh"
 source "$PROJECT_DIR/scripts/lib/github-issues.sh"
@@ -100,6 +140,9 @@ log_info "=== Phase 0: Integration Health Checks ===" | tee -a "$LOG_FILE"
 HEALTH_CHECKS_PASSED=0
 HEALTH_CHECKS_FAILED=0
 HEALTH_CHECK_DETAILS=""
+VOYAGE_API_KEY_VALUE=""
+VOYAGE_HEALTH_STATUS="unknown"
+VOYAGE_HEALTH_DETAILS=""
 # Declare CI_E2E_STATUS/RUN_ID early so they are never unbound under set -u
 # (Phase 0.5 re-assigns them after Phase 0 health metrics are written)
 CI_E2E_STATUS="unknown"
@@ -150,6 +193,56 @@ else
   HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Stripe endpoint returned HTTP $STRIPE_HTTP_CODE (expected 401 or 200)"
 fi
 
+# Check 4: Voyage AI Embedding Availability
+log_info "Checking Voyage AI embedding availability..." | tee -a "$LOG_FILE"
+VOYAGE_API_KEY_VALUE="$(get_config_value "VOYAGE_API_KEY")"
+if [[ -z "$VOYAGE_API_KEY_VALUE" ]]; then
+  VOYAGE_HEALTH_STATUS="FAIL"
+  VOYAGE_HEALTH_DETAILS="VOYAGE_API_KEY is not set in the shell environment or .env.local"
+  log_error "Voyage AI: FAILED - VOYAGE_API_KEY missing" | tee -a "$LOG_FILE"
+  HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+  HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Voyage AI check failed: $VOYAGE_HEALTH_DETAILS"
+else
+  export VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE"
+  VOYAGE_HTTP_CODE=$(
+    node <<'NODE' 2>/dev/null || true
+const key = process.env.VOYAGE_API_KEY;
+const body = {
+  input: ["qa preflight"],
+  model: "voyage-3.5",
+  input_type: "query",
+  output_dimension: 512,
+};
+
+fetch("https://api.voyageai.com/v1/embeddings", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(body),
+  signal: AbortSignal.timeout(15_000),
+})
+  .then((response) => console.log(response.status))
+  .catch(() => console.log("000"));
+NODE
+  )
+  [[ -z "$VOYAGE_HTTP_CODE" ]] && VOYAGE_HTTP_CODE="000"
+
+  if [[ "$VOYAGE_HTTP_CODE" == "200" ]]; then
+    VOYAGE_HEALTH_STATUS="PASS"
+    VOYAGE_HEALTH_DETAILS="Voyage AI embeddings endpoint reachable"
+    log_success "Voyage AI: OK" | tee -a "$LOG_FILE"
+    HEALTH_CHECKS_PASSED=$((HEALTH_CHECKS_PASSED + 1))
+  else
+    VOYAGE_HEALTH_STATUS="FAIL"
+    VOYAGE_HEALTH_DETAILS="Voyage AI embeddings endpoint returned HTTP $VOYAGE_HTTP_CODE"
+    log_error "Voyage AI: FAILED - HTTP $VOYAGE_HTTP_CODE" | tee -a "$LOG_FILE"
+    HEALTH_CHECKS_FAILED=$((HEALTH_CHECKS_FAILED + 1))
+    HEALTH_CHECK_DETAILS="${HEALTH_CHECK_DETAILS}\n- Voyage AI check failed: $VOYAGE_HEALTH_DETAILS"
+  fi
+fi
+
 log_info "Health checks complete: $HEALTH_CHECKS_PASSED passed, $HEALTH_CHECKS_FAILED failed" | tee -a "$LOG_FILE"
 
 # Send SMS alert for critical health check failures
@@ -169,6 +262,10 @@ if [[ $HEALTH_CHECKS_FAILED -gt 0 ]]; then
     [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
     FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Stripe"
   fi
+  if [[ "$VOYAGE_HEALTH_STATUS" != "PASS" ]]; then
+    [[ -n "$FAILED_CHECK_NAMES" ]] && FAILED_CHECK_NAMES="$FAILED_CHECK_NAMES, "
+    FAILED_CHECK_NAMES="${FAILED_CHECK_NAMES}Voyage AI"
+  fi
 
   send_health_summary_alert "$HEALTH_CHECKS_FAILED" "$FAILED_CHECK_NAMES" 2>&1 | tee -a "$LOG_FILE" || {
     log_warn "SMS alert failed (Twilio may not be configured)" | tee -a "$LOG_FILE"
@@ -181,6 +278,7 @@ HEALTH_METRICS_FILE="$PROJECT_DIR/.qa-health-metrics.tmp"
   echo "INTEGRATION HEALTH CHECKS:"
   echo "- Passed: $HEALTH_CHECKS_PASSED"
   echo "- Failed: $HEALTH_CHECKS_FAILED"
+  echo "- Voyage AI Status: $VOYAGE_HEALTH_STATUS"
   echo "- CI E2E Status: ${CI_E2E_STATUS:-unknown}"
   if [[ -n "$HEALTH_CHECK_DETAILS" ]]; then
     echo ""
@@ -233,7 +331,13 @@ export QA_TESTS_PER_CATEGORY="$TESTS_PER_CATEGORY"
 export NEXT_PUBLIC_SITE_URL="http://localhost:3006"
 
 # Run vitest and capture both output and exit code
-TEST_OUTPUT=$(npm run test:qa 2>&1) || TEST_EXIT_CODE=$?
+TEST_EXIT_CODE=0
+if [[ "$VOYAGE_HEALTH_STATUS" != "PASS" ]]; then
+  TEST_OUTPUT="QA PREFLIGHT: Voyage AI embedding availability failed - ${VOYAGE_HEALTH_DETAILS}. Set VOYAGE_API_KEY in the QA environment or .env.local before running npm run test:qa."
+  TEST_EXIT_CODE=1
+else
+  TEST_OUTPUT=$(npm run test:qa 2>&1) || TEST_EXIT_CODE=$?
+fi
 TEST_EXIT_CODE=${TEST_EXIT_CODE:-0}
 
 # Parse test results from vitest output
