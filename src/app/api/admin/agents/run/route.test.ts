@@ -31,7 +31,8 @@ vi.mock("child_process", async (importOriginal) => {
 });
 
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { POST, GET, DELETE, resetRunningAgentsForTests } from "./route";
+import { POST, GET, DELETE } from "./route";
+import { resetRunningAgentsForTests } from "./state";
 
 const LEGACY_RUNNER_OVERRIDE = ["ALLOW", "AGENT", "RUN"].join("_");
 const originalVercelEnv = process.env.VERCEL_ENV;

@@ -1035,6 +1035,72 @@ describe("POST /api/chat", () => {
     );
   });
 
+  describe("V8 sub-expression gap closers", () => {
+    it("re-throws non-timeout errors from generateChatResponse (line 202)", async () => {
+      // When generateChatResponse rejects with a non-timeout error, the catch at line 200
+      // checks isChatStreamStageTimeout — false for a plain Error — so line 202 `throw responseErr`
+      // executes, propagating to the outer catch which returns 500.
+      vi.mocked(validateChatRequest).mockReturnValue({
+        valid: true,
+        sanitizedMessage: "Tell me about Asturias",
+        sanitizedContext: undefined,
+      });
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+      vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+      vi.mocked(generateChatResponse).mockRejectedValue(new Error("Claude API error"));
+      vi.mocked(detectInjectionAttempt).mockReturnValue(false);
+
+      const request = new NextRequest("http://localhost:3006/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "Tell me about Asturias" }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(500);
+      expect(logger.error).toHaveBeenCalledWith(
+        "Chat API error:",
+        expect.objectContaining({ error: "Claude API error" })
+      );
+    });
+
+    it("handles feature flag rejection with fallback and covers line 145 empty-catch handler", async () => {
+      // When isFeatureFlagEnabled rejects with a normal (non-timeout) error:
+      // 1. The void asturianEnabledPromise.catch(() => {}) empty handler at line 145 runs.
+      // 2. The try/catch at line 182 catches it and logs a CHAT_FEATURE_FLAG_FALLBACK warning.
+      // 3. The route continues with asturianEnabled=false (the fallback) and returns 200.
+      vi.mocked(isFeatureFlagEnabled).mockRejectedValue(new Error("Feature flag service unavailable"));
+      vi.mocked(validateChatRequest).mockReturnValue({
+        valid: true,
+        sanitizedMessage: "Tell me about Asturias",
+        sanitizedContext: undefined,
+      });
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+      vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+      vi.mocked(generateChatResponse).mockResolvedValue("Response about Asturias");
+      vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+      vi.mocked(detectInjectionAttempt).mockReturnValue(false);
+      vi.mocked(detectPromptLeakage).mockReturnValue(false);
+
+      const request = new NextRequest("http://localhost:3006/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "Tell me about Asturias" }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      expect(logger.warn).toHaveBeenCalledWith(
+        "[CHAT_FEATURE_FLAG_FALLBACK]",
+        expect.objectContaining({ error: expect.any(Error) })
+      );
+      expect(generateChatResponse).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        false,
+        undefined
+      );
+    });
+  });
+
   describe("Zod runtime validation", () => {
     it("should return 400 with Zod details for invalid JSON body", async () => {
       const request = new NextRequest("http://localhost:3006/api/chat", {

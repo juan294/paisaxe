@@ -50,6 +50,31 @@ async function getCsrfToken(): Promise<string> {
   return match[1];
 }
 
+async function formatChatApiError(response: Response): Promise<string> {
+  const bodyText = await response.text().catch(() => '');
+  if (!bodyText) {
+    return `Chat API error: ${response.status}`;
+  }
+
+  try {
+    const errorBody = JSON.parse(bodyText) as { error?: unknown; message?: unknown };
+    const reason =
+      typeof errorBody.error === 'string'
+        ? errorBody.error
+        : typeof errorBody.message === 'string'
+          ? errorBody.message
+          : undefined;
+
+    if (reason) {
+      return `Chat API error: ${response.status} (${reason})`;
+    }
+  } catch {
+    // Fall through to a bounded raw-body preview for non-JSON errors.
+  }
+
+  return `Chat API error: ${response.status} (${bodyText.slice(0, 200)})`;
+}
+
 // Helper to call the chat API with retry for rate limiting
 async function sendChatMessage(message: string, retries = 3): Promise<ChatResponse> {
   const csrfToken = await getCsrfToken();
@@ -73,7 +98,7 @@ async function sendChatMessage(message: string, retries = 3): Promise<ChatRespon
     }
 
     if (!response.ok) {
-      throw new Error(`Chat API error: ${response.status}`);
+      throw new Error(await formatChatApiError(response));
     }
 
     const data = await response.json();

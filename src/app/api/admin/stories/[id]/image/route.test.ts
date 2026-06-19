@@ -1049,10 +1049,26 @@ describe("PUT /api/admin/stories/[id]/image", () => {
       expect(data.error).toBe("Private or reserved IP addresses are not allowed");
     });
 
-    // parseIpv4Octets lines 28, 31, 42 are architecturally unreachable through this route:
+    // parseIpv4Octets lines 35, 38, 42-44 are architecturally unreachable through this route:
     // isUnsafeIpv4 is only called (a) from isUnsafeIpAddress when isIP returns 4 (guaranteeing
     // valid 4-octet address), and (b) from the ::ffff: DNS regex match which enforces digit-only
     // octets. There is no code path that feeds an invalid string to parseIpv4Octets.
+    // Similarly, isUnsafeIpv4 line 49 (`if (!octets) return false`) is unreachable for the
+    // same reason — parseIpv4Octets always returns a valid array when called from this route.
+
+    it("should return 400 when DNS resolves to 0.x.x.x (isUnsafeIpv4 a===0 branch, line 53)", async () => {
+      // Line 53: `a === 0 ||` — the 0.0.0.0/8 block is reserved per RFC 1122 section 3.2.1.3.
+      // DNS returning 0.0.0.1 is the only way to exercise this branch.
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      dns.lookup.mockResolvedValueOnce([{ address: "0.0.0.1", family: 4 }]);
+
+      const request = createJsonImageRequest("https://cdn.example.com/image.jpg");
+      const response = await PUT(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Private or reserved IP addresses are not allowed");
+    });
 
     it("should allow URL when DNS resolves to non-private IPv6 (covers firstIpv6Hextet null return path)", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
@@ -1195,5 +1211,234 @@ describe("PUT /api/admin/stories/[id]/image", () => {
     expect(response.status).toBe(500);
     expect(consoleSpy).not.toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalled();
+  });
+
+  describe("readRemoteImageBufferWithLimit — uncovered paths (lines 140, 168-169)", () => {
+    // Line 140: response has no body stream (!response.body) but arrayBuffer.byteLength > maxBytes.
+    // The RemoteImageTooLargeError is thrown from the no-body branch.
+    // In Vitest's ESM environment, the instanceof check in the catch block correctly identifies
+    // the error, but requires the DB mock to be set up so the route can reach that return point.
+    it("rejects when response body is null and arrayBuffer exceeds the 10MB limit (line 140)", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      // Set up DB mock — required so the route doesn't fail with TypeError when supabase is undefined
+      // in case the non-fatal path is taken (covers both instanceof success and failure outcomes).
+      const { mockUpdate } = setupStoryUpdateMock("https://example.com/huge-no-stream.jpg");
+
+      const largeBuffer = new ArrayBuffer(11 * 1024 * 1024); // 11MB > MAX_REMOTE_SIZE (10MB)
+      const arrayBufferMock = vi.fn().mockResolvedValue(largeBuffer);
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({}),
+        body: null, // no body stream → falls into `if (!response.body)` branch
+        arrayBuffer: arrayBufferMock,
+      } as unknown as Response);
+
+      const request = createJsonImageRequest("https://example.com/huge-no-stream.jpg");
+      const response = await PUT(request, mockParams);
+
+      // Verify that response.arrayBuffer() was called — confirming line 140 was reached
+      expect(arrayBufferMock).toHaveBeenCalled();
+
+      // RemoteImageTooLargeError is thrown at line 140 and caught by the inner catch.
+      // The instanceof check returns true → route returns 400 without reaching the DB update.
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("Image too large (max 10MB)");
+      expect(mockUpdate).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+    });
+
+    // Lines 168-169: response.body is a ReadableStream that reads within the size limit
+    // (normal successful streaming path — return Buffer.concat(...))
+    it("reads streamed response body within size limit and generates blur (lines 168-169)", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: { id: "story-123", image_path: "https://example.com/small.jpg", image_source: null },
+        error: null,
+      });
+      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEq = vi.fn().mockReturnValue({ select: mockSelect });
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ update: mockUpdate });
+      vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
+
+      const smallChunk = new Uint8Array(8); // 8 bytes — well within 10MB limit
+      const bodyStream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(smallChunk);
+          controller.close();
+        },
+      });
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({}),
+        body: bodyStream, // has a body stream → uses reader path
+      } as unknown as Response);
+
+      const request = createJsonImageRequest("https://example.com/small.jpg");
+      const response = await PUT(request, mockParams);
+
+      expect(response.status).toBe(200);
+      // validateImageBuffer mock returns valid: true, so blur should be generated
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ blur_data_url: "data:image/webp;base64,mockblur" })
+      );
+
+      fetchSpy.mockRestore();
+    });
+  });
+
+  describe("fetch timeout abort callback (line 322)", () => {
+    // Line 322: `fetchController.abort()` inside the setTimeout callback that fires
+    // after FETCH_TIMEOUT_MS (8000ms) when the external image fetch hangs.
+    it("aborts the external image fetch after 8 seconds timeout (line 322)", async () => {
+      vi.useFakeTimers();
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const { mockUpdate } = setupStoryUpdateMock("https://example.com/slow.jpg");
+
+      // Mock fetch to hang until the signal is aborted, then reject
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((_url, options) => {
+        return new Promise((_resolve, reject) => {
+          const signal = (options as RequestInit)?.signal;
+          if (signal) {
+            signal.addEventListener("abort", () => {
+              reject(new DOMException("The user aborted a request.", "AbortError"));
+            });
+          }
+        });
+      });
+
+      const request = createJsonImageRequest("https://example.com/slow.jpg");
+      const responsePromise = PUT(request, mockParams);
+
+      // Advance past FETCH_TIMEOUT_MS (8000ms) — the setTimeout fires and calls
+      // fetchController.abort() (line 322), which triggers the AbortSignal event,
+      // which rejects our mocked fetch with an AbortError.
+      await vi.advanceTimersByTimeAsync(8001);
+
+      const response = await responsePromise;
+
+      // Abort during blur generation is non-fatal — route continues to DB update
+      expect(response.status).toBe(200);
+      // No blur placeholder since fetch was aborted before buffer was read
+      expect(mockUpdate).toHaveBeenCalledWith({ image_path: "https://example.com/slow.jpg" });
+      // The abort error is logged as a warning (non-fatal path)
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Could not fetch external image for blur generation"),
+        expect.anything()
+      );
+
+      fetchSpy.mockRestore();
+      vi.useRealTimers();
+    });
+  });
+
+  describe("V8 sub-expression gap closers", () => {
+    describe("isUnsafeIpv6 — first hextet below 0xfc00 (line 88 left-AND short-circuit)", () => {
+      // Line 88: `(first >= 0xfc00 && first <= 0xfdff) ||`
+      // When first < 0xfc00, the left operand of `&&` is FALSE and the entire sub-expression
+      // short-circuits on the left side (not the right). All existing tests have first >= 0xfc00.
+      // A public IPv6 like 2001::1 (first=0x2001) exercises the left-side-false path.
+      it("allows URL when DNS resolves to public IPv6 with first hextet < 0xfc00", async () => {
+        vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+        dns.lookup.mockResolvedValueOnce([{ address: "2001::1", family: 6 }]);
+        setupStoryUpdateMock("https://cdn.example.com/image.jpg");
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network"));
+
+        const request = createJsonImageRequest("https://cdn.example.com/image.jpg");
+        const response = await PUT(request, mockParams);
+
+        expect(response.status).toBe(200);
+
+        fetchSpy.mockRestore();
+      });
+    });
+
+    describe("validateRemoteImageUrl DNS catch — String(error) branch (line 123)", () => {
+      // Line 123: `error: error instanceof Error ? error.message : String(error),`
+      // Existing test rejects with `new Error("ENOTFOUND")` which always takes the
+      // `error.message` arm. Rejecting with a plain string covers String(error).
+      it("uses String(error) when DNS lookup rejects with a non-Error value", async () => {
+        vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+        dns.lookup.mockRejectedValueOnce("ENOTFOUND_string");
+
+        const request = createJsonImageRequest("https://unknown.cdn.example.com/image.jpg");
+        const response = await PUT(request, mockParams);
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.error).toBe("Remote image host could not be validated");
+        expect(logger.warn).toHaveBeenCalledWith(
+          "Could not validate remote image host:",
+          expect.objectContaining({ error: "ENOTFOUND_string" })
+        );
+      });
+    });
+
+    describe("readRemoteImageBufferWithLimit — undefined chunk skipped (line 153)", () => {
+      // Line 153: `if (!value) continue;`
+      // The standard ReadableStream never yields a falsy chunk value between done=false reads,
+      // but the guard exists for defensive correctness. Exercise it with a custom reader stub.
+      it("skips undefined values yielded by the stream reader before reading real chunks", async () => {
+        vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+        setupStoryUpdateMock("https://example.com/chunky.jpg");
+
+        let step = 0;
+        const customBody = {
+          getReader: () => ({
+            read: async () => {
+              step++;
+              if (step === 1) return { done: false as const, value: undefined as unknown as Uint8Array };
+              if (step === 2) return { done: false as const, value: new Uint8Array(4) };
+              return { done: true as const, value: undefined as unknown as Uint8Array };
+            },
+            releaseLock: () => {},
+          }),
+        };
+
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+          ok: true,
+          status: 200,
+          headers: new Headers({}),
+          body: customBody as unknown as ReadableStream<Uint8Array>,
+        } as unknown as Response);
+
+        const request = createJsonImageRequest("https://example.com/chunky.jpg");
+        const response = await PUT(request, mockParams);
+
+        expect(response.status).toBe(200);
+
+        fetchSpy.mockRestore();
+      });
+    });
+
+    describe("outer catch block — String(error) branch (line 429)", () => {
+      // Line 429: `logger.error("Admin image API error:", { error: error instanceof Error ? error.message : String(error) })`
+      // The existing "content-type fallback" test throws a SyntaxError (instanceof Error),
+      // always taking the `error.message` arm. Throwing a plain string covers String(error).
+      it("uses String(error) when a non-Error value is thrown inside the main try block", async () => {
+        vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+        vi.mocked(createAdminClient).mockImplementationOnce(() => {
+          throw "plain-string-thrown";
+        });
+
+        const request = createJsonImageRequest("https://example.com/image.jpg");
+        const response = await PUT(request, mockParams);
+        const data = await response.json();
+
+        expect(response.status).toBe(500);
+        expect(data.error).toBe("Internal server error");
+        expect(logger.error).toHaveBeenCalledWith(
+          "Admin image API error:",
+          expect.objectContaining({ error: "plain-string-thrown" })
+        );
+      });
+    });
   });
 });
