@@ -429,26 +429,24 @@ describe("POST /api/admin/stories", () => {
     expect(insertCall.display_order).toBe(6);
   });
 
-  it("should update suggestion status when converting", async () => {
-    const mockUpdate = vi.fn().mockReturnValue({
-      eq: vi.fn().mockResolvedValue({ error: null }),
+  it("converts a suggestion atomically via a single RPC (story insert + suggestion update)", async () => {
+    // BE-M4 regression: the story insert and the suggestion status update must
+    // happen in ONE transaction. The route must call a single
+    // create_story_from_suggestion RPC instead of a separate insert + update.
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: {
+        id: "new-story-id",
+        slug: "suggested-place",
+        title: "Suggested Place",
+        category: "nature",
+        display_order: 1,
+        curation_status: "needs_curation",
+        created_at: "2024-01-01T00:00:00Z",
+      },
+      error: null,
     });
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: {
-            id: "new-story-id",
-            slug: "suggested-place",
-            title: "Suggested Place",
-            category: "nature",
-            display_order: 1,
-            curation_status: "needs_curation",
-            created_at: "2024-01-01T00:00:00Z",
-          },
-          error: null,
-        }),
-      }),
-    });
+    const mockInsert = vi.fn();
+    const mockUpdate = vi.fn();
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
@@ -465,7 +463,7 @@ describe("POST /api/admin/stories", () => {
       }
       return { select: mockSelect, insert: mockInsert };
     });
-    mockWithAdminAuthorized({ from: mockFrom });
+    mockWithAdminAuthorized({ from: mockFrom, rpc: mockRpc });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -477,34 +475,26 @@ describe("POST /api/admin/stories", () => {
       }),
     });
     const response = await POST(request);
+    const data = await response.json();
 
     expect(response.status).toBe(201);
-    expect(mockUpdate).toHaveBeenCalledWith({
-      status: "converted",
-      converted_story_id: "new-story-id",
-      updated_at: expect.any(String),
-    });
+    expect(data.data.id).toBe("new-story-id");
+    // Single atomic RPC, NOT a separate insert + update.
+    expect(mockRpc).toHaveBeenCalledWith(
+      "create_story_from_suggestion",
+      expect.objectContaining({
+        p_suggestion_id: "550e8400-e29b-41d4-a716-446655440000",
+        p_source_type: "user_submitted",
+      })
+    );
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("should insert the canonical DB source type for user-submitted stories", async () => {
-    const mockUpdate = vi.fn().mockReturnValue({
-      eq: vi.fn().mockResolvedValue({ error: null }),
-    });
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: {
-            id: "new-story-id",
-            slug: "suggested-place",
-            title: "Suggested Place",
-            category: "nature",
-            display_order: 1,
-            curation_status: "needs_curation",
-            created_at: "2024-01-01T00:00:00Z",
-          },
-          error: null,
-        }),
-      }),
+  it("returns 500 when the atomic conversion RPC fails", async () => {
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "conversion failed" },
     });
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
@@ -516,13 +506,50 @@ describe("POST /api/admin/stories", () => {
         }),
       }),
     });
-    const mockFrom = vi.fn().mockImplementation((table: string) => {
-      if (table === "story_suggestions") {
-        return { update: mockUpdate };
-      }
-      return { select: mockSelect, insert: mockInsert };
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    mockWithAdminAuthorized({ from: mockFrom, rpc: mockRpc });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "Suggested Place",
+        category: "nature",
+        suggestionId: "550e8400-e29b-41d4-a716-446655440000",
+        sourceType: "user_submitted",
+      }),
     });
-    mockWithAdminAuthorized({ from: mockFrom });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to create story");
+  });
+
+  it("should pass the canonical DB source type to the conversion RPC for user-submitted stories", async () => {
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: {
+        id: "new-story-id",
+        slug: "suggested-place",
+        title: "Suggested Place",
+        category: "nature",
+        display_order: 1,
+        curation_status: "needs_curation",
+        created_at: "2024-01-01T00:00:00Z",
+      },
+      error: null,
+    });
+    const mockSelect = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }),
+      order: vi.fn().mockReturnValue({
+        limit: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      }),
+    });
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    mockWithAdminAuthorized({ from: mockFrom, rpc: mockRpc });
 
     const request = new NextRequest("http://localhost:3000/api/admin/stories", {
       method: "POST",
@@ -536,10 +563,11 @@ describe("POST /api/admin/stories", () => {
     const response = await POST(request);
 
     expect(response.status).toBe(201);
-    expect(mockInsert).toHaveBeenCalledWith(
+    expect(mockRpc).toHaveBeenCalledWith(
+      "create_story_from_suggestion",
       expect.objectContaining({
-        source_type: "user_submitted",
-        suggestion_id: "550e8400-e29b-41d4-a716-446655440000",
+        p_source_type: "user_submitted",
+        p_suggestion_id: "550e8400-e29b-41d4-a716-446655440000",
       })
     );
   });
@@ -618,25 +646,14 @@ describe("POST /api/admin/stories", () => {
     expect(insertCall.metadata).toEqual({ tags: ["cultural"] });
   });
 
-  it("should log error but succeed when suggestion status update fails", async () => {
-    const mockUpdate = vi.fn().mockReturnValue({
-      eq: vi.fn().mockResolvedValue({ error: { message: "Suggestion update failed" } }),
-    });
-    const mockInsert = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: {
-            id: "new-story-id",
-            slug: "suggested-place",
-            title: "Suggested Place",
-            category: "nature",
-            display_order: 1,
-            curation_status: "needs_curation",
-            created_at: "2024-01-01T00:00:00Z",
-          },
-          error: null,
-        }),
-      }),
+  it("rolls back (returns 500) when the atomic conversion RPC reports an error", async () => {
+    // BE-M4: previously the route created the story then separately updated the
+    // suggestion, logging-but-swallowing update failures (leaving a story
+    // created but the suggestion unmarked). Now the conversion is atomic, so an
+    // RPC error must surface as a failed request — nothing is half-committed.
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "suggestion update failed inside transaction" },
     });
     const mockSelect = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
@@ -648,13 +665,8 @@ describe("POST /api/admin/stories", () => {
         }),
       }),
     });
-    const mockFrom = vi.fn().mockImplementation((table: string) => {
-      if (table === "story_suggestions") {
-        return { update: mockUpdate };
-      }
-      return { select: mockSelect, insert: mockInsert };
-    });
-    mockWithAdminAuthorized({ from: mockFrom });
+    const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    mockWithAdminAuthorized({ from: mockFrom, rpc: mockRpc });
 
     const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
@@ -668,16 +680,11 @@ describe("POST /api/admin/stories", () => {
       }),
     });
     const response = await POST(request);
+    const data = await response.json();
 
-    // Story creation should still succeed even though suggestion update failed
-    expect(response.status).toBe(201);
-    expect(loggerSpy).toHaveBeenCalledWith(
-      "[ADMIN_STORIES_SUGGESTION_UPDATE_FAILED]",
-      expect.objectContaining({
-        suggestion_id: "550e8400-e29b-41d4-a716-446655440000",
-        error: expect.objectContaining({ message: "Suggestion update failed" }),
-      })
-    );
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to create story");
+    expect(loggerSpy).toHaveBeenCalled();
 
     loggerSpy.mockRestore();
   });

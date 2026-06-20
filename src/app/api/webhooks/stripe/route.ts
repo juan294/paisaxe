@@ -75,6 +75,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const supabase = createAdminClient();
     const { data, error } = await supabase.rpc("grant_day_pass_idempotent", {
       p_event_id: event.id,
+      p_event_type: event.type,
       p_user_id: userId,
       p_payment_provider_id: paymentProviderId,
       p_expires_at: expiresAt.toISOString(),
