@@ -104,7 +104,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE /api/admin/suggestions/[id] - Delete a suggestion
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   // Validate admin auth
   const auth = await validateAdminAuth();
   if (!auth.valid) {

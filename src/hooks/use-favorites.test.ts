@@ -77,7 +77,7 @@ describe("useFavorites", () => {
       );
 
       // Mock the cloud sync GET to return same favorites
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+      mockFetch.mockImplementation(async (_url: string, options?: Record<string, unknown>) => {
         if (!options?.method || options.method === "GET") {
           return { ok: true, json: async () => ["story-1", "story-2"] };
         }
@@ -190,7 +190,7 @@ describe("useFavorites", () => {
 
       localStorageMock.getItem.mockReturnValue(JSON.stringify(["story-1"]));
 
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+      mockFetch.mockImplementation(async (_url: string, options?: Record<string, unknown>) => {
         if (!options?.method || options.method === "GET") {
           return { ok: true, json: async () => ["story-1"] };
         }
@@ -313,7 +313,7 @@ describe("useFavorites", () => {
 
     it("should DELETE from /api/favorites when removing a favorite", async () => {
       // The cloud sync GET returns story-1 so it's in favorites
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+      mockFetch.mockImplementation(async (_url: string, options?: Record<string, unknown>) => {
         if (!options?.method || options.method === "GET") {
           return { ok: true, json: async () => ["story-1"] };
         }
@@ -362,7 +362,7 @@ describe("useFavorites", () => {
       let cloudSyncDone = false;
 
       // Cloud sync GET succeeds, but toggle POST fails
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+      mockFetch.mockImplementation(async (_url: string, options?: Record<string, unknown>) => {
         if (!options?.method || options.method === "GET") {
           return { ok: true, json: async () => [] };
         }
@@ -381,7 +381,7 @@ describe("useFavorites", () => {
 
       // Now make subsequent POST calls fail
       cloudSyncDone = true;
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+      mockFetch.mockImplementation(async (_url: string, options?: Record<string, unknown>) => {
         if (!options?.method || options.method === "GET") {
           return { ok: true, json: async () => [] };
         }
@@ -407,7 +407,7 @@ describe("useFavorites", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+      mockFetch.mockImplementation(async (_url: string, options?: Record<string, unknown>) => {
         if (!options?.method || options.method === "GET") {
           return { ok: true, json: async () => [] };
         }
@@ -444,7 +444,7 @@ describe("useFavorites", () => {
         .mockImplementation(() => {});
 
       // Cloud sync GET succeeds with story-1, toggle DELETE will fail
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+      mockFetch.mockImplementation(async (_url: string, options?: Record<string, unknown>) => {
         if (!options?.method || options.method === "GET") {
           return { ok: true, json: async () => ["story-1"] };
         }
@@ -486,7 +486,7 @@ describe("useFavorites", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      mockFetch.mockImplementation(async (url: string, options?: Record<string, unknown>) => {
+      mockFetch.mockImplementation(async (_url: string, options?: Record<string, unknown>) => {
         if (!options?.method || options.method === "GET") {
           return { ok: true, json: async () => ["story-1"] };
         }

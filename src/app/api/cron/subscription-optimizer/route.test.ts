@@ -12,7 +12,7 @@ vi.mock("@/lib/logger", () => ({ logger }));
 vi.mock("next/server", () => ({
   NextRequest: class MockNextRequest {
     headers: Map<string, string>;
-    constructor(url: string, init?: { headers?: Record<string, string> }) {
+    constructor(_url: string, init?: { headers?: Record<string, string> }) {
       this.headers = new Map(Object.entries(init?.headers || {}));
     }
   },
