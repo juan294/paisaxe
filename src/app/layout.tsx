@@ -8,12 +8,10 @@
 
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { headers } from "next/headers";
 import { VercelAnalytics } from "@/components/analytics";
 import { JsonLd } from "@/components/seo/json-ld";
 import { LOCATION_CONFIG } from "@/config/location";
 import { getSiteUrl, getSupabaseUrl } from "@/lib/env";
-import { resolveServerLocale } from "@/lib/i18n/resolve-server-locale";
 import { Providers } from "./providers";
 import { PostHogPageView } from "@/components/posthog-provider";
 import "./globals.css";
@@ -116,20 +114,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // FE-M4: Resolve locale server-side so SSR HTML matches the user's language.
-  // Reading Accept-Language + locale cookie avoids the Spanish flash for
-  // non-Spanish users. We await headers() as required by Next.js 16 App Router.
-  const reqHeaders = await headers();
-  const initialLocale = resolveServerLocale(
-    reqHeaders.get("cookie"),
-    reqHeaders.get("accept-language"),
-  );
-
+  // NOTE: locale is resolved client-side in LanguageProvider. Reading headers()
+  // here would make the root layout dynamic and break the PPR static shell
+  // (see CLAUDE.md "CSP and PPR Compatibility"); FE-M4 server-side locale was
+  // reverted for that reason — the i18n first-paint flash remains a known item.
   return (
     <html lang={LOCATION_CONFIG.primaryLanguage} suppressHydrationWarning>
       <head>
@@ -150,7 +143,7 @@ export default async function RootLayout({
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <JsonLd type="website" />
-        <Providers initialLocale={initialLocale}>
+        <Providers>
           <PostHogPageView />
           <div id="main-content">
             {children}
