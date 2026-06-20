@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceAccess } from "@/hooks/use-voice-access";
 import { useTranslation } from "@/lib/i18n";
@@ -8,6 +8,20 @@ import PricingLoading from "./loading";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin } from "lucide-react";
+
+/** Voice-pass tiers offered on the pricing page (#137). */
+type PricingTier = {
+  id: "day_pass" | "weekly_pass" | "monthly_pass";
+  price: string;
+  durationKey: string;
+  fallbackLabel: string;
+};
+
+const PRICING_TIERS: PricingTier[] = [
+  { id: "day_pass", price: "€1.99", durationKey: "premium.tier_day", fallbackLabel: "24 horas" },
+  { id: "weekly_pass", price: "€4.99", durationKey: "premium.tier_week", fallbackLabel: "7 días" },
+  { id: "monthly_pass", price: "€9.99", durationKey: "premium.tier_month", fallbackLabel: "30 días" },
+];
 
 export default function PricingPage() {
   return (
@@ -29,9 +43,14 @@ function PricingPageContent() {
   const pricingUrl = encodedReturnTo
     ? `/pricing?returnTo=${encodedReturnTo}`
     : "/pricing";
-  const checkoutUrl = encodedReturnTo
-    ? `/pricing/checkout?returnTo=${encodedReturnTo}`
-    : "/pricing/checkout";
+
+  // #137: selected pass tier — defaults to the Day Pass.
+  const [selectedTier, setSelectedTier] = useState<PricingTier["id"]>("day_pass");
+
+  const checkoutParams = new URLSearchParams();
+  if (returnTo) checkoutParams.set("returnTo", returnTo);
+  checkoutParams.set("tier", selectedTier);
+  const checkoutUrl = `/pricing/checkout?${checkoutParams.toString()}`;
 
   const handlePurchase = () => {
     if (!user || !session) {
@@ -113,13 +132,42 @@ function PricingPageContent() {
         {/* Pricing Card */}
         {(!canUseVoice || isResolvingAuthenticatedAccess) && (
           <div className="rounded-xl border border-neutral-800 overflow-hidden">
-            {/* Price */}
+            {/* Price + tier selector (#137) */}
             <div className="p-6 text-center border-b border-neutral-800">
-              <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-3">
+              <p className="text-xs font-medium text-green-500 uppercase tracking-widest mb-4">
                 {t("premium.voice_pass_label")}
               </p>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-semibold text-white">€1.99</span>
+              <div
+                role="radiogroup"
+                aria-label={t("premium.voice_pass_label")}
+                className="grid grid-cols-3 gap-2"
+              >
+                {PRICING_TIERS.map((tier) => {
+                  const selected = selectedTier === tier.id;
+                  return (
+                    <button
+                      key={tier.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setSelectedTier(tier.id)}
+                      className={`flex flex-col items-center rounded-lg border px-2 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 ${
+                        selected
+                          ? "border-green-500 bg-green-500/10"
+                          : "border-neutral-800 hover:border-neutral-700"
+                      }`}
+                    >
+                      <span className="text-lg font-semibold text-white">
+                        {tier.price}
+                      </span>
+                      <span className="mt-1 text-[11px] text-neutral-400">
+                        {t(tier.durationKey) === tier.durationKey
+                          ? tier.fallbackLabel
+                          : t(tier.durationKey)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

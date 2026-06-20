@@ -1,12 +1,40 @@
 // PE-H4: Static import for production SDK path (avoids per-request dynamic import overhead).
-// Note: claude.ts uses curl in development/test (Turbopack workaround) and the SDK only in
-// production. The dynamic-import deferral that remains in route.ts is a separate concern
-// (documented in docs/engineering/turbopack-fix.md) and is intentionally left as-is there.
+//
+// PARITY GAP (PE-M2, issue #534): claude.ts uses curl in development/test and the
+// Anthropic SDK only in production. This dev/prod split exists because the Anthropic
+// SDK's HTTP layer hit a process-level ECONNRESET under the Next.js 16 Turbopack dev
+// server (see docs/engineering/turbopack-fix.md for the full investigation). The curl
+// subprocess sidesteps the corrupted Node HTTP stack.
+//
+// The gap was NOT closed in #534 because we could not verify, in CI/headless, that the
+// SDK streams reliably under the current Turbopack dev server without risking the live
+// chat path. Per the issue's conservative guidance, the curl path is retained but the
+// former `setTimeout(resolve, 100)` polling handoff in streamWithCurl has been replaced
+// with a fully event-driven promise (no fixed-interval polling, no added latency).
+// Re-test the SDK in dev after future Next.js patches; if it streams cleanly, delete the
+// curl branches and the USE_CURL flag and route all environments through the SDK.
 import AnthropicSDK from "@anthropic-ai/sdk";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Chunk, ImageResult, Source } from "@/types";
 import { CHAT_MODEL } from "@/lib/models";
 import { logger } from "@/lib/logger";
+import { recordAnthropicUsage } from "@/lib/costs/anthropic-usage";
+
+/** Raw Anthropic usage block as it appears on streaming SSE events. */
+interface RawUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}
+
+/**
+ * Fire-and-forget usage recording (#138). Never awaited on the hot path and
+ * never throws — recordAnthropicUsage swallows its own errors.
+ */
+function trackUsage(model: string, usage: RawUsage | null | undefined, source: string): void {
+  void recordAnthropicUsage({ model, usage, source });
+}
 
 interface AnthropicMessage {
   role: "user" | "assistant";
@@ -79,6 +107,14 @@ async function* streamWithSDK(
           yield event.delta.text;
         }
       }
+      // #138: record usage from the completed stream (best-effort, non-blocking).
+      try {
+        const finalMessage = await stream.finalMessage();
+        trackUsage(model, finalMessage.usage as RawUsage | undefined, "chat_stream");
+      } catch {
+        // finalMessage() can throw if the stream errored after we drained text;
+        // usage tracking must never affect the response.
+      }
       return; // success
     } catch (err) {
       if (attempt < 2) {
@@ -134,19 +170,48 @@ async function* streamWithCurl(
 
   let buffer = "";
 
-  // Create an async iterator from the stdout stream
+  // Create an async iterator from the stdout stream.
+  //
+  // Event-driven handoff (PE-M2): producers (stdout/close/error/abort) call
+  // `wake()` whenever new work is available; the consumer loop below awaits a
+  // promise that resolves on the next `wake()`. A `pending` flag closes the
+  // classic lost-wakeup race — if a wake fires between the consumer draining
+  // the queue and re-awaiting, the next `waitForWork()` resolves immediately
+  // instead of blocking. This replaces the previous 100ms `setTimeout` poll,
+  // which masked the race at the cost of up to 100ms of added latency per gap.
   const chunks: string[] = [];
   let resolveNext: (() => void) | null = null;
+  let pending = false;
   let done = false;
   let error: Error | null = null;
+
+  const wake = () => {
+    pending = true;
+    if (resolveNext) {
+      const resolve = resolveNext;
+      resolveNext = null;
+      resolve();
+    }
+  };
+
+  const waitForWork = () =>
+    new Promise<void>((resolve) => {
+      if (pending) {
+        // Work arrived (or completed) before we started waiting — resume now.
+        resolve();
+        return;
+      }
+      resolveNext = resolve;
+    });
+
+  // #138: accumulate usage from message_start (input/cache) + message_delta (output).
+  const streamUsage: RawUsage = {};
+
   const handleAbort = () => {
     error = createAbortError();
     done = true;
     curlProcess.kill?.();
-    if (resolveNext) {
-      resolveNext();
-      resolveNext = null;
-    }
+    wake();
   };
 
   options.signal?.addEventListener("abort", handleAbort, { once: true });
@@ -169,10 +234,18 @@ async function* streamWithCurl(
           // Handle content_block_delta events (streaming text)
           if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
             chunks.push(event.delta.text);
-            if (resolveNext) {
-              resolveNext();
-              resolveNext = null;
-            }
+            wake();
+          }
+
+          // Capture usage as it streams (#138).
+          if (event.type === "message_start" && event.message?.usage) {
+            const u = event.message.usage;
+            streamUsage.input_tokens = u.input_tokens;
+            streamUsage.cache_creation_input_tokens = u.cache_creation_input_tokens;
+            streamUsage.cache_read_input_tokens = u.cache_read_input_tokens;
+          }
+          if (event.type === "message_delta" && event.usage) {
+            streamUsage.output_tokens = event.usage.output_tokens;
           }
 
           // Handle error events
@@ -192,19 +265,13 @@ async function* streamWithCurl(
 
   curlProcess.on("close", () => {
     done = true;
-    if (resolveNext) {
-      resolveNext();
-      resolveNext = null;
-    }
+    wake();
   });
 
   curlProcess.on("error", (err) => {
     error = err;
     done = true;
-    if (resolveNext) {
-      resolveNext();
-      resolveNext = null;
-    }
+    wake();
   });
 
   // Yield chunks as they arrive
@@ -218,13 +285,18 @@ async function* streamWithCurl(
 
       if (done) break;
 
-      // Wait for more data
-      await new Promise<void>((resolve) => {
-        resolveNext = resolve;
-        // Also resolve after a short timeout to check for completion
-        setTimeout(resolve, 100);
-      });
+      // Reset the pending flag, then wait for the next wake() (new chunk,
+      // close, error, or abort). The flag is consumed here so the next
+      // waitForWork() blocks until genuinely new work arrives.
+      pending = false;
+      // Re-check after clearing the flag to avoid a wake() that landed between
+      // the drain above and this reset being lost.
+      if (chunks.length === 0 && !done && !error) {
+        await waitForWork();
+      }
     }
+    // #138: record usage once the stream has drained cleanly.
+    trackUsage(model, streamUsage, "chat_stream");
   } finally {
     options.signal?.removeEventListener("abort", handleAbort);
   }
@@ -244,11 +316,14 @@ export async function callAnthropicAPI(
   model: string,
   maxTokens: number
 ): Promise<Anthropic.Message> {
-  if (USE_CURL) {
-    return callWithCurl(system, messages, model, maxTokens);
-  } else {
-    return callWithSDK(system, messages, model, maxTokens);
-  }
+  const response = USE_CURL
+    ? await callWithCurl(system, messages, model, maxTokens)
+    : await callWithSDK(system, messages, model, maxTokens);
+
+  // #138: record token usage + estimated cost (best-effort, non-blocking).
+  trackUsage(model, response.usage as RawUsage | undefined, "chat");
+
+  return response;
 }
 
 /**

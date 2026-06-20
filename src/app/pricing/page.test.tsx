@@ -377,7 +377,7 @@ describe("PricingPage", () => {
     const button = screen.getByRole("button", { name: "premium.pricing_cta" });
     fireEvent.click(button);
 
-    expect(mockPush).toHaveBeenCalledWith("/pricing/checkout");
+    expect(mockPush).toHaveBeenCalledWith("/pricing/checkout?tier=day_pass");
   });
 
   it("preserves returnTo when authenticated users continue to checkout", () => {
@@ -396,8 +396,25 @@ describe("PricingPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "premium.pricing_cta" }));
 
     expect(mockPush).toHaveBeenCalledWith(
-      "/pricing/checkout?returnTo=oviedo-walking-tour"
+      "/pricing/checkout?returnTo=oviedo-walking-tour&tier=day_pass"
     );
+  });
+
+  it("forwards the selected tier when continuing to checkout", () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: "user-123", email: "test@example.com" },
+      session: { access_token: "token" },
+      signInWithGoogle: mockSignInWithGoogle,
+      isLoading: false,
+    });
+
+    render(<PricingPage />);
+
+    // Select the weekly tier, then continue.
+    fireEvent.click(screen.getByRole("radio", { name: /4\.99/ }));
+    fireEvent.click(screen.getByRole("button", { name: "premium.pricing_cta" }));
+
+    expect(mockPush).toHaveBeenCalledWith("/pricing/checkout?tier=weekly_pass");
   });
 
   it("should show Premium Access text when isWhitelisted is true with no expiresAt", () => {

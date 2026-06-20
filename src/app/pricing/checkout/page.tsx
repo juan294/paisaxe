@@ -36,6 +36,12 @@ function CheckoutPageContent() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
+  // #137: pass tier (day_pass | weekly_pass | monthly_pass) selected on the pricing page.
+  const VALID_TIERS = ["day_pass", "weekly_pass", "monthly_pass"] as const;
+  const tierParam = searchParams.get("tier");
+  const purchaseType = (VALID_TIERS as readonly string[]).includes(tierParam ?? "")
+    ? (tierParam as (typeof VALID_TIERS)[number])
+    : "day_pass";
   const checkoutPath = returnTo
     ? `/pricing/checkout?returnTo=${encodeURIComponent(returnTo)}`
     : "/pricing/checkout";
@@ -46,7 +52,10 @@ function CheckoutPageContent() {
       const response = await fetch("/api/checkout/embedded", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders() },
-        body: JSON.stringify({ ...(returnTo ? { returnTo } : {}) }),
+        body: JSON.stringify({
+          ...(returnTo ? { returnTo } : {}),
+          purchaseType,
+        }),
       });
 
       if (!response.ok) {
@@ -60,7 +69,7 @@ function CheckoutPageContent() {
       setError(err instanceof Error ? err.message : t("errors.unknown"));
       throw err;
     }
-  }, [returnTo, t]);
+  }, [returnTo, purchaseType, t]);
 
   // Show sign-in prompt if not authenticated
   if (!user || !session) {

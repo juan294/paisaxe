@@ -26,6 +26,7 @@ vi.mock("stripe", () => {
 import {
   isStripeConfigured,
   calculateExpiryDate,
+  getPriceIdForPurchaseType,
   formatPrice,
   getStripeClient,
   createDayPassCheckoutSession,
@@ -69,10 +70,44 @@ describe("stripe", () => {
       expect(expiry.getTime()).toBeLessThanOrEqual(after + expectedMs);
     });
 
+    it("should return date 7 days in future for weekly_pass", () => {
+      const before = Date.now();
+      const expiry = calculateExpiryDate("weekly_pass");
+      const after = Date.now();
+      const expectedMs = 7 * 24 * 60 * 60 * 1000;
+      expect(expiry.getTime()).toBeGreaterThanOrEqual(before + expectedMs);
+      expect(expiry.getTime()).toBeLessThanOrEqual(after + expectedMs);
+    });
+
+    it("should return date 30 days in future for monthly_pass", () => {
+      const before = Date.now();
+      const expiry = calculateExpiryDate("monthly_pass");
+      const after = Date.now();
+      const expectedMs = 30 * 24 * 60 * 60 * 1000;
+      expect(expiry.getTime()).toBeGreaterThanOrEqual(before + expectedMs);
+      expect(expiry.getTime()).toBeLessThanOrEqual(after + expectedMs);
+    });
+
     it("should throw error for unknown purchase type", () => {
       expect(() =>
-        calculateExpiryDate("weekly_pass" as "day_pass")
-      ).toThrow("Unknown purchase type: weekly_pass");
+        calculateExpiryDate("yearly_pass" as "day_pass")
+      ).toThrow("Unknown purchase type: yearly_pass");
+    });
+  });
+
+  describe("getPriceIdForPurchaseType", () => {
+    it("resolves each tier to its env price ID", () => {
+      vi.stubEnv("STRIPE_DAY_PASS_PRICE_ID", "price_day");
+      vi.stubEnv("STRIPE_WEEKLY_PRICE_ID", "price_week");
+      vi.stubEnv("STRIPE_MONTHLY_PRICE_ID", "price_month");
+      expect(getPriceIdForPurchaseType("day_pass")).toBe("price_day");
+      expect(getPriceIdForPurchaseType("weekly_pass")).toBe("price_week");
+      expect(getPriceIdForPurchaseType("monthly_pass")).toBe("price_month");
+    });
+
+    it("returns null when a tier's price ID is unset", () => {
+      vi.stubEnv("STRIPE_WEEKLY_PRICE_ID", "");
+      expect(getPriceIdForPurchaseType("weekly_pass")).toBeNull();
     });
   });
 
@@ -182,10 +217,48 @@ describe("stripe", () => {
         payment_method_types: ["card"],
         line_items: [{ price: "price_123", quantity: 1 }],
         customer_email: "test@example.com",
-        metadata: { user_id: "user-123" },
+        metadata: { user_id: "user-123", purchase_type: "day_pass" },
         success_url: "https://example.com/success",
         cancel_url: "https://example.com/cancel",
       });
+    });
+
+    it("should use the weekly price ID and record the tier in metadata", async () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_WEEKLY_PRICE_ID", "price_week");
+
+      mockCreate.mockResolvedValue({ url: "https://checkout.stripe.com/week" });
+
+      const url = await createDayPassCheckoutSession({
+        userId: "user-123",
+        userEmail: "test@example.com",
+        successUrl: "https://example.com/success",
+        cancelUrl: "https://example.com/cancel",
+        purchaseType: "weekly_pass",
+      });
+
+      expect(url).toBe("https://checkout.stripe.com/week");
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          line_items: [{ price: "price_week", quantity: 1 }],
+          metadata: { user_id: "user-123", purchase_type: "weekly_pass" },
+        })
+      );
+    });
+
+    it("throws when the requested tier's price ID is missing", async () => {
+      vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
+      vi.stubEnv("STRIPE_MONTHLY_PRICE_ID", "");
+
+      await expect(
+        createDayPassCheckoutSession({
+          userId: "user-123",
+          userEmail: "test@example.com",
+          successUrl: "https://example.com/success",
+          cancelUrl: "https://example.com/cancel",
+          purchaseType: "monthly_pass",
+        })
+      ).rejects.toThrow("STRIPE_MONTHLY_PRICE_ID not configured");
     });
 
     it("should throw error when session URL is not returned", async () => {
@@ -244,7 +317,7 @@ describe("stripe", () => {
         payment_method_types: ["card"],
         line_items: [{ price: "price_123", quantity: 1 }],
         customer_email: "test@example.com",
-        metadata: { user_id: "user-123" },
+        metadata: { user_id: "user-123", purchase_type: "day_pass" },
         return_url: "https://example.com/checkout/return?session_id={CHECKOUT_SESSION_ID}",
       });
     });

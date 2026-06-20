@@ -241,7 +241,7 @@ describe("CheckoutPage", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/checkout/embedded", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ purchaseType: "day_pass" }),
       });
       expect(secret).toBe("cs_test_123");
     });
@@ -257,10 +257,27 @@ describe("CheckoutPage", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/checkout/embedded", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ returnTo: "oviedo-walking-tour" }),
+        body: JSON.stringify({ returnTo: "oviedo-walking-tour", purchaseType: "day_pass" }),
       });
 
       mockSearchParams.delete("returnTo");
+    });
+
+    it("should forward the selected tier as purchaseType", async () => {
+      mockSearchParams.set("tier", "weekly_pass");
+
+      render(<CheckoutPage />);
+
+      expect(capturedFetchClientSecret).toBeDefined();
+      await capturedFetchClientSecret!();
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/checkout/embedded", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purchaseType: "weekly_pass" }),
+      });
+
+      mockSearchParams.delete("tier");
     });
 
     it("should show error state when fetch returns non-ok response with error body", async () => {

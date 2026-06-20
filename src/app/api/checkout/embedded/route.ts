@@ -1,8 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createEmbeddedCheckoutSession } from "@/lib/stripe";
+import { createEmbeddedCheckoutSession, type PurchaseType } from "@/lib/stripe";
 import { getSupabaseClient } from "@/lib/supabase-auth";
 import { checkoutBodySchema } from "@/lib/schemas";
 import { logger } from "@/lib/logger";
+
+/** Voice-pass tiers accepted by checkout (#137). */
+const VALID_PURCHASE_TYPES: readonly PurchaseType[] = [
+  "day_pass",
+  "weekly_pass",
+  "monthly_pass",
+];
+
+/** Parse an optional pass tier from a request body, defaulting to day_pass. */
+function parsePurchaseType(raw: unknown): PurchaseType {
+  if (
+    raw &&
+    typeof raw === "object" &&
+    "purchaseType" in raw &&
+    VALID_PURCHASE_TYPES.includes((raw as { purchaseType: PurchaseType }).purchaseType)
+  ) {
+    return (raw as { purchaseType: PurchaseType }).purchaseType;
+  }
+  return "day_pass";
+}
 
 const ALLOWED_ORIGINS = [
   process.env.NEXT_PUBLIC_SITE_URL,
@@ -60,14 +80,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         ? rawOrigin
         : (process.env.NEXT_PUBLIC_SITE_URL ?? "https://paisaxe.es");
 
-    // Parse optional returnTo slug from request body
+    // Parse optional returnTo slug + pass tier from request body
     let returnTo: string | undefined;
+    let purchaseType: PurchaseType = "day_pass";
     try {
       const rawBody = await request.json();
       const bodyParsed = checkoutBodySchema.safeParse(rawBody);
       if (bodyParsed.success && bodyParsed.data.returnTo && isValidSlug(bodyParsed.data.returnTo)) {
         returnTo = bodyParsed.data.returnTo;
       }
+      purchaseType = parsePurchaseType(rawBody);
     } catch {
       // No body or invalid JSON — that's fine, returnTo stays undefined
     }
@@ -80,6 +102,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       userId: user.id,
       userEmail: user.email || "",
       returnUrl,
+      purchaseType,
     });
 
     return NextResponse.json({ clientSecret });
