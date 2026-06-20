@@ -412,6 +412,58 @@ describe("POST /api/admin/agents/run", () => {
     expect(data.logs[0].text).toBe("Success: all tests passed");
   });
 
+  // --- SE-L1 (#542): env allowlist + output sanitization ---
+
+  it("spawns the child with an allowlisted env, not the whole process env", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    // A secret that must NOT be forwarded to the child process.
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "super-secret-service-key";
+    process.env.PATH = process.env.PATH || "/usr/bin";
+
+    const mockChild = createMockChild(55001);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "qa_agent_enabled" }));
+
+    expect(mockSpawn).toHaveBeenCalled();
+    const spawnOptions = mockSpawn.mock.calls[0][2] as { env: NodeJS.ProcessEnv };
+    expect(spawnOptions.env).toBeDefined();
+    // Allowlisted vars pass through…
+    expect(spawnOptions.env.PATH).toBeDefined();
+    // …but arbitrary secrets do not.
+    expect(spawnOptions.env.SUPABASE_SERVICE_ROLE_KEY).toBeUndefined();
+
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  });
+
+  it("sanitizes secrets in captured subprocess output", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(55002);
+    mockSpawn.mockReturnValue(mockChild);
+
+    await POST(makeRequest({ agentKey: "coverage_agent_enabled" }));
+
+    const stdout = (mockChild as EventEmitter & { stdout: EventEmitter }).stdout;
+    // An email address in the output must be redacted before it reaches the log buffer.
+    stdout.emit("data", Buffer.from("Notifying admin@example.com of results\n"));
+
+    const response = await GET(
+      makeGetRequest({ agentKey: "coverage_agent_enabled" })
+    );
+    const data = await response.json();
+
+    expect(data.logs[0].text).not.toContain("admin@example.com");
+    expect(data.logs[0].text).toContain("[REDACTED]");
+  });
+
   it("handles exit event and flushes remaining buffers", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,

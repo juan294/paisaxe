@@ -16,6 +16,10 @@ vi.mock("node:util", () => ({
 vi.mock("node:timers/promises", () => ({
   setTimeout: mockSleep,
 }));
+// #138: usage recording is fire-and-forget; stub it so tests don't touch Supabase.
+vi.mock("@/lib/costs/anthropic-usage", () => ({
+  recordAnthropicUsage: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { generateChatResponse, extractSourcesFromChunks, sanitizeOutput, streamChatResponse, formatImagesForContext } from "./claude";
 
@@ -989,6 +993,37 @@ describe("claude", () => {
         chunks.push(chunk);
       }
       expect(chunks).toEqual(["after error"]);
+    });
+
+    // PE-M2 (#534): the streaming handoff must be event-driven, not poll-based.
+    // A chunk that arrives only AFTER the consumer has begun awaiting must still be
+    // delivered without relying on a fixed-interval timer.
+    it("resumes when a chunk arrives after the consumer is already waiting (event-driven, no poll)", async () => {
+      const proc = setupMockSpawn();
+
+      // Emit the first chunk synchronously-ish, then a long gap, then the rest.
+      // With the old 100ms poll removed, delivery is driven purely by wake().
+      setTimeout(() => proc.stdout.emit("data", sseDelta("first ")), 5);
+      setTimeout(() => proc.stdout.emit("data", sseDelta("second")), 40);
+      setTimeout(() => proc.emit("close"), 60);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["first ", "second"]);
+    });
+
+    it("completes when close fires with no chunks (event-driven termination)", async () => {
+      const proc = setupMockSpawn();
+      // Close with a delay so the consumer is parked in waitForWork() first.
+      setTimeout(() => proc.emit("close"), 30);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual([]);
     });
 
     it("should include stream:true in the request body", async () => {

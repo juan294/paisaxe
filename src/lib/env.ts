@@ -69,6 +69,12 @@ export const getStripeSecretKey = () => getEnv("STRIPE_SECRET_KEY");
 /** Stripe day-pass price ID (server-only, trimmed) */
 export const getStripeDayPassPriceId = () => getEnv("STRIPE_DAY_PASS_PRICE_ID");
 
+/** Stripe weekly-pass price ID (server-only, trimmed) — #137 */
+export const getStripeWeeklyPassPriceId = () => getEnv("STRIPE_WEEKLY_PRICE_ID");
+
+/** Stripe monthly-pass price ID (server-only, trimmed) — #137 */
+export const getStripeMonthlyPassPriceId = () => getEnv("STRIPE_MONTHLY_PRICE_ID");
+
 /** Stripe webhook secret (server-only, trimmed) */
 export const getStripeWebhookSecret = () => getEnv("STRIPE_WEBHOOK_SECRET");
 

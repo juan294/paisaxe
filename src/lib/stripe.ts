@@ -2,6 +2,8 @@ import "server-only";
 import Stripe from "stripe";
 import {
   getStripeDayPassPriceId,
+  getStripeWeeklyPassPriceId,
+  getStripeMonthlyPassPriceId,
   getStripeSecretKey,
   getStripeWebhookSecret,
 } from "@/lib/env";
@@ -9,9 +11,40 @@ import {
 /**
  * Stripe integration for voice pass purchases.
  *
- * Products:
+ * Products (#137 — revenue diversification):
  * - Day Pass (€1.99): 24 hours of unlimited voice conversations
+ * - Weekly Pass (€4.99): 7 days
+ * - Monthly Pass (€9.99): 30 days
+ *
+ * Live Stripe products/prices are created out-of-band; their price IDs are read
+ * from env (STRIPE_DAY_PASS_PRICE_ID / STRIPE_WEEKLY_PRICE_ID / STRIPE_MONTHLY_PRICE_ID).
  */
+
+/** The voice-pass tiers a visitor can buy. */
+export type PurchaseType = "day_pass" | "weekly_pass" | "monthly_pass";
+
+/** Duration of each pass tier, in milliseconds. */
+const PASS_DURATIONS_MS: Record<PurchaseType, number> = {
+  day_pass: 24 * 60 * 60 * 1000,
+  weekly_pass: 7 * 24 * 60 * 60 * 1000,
+  monthly_pass: 30 * 24 * 60 * 60 * 1000,
+};
+
+/** Resolve the configured Stripe price ID for a purchase tier (or null). */
+export function getPriceIdForPurchaseType(
+  purchaseType: PurchaseType
+): string | null {
+  switch (purchaseType) {
+    case "day_pass":
+      return getStripeDayPassPriceId() ?? null;
+    case "weekly_pass":
+      return getStripeWeeklyPassPriceId() ?? null;
+    case "monthly_pass":
+      return getStripeMonthlyPassPriceId() ?? null;
+    default:
+      return null;
+  }
+}
 
 
 /**
@@ -45,28 +78,45 @@ interface StripeCheckoutOptions {
   userEmail: string;
   successUrl: string;
   cancelUrl: string;
+  /** Which pass tier to buy. Defaults to the Day Pass for backwards compat. */
+  purchaseType?: PurchaseType;
+}
+
+/** Human-readable env var name for a tier, for clear error messages. */
+const PRICE_ENV_NAMES: Record<PurchaseType, string> = {
+  day_pass: "STRIPE_DAY_PASS_PRICE_ID",
+  weekly_pass: "STRIPE_WEEKLY_PRICE_ID",
+  monthly_pass: "STRIPE_MONTHLY_PRICE_ID",
+};
+
+/** Resolve the price ID for a tier or throw a descriptive error. */
+function requirePriceId(purchaseType: PurchaseType): string {
+  const priceId = getPriceIdForPurchaseType(purchaseType);
+  if (!priceId) {
+    throw new Error(`${PRICE_ENV_NAMES[purchaseType]} not configured`);
+  }
+  return priceId;
 }
 
 /**
- * Create a Stripe Checkout Session for the Day Pass product.
+ * Create a Stripe Checkout Session for a voice pass.
  * Returns the checkout URL to redirect the user to.
+ * The chosen tier is recorded in `metadata.purchase_type` so the webhook can
+ * grant the correct access duration.
  */
 export async function createDayPassCheckoutSession(
   options: StripeCheckoutOptions
 ): Promise<string> {
   const stripe = getStripeClient();
-  const priceId = getStripeDayPassPriceId();
-
-  if (!priceId) {
-    throw new Error("STRIPE_DAY_PASS_PRICE_ID not configured");
-  }
+  const purchaseType = options.purchaseType ?? "day_pass";
+  const priceId = requirePriceId(purchaseType);
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],
     customer_email: options.userEmail,
-    metadata: { user_id: options.userId },
+    metadata: { user_id: options.userId, purchase_type: purchaseType },
     success_url: options.successUrl,
     cancel_url: options.cancelUrl,
     // Note: automatic_tax requires Stripe Tax to be configured in dashboard
@@ -87,21 +137,20 @@ interface StripeEmbeddedCheckoutOptions {
   userId: string;
   userEmail: string;
   returnUrl: string;
+  /** Which pass tier to buy. Defaults to the Day Pass for backwards compat. */
+  purchaseType?: PurchaseType;
 }
 
 /**
- * Create a Stripe Embedded Checkout Session for the Day Pass product.
+ * Create a Stripe Embedded Checkout Session for a voice pass.
  * Returns the client_secret for the embedded checkout form.
  */
 export async function createEmbeddedCheckoutSession(
   options: StripeEmbeddedCheckoutOptions
 ): Promise<string> {
   const stripe = getStripeClient();
-  const priceId = getStripeDayPassPriceId();
-
-  if (!priceId) {
-    throw new Error("STRIPE_DAY_PASS_PRICE_ID not configured");
-  }
+  const purchaseType = options.purchaseType ?? "day_pass";
+  const priceId = requirePriceId(purchaseType);
 
   const session = await stripe.checkout.sessions.create({
     ui_mode: "form",
@@ -109,7 +158,7 @@ export async function createEmbeddedCheckoutSession(
     payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],
     customer_email: options.userEmail,
-    metadata: { user_id: options.userId },
+    metadata: { user_id: options.userId, purchase_type: purchaseType },
     return_url: options.returnUrl,
   });
 
@@ -148,18 +197,15 @@ export function isStripeConfigured(): boolean {
 }
 
 /**
- * Calculate expiry date based on purchase type.
+ * Calculate the access-expiry date for a given pass tier.
+ * day_pass = 24h, weekly_pass = 7d, monthly_pass = 30d.
  */
-export function calculateExpiryDate(purchaseType: "day_pass"): Date {
-  const now = new Date();
-
-  switch (purchaseType) {
-    case "day_pass":
-      // 24 hours from now
-      return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    default:
-      throw new Error(`Unknown purchase type: ${purchaseType}`);
+export function calculateExpiryDate(purchaseType: PurchaseType): Date {
+  const duration = PASS_DURATIONS_MS[purchaseType];
+  if (duration === undefined) {
+    throw new Error(`Unknown purchase type: ${purchaseType}`);
   }
+  return new Date(Date.now() + duration);
 }
 
 /**

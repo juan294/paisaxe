@@ -86,6 +86,7 @@ describe("POST /api/checkout/embedded", () => {
       userId: "user-123",
       userEmail: "test@example.com",
       returnUrl: "https://paisaxe.es/pricing/checkout/return?session_id={CHECKOUT_SESSION_ID}",
+      purchaseType: "day_pass",
     });
   });
 

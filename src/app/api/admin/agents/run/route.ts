@@ -3,7 +3,46 @@ import { validateAdminAuth } from "@/lib/admin-auth";
 import { spawn } from "child_process";
 import path from "path";
 import { logger } from "@/lib/logger";
+import { sanitizeLogMessage } from "@/lib/logger-sanitize";
 import { runningAgents, type RunningAgent } from "./state";
+
+/**
+ * SE-L1 (#542): Explicit env allowlist for spawned agent scripts.
+ *
+ * Passing the whole `process.env` to a child process leaks every secret the
+ * Next.js server holds (API keys, DB credentials, tokens) into the agent
+ * subprocess and any process it spawns. The agent scripts only need a small,
+ * well-known set of variables: PATH/HOME for the shell + Claude CLI, the
+ * Anthropic key the headless CLI uses, and a couple of locale/runtime hints.
+ */
+const CHILD_ENV_ALLOWLIST = [
+  "PATH",
+  "HOME",
+  "SHELL",
+  "USER",
+  "LOGNAME",
+  "TERM",
+  "TMPDIR",
+  "LANG",
+  "LC_ALL",
+  "NODE_ENV",
+  "ANTHROPIC_API_KEY",
+  "CLAUDE_CONFIG_DIR",
+] as const;
+
+/** Build the explicit, allowlisted environment for a spawned agent process. */
+function buildChildEnv(): NodeJS.ProcessEnv {
+  const env: Record<string, string | undefined> = {};
+  // Iterate as plain strings so NODE_ENV (a read-only key on ProcessEnv) can be
+  // assigned via a string index without a type error.
+  for (const key of CHILD_ENV_ALLOWLIST as readonly string[]) {
+    const value = process.env[key];
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  }
+  return env as NodeJS.ProcessEnv;
+}
 
 /** Map agent flag keys to their script filenames (all live in scripts/). */
 const AGENT_SCRIPTS: Record<string, string> = {
@@ -26,7 +65,10 @@ function stripAnsi(str: string): string {
 
 /** Append a line to an agent's log buffer, enforcing the ring buffer limit. */
 function appendLog(agent: RunningAgent, text: string) {
-  agent.logs.push({ timestamp: new Date().toISOString(), text: stripAnsi(text) });
+  // SE-L1 (#542): scrub secrets (API keys, tokens, emails, …) from captured
+  // subprocess output before it lands in the log buffer / admin UI.
+  const safe = sanitizeLogMessage(stripAnsi(text));
+  agent.logs.push({ timestamp: new Date().toISOString(), text: safe });
   if (agent.logs.length > MAX_LOG_LINES) {
     agent.logs.splice(0, agent.logs.length - MAX_LOG_LINES);
   }
@@ -136,7 +178,8 @@ export async function POST(request: NextRequest) {
     cwd: projectRoot,
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
+    // SE-L1 (#542): pass an explicit allowlist, never the whole process env.
+    env: buildChildEnv(),
   });
 
   child.unref();

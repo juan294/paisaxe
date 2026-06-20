@@ -103,6 +103,7 @@ describe("POST /api/checkout/day-pass", () => {
       userEmail: "test@example.com",
       successUrl: "https://paisaxe.es/pricing/success",
       cancelUrl: "https://paisaxe.es/pricing",
+      purchaseType: "day_pass",
     });
   });
 
