@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject } from "react";
+import { memo, type RefObject } from "react";
 import { Camera, Bookmark, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Story } from "@/types/immersive";
@@ -39,8 +39,11 @@ interface StoryInfoPanelProps {
 /**
  * Overlay panel that displays story title, description, badges, and action buttons.
  * Slides in/out based on `showInfo` state.
+ *
+ * FE-L1: memoized — all callback props passed by StoryViewer are stabilized with
+ * useCallback so this component doesn't re-render on every index change.
  */
-export function StoryInfoPanel({
+export const StoryInfoPanel = memo(function StoryInfoPanel({
   story,
   localizedStory,
   showInfo,
@@ -158,4 +161,4 @@ export function StoryInfoPanel({
       </div>
     </article>
   );
-}
+});

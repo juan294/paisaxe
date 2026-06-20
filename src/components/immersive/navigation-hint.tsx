@@ -5,6 +5,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 
+// UX-M2: Changed from localStorage ("never show again") to sessionStorage ("once per
+// browser session"). Returning visitors who open a new tab or browser session will
+// see the swipe hint again, keeping the invisible tap zones discoverable without
+// being intrusive to users who already know the gesture in the current session.
 const STORAGE_KEY = "paisaxe-nav-hint-seen";
 const AUTO_DISMISS_MS = 3000;
 const FADE_OUT_MS = 500;
@@ -16,7 +20,8 @@ export function NavigationHint() {
 
   const dismiss = useCallback(() => {
     setFading(true);
-    localStorage.setItem(STORAGE_KEY, "true");
+    // Mark as seen for this session only (sessionStorage clears on tab/browser close)
+    sessionStorage.setItem(STORAGE_KEY, "true");
     setTimeout(() => setVisible(false), FADE_OUT_MS);
   }, []);
 
@@ -26,8 +31,8 @@ export function NavigationHint() {
     // arrows are already visible, so the swipe hint is unnecessary.
     if (!window.matchMedia("(pointer: coarse)").matches) return;
     if (!window.matchMedia("(max-width: 639px)").matches) return;
-    // Only show if not seen before
-    if (localStorage.getItem(STORAGE_KEY) === "true") return;
+    // Only show if not seen this session
+    if (sessionStorage.getItem(STORAGE_KEY) === "true") return;
 
     setVisible(true);
 
