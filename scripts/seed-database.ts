@@ -369,14 +369,15 @@ async function generateContextualizedEmbeddingsWithRetry(
         outputDimension: EMBEDDING_DIMENSIONS,
       });
 
-      if (!result.data || result.data.length === 0 || !result.data[0].data) {
+      // voyageai 0.4.x ExtendedClient returns { results: [{ embeddings: number[][] }], totalTokens }
+      if (!result.results || result.results.length === 0 || !result.results[0].embeddings) {
         throw new Error(`No contextualized embeddings returned for ${sourcePdf}`);
       }
 
-      const chunkEmbeddings = result.data[0].data;
+      const chunkEmbeddings = result.results[0].embeddings.map((embedding) => ({ embedding }));
       return {
         data: chunkEmbeddings,
-        totalTokens: result.usage?.totalTokens || 0,
+        totalTokens: result.totalTokens || 0,
       };
     } catch (error: unknown) {
       if (isRateLimitError(error) && attempt < MAX_RETRIES) {
