@@ -245,6 +245,70 @@ describe("readSseStream", () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
+  // FE-M2: reader lock must be released on every exit path (success, error, abort)
+  it("FE-M2: releases reader lock after normal stream completion", async () => {
+    const onEvent = vi.fn();
+    const onDone = vi.fn();
+    const onError = vi.fn();
+
+    let releaseLockCalled = false;
+    const fakeStream = {
+      getReader() {
+        const encoder = new TextEncoder();
+        let done = false;
+        return {
+          async read() {
+            if (!done) {
+              done = true;
+              return {
+                done: false,
+                value: encoder.encode(`data: {"type":"done","images":[],"sources":[]}\n\n`),
+              };
+            }
+            return { done: true, value: undefined };
+          },
+          async cancel() {},
+          releaseLock() {
+            releaseLockCalled = true;
+          },
+        };
+      },
+    } as unknown as ReadableStream<Uint8Array>;
+
+    await readSseStream(fakeStream, { onEvent, onDone, onError });
+
+    expect(releaseLockCalled).toBe(true);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("FE-M2: releases reader lock after an error is thrown during reading", async () => {
+    const onEvent = vi.fn();
+    const onDone = vi.fn();
+    const onError = vi.fn();
+
+    let releaseLockCalled = false;
+    const fakeStream = {
+      getReader() {
+        return {
+          async read(): Promise<{ done: boolean; value: undefined }> {
+            throw new Error("read failure");
+          },
+          async cancel() {},
+          releaseLock() {
+            releaseLockCalled = true;
+          },
+        };
+      },
+    } as unknown as ReadableStream<Uint8Array>;
+
+    await readSseStream(fakeStream, { onEvent, onDone, onError });
+
+    expect(releaseLockCalled).toBe(true);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
   it("wraps a non-Error, non-DOMException thrown value in a new Error (line 78)", async () => {
     // This covers the final else branch: `err` is not an Error instance and does
     // not have both `name` and `message` properties, so it is wrapped via String().

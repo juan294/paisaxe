@@ -77,5 +77,14 @@ export async function readSseStream(
     } else {
       onError(new Error(String(err)));
     }
+  } finally {
+    // FE-M2: always release the reader lock so the stream is not left in a
+    // locked state on abort or error exit paths.
+    try {
+      await reader.cancel();
+    } catch {
+      // cancel() may throw if the stream is already errored/closed — ignore.
+    }
+    reader.releaseLock();
   }
 }

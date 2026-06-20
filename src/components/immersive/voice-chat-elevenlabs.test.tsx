@@ -727,6 +727,60 @@ describe("VoiceChatElevenLabs", () => {
     });
   });
 
+  // FE-H1: unmount cleanup — endSession + mic track teardown
+  describe("FE-H1: unmount cleanup", () => {
+    it("calls endSession when the component unmounts", () => {
+      const { unmount } = render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      unmount();
+
+      expect(mockEndSession).toHaveBeenCalled();
+    });
+
+    it("stops mic tracks when component unmounts after a session was started", async () => {
+      const mockTrack = { stop: vi.fn() } as unknown as MediaStreamTrack;
+      const mockStream = {
+        getTracks: vi.fn().mockReturnValue([mockTrack]),
+      } as unknown as MediaStream;
+
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: {
+          getUserMedia: vi.fn().mockResolvedValue(mockStream),
+        },
+        writable: true,
+      });
+
+      mockStartSession.mockResolvedValue(undefined);
+
+      const { unmount } = render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Start conversation to capture the MediaStream
+      const orbButton = screen.getByRole("button", { name: /Háblame/i });
+      fireEvent.click(orbButton);
+
+      await waitFor(() => {
+        expect(mockStartSession).toHaveBeenCalled();
+      });
+
+      unmount();
+
+      // After unmount, mic tracks must be stopped
+      expect(mockTrack.stop).toHaveBeenCalled();
+    });
+  });
+
   // UX-H1: getUserMedia should NOT be called on mount — only on startConversation click
   describe("UX-H1: deferred microphone permission", () => {
     it("should NOT call getUserMedia on mount", async () => {

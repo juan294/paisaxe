@@ -43,11 +43,26 @@ export async function POST(request: NextRequest) {
   return withRouteContext(request, () => handlePost(request));
 }
 
+// BE-H1: stricter shared-bucket rate limit for requests without a trusted Vercel IP
+// header. All such clients share one bucket with a tighter cap (3 req/60s) to prevent
+// the "unknown" key from being used as a bypass. On Vercel production, all real
+// requests carry x-vercel-forwarded-for, so this only fires in unusual conditions.
+const UNTRUSTED_RATE_LIMIT = { windowMs: 60_000, maxRequests: 3, maxEntries: 1 };
+
 async function handlePost(request: NextRequest) {
   try {
     // Rate limiting
     const ip = getClientIp(request);
-    const rateLimit = await checkRateLimit(ip);
+    if (ip === "unknown") {
+      logger.warn("[CHAT_STREAM_UNTRUSTED_IP]", {
+        path: "/api/chat/stream",
+        reason: "no_vercel_forwarded_for",
+      });
+    }
+    const rateLimit = await checkRateLimit(
+      ip === "unknown" ? "untrusted" : ip,
+      ip === "unknown" ? UNTRUSTED_RATE_LIMIT : undefined
+    );
 
     if (!rateLimit.allowed) {
       return new Response(
