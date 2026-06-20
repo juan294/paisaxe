@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -184,15 +185,20 @@ function useFeatureFlagsState(
     [flags, isReady]
   );
 
-  return {
-    flags,
-    /** Whether flags have been loaded from server */
-    isReady,
-    /** Check if a flag is enabled (returns false while loading) */
-    isEnabled,
-    /** Check if a flag is enabled with a default value while loading */
-    isEnabledWithDefault,
-  };
+  // FE-M1: memoize the returned value so that FeatureFlagsProvider consumers
+  // only re-render when flags, readiness, or the stable callbacks actually change.
+  return useMemo(
+    () => ({
+      flags,
+      /** Whether flags have been loaded from server */
+      isReady,
+      /** Check if a flag is enabled (returns false while loading) */
+      isEnabled,
+      /** Check if a flag is enabled with a default value while loading */
+      isEnabledWithDefault,
+    }),
+    [flags, isReady, isEnabled, isEnabledWithDefault],
+  );
 }
 
 interface FeatureFlagsProviderProps {
