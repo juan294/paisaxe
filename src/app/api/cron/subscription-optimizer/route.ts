@@ -59,20 +59,26 @@ async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextRespon
 
     const markdownReport = generateReport(result);
 
-    // Persist report to disk so the agents-summary API can read it
+    // Persist report to disk so the agents-summary API can read it.
+    // BE-M4: Use atomic write (write to .tmp + rename) to prevent partial reads
+    // from concurrent cron runs. The cron lease provides mutual exclusion but
+    // atomic rename eliminates any read-torn-write window within a single run.
     const projectRoot = process.cwd();
     const reportPath = pathModule.join(
       projectRoot,
       "docs/agents/subscription-optimizer-report.md"
     );
+    const reportTmpPath = `${reportPath}.tmp`;
     try {
-      await fs.writeFile(reportPath, markdownReport, "utf-8");
+      await fs.writeFile(reportTmpPath, markdownReport, "utf-8");
+      await fs.rename(reportTmpPath, reportPath);
     } catch {
       // Serverless environments may not have write access — continue gracefully
     }
 
     // Append shared context entry for cross-agent insights
     const sharedContextPath = pathModule.join(projectRoot, "docs/agents/shared-context.md");
+    const sharedContextTmpPath = `${sharedContextPath}.tmp`;
     try {
       const contextEntry = generateSharedContextEntry(result);
       let existing = "";
@@ -86,11 +92,13 @@ async function runOptimizer(usageMetrics: UsageMetricsInput): Promise<NextRespon
       const headerEnd = existing.indexOf("\n\n");
       const header = headerEnd >= 0 ? existing.slice(0, headerEnd) : existing;
       const body = headerEnd >= 0 ? existing.slice(headerEnd + 2) : "";
+      // BE-M4: atomic write via tmp + rename
       await fs.writeFile(
-        sharedContextPath,
+        sharedContextTmpPath,
         `${header}\n\n${contextEntry}\n\n${body}`,
         "utf-8"
       );
+      await fs.rename(sharedContextTmpPath, sharedContextPath);
     } catch {
       // Non-critical — don't fail the run if shared context write fails
     }
@@ -148,6 +156,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!auth.valid) {
       return auth.error;
     }
+    // BE-M1: webhook secret was absent/wrong but admin auth succeeded — log for ops visibility
+    logger.warn("[CRON_AUTH_FALLBACK]", { source: "webhook", fellBackTo: "admin_auth" });
   }
 
   // Use provided usage metrics or fall back to defaults

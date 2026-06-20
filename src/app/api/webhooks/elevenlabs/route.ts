@@ -329,21 +329,36 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // A separate pending_bookings UPDATE after this point would risk being lost
         // forever — the idempotency key prevents re-attempt, so a failure here
         // leaves outcome_message NULL with no recovery path.
-        const { error: completeSMSError } = await supabase.rpc(
-          "complete_booking_sms_job",
-          {
-            p_event_key: eventKey,
-            p_provider_sid: smsResult.sid ?? null,
-            p_outcome_message: smsMessage,
+        //
+        // BE-M2: retry complete_booking_sms_job up to 2 attempts with a short
+        // backoff to avoid leaving the job in 'processing' state (re-claimable
+        // → duplicate SMS).  After all retries, log prominently for ops.
+        {
+          const MAX_COMPLETE_ATTEMPTS = 2;
+          let completeSMSError: { message: string } | null = null;
+          for (let attempt = 1; attempt <= MAX_COMPLETE_ATTEMPTS; attempt++) {
+            const result = await supabase.rpc("complete_booking_sms_job", {
+              p_event_key: eventKey,
+              p_provider_sid: smsResult.sid ?? null,
+              p_outcome_message: smsMessage,
+            });
+            if (!result.error) {
+              completeSMSError = null;
+              break;
+            }
+            completeSMSError = result.error;
+            if (attempt < MAX_COMPLETE_ATTEMPTS) {
+              await new Promise((resolve) => setTimeout(resolve, 200));
+            }
           }
-        );
-
-        if (completeSMSError) {
-          logger.error("[ELEVENLABS_WEBHOOK_SMS_COMPLETE_FAILED]", {
-            booking_id: booking.id,
-            event_key: eventKey,
-            error: completeSMSError.message,
-          });
+          if (completeSMSError) {
+            logger.error("[ELEVENLABS_WEBHOOK_SMS_COMPLETE_FAILED]", {
+              booking_id: booking.id,
+              event_key: eventKey,
+              error: completeSMSError.message,
+              attempts: MAX_COMPLETE_ATTEMPTS,
+            });
+          }
         }
       }
     }

@@ -30,18 +30,19 @@ vi.mock("@/lib/admin-auth", () => ({
     Promise.resolve({ valid: false, error: { status: 401 } }),
 }));
 
-// Mock fs.promises.writeFile and readFile
+// Mock fs.promises.writeFile, readFile, and rename
 const mockWriteFile = vi.fn();
 const mockReadFile = vi.fn();
+const mockRename = vi.fn();
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
   return {
     ...actual,
     default: {
       ...actual,
-      promises: { ...actual.promises, writeFile: mockWriteFile, readFile: mockReadFile },
+      promises: { ...actual.promises, writeFile: mockWriteFile, readFile: mockReadFile, rename: mockRename },
     },
-    promises: { ...actual.promises, writeFile: mockWriteFile, readFile: mockReadFile },
+    promises: { ...actual.promises, writeFile: mockWriteFile, readFile: mockReadFile, rename: mockRename },
   };
 });
 
@@ -81,8 +82,10 @@ describe("POST /api/cron/subscription-optimizer", () => {
     mockGenerateSharedContextEntry.mockReset();
     mockWriteFile.mockReset();
     mockReadFile.mockReset();
+    mockRename.mockReset();
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockRename.mockResolvedValue(undefined);
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
     mockRpc.mockReset();
     // Default: durable cron lease succeeds
@@ -181,7 +184,8 @@ describe("POST /api/cron/subscription-optimizer", () => {
     expect((response as any).body.report).toBe("# Subscription Optimizer Report");
   });
 
-  it("writes the report to docs/agents/subscription-optimizer-report.md", async () => {
+  // BE-M4: writes use a temp-file + rename pattern for atomicity
+  it("BE-M4: writes the report atomically via tmp file + rename", async () => {
     const reportContent = "# Subscription Optimizer Report\nContent here.";
     const mockReport = {
       recommendations: [],
@@ -199,13 +203,20 @@ describe("POST /api/cron/subscription-optimizer", () => {
     );
 
     await POST(request as never);
-    // writeFile is called twice: once for the report, once for shared context
-    expect(mockWriteFile).toHaveBeenCalledTimes(2);
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining("docs/agents/subscription-optimizer-report.md"),
-      reportContent,
-      "utf-8"
+    // Must write to a .tmp file first
+    const tmpWriteCall = mockWriteFile.mock.calls.find(
+      (call: string[]) => String(call[0]).includes("subscription-optimizer-report") && String(call[0]).endsWith(".tmp")
     );
+    expect(tmpWriteCall).toBeDefined();
+    expect(tmpWriteCall![1]).toBe(reportContent);
+    // Then rename the tmp file to the final path atomically
+    const renameCall = mockRename.mock.calls.find(
+      (call: string[]) => String(call[1]).includes("subscription-optimizer-report.md")
+    );
+    expect(renameCall).toBeDefined();
+    // The source must be the same .tmp file that was written
+    expect(String(renameCall![0])).toContain("subscription-optimizer-report");
+    expect(String(renameCall![0])).toMatch(/\.tmp$/);
   });
 
   it("does not fail if report file write fails", async () => {
@@ -295,14 +306,19 @@ describe("POST /api/cron/subscription-optimizer", () => {
 
     const response = await POST(request as never);
     expect(response.status).toBe(200);
-    // writeFile should be called twice: once for the report, once for shared context
+    // BE-M4: both writes use tmp+rename; writeFile calls should use .tmp paths
     expect(mockWriteFile).toHaveBeenCalledTimes(2);
-    // The shared context write should include the default header
-    const sharedContextCall = mockWriteFile.mock.calls.find(
-      (call: string[]) => String(call[0]).includes("shared-context.md")
+    // The shared context write should use a .tmp path containing the file stem
+    const sharedContextTmpCall = mockWriteFile.mock.calls.find(
+      (call: string[]) => String(call[0]).includes("shared-context") && String(call[0]).endsWith(".tmp")
     );
-    expect(sharedContextCall).toBeDefined();
-    expect(sharedContextCall![1]).toContain("Agent Shared Context");
+    expect(sharedContextTmpCall).toBeDefined();
+    expect(sharedContextTmpCall![1]).toContain("Agent Shared Context");
+    // And rename should have been called to finalize the shared-context.md
+    const renameToSharedContext = mockRename.mock.calls.find(
+      (call: string[]) => String(call[1]).includes("shared-context.md")
+    );
+    expect(renameToSharedContext).toBeDefined();
   });
 
   it("prepends context entry to existing shared-context.md when readFile succeeds", async () => {
@@ -327,15 +343,20 @@ describe("POST /api/cron/subscription-optimizer", () => {
 
     const response = await POST(request as never);
     expect(response.status).toBe(200);
-    // The shared context write should prepend the new entry after the header
-    const sharedContextCall = mockWriteFile.mock.calls.find(
-      (call: string[]) => String(call[0]).includes("shared-context.md")
+    // BE-M4: atomic write — check the .tmp write and the rename
+    const sharedContextTmpCall = mockWriteFile.mock.calls.find(
+      (call: string[]) => String(call[0]).includes("shared-context") && String(call[0]).endsWith(".tmp")
     );
-    expect(sharedContextCall).toBeDefined();
+    expect(sharedContextTmpCall).toBeDefined();
     // Should contain the header, new context entry, and old body
-    expect(sharedContextCall![1]).toContain("Agent Shared Context");
-    expect(sharedContextCall![1]).toContain("Subscription Optimizer");
-    expect(sharedContextCall![1]).toContain("Old Entry");
+    expect(sharedContextTmpCall![1]).toContain("Agent Shared Context");
+    expect(sharedContextTmpCall![1]).toContain("Subscription Optimizer");
+    expect(sharedContextTmpCall![1]).toContain("Old Entry");
+    // Rename should finalize the file
+    const renameToSharedContext = mockRename.mock.calls.find(
+      (call: string[]) => String(call[1]).includes("shared-context.md")
+    );
+    expect(renameToSharedContext).toBeDefined();
   });
 
   it("returns 500 with 'Unknown error' when a non-Error value is thrown", async () => {
@@ -519,8 +540,10 @@ describe("GET /api/cron/subscription-optimizer (Vercel Cron)", () => {
     mockGenerateSharedContextEntry.mockReset();
     mockWriteFile.mockReset();
     mockReadFile.mockReset();
+    mockRename.mockReset();
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockRename.mockResolvedValue(undefined);
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
     mockRpc.mockReset();
     mockRpc.mockImplementation((fn: string) => {
@@ -603,8 +626,10 @@ describe("Cron lease (DO-M2) — subscription-optimizer", () => {
     mockGenerateSharedContextEntry.mockReset();
     mockWriteFile.mockReset();
     mockReadFile.mockReset();
+    mockRename.mockReset();
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockRename.mockResolvedValue(undefined);
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
     mockRpc.mockReset();
   });
@@ -766,8 +791,10 @@ describe("CRON_SUCCESS/CRON_FAILURE telemetry — subscription-optimizer", () =>
     mockGenerateSharedContextEntry.mockReset();
     mockWriteFile.mockReset();
     mockReadFile.mockReset();
+    mockRename.mockReset();
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+    mockRename.mockResolvedValue(undefined);
     mockGenerateSharedContextEntry.mockReturnValue("## Subscription Optimizer\nContext entry");
     mockRpc.mockReset();
     logger.info.mockClear();

@@ -1383,5 +1383,99 @@ describe("POST /api/webhooks/elevenlabs", () => {
       expect(response.status).toBe(200);
       expect(data.smsSent).toBe(true);
     });
+
+    // BE-M2: complete_booking_sms_job must be retried up to 2 times on error
+    // to avoid the job staying 'processing' and re-claimable → duplicate SMS.
+    it("BE-M2: complete_booking_sms_job succeeds on second attempt after initial failure", async () => {
+      vi.mocked(sendSMS).mockResolvedValue({ success: true, sid: "SM_retry" });
+      let completeCalls = 0;
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "processed", error: null });
+        }
+        if (fn === "enqueue_booking_sms_job") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "claim_booking_sms_job") {
+          return Promise.resolve({
+            data: {
+              booking_id: "booking-123",
+              event_key: "post_call_transcription:conv_456",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+            },
+            error: null,
+          });
+        }
+        if (fn === "complete_booking_sms_job") {
+          completeCalls += 1;
+          // First call fails, second succeeds
+          if (completeCalls === 1) {
+            return Promise.resolve({ data: null, error: { message: "transient write error" } });
+          }
+          return Promise.resolve({ data: true, error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(true);
+      // Must have been called at least twice (retry happened)
+      expect(completeCalls).toBeGreaterThanOrEqual(2);
+    });
+
+    it("BE-M2: complete_booking_sms_job logs [ELEVENLABS_WEBHOOK_SMS_COMPLETE_FAILED] after all retries exhausted", async () => {
+      vi.mocked(sendSMS).mockResolvedValue({ success: true, sid: "SM_retry" });
+      // Spy on logger.error to capture the final failure log
+      const { logger } = await import("@/lib/logger");
+      const logSpy = vi.spyOn(logger, "error");
+
+      let completeCalls = 0;
+      mockRpc.mockImplementation((fn: string) => {
+        if (fn === "process_elevenlabs_event_idempotent") {
+          return Promise.resolve({ data: "processed", error: null });
+        }
+        if (fn === "enqueue_booking_sms_job") {
+          return Promise.resolve({ data: "queued", error: null });
+        }
+        if (fn === "claim_booking_sms_job") {
+          return Promise.resolve({
+            data: {
+              booking_id: "booking-123",
+              event_key: "post_call_transcription:conv_456",
+              to_phone: "+34612345678",
+              message: "Confirmation SMS",
+            },
+            error: null,
+          });
+        }
+        if (fn === "complete_booking_sms_job") {
+          completeCalls += 1;
+          return Promise.resolve({ data: null, error: { message: "persistent DB error" } });
+        }
+        return Promise.resolve({ data: null, error: null });
+      });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Still returns 200 (booking state was committed; this is an ops alert)
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(true);
+      // complete_booking_sms_job must have been retried (2 attempts)
+      expect(completeCalls).toBe(2);
+      // Must have logged the failure prominently after all retries
+      expect(logSpy).toHaveBeenCalledWith(
+        "[ELEVENLABS_WEBHOOK_SMS_COMPLETE_FAILED]",
+        expect.objectContaining({ booking_id: "booking-123" })
+      );
+
+      logSpy.mockRestore();
+    });
   });
 });

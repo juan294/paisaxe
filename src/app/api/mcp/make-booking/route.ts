@@ -298,6 +298,27 @@ export async function POST(request: Request): Promise<NextResponse> {
         status: "initiated",
         estimated_wait: "30-60 seconds",
       });
+    } else if (result.timedOut) {
+      // BE-H2: The fetch to ElevenLabs timed out — we do NOT know whether
+      // ElevenLabs accepted the call. Leave the pending_bookings row in
+      // 'initiating' so the stale-bookings cron or a late webhook can
+      // reconcile. Do NOT mark 'failed' — that is a terminal state that
+      // prevents the cron from cleaning up and blocks retries.
+      logger.warn("[MAKE_BOOKING_CALL_TIMED_OUT]", {
+        pending_row_id: pendingRowId,
+        idempotency_key: idempotencyKey,
+        venue: venue_name,
+        error: result.error,
+      });
+      return NextResponse.json<MakeBookingResponse>(
+        {
+          success: false,
+          message: `The call to ${venue_name} timed out — we are not sure if the venue received it. The system will retry or expire the request automatically.`,
+          status: "timed_out",
+          recovery_action: `Tell the user: "La llamada está tardando demasiado. El sistema reintentará pronto. Si necesitas reservar con urgencia, llama directamente a ${phone_number}."`,
+        },
+        { status: 202 }
+      );
     } else {
       await markPendingBookingFailed(
         pendingRowId,
