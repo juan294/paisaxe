@@ -7,9 +7,26 @@ vi.mock("@/lib/supabase", () => ({
   createAdminClient: vi.fn(),
 }));
 
-vi.mock("@/lib/admin-auth", () => ({
-  validateAdminAuth: vi.fn(),
-}));
+// AR-M3 (#626): route now uses the withAdmin wrapper. Provide a faithful mock
+// that calls the mocked validateAdminAuth and, on success, invokes the handler
+// with the mocked admin client — preserving the existing test contract.
+vi.mock("@/lib/admin-auth", async () => {
+  const { createAdminClient } = await import("@/lib/supabase");
+  const validateAdminAuth = vi.fn();
+  return {
+    validateAdminAuth,
+    withAdmin: async (
+      handler: (supabase: unknown) => Promise<unknown>,
+      _request?: unknown
+    ) => {
+      const auth = await (validateAdminAuth as () => Promise<{ valid: boolean; error?: unknown }>)();
+      if (!auth.valid) {
+        return auth.error;
+      }
+      return handler((createAdminClient as () => unknown)());
+    },
+  };
+});
 
 vi.mock("@/lib/encryption", () => ({
   encryptJson: vi.fn((data) => `encrypted:${JSON.stringify(data)}`),
@@ -45,7 +62,9 @@ describe("Marketing Accounts API", () => {
         error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }) as never,
       });
 
-      const response = await GET();
+      const response = await GET(
+        new NextRequest("http://localhost:3000/api/admin/marketing/accounts")
+      );
       expect(response.status).toBe(401);
     });
 
@@ -59,7 +78,9 @@ describe("Marketing Accounts API", () => {
       });
       vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
-      const response = await GET();
+      const response = await GET(
+        new NextRequest("http://localhost:3000/api/admin/marketing/accounts")
+      );
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -394,18 +415,30 @@ describe("Marketing Accounts API", () => {
       });
       vi.mocked(createAdminClient).mockReturnValue({ from: mockFrom } as never);
 
-      const response = await GET();
+      const response = await GET(
+        new NextRequest("http://localhost:3000/api/admin/marketing/accounts")
+      );
       expect(response.status).toBe(500);
     });
 
     it("GET should return 500 on unexpected exception", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-      vi.mocked(createAdminClient).mockImplementation(() => {
-        throw new Error("Connection failed");
-      });
+      // #626: createAdminClient is now invoked by withAdmin (outside the
+      // handler try). To exercise the handler's 500 catch, return a client that
+      // throws when its query methods are used inside the handler.
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: () => {
+          throw new Error("Connection failed");
+        },
+        rpc: () => {
+          throw new Error("Connection failed");
+        },
+      } as never);
 
-      const response = await GET();
+      const response = await GET(
+        new NextRequest("http://localhost:3000/api/admin/marketing/accounts")
+      );
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -439,9 +472,17 @@ describe("Marketing Accounts API", () => {
     it("POST should return 500 on unexpected exception", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-      vi.mocked(createAdminClient).mockImplementation(() => {
-        throw new Error("Connection failed");
-      });
+      // #626: createAdminClient is now invoked by withAdmin (outside the
+      // handler try). To exercise the handler's 500 catch, return a client that
+      // throws when its query methods are used inside the handler.
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: () => {
+          throw new Error("Connection failed");
+        },
+        rpc: () => {
+          throw new Error("Connection failed");
+        },
+      } as never);
 
       const request = new NextRequest("http://localhost:3000/api/admin/marketing/accounts", {
         method: "POST",
@@ -487,9 +528,17 @@ describe("Marketing Accounts API", () => {
     it("PATCH should return 500 on unexpected exception", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-      vi.mocked(createAdminClient).mockImplementation(() => {
-        throw new Error("Connection failed");
-      });
+      // #626: createAdminClient is now invoked by withAdmin (outside the
+      // handler try). To exercise the handler's 500 catch, return a client that
+      // throws when its query methods are used inside the handler.
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: () => {
+          throw new Error("Connection failed");
+        },
+        rpc: () => {
+          throw new Error("Connection failed");
+        },
+      } as never);
 
       const request = new NextRequest(
         "http://localhost:3000/api/admin/marketing/accounts?platform=x&action=pause",
@@ -506,9 +555,17 @@ describe("Marketing Accounts API", () => {
     it("DELETE should return 500 on unexpected exception", async () => {
       vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 
-      vi.mocked(createAdminClient).mockImplementation(() => {
-        throw new Error("Connection failed");
-      });
+      // #626: createAdminClient is now invoked by withAdmin (outside the
+      // handler try). To exercise the handler's 500 catch, return a client that
+      // throws when its query methods are used inside the handler.
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: () => {
+          throw new Error("Connection failed");
+        },
+        rpc: () => {
+          throw new Error("Connection failed");
+        },
+      } as never);
 
       const request = new NextRequest(
         "http://localhost:3000/api/admin/marketing/accounts?platform=x",

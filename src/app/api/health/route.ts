@@ -68,14 +68,18 @@ const STORAGE_WARNING_THRESHOLD = 0.8; // 80%
 
 async function checkSupabase(): Promise<SupabaseProbeResult> {
   return withTimeout(
-    (async (): Promise<SupabaseProbeResult> => {
+    async (signal): Promise<SupabaseProbeResult> => {
       try {
-        const { error } = await supabase.from("chunks").select("id").limit(1);
+        const { error } = await supabase
+          .from("chunks")
+          .select("id")
+          .limit(1)
+          .abortSignal(signal);
         return error ? { status: "error" } : { status: "connected" };
       } catch {
         return { status: "error" };
       }
-    })(),
+    },
     PROBE_TIMEOUTS_MS.supabase,
     (): SupabaseProbeResult => ({ status: "error" })
   );
@@ -83,13 +87,14 @@ async function checkSupabase(): Promise<SupabaseProbeResult> {
 
 async function checkStories(): Promise<StoriesProbeResult> {
   return withTimeout(
-    (async (): Promise<StoriesProbeResult> => {
+    async (signal): Promise<StoriesProbeResult> => {
       try {
         const { count, error } = await supabase
           .from("stories")
           .select("id", { count: "exact", head: true })
           .eq("is_active", true)
-          .eq("curation_status", "approved");
+          .eq("curation_status", "approved")
+          .abortSignal(signal);
 
         if (error) {
           return { status: "fallback" };
@@ -99,7 +104,7 @@ async function checkStories(): Promise<StoriesProbeResult> {
       } catch {
         return { status: "fallback" };
       }
-    })(),
+    },
     PROBE_TIMEOUTS_MS.stories,
     (): StoriesProbeResult => ({ status: "fallback" })
   );
@@ -107,9 +112,11 @@ async function checkStories(): Promise<StoriesProbeResult> {
 
 async function checkDatabaseSize(): Promise<DatabaseProbeResult> {
   return withTimeout(
-    (async (): Promise<DatabaseProbeResult> => {
+    async (signal): Promise<DatabaseProbeResult> => {
       try {
-        const { data, error } = await supabase.rpc("get_database_size");
+        const { data, error } = await supabase
+          .rpc("get_database_size")
+          .abortSignal(signal);
 
         if (error) {
           return { usage_percent: null };
@@ -124,22 +131,33 @@ async function checkDatabaseSize(): Promise<DatabaseProbeResult> {
       } catch {
         return { usage_percent: null };
       }
-    })(),
+    },
     PROBE_TIMEOUTS_MS.database,
     (): DatabaseProbeResult => ({ usage_percent: null })
   );
 }
 
+/**
+ * DO-L2 (#528): run a probe with a hard timeout AND cancel the underlying
+ * request when the timeout fires. The probe factory receives an AbortSignal
+ * which is threaded into the Supabase query via .abortSignal(); on timeout we
+ * abort the controller so the in-flight request is actually cancelled instead
+ * of leaking after Promise.race resolves the fallback value.
+ */
 function withTimeout<T>(
-  promise: Promise<T>,
+  run: (signal: AbortSignal) => Promise<T>,
   timeoutMs: number,
   onTimeout: () => T
 ): Promise<T> {
+  const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(onTimeout()), timeoutMs);
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve(onTimeout());
+    }, timeoutMs);
   });
-  return Promise.race([promise, timeoutPromise]).finally(() => {
+  return Promise.race([run(controller.signal), timeoutPromise]).finally(() => {
     if (timer !== undefined) clearTimeout(timer);
   });
 }

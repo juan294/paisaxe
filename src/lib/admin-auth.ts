@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "./supabase";
 import { getSupabaseUrl, getSupabaseAnonKey } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { withRequestContext } from "@/lib/request-context";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type AuthResult =
@@ -156,13 +157,18 @@ export async function validateAdminAuth(): Promise<AuthResult> {
  * Use for mutations (INSERT/UPDATE/DELETE) that need to bypass RLS.
  */
 export async function withAdmin<T>(
-  handler: (supabase: SupabaseClient) => Promise<T>
+  handler: (supabase: SupabaseClient) => Promise<T>,
+  request?: Pick<Request, "headers">
 ): Promise<T | NextResponse> {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
-  return handler(createAdminClient());
+  const run = async (): Promise<T | NextResponse> => {
+    const auth = await validateAdminAuth();
+    if (!auth.valid) {
+      return auth.error;
+    }
+    return handler(createAdminClient());
+  };
+
+  return request ? withRequestContext(request, run) : run();
 }
 
 /**
@@ -174,32 +180,37 @@ export async function withAdmin<T>(
  * withAdmin (service-role) instead.
  */
 export async function withAdminRead<T>(
-  handler: (supabase: SupabaseClient) => Promise<T>
+  handler: (supabase: SupabaseClient) => Promise<T>,
+  request?: Pick<Request, "headers">
 ): Promise<T | NextResponse> {
-  const auth = await validateAdminAuth();
-  if (!auth.valid) {
-    return auth.error;
-  }
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    getSupabaseUrl() ?? "",
-    getSupabaseAnonKey() ?? "",
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Server Component context — can be ignored
-          }
-        },
-      },
+  const run = async (): Promise<T | NextResponse> => {
+    const auth = await validateAdminAuth();
+    if (!auth.valid) {
+      return auth.error;
     }
-  );
-  return handler(supabase);
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      getSupabaseUrl() ?? "",
+      getSupabaseAnonKey() ?? "",
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Server Component context — can be ignored
+            }
+          },
+        },
+      }
+    );
+    return handler(supabase);
+  };
+
+  return request ? withRequestContext(request, run) : run();
 }

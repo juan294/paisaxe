@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
 import { updateStorySchema } from "@/lib/schemas";
+import { readJsonBody, uuidParam } from "@/lib/request-validation";
 import type { StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
 
 export async function PATCH(
@@ -16,11 +17,22 @@ export async function PATCH(
   }
 
   try {
-    const { id } = await params;
-    const rawBody = await request.json();
+    const { id: rawId } = await params;
+
+    // Validate the dynamic route param is a UUID (BE-M2 #570)
+    const idResult = uuidParam(rawId, "story id");
+    if (!idResult.ok) {
+      return idResult.error;
+    }
+    const id = idResult.value;
+
+    const bodyResult = await readJsonBody(request);
+    if (!bodyResult.ok) {
+      return bodyResult.error;
+    }
 
     // Zod schema validation (BE-M1)
-    const parsed = updateStorySchema.safeParse(rawBody);
+    const parsed = updateStorySchema.safeParse(bodyResult.data);
     if (!parsed.success) {
       const flat = parsed.error.flatten();
       // Preserve backward-compatible single-field error messages

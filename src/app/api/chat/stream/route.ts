@@ -5,8 +5,8 @@ import { chatRequestSchema } from "@/lib/schemas";
 // Static here so they are resolved once at module load, not on every request.
 // This removes 100-300 ms of cold-start dynamic-import cost for rejected
 // requests (rate-limit, validation, injection) that never need the AI stack.
-import { validateChatRequest } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { withRouteContext } from "@/lib/request-validation";
 import { getClientIp } from "@/lib/request-utils";
 import {
   detectInjectionAttempt,
@@ -17,6 +17,8 @@ import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
 import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
 import {
+  CHAT_STREAM_STAGE_TIMEOUTS_MS,
+  ChatStreamStageTimeoutError,
   isChatStreamStageTimeout,
   withChatStreamStageTiming,
 } from "@/lib/chat-stream-timeouts";
@@ -36,6 +38,12 @@ function isAbortError(error: unknown): boolean {
  * Final event includes any relevant images.
  */
 export async function POST(request: NextRequest) {
+  // DO-M1 (#619): bind X-Request-ID into the request context so handler logs
+  // carry request_id.
+  return withRouteContext(request, () => handlePost(request));
+}
+
+async function handlePost(request: NextRequest) {
   try {
     // Rate limiting
     const ip = getClientIp(request);
@@ -54,7 +62,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Input validation — Zod runtime schema check first
+    // Input validation — single Zod parse path (BE-L3 #524).
     const body = await request.json().catch(() => null);
     const zodResult = chatRequestSchema.safeParse(body);
     if (!zodResult.success) {
@@ -64,16 +72,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validation = validateChatRequest(body);
-
-    if (!validation.valid) {
-      return new Response(JSON.stringify({ error: validation.error }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const { sanitizedMessage: message, sanitizedContext: context, messageIndex } = validation;
+    const { message, context, messageIndex } = zodResult.data;
 
     // Security checks
     if (message && message.length > MAX_INPUT_LENGTH) {
@@ -101,7 +100,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cleanMessage = sanitizeInput(message!);
+    const cleanMessage = sanitizeInput(message);
 
     const streamAbortController = new AbortController();
     const handleRequestAbort = () => {
@@ -192,9 +191,36 @@ export async function POST(request: NextRequest) {
     // Create a readable stream for SSE
     const encoder = new TextEncoder();
 
+    // QA-M3 (#631): apply an idle timeout to the generation loop. The
+    // per-stage timeouts above only cover embedding/search/feature-flag; the
+    // for-await generation had no guard, so a stalled upstream stream could
+    // hang the connection indefinitely. We reset an idle timer on every chunk
+    // and abort the stream if no chunk arrives within the configured window.
+    const IDLE_TIMEOUT_MS = CHAT_STREAM_STAGE_TIMEOUTS_MS.response;
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    let idleTimedOut = false;
+
+    const clearIdleTimer = () => {
+      if (idleTimer !== undefined) {
+        clearTimeout(idleTimer);
+        idleTimer = undefined;
+      }
+    };
+    const resetIdleTimer = () => {
+      clearIdleTimer();
+      idleTimer = setTimeout(() => {
+        idleTimedOut = true;
+        streamAbortController.abort();
+      }, IDLE_TIMEOUT_MS);
+    };
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          // Arm the idle timer before the first chunk so a stream that never
+          // yields is still bounded.
+          resetIdleTimer();
+
           // Stream text chunks
           for await (const chunk of streamChatResponse(
             enrichedMessage,
@@ -208,10 +234,19 @@ export async function POST(request: NextRequest) {
               break;
             }
 
+            // A chunk arrived — reset the idle window.
+            resetIdleTimer();
+
             // Send text chunk as SSE event
             controller.enqueue(encoder.encode(
               encodeSseEvent({ type: "text", content: chunk })
             ));
+          }
+
+          clearIdleTimer();
+
+          if (idleTimedOut) {
+            throw new ChatStreamStageTimeoutError("response", IDLE_TIMEOUT_MS);
           }
 
           // Send final event with images and sources
@@ -227,7 +262,17 @@ export async function POST(request: NextRequest) {
           }
 
         } catch (error) {
-          if (isAbortError(error) || streamAbortController.signal.aborted) {
+          if (idleTimedOut || isChatStreamStageTimeout(error)) {
+            logger.warn("[CHAT_STREAM_RESPONSE_TIMEOUT]", {
+              timeoutMs: IDLE_TIMEOUT_MS,
+            });
+            controller.enqueue(encoder.encode(
+              encodeSseEvent({
+                type: "error",
+                message: "response_timeout",
+              })
+            ));
+          } else if (isAbortError(error) || streamAbortController.signal.aborted) {
             logger.warn("[CHAT_STREAM_ABORTED]", { reason: "client_disconnect" });
           } else {
             const err = error instanceof Error ? error : new Error(String(error));
@@ -243,6 +288,7 @@ export async function POST(request: NextRequest) {
             ));
           }
         } finally {
+          clearIdleTimer();
           request.signal.removeEventListener("abort", handleRequestAbort);
           try {
             controller.close();
@@ -252,6 +298,7 @@ export async function POST(request: NextRequest) {
         }
       },
       cancel() {
+        clearIdleTimer();
         streamAbortController.abort();
         request.signal.removeEventListener("abort", handleRequestAbort);
       },

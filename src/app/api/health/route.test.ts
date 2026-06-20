@@ -23,6 +23,19 @@ import { getRateLimitBackendStatus } from "@/lib/rate-limit";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+
+/**
+ * #528 (DO-L2): probes now terminate their Supabase query chains in
+ * `.abortSignal(signal)`. These helpers wrap a terminal value so the chain ends
+ * in an `.abortSignal()` that yields the original Promise (resolve/reject/hang).
+ */
+function abortable(promise: unknown) {
+  return { abortSignal: vi.fn().mockReturnValue(promise) };
+}
+function resolved(value: unknown) {
+  return abortable(Promise.resolve(value));
+}
+
 function createChainMock(resolveValue: unknown) {
   const mock = {
     select: vi.fn(),
@@ -30,7 +43,7 @@ function createChainMock(resolveValue: unknown) {
   };
 
   mock.select.mockReturnValue(mock);
-  mock.limit.mockReturnValue(Promise.resolve(resolveValue));
+  mock.limit.mockReturnValue(resolved(resolveValue));
 
   return mock;
 }
@@ -38,7 +51,7 @@ function createChainMock(resolveValue: unknown) {
 function mockHealthySupabase() {
   vi.mocked(supabase.from).mockImplementation((table: string) => {
     if (table === "stories") {
-      const lastEq = vi.fn().mockResolvedValue({ count: 1, error: null });
+      const lastEq = vi.fn().mockReturnValue(resolved({ count: 1, error: null }));
       const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
 
       return {
@@ -53,7 +66,7 @@ function mockHealthySupabase() {
 function mockSupabaseProbeError(message: string) {
   vi.mocked(supabase.from).mockImplementation((table: string) => {
     if (table === "stories") {
-      const lastEq = vi.fn().mockResolvedValue({ count: 1, error: null });
+      const lastEq = vi.fn().mockReturnValue(resolved({ count: 1, error: null }));
       const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
 
       return {
@@ -68,7 +81,7 @@ function mockSupabaseProbeError(message: string) {
 function mockStoryCount(count: number | null, error: { message: string } | null) {
   vi.mocked(supabase.from).mockImplementation((table: string) => {
     if (table === "stories") {
-      const lastEq = vi.fn().mockResolvedValue({ count, error });
+      const lastEq = vi.fn().mockReturnValue(resolved({ count, error }));
       const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
 
       return {
@@ -81,17 +94,15 @@ function mockStoryCount(count: number | null, error: { message: string } | null)
 }
 
 function mockDatabaseSize(sizeBytes: number) {
-  vi.mocked(supabase.rpc).mockResolvedValue({
-    data: sizeBytes,
-    error: null,
-  } as never);
+  vi.mocked(supabase.rpc).mockReturnValue(
+    resolved({ data: sizeBytes, error: null }) as never
+  );
 }
 
 function mockDatabaseSizeError(message: string) {
-  vi.mocked(supabase.rpc).mockResolvedValue({
-    data: null,
-    error: { message },
-  } as never);
+  vi.mocked(supabase.rpc).mockReturnValue(
+    resolved({ data: null, error: { message } }) as never
+  );
 }
 
 describe("GET /api/health", () => {
@@ -176,13 +187,13 @@ describe("GET /api/health", () => {
   it("degrades when the chunks probe throws unexpectedly (inner catch, line 81)", async () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === "stories") {
-        const lastEq = vi.fn().mockResolvedValue({ count: 1, error: null });
+        const lastEq = vi.fn().mockReturnValue(resolved({ count: 1, error: null }));
         const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
         return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
       }
       return {
         select: vi.fn().mockReturnValue({
-          limit: vi.fn().mockRejectedValue(new Error("Connection refused")),
+          limit: vi.fn().mockReturnValue(abortable(Promise.reject(new Error("Connection refused")))),
         }),
       } as never;
     });
@@ -198,10 +209,9 @@ describe("GET /api/health", () => {
   it("degrades when the stories probe returns an error response (line 100)", async () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === "stories") {
-        const lastEq = vi.fn().mockResolvedValue({
-          count: null,
-          error: { message: "Stories DB error" },
-        });
+        const lastEq = vi.fn().mockReturnValue(
+          resolved({ count: null, error: { message: "Stories DB error" } })
+        );
         const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
         return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
       }
@@ -219,7 +229,7 @@ describe("GET /api/health", () => {
   it("degrades when the stories probe throws unexpectedly (inner catch, line 105)", async () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === "stories") {
-        const lastEq = vi.fn().mockRejectedValue(new Error("Stories DB crash"));
+        const lastEq = vi.fn().mockReturnValue(abortable(Promise.reject(new Error("Stories DB crash"))));
         const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
         return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
       }
@@ -248,7 +258,7 @@ describe("GET /api/health", () => {
   it("fails fast when the chunks probe hangs", async () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === "stories") {
-        const lastEq = vi.fn().mockResolvedValue({ count: 1, error: null });
+        const lastEq = vi.fn().mockReturnValue(resolved({ count: 1, error: null }));
         const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
 
         return {
@@ -258,7 +268,7 @@ describe("GET /api/health", () => {
 
       return {
         select: vi.fn().mockReturnValue({
-          limit: vi.fn().mockReturnValue(new Promise(() => {})),
+          limit: vi.fn().mockReturnValue(abortable(new Promise(() => {}))),
         }),
       } as never;
     });
@@ -275,10 +285,46 @@ describe("GET /api/health", () => {
     expect(elapsed).toBeLessThan(PROBE_TIMEOUTS_MS.supabase + 400);
   }, 10000);
 
+  // #528 (DO-L2): the timeout must CANCEL the underlying request, not just race
+  // a fallback. We capture the AbortSignal handed to .abortSignal() and assert
+  // it is aborted once the probe times out.
+  it("aborts the underlying chunks request when the probe times out", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    vi.mocked(supabase.from).mockImplementation((table: string) => {
+      if (table === "stories") {
+        const lastEq = vi.fn().mockReturnValue(resolved({ count: 1, error: null }));
+        const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
+        return { select: vi.fn().mockReturnValue({ eq: firstEq }) } as never;
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          limit: vi.fn().mockReturnValue({
+            // Never resolves on its own; only settles when the signal aborts.
+            abortSignal: vi.fn().mockImplementation((signal: AbortSignal) => {
+              capturedSignal = signal;
+              return new Promise((_resolve, reject) => {
+                signal.addEventListener("abort", () => reject(new Error("aborted")), {
+                  once: true,
+                });
+              });
+            }),
+          }),
+        }),
+      } as never;
+    });
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
+    expect(capturedSignal?.aborted).toBe(true);
+  }, 10000);
+
   it("degrades when the stories probe hangs past its timeout", async () => {
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       if (table === "stories") {
-        const lastEq = vi.fn().mockReturnValue(new Promise(() => {}));
+        const lastEq = vi.fn().mockReturnValue(abortable(new Promise(() => {})));
         const firstEq = vi.fn().mockReturnValue({ eq: lastEq });
         return {
           select: vi.fn().mockReturnValue({ eq: firstEq }),
@@ -297,7 +343,7 @@ describe("GET /api/health", () => {
 
   it("stays healthy when the database size probe hangs past its timeout", async () => {
     mockHealthySupabase();
-    vi.mocked(supabase.rpc).mockReturnValue(new Promise(() => {}) as never);
+    vi.mocked(supabase.rpc).mockReturnValue(abortable(new Promise(() => {})) as never);
 
     const response = await GET();
     const data = await response.json();
@@ -309,7 +355,7 @@ describe("GET /api/health", () => {
 
   it("does not degrade when the database size probe throws unexpectedly", async () => {
     mockHealthySupabase();
-    vi.mocked(supabase.rpc).mockRejectedValue(new Error("Unexpected DB error"));
+    vi.mocked(supabase.rpc).mockReturnValue(abortable(Promise.reject(new Error("Unexpected DB error"))) as never);
 
     const response = await GET();
     const data = await response.json();

@@ -14,6 +14,7 @@
 
 import { z } from "zod";
 import { STORY_SOURCE_TYPES } from "@/types/immersive";
+import { sanitizeInput } from "@/lib/validation";
 
 // ---------------------------------------------------------------------------
 // Primitives
@@ -219,11 +220,62 @@ export const updateFeatureFlagSchema = z
 // chat POST (shared by /api/chat and /api/chat/stream)
 // ---------------------------------------------------------------------------
 
-export const chatRequestSchema = z.object({
-  message: z.string().min(1, "Message is required").max(500, "Message exceeds maximum length of 500 characters"),
-  context: z.string().max(600, "Context exceeds maximum length of 600 characters").optional(),
-  messageIndex: z.number().int().min(0).optional(),
-});
+const CHAT_MAX_MESSAGE_LENGTH = 500;
+const CHAT_MAX_CONTEXT_LENGTH = 600;
+
+/**
+ * Chat request schema (shared by /api/chat and /api/chat/stream).
+ *
+ * BE-L3 (#524): this schema now subsumes the former `validateChatRequest`
+ * helper. It sanitizes message/context via `.transform()` and enforces length
+ * limits AFTER sanitization, so a single parse path produces the sanitized
+ * values the route consumes. `messageIndex` is coerced to 0 when absent or
+ * invalid (matching the prior lenient behaviour).
+ */
+export const chatRequestSchema = z
+  .object({
+    message: z
+      .string()
+      .transform((value) => sanitizeInput(value))
+      .pipe(
+        z
+          .string()
+          .min(1, "Message cannot be empty")
+          .max(
+            CHAT_MAX_MESSAGE_LENGTH,
+            `Message exceeds maximum length of ${CHAT_MAX_MESSAGE_LENGTH} characters`
+          )
+      ),
+    context: z
+      .string()
+      .transform((value) => sanitizeInput(value))
+      .pipe(
+        z
+          .string()
+          .max(
+            CHAT_MAX_CONTEXT_LENGTH,
+            `Context exceeds maximum length of ${CHAT_MAX_CONTEXT_LENGTH} characters`
+          )
+      )
+      .optional(),
+    messageIndex: z.unknown().optional(),
+  })
+  .transform((parsed) => {
+    const rawIndex = parsed.messageIndex;
+    const messageIndex =
+      typeof rawIndex === "number" &&
+      Number.isInteger(rawIndex) &&
+      rawIndex >= 0
+        ? rawIndex
+        : 0;
+    return {
+      message: parsed.message,
+      context: parsed.context,
+      messageIndex,
+    };
+  });
+
+export type ChatRequest = z.infer<typeof chatRequestSchema>;
 
 // ---------------------------------------------------------------------------
 // admin/agent-config PUT
