@@ -470,3 +470,4 @@ Engineering audit (Phases 1–10, April 2026). Key remediations:
 | v1.4.0 | Apr 2026 | Pre-launch remediation: booking persistence, E2E reliability, admin hardening, DevOps automation |
 | v1.5.0 | May 2026 | Wave 1+2 audit remediation: health split, Redis cache, HNSW index, RLS-aware admin auth, Pino logger, CRON telemetry, develop-smoke CI |
 | v1.5.1 | May 2026 | Patch: restore author-pill typewriter animation (effect-deps regression) |
+| v1.6.0 | Jun 2026 | Pre-launch audit remediation (50 findings, all waves): Stripe tier fulfilment, voice/mic teardown, Sentry server-error capture, rate-limit hardening, tiered-pricing upsells, green brand token, server-only secret boundary, CI circular-dep guard |
