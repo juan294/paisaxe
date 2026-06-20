@@ -125,6 +125,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -630,18 +631,6 @@
 - Triage Agent: The in-house `basic-markdown.tsx` renderer that replaced react-markdown (Jun 12) now has full dedicated test coverage including XSS-relevant link-safety branches. Recommend the coverage cron pass `--maxWorkers=3` to avoid recurring worker starvation.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-06-16T16:21:00Z -->
-## Triage — 2026-06-16
-- **Reports processed**: 8 (cc-rpi, cost-analyst, coverage, documentation, localization, performance, qa, security)
-- **Action items resolved**: 4 (npm audit fix 9→0 advisories, esbuild+protobufjs to overrides 36/40→34/40 prod deps, QA preflight added refs #635, coverage test files committed)
-- **Summary**: Security YELLOW→GREEN (audit fix); Performance carrying action completed (dep pin cleanup); Coverage tests committed; QA harness preflight added for clearer failure signal.
-**Cross-agent recommendations:**
-- Security: GREEN after this triage (`npm audit --omit=dev` clean). Watch for OTel/Sentry minor bump that may reintroduce moderate advisories transitively.
-- Performance: Production dep count now 34/40 (esbuild+protobufjs moved to overrides). Next actionable: run `build:analyze` once to verify initial-load budget half.
-- QA: Preflight added to LLM test suite — next run will emit a clear harness error instead of 12 opaque ECONNREFUSED stacks. Issue #635 still open for permanent webServer fix.
-- Cost Analyst: 123-day revenue drought and 119-day voice silence require manual production investigation on paisaxe.es (not a code item).
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-06-17T06:00:03Z -->
 ## Documentation Agent — 2026-06-17
 - Status: GREEN — No documentation gaps found. Twenty-eighth consecutive clean run.
@@ -740,21 +729,6 @@
 - QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 in `FeatureFlagKey` + 10 agent flags.
 - Cost Analyst Agent: No cost-related documentation concerns.
 - Performance Agent: No documentation-impacting changes.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-06-18T05:04:23Z -->
-## Localization Agent — 2026-06-18
-- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 54th consecutive clean run.
-- UI strings: 406 leaf keys per locale (programmatically verified — all 5 non-Spanish locales have exactly 406 keys, 0 missing, 0 orphaned).
-- Story translations: 113 stories x 5 locales = 565 target-locale records, all complete (title + subtitle + description).
-- Type safety: Pass — 0 TypeScript errors, full project tsc clean.
-- All 102 translation tests pass. No changes made this cycle.
-
-**Cross-agent recommendations:**
-- Performance Agent: i18n bundle sizes stable (~15 KB each). Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. No optimization needed.
-- Coverage Agent: translations.test.ts dynamically compares each locale's key count to ES — any key additions without locale parity are caught in CI automatically.
-- QA Agent: No locale-related issues. All translations stable for 54 consecutive days. Next LLM quality cycle (post-#635 fix) should confirm no locale regressions.
-- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-06-18T06:05:10Z -->
@@ -947,6 +921,21 @@
 - Triage Agent: No new code actions from Cost Analyst. Watch items: (1) VOYAGE_API_KEY in QA env, (2) Twilio number release decision before ~Jul 7 if no bookings expected. Manual: Anthropic billing at platform.claude.com/settings/billing.
 - Performance Agent: ElevenLabs voice integration still serves 123 days of zero Paisaxe traffic. Voice-shelving product case (~$45/mo combined savings) unchanged, independent of bundle size.
 - Security Agent: 0 cost-related security concerns. All auth/payment controls healthy.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-06-20T05:03:00Z -->
+## Localization Agent — 2026-06-20
+- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 56th consecutive clean run.
+- UI strings: 406 leaf keys per locale — all 5 non-Spanish locales have exactly 406 keys, 0 missing, 0 orphaned.
+- Story translations: 113 stories x 5 locales = 565 target-locale records, all complete (title + subtitle + description). Story count is 113 (not 100 as in older reports — 13 additional stories added and translated).
+- Type safety: Pass — 105/105 translation tests passing, 0 TypeScript errors.
+- No changes made this cycle.
+
+**Cross-agent recommendations:**
+- Performance Agent: i18n bundle sizes stable (~15 KB each). Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. No optimization needed.
+- Coverage Agent: translations.test.ts dynamically compares each locale key count to es — any key additions without locale parity are caught in CI automatically.
+- QA Agent: No locale-related issues. All translations stable for 56 consecutive cycles.
+- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-06-20T06:30:00Z -->
