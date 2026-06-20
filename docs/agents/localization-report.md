@@ -1,52 +1,65 @@
-# Localization Agent Report
-
-Date: 2026-06-19
-Agent: Paisaxe Localization Agent
-Status: COMPLETE — 100% coverage, no edits needed. 55th consecutive clean run.
+# Localization Agent Report — 2026-06-20
 
 ## Summary
 
-Translation coverage is Complete across all 6 supported locales (es, en, fr, de, pt, ast). No edits were required this cycle.
+**Status: 100% complete. No edits needed. 56th consecutive clean run.**
+
+All UI string keys and story translations are fully covered across all supported locales.
+
+### UI Translations (src/lib/i18n/)
 
 | Locale | Leaf Keys | Missing | Orphaned | Status |
 |--------|-----------|---------|----------|--------|
-| es (Spanish, source) | 406 | 0 | 0 | Pass |
-| en (English) | 406 | 0 | 0 | Pass |
-| fr (French) | 406 | 0 | 0 | Pass |
-| de (German) | 406 | 0 | 0 | Pass |
-| pt (Portuguese) | 406 | 0 | 0 | Pass |
-| ast (Asturian) | 406 | 0 | 0 | Pass |
+| es (source) | 406 | — | — | Complete |
+| en | 406 | 0 | 0 | Complete |
+| fr | 406 | 0 | 0 | Complete |
+| de | 406 | 0 | 0 | Complete |
+| pt | 406 | 0 | 0 | Complete |
 
-Story translations: 113 stories across 5 target locales (en, fr, de, pt, ast) — all 565 entries present with non-empty title and description.
+Total: 5 locales x 406 leaf keys = 2030 translation entries. 100% parity.
 
-## Verification
+### Story Translations (content/translations/story-translations.ts)
 
-- UI translation tests: 102/102 passing (translations.test.ts)
-- Story coverage tests: 3/3 passing (story-translations-coverage.test.ts)
-- Full i18n test suite: 202/202 passing (5 test files)
-- TypeScript check: Pass (0 errors, tsc --ignoreConfig on all 6 locale files)
-- Key parity: All 5 non-Spanish locales have exactly 406 leaf keys, matching Spanish source of truth
+| Locale | Stories Covered | Missing | Status |
+|--------|----------------|---------|--------|
+| en | 113 / 113 | 0 | Complete |
+| fr | 113 / 113 | 0 | Complete |
+| de | 113 / 113 | 0 | Complete |
+| pt | 113 / 113 | 0 | Complete |
+| ast | 113 / 113 | 0 | Complete |
 
-## Fixed
+Total: 113 stories x 5 locales = 565 translation records. 100% coverage.
 
-No translations were added or modified this cycle. All gaps were closed in prior cycles.
+Note: Story count confirmed at 113 (programmatically verified via slug count in story-translations.ts). Prior reports citing 100 stories referred to core seed stories only.
+
+## Fixed Translations
+
+No translations added this cycle. All locales were already complete.
 
 ## Remaining Gaps
 
-None. Coverage is at 100% for UI strings and story translations.
+None.
 
 ## Orphaned Keys
 
-None detected. No keys exist in non-Spanish locales that are absent from the Spanish source.
+None detected. All keys in non-Spanish locales have a corresponding Spanish source key.
+
+## Type Safety
+
+- tsc --noEmit: Pass — 0 TypeScript errors in i18n files or story-translations.ts
+- Translation tests: Pass — 105/105 tests pass (translations.test.ts: 102, story-translations-coverage.test.ts: 3)
+
+## Verification Method
+
+1. Counted string-value lines per locale file via Node.js script — all 5 locales: 406 lines.
+2. Counted story slugs and per-locale entries in story-translations.ts — 113 slugs, all 5 locales fully covered.
+3. Ran vitest on translations.test.ts and story-translations-coverage.test.ts — 105/105 pass.
+4. Ran tsc --noEmit across project — 0 errors.
 
 ## Cross-Agent Notes
 
-- Security Agent (Jun 18): GREEN, 0 advisories. No sensitive data in any locale or story-translations file.
-- Performance Agent (Jun 18): i18n bundle sizes stable. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. Total JS 3,027 KB / 3,500 KB budget.
-- QA Agent (Jun 18): Port 3006 fix (#635) confirmed working; new LLM blocker is VOYAGE_API_KEY missing from QA environment. No locale-related test failures in browser journeys (10/10 stable).
-- Cost Analyst (Jun 19): 126-day revenue drought / 122-day voice silence. VOYAGE_API_KEY in QA env flagged as outstanding action to restore 12/12 LLM safety tests.
-- Coverage Agent (Jun 16): translations.test.ts dynamically verifies key parity — any new ES key added without locale parity will fail CI automatically.
-- Triage (Jun 17): Port 3006 fix, CORS origin fix, 3 Dependabot PRs merged. No localization-impacting changes.
-- Note: The agent task description lists 5 supported locales, but this project tracks 6 (including ast/Asturian). All 6 are at 100% coverage.
+- No new translation keys added since 2026-05-13. Codebase stable.
+- translations.test.ts dynamically compares each locale key count to es, so future key additions without parity fail CI immediately.
+- Lazy-loading setup (es+en static, fr/de/pt/ast dynamic) confirmed unchanged per Performance Agent 2026-06-17 report.
 
 ---
