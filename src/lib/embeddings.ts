@@ -129,23 +129,24 @@ export async function generateContextualizedEmbeddings(
       outputDimension: EMBEDDING_DIMENSIONS,
     });
 
-    if (!result.data || result.data.length === 0) {
+    // voyageai 0.4.x ExtendedClient returns { results: [{ embeddings: number[][] }], totalTokens }
+    if (!result.results || result.results.length === 0) {
       throw new Error(`No contextualized embeddings returned for group ${i}`);
     }
 
-    // Response structure: data[0] is the document, data[0].data[] are per-chunk embeddings
-    const documentData = result.data[0];
-    if (!documentData.data) {
+    // results[0] is the document; results[0].embeddings[] are per-chunk vectors
+    const documentResult = result.results[0];
+    if (!documentResult.embeddings) {
       throw new Error(`No chunk embeddings in contextualized response for group ${i}`);
     }
 
-    const groupEmbeddings = documentData.data
-      .map((item) => item.embedding)
-      .filter((e): e is number[] => e !== undefined);
+    const groupEmbeddings = documentResult.embeddings.filter(
+      (e): e is number[] => e !== undefined
+    );
 
     allEmbeddings.push(...groupEmbeddings);
 
-    const groupTokens = result.usage?.totalTokens || 0;
+    const groupTokens = result.totalTokens || 0;
     totalTokens += groupTokens;
 
     if (groupTokens) {

@@ -277,29 +277,22 @@ describe("embeddings", () => {
 
       mockContextualizedEmbed
         .mockResolvedValueOnce({
-          data: [
+          results: [
             {
-              object: "list",
-              data: [
-                { object: "embedding", embedding: mockEmbedding1, index: 0 },
-                { object: "embedding", embedding: mockEmbedding2, index: 1 },
-              ],
               index: 0,
+              embeddings: [mockEmbedding1, mockEmbedding2],
             },
           ],
-          usage: { totalTokens: 200 },
+          totalTokens: 200,
         })
         .mockResolvedValueOnce({
-          data: [
+          results: [
             {
-              object: "list",
-              data: [
-                { object: "embedding", embedding: mockEmbedding3, index: 0 },
-              ],
               index: 0,
+              embeddings: [mockEmbedding3],
             },
           ],
-          usage: { totalTokens: 100 },
+          totalTokens: 100,
         });
 
       const { generateContextualizedEmbeddings } = await import("./embeddings");
@@ -318,17 +311,13 @@ describe("embeddings", () => {
     it("should call contextualizedEmbed with correct payload structure", async () => {
       const mockEmbedding = Array(1024).fill(0.1);
       mockContextualizedEmbed.mockResolvedValue({
-        data: [
+        results: [
           {
-            object: "list",
-            data: [
-              { object: "embedding", embedding: mockEmbedding, index: 0 },
-              { object: "embedding", embedding: mockEmbedding, index: 1 },
-            ],
             index: 0,
+            embeddings: [mockEmbedding, mockEmbedding],
           },
         ],
-        usage: { totalTokens: 50 },
+        totalTokens: 50,
       });
 
       const { generateContextualizedEmbeddings } = await import("./embeddings");
@@ -353,29 +342,23 @@ describe("embeddings", () => {
       // Group 1: 2 chunks
       mockContextualizedEmbed
         .mockResolvedValueOnce({
-          data: [
+          results: [
             {
-              data: [
-                { embedding: embeddings[0], index: 0 },
-                { embedding: embeddings[1], index: 1 },
-              ],
               index: 0,
+              embeddings: [embeddings[0], embeddings[1]],
             },
           ],
-          usage: { totalTokens: 100 },
+          totalTokens: 100,
         })
         // Group 2: 2 chunks
         .mockResolvedValueOnce({
-          data: [
+          results: [
             {
-              data: [
-                { embedding: embeddings[2], index: 0 },
-                { embedding: embeddings[3], index: 1 },
-              ],
               index: 0,
+              embeddings: [embeddings[2], embeddings[3]],
             },
           ],
-          usage: { totalTokens: 150 },
+          totalTokens: 150,
         });
 
       const { generateContextualizedEmbeddings } = await import("./embeddings");
@@ -394,7 +377,7 @@ describe("embeddings", () => {
 
     it("should throw error when no data is returned for a group", async () => {
       mockContextualizedEmbed.mockResolvedValue({
-        data: null,
+        results: null,
       });
 
       const { generateContextualizedEmbeddings } = await import("./embeddings");
@@ -406,7 +389,7 @@ describe("embeddings", () => {
 
     it("should throw error when data array is empty for a group", async () => {
       mockContextualizedEmbed.mockResolvedValue({
-        data: [],
+        results: [],
       });
 
       const { generateContextualizedEmbeddings } = await import("./embeddings");
@@ -418,10 +401,10 @@ describe("embeddings", () => {
 
     it("should throw error when document data is missing chunk embeddings", async () => {
       mockContextualizedEmbed.mockResolvedValue({
-        data: [
+        results: [
           {
-            data: undefined,
             index: 0,
+            embeddings: undefined,
           },
         ],
       });
@@ -436,13 +419,13 @@ describe("embeddings", () => {
     it("should skip empty groups", async () => {
       const mockEmbedding = Array(1024).fill(0.5);
       mockContextualizedEmbed.mockResolvedValue({
-        data: [
+        results: [
           {
-            data: [{ embedding: mockEmbedding, index: 0 }],
             index: 0,
+            embeddings: [mockEmbedding],
           },
         ],
-        usage: { totalTokens: 30 },
+        totalTokens: 30,
       });
 
       const { generateContextualizedEmbeddings } = await import("./embeddings");
@@ -460,17 +443,17 @@ describe("embeddings", () => {
 
     it("should filter out undefined embeddings from response", async () => {
       mockContextualizedEmbed.mockResolvedValue({
-        data: [
+        results: [
           {
-            data: [
-              { embedding: Array(1024).fill(0.1), index: 0 },
-              { embedding: undefined, index: 1 },
-              { embedding: Array(1024).fill(0.3), index: 2 },
-            ],
             index: 0,
+            embeddings: [
+              Array(1024).fill(0.1),
+              undefined,
+              Array(1024).fill(0.3),
+            ],
           },
         ],
-        usage: { totalTokens: 75 },
+        totalTokens: 75,
       });
 
       const { generateContextualizedEmbeddings } = await import("./embeddings");
@@ -484,13 +467,13 @@ describe("embeddings", () => {
     it("should handle missing usage data", async () => {
       const mockEmbedding = Array(1024).fill(0.1);
       mockContextualizedEmbed.mockResolvedValue({
-        data: [
+        results: [
           {
-            data: [{ embedding: mockEmbedding, index: 0 }],
             index: 0,
+            embeddings: [mockEmbedding],
           },
         ],
-        // No usage field
+        // No totalTokens field
       });
 
       const { generateContextualizedEmbeddings } = await import("./embeddings");
@@ -512,13 +495,13 @@ describe("embeddings", () => {
       const consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
       const mockEmbedding = Array(1024).fill(0.1);
       mockContextualizedEmbed.mockResolvedValue({
-        data: [
+        results: [
           {
-            data: [{ embedding: mockEmbedding, index: 0 }],
             index: 0,
+            embeddings: [mockEmbedding],
           },
         ],
-        usage: { totalTokens: 88 },
+        totalTokens: 88,
       });
 
       const { generateContextualizedEmbeddings } = await import("./embeddings");
@@ -537,13 +520,13 @@ describe("embeddings", () => {
       const consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
       const mockEmbedding = Array(1024).fill(0.1);
       mockContextualizedEmbed.mockResolvedValue({
-        data: [
+        results: [
           {
-            data: [{ embedding: mockEmbedding, index: 0 }],
             index: 0,
+            embeddings: [mockEmbedding],
           },
         ],
-        usage: { totalTokens: 50 },
+        totalTokens: 50,
       });
 
       const { generateContextualizedEmbeddings } = await import("./embeddings");
