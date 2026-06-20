@@ -161,6 +161,12 @@ supabase db push
 curl -s https://paisaxe.es/api/health | jq
 ```
 
+> **Ordering rule (DO-M1):** If the compensation migration must be accompanied by a
+> code change (e.g., to stop referencing the dropped column), apply the migration
+> FIRST and verify it is live before merging the code PR to `main`. Never let code
+> land that depends on a schema change that hasn't been applied yet.
+> See [Migration Policy — Migration-Deploy Ordering Rule](./migration-policy.md#migration-deploy-ordering-rule-do-m1).
+
 ---
 
 ## 4. Incident Communication Template

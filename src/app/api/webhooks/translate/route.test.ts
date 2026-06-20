@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { POST } from "./route";
 import { logger } from "@/lib/logger";
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
@@ -11,7 +11,7 @@ vi.mock("@/lib/translate-story", () => ({
   translateStory: vi.fn(),
 }));
 
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 describe("translate webhook", () => {
   const VALID_SECRET = "test-webhook-secret";

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import {
   fetchManualCosts,
   createManualCost,
@@ -8,7 +8,8 @@ import {
   getManualCost,
 } from "./manual-costs";
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 

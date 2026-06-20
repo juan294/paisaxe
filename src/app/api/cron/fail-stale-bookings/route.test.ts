@@ -10,7 +10,7 @@ const logger = vi.hoisted(() => ({
 
 vi.mock("@/lib/logger", () => ({ logger }));
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
@@ -23,7 +23,7 @@ vi.mock("@/lib/cron-auth", () => ({
   verifyWebhookSecret: vi.fn(),
 }));
 
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 

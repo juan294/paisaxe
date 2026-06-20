@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { GET, POST, PATCH, DELETE } from "./route";
 
 // Mock dependencies
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
@@ -11,7 +11,7 @@ vi.mock("@/lib/supabase", () => ({
 // that calls the mocked validateAdminAuth and, on success, invokes the handler
 // with the mocked admin client — preserving the existing test contract.
 vi.mock("@/lib/admin-auth", async () => {
-  const { createAdminClient } = await import("@/lib/supabase");
+  const { createAdminClient } = await import("@/lib/supabase-admin");
   const validateAdminAuth = vi.fn();
   return {
     validateAdminAuth,
@@ -33,7 +33,7 @@ vi.mock("@/lib/encryption", () => ({
   isEncryptionConfigured: vi.fn(() => true),
 }));
 
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
 
 describe("Marketing Accounts API", () => {

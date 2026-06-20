@@ -4,7 +4,7 @@ import { getRequestId } from "./request-context";
 
 // Mock createAdminClient so withAdmin tests don't need SUPABASE_SERVICE_KEY
 const mockAdminClient = { from: vi.fn() };
-vi.mock("./supabase", () => ({
+vi.mock("./supabase-admin", () => ({
   createAdminClient: vi.fn(() => mockAdminClient),
 }));
 

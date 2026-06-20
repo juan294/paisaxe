@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { validateMcpSecret } from "@/lib/mcp-auth";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { logger } from "@/lib/logger";
 
 /**

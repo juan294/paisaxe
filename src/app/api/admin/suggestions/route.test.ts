@@ -99,7 +99,7 @@ const defaultSupabaseClient = () => ({
 
 mockCreateAdminClient.mockImplementation(defaultSupabaseClient);
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: (...args: unknown[]) => mockCreateAdminClient(...args),
 }));
 

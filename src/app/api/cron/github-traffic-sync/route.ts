@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 import { acquireCronJobLease, releaseCronJobLease } from "@/lib/cron-job-lock";
 

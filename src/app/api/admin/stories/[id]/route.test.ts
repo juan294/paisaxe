@@ -12,7 +12,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 // Mock dependencies
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
@@ -20,7 +20,7 @@ vi.mock("@/lib/admin-auth", () => ({
   validateAdminAuth: vi.fn(),
 }));
 
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
 
 describe("PATCH /api/admin/stories/[id]", () => {

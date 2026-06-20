@@ -161,6 +161,56 @@ The known historical gaps in this project (numbers 5, 23, and 24) were applied o
 
 ---
 
+## Migration-Deploy Ordering Rule (DO-M1)
+
+**Migrations MUST be applied and verified BEFORE dependent code merges to `main`.**
+
+This is a hard ordering constraint — not a recommendation. Violating it can cause
+500 errors on production the moment the new code deploy lands and references a
+column, table, or function that doesn't exist yet.
+
+### The Rule
+
+```
+1. Apply migration to production Supabase:
+     supabase db push
+2. Verify schema change is live:
+     curl -s https://paisaxe.es/api/health | jq '.supabase'
+     # Must return "connected" — not "error"
+3. Verify the specific object exists (for new tables/columns):
+     # Example: new column on chunks
+     SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'chunks' AND column_name = 'new_col';
+4. Only THEN: merge the PR containing dependent code to main.
+```
+
+### Release Checklist Addition
+
+When any PR being released includes a migration AND code that depends on that migration,
+add these items to the pre-merge checklist in the PR description:
+
+- [ ] Migration applied to production: `supabase db push`
+- [ ] `/api/health` returns `"supabase": "connected"` after migration
+- [ ] Schema object confirmed live (query or Supabase dashboard verification)
+- [ ] Code-side PR merges to `main` **after** all three items above are checked
+
+### Why Manual Application (Not Auto-Migrate)
+
+Migrations are NOT wired into CI or the deploy pipeline on purpose:
+
+- Supabase migrations run DDL against a live database. A failed migration mid-deploy
+  can leave the schema in an inconsistent state with no automatic rollback.
+- A migration applied at deploy time runs with zero opportunity for human review of
+  the live schema before application.
+- The expand/contract pattern (see above) explicitly requires separate deploys for
+  the expand and contract phases — auto-migration would collapse these.
+
+The trade-off accepted here: a deploy without its migration applied is a visible,
+diagnosable failure (HTTP 500 from a missing column). The fix is always `supabase db push`.
+This is preferable to auto-migration failures that can be harder to reason about or roll back.
+
+---
+
 ## Migration Authoring Guidelines
 
 1. **Include a header comment** explaining the purpose, any required manual steps, and data impacts.

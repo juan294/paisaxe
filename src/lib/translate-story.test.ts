@@ -8,7 +8,7 @@ vi.mock("./claude", () => ({
 }));
 
 // Mock Supabase client
-vi.mock("./supabase", () => ({
+vi.mock("./supabase-admin", () => ({
   createAdminClient: vi.fn(() => ({
     from: vi.fn(() => ({
       select: vi.fn(() => ({
@@ -244,7 +244,7 @@ describe("translate-story", () => {
 
   describe("translateStory", () => {
     it("should return error when story is not found", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({
@@ -263,7 +263,7 @@ describe("translate-story", () => {
     });
 
     it("should call Claude API with translation prompt", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -324,7 +324,7 @@ describe("translate-story", () => {
     });
 
     it("patches generated translation metadata without sending unrelated metadata fields", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -416,7 +416,7 @@ describe("translate-story", () => {
     });
 
     it("should only translate specified locales when provided", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -469,7 +469,7 @@ describe("translate-story", () => {
     });
 
     it("should skip existing translations unless forceRetranslate is true", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const existingTranslation: StoryTranslation = {
@@ -521,7 +521,7 @@ describe("translate-story", () => {
     });
 
     it("should return error when DB update fails after successful translation", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -581,7 +581,7 @@ describe("translate-story", () => {
     });
 
     it("should mark all locales as failed when Claude API throws", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -625,7 +625,7 @@ describe("translate-story", () => {
     });
 
     it("should use 'Unknown error' when catch receives a non-Error object", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -662,7 +662,7 @@ describe("translate-story", () => {
     });
 
     it("should count pre-existing translations in successCount", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -730,7 +730,7 @@ describe("translate-story", () => {
     });
 
     it("should mark locale as failed when not returned by API", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -783,7 +783,7 @@ describe("translate-story", () => {
     });
 
     it("should throw when Claude returns no text block", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -829,7 +829,7 @@ describe("translate-story", () => {
     });
 
     it("should throw when translation response fails to parse", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -875,7 +875,7 @@ describe("translate-story", () => {
     });
 
     it("should handle story with null metadata (line 161 || {} fallback)", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       // Story with null metadata — triggers the `|| {}` fallback at line 161
@@ -929,7 +929,7 @@ describe("translate-story", () => {
     it("should use fallback error message when parseResult has no error (line 241)", async () => {
       // Covers the `parseResult.error || "Failed to parse translations"` branch
       // at line 241 when parseResult.success is false but error is undefined.
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -988,7 +988,7 @@ describe("translate-story", () => {
     });
 
     it("should return 'No data returned' when translateStory fetch returns null data and null error (line 157)", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
 
       const mockSupabase = {
         from: vi.fn(() => ({
@@ -1008,7 +1008,7 @@ describe("translate-story", () => {
     });
 
     it("should retranslate when forceRetranslate is true", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const { callAnthropicAPI } = await import("./claude");
 
       const mockStory = {
@@ -1071,7 +1071,7 @@ describe("translate-story", () => {
 
   describe("updateStoryTranslation", () => {
     it("should return error when story is not found", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({
@@ -1096,7 +1096,7 @@ describe("translate-story", () => {
     });
 
     it("should update translation successfully", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({
@@ -1126,7 +1126,7 @@ describe("translate-story", () => {
     });
 
     it("patches manual translation edits without sending unrelated metadata fields", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const rpcMock = vi.fn().mockResolvedValue({ data: true, error: null });
       const updateMock = vi.fn().mockReturnValue({
         eq: vi.fn().mockResolvedValue({ error: null }),
@@ -1186,7 +1186,7 @@ describe("translate-story", () => {
     });
 
     it("should return error when update fails", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const rpcMock = vi.fn().mockResolvedValue({ data: null, error: { message: "Update failed" } });
       const mockSupabase = {
         from: vi.fn(() => ({
@@ -1219,7 +1219,7 @@ describe("translate-story", () => {
     });
 
     it("should return 'No data returned' when fetch returns null data and null error", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({
@@ -1244,7 +1244,7 @@ describe("translate-story", () => {
     });
 
     it("should handle story with no existing metadata", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({
@@ -1275,7 +1275,7 @@ describe("translate-story", () => {
 
   describe("getStoryTranslations", () => {
     it("should return error when story is not found", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({
@@ -1294,7 +1294,7 @@ describe("translate-story", () => {
     });
 
     it("should return translations for a story", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const enTranslation: StoryTranslation = {
         title: "Lakes of Covadonga",
         subtitle: "Glacial paradise",
@@ -1334,7 +1334,7 @@ describe("translate-story", () => {
     });
 
     it("should return 'No data returned' when fetch returns null data and null error", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({
@@ -1353,7 +1353,7 @@ describe("translate-story", () => {
     });
 
     it("should handle story with empty metadata", async () => {
-      const { createAdminClient } = await import("./supabase");
+      const { createAdminClient } = await import("./supabase-admin");
       const mockSupabase = {
         from: vi.fn(() => ({
           select: vi.fn(() => ({

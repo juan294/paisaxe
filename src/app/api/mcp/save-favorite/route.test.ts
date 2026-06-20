@@ -15,7 +15,7 @@ vi.mock("@/lib/mcp-auth", () => ({
   validateMcpSecret: mockValidateMcpSecret,
 }));
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: () => ({ from: mockFrom }),
 }));
 

@@ -20,7 +20,7 @@ vi.mock("node:dns/promises", () => ({
 }));
 
 // Mock dependencies
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
@@ -46,7 +46,7 @@ vi.mock("@/lib/image-optimization", () => ({
   generateBlurPlaceholder: vi.fn().mockResolvedValue("data:image/webp;base64,mockblur"),
 }));
 
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { validateImageBuffer } from "@/lib/image-optimization";
 

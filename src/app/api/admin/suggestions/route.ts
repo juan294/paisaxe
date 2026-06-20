@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import type { StorySuggestionRow, SuggestionStatus } from "@/types/suggestions";
 import { rowToAdminStorySuggestion } from "@/types/suggestions";

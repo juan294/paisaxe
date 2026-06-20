@@ -46,7 +46,7 @@ let mockDeleteResult: { error: { message: string; code?: string } | null } = {
 let mockShouldThrow = false;
 
 // Mock Supabase with proper chain structure
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: () => ({
     from: () => {
       if (mockShouldThrow) {

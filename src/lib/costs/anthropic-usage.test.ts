@@ -7,7 +7,8 @@ const { mockInsert, mockFrom } = vi.hoisted(() => {
   return { mockInsert, mockFrom };
 });
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: () => ({ from: mockFrom }),
 }));
 

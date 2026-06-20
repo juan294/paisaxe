@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { logger } from "@/lib/logger";
 import { sendSMS, type PendingBooking } from "@/lib/twilio-sms";
