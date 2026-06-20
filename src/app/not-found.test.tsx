@@ -66,4 +66,16 @@ describe("NotFound", () => {
     const wrapper = container.firstChild as HTMLElement;
     expect(wrapper.className).toContain("min-h-screen");
   });
+
+  // UX-M4: branded logo and primary-accent button
+  it("UX-M4: renders the Paisaxe logo", () => {
+    renderWithI18n(<NotFound />);
+    expect(screen.getByLabelText("Paisaxe logo")).toBeInTheDocument();
+  });
+
+  it("UX-M4: home link uses brand primary accent", () => {
+    renderWithI18n(<NotFound />);
+    const link = screen.getByRole("link", { name: "Volver al inicio" });
+    expect(link.className).toMatch(/bg-primary|text-primary|border-primary/);
+  });
 });

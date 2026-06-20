@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as Sentry from "@sentry/nextjs";
 
 describe("instrumentation register", () => {
   const originalConsole = {
@@ -137,5 +138,21 @@ describe("instrumentation register", () => {
     expect(parsed.source).toBe("console.warn");
     expect(parsed.msg).toContain("structured-warning");
     expect(parsed.msg).toContain("42");
+  });
+});
+
+describe("instrumentation onRequestError (DO-H1)", () => {
+  it("exports onRequestError so Next.js 15/16 forwards server errors to Sentry", async () => {
+    vi.resetModules();
+    const mod = await import("./instrumentation");
+    // The export must be a function (Sentry.captureRequestError)
+    expect(typeof (mod as Record<string, unknown>).onRequestError).toBe("function");
+  });
+
+  it("onRequestError is Sentry.captureRequestError", async () => {
+    vi.resetModules();
+    const sentryMod = await import("@sentry/nextjs") as typeof Sentry & { captureRequestError: unknown };
+    const mod = await import("./instrumentation") as Record<string, unknown>;
+    expect(mod.onRequestError).toBe(sentryMod.captureRequestError);
   });
 });

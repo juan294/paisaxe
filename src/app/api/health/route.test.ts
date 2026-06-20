@@ -607,4 +607,86 @@ describe("GET /api/health", () => {
     expect(response.status).toBe(200);
     expect(data.status).toBe("degraded");
   });
+
+  // DO-L1: SUPABASE_STORAGE_LIMIT_MB env override
+  it("DO-L1: uses default STORAGE_LIMIT_MB=8192 when env var is unset", async () => {
+    vi.unstubAllEnvs();
+    vi.stubEnv("CRON_SECRET", "test-secret");
+    delete process.env.SUPABASE_STORAGE_LIMIT_MB;
+    mockHealthySupabase();
+    // 8192 MB * 0.8 threshold = 6553.6 MB → 6871954637 bytes is ~6553 MB which should degrade
+    mockDatabaseSize(6871954637);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("degraded");
+  });
+
+  it("DO-L1: uses SUPABASE_STORAGE_LIMIT_MB env var to override storage limit", async () => {
+    vi.stubEnv("SUPABASE_STORAGE_LIMIT_MB", "16384"); // 16 GB
+    mockHealthySupabase();
+    // 6871954637 bytes = ~6553 MB — below 80% of 16384 MB (13107 MB) → healthy
+    mockDatabaseSize(6871954637);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe("healthy");
+  });
+
+  // DO-L2: cron_auth:misconfigured degrades overall status in production only
+  it("DO-L2: does NOT degrade overall status when cron_auth is misconfigured in development", async () => {
+    vi.stubEnv("CRON_SECRET", "");
+    vi.stubEnv("VERCEL_ENV", "development");
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.cron_auth.status).toBe("misconfigured");
+    expect(data.status).toBe("healthy");
+  });
+
+  it("DO-L2: does NOT degrade overall status when cron_auth is misconfigured in preview", async () => {
+    vi.stubEnv("CRON_SECRET", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.cron_auth.status).toBe("misconfigured");
+    expect(data.status).toBe("healthy");
+  });
+
+  it("DO-L2: degrades overall status in production when cron_auth is misconfigured", async () => {
+    vi.stubEnv("CRON_SECRET", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200); // always HTTP 200
+    expect(data.cron_auth.status).toBe("misconfigured");
+    expect(data.status).toBe("degraded");
+  });
+
+  it("DO-L2: HTTP status remains 200 even when cron_auth degrades production status", async () => {
+    vi.stubEnv("CRON_SECRET", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    mockHealthySupabase();
+    mockDatabaseSize(129394278);
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+  });
 });

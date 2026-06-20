@@ -55,15 +55,29 @@ function checkRateLimitBackend(): RateLimitProbeResult {
   };
 }
 
-function isSentryRequired(): boolean {
+function isProductionEnv(): boolean {
   return process.env.VERCEL_ENV === "production";
+}
+
+function isSentryRequired(): boolean {
+  return isProductionEnv();
 }
 
 function isRateLimitBackendRequired(): boolean {
-  return process.env.VERCEL_ENV === "production";
+  return isProductionEnv();
 }
 
-const STORAGE_LIMIT_MB = 8192; // Supabase Pro tier: 8 GB
+/**
+ * DO-L1: Allow overriding the storage limit via env var so operators can
+ * adjust the threshold without a code change (e.g. after a plan upgrade).
+ * Defaults to 8192 MB (Supabase Pro tier: 8 GB).
+ * Evaluated at call time so tests can stub SUPABASE_STORAGE_LIMIT_MB.
+ */
+function getStorageLimitMb(): number {
+  const raw = process.env.SUPABASE_STORAGE_LIMIT_MB?.trim();
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 8192;
+}
 const STORAGE_WARNING_THRESHOLD = 0.8; // 80%
 
 async function checkSupabase(): Promise<SupabaseProbeResult> {
@@ -125,7 +139,7 @@ async function checkDatabaseSize(): Promise<DatabaseProbeResult> {
         const sizeBytes = data as number;
         const size_mb = Math.round((sizeBytes / (1024 * 1024)) * 10) / 10;
         const usage_percent =
-          Math.round((size_mb / STORAGE_LIMIT_MB) * 1000) / 10;
+          Math.round((size_mb / getStorageLimitMb()) * 1000) / 10;
 
         return { usage_percent };
       } catch {
@@ -226,13 +240,22 @@ export async function GET(): Promise<NextResponse<PublicHealthResponse>> {
       isSentryRequired() && sentryStatus.status !== "configured";
     const isRateLimitDegradedInRequiredEnv =
       isRateLimitBackendRequired() && rateLimitStatus.status === "degraded";
+    /**
+     * DO-L2: In production, an unconfigured CRON_SECRET means scheduled jobs
+     * silently fail auth. Surface this as degraded so monitors catch it.
+     * Non-production environments (dev, preview) are excluded to avoid noise.
+     * HTTP status stays 200 — degraded is expressed in the body only.
+     */
+    const isCronAuthMisconfiguredInProduction =
+      isProductionEnv() && cronAuth.status === "misconfigured";
 
     const overallStatus =
       isSupabaseError ||
       isStoriesFallback ||
       isDatabaseOverThreshold ||
       isSentryMissingInDeployedEnv ||
-      isRateLimitDegradedInRequiredEnv
+      isRateLimitDegradedInRequiredEnv ||
+      isCronAuthMisconfiguredInProduction
         ? "degraded"
         : "healthy";
 
