@@ -191,18 +191,18 @@ test.describe("Checkout flow", () => {
   //
   // pre-launch:live gate (stripe-real-checkout.spec.ts) covers the full
   // card→webhook→DB write path before every production release.
-  test("checkout/embedded returns 401 for unauthenticated POST (fail-closed gate)", async ({
+  test("checkout/embedded denies unauthenticated POST (fail-closed gate)", async ({
     request,
   }) => {
-    // With dummy Supabase credentials (CI default), no session exists → 401.
-    // This asserts the endpoint is fail-closed: unauthenticated callers cannot
-    // obtain a Stripe client secret under any circumstances.
+    // This asserts the endpoint is fail-closed: an unauthenticated, cross-origin
+    // POST cannot obtain a Stripe client secret. The request carries no session
+    // and no CSRF token, so it is denied — 403 from the proxy CSRF double-submit
+    // gate, or 401 from the route's own auth check. Either denial proves the gate.
     const response = await request.post("/api/checkout/embedded", {
       data: { returnTo: "lagos-covadonga" },
       headers: { "Content-Type": "application/json" },
     });
-    // Supabase auth resolves to null user with dummy creds → 401
-    expect(response.status()).toBe(401);
+    expect([401, 403]).toContain(response.status());
   });
 
   test("return page renders success screen and immersive link after mock purchase (QA-M2)", async ({
