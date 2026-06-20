@@ -31,6 +31,22 @@ vi.mock("next/dynamic", () => ({
   },
 }));
 
+// #569: dynamically-imported (next/dynamic) controls mount only after their
+// loader import promise resolves. The number of microtask turns needed to
+// resolve that promise varies with vitest's module-cache state under parallel
+// load, so a single `await Promise.resolve()` is racy. Fake timers block
+// findBy*/waitFor polling, so drain the microtask queue manually until the
+// control appears (bounded, deterministic).
+async function flushUntil(query: () => HTMLElement | null): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 50; i++) {
+       
+      await Promise.resolve();
+      if (query()) return;
+    }
+  });
+}
+
 // Mock i18n
 const mockT = createMockT();
 vi.mock("@/lib/i18n", () => ({
@@ -290,8 +306,8 @@ describe("StoryViewer", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Más opciones" }));
       // #569: SuggestPlaceButton is now dynamically imported — flush the import
-      // microtask (fake timers are active, so findBy* polling can't advance).
-      await act(async () => { await Promise.resolve(); });
+      // until the menuitem mounts (fake timers are active, so findBy* can't poll).
+      await flushUntil(() => screen.queryByRole("menuitem"));
       fireEvent.click(screen.getByRole("menuitem"));
 
       expect(querySelectorSpy).not.toHaveBeenCalled();
@@ -1455,8 +1471,8 @@ describe("StoryViewer", () => {
       fireEvent.click(menuButton);
 
       // #569: SuggestPlaceButton is dynamically imported — flush the import
-      // microtask before querying (fake timers block findBy* polling).
-      await act(async () => { await Promise.resolve(); });
+      // until the action mounts (fake timers block findBy* polling).
+      await flushUntil(() => screen.queryByText("suggestions.suggest_short"));
       const suggestItem = screen.getByText("suggestions.suggest_short");
       fireEvent.click(suggestItem);
 
