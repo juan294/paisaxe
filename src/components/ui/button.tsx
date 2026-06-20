@@ -19,9 +19,9 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         glass:
-          "rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+          "rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950",
         glassIcon:
-          "p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+          "p-3 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white transition-all motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950",
       },
       size: {
         default: "h-9 px-4 py-2",

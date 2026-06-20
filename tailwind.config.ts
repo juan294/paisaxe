@@ -43,14 +43,15 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        // TODO: apply brand tokens — paisaxe-blue, paisaxe-green, paisaxe-sand are
-        // defined here but not yet used in components. Un-comment and replace ad-hoc
-        // color utilities (e.g. green-500/green-400) once a design pass is done.
-        // paisaxe: {
-        //   blue: "#0077b6",
-        //   green: "#2d6a4f",
-        //   sand: "#e9c46a",
-        // },
+        // Brand tokens — standardised accent is Tailwind green-500 (#22c55e).
+        // Use `paisaxe-green` / `paisaxe-green-hover` on conversion surfaces
+        // instead of raw green-500/green-400 utilities.
+        paisaxe: {
+          green: "#22c55e",       // = Tailwind green-500
+          "green-hover": "#4ade80", // = Tailwind green-400
+          blue: "#0077b6",
+          sand: "#e9c46a",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
