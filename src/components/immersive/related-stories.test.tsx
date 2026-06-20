@@ -110,4 +110,26 @@ describe("RelatedStories", () => {
 
     expect(screen.getByRole("region", { name: new RegExp(mockT("accessibility.related_stories"), "i") })).toBeInTheDocument();
   });
+
+  // UX-M5: Related story images must have meaningful alt text (story title), not empty
+  it("UX-M5: related story images have non-empty alt text derived from story title", () => {
+    const { container } = render(<RelatedStories {...defaultProps} />);
+
+    const img1 = container.querySelector('img[src="/img1.png"]');
+    const img2 = container.querySelector('img[src="/img2.png"]');
+
+    expect(img1).not.toBeNull();
+    expect(img2).not.toBeNull();
+    expect(img1).toHaveAttribute("alt", "Related Story 1");
+    expect(img2).toHaveAttribute("alt", "Related Story 2");
+  });
+
+  it("UX-M5: related story images do not have empty alt text", () => {
+    const { container } = render(<RelatedStories {...defaultProps} />);
+
+    const imgs = container.querySelectorAll("img");
+    imgs.forEach((img) => {
+      expect(img.getAttribute("alt")).not.toBe("");
+    });
+  });
 });

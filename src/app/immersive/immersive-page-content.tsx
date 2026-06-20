@@ -16,6 +16,7 @@ import { MoodOverlay } from "@/components/immersive/mood-overlay";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { ComponentErrorBoundary } from "@/components/ui/component-error-boundary";
+import { trimStoriesTranslations } from "@/lib/localize-story";
 
 // Dynamically import VoiceChat - only loads when chat is opened
 // This saves ~15KB+ from initial bundle
@@ -69,14 +70,18 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
   const lastHandledDeepLink = useRef<string | null>(null);
   const chatTriggerRef = useRef<HTMLButtonElement>(null);
 
-  // Use server-provided seed if available, otherwise generate client-side
-  // This ensures shuffling happens on first render without flicker
-  const shuffleSeed = useRef(serverShuffleSeed ?? Math.floor(Math.random() * 2147483647));
+  // FE-L2: lazy-init the shuffle seed so Math.random() is only called once (on
+  // mount) rather than re-evaluated on every render. When the server provides a
+  // seed the ref is pre-set to null so the lazy initializer sets it once instead.
+  const shuffleSeed = useRef<number | null>(serverShuffleSeed);
+  if (shuffleSeed.current === null) {
+    shuffleSeed.current = Math.floor(Math.random() * 2147483647);
+  }
 
   // Pass server-fetched initialFlags so the hook is ready immediately on first
   // paint — no client fetch on mount, no flag-gated UI flash.
   const { isEnabled, isReady: flagsReady } = useFeatureFlags();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { viewedIndices, markViewed } = useViewedStories();
   const searchParams = useSearchParams();
 
@@ -119,11 +124,16 @@ function ImmersivePageContentInner({ serverShuffleSeed }: ImmersivePageContentIn
     //    Otherwise, wait for client-side flags to be ready
     const shouldShuffle = serverShuffleSeed !== null || isEnabled("randomized_order");
     if (shouldShuffle) {
-      stories = fisherYatesShuffle(stories, shuffleSeed.current);
+      // shuffleSeed.current is always a number by the time we reach this point
+      // (set to a non-null value in the render-phase lazy-init above).
+      stories = fisherYatesShuffle(stories, shuffleSeed.current!);
     }
 
-    return stories;
-  }, [allStories, selectedMood, isEnabled, serverShuffleSeed]);
+    // PE-M1: trim translation payload to active locale + Spanish default only.
+    // Drops unused locale translations from the client-side story objects so the
+    // in-memory representation doesn't carry ~4x the translation data it needs.
+    return trimStoriesTranslations(stories, locale);
+  }, [allStories, selectedMood, isEnabled, serverShuffleSeed, locale]);
 
   const {
     filteredStories,

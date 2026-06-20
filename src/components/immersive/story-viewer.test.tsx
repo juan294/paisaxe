@@ -313,12 +313,29 @@ describe("StoryViewer", () => {
       expect(querySelectorSpy).not.toHaveBeenCalled();
     });
 
-    // UX-L2 (#522): Hero images are decorative (title announced by adjacent <h1>)
-    // so alt="" — query by src or the specific img within the background div instead.
+    // UX-M5: Hero image now has a meaningful alt derived from the localized story title.
+    it("UX-M5: hero image has non-empty alt text derived from localized story title", async () => {
+      const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
+      expect(img).not.toBeNull();
+      // Must have a non-empty alt tied to the story title
+      expect(img).toHaveAttribute("alt", "Lagos de Covadonga");
+    });
+
+    it("UX-M5: hero image alt text updates when story changes", async () => {
+      const { container } = await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
+      );
+
+      const img = container.querySelector(`img[src="${mockStories[1].image}"]`);
+      expect(img).not.toBeNull();
+      expect(img).toHaveAttribute("alt", "Oviedo Cathedral");
+    });
+
     it("should render story image with blur placeholder", async () => {
       const { container } = await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // Hero image is decorative (alt=""), find it by src
       const img = container.querySelector(`img[src="${mockStories[0].image}"]`);
       expect(img).not.toBeNull();
       expect(img).toHaveAttribute("data-placeholder", "blur");
@@ -1140,19 +1157,17 @@ describe("StoryViewer", () => {
       vi.spyOn(Math, "random").mockRestore();
     });
 
-    it("should show autoplay toggle in overflow when flag enabled", async () => {
+    // UX-M1: autoplay toggle is now a top-level button (not in overflow) so it's always reachable
+    it("should show autoplay toggle as a top-level button (promoted from overflow) when flag enabled", async () => {
       mockIsEnabled.mockImplementation(
         (flag: string) => flag === "autoplay_button"
       );
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const menuButton = screen.getByLabelText("Más opciones");
-      fireEvent.click(menuButton);
-
-      expect(
-        screen.getByText("accessibility.play_short", { exact: true })
-      ).toBeInTheDocument();
+      // The ambient toggle button is now always visible at top level
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      expect(ambientToggle).toBeInTheDocument();
     });
 
     it("should show share option in overflow when flag enabled", async () => {
@@ -1481,21 +1496,18 @@ describe("StoryViewer", () => {
     });
   });
 
-  describe("mobile overflow autoplay toggle without ambient", () => {
-    it("should toggle simple autoplay from overflow when ambient_discovery is NOT enabled (line 496)", async () => {
-      // Enable autoplay_button but NOT ambient_discovery — triggers the else branch (line 496)
+  describe("top-level autoplay toggle without ambient (UX-M1: promoted from overflow)", () => {
+    it("should toggle simple autoplay from top-level button when ambient_discovery is NOT enabled", async () => {
+      // Enable autoplay_button but NOT ambient_discovery
       mockIsEnabled.mockImplementation(
         (flag: string) => flag === "autoplay_button"
       );
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const menuButton = screen.getByLabelText("Más opciones");
-      fireEvent.click(menuButton);
-
-      // Find and click the play item in the overflow
-      const playItem = screen.getByText("accessibility.play_short");
-      fireEvent.click(playItem);
+      // The ambient/autoplay toggle is now always visible at the top level
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      fireEvent.click(ambientToggle);
 
       // After clicking, auto-play should start — advance non-ambient interval (6s)
       act(() => {
@@ -1511,20 +1523,17 @@ describe("StoryViewer", () => {
     });
   });
 
-  describe("mobile overflow ambient toggle", () => {
-    it("should toggle ambient mode from overflow menu when ambient_discovery is enabled", async () => {
+  describe("top-level ambient toggle (UX-M1: promoted from overflow)", () => {
+    it("should toggle ambient mode from top-level button when ambient_discovery is enabled", async () => {
       mockIsEnabled.mockImplementation(
         (flag: string) => flag === "autoplay_button" || flag === "ambient_discovery"
       );
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const menuButton = screen.getByLabelText("Más opciones");
-      fireEvent.click(menuButton);
-
-      // Find the play/pause item in the overflow
-      const playItem = screen.getByText("accessibility.play_short");
-      fireEvent.click(playItem);
+      // Click the top-level ambient toggle button
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      fireEvent.click(ambientToggle);
 
       // After clicking, auto-play should start — advance ambient interval (12s)
       act(() => {
@@ -2273,6 +2282,76 @@ describe("StoryViewer", () => {
       ).map((l) => l.getAttribute("href"));
 
       expect(preloads).not.toContain("/images/lagos.jpg");
+    });
+  });
+
+  describe("UX-M1: ambient/autoplay toggle visible on mobile (promoted from overflow)", () => {
+    beforeEach(() => {
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "autoplay_button" || flag === "ambient_discovery"
+      );
+    });
+
+    afterEach(() => {
+      mockIsEnabled.mockReturnValue(false);
+    });
+
+    it("ambient toggle is rendered at top level (not only inside overflow menu)", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // The ambient toggle should be directly reachable without opening the overflow menu.
+      // It has data-testid="ambient-toggle" (and a Play/Pause icon inside).
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      expect(ambientToggle).toBeInTheDocument();
+    });
+
+    it("ambient toggle has aria-pressed=false when stopped", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      expect(ambientToggle).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("ambient toggle has aria-pressed=true after being clicked", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      const ambientToggle = screen.getByTestId("ambient-toggle");
+      fireEvent.click(ambientToggle);
+      expect(ambientToggle).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("ambient toggle is NOT inside the overflow menu", async () => {
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Open the overflow menu
+      const menuButton = screen.getByLabelText("Más opciones");
+      fireEvent.click(menuButton);
+
+      // The overflow menu should NOT contain a play/pause item for ambient/autoplay
+      // (it was removed from the overflow since it's now promoted to top-level).
+      // MenuItems inside overflow have role="menuitem"
+      const menuItems = screen.queryAllByRole("menuitem");
+      const playPauseInOverflow = menuItems.find(
+        (item) => item.querySelector(".lucide-play") || item.querySelector(".lucide-pause")
+      );
+      expect(playPauseInOverflow).toBeUndefined();
+    });
+  });
+
+  describe("FE-L1: StoryInfoPanel and StoryToolbar memoization", () => {
+    it("StoryInfoPanel export is a memo component (has $$typeof or displayName)", async () => {
+      // Verify the component is wrapped in memo by checking it renders correctly
+      // and checking the module export type via dynamic import
+      const mod = await import("./story-info-panel");
+      // memo returns an object with $$typeof = Symbol(react.memo)
+      const comp = mod.StoryInfoPanel as unknown as { $$typeof?: symbol; type?: unknown };
+      expect(comp.$$typeof?.toString()).toContain("react.memo");
+    });
+
+    it("StoryToolbar export is a memo component", async () => {
+      const mod = await import("./story-toolbar");
+      const comp = mod.StoryToolbar as unknown as { $$typeof?: symbol; type?: unknown };
+      expect(comp.$$typeof?.toString()).toContain("react.memo");
     });
   });
 });

@@ -231,6 +231,14 @@ export function StoryViewer({
   // Get localized story text based on current locale (falls back to Spanish)
   const localizedStory = story ? getLocalizedStory(story, locale) : null;
 
+  // FE-L1: Stable callbacks for StoryInfoPanel props — prevents re-renders when
+  // only the index changes (story/id change is reflected via the story prop itself).
+  // These must be declared BEFORE the early return so hooks are always called in
+  // the same order (React rules-of-hooks).
+  const storyId = story?.id ?? "";
+  const handleFavoritesNav = useCallback(() => router.push("/favorites"), [router]);
+  const handleToggleFavorite = useCallback(() => toggleFavorite(storyId), [toggleFavorite, storyId]);
+
   if (!story || !localizedStory) return null;
 
   // Question prompts from metadata
@@ -282,7 +290,7 @@ export function StoryViewer({
       >
         <Image
           src={story.image}
-          alt=""
+          alt={localizedStory.title}
           fill
           sizes="100vw"
           className={cn("object-cover", zoomClass)}
@@ -343,9 +351,9 @@ export function StoryViewer({
         questionPrompts={questionPrompts}
         requiresAuth={requiresAuth}
         onAuthRequired={signInWithGoogle}
-        onFavoritesNav={() => router.push("/favorites")}
+        onFavoritesNav={handleFavoritesNav}
         isFavorite={isFavorite(story.id)}
-        onToggleFavorite={() => toggleFavorite(story.id)}
+        onToggleFavorite={handleToggleFavorite}
         chatTriggerRef={chatTriggerRef}
       />
 
@@ -363,49 +371,42 @@ export function StoryViewer({
         {/* Language Switcher - always visible */}
         <LanguageSwitcher />
 
-        {/* Desktop: Show all controls inline */}
-        {/* Ambient / Auto-play toggle - hidden on mobile */}
+        {/* UX-M1: Ambient/Auto-play toggle — always visible on all viewports.
+            This is the signature "lean back" control; promoting it to a top-level
+            button makes it reachable without opening the overflow menu on mobile. */}
         {isEnabled("autoplay_button") && (
-          isEnabled("ambient_discovery") ? (
-            <Button
-              variant="glassIcon"
-              onClick={(e) => {
-                e.stopPropagation();
+          <Button
+            variant="glassIcon"
+            data-testid="ambient-toggle"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isEnabled("ambient_discovery")) {
                 toggleAmbient();
-              }}
-              className={cn(
-                "hidden md:flex p-2",
-                ambientMode && "ring-1 ring-white/30"
-              )}
-              aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
-              title={ambientMode ? t("stories.ambient_off") : t("stories.ambient_on")}
-            >
-              {autoPlay ? (
-                <Pause className="h-5 w-5 text-white" />
-              ) : (
-                <Play className="h-5 w-5 text-white" />
-              )}
-            </Button>
-          ) : (
-            <Button
-              variant="glassIcon"
-              onClick={(e) => {
-                e.stopPropagation();
+              } else {
                 setAutoPlay((prev) => !prev);
-              }}
-              aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
-              className="hidden md:flex p-2"
-            >
-              {autoPlay ? (
-                <Pause className="h-5 w-5 text-white" />
-              ) : (
-                <Play className="h-5 w-5 text-white" />
-              )}
-            </Button>
-          )
+              }
+            }}
+            className={cn(
+              "flex p-2",
+              ambientMode && "ring-1 ring-white/30"
+            )}
+            aria-label={autoPlay ? t("accessibility.pause_stories") : t("accessibility.play_stories")}
+            title={
+              isEnabled("ambient_discovery")
+                ? ambientMode ? t("stories.ambient_off") : t("stories.ambient_on")
+                : undefined
+            }
+            aria-pressed={autoPlay}
+          >
+            {autoPlay ? (
+              <Pause className="h-5 w-5 text-white" />
+            ) : (
+              <Play className="h-5 w-5 text-white" />
+            )}
+          </Button>
         )}
 
-        {/* Surprise Me button - hidden on mobile */}
+        {/* Surprise Me button - secondary: desktop only */}
         {isEnabled("surprise_me") && viewedIndices && (
           <div className="hidden md:block">
             <SurpriseMeButton
@@ -417,36 +418,22 @@ export function StoryViewer({
           </div>
         )}
 
-        {/* Share button - hidden on mobile */}
+        {/* Share button - secondary: desktop only */}
         {isEnabled("story_sharing") && (
           <div className="hidden md:block">
             <ShareButton story={story} />
           </div>
         )}
 
-        {/* Suggest Place button - hidden on mobile */}
+        {/* Suggest Place button - secondary: desktop only */}
         {isEnabled("user_story_suggestions") && (
           <div className="hidden md:block">
             <SuggestPlaceButton onOpen={() => setIsSuggestDialogOpen(true)} />
           </div>
         )}
 
-        {/* Mobile overflow menu */}
+        {/* Mobile overflow menu — secondary controls only (ambient is promoted above) */}
         <ToolbarOverflowMenu>
-          {isEnabled("autoplay_button") && (
-            <ToolbarOverflowItem
-              icon={autoPlay ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              label={autoPlay ? t("accessibility.pause_short") : t("accessibility.play_short")}
-              onClick={() => {
-                if (isEnabled("ambient_discovery")) {
-                  toggleAmbient();
-                } else {
-                  setAutoPlay((prev) => !prev);
-                }
-              }}
-              active={autoPlay}
-            />
-          )}
           {isEnabled("surprise_me") && viewedIndices && (
             <ToolbarOverflowItem
               icon={<Shuffle className="h-4 w-4" />}

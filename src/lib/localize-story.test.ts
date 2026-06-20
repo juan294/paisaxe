@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getLocalizedStory, hasTranslation } from './localize-story';
+import { getLocalizedStory, hasTranslation, trimStoryTranslations, trimStoriesTranslations } from './localize-story';
 import type { Story } from '@/types/immersive';
 
 describe('getLocalizedStory', () => {
@@ -168,5 +168,87 @@ describe('hasTranslation', () => {
   it('should return false when story has no translations', () => {
     const storyWithoutMeta: Story = { ...mockStory, metadata: undefined };
     expect(hasTranslation(storyWithoutMeta, 'en')).toBe(false);
+  });
+});
+
+// PE-M1: trimStoryTranslations strips all but the active locale + Spanish default
+describe('trimStoryTranslations', () => {
+  const storyWithAllLocales: Story = {
+    id: 'test-story',
+    title: 'Título en Español',
+    subtitle: 'Subtítulo',
+    description: 'Descripción.',
+    image: '/test.jpg',
+    category: 'nature',
+    sourcePdf: 'test.pdf',
+    metadata: {
+      question_prompts: ['¿Qué ver?'],
+      translations: {
+        en: { title: 'English Title', subtitle: 'English Subtitle', description: 'Description.' },
+        fr: { title: 'Titre', subtitle: 'Sous-titre', description: 'Description.' },
+        de: { title: 'Titel', subtitle: 'Untertitel', description: 'Beschreibung.' },
+        pt: { title: 'Título', subtitle: 'Subtítulo', description: 'Descrição.' },
+        ast: { title: 'Títulu', subtitle: 'Subtítulu', description: 'Descripción.' },
+      },
+    },
+  };
+
+  it('PE-M1: keeps only the active locale translation when locale is non-Spanish', () => {
+    const trimmed = trimStoryTranslations(storyWithAllLocales, 'en');
+    const translations = trimmed.metadata?.translations ?? {};
+    // Only the 'en' locale should remain
+    expect(Object.keys(translations)).toEqual(['en']);
+    expect(translations['en']).toBeDefined();
+  });
+
+  it('PE-M1: serialized payload no longer carries all 5 locales', () => {
+    const trimmed = trimStoryTranslations(storyWithAllLocales, 'fr');
+    const translations = trimmed.metadata?.translations ?? {};
+    // Should not contain non-active locales
+    expect(translations['en']).toBeUndefined();
+    expect(translations['de']).toBeUndefined();
+    expect(translations['pt']).toBeUndefined();
+    expect(translations['ast']).toBeUndefined();
+    // Should contain the active locale
+    expect(translations['fr']).toBeDefined();
+  });
+
+  it('PE-M1: returns story unchanged when locale is Spanish (no translations needed)', () => {
+    const trimmed = trimStoryTranslations(storyWithAllLocales, 'es');
+    // Spanish returns the same reference (fast path)
+    expect(trimmed).toBe(storyWithAllLocales);
+  });
+
+  it('PE-M1: returns story unchanged when no translations exist', () => {
+    const noTranslations: Story = { ...storyWithAllLocales, metadata: { question_prompts: [] } };
+    const trimmed = trimStoryTranslations(noTranslations, 'en');
+    expect(trimmed).toBe(noTranslations);
+  });
+
+  it('PE-M1: preserves other metadata fields when trimming', () => {
+    const trimmed = trimStoryTranslations(storyWithAllLocales, 'en');
+    expect(trimmed.metadata?.question_prompts).toEqual(['¿Qué ver?']);
+  });
+
+  it('PE-M1: does not mutate the original story', () => {
+    const original = storyWithAllLocales;
+    trimStoryTranslations(original, 'en');
+    // Original should still have all 5 locales
+    expect(Object.keys(original.metadata?.translations ?? {})).toHaveLength(5);
+  });
+
+  it('PE-M1: trimStoriesTranslations applies to each story in an array', () => {
+    const stories = [storyWithAllLocales, storyWithAllLocales];
+    const trimmed = trimStoriesTranslations(stories, 'de');
+    for (const s of trimmed) {
+      const keys = Object.keys(s.metadata?.translations ?? {});
+      expect(keys).toEqual(['de']);
+    }
+  });
+
+  it('PE-M1: trimStoriesTranslations returns original array reference for Spanish (fast path)', () => {
+    const stories = [storyWithAllLocales];
+    const trimmed = trimStoriesTranslations(stories, 'es');
+    expect(trimmed).toBe(stories);
   });
 });
