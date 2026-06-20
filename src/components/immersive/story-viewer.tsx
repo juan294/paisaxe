@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo, RefObject } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/immersive";
@@ -14,14 +15,33 @@ import { useAuth } from "@/hooks/use-auth";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { getRelatedStories } from "@/lib/related-stories";
-import { RelatedStories } from "./related-stories";
-import { SurpriseMeButton } from "./surprise-me-button";
-import { ShareButton } from "./share-button";
 import { LanguageSwitcher } from "./language-switcher";
-import { SuggestPlaceButton } from "./suggest-place-button";
 import { SuggestPlaceDialog } from "./suggest-place-dialog";
 import { ToolbarOverflowMenu, ToolbarOverflowItem } from "./toolbar-overflow-menu";
-import { FullscreenButton } from "./fullscreen-button";
+
+// #569: Flag-gated tools are dynamically imported so their code only loads when
+// the corresponding feature flag is enabled (keeps them out of the initial bundle).
+// ssr: false — these are interactive, client-only controls (matches VoiceChat).
+const RelatedStories = dynamic(
+  () => import("./related-stories").then((m) => m.RelatedStories),
+  { ssr: false, loading: () => null }
+);
+const SurpriseMeButton = dynamic(
+  () => import("./surprise-me-button").then((m) => m.SurpriseMeButton),
+  { ssr: false, loading: () => null }
+);
+const ShareButton = dynamic(
+  () => import("./share-button").then((m) => m.ShareButton),
+  { ssr: false, loading: () => null }
+);
+const SuggestPlaceButton = dynamic(
+  () => import("./suggest-place-button").then((m) => m.SuggestPlaceButton),
+  { ssr: false, loading: () => null }
+);
+const FullscreenButton = dynamic(
+  () => import("./fullscreen-button").then((m) => m.FullscreenButton),
+  { ssr: false, loading: () => null }
+);
 import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { NavigationHint } from "./navigation-hint";
@@ -189,6 +209,22 @@ export function StoryViewer({
     [stories]
   );
 
+  // PE-M4 (#615): prefetch the adjacent (next & prev) story images so navigation
+  // shows the next photo instantly instead of waiting on a cold fetch. Wraps
+  // around at both ends and never re-preloads the current image.
+  const adjacentImages = useMemo(() => {
+    const len = stories.length;
+    if (len <= 1) return [];
+    const nextIndex = currentIndex < len - 1 ? currentIndex + 1 : 0;
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : len - 1;
+    const urls = new Set<string>();
+    for (const idx of [nextIndex, prevIndex]) {
+      const img = stories[idx]?.image;
+      if (img && idx !== currentIndex) urls.add(img);
+    }
+    return Array.from(urls);
+  }, [stories, currentIndex]);
+
   // Asturianu labels
   const ast = isEnabled("asturianu_touches");
 
@@ -205,6 +241,12 @@ export function StoryViewer({
       className="relative h-dvh w-screen overflow-hidden bg-black"
       aria-hidden={chatOpen ? "true" : undefined}
     >
+      {/* PE-M4 (#615): preload adjacent story images for instant navigation.
+          React hoists these <link> tags into <head>. */}
+      {adjacentImages.map((src) => (
+        <link key={src} rel="preload" as="image" href={src} />
+      ))}
+
       {/* Screen reader announcement for story changes */}
       <div
         role="status"

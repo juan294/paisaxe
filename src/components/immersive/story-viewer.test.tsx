@@ -5,6 +5,31 @@ import { Story, StoryCategory, StoryLocation, StoryDuration } from "@/types/imme
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ReactNode } from "react";
 import { createMockT } from "@/test/i18n-mock";
+import { useState, useEffect } from "react";
+import type { ComponentType } from "react";
+
+// #569: StoryViewer now loads its flag-gated tools via next/dynamic. The real
+// next/dynamic loader does not resolve under vitest, so mock it to eagerly load
+// the underlying module and render the real component (after a microtask, so
+// tests use findBy*/waitFor — matching production's async-load behavior).
+vi.mock("next/dynamic", () => ({
+  default: (loader: () => Promise<ComponentType<Record<string, unknown>>>) => {
+    function DynamicLoaded(props: Record<string, unknown>) {
+      const [Comp, setComp] = useState<ComponentType<Record<string, unknown>> | null>(null);
+      useEffect(() => {
+        let active = true;
+        Promise.resolve(loader()).then((mod) => {
+          if (active) setComp(() => mod);
+        });
+        return () => {
+          active = false;
+        };
+      }, []);
+      return Comp ? <Comp {...props} /> : null;
+    }
+    return DynamicLoaded;
+  },
+}));
 
 // Mock i18n
 const mockT = createMockT();
@@ -264,6 +289,9 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Más opciones" }));
+      // #569: SuggestPlaceButton is now dynamically imported — flush the import
+      // microtask (fake timers are active, so findBy* polling can't advance).
+      await act(async () => { await Promise.resolve(); });
       fireEvent.click(screen.getByRole("menuitem"));
 
       expect(querySelectorSpy).not.toHaveBeenCalled();
@@ -573,7 +601,12 @@ describe("StoryViewer", () => {
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
+      // The overlay toggle button is the one carrying aria-expanded (#634: the
+      // panel's dedicated hide button does not, so scope by `expanded`).
+      const infoToggleBtn = screen.getByRole("button", {
+        name: /mostrar información|ocultar información/i,
+        expanded: true,
+      });
       fireEvent.click(infoToggleBtn);
 
       // After clicking the overlay button on desktop, info should be hidden
@@ -598,7 +631,7 @@ describe("StoryViewer", () => {
       expect(bottomContent).toHaveClass("opacity-100");
     });
 
-    it("should toggle info when clicking the article content area", async () => {
+    it("does NOT toggle info when clicking the article text body (#634)", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       // The article element is the content overlay at the bottom
@@ -607,9 +640,13 @@ describe("StoryViewer", () => {
         .closest("article[class*='bottom-0']");
       expect(article).not.toBeNull();
 
-      fireEvent.click(article!);
+      // #634: reading the description/title must not dismiss the panel.
+      fireEvent.click(screen.getByText("Beautiful glacial lakes in the mountains"));
+      fireEvent.click(screen.getByText("Lagos de Covadonga"));
+      expect(article).toHaveClass("opacity-100");
 
-      // After clicking article content, info should be hidden
+      // The dedicated hide button DOES dismiss it.
+      fireEvent.click(screen.getByTestId("hide-info-button"));
       expect(article).toHaveClass("opacity-0");
     });
 
@@ -649,7 +686,11 @@ describe("StoryViewer", () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
       const controlsNav = screen.getByRole("navigation", { name: "Controles de historias" });
-      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
+      // #634: scope to the overlay toggle (the one with aria-expanded).
+      const infoToggleBtn = screen.getByRole("button", {
+        name: /mostrar información|ocultar información/i,
+        expanded: true,
+      });
 
       fireEvent.click(infoToggleBtn);
 
@@ -1413,6 +1454,9 @@ describe("StoryViewer", () => {
       const menuButton = screen.getByLabelText("Más opciones");
       fireEvent.click(menuButton);
 
+      // #569: SuggestPlaceButton is dynamically imported — flush the import
+      // microtask before querying (fake timers block findBy* polling).
+      await act(async () => { await Promise.resolve(); });
       const suggestItem = screen.getByText("suggestions.suggest_short");
       fireEvent.click(suggestItem);
 
@@ -1966,7 +2010,10 @@ describe("StoryViewer", () => {
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // Trigger onOpen (line 388): click the desktop SuggestPlaceButton
+      // Trigger onOpen (line 388): click the desktop SuggestPlaceButton.
+      // #569: SuggestPlaceButton is dynamically imported — flush the import
+      // microtask before querying (fake timers block findBy* polling).
+      await act(async () => { await Promise.resolve(); });
       const suggestBtn = screen.getByRole("button", {
         name: "suggestions.suggest_place",
       });
@@ -2042,8 +2089,12 @@ describe("StoryViewer", () => {
     it("should have a transparent button overlay for toggling info on desktop", async () => {
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      // There should be a dedicated button for toggling info visibility
-      const infoToggleBtn = screen.queryByRole("button", { name: /mostrar información|ocultar información/i });
+      // There should be a dedicated overlay button for toggling info visibility
+      // (#634: scoped by aria-expanded to distinguish from the panel hide button).
+      const infoToggleBtn = screen.queryByRole("button", {
+        name: /mostrar información|ocultar información/i,
+        expanded: true,
+      });
       expect(infoToggleBtn).toBeInTheDocument();
     });
 
@@ -2062,7 +2113,10 @@ describe("StoryViewer", () => {
 
       await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
 
-      const infoToggleBtn = screen.getByRole("button", { name: /mostrar información|ocultar información/i });
+      const infoToggleBtn = screen.getByRole("button", {
+        name: /mostrar información|ocultar información/i,
+        expanded: true,
+      });
       // Initially info is shown (showInfo = true)
       expect(infoToggleBtn).toHaveAttribute("aria-expanded", "true");
 
@@ -2161,6 +2215,48 @@ describe("StoryViewer", () => {
       }
 
       mockIsEnabled.mockReturnValue(false);
+    });
+  });
+
+  describe("PE-M4 (#615): adjacent image prefetch", () => {
+    it("renders preload links for the next and previous story images", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 1 })} />
+      );
+
+      const preloads = Array.from(
+        document.querySelectorAll('link[rel="preload"][as="image"]')
+      ).map((l) => l.getAttribute("href"));
+
+      // currentIndex 1 → prev = story-1 (lagos), next = story-3 (sidra)
+      expect(preloads).toContain("/images/lagos.jpg");
+      expect(preloads).toContain("/images/sidra.jpg");
+    });
+
+    it("wraps around: prefetches next and previous images from index 0", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 0 })} />
+      );
+
+      const preloads = Array.from(
+        document.querySelectorAll('link[rel="preload"][as="image"]')
+      ).map((l) => l.getAttribute("href"));
+
+      // currentIndex 0 → next = story-2 (cathedral), prev wraps to story-3 (sidra)
+      expect(preloads).toContain("/images/cathedral.jpg");
+      expect(preloads).toContain("/images/sidra.jpg");
+    });
+
+    it("does not preload the current story image", async () => {
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ currentIndex: 0 })} />
+      );
+
+      const preloads = Array.from(
+        document.querySelectorAll('link[rel="preload"][as="image"]')
+      ).map((l) => l.getAttribute("href"));
+
+      expect(preloads).not.toContain("/images/lagos.jpg");
     });
   });
 });

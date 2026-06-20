@@ -39,6 +39,16 @@ describe("StoryProgressBar", () => {
     expect(segments.length).toBe(5); // 5 stories < 20 PAGE_SIZE
   });
 
+  // UX-M6 (#479): list items must carry a stable, story-position-derived key
+  // (data-story-index) rather than the volatile within-page index.
+  it("renders list items keyed by the absolute story index (stable key)", () => {
+    const { container } = render(<StoryProgressBar {...defaultProps} />);
+    const items = container.querySelectorAll("li[data-story-index]");
+    expect(items).toHaveLength(5);
+    const indices = Array.from(items).map((el) => el.getAttribute("data-story-index"));
+    expect(indices).toEqual(["0", "1", "2", "3", "4"]);
+  });
+
   it("caps segments at PAGE_SIZE (20) for large story counts", () => {
     render(<StoryProgressBar {...defaultProps} storiesLength={50} />);
     const segments = getSegments();

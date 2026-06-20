@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { StoryInfoPanel } from "./story-info-panel";
 import { Story } from "@/types/immersive";
 import { createMockT } from "@/test/i18n-mock";
@@ -166,5 +166,57 @@ describe("StoryInfoPanel", () => {
 
     const panel = screen.getByTestId("story-info-panel");
     expect(panel).toHaveClass("opacity-100");
+  });
+
+  // UX-M2 (#634): reading the description text must NOT dismiss the panel.
+  it("does not call onToggleInfo when the description text is clicked", () => {
+    const onToggleInfo = vi.fn();
+    render(
+      <StoryInfoPanel
+        story={mockStory}
+        localizedStory={localizedStory}
+        showInfo={true}
+        t={mockT}
+        onAskAbout={undefined}
+        onToggleInfo={onToggleInfo}
+        ast={false}
+        isEnabled={(_flag) => false}
+        questionPrompts={[]}
+        requiresAuth={false}
+        onAuthRequired={undefined}
+        onFavoritesNav={undefined}
+        isFavorite={false}
+        onToggleFavorite={undefined}
+      />
+    );
+
+    fireEvent.click(screen.getByText("Beautiful glacial lakes in the mountains"));
+    fireEvent.click(screen.getByTestId("story-title"));
+    expect(onToggleInfo).not.toHaveBeenCalled();
+  });
+
+  it("calls onToggleInfo when the dedicated hide-info button is clicked", () => {
+    const onToggleInfo = vi.fn();
+    render(
+      <StoryInfoPanel
+        story={mockStory}
+        localizedStory={localizedStory}
+        showInfo={true}
+        t={mockT}
+        onAskAbout={undefined}
+        onToggleInfo={onToggleInfo}
+        ast={false}
+        isEnabled={(_flag) => false}
+        questionPrompts={[]}
+        requiresAuth={false}
+        onAuthRequired={undefined}
+        onFavoritesNav={undefined}
+        isFavorite={false}
+        onToggleFavorite={undefined}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("hide-info-button"));
+    expect(onToggleInfo).toHaveBeenCalledTimes(1);
   });
 });
