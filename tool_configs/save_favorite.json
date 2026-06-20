@@ -25,25 +25,25 @@
         "request_body_schema": {
             "type": "object",
             "required": [
-                "place_name"
+                "placeName"
             ],
             "description": "The place the visitor wants to bookmark. Use the name (and address/place_id from search_places when available).",
             "properties": {
-                "place_name": {
+                "placeName": {
                     "type": "string",
                     "description": "Name of the place to save (e.g. 'Casa Marcial', 'Mirador del Fito')",
                     "is_system_provided": false,
                     "dynamic_variable": "",
                     "constant_value": ""
                 },
-                "place_address": {
+                "placeAddress": {
                     "type": "string",
                     "description": "Optional: address of the place, from search_places",
                     "is_system_provided": false,
                     "dynamic_variable": "",
                     "constant_value": ""
                 },
-                "place_id": {
+                "placeId": {
                     "type": "string",
                     "description": "Optional: Google place_id from search_places",
                     "is_system_provided": false,
@@ -57,12 +57,9 @@
                     "dynamic_variable": "",
                     "constant_value": ""
                 },
-                "conversation_id": {
+                "conversationId": {
                     "type": "string",
-                    "description": "Conversation id used to group the visitor's saved places",
-                    "is_system_provided": true,
-                    "dynamic_variable": "system__conversation_id",
-                    "constant_value": ""
+                    "dynamic_variable": "system__conversation_id"
                 }
             }
         },

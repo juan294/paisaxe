@@ -86,4 +86,32 @@ describe("POST /api/mcp/save-favorite", () => {
     const row = mockUpsert.mock.calls[0][0];
     expect(row.conversation_id).toBe("unknown");
   });
+
+  it("accepts camelCase body keys (ElevenLabs camelCases tool params on push)", async () => {
+    const res = await POST(
+      makeRequest({
+        placeName: "Casa Marcial",
+        placeAddress: "La Salgar, Arriondas",
+        placeId: "gpid-123",
+        notes: "great cider",
+        conversationId: "conv-camel",
+      })
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+
+    const row = mockUpsert.mock.calls[0][0];
+    expect(row.place_name).toBe("Casa Marcial");
+    expect(row.place_address).toBe("La Salgar, Arriondas");
+    expect(row.place_id).toBe("gpid-123");
+    expect(row.notes).toBe("great cider");
+    expect(row.conversation_id).toBe("conv-camel");
+  });
+
+  it("returns 400 when placeName (camelCase) is missing", async () => {
+    const res = await POST(makeRequest({ conversationId: "conv-camel" }));
+    expect(res.status).toBe(400);
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
 });

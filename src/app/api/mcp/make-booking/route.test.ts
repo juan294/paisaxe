@@ -259,6 +259,140 @@ describe("/api/mcp/make-booking", () => {
       expect(data.fallback_action).toContain("Casa Gerardo");
     });
 
+    it("should accept camelCase body keys (ElevenLabs camelCases tool params on push)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_camel" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "camel-key",
+        },
+        body: JSON.stringify({
+          venueName: "Casa Gerardo",
+          phoneNumber: "+34 985 88 77 97",
+          partySize: 4,
+          date: "hoy",
+          time: "21:00",
+          customerName: "Juan García López",
+          customerPhone: "+34612345678",
+          specialRequests: "Trona para bebé",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe("initiated");
+
+      // Booking persisted with the camelCase values mapped to snake_case DB columns
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          venue_name: "Casa Gerardo",
+          venue_phone: "+34985887797",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+          party_size: 4,
+          booking_date: "hoy",
+          booking_time: "21:00",
+          special_requests: "Trona para bebé",
+        })
+      );
+    });
+
+    it("should still accept snake_case body keys for backward compatibility", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_snake" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "snake-key",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "+34612345678",
+          special_requests: "Trona para bebé",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe("initiated");
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          venue_name: "Casa Gerardo",
+          customer_name: "Juan García López",
+          special_requests: "Trona para bebé",
+        })
+      );
+    });
+
+    it("should support MCP arguments wrapper with camelCase keys", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ conversation_id: "conv_camel_mcp" }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "camel-mcp-key",
+        },
+        body: JSON.stringify({
+          tool: "make_booking",
+          arguments: {
+            venueName: "Casa Gerardo",
+            phoneNumber: "+34985887797",
+            partySize: 4,
+            date: "hoy",
+            time: "21:00",
+            customerName: "Juan García López",
+            customerPhone: "612345678",
+          },
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe("initiated");
+    });
+
     it("should initiate ElevenLabs call when configured", async () => {
       // Configure ElevenLabs
       process.env.ELEVENLABS_API_KEY = "test-api-key";

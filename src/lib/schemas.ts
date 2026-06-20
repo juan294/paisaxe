@@ -54,11 +54,61 @@ const makeBookingSchema = z.object({
   language: z.enum(["es", "en"]).optional(),
 });
 
-/** Wraps flat and MCP-nested payloads. */
-export const makeBookingRequestSchema = z.union([
-  makeBookingSchema,
-  z.object({ arguments: makeBookingSchema }).transform((v) => v.arguments),
-]);
+/**
+ * camelCase → snake_case aliases for the make-booking body.
+ *
+ * ElevenLabs camelCases tool property keys when a tool is pushed, so the live
+ * voice agent posts `venueName`, `phoneNumber`, etc. (#34). The internal schema
+ * and route still use snake_case, so we normalize the incoming body here and
+ * keep accepting the legacy snake_case keys for backward compatibility — the
+ * make_booking webhook is LIVE, so both styles must work during the release
+ * window before the ElevenLabs tool is re-pushed.
+ */
+const MAKE_BOOKING_KEY_ALIASES: Record<string, string> = {
+  venueName: "venue_name",
+  phoneNumber: "phone_number",
+  partySize: "party_size",
+  customerName: "customer_name",
+  customerPhone: "customer_phone",
+  specialRequests: "special_requests",
+};
+
+/**
+ * Normalize a make-booking payload to snake_case keys, accepting either key
+ * style. snake_case keys win when both are present. `date`, `time`, and
+ * `language` are already single-word and need no aliasing.
+ */
+function normalizeMakeBookingKeys(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return input;
+  }
+
+  const source = input as Record<string, unknown>;
+  const normalized: Record<string, unknown> = { ...source };
+
+  for (const [camel, snake] of Object.entries(MAKE_BOOKING_KEY_ALIASES)) {
+    if (normalized[snake] === undefined && source[camel] !== undefined) {
+      normalized[snake] = source[camel];
+    }
+    delete normalized[camel];
+  }
+
+  return normalized;
+}
+
+/**
+ * Wraps flat and MCP-nested payloads, tolerating both camelCase and snake_case
+ * keys (ElevenLabs camelCases tool params on push). The preprocess unwraps an
+ * optional `arguments` envelope and aliases camelCase keys to snake_case before
+ * validation.
+ */
+export const makeBookingRequestSchema = z.preprocess((body) => {
+  const unwrapped =
+    body && typeof body === "object" && !Array.isArray(body) && "arguments" in body
+      ? (body as { arguments?: unknown }).arguments
+      : body;
+  return normalizeMakeBookingKeys(unwrapped);
+}, makeBookingSchema);
 
 // ---------------------------------------------------------------------------
 // favorites

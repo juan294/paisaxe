@@ -12,15 +12,25 @@ import { logger } from "@/lib/logger";
  * a user id. Persists into voice_saved_places (see migration 095).
  *
  * POST /api/mcp/save-favorite
- * Body: { place_name, place_address?, place_id?, notes?, conversation_id? }
+ * Body (camelCase, as ElevenLabs camelCases tool params on push):
+ *   { placeName, placeAddress?, placeId?, notes?, conversationId? }
+ * Legacy snake_case keys ({ place_name, place_address, ... }) are still accepted
+ * for backward compatibility (#34).
  */
 
 interface SaveFavoriteRequest {
+  // camelCase keys (current ElevenLabs tool contract)
+  placeName?: unknown;
+  placeAddress?: unknown;
+  placeId?: unknown;
+  conversationId?: unknown;
+  // snake_case keys (legacy / backward compatibility)
   place_name?: unknown;
   place_address?: unknown;
   place_id?: unknown;
-  notes?: unknown;
   conversation_id?: unknown;
+  // single-word, unchanged
+  notes?: unknown;
 }
 
 interface SaveFavoriteResponse {
@@ -53,20 +63,21 @@ export async function POST(request: Request): Promise<NextResponse<SaveFavoriteR
     );
   }
 
-  const placeName = asString(body.place_name);
+  const placeName = asString(body.placeName ?? body.place_name);
   if (!placeName) {
     return NextResponse.json<SaveFavoriteResponse>(
       {
         success: false,
-        message: "place_name is required to save a place.",
+        message: "placeName is required to save a place.",
       },
       { status: 400 }
     );
   }
 
-  // conversation_id is system-provided by ElevenLabs; tolerate its absence so a
+  // conversationId is system-provided by ElevenLabs; tolerate its absence so a
   // bookmark is still recorded rather than lost.
-  const conversationId = asString(body.conversation_id) ?? "unknown";
+  const conversationId =
+    asString(body.conversationId ?? body.conversation_id) ?? "unknown";
 
   try {
     const supabase = createAdminClient();
@@ -76,8 +87,8 @@ export async function POST(request: Request): Promise<NextResponse<SaveFavoriteR
         {
           conversation_id: conversationId,
           place_name: placeName,
-          place_address: asString(body.place_address),
-          place_id: asString(body.place_id),
+          place_address: asString(body.placeAddress ?? body.place_address),
+          place_id: asString(body.placeId ?? body.place_id),
           notes: asString(body.notes),
         },
         { onConflict: "conversation_id,place_name" }
@@ -118,14 +129,14 @@ export async function GET(): Promise<NextResponse> {
     endpoint: "/api/mcp/save-favorite",
     description:
       "Save (bookmark) a place to the visitor's saved places during a Pelayo voice conversation.",
-    required_fields: ["place_name"],
-    optional_fields: ["place_address", "place_id", "notes", "conversation_id"],
+    required_fields: ["placeName"],
+    optional_fields: ["placeAddress", "placeId", "notes", "conversationId"],
     required_headers: ["x-mcp-secret"],
     example_request: {
-      place_name: "Casa Marcial",
-      place_address: "La Salgar, Arriondas",
-      place_id: "ChIJ...",
-      conversation_id: "conv_abc123",
+      placeName: "Casa Marcial",
+      placeAddress: "La Salgar, Arriondas",
+      placeId: "ChIJ...",
+      conversationId: "conv_abc123",
     },
   });
 }

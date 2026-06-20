@@ -396,31 +396,31 @@
                             "request_body_schema": {
                                 "type": "object",
                                 "required": [
-                                    "venue_name",
-                                    "phone_number",
-                                    "party_size",
+                                    "venueName",
+                                    "phoneNumber",
+                                    "partySize",
                                     "date",
                                     "time",
-                                    "customer_name",
-                                    "customer_phone"
+                                    "customerName",
+                                    "customerPhone"
                                 ],
-                                "description": "Booking request details. Before calling, you MUST have collected: venue_name and phone_number (from search_places), party_size, date, time, customer_name (full name), and customer_phone (visitor's callback number).",
+                                "description": "Booking request details. Before calling, you MUST have collected: venueName and phoneNumber (from search_places), partySize, date, time, customerName (full name), and customerPhone (visitor's callback number).",
                                 "properties": {
-                                    "venue_name": {
+                                    "venueName": {
                                         "type": "string",
                                         "description": "Name of the venue (restaurant, hotel, activity provider) to call",
                                         "is_system_provided": false,
                                         "dynamic_variable": "",
                                         "constant_value": ""
                                     },
-                                    "phone_number": {
+                                    "phoneNumber": {
                                         "type": "string",
                                         "description": "Phone number of the business (from search_places result)",
                                         "is_system_provided": false,
                                         "dynamic_variable": "",
                                         "constant_value": ""
                                     },
-                                    "party_size": {
+                                    "partySize": {
                                         "type": "number",
                                         "description": "Number of people for the reservation",
                                         "is_system_provided": false,
@@ -441,21 +441,21 @@
                                         "dynamic_variable": "",
                                         "constant_value": ""
                                     },
-                                    "customer_name": {
+                                    "customerName": {
                                         "type": "string",
                                         "description": "Visitor's FULL NAME for the reservation (e.g., 'Juan García López')",
                                         "is_system_provided": false,
                                         "dynamic_variable": "",
                                         "constant_value": ""
                                     },
-                                    "customer_phone": {
+                                    "customerPhone": {
                                         "type": "string",
                                         "description": "Visitor's phone number for the restaurant to call back if needed (e.g., '612345678', '+34612345678')",
                                         "is_system_provided": false,
                                         "dynamic_variable": "",
                                         "constant_value": ""
                                     },
-                                    "special_requests": {
+                                    "specialRequests": {
                                         "type": "string",
                                         "description": "Any special requests (e.g., 'trona para bebé', 'mesa en terraza', 'alergia al gluten')",
                                         "is_system_provided": false,
@@ -522,25 +522,25 @@
                             "request_body_schema": {
                                 "type": "object",
                                 "required": [
-                                    "place_name"
+                                    "placeName"
                                 ],
                                 "description": "The place the visitor wants to bookmark. Use the name (and address/place_id from search_places when available).",
                                 "properties": {
-                                    "place_name": {
+                                    "placeName": {
                                         "type": "string",
                                         "description": "Name of the place to save (e.g. 'Casa Marcial', 'Mirador del Fito')",
                                         "is_system_provided": false,
                                         "dynamic_variable": "",
                                         "constant_value": ""
                                     },
-                                    "place_address": {
+                                    "placeAddress": {
                                         "type": "string",
                                         "description": "Optional: address of the place, from search_places",
                                         "is_system_provided": false,
                                         "dynamic_variable": "",
                                         "constant_value": ""
                                     },
-                                    "place_id": {
+                                    "placeId": {
                                         "type": "string",
                                         "description": "Optional: Google place_id from search_places",
                                         "is_system_provided": false,
@@ -554,12 +554,9 @@
                                         "dynamic_variable": "",
                                         "constant_value": ""
                                     },
-                                    "conversation_id": {
+                                    "conversationId": {
                                         "type": "string",
-                                        "description": "Conversation id used to group the visitor's saved places",
-                                        "is_system_provided": true,
-                                        "dynamic_variable": "system__conversation_id",
-                                        "constant_value": ""
+                                        "dynamic_variable": "system__conversation_id"
                                     }
                                 }
                             },
