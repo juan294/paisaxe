@@ -1,6 +1,7 @@
 import "server-only";
 import { VoyageAIClient } from "voyageai";
 import { EmbeddingCache } from "./embedding-cache";
+import { logger } from "./logger";
 
 const voyageClient = new VoyageAIClient({
   apiKey: process.env.VOYAGE_API_KEY?.trim(),
@@ -45,7 +46,9 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
   // Log token usage
   if (result.usage?.totalTokens) {
-    console.info(`[Voyage AI] generateEmbedding: ${result.usage.totalTokens} tokens`);
+    logger.debug("[Voyage AI] generateEmbedding", {
+      total_tokens: result.usage.totalTokens,
+    });
   }
 
   // Cache the result
@@ -83,11 +86,17 @@ export async function generateEmbeddings(texts: string[]): Promise<BatchEmbeddin
 
     // Log token usage per batch
     if (batchTokens) {
-      console.info(`[Voyage AI] generateEmbeddings batch ${i}: ${batchTokens} tokens`);
+      logger.debug("[Voyage AI] generateEmbeddings batch", {
+        batch: i,
+        batch_tokens: batchTokens,
+      });
     }
   }
 
-  console.info(`[Voyage AI] generateEmbeddings total: ${totalTokens} tokens for ${texts.length} texts`);
+  logger.debug("[Voyage AI] generateEmbeddings total", {
+    total_tokens: totalTokens,
+    text_count: texts.length,
+  });
   return { embeddings: allEmbeddings, totalTokens };
 }
 
@@ -140,15 +149,18 @@ export async function generateContextualizedEmbeddings(
     totalTokens += groupTokens;
 
     if (groupTokens) {
-      console.info(
-        `[Voyage AI] contextualizedEmbed group ${i}: ${group.length} chunks, ${groupTokens} tokens`
-      );
+      logger.debug("[Voyage AI] contextualizedEmbed group", {
+        group: i,
+        chunks: group.length,
+        group_tokens: groupTokens,
+      });
     }
   }
 
-  console.info(
-    `[Voyage AI] generateContextualizedEmbeddings total: ${totalTokens} tokens for ${chunkGroups.length} groups`
-  );
+  logger.debug("[Voyage AI] generateContextualizedEmbeddings total", {
+    total_tokens: totalTokens,
+    group_count: chunkGroups.length,
+  });
   return { embeddings: allEmbeddings, totalTokens };
 }
 

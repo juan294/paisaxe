@@ -155,11 +155,13 @@ describe("isFeatureFlagEnabled", () => {
 
     expect(result).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      "[FEATURE_FLAG_FAILURE]",
-      expect.objectContaining({
-        flag: "randomized_order",
-        error: "Connection failed",
-      })
+      expect.stringContaining("[FEATURE_FLAG_FAILURE]")
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"flag":"randomized_order"')
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"error":"Connection failed"')
     );
   });
 
@@ -175,11 +177,10 @@ describe("isFeatureFlagEnabled", () => {
 
     expect(result).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      "[FEATURE_FLAG_FAILURE]",
-      expect.objectContaining({
-        flag: "randomized_order",
-        statusCode: 503,
-      })
+      expect.stringContaining("[FEATURE_FLAG_FAILURE]")
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"statusCode":503')
     );
   });
 
@@ -193,11 +194,10 @@ describe("isFeatureFlagEnabled", () => {
 
     expect(result).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      "[FEATURE_FLAG_FAILURE]",
-      expect.objectContaining({
-        flag: "randomized_order",
-        error: expect.stringContaining("aborted"),
-      })
+      expect.stringContaining("[FEATURE_FLAG_FAILURE]")
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("aborted")
     );
   });
 
@@ -287,8 +287,10 @@ describe("getAllFeatureFlagsServer", () => {
 
     expect(result).toEqual({});
     expect(consoleWarn).toHaveBeenCalledWith(
-      "Failed to fetch all feature flags:",
-      503
+      expect.stringContaining("Failed to fetch all feature flags")
+    );
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringContaining('"statusCode":503')
     );
   });
 
@@ -301,8 +303,7 @@ describe("getAllFeatureFlagsServer", () => {
 
     expect(result).toEqual({});
     expect(consoleWarn).toHaveBeenCalledWith(
-      "Error fetching all feature flags:",
-      expect.any(Error)
+      expect.stringContaining("Error fetching all feature flags")
     );
   });
 
@@ -379,8 +380,7 @@ describe("getAllFeatureFlagsServer", () => {
 
     await expect(resultPromise).resolves.toEqual({});
     expect(consoleWarn).toHaveBeenCalledWith(
-      "Error fetching all feature flags:",
-      expect.any(DOMException)
+      expect.stringContaining("Error fetching all feature flags")
     );
   });
 });

@@ -12,6 +12,7 @@ import type {
 } from "@/types/admin";
 import type { StoryLocale, StoryTranslation } from "@/types/immersive";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 
 const API_BASE = "/api/admin";
 
@@ -35,7 +36,7 @@ export async function createStory(
 
     return await response.json();
   } catch (error) {
-    console.error("Error creating story:", error);
+    clientLogger.error("Error creating story", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -61,7 +62,7 @@ export async function updateStory(
 
     return await response.json();
   } catch (error) {
-    console.error("Error updating story:", error);
+    clientLogger.error("Error updating story", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -113,7 +114,7 @@ export async function fetchStories(
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching stories:", error);
+    clientLogger.error("Error fetching stories", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -140,7 +141,7 @@ export async function updateStoryImageUrl(
 
     return await response.json();
   } catch (error) {
-    console.error("Error updating image:", error);
+    clientLogger.error("Error updating image", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -173,7 +174,7 @@ export async function uploadStoryImage(
 
     return await response.json();
   } catch (error) {
-    console.error("Error uploading image:", error);
+    clientLogger.error("Error uploading image", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -199,7 +200,7 @@ export async function updateStoryImageSource(
 
     return await response.json();
   } catch (error) {
-    console.error("Error updating image source:", error);
+    clientLogger.error("Error updating image source", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -225,7 +226,7 @@ export async function updateStoryStatus(
 
     return await response.json();
   } catch (error) {
-    console.error("Error updating status:", error);
+    clientLogger.error("Error updating status", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -251,7 +252,7 @@ export async function bulkUpdateStoryStatus(
 
     return await response.json();
   } catch (error) {
-    console.error("Error bulk updating status:", error);
+    clientLogger.error("Error bulk updating status", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -276,7 +277,7 @@ export async function bulkDeleteStories(
 
     return await response.json();
   } catch (error) {
-    console.error("Error bulk deleting stories:", error);
+    clientLogger.error("Error bulk deleting stories", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -300,7 +301,7 @@ export async function approveAllPendingStories(): Promise<
 
     return await response.json();
   } catch (error) {
-    console.error("Error approving all stories:", error);
+    clientLogger.error("Error approving all stories", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -321,7 +322,7 @@ export async function searchContentImages(
 
     return await response.json();
   } catch (error) {
-    console.error("Error searching content images:", error);
+    clientLogger.error("Error searching content images", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -342,7 +343,7 @@ export async function fetchStoryTranslations(
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching translations:", error);
+    clientLogger.error("Error fetching translations", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -369,7 +370,7 @@ export async function updateStoryTranslation(
 
     return await response.json();
   } catch (error) {
-    console.error("Error updating translation:", error);
+    clientLogger.error("Error updating translation", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -398,7 +399,7 @@ export async function generateStoryTranslations(
 
     return await response.json();
   } catch (error) {
-    console.error("Error generating translations:", error);
+    clientLogger.error("Error generating translations", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }

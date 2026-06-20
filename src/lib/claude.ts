@@ -6,6 +6,7 @@ import AnthropicSDK from "@anthropic-ai/sdk";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Chunk, ImageResult, Source } from "@/types";
 import { CHAT_MODEL } from "@/lib/models";
+import { logger } from "@/lib/logger";
 
 interface AnthropicMessage {
   role: "user" | "assistant";
@@ -82,7 +83,9 @@ async function* streamWithSDK(
     } catch (err) {
       if (attempt < 2) {
         // Single retry
-        console.warn("[Claude Streaming] SDK stream failed on first attempt, retrying...", err);
+        logger.warn("[Claude Streaming] SDK stream failed on first attempt, retrying", {
+          error: err instanceof Error ? err.message : String(err),
+        });
         continue;
       }
       throw err;
@@ -184,7 +187,7 @@ async function* streamWithCurl(
   });
 
   curlProcess.stderr.on("data", (data: Buffer) => {
-    console.error("[Claude Streaming] curl stderr:", data.toString());
+    logger.error("[Claude Streaming] curl stderr", { stderr: data.toString() });
   });
 
   curlProcess.on("close", () => {
@@ -325,13 +328,18 @@ async function callWithCurl(
       const isRetryable = [56, 7, 28].includes(exitCode) || isNaN(exitCode);
 
       if (isRetryable && attempt < MAX_RETRIES) {
-        console.warn(`[Claude API] curl failed (attempt ${attempt}/${MAX_RETRIES}, code ${err.code}), retrying in ${RETRY_DELAY_MS}ms...`);
+        logger.warn("[Claude API] curl failed, retrying", {
+          attempt,
+          max_retries: MAX_RETRIES,
+          code: err.code,
+          retry_delay_ms: RETRY_DELAY_MS,
+        });
         await sleep(RETRY_DELAY_MS * attempt); // Exponential backoff
         lastError = new Error(`curl failed: ${err.code}`);
         continue;
       }
 
-      console.error("[Claude API] curl execution failed:", {
+      logger.error("[Claude API] curl execution failed", {
         code: err.code,
         stderr: err.stderr,
         killed: err.killed,
@@ -342,17 +350,20 @@ async function callWithCurl(
     }
 
     if (stderr) {
-      console.error("[Claude API] curl stderr:", stderr);
+      logger.error("[Claude API] curl stderr", { stderr });
     }
 
     if (!stdout || stdout.trim() === "") {
       if (attempt < MAX_RETRIES) {
-        console.warn(`[Claude API] Empty response (attempt ${attempt}/${MAX_RETRIES}), retrying...`);
+        logger.warn("[Claude API] Empty response, retrying", {
+          attempt,
+          max_retries: MAX_RETRIES,
+        });
         await sleep(RETRY_DELAY_MS * attempt);
         lastError = new Error("Empty response from Anthropic API");
         continue;
       }
-      console.error("[Claude API] Empty response from curl after all retries");
+      logger.error("[Claude API] Empty response from curl after all retries");
       throw new Error("Empty response from Anthropic API");
     }
 
@@ -360,19 +371,21 @@ async function callWithCurl(
     try {
       parsed = JSON.parse(stdout);
     } catch {
-      console.error("[Claude API] Failed to parse response:", stdout.slice(0, 500));
+      logger.error("[Claude API] Failed to parse response", {
+        response_preview: stdout.slice(0, 500),
+      });
       throw new Error(`Invalid JSON response: ${stdout.slice(0, 100)}`);
     }
 
     if (parsed.error) {
       // Don't retry API-level errors (rate limits, auth, etc.)
-      console.error("[Claude API] API error:", parsed.error);
+      logger.error("[Claude API] API error", { error: parsed.error });
       throw new Error(`Anthropic API error: ${parsed.error.message}`);
     }
 
     // Success
     if (attempt > 1) {
-      console.info(`[Claude API] Succeeded on attempt ${attempt}`);
+      logger.info("[Claude API] Succeeded on retry", { attempt });
     }
     return parsed as Anthropic.Message;
   }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "./use-auth";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 
 const STORAGE_KEY = "paisaxe_favorites";
 
@@ -64,7 +65,7 @@ export function useFavorites(): UseFavoritesReturn {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudFavorites));
         }
       } catch (error) {
-        console.error("Error syncing favorites:", error);
+        clientLogger.error("Error syncing favorites", { error: error instanceof Error ? error.message : String(error) });
       } finally {
         setIsLoading(false);
       }
@@ -123,7 +124,7 @@ export function useFavorites(): UseFavoritesReturn {
           }
         }
       } catch (error) {
-        console.error("Error syncing favorite to cloud:", error);
+        clientLogger.error("Error syncing favorite to cloud", { error: error instanceof Error ? error.message : String(error) });
         // Revert optimistic update on failure
         setFavorites(previousFavorites);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(previousFavorites));

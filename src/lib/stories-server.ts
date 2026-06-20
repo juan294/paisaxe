@@ -7,13 +7,13 @@ import { logger } from "@/lib/logger";
 
 /**
  * Log a warning when serving fallback stories.
- * Uses console.error in production so it surfaces in Vercel logs.
+ * Uses logger.error in production so it surfaces in Vercel logs.
  */
 function logFallback(reason: string): void {
   if (getEnvironment() === "production") {
-    console.error(`[STORIES_FALLBACK] Serving placeholder stories: ${reason}`);
+    logger.error("[STORIES_FALLBACK] Serving placeholder stories", { reason });
   } else {
-    console.warn(`[STORIES_FALLBACK] ${reason}`);
+    logger.warn("[STORIES_FALLBACK]", { reason });
   }
 }
 

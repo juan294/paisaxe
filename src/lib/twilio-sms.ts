@@ -5,6 +5,8 @@
  * Sends SMS to customers after booking agent calls complete.
  */
 
+import { logger } from "@/lib/logger";
+
 export interface PendingBooking {
   id: string;
   conversation_id: string;
@@ -40,7 +42,7 @@ export async function sendSMS(to: string, body: string): Promise<SendSMSResult> 
   const fromNumber = process.env.TWILIO_PHONE_NUMBER?.trim();
 
   if (!accountSid || !authToken || !fromNumber) {
-    console.error("[twilio-sms] Missing Twilio credentials");
+    logger.error("[twilio-sms] Missing Twilio credentials");
     return {
       success: false,
       error: "Twilio not configured",
@@ -70,7 +72,7 @@ export async function sendSMS(to: string, body: string): Promise<SendSMSResult> 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("[twilio-sms] API error:", data);
+      logger.error("[twilio-sms] API error", { data });
       return {
         success: false,
         error: data.message || `Twilio error: ${response.status}`,
@@ -82,7 +84,9 @@ export async function sendSMS(to: string, body: string): Promise<SendSMSResult> 
       sid: data.sid,
     };
   } catch (error) {
-    console.error("[twilio-sms] Failed to send SMS:", error);
+    logger.error("[twilio-sms] Failed to send SMS", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

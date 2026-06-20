@@ -9,6 +9,7 @@
  */
 
 import { Resend } from "resend";
+import { logger } from "@/lib/logger";
 
 /** Default sender address for Paisaxe emails */
 const DEFAULT_FROM = "Paisaxe <no-reply@paisaxe.es>";
@@ -55,7 +56,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
   const apiKey = process.env.RESEND_API_KEY?.trim();
 
   if (!apiKey) {
-    console.error("[email] Missing RESEND_API_KEY");
+    logger.error("[email] Missing RESEND_API_KEY");
     return {
       success: false,
       error: "Resend not configured",
@@ -93,7 +94,9 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
     const { data, error } = await resend.emails.send(payload as Parameters<typeof resend.emails.send>[0]);
 
     if (error) {
-      console.error("[email] Resend API error:", error);
+      logger.error("[email] Resend API error", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         success: false,
         error: error.message,
@@ -105,7 +108,9 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
       id: data?.id,
     };
   } catch (error) {
-    console.error("[email] Failed to send email:", error);
+    logger.error("[email] Failed to send email", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

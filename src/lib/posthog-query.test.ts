@@ -113,7 +113,10 @@ describe("queryPostHog", () => {
     );
 
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("PostHog query retry 1/2")
+      expect.stringContaining("PostHog query retry")
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"attempt":1')
     );
     expect(result).toEqual({ results: [[99]] });
     warnSpy.mockRestore();
@@ -139,7 +142,10 @@ describe("queryPostHog", () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ results: [[7]] });
     expect(warnSpy).toHaveBeenCalledWith(
-      "PostHog query retry 1/2 after ECONNRESET"
+      expect.stringContaining("PostHog query retry")
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("ECONNRESET")
     );
     warnSpy.mockRestore();
   });
@@ -158,7 +164,10 @@ describe("queryPostHog", () => {
     await queryPostHog("SELECT 1", "project-123", "phx_api-key");
 
     expect(warnSpy).toHaveBeenCalledWith(
-      "PostHog query retry 1/2 after ETIMEDOUT"
+      expect.stringContaining("PostHog query retry")
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("ETIMEDOUT")
     );
     warnSpy.mockRestore();
   });
@@ -216,7 +225,10 @@ describe("queryPostHog", () => {
     expect(result).toEqual({ results: [[42]] });
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("PostHog query retry 1/2")
+      expect.stringContaining("PostHog query retry")
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"attempt":1')
     );
     warnSpy.mockRestore();
     vi.useRealTimers();

@@ -16,7 +16,7 @@ import pino from "pino";
 import { getRequestId } from "./request-context";
 import { sanitizeLogMessage, sanitizeValue } from "./logger-sanitize";
 
-type LogLevel = "info" | "warn" | "error";
+type LogLevel = "debug" | "info" | "warn" | "error";
 
 const REDACTED = "[REDACTED]";
 const isProduction = process.env.NODE_ENV === "production";
@@ -64,6 +64,7 @@ function getRequestIdBindings() {
 }
 
 type Logger = {
+  debug: (msg: string, meta?: Record<string, unknown>) => void;
   info: (msg: string, meta?: Record<string, unknown>) => void;
   warn: (msg: string, meta?: Record<string, unknown>) => void;
   error: (msg: string, meta?: Record<string, unknown>) => void;
@@ -89,6 +90,7 @@ function makeDevLogger(bindings?: Record<string, unknown>): Logger {
   };
 
   return {
+    debug: (msg: string, meta?: Record<string, unknown>) => emit("debug", msg, meta),
     info: (msg: string, meta?: Record<string, unknown>) => emit("info", msg, meta),
     warn: (msg: string, meta?: Record<string, unknown>) => emit("warn", msg, meta),
     error: (msg: string, meta?: Record<string, unknown>) => emit("error", msg, meta),
@@ -123,6 +125,7 @@ function makePinoLogger(instance = pino({
   };
 
   return {
+    debug: (msg: string, meta?: Record<string, unknown>) => emit("debug", msg, meta),
     info: (msg: string, meta?: Record<string, unknown>) => emit("info", msg, meta),
     warn: (msg: string, meta?: Record<string, unknown>) => emit("warn", msg, meta),
     error: (msg: string, meta?: Record<string, unknown>) => emit("error", msg, meta),

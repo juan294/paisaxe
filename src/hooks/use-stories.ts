@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { FALLBACK_STORIES, getStoriesFromDB } from "@/lib/stories-data";
+import { clientLogger } from "@/lib/client-logger";
 import type { PublicStory, Story } from "@/types/immersive";
 import { publicStoryToStory, toPublicStory } from "@/types/immersive";
 
@@ -103,7 +104,7 @@ function saveToStorage(data: Story[]): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
   } catch {
     // Storage full or other error - ignore
-    console.warn("Failed to persist stories to localStorage");
+    clientLogger.warn("[STORIES_CACHE] Failed to persist stories to localStorage");
   }
 }
 
@@ -199,7 +200,9 @@ function useStoriesState(
         cache.promise = null;
         // Keep stale data on error
         if (cache.data) {
-          console.warn("Failed to refresh stories, using cached data:", err);
+          clientLogger.warn("[STORIES_REFRESH] Failed to refresh stories, using cached data", {
+            error: err instanceof Error ? err.message : String(err),
+          });
           return cache.data;
         }
         throw err;
@@ -257,7 +260,13 @@ function useStoriesState(
     function handleFocus() {
       const isStale = Date.now() - cache.timestamp > CACHE_TTL;
       if (isStale && cache.data) {
-        fetchStories().then(setStories).catch(console.error);
+        fetchStories()
+          .then(setStories)
+          .catch((err: unknown) =>
+            clientLogger.error("[STORIES_FOCUS_REVALIDATE_FAILURE]", {
+              error: err instanceof Error ? err.message : String(err),
+            }),
+          );
       }
     }
 
@@ -317,7 +326,11 @@ export function prefetchStories(): void {
         cache.timestamp = Date.now();
         saveToStorage(data);
       })
-      .catch(console.error);
+      .catch((err: unknown) =>
+        clientLogger.error("[STORIES_PREFETCH_FAILURE]", {
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
   }
 }
 

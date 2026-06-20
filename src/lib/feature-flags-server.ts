@@ -1,5 +1,6 @@
 import type { FeatureFlagKey } from "@/types/feature-flags";
 import { getEnvironment } from "@/lib/environment";
+import { logger } from "@/lib/logger";
 
 /**
  * Server-side function to fetch ALL feature flags as a key→enabled map.
@@ -37,7 +38,7 @@ export async function getAllFeatureFlagsServer(): Promise<
     );
 
     if (!response.ok) {
-      console.warn("Failed to fetch all feature flags:", response.status);
+      logger.warn("Failed to fetch all feature flags", { statusCode: response.status });
       return {};
     }
 
@@ -48,7 +49,9 @@ export async function getAllFeatureFlagsServer(): Promise<
       rows.map((r) => [r.flag_key, r.enabled])
     ) as Partial<Record<FeatureFlagKey, boolean>>;
   } catch (error) {
-    console.warn("Error fetching all feature flags:", error);
+    logger.warn("Error fetching all feature flags", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {};
   } finally {
     clearTimeout(timeout);
@@ -100,7 +103,7 @@ export async function isFeatureFlagEnabled(
     );
 
     if (!response.ok) {
-      console.error("[FEATURE_FLAG_FAILURE]", {
+      logger.error("[FEATURE_FLAG_FAILURE]", {
         flag: key,
         statusCode: response.status,
       });
@@ -115,7 +118,7 @@ export async function isFeatureFlagEnabled(
     return false;
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    console.error("[FEATURE_FLAG_FAILURE]", {
+    logger.error("[FEATURE_FLAG_FAILURE]", {
       flag: key,
       error: err.message,
     });

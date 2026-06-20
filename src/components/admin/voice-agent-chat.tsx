@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 import type { MarketingPlatform } from "@/types/marketing";
 
 interface Message {
@@ -98,7 +99,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
       }
     },
     onError: (error) => {
-      console.error("Conversation error:", error);
+      clientLogger.error("[VOICE_AGENT_CONVERSATION_ERROR]", { error: String(error) });
       setError("Connection error. Try again or switch to text mode.");
     },
   });
@@ -159,7 +160,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
         connectionType: "websocket",
       });
     } catch (err) {
-      console.error("Failed to start voice call:", err);
+      clientLogger.error("Failed to start voice call", { error: err instanceof Error ? err.message : String(err) });
       setError("Failed to connect. Check your microphone permissions.");
     }
   };
@@ -168,7 +169,7 @@ export function VoiceAgentChat({ agentIds = {} }: VoiceAgentChatProps) {
     try {
       await conversation.endSession();
     } catch (err) {
-      console.error("Failed to end call:", err);
+      clientLogger.error("Failed to end call", { error: err instanceof Error ? err.message : String(err) });
     }
   };
 

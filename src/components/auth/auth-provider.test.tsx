@@ -140,7 +140,7 @@ describe("AuthProvider — null supabase client (FE-M4 regression)", () => {
     // signOut must resolve (not throw) even when supabase is null
     await expect(result.current.signOut()).resolves.toBeUndefined();
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Supabase client unavailable — cannot sign out.",
+      expect.stringContaining("Supabase client unavailable — cannot sign out."),
     );
 
     consoleSpy.mockRestore();
@@ -190,8 +190,10 @@ describe("AuthProvider", () => {
     });
     expect(screen.getByTestId("user").textContent).toBe("none");
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Error initializing auth:",
-      expect.any(Error)
+      expect.stringContaining("[AUTH_INIT_FAILURE]")
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"error":"client init failed"')
     );
     expect(mockGetSession).not.toHaveBeenCalled();
 
@@ -315,8 +317,10 @@ describe("AuthProvider", () => {
     // User should remain null on error
     expect(screen.getByTestId("user").textContent).toBe("none");
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Error initializing auth:",
-      expect.any(Error)
+      expect.stringContaining("[AUTH_INIT_FAILURE]")
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"error":"Session fetch failed"')
     );
 
     consoleSpy.mockRestore();
@@ -587,8 +591,10 @@ describe("AuthProvider", () => {
     await expect(signInPromise!).rejects.toThrow("OAuth failed");
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Error signing in with Google:",
-      oauthError
+      expect.stringContaining("[AUTH_SIGNIN_FAILURE]")
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"error":"OAuth failed"')
     );
 
     consoleSpy.mockRestore();
@@ -629,8 +635,10 @@ describe("AuthProvider", () => {
     await expect(signOutPromise!).rejects.toThrow("Sign out failed");
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Error signing out:",
-      signOutError
+      expect.stringContaining("[AUTH_SIGNOUT_FAILURE]")
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"error":"Sign out failed"')
     );
 
     consoleSpy.mockRestore();

@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase";
+import { logger } from "@/lib/logger";
 import type {
   ManualCostEntry,
   CreateManualCostRequest,
@@ -27,7 +28,9 @@ export async function fetchManualCosts(
       .order("billing_period_start", { ascending: false });
 
     if (error) {
-      console.error("Error fetching manual costs:", error);
+      logger.error("Error fetching manual costs", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return [];
     }
 
@@ -44,7 +47,9 @@ export async function fetchManualCosts(
       notes: entry.notes || undefined,
     }));
   } catch (error) {
-    console.error("Error in fetchManualCosts:", error);
+    logger.error("Error in fetchManualCosts", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 }
@@ -75,13 +80,17 @@ export async function createManualCost(
       .single();
 
     if (error) {
-      console.error("Error creating manual cost:", error);
+      logger.error("Error creating manual cost", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
 
     return mapDbToManualCostEntry(data);
   } catch (error) {
-    console.error("Error in createManualCost:", error);
+    logger.error("Error in createManualCost", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -115,13 +124,17 @@ export async function updateManualCost(
       .single();
 
     if (error) {
-      console.error("Error updating manual cost:", error);
+      logger.error("Error updating manual cost", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
 
     return mapDbToManualCostEntry(data);
   } catch (error) {
-    console.error("Error in updateManualCost:", error);
+    logger.error("Error in updateManualCost", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -139,13 +152,17 @@ export async function deleteManualCost(id: string): Promise<boolean> {
       .eq("id", id);
 
     if (error) {
-      console.error("Error deleting manual cost:", error);
+      logger.error("Error deleting manual cost", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("Error in deleteManualCost:", error);
+    logger.error("Error in deleteManualCost", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return false;
   }
 }
@@ -164,13 +181,17 @@ export async function getManualCost(id: string): Promise<ManualCostEntry | null>
       .single();
 
     if (error) {
-      console.error("Error fetching manual cost:", error);
+      logger.error("Error fetching manual cost", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
 
     return mapDbToManualCostEntry(data);
   } catch (error) {
-    console.error("Error in getManualCost:", error);
+    logger.error("Error in getManualCost", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }

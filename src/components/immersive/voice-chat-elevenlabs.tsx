@@ -8,6 +8,7 @@ import { useTranslation } from "@/lib/i18n";
 import { getLocalizedStory } from "@/lib/localize-story";
 import { useVoiceSession } from "@/hooks/use-voice-session";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { clientLogger } from "@/lib/client-logger";
 import type { Story } from "@/types/immersive";
 
 interface Message {
@@ -147,7 +148,9 @@ export function VoiceChatElevenLabs({
       }
     },
     onError: (err) => {
-      console.error("Voice conversation error:", err);
+      clientLogger.error("[VOICE_CONVERSATION_ERROR]", {
+        error: String(err),
+      });
       setError(t("voice.error"));
       onFallbackToText();
     },
@@ -232,7 +235,9 @@ export function VoiceChatElevenLabs({
         },
       });
     } catch (err) {
-      console.error("Failed to start voice conversation:", err);
+      clientLogger.error("[VOICE_START_FAILURE]", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       setError(t("voice.error"));
       onFallbackToText();
     }
@@ -242,7 +247,9 @@ export function VoiceChatElevenLabs({
     try {
       await conversation.endSession();
     } catch (err) {
-      console.error("Failed to end conversation:", err);
+      clientLogger.error("[VOICE_END_FAILURE]", {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 

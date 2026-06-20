@@ -11,11 +11,27 @@ describe("logger", () => {
   });
 
   describe("exported methods", () => {
-    it("exports info, warn, and error methods", async () => {
+    it("exports debug, info, warn, and error methods", async () => {
       const { logger } = await import("./logger");
+      expect(typeof logger.debug).toBe("function");
       expect(typeof logger.info).toBe("function");
       expect(typeof logger.warn).toBe("function");
       expect(typeof logger.error).toBe("function");
+    });
+
+    it("emits structured JSON output on logger.debug", async () => {
+      const { logger } = await import("./logger");
+      const spy = vi.spyOn(console, "debug").mockImplementation(() => {});
+
+      logger.debug("[VOYAGE_TOKENS]", { total_tokens: 42 });
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      const parsed = JSON.parse(spy.mock.calls[0][0] as string);
+      expect(parsed).toMatchObject({
+        level: "debug",
+        msg: "[VOYAGE_TOKENS]",
+        total_tokens: 42,
+      });
     });
   });
 

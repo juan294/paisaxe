@@ -6,6 +6,7 @@ import type {
   UpdateManualCostRequest,
 } from "@/types/costs-analytics";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 
 const API_BASE = "/api/admin";
 
@@ -32,7 +33,7 @@ export async function fetchCostsAnalytics(
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching costs analytics:", error);
+    clientLogger.error("Error fetching costs analytics", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -57,7 +58,7 @@ export async function createManualCostEntry(
 
     return await response.json();
   } catch (error) {
-    console.error("Error creating cost entry:", error);
+    clientLogger.error("Error creating cost entry", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -83,7 +84,7 @@ export async function updateManualCostEntry(
 
     return await response.json();
   } catch (error) {
-    console.error("Error updating cost entry:", error);
+    clientLogger.error("Error updating cost entry", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -107,7 +108,7 @@ export async function deleteManualCostEntry(
 
     return await response.json();
   } catch (error) {
-    console.error("Error deleting cost entry:", error);
+    clientLogger.error("Error deleting cost entry", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }

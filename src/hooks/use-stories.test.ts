@@ -799,7 +799,9 @@ describe("useStories localStorage persistence", () => {
 
     // Should still have stories despite localStorage error
     expect(result.current.stories).toEqual(mockStories);
-    expect(consoleSpy).toHaveBeenCalledWith("Failed to persist stories to localStorage");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to persist stories to localStorage")
+    );
 
     consoleSpy.mockRestore();
   });

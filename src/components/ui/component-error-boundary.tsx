@@ -3,6 +3,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { LanguageContext } from "@/lib/i18n/provider";
 import type { LanguageContextValue } from "@/lib/i18n/provider";
+import { clientLogger } from "@/lib/client-logger";
 
 interface ComponentErrorBoundaryProps {
   children: ReactNode;
@@ -30,7 +31,7 @@ export class ComponentErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error("ComponentErrorBoundary caught:", error, errorInfo);
+    clientLogger.error("[COMPONENT_ERROR_BOUNDARY]", { error: error instanceof Error ? error.message : String(error), componentStack: errorInfo?.componentStack });
     this.props.onError?.(error, errorInfo);
   }
 

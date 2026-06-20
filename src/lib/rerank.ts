@@ -1,6 +1,7 @@
 import "server-only";
 import { VoyageAIClient } from "voyageai";
 import type { Chunk } from "@/types";
+import { logger } from "./logger";
 
 const voyageClient = new VoyageAIClient({
   apiKey: process.env.VOYAGE_API_KEY?.trim(),
@@ -34,13 +35,14 @@ export async function rerankChunks(
 
     // Log token usage
     if (result.usage?.totalTokens) {
-      console.info(
-        `[Voyage AI] rerank: ${result.usage.totalTokens} tokens for ${chunks.length} chunks`
-      );
+      logger.debug("[Voyage AI] rerank", {
+        total_tokens: result.usage.totalTokens,
+        chunk_count: chunks.length,
+      });
     }
 
     if (!result.data) {
-      console.error("[Voyage AI] Rerank returned no data, falling back to original order");
+      logger.error("[Voyage AI] Rerank returned no data, falling back to original order");
       return chunks.slice(0, topK);
     }
 
@@ -51,7 +53,9 @@ export async function rerankChunks(
 
     return reranked;
   } catch (error) {
-    console.error("[Voyage AI] Rerank failed, falling back to original order:", error);
+    logger.error("[Voyage AI] Rerank failed, falling back to original order", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return chunks.slice(0, topK);
   }
 }

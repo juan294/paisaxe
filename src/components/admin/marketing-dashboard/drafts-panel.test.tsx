@@ -345,7 +345,12 @@ describe("DraftsPanel", () => {
     await user.click(deleteButtons[0]);
 
     await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith("Failed to delete draft:", expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to delete draft")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"Network failure"')
+      );
     });
 
     consoleSpy.mockRestore();
@@ -409,7 +414,12 @@ describe("DraftsPanel", () => {
     await user.click(copyButtons[0]);
 
     await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith("Failed to copy:", expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to copy")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"Clipboard denied"')
+      );
     });
 
     consoleSpy.mockRestore();
@@ -487,7 +497,12 @@ describe("DraftsPanel", () => {
     await user.click(postedButtons[0]);
 
     await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith("Failed to mark as posted:", expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to mark as posted")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"Network failure"')
+      );
     });
 
     // onDraftPosted should NOT have been called on error
