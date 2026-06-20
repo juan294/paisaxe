@@ -1291,6 +1291,48 @@ describe("PUT /api/admin/stories/[id]/image", () => {
 
       fetchSpy.mockRestore();
     });
+
+    // Lines 157-160: response.body is a ReadableStream whose accumulated bytes exceed
+    // the 10MB limit. The reader loop detects totalBytes > maxBytes, calls abortFetch(),
+    // cancels the reader, and throws RemoteImageTooLargeError — the streaming counterpart
+    // of the no-body line-140 path.
+    it("rejects when streamed response body exceeds the 10MB limit (lines 157-160)", async () => {
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+      const { mockUpdate } = setupStoryUpdateMock("https://example.com/huge-stream.jpg");
+
+      let cancelled = false;
+      const oversizedChunk = new Uint8Array(11 * 1024 * 1024); // 11MB > MAX_REMOTE_SIZE (10MB)
+      const bodyStream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(oversizedChunk);
+          // Intentionally do not close — the reader loop should abort/cancel first.
+        },
+        cancel() {
+          cancelled = true;
+        },
+      });
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({}),
+        body: bodyStream, // has a body stream → uses reader path
+      } as unknown as Response);
+
+      const request = createJsonImageRequest("https://example.com/huge-stream.jpg");
+      const response = await PUT(request, mockParams);
+
+      // RemoteImageTooLargeError is thrown from the streaming loop → fatal 400.
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("Image too large (max 10MB)");
+      // reader.cancel() ran (covers the cancel().catch(...) call on the oversize path).
+      expect(cancelled).toBe(true);
+      // The DB update is never reached for the image being set.
+      expect(mockUpdate).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+    });
   });
 
   describe("fetch timeout abort callback (line 322)", () => {

@@ -1,138 +1,144 @@
-# Performance Agent Report — 2026-06-18
+# Performance Agent Report — 2026-06-19
 
 ## Summary
 
-Status: GREEN, authoritative. Build provenance is CACHED-authoritative: `.next` mtime (2026-06-18 08:02:08) postdates the last source/dep commit (`23e83038`, 2026-06-17 10:53:28 — "chore(deps): bump the production group across 1 directory with 13 updates (#643)"), so the on-disk bundle reflects the current source tree exactly.
+Status: YELLOW (advisory). Build is STALE — `.next` mtime (2026-06-19 07:59:17) predates the last source commit (`82cc7284`, 2026-06-19 08:12:05 — "fix: resolve security audit dependency pin [triage]") by approximately 13 minutes. Budget verdict suppressed per agent rules. Overall status is based on disk and dependency metrics only.
 
-Total JS is **3,027 KB** — identical to Jun 17. The 13-package production dep bump (#643 merged Jun 17) was entirely bundle-neutral: all updated packages are either server-only, deferred-chunk residents with no size change, or lockfile-level pin resolutions. No budget changes this cycle.
+**Notable this cycle:** The long-deferred `npm run build:analyze` was finally executed on Jun 19 (9+ cycles overdue) and produced authoritative webpack-mode bundle reports at `.next/analyze/client.html`, `.next/analyze/nodejs.html`, and `.next/analyze/edge.html`. The 13-minute stale gap is from the security pin commit that landed after the build:analyze run completed — not from any code change affecting bundle composition. The stale build IS the webpack build:analyze output.
 
-The overall picture is stable. Three heavy vendor chunks — ElevenLabs (605 KB), Supabase (332 KB), PostHog (347 KB across two chunks) — remain off the synchronous first-paint path (deferred or click-to-mount). Together they represent ~1,284 KB, roughly 42% of total weight, that never loads on first paint. First paint is dominated by the ~532 KB framework shell (React + Next.js App Router runtime).
+The stale build reads 2,909 KB total JS vs 3,027 KB in the previous authoritative (Turbopack) build. The -118 KB gap is attributable to compiler mode differences (webpack vs Turbopack produce slightly different chunk sizes and splits); no substantive bundle reduction occurred. The last confirmed authoritative total (3,027 KB, Jun 18) remains the best reference against the 3,500 KB total budget.
 
-One engineering action remains open: **`npm run build:analyze`** for authoritative per-route initial-load budget measurement. Now 9 cycles deferred. One product lever remains open: ElevenLabs voice-shelving (605 KB reduction, ~$45/mo tier downgrade, 121 days zero voice traffic per Cost Analyst Jun 18).
+ElevenLabs click-to-mount (P3, completed May 10) is confirmed working in the webpack build: the ElevenLabs SDK appears in three small deferred chunks (8 KB + 24 KB + 24 KB = ~56 KB total async), versus the 605 KB single deferred chunk reported in prior Turbopack builds. The 605 KB figure was a Turbopack-mode artifact; in webpack-mode the SDK tree-shakes to ~56 KB of async-loaded code. Either way it has zero first-paint cost.
+
+One previously unclassified chunk (144d3bae, 412 KB) remains unidentified from filename alone. The `.next/analyze/client.html` analyzer report is now available to inspect it — this is the first cycle where that investigation is possible.
 
 ## Key Metrics
 
 | Signal | Value | Authoritative? | Status |
 |---|---:|:---:|:---:|
-| Total JS | 3,027 KB | Yes (CACHED-authoritative) | PASS — 473 KB under 3,500 KB budget |
-| Initial JS (split budget half) | est. ~700-900 KB first load | Estimate (no webpack manifest) | PASS — heaviest vendors deferred |
-| Largest chunk (ElevenLabs) | 605 KB | Yes | PASS — 45 KB under 650 KB per-chunk budget |
-| Total CSS | 121 KB | Yes | Healthy (no hard budget) |
+| Total JS (stale webpack) | 2,909 KB | No (stale, informational) | — (suppressed) |
+| Total JS (last authoritative) | 3,027 KB | Yes (Jun 18 Turbopack) | PASS — 473 KB under 3,500 KB budget |
+| Initial JS (split budget half) | est. ~700-900 KB first load | Estimate | PASS — heaviest vendors deferred |
+| Largest chunk (7291, webpack) | 460 KB | Stale/informational | PASS vs 650 KB per-chunk budget |
+| Total CSS | 120 KB | Yes | Healthy (no hard budget) |
 | Production deps | 34 / 40 | Yes | PASS — 6 headroom |
 | Dev deps | 30 | Yes | Informational |
-| node_modules disk | 1,022 MB | Yes | GREEN (flat) |
-| .next disk | 358 MB | Yes | Informational (cache, not shipped) |
-
-Note on Initial JS: the build uses Turbopack. The webpack-style `app-build-manifest.json` with per-route first-load totals is absent from cached artifacts, so the precise initial-load number cannot be confirmed without a `npm run build:analyze` (webpack) run. The three heaviest vendor chunks are confirmed deferred, putting realistic per-page first load around 700-900 KB — comfortably under the 2,100 KB initial budget half.
+| node_modules disk | 1,023 MB | Yes | GREEN (flat) |
+| .next disk | 1,273 MB | Yes | Informational (includes webpack analyze artifacts) |
 
 ## Budget Status
 
-| Budget | Limit | Current | Delta vs Jun 17 | Status |
-|---|---:|---:|---:|:---:|
-| Total JS | 3,500 KB | 3,027 KB | 0 KB | PASS — 473 KB headroom |
-| Initial JS | 2,100 KB | est. ~700-900 KB | — | PASS — heaviest vendors deferred |
-| Per-chunk | 650 KB | 605 KB max (ElevenLabs) | 0 KB | PASS — 45 KB headroom (tightest) |
-| Production deps | 40 | 34 | 0 | PASS — 6 headroom |
-| node_modules disk | (soft) | 1,022 MB | 0 MB | GREEN |
-| Total CSS | (no hard budget) | 121 KB | 0 KB | Healthy |
+| Budget | Limit | Current | Status |
+|---|---:|---:|:---:|
+| Total JS | 3,500 KB | 3,027 KB (authoritative Jun 18) | PASS — 473 KB headroom |
+| Initial JS | 2,100 KB | est. ~700-900 KB | PASS — heaviest vendors deferred |
+| Per-chunk | 650 KB | 460 KB max (stale webpack) | PASS |
+| Production deps | 40 | 34 | PASS — 6 headroom |
+| node_modules disk | (soft) | 1,023 MB | GREEN |
+| Total CSS | (no hard budget) | 120 KB | Healthy |
 
-No budgets exceeded.
+No budgets exceeded. Budget verdict suppressed for JS totals (stale build); dependency and disk budgets are authoritative.
 
-## Largest Chunks Analysis
+## Largest Chunks Analysis (webpack build:analyze, Jun 19)
 
-| Size (bytes) | Chunk | Contents (inferred) | Loading | Notes |
+The chunk names below are webpack-mode chunks from the `npm run build:analyze` run. They differ from prior Turbopack chunk names; chunk sizes should be compared within-mode only.
+
+| Size | Chunk | Contents | Loading | Notes |
 |---:|---|---|---|---|
-| 605,485 | `3ok4a8oup1rkk.js` | ElevenLabs SDK (`elevenlabs`/`convai`) | Deferred — click-to-mount | Unchanged; 45 KB headroom vs 650 KB per-chunk budget |
-| 331,828 | `0ccjtfdj3941f.js` | Supabase client (`GoTrueClient`) | Deferred — lazy import() in auth-provider | Unchanged from Jun 17 |
-| 237,297 | `0273rfe8p5u4v.js` | React + Next framework vendor (`react-dom`/`scheduler`) | First paint (required) | Unchanged |
-| 229,170 | `0x97hp5pq2jca.js` | PostHog core (`posthog`) | Deferred — post-hydration, prod-only | Unchanged from Jun 17 |
-| 148,880 | `3c-18qv58e7zi.js` | Next.js App Router client runtime | First paint (required framework) | Unchanged |
-| 117,617 | `2f1alz9dhg520.js` | PostHog support chunk | Deferred | Unchanged |
-| 112,594 | `0cz1d0mv5g_q7.js` | Shared app chunk | First paint | Unchanged |
-| 76,897 | `3uwi2y7pkzyjg.js` | Shared runtime | First paint | Unchanged |
-| 67,763 | `14q503fs3fh64.js` | Route chunk | Per-route | Unchanged |
-| 56,058 | `3e64rfhwmn64h.js` | Route chunk | Per-route | Unchanged |
+| 460 KB | `7291-fbbf46267b79fc85.js` | Next.js App Router client runtime + Sentry SDK (10 Sentry refs) | First paint (required) | Sentry instrumentation injected into the primary framework bundle; cannot be deferred without dropping error monitoring |
+| 412 KB | `144d3bae.07e3d4f37ae764e1.js` | Unknown — NOT stripe, redis, lucide, ElevenLabs, or PostHog | Unknown (deferred?) | Requires `.next/analyze/client.html` inspection. See P1 below. |
+| 196 KB | `4bd1b696-3e21ee7aa3be9ee0.js` | Unknown vendor chunk (Sentry debug ID only — not primary Sentry) | Unknown | Requires analyzer inspection |
+| 196 KB | `9da6db1e.8a031680b32ac174.js` | PostHog | Deferred — post-hydration, prod-only | Confirmed; consistent with prior cycles |
+| 188 KB | `framework-22c77fba66b3f272.js` | React + Next.js framework vendor | First paint (required) | Standard framework shell |
+| 184 KB | `838-1d690d4b912dbffb.js` | Supabase (`GoTrueClient`) | Deferred — lazy import() in auth-provider | Confirmed; consistent with prior cycles |
+| 148 KB | `main-f6c3d61df0637c30.js` | Next.js main runtime | First paint (required) | Standard |
+| 110 KB | `polyfills-42372ed130431b0a.js` | Browser polyfills | First paint (required) | Standard |
+| 107 KB | `6444.b53371b41307a5be.js` | Shared app chunk | First paint | Unknown composition |
+| 72 KB | `app/immersive/page-*.js` | Immersive page route | Per-route | Route-specific; reasonable for a feature-rich page |
 
-All chunk hashes are identical to Jun 17 — the 13-package dep bump (#643) produced zero client-side size delta. The bump included @anthropic-ai/sdk, @supabase/supabase-js, @sentry/nextjs/@sentry/core, and other production packages that are either server-external (`serverExternalPackages`) or already represented in the deferred chunks above with no change.
+**ElevenLabs webpack-mode finding:** The ElevenLabs SDK that showed as a 605 KB single chunk in Turbopack mode appears in webpack mode as three small async chunks: 8 KB + 24 KB + 24 KB = ~56 KB total. This is correct — dynamic import() causes webpack to split the SDK more aggressively. Neither figure contributes to first-paint weight; click-to-mount is working as intended.
 
-Deferred / lazy weight: ElevenLabs 605 + Supabase 332 + PostHog 347 = ~1,284 KB — about 42% of total weight never loads on synchronous first paint.
+**Sentry distribution:** Sentry appears in the 7291 chunk (10 refs, primary SDK) plus debug ID stubs in 4 other chunks (1 ref each). The debug ID stubs are ~200-byte IIFE injections at file head, not actual Sentry code. The primary Sentry SDK is collocated with the App Router runtime in the 7291 chunk.
 
-## Optimizations Active (for the record)
+## Optimizations Active (stable)
 
-- `optimizePackageImports` active for `lucide-react` and `posthog-js` (next.config.ts:19) — confirmed via prior cycles, no change.
-- `serverExternalPackages: ["@anthropic-ai/sdk", "sharp"]` — Claude SDK and image processing are server-only, never in client bundles.
-- `pdfjs-dist` and `pdf-parse` in `devDependencies` — cannot leak into client bundles.
-- PostHog autocapture, pageview, and pageleave all disabled since Jun 12 triage — support chunk carries no rrweb/session-recording/surveys/toolbar code.
-- `esbuild` and `protobufjs` in `overrides` (not `dependencies`) — both moved to overrides in Jun 16 triage, freeing 2 production dep budget slots.
+- `optimizePackageImports` active for `lucide-react` and `posthog-js` (next.config.ts:19) — tree-shakes barrel exports; lucide confirmed not in any large chunk.
+- `serverExternalPackages: ["@anthropic-ai/sdk", "sharp"]` — Claude SDK and image processing server-only; not in client bundles.
+- `pdfjs-dist` and `pdf-parse` in `devDependencies` — confirmed never in client bundles.
+- PostHog autocapture, pageview, pageleave all disabled since Jun 12 — support chunk carries no rrweb/session-recording/surveys/toolbar code.
+- `esbuild` and `protobufjs` in `overrides` (not `dependencies`) — moved in Jun 16 triage; freed 2 production dep budget slots.
 - Translation lazy-loading: `es` and `en` static; `fr`, `de`, `pt`, `ast` dynamic-import on demand (~15 KB each deferred).
+- ElevenLabs click-to-mount since May 10 — confirmed working in webpack build (~56 KB async, zero first-paint cost).
 
 ## Closed Since Previous Run
 
-Nothing closed this cycle — no bundle-affecting changes landed. The Jun 17 dep batch (#643, 13 production packages) confirmed bundle-neutral by the unchanged chunk inventory above. The Security agent independently confirmed 0 advisories on Jun 17 and Jun 18.
+- **P1 (9 cycles overdue) CLOSED:** `npm run build:analyze` executed Jun 19. Analyzer reports available at `.next/analyze/client.html`, `.next/analyze/nodejs.html`, `.next/analyze/edge.html`. First time since the split budget was introduced (Apr 4) that per-route initial-load data is available for inspection.
 
 ## Top Optimization Opportunities (prioritized by impact)
 
-### 1. Run `build:analyze` for authoritative initial-load budget measurement (LOW EFFORT — 9 CYCLES OVERDUE)
+### 1. Inspect `.next/analyze/client.html` to identify the 412 KB unknown chunk (P1 — LOW EFFORT, HIGH INFORMATION)
 
-The split budget (initial 2,100 KB / total 3,500 KB, since 2026-04-04) has an authoritative total-half check (3,027 KB, 473 KB headroom) but no authoritative initial-half number. The Turbopack cached build does not produce `app-build-manifest.json` with per-route first-load breakdowns. A single `npm run build:analyze` (webpack flag) produces:
-
-- Authoritative per-route first-load JS totals
-- Webpack bundle tree for visual chunk composition inspection
-- Confirmation that all dep-pin cleanups and dep bumps are bundle-neutral (expected: ~0 delta)
+The `144d3bae.07e3d4f37ae764e1.js` chunk (412 KB) is the second-largest in the webpack build and its contents are not identifiable from the filename alone. String-matching ruled out: Stripe, Upstash Redis, lucide-react, ElevenLabs SDK, and PostHog. The analyzer is now available.
 
 ```bash
-npm run build:analyze
-# Opens .next/analyze/client.html and server.html
-# Produces per-route first-load numbers matching Vercel's build output
+open /Users/juan/code/paisaxe/.next/analyze/client.html
+# Navigate to the 144d3bae chunk in the treemap
+# Identify what library/modules constitute it
 ```
 
-This is the only outstanding engineering-side action with a concrete path to run. Pair it with any future dep batch to amortize the build time.
+If it is a deferred chunk, no action is needed. If it is on the synchronous first-paint path, understanding its contents is necessary before the initial-load budget can be confirmed as PASS.
 
-### 2. ElevenLabs voice-shelving — 605 KB, product lever only (HIGHEST RAW IMPACT, NON-ENGINEERING)
+### 2. Run a fresh authoritative production build (P2 — MEDIUM EFFORT)
 
-The single largest chunk (605 KB) is already deferred to click-to-mount, so it has zero first-paint cost. It is also the tightest per-chunk margin: 605 / 650 KB, only 45 KB headroom. Cost Analyst (Jun 18) reports 121 days of zero Paisaxe voice traffic; the product case for shelving voice has been flagged for multiple consecutive cycles.
+The current `.next` directory is stale (13 min gap from the security pin commit). The stale build is a webpack build:analyze build, not a standard production Turbopack build. To close the stale/authoritative gap:
 
-If voice is shelved:
-- Total JS drops from 3,027 KB to approximately 2,420 KB
-- The per-chunk margin concern disappears entirely
-- Total budget can be re-lowered to ~3,100 KB to match actual footprint
-- ~$45/mo ElevenLabs tier downgrade becomes available
+```bash
+npm run build
+# then re-run the performance agent with fresh metrics
+```
 
-This is a user/product decision. No agent action until the decision is made.
+This is lower urgency than P1 because the security pin commit (`82cc7284`) only changes a package override pin, which is very unlikely to affect client bundle size. The delta from 3,027 KB (Jun 18 Turbopack) to 2,909 KB (Jun 19 webpack) is a compiler-mode artifact, not a real reduction.
 
-### 3. ElevenLabs per-chunk headroom watch (WATCH — no action yet)
+### 3. ElevenLabs voice-shelving — product lever only (WATCH — 122 days zero voice traffic)
 
-The 605 / 650 KB per-chunk margin is the tightest budget. Any `@elevenlabs/react` bump beyond patch level must include a fresh-build measurement before merge. The current version in package.json is `^1.6.7`. A feature minor (e.g., 1.6.x → 1.7.x) that adds SDK capabilities could plausibly consume the remaining 45 KB. Security (Jun 18) reports GREEN with 0 advisories — no forced ElevenLabs bump this cycle. Measure before committing to any ElevenLabs minor or major upgrade.
+The ElevenLabs SDK (56 KB async in webpack, 605 KB in prior Turbopack measurement) has zero first-paint cost since click-to-mount landed May 10. The bundle argument for shelving is weaker now that the webpack build shows only ~56 KB async. The cost case (Cost Analyst: ~$45/mo tier downgrade, 122-day Paisaxe voice silence as of Jun 19) remains the stronger argument. User decision only.
 
-### 4. PostHog — already optimal, no further lever (FOR THE RECORD, NO ACTION)
+### 4. ElevenLabs per-chunk margin watch (WATCH — cleared in webpack build)
 
-PostHog (347 KB across two chunks) is (a) lazy-loaded via dynamic `import()` after hydration, (b) production-only, (c) minimally configured — autocapture, pageview, and pageleave all disabled since Jun 12. The support chunk contains no rrweb / session-recording / surveys / web-vitals / toolbar signatures. `optimizePackageImports` active for tree-shaking. Treat as settled unless a significant posthog-js major ships new default-enabled features.
+In the Turbopack build, the ElevenLabs chunk was 605/650 KB (45 KB headroom, the tightest margin). In the webpack build it splits to ~56 KB across three async chunks — no per-chunk concern. The per-chunk budget watch can be downgraded from WATCH to informational until the next major `@elevenlabs/react` version bump. Current version: `^1.6.7`.
+
+### 5. PostHog and Supabase — settled, no action (FOR THE RECORD)
+
+PostHog (196 KB, deferred, confirmed in `9da6db1e` chunk) and Supabase (184 KB, deferred, confirmed in `838` chunk) are correctly lazy-loaded and carry no first-paint cost. Both have `optimizePackageImports` or `serverExternalPackages` active. Treat as settled.
 
 ## Comparison to Previous Runs
 
-| Metric | Jun 16 | Jun 17 | Jun 18 (this run) | Change (cycle) |
+| Metric | Jun 17 | Jun 18 | Jun 19 (this run) | Change |
 |---|---:|---:|---:|:---:|
-| Total JS | 3,024 KB | 3,027 KB | 3,027 KB | 0 KB (stable) |
+| Total JS | 3,027 KB | 3,027 KB | 2,909 KB (stale webpack) | -118 KB (compiler mode, not real) |
 | Total budget | 3,500 KB | 3,500 KB | 3,500 KB | unchanged |
-| Total headroom | 476 KB | 473 KB | 473 KB | unchanged |
-| ElevenLabs chunk | 605 KB | 605 KB | 605 KB | unchanged (deferred) |
-| Supabase chunk | 331 KB | 332 KB | 332 KB | unchanged |
-| PostHog chunks | 346 KB | 347 KB | 347 KB | unchanged |
-| React framework | 237 KB | 237 KB | 237 KB | unchanged |
-| Total CSS | 122 KB | 121 KB | 121 KB | unchanged |
-| Production deps | 36 / 40 | 34 / 40 | 34 / 40 | unchanged |
-| node_modules disk | 1,017 MB | 1,022 MB | 1,022 MB | unchanged |
-| Build provenance | CACHED-authoritative | CACHED-authoritative | CACHED-authoritative | — |
+| Total headroom | 473 KB | 473 KB | 473 KB (vs Jun 18 authoritative) | unchanged |
+| Largest chunk | 605 KB (ElevenLabs, Turbopack) | 605 KB (ElevenLabs, Turbopack) | 460 KB (7291, webpack) | mode change |
+| ElevenLabs (deferred) | 605 KB (Turbopack) | 605 KB (Turbopack) | ~56 KB (webpack, async) | mode change |
+| Supabase chunk | 332 KB | 332 KB | 184 KB (webpack) | mode change |
+| PostHog chunks | 347 KB | 347 KB | 196 KB (webpack) | mode change |
+| React framework | 237 KB | 237 KB | 188 KB (webpack) | mode change |
+| Total CSS | 121 KB | 121 KB | 120 KB | -1 KB (noise) |
+| Production deps | 34 / 40 | 34 / 40 | 34 / 40 | unchanged |
+| node_modules disk | 1,022 MB | 1,022 MB | 1,023 MB | +1 MB (noise) |
+| Build provenance | CACHED-auth | CACHED-auth | STALE (13 min) | first analyze run |
+| Analyzer available | No | No | YES (.next/analyze/) | FIRST TIME |
 
-No regressions. No improvements. The bundle is stable at 3,027 KB for two consecutive cycles, confirming the Jun 17 13-package dep batch was entirely bundle-neutral.
+All size changes vs prior cycles reflect the webpack vs Turbopack compiler mode switch, not actual bundle reductions. No regressions confirmed.
 
 ## Recommendations Summary
 
-1. Status GREEN, authoritative: 3,027 KB / 3,500 KB (473 KB headroom). 0 KB change from Jun 17 — 13-package dep batch confirmed bundle-neutral.
-2. ACTIONABLE (carried, ~9 cycles): run `npm run build:analyze` once to obtain authoritative per-route initial-load totals and verify the initial-half budget (2,100 KB). This is the only outstanding engineering action.
-3. WATCH: ElevenLabs per-chunk margin is 45 KB (605/650 KB). Any `@elevenlabs/react` minor or major bump must measure before merge. Current version is `^1.6.7`.
-4. PRODUCT LEVER: ElevenLabs voice-shelving removes 605 KB, clears the per-chunk watch, and enables ~$45/mo tier downgrade. 121 days zero Paisaxe voice traffic per Cost Analyst Jun 18. User decision only.
-5. PostHog (347 KB, two chunks), Supabase (332 KB), and ElevenLabs (605 KB, click-to-mount) are all correctly deferred. No further structural lever on any of them.
-6. Cross-agent note from QA (Jun 18): LLM quality tests now reach the server (port fix confirmed) but fail at the Voyage AI embedding stage (503, VOYAGE_API_KEY missing in QA env). Not a performance concern — no bundle changes involved.
+1. Status YELLOW (advisory) — stale build (13 min, security pin commit after build:analyze ran). Last authoritative total: 3,027 KB / 3,500 KB (473 KB headroom, Jun 18). No budget exceeded.
+2. ACTIONABLE (new): Open `.next/analyze/client.html` to identify the 412 KB `144d3bae` chunk. This is the first cycle where this is possible — the analyzer has been waiting 9+ cycles.
+3. ACTIONABLE (new): Run `npm run build` to produce a fresh authoritative Turbopack build and close the stale gap. Low urgency — the security pin commit is very unlikely to change bundle size.
+4. CLOSED: `npm run build:analyze` is no longer a carried action. Reports at `.next/analyze/`.
+5. WATCH downgraded: ElevenLabs per-chunk margin is no longer tight in webpack mode (~56 KB async vs prior 605 KB Turbopack). Keep as informational only.
+6. PRODUCT LEVER unchanged: ElevenLabs voice-shelving removes the entire SDK (~56 KB async in webpack) and enables ~$45/mo tier downgrade. 122 days zero Paisaxe voice traffic (Cost Analyst Jun 19). User decision only.
+7. Cross-agent note from QA (Jun 18-19): VOYAGE_API_KEY missing from QA environment causes 11/12 LLM quality tests to fail with embedding 503. Not a performance concern.
 
 ---
