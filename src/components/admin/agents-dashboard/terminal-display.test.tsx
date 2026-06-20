@@ -200,6 +200,43 @@ describe("AgentTerminal", () => {
       expect(screen.getByText("1:05")).toBeInTheDocument();
     });
 
+    it("pauses the elapsed-time tick while the tab is hidden (PE-L1 #537)", () => {
+      const visibilitySpy = vi.spyOn(document, "hidden", "get");
+      visibilitySpy.mockReturnValue(false);
+
+      render(
+        <AgentTerminal
+          {...defaultProps}
+          finished={false}
+          startedAt="2026-02-16T12:00:00Z"
+        />
+      );
+
+      expect(screen.getByText("1:00")).toBeInTheDocument();
+
+      // Tab becomes hidden — ticks must stop.
+      act(() => {
+        visibilitySpy.mockReturnValue(true);
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      // Advance wall-clock 20s while hidden; elapsed must NOT update.
+      act(() => {
+        vi.advanceTimersByTime(20000);
+      });
+      expect(screen.getByText("1:00")).toBeInTheDocument();
+
+      // Tab becomes visible again — tick resumes and catches up immediately
+      // to the real elapsed time (1:00 + 20s = 1:20).
+      act(() => {
+        visibilitySpy.mockReturnValue(false);
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(screen.getByText("1:20")).toBeInTheDocument();
+
+      visibilitySpy.mockRestore();
+    });
+
     it("stops updating elapsed time when finished", () => {
       const { rerender } = render(
         <AgentTerminal

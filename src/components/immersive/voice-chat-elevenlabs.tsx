@@ -24,6 +24,9 @@ interface VoiceChatElevenLabsProps {
   userAccessToken?: string | null;
 }
 
+// Stable identifiers for the 5 fixed sound-visualizer bars (#479: avoid index-as-key).
+const SOUND_BARS = ["bar-far-left", "bar-left", "bar-center", "bar-right", "bar-far-right"] as const;
+
 // Animated orb component for voice visualization
 function VoiceOrb({
   isActive,
@@ -82,9 +85,9 @@ function VoiceOrb({
       >
         {/* Animated sound bars */}
         <div className="flex items-center justify-center gap-[3px]">
-          {[0, 1, 2, 3, 4].map((i) => (
+          {SOUND_BARS.map((barId, i) => (
             <div
-              key={i}
+              key={barId}
               className={cn(
                 "w-[3px] rounded-full bg-current transition-all",
                 isConnecting && "animate-pulse",

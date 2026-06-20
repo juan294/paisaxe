@@ -138,7 +138,7 @@ export const StoryProgressBar = memo(function StoryProgressBar({
           const targetIndex = base + i;
           const isCurrent = i === fillPosition;
           return (
-            <li key={i} className="flex flex-1">
+            <li key={targetIndex} data-story-index={targetIndex} className="flex flex-1">
               <button
                 type="button"
                 ref={(el) => { segmentRefs.current[i] = el; }}
