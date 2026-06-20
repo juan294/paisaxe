@@ -253,6 +253,7 @@ test.describe("Navigation behavior", () => {
     const title = page.getByTestId("story-title").first();
     const initialTitle = await title.textContent();
 
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("ArrowRight");
 
     // Title should change after transition
@@ -270,6 +271,7 @@ test.describe("Navigation behavior", () => {
     // First go to second story
     const title = page.getByTestId("story-title").first();
     const initialTitle = await title.textContent();
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("ArrowRight");
     await expect(title).not.toHaveText(initialTitle!, {
       timeout: 3000,
@@ -278,6 +280,7 @@ test.describe("Navigation behavior", () => {
     const secondTitle = await title.textContent();
 
     // Now go back
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("ArrowLeft");
 
     // Title should change back
@@ -298,10 +301,12 @@ test.describe("Navigation behavior", () => {
     await expect(infoPanel).toHaveClass(/opacity-100/);
 
     // Press i to hide
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("i");
     await expect(infoPanel).toHaveClass(/opacity-0/, { timeout: 5000 });
 
     // Press i again to show
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("i");
     await expect(infoPanel).toHaveClass(/opacity-100/, { timeout: 5000 });
   });

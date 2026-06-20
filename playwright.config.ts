@@ -5,6 +5,15 @@ const useDevServer = process.env.PLAYWRIGHT_USE_DEV_SERVER === "true";
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === "true";
 const e2ePort = process.env.PLAYWRIGHT_PORT ?? "3100";
 const baseURL = `http://localhost:${e2ePort}`;
+const chromeChannel = process.env.PLAYWRIGHT_CHROME_CHANNEL;
+const desktopChrome = {
+  ...devices["Desktop Chrome"],
+  ...(chromeChannel ? { channel: chromeChannel } : {}),
+};
+const mobileChrome = {
+  ...devices["Pixel 7"],
+  ...(chromeChannel ? { channel: chromeChannel } : {}),
+};
 
 function getWebServerCommand() {
   if (isCI) return `npm run start -- --port ${e2ePort}`;
@@ -45,7 +54,7 @@ export default defineConfig({
   projects: [
     {
       name: "desktop",
-      use: { ...devices["Desktop Chrome"] },
+      use: desktopChrome,
       testIgnore: [
         "**/qa-journey.spec.ts",
         "**/visual-regression.spec.ts",
@@ -54,7 +63,7 @@ export default defineConfig({
     },
     {
       name: "mobile",
-      use: { ...devices["Pixel 7"] },
+      use: mobileChrome,
       testIgnore: [
         "**/qa-journey.spec.ts",
         "**/visual-regression.spec.ts",
@@ -63,24 +72,24 @@ export default defineConfig({
     },
     {
       name: "qa-journey",
-      use: { ...devices["Desktop Chrome"] },
+      use: desktopChrome,
       testMatch: "qa-journey.spec.ts",
       timeout: 30_000,
     },
     {
       name: "stripe-integration",
-      use: { ...devices["Desktop Chrome"], locale: "en-US" },
+      use: { ...desktopChrome, locale: "en-US" },
       testMatch: "stripe-real-checkout.spec.ts",
       timeout: 120_000,
     },
     {
       name: "visual-desktop",
-      use: { ...devices["Desktop Chrome"], locale: "en-US" },
+      use: { ...desktopChrome, locale: "en-US" },
       testMatch: "visual-regression.spec.ts",
     },
     {
       name: "visual-mobile",
-      use: { ...devices["Pixel 7"], locale: "en-US" },
+      use: { ...mobileChrome, locale: "en-US" },
       testMatch: "visual-regression.spec.ts",
     },
   ],

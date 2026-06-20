@@ -59,6 +59,7 @@ test.describe("Immersive story viewer", () => {
     await expect(title).toBeVisible({ timeout: 15000 });
     const firstTitle = await title.textContent();
 
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("ArrowRight");
 
     // Wait for title to change after transition
@@ -84,6 +85,7 @@ test.describe("Immersive story viewer", () => {
     await expect(infoPanel).toHaveClass(/opacity-100/);
 
     // Press 'i' to hide info overlay
+    await page.evaluate(() => window.focus());
     await page.keyboard.press("i");
 
     // Class changes instantly on React state update (before CSS transition)
