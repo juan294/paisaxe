@@ -159,7 +159,7 @@ describe("/api/admin/marketing/agent-logs", () => {
 
     it("should convert database rows to log objects", async () => {
       // Override the mock to return actual data
-      vi.doMock("@/lib/supabase", () => ({
+      vi.doMock("@/lib/supabase-admin", () => ({
         createAdminClient: () => ({
           from: () => ({
             select: () => ({
@@ -207,7 +207,7 @@ describe("/api/admin/marketing/agent-logs", () => {
         validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
       }));
 
-      vi.doMock("@/lib/supabase", () => ({
+      vi.doMock("@/lib/supabase-admin", () => ({
         createAdminClient: () => ({
           from: () => ({
             select: () => ({
@@ -241,7 +241,7 @@ describe("/api/admin/marketing/agent-logs", () => {
         validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
       }));
 
-      vi.doMock("@/lib/supabase", () => ({
+      vi.doMock("@/lib/supabase-admin", () => ({
         createAdminClient: () => {
           throw new Error("Connection refused");
         },
@@ -259,7 +259,7 @@ describe("/api/admin/marketing/agent-logs", () => {
   });
 
   it("should use logger.error (not console.error) on unhandled GET error", async () => {
-    vi.doMock("@/lib/supabase", () => ({
+    vi.doMock("@/lib/supabase-admin", () => ({
       createAdminClient: () => {
         throw new Error("Connection refused");
       },

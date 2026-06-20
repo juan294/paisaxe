@@ -21,6 +21,13 @@ vi.mock("@/lib/i18n/detect-language", () => ({
   mapLanguageTag: (tag: string) => tag.startsWith("es") ? "es" : tag.startsWith("en") ? "en" : null,
 }));
 
+// RootLayout is an async server component that awaits headers() (FE-M4 server-side
+// locale resolution). Mock next/headers so server-side locale resolution falls back
+// to 'es' (no cookie / no Accept-Language), matching the default-locale expectations.
+vi.mock("next/headers", () => ({
+  headers: () => Promise.resolve({ get: () => null }),
+}));
+
 const SITE_URL = "https://paisaxe.es";
 
 describe("RootLayout", () => {
@@ -124,8 +131,8 @@ describe("RootLayout", () => {
   });
 
   describe("content target", () => {
-    it("renders a non-landmark #main-content target so route pages own the main landmark", () => {
-      const Component = RootLayout({ children: <div data-testid="child">Child</div> });
+    it("renders a non-landmark #main-content target so route pages own the main landmark", async () => {
+      const Component = await RootLayout({ children: <div data-testid="child">Child</div> });
       const { container } = render(Component);
       const mainTarget = container.querySelector("#main-content");
       expect(mainTarget).not.toBeNull();
@@ -133,8 +140,8 @@ describe("RootLayout", () => {
       expect(container.querySelector("main#main-content")).toBeNull();
     });
 
-    it("places children inside the #main-content target", () => {
-      const Component = RootLayout({ children: <div data-testid="inner">Inner</div> });
+    it("places children inside the #main-content target", async () => {
+      const Component = await RootLayout({ children: <div data-testid="inner">Inner</div> });
       const { container } = render(Component);
       const mainTarget = container.querySelector("#main-content");
       expect(mainTarget).not.toBeNull();
@@ -163,24 +170,24 @@ describe("RootLayout", () => {
   });
 
   describe("rendering", () => {
-    it("should render children", () => {
-      const Component = RootLayout({ children: <div data-testid="child">Test Child</div> });
+    it("should render children", async () => {
+      const Component = await RootLayout({ children: <div data-testid="child">Test Child</div> });
       render(Component);
 
       expect(screen.getByTestId("child")).toBeInTheDocument();
       expect(screen.getByText("Test Child")).toBeInTheDocument();
     });
 
-    it("should set html lang to es", () => {
-      const Component = RootLayout({ children: <div>Content</div> });
+    it("should set html lang to es", async () => {
+      const Component = await RootLayout({ children: <div>Content</div> });
       render(Component);
 
       const html = document.documentElement;
       expect(html.getAttribute("lang")).toBe("es");
     });
 
-    it("should apply font classes to body", () => {
-      const Component = RootLayout({ children: <div>Content</div> });
+    it("should apply font classes to body", async () => {
+      const Component = await RootLayout({ children: <div>Content</div> });
       render(Component);
 
       const body = document.body;
@@ -188,8 +195,8 @@ describe("RootLayout", () => {
       expect(body.className).toContain("antialiased");
     });
 
-    it("should render JsonLd WebSite component", () => {
-      const Component = RootLayout({ children: <div>Content</div> });
+    it("should render JsonLd WebSite component", async () => {
+      const Component = await RootLayout({ children: <div>Content</div> });
       const { container } = render(Component);
       const script = container.querySelector(
         'script[type="application/ld+json"]'
