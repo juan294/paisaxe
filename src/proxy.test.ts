@@ -1626,6 +1626,109 @@ describe("emitAuthRefreshTimeoutEvent (auth-refresh.ts:55)", () => {
   }, 10_000);
 });
 
+describe("PE-M2: API fast-path — CSP header decoration skip", () => {
+  beforeEach(() => {
+    process.env.MAINTENANCE_MODE = "false";
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.MAINTENANCE_MODE;
+  });
+
+  it("does NOT set Content-Security-Policy on GET /api/feature-flags responses", async () => {
+    const request = new NextRequest("http://localhost:3006/api/feature-flags");
+    const response = await proxy(request);
+
+    // API responses have no use for CSP — it's a browser page protection header
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+  });
+
+  it("does NOT set Content-Security-Policy on GET /api/chat/stream responses", async () => {
+    const request = new NextRequest("http://localhost:3006/api/chat/stream");
+    const response = await proxy(request);
+
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+  });
+
+  it("does NOT set Content-Security-Policy on GET /api/health responses", async () => {
+    const request = new NextRequest("http://localhost:3006/api/health");
+    const response = await proxy(request);
+
+    expect(response.headers.get("Content-Security-Policy")).toBeNull();
+  });
+
+  it("still sets Content-Security-Policy on page (non-API) responses", async () => {
+    const request = new NextRequest("http://localhost:3006/immersive");
+    const response = await proxy(request);
+
+    expect(response.headers.get("Content-Security-Policy")).toBeTruthy();
+  });
+
+  it("does NOT set __csrf cookie on API responses (fast-path confirms no cookie decoration)", async () => {
+    const request = new NextRequest("http://localhost:3006/api/feature-flags");
+    const response = await proxy(request);
+
+    // setCsrfCookie already guards against API paths but confirm it via proxy
+    expect(response.cookies.get("__csrf")).toBeUndefined();
+  });
+
+  it("still enforces CSRF validation on mutating POST /api/ requests (fast-path does NOT skip validation)", async () => {
+    // A POST to a non-exempt API route WITHOUT a CSRF token must still return 403
+    const request = new NextRequest("http://localhost:3006/api/admin/stories", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        origin: "https://paisaxe.es",
+      },
+      body: JSON.stringify({ title: "test" }),
+    });
+    const response = await proxy(request);
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toContain("CSRF");
+  });
+
+  it("still enforces CSRF validation on mutating DELETE /api/ requests (fast-path does NOT skip validation)", async () => {
+    const request = new NextRequest("http://localhost:3006/api/favorites?storyId=xyz", {
+      method: "DELETE",
+    });
+    const response = await proxy(request);
+
+    expect(response.status).toBe(403);
+  });
+
+  it("still runs auth session refresh for API routes with auth cookies", async () => {
+    // Auth refresh is NOT skipped on API paths — only CSP/CSRF-cookie decoration is
+    const FAKE_JWT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test-project.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = FAKE_JWT_KEY;
+
+    const request = new NextRequest("http://localhost:3006/api/feature-flags", {
+      headers: { cookie: "sb-test-project-auth-token=some-jwt-value" },
+    });
+    const response = await proxy(request);
+
+    // Response still passes through (not 403)
+    expect(response.status).not.toBe(403);
+    expect(response.headers.get("x-middleware-next")).toBeTruthy();
+
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  });
+
+  it("still adds CORS headers on API responses when origin matches", async () => {
+    const request = new NextRequest("http://localhost:3006/api/chat/stream", {
+      headers: { origin: "https://paisaxe.es" },
+    });
+    const response = await proxy(request);
+
+    // CORS decoration is NOT skipped — only CSP + CSRF cookie set
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://paisaxe.es");
+  });
+});
+
 describe("development mode ALLOWED_ORIGINS initialization (proxy.ts:29)", () => {
   // Line 29: `ALLOWED_ORIGINS.push("http://localhost:3006")` runs at module load time
   // when NODE_ENV === "development". We must vi.resetModules() + dynamic import so the

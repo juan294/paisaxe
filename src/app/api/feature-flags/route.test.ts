@@ -90,7 +90,10 @@ describe("GET /api/feature-flags", () => {
     expect(data.data[1].enabled).toBe(false);
     expect(data.data[1].config).toEqual({ maxResults: 5 });
     expect(mockFrom).toHaveBeenCalledWith("feature_flags");
-    expect(mockSelect).toHaveBeenCalledWith("*");
+    // PE-L2: narrow select — only the columns actually used after scrubSensitiveConfig
+    expect(mockSelect).toHaveBeenCalledWith(
+      "id, flag_key, enabled, label, description, config, environment, created_at, updated_at"
+    );
     expect(mockEq).toHaveBeenCalledWith("environment", "development");
     expect(mockOrder).toHaveBeenCalledWith("flag_key", { ascending: true });
   });
@@ -225,6 +228,50 @@ describe("GET /api/feature-flags", () => {
       expect(response.headers.get("Cache-Control")).toBe(
         "public, max-age=60, stale-while-revalidate=120"
       );
+    });
+  });
+
+  // ─── PE-L2: narrow select ────────────────────────────────────────────────────
+  describe("PE-L2: narrow select — only fetch columns actually returned", () => {
+    it("passes the explicit column list to .select() instead of wildcard '*'", async () => {
+      const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null });
+      const mockEq = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+      vi.mocked(supabase.from).mockImplementation(mockFrom);
+
+      await GET();
+
+      // Must NOT use the wildcard — every column that reaches scrubSensitiveConfig
+      // and rowToFeatureFlag must be listed explicitly here.
+      expect(mockSelect).not.toHaveBeenCalledWith("*");
+      expect(mockSelect).toHaveBeenCalledWith(
+        "id, flag_key, enabled, label, description, config, environment, created_at, updated_at"
+      );
+    });
+
+    it("still returns all FeatureFlag fields after narrow select", async () => {
+      const mockOrder = vi.fn().mockResolvedValue({ data: mockFlagRows, error: null });
+      const mockEq = vi.fn().mockReturnValue({ order: mockOrder });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
+      vi.mocked(supabase.from).mockImplementation(mockFrom);
+
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      const flag = data.data[0];
+      // All FeatureFlag fields must be present
+      expect(flag).toHaveProperty("id");
+      expect(flag).toHaveProperty("flagKey");
+      expect(flag).toHaveProperty("enabled");
+      expect(flag).toHaveProperty("label");
+      expect(flag).toHaveProperty("description");
+      expect(flag).toHaveProperty("config");
+      expect(flag).toHaveProperty("environment");
+      expect(flag).toHaveProperty("createdAt");
+      expect(flag).toHaveProperty("updatedAt");
     });
   });
 });
