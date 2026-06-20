@@ -142,6 +142,29 @@ Check critical flags at https://paisaxe.es/api/feature-flags:
 
 Real User Monitoring (RUM) for Core Web Vitals in production. View data in the Vercel Dashboard under Speed Insights.
 
+## Stories Cache Hit-Rate
+
+`getStoriesServer()` (`src/lib/stories-server.ts`) fetches approved stories via the Supabase REST API wrapped in Next.js's `revalidate: 60` data cache. Because we run in a single Vercel region (`fra1`), the effective cache hit-rate is the main lever for keeping Supabase read load and latency low.
+
+**Telemetry:** every time the function bypasses the data cache and performs a real Supabase fetch, it emits a structured `info` event:
+
+```
+[STORIES_CACHE_MISS]  { table: "stories", count: 1 }
+```
+
+A request served from the `revalidate` cache does **not** run the fetch, so it emits **no** event. The miss-rate is therefore `count([STORIES_CACHE_MISS]) / total story-page renders`, and the hit-rate is `1 − miss-rate`.
+
+**Log-drain query** (Vercel log drain / aggregator):
+
+```
+msg:[STORIES_CACHE_MISS]
+```
+
+**How to read it:**
+- A miss every ~60 s under steady traffic is expected — that is the revalidate window expiring.
+- A burst of misses with no corresponding traffic spike suggests the data cache is being skipped (e.g. `cache: "no-store"` leaking into production, or the revalidate window being bypassed). Investigate the fetch options in `stories-server.ts`.
+- Misses paired with `[STORIES_FALLBACK]` or `[TABLE_FALLBACK]` events mean Supabase reads are failing — follow the alerting-runbook "Health Endpoint Degraded" procedure.
+
 ## Function Region Verification
 
 Verified on **2026-04-23**:
@@ -163,11 +186,14 @@ Automated maintenance jobs run on Supabase via pg_cron:
 | `cleanup-cron-history` | Sundays 5:00 AM UTC | 011 | Delete cron history older than 30 days |
 | `keep-alive` | Every 3 days 12:00 PM UTC | 012 | Database activity safeguard |
 | `edge-keep-alive` | Every 3 days 12:00 PM UTC | 014 | Call keep-alive Edge Function via pg_net |
-| `content-discovery` | Weekly Monday 3:00 AM UTC | Vercel Cron | Discovers new Asturias places via Google Places API |
-| `fail-stale-translations` | Daily 6:00 AM UTC | Vercel Cron | Mark stories stuck in `translating` state as failed |
-| `github-traffic-sync` | Daily 1:00 AM UTC | Vercel Cron | Sync GitHub traffic stats to admin dashboard |
-| `subscription-optimizer` | Weekly Monday 4:00 AM UTC | Vercel Cron | Analyze service costs and spending |
-| `retry-booking-sms` | Every 10 minutes | Vercel Cron | Retry failed booking SMS confirmations (up to 3 attempts per job) |
+| `content-discovery` | Weekly Monday 3:00 AM UTC (`0 3 * * 1`) | Vercel Cron | Discovers new Asturias places via Google Places API |
+| `fail-stale-translations` | Every 15 minutes (`*/15 * * * *`) | Vercel Cron | Mark stories stuck in `translating` state as failed |
+| `fail-stale-bookings` | Every 5 minutes (`*/5 * * * *`) | Vercel Cron | Mark bookings stuck in a pending/in-progress state as failed |
+| `github-traffic-sync` | Every 6 hours (`0 */6 * * *`) | Vercel Cron | Sync GitHub traffic stats to admin dashboard |
+| `subscription-optimizer` | Weekly Monday 4:00 AM UTC (`0 4 * * 1`) | Vercel Cron | Analyze service costs and spending |
+| `retry-booking-sms` | Every 10 minutes (`*/10 * * * *`) | Vercel Cron | Retry failed booking SMS confirmations (up to 3 attempts per job) |
+
+The Vercel Cron schedules above mirror `vercel.json` exactly — keep both in sync when adding or rescheduling a job.
 
 Verify jobs: `SELECT jobname, schedule, command FROM cron.job ORDER BY jobname;`
 
@@ -320,7 +346,7 @@ On PRs targeting `main`, waits for the Vercel preview deployment and runs `scrip
 | **License Check** (`license-check.yml`) | PRs only | Blocks copyleft/GPL dependencies |
 | **Lighthouse CI** (`lighthouse.yml`) | PRs only | Performance & accessibility auditing |
 | **Bundle Size** (`bundle-size.yml`) | PRs only | Reports JS bundle sizes as PR comment |
-| **Knip** (`knip.yml`) | PRs only | Dead code & unused dependency detection |
+| **Knip** (`knip.yml`) | PRs only | Dead code & unused dependency detection. Scans `src/**` and `scripts/**` (the `scripts/` tree is declared as `entry` because those files are CLI executables invoked externally via `npx tsx`, launchd `.sh` agents, and docs — not imported by the app, so they must be treated as roots). `supabase/functions/**` is intentionally **out of scope**: they are Deno Edge Functions using Deno-global APIs and `https://` URL imports that knip's Node resolver cannot parse (including them yields false "unresolved import" errors); they are covered by their own Deno tooling instead. |
 | **Claude Review** (`claude-review.yml`) | PRs + `@claude` in PR comments | AI-powered code review |
 
 ### Dependency Management

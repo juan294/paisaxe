@@ -220,6 +220,31 @@ describe("/api/mcp/weather", () => {
       expect(data.city).toBe("Avilés");
     });
 
+    it("sets the same Cache-Control header as GET (#614)", async () => {
+      const mockWeatherResponse = {
+        name: "Oviedo",
+        main: { temp: 14, feels_like: 13, humidity: 80 },
+        weather: [{ description: "light rain", icon: "10d" }],
+        wind: { speed: 3.2 },
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockWeatherResponse),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/weather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ city: "Oviedo" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("public, max-age=300");
+    });
+
     it("should return 400 for invalid MCP request", async () => {
       const request = new Request("http://localhost:3000/api/mcp/weather", {
         method: "POST",

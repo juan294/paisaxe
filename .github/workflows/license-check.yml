@@ -26,5 +26,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check licenses
+      # Production deps: strong copyleft is a hard failure (these ship to clients).
+      - name: Check production licenses (blocking)
         run: npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-1.0;AGPL-3.0;EUPL-1.1;EUPL-1.2;SSPL-1.0;BSL-1.1;CPAL-1.0;OSL-3.0;CPOL-1.02"
+
+      # Dev/build deps: scan the full tree and report strong-copyleft findings.
+      # Build-time-only tooling (e.g. lightningcss MPL-2.0) never ships to clients,
+      # so this step is non-blocking — it surfaces dev-dep licenses for review.
+      # See docs/project/license-exceptions.md → "Dev-dependency scanning". (#623)
+      - name: Report dev-dependency licenses (non-blocking)
+        continue-on-error: true
+        run: |
+          echo "::group::Dev + production license summary"
+          npx license-checker --summary
+          echo "::endgroup::"
+          echo "Scanning full dependency tree (incl. devDependencies) for strong copyleft..."
+          npx license-checker --failOn "GPL-2.0;GPL-3.0;AGPL-1.0;AGPL-3.0;SSPL-1.0;BSL-1.1;CPAL-1.0;OSL-3.0;CPOL-1.02" \
+            || echo "::warning::Strong-copyleft license found in dev/build dependencies — review docs/project/license-exceptions.md"

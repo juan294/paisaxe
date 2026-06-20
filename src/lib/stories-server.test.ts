@@ -320,6 +320,45 @@ describe("getStoriesServer", () => {
     expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it("logs [STORIES_CACHE_MISS] when it performs a real Supabase fetch (#541)", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    });
+
+    const loggerModule = await import("@/lib/logger");
+    const infoSpy = vi.spyOn(loggerModule.logger, "info");
+
+    const { getStoriesServer } = await import("./stories-server");
+    await getStoriesServer();
+
+    expect(infoSpy).toHaveBeenCalledWith(
+      "[STORIES_CACHE_MISS]",
+      expect.objectContaining({ table: "stories", count: 1 })
+    );
+  });
+
+  it("does NOT log a cache MISS when Supabase credentials are absent (#541)", async () => {
+    process.env = {
+      ...originalEnv,
+      NEXT_PUBLIC_SUPABASE_URL: undefined,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
+    };
+
+    const loggerModule = await import("@/lib/logger");
+    const infoSpy = vi.spyOn(loggerModule.logger, "info");
+    infoSpy.mockClear();
+
+    const { getStoriesServer } = await import("./stories-server");
+    await getStoriesServer();
+
+    expect(infoSpy).not.toHaveBeenCalledWith(
+      "[STORIES_CACHE_MISS]",
+      expect.anything()
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it("logs [TABLE_FALLBACK] with logger.error on fetch error (#249)", async () => {
     mockFetch.mockRejectedValue(new Error("Network error"));
 
