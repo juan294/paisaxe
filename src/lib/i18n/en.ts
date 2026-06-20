@@ -41,6 +41,11 @@ export const en: Translations = {
     copied: 'Copied',
     copy_error: 'Could not copy',
     assistant_label: 'Paisaxe',
+    connection_lost: 'Connection lost. Retry',
+    error_timeout: 'The response took too long. Please try again.',
+    error_auth: 'Your session has expired. Reload the page to continue.',
+    error_server: 'A server error occurred. Please try again later.',
+    new_chat_prompt: 'You have reached the message limit. Start a new chat to continue.',
   },
 
   stories: {

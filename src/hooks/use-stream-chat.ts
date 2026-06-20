@@ -15,6 +15,16 @@ import {
 import { csrfHeaders } from "@/lib/csrf-client";
 import { parseSseEvent } from "@/types/sse";
 import { readSseStream } from "./use-sse-stream";
+import { MAX_CONVERSATION_TURNS } from "@/lib/chat-safety";
+
+// Sentinel: thrown when the error state has already been set so the outer
+// catch handler knows to skip the generic setError call.
+class HandledError extends Error {
+  constructor() {
+    super("already handled");
+    this.name = "HandledError";
+  }
+}
 
 export interface StreamChatMessage {
   id: string;
@@ -70,6 +80,20 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
     async (message: string, options: SendMessageOptions) => {
       if (!message.trim() || isStreaming) return;
 
+      // FE-M3: enforce 20-turn (40 message) cap client-side
+      // Each turn = 1 user + 1 assistant message, so 20 turns = 40 messages.
+      if (messages.length >= MAX_CONVERSATION_TURNS * 2) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant" as const,
+            content: t("chat.new_chat_prompt"),
+          },
+        ]);
+        return;
+      }
+
       const userMessage = message.trim();
       setError(null);
 
@@ -106,8 +130,15 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         });
 
         if (!response.ok) {
-          setError(t("chat.error"));
-          throw new Error("Failed");
+          // FE-H2: differentiate error types so the user gets actionable guidance
+          if (response.status === 401) {
+            setError(t("chat.error_auth"));
+          } else if (response.status >= 500) {
+            setError(t("chat.error_server"));
+          } else {
+            setError(t("chat.error"));
+          }
+          throw new HandledError();
         }
 
         // Check if we got a non-streaming JSON response (e.g., for flagged content)
@@ -170,6 +201,10 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
               return updated;
             });
           } else if (event.type === "error") {
+            // FE-H2: differentiate server-side error messages
+            const isTimeout =
+              event.message === "response_timeout" ||
+              event.message === "search_unavailable";
             setMessages((prev) => {
               const updated = [...prev];
               const current = updated[assistantIndex];
@@ -177,7 +212,9 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
               updated[assistantIndex] = {
                 ...current,
                 role: "assistant",
-                content: t("chat.error_generic"),
+                content: isTimeout
+                  ? t("chat.error_timeout")
+                  : t("chat.error_generic"),
                 images: current?.images,
               };
               return updated;
@@ -192,8 +229,11 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
             // managed incrementally inside processEvent callbacks.
           },
           onError: (err) => {
-            // Ignore AbortError (user navigated away or timeout fired)
+            // FE-H2: AbortError from connection loss surfaces to the user
             if (err.name === "AbortError") {
+              if (controller.signal.aborted) {
+                setError(t("chat.connection_lost"));
+              }
               return;
             }
             setError(t("chat.error"));
@@ -217,8 +257,48 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
           },
         });
       } catch (err) {
-        // Ignore AbortError (user navigated away or timeout fired)
+        // Error already handled (error state already set) — skip the generic handler
+        if (err instanceof HandledError) {
+          setMessages((prev) => {
+            const updated = [...prev];
+            if (updated[assistantIndex]) {
+              updated[assistantIndex] = {
+                ...updated[assistantIndex],
+                role: "assistant",
+                content: t("chat.error_generic"),
+              };
+            }
+            return updated;
+          });
+          return;
+        }
+        // FE-H2: AbortError from the 60s timeout should surface to the user;
+        // AbortError from unmount/navigation should be silent.
         if (err instanceof Error && err.name === "AbortError") {
+          // If the controller was aborted because the timeout fired, tell the user.
+          // We distinguish by checking whether the 60s timer was the cause:
+          // the timeout fires controller.abort() BEFORE rejecting fetch, so
+          // controller.signal.aborted is true and the timeout has already fired.
+          if (controller.signal.aborted) {
+            setError(t("chat.connection_lost"));
+            setMessages((prev) => {
+              const updated = [...prev];
+              if (updated[assistantIndex]) {
+                updated[assistantIndex] = {
+                  ...updated[assistantIndex],
+                  role: "assistant",
+                  content: t("chat.error_timeout"),
+                };
+              } else {
+                updated.push({
+                  id: crypto.randomUUID(),
+                  role: "assistant",
+                  content: t("chat.error_timeout"),
+                });
+              }
+              return updated;
+            });
+          }
           return;
         }
         setError(t("chat.error"));
@@ -244,7 +324,7 @@ export function useStreamChat({ canUseVoice }: UseStreamChatOptions) {
         setIsStreaming(false);
       }
     },
-    [isStreaming, canUseVoice, t]
+    [isStreaming, canUseVoice, t, messages]
   );
 
   return {

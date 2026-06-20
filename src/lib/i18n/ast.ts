@@ -41,6 +41,11 @@ export const ast: Translations = {
     copied: 'Copiao',
     copy_error: 'Nun se pudo copiar',
     assistant_label: 'Paisaxe',
+    connection_lost: 'Perdiose la conexón. Tornar a intentar',
+    error_timeout: 'La rempuesta tardó demasiáu. Por favor, intenta otra vuelta.',
+    error_auth: 'La to sesión caducó. Recarga la páxina pa continuar.',
+    error_server: 'Hebo un error nel servidor. Intenta otra vuelta más tarde.',
+    new_chat_prompt: 'Algamasti\'l llímite de mensaxes. Empeceta un chatu nuevu pa continuar.',
   },
 
   stories: {

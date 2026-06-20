@@ -41,6 +41,11 @@ export const de: Translations = {
     copied: 'Kopiert',
     copy_error: 'Kopieren fehlgeschlagen',
     assistant_label: 'Paisaxe',
+    connection_lost: 'Verbindung unterbrochen. Erneut versuchen',
+    error_timeout: 'Die Antwort hat zu lange gedauert. Bitte versuchen Sie es erneut.',
+    error_auth: 'Ihre Sitzung ist abgelaufen. Laden Sie die Seite neu, um fortzufahren.',
+    error_server: 'Ein Serverfehler ist aufgetreten. Bitte versuchen Sie es später erneut.',
+    new_chat_prompt: 'Sie haben das Nachrichtenlimit erreicht. Starten Sie einen neuen Chat, um fortzufahren.',
   },
 
   stories: {

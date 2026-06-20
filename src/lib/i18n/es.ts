@@ -41,6 +41,11 @@ export const es: Translations = {
     copied: 'Copiado',
     copy_error: 'No se pudo copiar',
     assistant_label: 'Paisaxe',
+    connection_lost: 'Se perdió la conexión. Reintentar',
+    error_timeout: 'La respuesta tardó demasiado. Por favor, inténtalo de nuevo.',
+    error_auth: 'Tu sesión ha expirado. Recarga la página para continuar.',
+    error_server: 'Ocurrió un error en el servidor. Inténtalo de nuevo más tarde.',
+    new_chat_prompt: 'Has alcanzado el límite de mensajes. Empieza un nuevo chat para continuar.',
   },
 
   stories: {

@@ -119,6 +119,8 @@ export function VoiceChatElevenLabs({
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // FE-H1: retain mic stream so unmount cleanup can stop tracks
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const { t, locale } = useTranslation();
   const localizedStory = getLocalizedStory(story, locale);
   const prefersReducedMotion = useReducedMotion();
@@ -170,6 +172,24 @@ export function VoiceChatElevenLabs({
     []
   );
 
+  // FE-H1: cleanup on unmount — end WebSocket session and stop mic tracks so
+  // closing the dialog does not leave a live connection and mic indicator running.
+  useEffect(() => {
+    return () => {
+      // End the ElevenLabs WebSocket session if still active.
+      void Promise.resolve(conversation.endSession()).catch(() => {
+        // Ignore errors during cleanup — component is already unmounting
+      });
+      // Stop any captured mic tracks so the browser mic indicator clears.
+      // Guard getTracks in case the MediaStream mock is incomplete.
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks?.().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Auto-scroll to bottom — respects prefers-reduced-motion
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({
@@ -189,7 +209,9 @@ export function VoiceChatElevenLabs({
 
       // Request mic permission on click — not on mount (UX-H1)
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // FE-H1: store the stream so unmount cleanup can stop the mic tracks
+        mediaStreamRef.current = stream;
         setHasPermission(true);
       } catch {
         setHasPermission(false);

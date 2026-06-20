@@ -11,6 +11,12 @@ vi.mock("@/lib/i18n", () => ({
       const translations: Record<string, string> = {
         "chat.error_generic": "Lo siento, hubo un error. Intenta de nuevo.",
         "chat.error_processing": "Lo siento, no pude procesar tu pregunta.",
+        "chat.error": "No se pudo conectar. Por favor, inténtalo de nuevo.",
+        "chat.error_auth": "Tu sesión ha expirado. Recarga la página para continuar.",
+        "chat.error_server": "Ocurrió un error en el servidor. Inténtalo de nuevo más tarde.",
+        "chat.connection_lost": "Se perdió la conexión. Reintentar",
+        "chat.error_timeout": "La respuesta tardó demasiado. Por favor, inténtalo de nuevo.",
+        "chat.new_chat_prompt": "Has alcanzado el límite de mensajes. Empieza un nuevo chat para continuar.",
       };
       return translations[key] || key;
     },
@@ -40,6 +46,11 @@ vi.mock("@/lib/chat-upsell-throttle", () => ({
   canShowUpsell: (...args: unknown[]) => mockCanShowUpsell(...args),
   recordUpsellShown: (...args: unknown[]) => mockRecordUpsellShown(...args),
   recordUpsellDismissed: vi.fn(),
+}));
+
+// Mock chat-safety (read-only — only used for MAX_CONVERSATION_TURNS)
+vi.mock("@/lib/chat-safety", () => ({
+  MAX_CONVERSATION_TURNS: 20,
 }));
 
 // Mock fetch
@@ -1077,7 +1088,7 @@ describe("useStreamChat", () => {
     });
 
     // onError non-AbortError path: sets error and updates assistant message
-    expect(result.current.error).toBe("chat.error");
+    expect(result.current.error).toBe("No se pudo conectar. Por favor, inténtalo de nuevo.");
     expect(result.current.messages[1].content).toBe(
       "Lo siento, hubo un error. Intenta de nuevo."
     );
@@ -1157,7 +1168,7 @@ describe("useStreamChat", () => {
     });
 
     // else branch (line 209): pushed a new error message
-    expect(result.current.error).toBe("chat.error");
+    expect(result.current.error).toBe("No se pudo conectar. Por favor, inténtalo de nuevo.");
     expect(result.current.messages).toHaveLength(1);
     expect(result.current.messages[0]).toMatchObject({
       role: "assistant",
@@ -1184,7 +1195,7 @@ describe("useStreamChat", () => {
     expect(result.current.error).toBeNull();
   });
 
-  it("60-second timeout aborts the request and resolves gracefully (line 80 callback)", async () => {
+  it("60-second timeout aborts the request and surfaces a connection-lost error (FE-H2)", async () => {
     vi.useFakeTimers();
 
     let resolvePromise!: (value: unknown) => void;
@@ -1204,12 +1215,12 @@ describe("useStreamChat", () => {
       });
     });
 
-    // Advance 60 seconds — fires the timeout callback at line 80
+    // Advance 60 seconds — fires the timeout callback
     await act(async () => {
       vi.advanceTimersByTime(60_000);
     });
 
-    // The AbortController abort fires — resolve mock with an abort error
+    // The AbortController abort fires — fetch rejects with AbortError
     const abortError = new Error("The operation was aborted");
     abortError.name = "AbortError";
     resolvePromise(Promise.reject(abortError));
@@ -1220,8 +1231,123 @@ describe("useStreamChat", () => {
 
     vi.useRealTimers();
 
-    // After abort, isStreaming returns to false and no unhandled error
+    // FE-H2: timeout should now surface an error and timeout message, not silently resolve
     expect(result.current.isStreaming).toBe(false);
-    expect(result.current.error).toBeNull();
+    expect(result.current.error).toBe("Se perdió la conexión. Reintentar");
+    expect(result.current.messages[1].content).toBe(
+      "La respuesta tardó demasiado. Por favor, inténtalo de nuevo."
+    );
+  });
+
+  it("FE-H2: 401 response sets auth error message", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.error).toBe(
+      "Tu sesión ha expirado. Recarga la página para continuar."
+    );
+  });
+
+  it("FE-H2: 500 response sets server error message", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.error).toBe(
+      "Ocurrió un error en el servidor. Inténtalo de nuevo más tarde."
+    );
+  });
+
+  it("FE-H2: SSE response_timeout event shows timeout message", async () => {
+    const encoder = new TextEncoder();
+    const timeoutEvent = `data: ${JSON.stringify({ type: "error", message: "response_timeout" })}\n\n`;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(timeoutEvent));
+        controller.close();
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: stream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    await act(async () => {
+      await result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    expect(result.current.messages[1].content).toBe(
+      "La respuesta tardó demasiado. Por favor, inténtalo de nuevo."
+    );
+  });
+
+  it("FE-M3: 20-turn cap — sends new_chat_prompt instead of fetching when messages === MAX_CONVERSATION_TURNS*2", async () => {
+    // Fill 20 turns (40 messages) via 20 successful sends, then verify
+    // the 21st send is blocked and a new_chat_prompt message is appended.
+    // Use a fast 1-word response to keep each round-trip minimal.
+    for (let i = 0; i < 20; i++) {
+      mockFetch.mockResolvedValueOnce(createStreamingResponse("Ok"));
+    }
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    for (let i = 0; i < 20; i++) {
+      await act(async () => {
+        await result.current.sendMessage(`Q${i}`, {
+          context: "ctx",
+          locale: "es",
+          messageIndex: i,
+        });
+      });
+    }
+
+    // Should have exactly 40 messages (20 turns × 2)
+    expect(result.current.messages).toHaveLength(40);
+
+    // 21st send should be blocked
+    mockFetch.mockReset();
+
+    await act(async () => {
+      await result.current.sendMessage("Over the limit", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 20,
+      });
+    });
+
+    // Fetch must NOT have been called
+    expect(mockFetch).not.toHaveBeenCalled();
+    // A new_chat_prompt assistant message should have been appended
+    expect(result.current.messages).toHaveLength(41);
+    const lastMsg = result.current.messages[40];
+    expect(lastMsg.role).toBe("assistant");
+    expect(lastMsg.content).toBe(
+      "Has alcanzado el límite de mensajes. Empieza un nuevo chat para continuar."
+    );
   });
 });

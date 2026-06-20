@@ -874,6 +874,64 @@ describe("POST /api/chat", () => {
     );
   });
 
+  describe("BE-H1: untrusted IP rate-limiting", () => {
+    it("applies strict rate limit when no Vercel IP header is present and logs the event", async () => {
+      // When getClientIp returns "unknown" (no x-vercel-forwarded-for), the route
+      // should use a stricter shared bucket and log [CHAT_UNTRUSTED_IP].
+      vi.mocked(checkRateLimit).mockResolvedValue({
+        allowed: false,
+        limit: 3,
+        remaining: 0,
+        resetAt: Date.now() + 60_000,
+        retryAfter: 60,
+      });
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+
+      // Request with NO forwarded-for headers → getClientIp returns "unknown"
+      const request = new NextRequest("http://localhost:3006/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "Tell me about Asturias" }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(429);
+      expect(logger.warn).toHaveBeenCalledWith(
+        "[CHAT_UNTRUSTED_IP]",
+        expect.objectContaining({ reason: "no_vercel_forwarded_for" })
+      );
+      // Heavy modules must NOT have been called
+      expect(generateEmbedding).not.toHaveBeenCalled();
+    });
+
+    it("routes trusted (identified) IP through the normal rate limiter", async () => {
+      vi.mocked(checkRateLimit).mockResolvedValue({
+        allowed: true,
+        limit: 10,
+        remaining: 9,
+        resetAt: Date.now() + 60_000,
+      });
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(512).fill(0.1));
+      vi.mocked(search).mockResolvedValue({ chunks: [], images: [] });
+      vi.mocked(generateChatResponse).mockResolvedValue("Response");
+      vi.mocked(extractSourcesFromChunks).mockReturnValue([]);
+
+      // Request WITH x-vercel-forwarded-for → getClientIp returns a real IP
+      const request = new NextRequest("http://localhost:3006/api/chat", {
+        method: "POST",
+        headers: { "x-vercel-forwarded-for": "203.0.113.50" },
+        body: JSON.stringify({ message: "Tell me about Asturias" }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      // [CHAT_UNTRUSTED_IP] must NOT be logged for a known IP
+      expect(logger.warn).not.toHaveBeenCalledWith(
+        "[CHAT_UNTRUSTED_IP]",
+        expect.anything()
+      );
+    });
+  });
+
   describe("V8 sub-expression gap closers", () => {
     it("re-throws non-timeout errors from generateChatResponse (line 202)", async () => {
       // When generateChatResponse rejects with a non-timeout error, the catch at line 200
