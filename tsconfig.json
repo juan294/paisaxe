@@ -46,6 +46,7 @@
     "node_modules.nosync",
     "scripts",
     "e2e",
-    "supabase/functions"
+    "supabase/functions",
+    "content/processed"
   ]
 }
