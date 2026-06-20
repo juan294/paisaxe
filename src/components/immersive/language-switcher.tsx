@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const languages: { code: Locale; label: string; fullName: string }[] = [
+const ALL_LANGUAGES: { code: Locale; label: string; fullName: string }[] = [
   { code: "es", label: "ES", fullName: "Espa\u00f1ol (ES)" },
   { code: "ast", label: "AST", fullName: "Asturianu (AST)" },
   { code: "en", label: "EN", fullName: "English (EN)" },
@@ -15,6 +15,37 @@ const languages: { code: Locale; label: string; fullName: string }[] = [
   { code: "pt", label: "PT", fullName: "Portugu\u00eas (PT)" },
 ];
 
+/**
+ * UX-M3: Estimated UI translation coverage per locale (0\u2013100 %).
+ *
+ * 'es' and 'en' are always shown (reference locales, 100 % coverage).
+ * Other locales are shown only when their coverage meets MIN_COVERAGE_THRESHOLD.
+ *
+ * Update these values whenever a locale's translation file is updated:
+ * - Run the translation coverage script (if available) or manually audit
+ *   `src/lib/i18n/<locale>.ts` against `es.ts` to estimate completeness.
+ *
+ * @remarks
+ * This is a reversible, minimal gate: lowering MIN_COVERAGE_THRESHOLD or
+ * raising a locale's coverage score will make it visible immediately.
+ * The gate is intentionally static (no runtime API call) to keep the
+ * component synchronous and tree-shakeable.
+ */
+export const LOCALE_COVERAGE: Partial<Record<Locale, number>> = {
+  es: 100,
+  en: 100,
+  fr: 85,  // French translation file is substantially complete
+  de: 85,  // German translation file is substantially complete
+  pt: 85,  // Portuguese translation file is substantially complete
+  ast: 40, // Asturian translation is partial \u2014 below threshold by default
+};
+
+/**
+ * Minimum coverage percentage required to show a locale in the switcher.
+ * 'es' and 'en' are always shown regardless of this value.
+ */
+export const MIN_COVERAGE_THRESHOLD = 70;
+
 export function LanguageSwitcher() {
   const { locale, setLocale, t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -22,7 +53,19 @@ export function LanguageSwitcher() {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listboxRef = useRef<HTMLDivElement>(null);
 
-  const currentLanguage = languages.find((lang) => lang.code === locale) || languages[0];
+  // UX-M3: Only show locales that meet the coverage threshold.
+  // 'es' and 'en' are always included as reference locales.
+  const languages = useMemo(
+    () =>
+      ALL_LANGUAGES.filter((lang) => {
+        if (lang.code === "es" || lang.code === "en") return true;
+        const coverage = LOCALE_COVERAGE[lang.code] ?? 0;
+        return coverage >= MIN_COVERAGE_THRESHOLD;
+      }),
+    [],
+  );
+
+  const currentLanguage = languages.find((lang) => lang.code === locale) ?? ALL_LANGUAGES.find((lang) => lang.code === locale) ?? ALL_LANGUAGES[0];
 
   // Close on click outside
   useEffect(() => {
@@ -96,7 +139,7 @@ export function LanguageSwitcher() {
         handleLanguageSelect(languages[currentIndex].code);
       }
     }
-  }, [handleLanguageSelect]);
+  }, [handleLanguageSelect, languages]);
 
   return (
     <div

@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -286,12 +287,12 @@ function useStoriesState(
     }
   }, [fetchStories]);
 
-  return {
-    stories,
-    isLoading,
-    error,
-    refresh,
-  };
+  // FE-M1: memoize the returned value so that StoriesProvider consumers
+  // only re-render when stories, isLoading, error, or refresh actually change.
+  return useMemo(
+    () => ({ stories, isLoading, error, refresh }),
+    [stories, isLoading, error, refresh],
+  );
 }
 
 interface StoriesProviderProps {

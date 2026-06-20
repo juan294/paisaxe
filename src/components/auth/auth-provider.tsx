@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   useCallback,
   useRef,
@@ -174,13 +175,12 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
     }
   }, [getSupabaseClient]);
 
-  const value: AuthContextValue = {
-    user,
-    session,
-    isLoading,
-    signInWithGoogle,
-    signOut,
-  };
+  // FE-M1: memoize the context value so that consumers only re-render when
+  // user, session, isLoading, or the stable callbacks actually change.
+  const value = useMemo<AuthContextValue>(
+    () => ({ user, session, isLoading, signInWithGoogle, signOut }),
+    [user, session, isLoading, signInWithGoogle, signOut],
+  );
 
   return (
     <AuthContext.Provider value={value}>
