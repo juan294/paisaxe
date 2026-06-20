@@ -196,6 +196,7 @@ describe("POST /api/webhooks/stripe", () => {
     expect(data).toEqual({ status: "duplicate" });
     expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
       p_event_id: "evt_duplicate",
+      p_event_type: "checkout.session.completed",
       p_user_id: "user-123",
       p_payment_provider_id: "pi_duplicate",
       p_expires_at: "2024-01-02T00:00:00.000Z",
@@ -220,6 +221,7 @@ describe("POST /api/webhooks/stripe", () => {
     expect(data).toEqual({ status: "granted" });
     expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
       p_event_id: "evt_granted",
+      p_event_type: "checkout.session.completed",
       p_user_id: "user-123",
       p_payment_provider_id: "pi_granted",
       p_expires_at: "2024-01-02T00:00:00.000Z",
@@ -343,6 +345,7 @@ describe("POST /api/webhooks/stripe", () => {
     expect(data).toEqual({ status: "granted" });
     expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
       p_event_id: "evt_zero_amount",
+      p_event_type: "checkout.session.completed",
       p_user_id: "user-123",
       p_payment_provider_id: "pi_zero_amount",
       p_expires_at: "2024-01-02T00:00:00.000Z",
@@ -404,6 +407,7 @@ describe("POST /api/webhooks/stripe", () => {
       expect(mockRpc).toHaveBeenCalledTimes(2);
       const expectedArgs = {
         p_event_id: "evt_atomic_retry",
+        p_event_type: "checkout.session.completed",
         p_user_id: "user-atomic",
         p_payment_provider_id: "pi_atomic",
         p_expires_at: "2024-01-02T00:00:00.000Z",
@@ -445,6 +449,36 @@ describe("POST /api/webhooks/stripe", () => {
     });
   });
 
+  // ─── BE-M3: Stripe webhook audit row matches the table shape ──────────────
+  describe("BE-M3: audit columns match stripe_webhook_events", () => {
+    it("passes the event type to the RPC so the audit row records event_type", async () => {
+      // BE-M3 regression: the audit row in stripe_webhook_events must capture
+      // the event_type. The route is the only place that knows event.type, so
+      // it must forward it to the atomic RPC that owns the dedup/audit row.
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent("user-123", "pi_audit_shape", "evt_audit_shape", 499)
+      );
+      mockRpc.mockResolvedValue({ data: "granted", error: null });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
+        p_event_id: "evt_audit_shape",
+        p_event_type: "checkout.session.completed",
+        p_user_id: "user-123",
+        p_payment_provider_id: "pi_audit_shape",
+        p_expires_at: "2024-01-02T00:00:00.000Z",
+        p_amount_paid: 499,
+      });
+      // The route must NOT do its own mismatched direct audit insert.
+      expect(mockAuditFrom).not.toHaveBeenCalled();
+      expect(mockAuditInsert).not.toHaveBeenCalled();
+    });
+  });
+
   // ─── BE-M1: Stripe webhook dedupe ownership ───────────────────────────────
   describe("BE-M1: stripe_webhook_events schema ownership", () => {
     it("lets the RPC claim stripe_webhook_events.event_id for checkout events", async () => {
@@ -461,6 +495,7 @@ describe("POST /api/webhooks/stripe", () => {
       expect(mockAuditInsert).not.toHaveBeenCalled();
       expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
         p_event_id: "evt_audit_1",
+        p_event_type: "checkout.session.completed",
         p_user_id: "user-123",
         p_payment_provider_id: "pi_audit_test",
         p_expires_at: "2024-01-02T00:00:00.000Z",
@@ -484,6 +519,7 @@ describe("POST /api/webhooks/stripe", () => {
       expect(mockAuditFrom).not.toHaveBeenCalled();
       expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", {
         p_event_id: "evt_duplicate_audit",
+        p_event_type: "checkout.session.completed",
         p_user_id: "user-123",
         p_payment_provider_id: "pi_dup",
         p_expires_at: "2024-01-02T00:00:00.000Z",

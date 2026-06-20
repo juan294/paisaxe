@@ -12,9 +12,70 @@ import {
   type MarketingStats,
   type MarketingPlatform,
   type PlatformStats,
-  type PostEngagement,
 } from "@/types/marketing";
 import { logger } from "@/lib/logger";
+
+/**
+ * Default empty stats object — used when the SQL aggregation RPC returns no
+ * rows (e.g. an empty marketing_posts table). Guarantees the response always
+ * has all three platforms present so the dashboard can render unconditionally.
+ */
+function emptyMarketingStats(): MarketingStats {
+  const emptyPlatform = (): PlatformStats => ({
+    posts: 0,
+    scheduled: 0,
+    engagement: {},
+    lastPostedAt: null,
+  });
+  return {
+    totalPosts: 0,
+    postsThisWeek: 0,
+    postsThisMonth: 0,
+    failedPosts: 0,
+    totalEngagement: {},
+    byPlatform: {
+      x: emptyPlatform(),
+      instagram: emptyPlatform(),
+      pinterest: emptyPlatform(),
+    },
+  };
+}
+
+/**
+ * Merge the SQL-aggregated stats over the empty defaults so every platform key
+ * is always present even if the RPC omitted a platform with no rows.
+ */
+function normalizeMarketingStats(raw: unknown): MarketingStats {
+  const base = emptyMarketingStats();
+  if (!raw || typeof raw !== "object") return base;
+  const stats = raw as Partial<MarketingStats>;
+
+  const platforms: MarketingPlatform[] = ["x", "instagram", "pinterest"];
+  const byPlatform = (stats.byPlatform ?? {}) as Partial<
+    Record<MarketingPlatform, PlatformStats>
+  >;
+
+  for (const platform of platforms) {
+    const p = byPlatform[platform];
+    if (p) {
+      base.byPlatform[platform] = {
+        posts: p.posts ?? 0,
+        scheduled: p.scheduled ?? 0,
+        engagement: p.engagement ?? {},
+        lastPostedAt: p.lastPostedAt ?? null,
+      };
+    }
+  }
+
+  return {
+    totalPosts: stats.totalPosts ?? 0,
+    postsThisWeek: stats.postsThisWeek ?? 0,
+    postsThisMonth: stats.postsThisMonth ?? 0,
+    failedPosts: stats.failedPosts ?? 0,
+    totalEngagement: stats.totalEngagement ?? {},
+    byPlatform: base.byPlatform,
+  };
+}
 
 /**
  * GET /api/admin/marketing/dashboard
@@ -30,22 +91,27 @@ export async function GET() {
   try {
     const supabase = createAdminClient();
 
-    // Fetch all data in parallel
-    const [accountsResult, postsResult, schedulesResult] = await Promise.all([
-      supabase.from("marketing_accounts").select("*").order("platform"),
+    // Fetch all data in parallel. Stats are aggregated in SQL via the
+    // get_marketing_post_stats RPC (PE-M4) instead of folding 100 rows in JS.
+    // The 100-row post fetch is still used for the recent/upcoming lists only.
+    const [accountsResult, postsResult, schedulesResult, statsResult] =
+      await Promise.all([
+        supabase.from("marketing_accounts").select("*").order("platform"),
 
-      supabase
-        .from("marketing_posts")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100), // Get recent posts for stats
+        supabase
+          .from("marketing_posts")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(100), // Recent posts for the recent/upcoming lists
 
-      supabase
-        .from("marketing_schedule")
-        .select("*")
-        .order("platform")
-        .order("day_of_week"),
-    ]);
+        supabase
+          .from("marketing_schedule")
+          .select("*")
+          .order("platform")
+          .order("day_of_week"),
+
+        supabase.rpc("get_marketing_post_stats"),
+      ]);
 
     if (accountsResult.error) {
       logger.error("Error fetching accounts:", { error: accountsResult.error.message });
@@ -71,6 +137,14 @@ export async function GET() {
       );
     }
 
+    if (statsResult.error) {
+      logger.error("Error fetching stats:", { error: statsResult.error.message });
+      return NextResponse.json(
+        { error: "Failed to fetch stats" },
+        { status: 500 }
+      );
+    }
+
     // Convert to typed objects
     const accounts = (accountsResult.data as MarketingAccountRow[]).map(
       rowToMarketingAccountPublic
@@ -81,11 +155,6 @@ export async function GET() {
     const schedules = (schedulesResult.data as MarketingScheduleRow[]).map(
       rowToMarketingSchedule
     );
-
-    // Calculate time ranges
-    const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Filter posts for different views
     const recentPosts = allPosts
@@ -101,12 +170,8 @@ export async function GET() {
       )
       .slice(0, 10);
 
-    // Calculate stats
-    const stats = calculateStats(
-      allPosts,
-      oneWeekAgo,
-      oneMonthAgo
-    );
+    // Stats are pre-aggregated in SQL (get_marketing_post_stats RPC).
+    const stats = normalizeMarketingStats(statsResult.data);
 
     const summary: MarketingDashboardSummary = {
       accounts,
@@ -123,92 +188,5 @@ export async function GET() {
       { error: "Internal server error" },
       { status: 500 }
     );
-  }
-}
-
-function calculateStats(
-  posts: ReturnType<typeof rowToMarketingPost>[],
-  oneWeekAgo: Date,
-  oneMonthAgo: Date
-): MarketingStats {
-  // Initialize platform stats
-  const byPlatform: Record<MarketingPlatform, PlatformStats> = {
-    x: createEmptyPlatformStats(),
-    instagram: createEmptyPlatformStats(),
-    pinterest: createEmptyPlatformStats(),
-  };
-
-  let totalPosts = 0;
-  let postsThisWeek = 0;
-  let postsThisMonth = 0;
-  let failedPosts = 0;
-  const totalEngagement: PostEngagement = {};
-
-  for (const post of posts) {
-    const platform = post.platform;
-    const postedAt = post.postedAt ? new Date(post.postedAt) : null;
-
-    // Count by status
-    if (post.status === "posted") {
-      totalPosts++;
-      byPlatform[platform].posts++;
-
-      if (postedAt) {
-        if (postedAt >= oneWeekAgo) {
-          postsThisWeek++;
-        }
-        if (postedAt >= oneMonthAgo) {
-          postsThisMonth++;
-        }
-
-        // Track last posted
-        if (
-          !byPlatform[platform].lastPostedAt ||
-          new Date(byPlatform[platform].lastPostedAt!) < postedAt
-        ) {
-          byPlatform[platform].lastPostedAt = post.postedAt;
-        }
-      }
-
-      // Aggregate engagement
-      if (post.engagement) {
-        aggregateEngagement(totalEngagement, post.engagement);
-        aggregateEngagement(byPlatform[platform].engagement, post.engagement);
-      }
-    } else if (post.status === "scheduled") {
-      byPlatform[platform].scheduled++;
-    } else if (post.status === "failed") {
-      failedPosts++;
-    }
-  }
-
-  return {
-    totalPosts,
-    postsThisWeek,
-    postsThisMonth,
-    failedPosts,
-    totalEngagement,
-    byPlatform,
-  };
-}
-
-function createEmptyPlatformStats(): PlatformStats {
-  return {
-    posts: 0,
-    scheduled: 0,
-    engagement: {},
-    lastPostedAt: null,
-  };
-}
-
-function aggregateEngagement(
-  target: PostEngagement,
-  source: PostEngagement
-): void {
-  for (const key of Object.keys(source) as (keyof PostEngagement)[]) {
-    const value = source[key];
-    if (typeof value === "number") {
-      target[key] = (target[key] || 0) + value;
-    }
   }
 }

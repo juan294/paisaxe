@@ -13,6 +13,7 @@ import {
   getStoriesByLocationFromDB,
   getStoriesByDurationFromDB,
   getStoryBySlugFromDB,
+  getStoryMetadataBySlug,
   isBuildPhase,
 } from "./stories-data";
 import { supabase } from "./supabase";
@@ -736,6 +737,67 @@ describe("stories-data", () => {
       });
 
       const result = await getStoryBySlugFromDB("completely-nonexistent-slug-xyz");
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("getStoryMetadataBySlug", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test");
+    });
+
+    it("selects only the slim metadata columns (not the full row, no select('*'))", async () => {
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: { slug: "test-story", title: "Test Story", description: "A test description" },
+        error: null,
+      });
+      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const result = await getStoryMetadataBySlug("test-story");
+
+      expect(mockSelect).not.toHaveBeenCalledWith("*");
+      const selectedFields = mockSelect.mock.calls[0][0].split(",");
+      expect(selectedFields).toEqual(["slug", "title", "description"]);
+      expect(result).toEqual({
+        slug: "test-story",
+        title: "Test Story",
+        description: "A test description",
+      });
+    });
+
+    it("falls back to slim metadata from FALLBACK_STORIES on DB error", async () => {
+      const mockSingle = vi.fn().mockResolvedValue({ data: null, error: { message: "Not found" } });
+      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const fallback = FALLBACK_STORIES[0];
+      const result = await getStoryMetadataBySlug(fallback.slug || fallback.id);
+
+      expect(result).toEqual({
+        slug: fallback.slug || fallback.id,
+        title: fallback.title,
+        description: fallback.description ?? null,
+      });
+    });
+
+    it("returns null when the slug matches no DB row and no fallback", async () => {
+      const mockSingle = vi.fn().mockResolvedValue({ data: null, error: { message: "Not found" } });
+      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const result = await getStoryMetadataBySlug("no-such-slug-xyz");
 
       expect(result).toBeNull();
     });

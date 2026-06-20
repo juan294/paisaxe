@@ -13,13 +13,13 @@ vi.mock("next/server", () => ({
 
 // Mock stories-data
 vi.mock("@/lib/stories-data", () => ({
-  getStoryBySlugFromDB: vi.fn(),
+  getStoryMetadataBySlug: vi.fn(),
   getStoriesFromDB: vi.fn(),
 }));
 
-import { getStoryBySlugFromDB, getStoriesFromDB } from "@/lib/stories-data";
+import { getStoryMetadataBySlug, getStoriesFromDB } from "@/lib/stories-data";
 
-const mockGetStoryBySlugFromDB = vi.mocked(getStoryBySlugFromDB);
+const mockGetStoryMetadataBySlug = vi.mocked(getStoryMetadataBySlug);
 const mockGetStoriesFromDB = vi.mocked(getStoriesFromDB);
 const mockRedirect = vi.mocked(redirect);
 
@@ -92,7 +92,7 @@ describe("StoryPage", () => {
 
   describe("generateMetadata", () => {
     it("should return default metadata when story not found", async () => {
-      mockGetStoryBySlugFromDB.mockResolvedValue(null);
+      mockGetStoryMetadataBySlug.mockResolvedValue(null);
 
       const metadata = await generateMetadata({
         params: Promise.resolve({ slug: "non-existent" }),
@@ -101,16 +101,23 @@ describe("StoryPage", () => {
       expect(metadata.title).toBe("Paisaxe | Descubre Asturias");
     });
 
-    it("should return story metadata when story exists", async () => {
-      mockGetStoryBySlugFromDB.mockResolvedValue({
-        id: "story-1",
+    it("uses the slim metadata query (not the full story row)", async () => {
+      mockGetStoryMetadataBySlug.mockResolvedValue({
         slug: "test-story",
         title: "Test Story",
-        subtitle: "Test Location",
         description: "A test description",
-        image: "/images/test.jpg",
-        category: "nature",
-        sourcePdf: "test.pdf",
+      });
+
+      await generateMetadata({ params: Promise.resolve({ slug: "test-story" }) });
+
+      expect(mockGetStoryMetadataBySlug).toHaveBeenCalledWith("test-story");
+    });
+
+    it("should return story metadata when story exists", async () => {
+      mockGetStoryMetadataBySlug.mockResolvedValue({
+        slug: "test-story",
+        title: "Test Story",
+        description: "A test description",
       });
 
       const metadata = await generateMetadata({

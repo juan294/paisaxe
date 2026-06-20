@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { getStoryBySlugFromDB, getStoriesFromDB } from "@/lib/stories-data";
+import { getStoryMetadataBySlug, getStoriesFromDB } from "@/lib/stories-data";
 import type { Metadata } from "next";
 
 interface StoryPageProps {
@@ -20,25 +20,29 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
 
 export async function generateMetadata({ params }: StoryPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const story = await getStoryBySlugFromDB(slug);
+  // Slim, cached metadata query — selects only slug/title/description instead
+  // of the full story row, avoiding the N+1 / full-row read in generateMetadata.
+  const story = await getStoryMetadataBySlug(slug);
 
   if (!story) {
     return { title: "Paisaxe | Descubre Asturias" };
   }
 
+  const description = story.description ?? undefined;
+
   return {
     title: `${story.title} | Paisaxe`,
-    description: story.description,
+    description,
     openGraph: {
       title: story.title,
-      description: story.description,
+      description,
       type: "article",
       siteName: "Paisaxe",
     },
     twitter: {
       card: "summary_large_image",
       title: story.title,
-      description: story.description,
+      description,
     },
   };
 }

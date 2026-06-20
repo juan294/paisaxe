@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { PublicStoryRow, Story, StoryCategory, StoryLocation, StoryDuration, StoryRow } from "@/types/immersive";
 import { PUBLIC_STORY_SELECT, rowToPublicStory } from "@/types/immersive";
 import { supabase } from "./supabase";
@@ -201,6 +202,68 @@ export async function getStoryBySlugFromDB(slug: string): Promise<Story | null> 
     return FALLBACK_STORIES.find(s => s.slug === slug || s.id === slug) || null;
   }
 }
+
+/**
+ * Slim story metadata used by `generateMetadata`.
+ * Only the columns required to build <title>/<meta> tags.
+ */
+export interface StoryMetadataSlim {
+  slug: string;
+  title: string;
+  description: string | null;
+}
+
+const STORY_METADATA_SELECT = ["slug", "title", "description"].join(",");
+
+function fallbackStoryMetadata(slug: string): StoryMetadataSlim | null {
+  const fallback = FALLBACK_STORIES.find((s) => s.slug === slug || s.id === slug);
+  if (!fallback) return null;
+  return {
+    slug: fallback.slug || fallback.id,
+    title: fallback.title,
+    description: fallback.description ?? null,
+  };
+}
+
+/**
+ * Fetch ONLY the slim metadata (slug, title, description) for a single story.
+ *
+ * Wrapped in React `cache` so that within a single request the metadata query
+ * is deduplicated. This avoids `generateMetadata` pulling the entire story row
+ * (select('*')) just to read the title/description (#573 / PE-M2).
+ */
+export const getStoryMetadataBySlug = cache(
+  async (slug: string): Promise<StoryMetadataSlim | null> => {
+    try {
+      const { data, error } = await getClient()
+        .from("stories")
+        .select(STORY_METADATA_SELECT)
+        .eq("slug", slug)
+        .eq("is_active", true)
+        .eq("curation_status", "approved")
+        .single();
+
+      if (error || !data) {
+        if (error && !isBuildPhase()) {
+          logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "metadata", error: error.message });
+        }
+        return fallbackStoryMetadata(slug);
+      }
+
+      const row = data as unknown as StoryMetadataSlim;
+      return {
+        slug: row.slug,
+        title: row.title,
+        description: row.description ?? null,
+      };
+    } catch (error) {
+      if (!isBuildPhase()) {
+        logger.error("[TABLE_FALLBACK]", { table: "stories", filter: "metadata", error: error instanceof Error ? error.message : String(error) });
+      }
+      return fallbackStoryMetadata(slug);
+    }
+  }
+);
 
 // Synchronous functions for backward compatibility (use hardcoded data)
 export function getStoriesByCategory(category: StoryCategory | null): Story[] {
