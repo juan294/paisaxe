@@ -18,6 +18,22 @@ function logFallback(reason: string): void {
 }
 
 /**
+ * Emit a structured cache-MISS event whenever the server actually reaches out to
+ * Supabase instead of being served from Next.js's `revalidate` data cache.
+ *
+ * Next.js dedupes/caches the underlying `fetch()` for the revalidate window
+ * (60 s in production), so this function only runs on a true cache MISS. Counting
+ * these events against total page renders gives the effective CDN/data-cache
+ * hit-rate. See docs/operations/operations.md → "Stories Cache Hit-Rate" for the
+ * log-drain query used to monitor it.
+ */
+function logCacheMiss(): void {
+  // info-level structured event so it is queryable in the Vercel log drain
+  // without polluting error budgets. `count: 1` lets aggregators sum misses.
+  logger.info("[STORIES_CACHE_MISS]", { table: "stories", count: 1 });
+}
+
+/**
  * Server-side story fetching with Next.js cache.
  * Uses the Supabase REST API directly with `next: { revalidate: 60 }`
  * so Next.js can cache and deduplicate the request.
@@ -38,6 +54,10 @@ export async function getStoriesServer(): Promise<Story[]> {
 
   try {
     const isDev = getEnvironment() === "development";
+
+    // Cache MISS: this code path only executes when Next.js's revalidate data
+    // cache does not already hold the response, so each call is a real fetch.
+    logCacheMiss();
 
     const response = await fetch(
       `${supabaseUrl}/rest/v1/stories?is_active=eq.true&curation_status=eq.approved&order=display_order.asc&select=${PUBLIC_STORY_SELECT}`,

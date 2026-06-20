@@ -11,7 +11,23 @@
 | Sentry (if configured) | Unhandled exceptions, performance regressions | Juan Gonzalez |
 | Manual monitoring | `/api/health` endpoint status | Juan Gonzalez |
 
-**Escalation path:** All alerts route to Juan Gonzalez (solo developer). No on-call rotation. For incidents affecting real users, triage immediately during business hours; review within 24 h at off-hours.
+## Escalation & On-Call SLO (accepted risk)
+
+Paisaxe is operated by a **single developer** (Juan Gonzalez). There is **no on-call rotation and no paging** — this is a deliberate, documented risk-acceptance decision appropriate to the project's current scale (low-volume tourism site, €1.99 voice passes, no PII beyond auth identity), not an oversight.
+
+**Accepted Service-Level Objective (SLO):**
+
+| Condition | Target response | Rationale |
+|-----------|-----------------|-----------|
+| Critical alert during **business hours** (approx. 09:00–21:00 CET) | Triage immediately (minutes) | Operator is typically reachable |
+| Critical alert **off-hours / asleep** | Best-effort, reviewed within **24 h** | No paging; alerts are pull-based (email/dashboard), so off-hours detection is not guaranteed |
+| Non-critical alert | Reviewed within **24 h** | — |
+
+**What "accepted risk" means here:** an outage that begins off-hours may persist until the operator next checks alerts (worst case ~12 h overnight). For a non-life-critical, low-revenue site this downtime exposure is acceptable and is explicitly chosen over the cost/complexity of a paging rotation. The graceful-degradation fallbacks (fallback stories, fail-closed rate limiting, Stripe's 3-day webhook retry) bound the blast radius of most failure modes during that window.
+
+**Escalation path:** All alert channels (PostHog, Vercel email, Sentry, manual `/api/health` checks) route to the single operator. There is no secondary contact. If the operator becomes unavailable for an extended period, the documented mitigation is to enable `maintenance_mode` (admin panel → Feature Flags → Behavior) to take the site to a safe holding state rather than leave it degraded.
+
+**Re-evaluation trigger:** revisit this risk acceptance (and consider wiring critical alerts to a paging service such as BetterStack email-to-PagerDuty) if any of the following hold: sustained traffic growth, handling of sensitive user data, a second operator joins, or recurring off-hours incidents are observed.
 
 ---
 

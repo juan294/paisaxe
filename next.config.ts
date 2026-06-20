@@ -99,7 +99,25 @@ const nextConfig: NextConfig = {
   },
 };
 
+// Only upload source maps to Sentry from the two long-lived branches that map
+// to real environments (preview = develop, production = main). Feature branches,
+// local builds, and ad-hoc preview deploys skip the upload entirely so we don't
+// burn Sentry release quota or leak maps for throwaway builds. (#536)
+const SENTRY_UPLOAD_BRANCHES = ["develop", "main"];
+const sentryBranch = process.env.VERCEL_GIT_COMMIT_REF?.trim();
+const shouldUploadSourcemaps =
+  process.env.VERCEL_ENV === "production" ||
+  (sentryBranch !== undefined && SENTRY_UPLOAD_BRANCHES.includes(sentryBranch));
+
 export default withSentryConfig(withBundleAnalyzer(nextConfig), {
   silent: true,
-  // sourcemaps are uploaded by default (not disabled); no need to set hideSourceMaps
+  sourcemaps: {
+    // Gate the (slow, quota-consuming) upload to develop/main builds only.
+    disable: !shouldUploadSourcemaps,
+    // Delete the generated `.map` files from the build output after they are
+    // uploaded to Sentry so client source maps are never served to end users.
+    // (Replaces the removed `hideSourceMaps` option; defaults to true, set
+    // explicitly to document the intent — #536.)
+    deleteSourcemapsAfterUpload: true,
+  },
 });

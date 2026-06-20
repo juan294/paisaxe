@@ -225,7 +225,11 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const { city } = paramsParsed.data;
     const weather = await fetchWeather(city);
-    return NextResponse.json(weather);
+    return NextResponse.json(weather, {
+      headers: {
+        "Cache-Control": "public, max-age=300", // Cache for 5 minutes (matches GET)
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
 

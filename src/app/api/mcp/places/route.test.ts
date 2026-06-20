@@ -334,6 +334,37 @@ describe("/api/mcp/places", () => {
       expect(data.places[0].name).toBe("Sidrería Tierra Astur");
     });
 
+    it("sets the same Cache-Control header as GET (#614)", async () => {
+      const mockPlacesResponse = createPlacesApiResponse([
+        {
+          name: "Sidrería Tierra Astur",
+          address: "Oviedo, Asturias",
+          rating: 4.2,
+          reviewsCount: 500,
+          priceLevel: "PRICE_LEVEL_MODERATE",
+          lat: 43.3619,
+          lng: -5.8494,
+          id: "ChIJcache",
+        },
+      ]);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockPlacesResponse),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/places", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET },
+        body: JSON.stringify({ query: "sidra", type: "restaurant" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("public, max-age=3600");
+    });
+
     it("should return 400 for invalid MCP request", async () => {
       const request = new Request("http://localhost:3000/api/mcp/places", {
         method: "POST",

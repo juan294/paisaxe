@@ -376,7 +376,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     const { query, type, city } = paramsParsed.data;
 
     const results = await searchPlaces(query, type, city);
-    return NextResponse.json(results);
+    return NextResponse.json(results, {
+      headers: {
+        "Cache-Control": "public, max-age=3600", // Cache for 1 hour (matches GET)
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

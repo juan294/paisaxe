@@ -45,8 +45,15 @@ log_info "Running license check..." | tee -a "$LOG_FILE"
 LICENSE_SUMMARY=$(npx license-checker --production --summary 2>&1 || true)
 LICENSE_FULL=$(npx license-checker --production --json 2>/dev/null || echo "{}")
 
-# Check for copyleft licenses
+# Check for copyleft licenses in PRODUCTION deps (these ship to clients — blocking concern)
 COPYLEFT_CHECK=$(npx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0;LGPL-2.0;LGPL-2.1;LGPL-3.0" 2>&1) && COPYLEFT_FOUND="false" || COPYLEFT_FOUND="true"
+
+# Check for copyleft licenses across the FULL tree (incl. devDependencies).
+# Build-time-only tooling (e.g. lightningcss MPL-2.0) never ships, so this is
+# reported for review rather than treated as a hard failure (#623).
+# See docs/project/license-exceptions.md → "Dev-dependency scanning".
+DEV_COPYLEFT_CHECK=$(npx license-checker --failOn "GPL-2.0;GPL-3.0;AGPL-3.0;SSPL-1.0;BSL-1.1" 2>&1) && DEV_COPYLEFT_FOUND="false" || DEV_COPYLEFT_FOUND="true"
+DEV_FLAGGED_LICENSES=$(npx license-checker --csv 2>/dev/null | grep -iE "MPL|LGPL|GPL|UNLICENSED|Unknown" | head -30 || echo "none")
 
 # Check for outdated packages
 log_info "Checking for outdated packages..." | tee -a "$LOG_FILE"
@@ -98,10 +105,16 @@ fi
   echo "LICENSE SUMMARY:"
   echo "$LICENSE_SUMMARY"
   echo ""
-  echo "COPYLEFT LICENSES FOUND: $COPYLEFT_FOUND"
+  echo "COPYLEFT LICENSES FOUND (production deps): $COPYLEFT_FOUND"
   if [[ "$COPYLEFT_FOUND" == "true" ]]; then
-    echo "Copyleft details:"
+    echo "Copyleft details (production):"
     echo "$COPYLEFT_CHECK"
+  fi
+  echo ""
+  echo "COPYLEFT LICENSES FOUND (dev/build deps, non-blocking): $DEV_COPYLEFT_FOUND"
+  if [[ "$DEV_COPYLEFT_FOUND" == "true" ]]; then
+    echo "Copyleft details (dev/build — review against docs/project/license-exceptions.md):"
+    echo "$DEV_COPYLEFT_CHECK"
   fi
   echo ""
   echo "OUTDATED PACKAGES: $OUTDATED_COUNT"
@@ -113,8 +126,11 @@ fi
   echo "- Gitleaks in CI: $GITLEAKS_IN_CI"
   echo "- npm audit in CI: $NPM_AUDIT_IN_CI"
   echo ""
-  echo "FLAGGED LICENSE PACKAGES (MPL/LGPL/GPL/UNLICENSED):"
+  echo "FLAGGED LICENSE PACKAGES — PRODUCTION (MPL/LGPL/GPL/UNLICENSED):"
   echo "$FLAGGED_LICENSES"
+  echo ""
+  echo "FLAGGED LICENSE PACKAGES — DEV+PROD FULL TREE (MPL/LGPL/GPL/UNLICENSED):"
+  echo "$DEV_FLAGGED_LICENSES"
   echo ""
   echo "SECURITY HEADERS:"
   echo "$SECURITY_HEADERS"
