@@ -54,14 +54,30 @@ export default [
     },
   },
   {
-    files: ["src/app/api/**/*.ts"],
+    // Ban console.* in production source paths. Server modules use the pino
+    // logger (@/lib/logger); client-bundled modules use @/lib/client-logger.
+    files: [
+      "src/app/api/**/*.{ts,tsx}",
+      "src/lib/**/*.{ts,tsx}",
+      "src/hooks/**/*.{ts,tsx}",
+      "src/components/**/*.{ts,tsx}",
+    ],
+    ignores: [
+      // The logger implementations are the one legitimate console sink.
+      "src/lib/logger.ts",
+      "src/lib/client-logger.ts",
+      // Tests assert on log output and may use console directly.
+      "**/*.test.{ts,tsx}",
+      "**/*.spec.{ts,tsx}",
+      "**/__tests__/**",
+    ],
     rules: {
       "no-restricted-syntax": [
         "error",
         {
           selector: "CallExpression[callee.object.name='console']",
           message:
-            "Use the shared logger from @/lib/logger instead of console.* in API routes. See docs/plans/2026-04-20-engineering-audit-remediation-phases/phase-3.md.",
+            "Use the shared logger from @/lib/logger (server) or @/lib/client-logger (client) instead of console.*. See docs/plans/2026-04-20-engineering-audit-remediation-phases/phase-3.md.",
         },
       ],
     },

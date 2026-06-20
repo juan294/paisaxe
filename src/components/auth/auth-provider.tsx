@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { getSiteUrl, getSupabaseAnonKey } from "@/lib/env";
+import { clientLogger } from "@/lib/client-logger";
 import type { Session, AuthChangeEvent, SupabaseClient } from "@supabase/supabase-js";
 import { mapSupabaseUser, type AuthUser, type AuthContextValue } from "@/types/auth";
 
@@ -55,7 +56,9 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
       }
 
       const supabase = await getSupabaseClient().catch((error: unknown) => {
-        console.error("Error initializing auth:", error);
+        clientLogger.error("[AUTH_INIT_FAILURE]", {
+          error: error instanceof Error ? error.message : String(error),
+        });
         return null;
       });
       if (cancelled) return;
@@ -84,7 +87,9 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
           }
         }
       } catch (error) {
-        console.error("Error initializing auth:", error);
+        clientLogger.error("[AUTH_INIT_FAILURE]", {
+          error: error instanceof Error ? error.message : String(error),
+        });
         if (!cancelled) {
           setSession(null);
           setUser(null);
@@ -133,8 +138,8 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
       // #556: env vars may be missing client-side (e.g. NEXT_PUBLIC_SUPABASE_*
       // not inlined). Never throw inside a click handler — the user-visible
       // symptom would be a dead button with no feedback.
-      console.error(
-        "Supabase client unavailable — cannot sign in. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.",
+      clientLogger.error(
+        "[AUTH_SIGNIN_NO_CLIENT] Supabase client unavailable — cannot sign in. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.",
       );
       return;
     }
@@ -147,7 +152,9 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
     });
 
     if (error) {
-      console.error("Error signing in with Google:", error);
+      clientLogger.error("[AUTH_SIGNIN_FAILURE]", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }, [getSupabaseClient]);
@@ -155,12 +162,14 @@ export function AuthProvider({ children, deferInitialAuth = false }: AuthProvide
   const signOut = useCallback(async () => {
     const supabase = await getSupabaseClient();
     if (!supabase) {
-      console.error("Supabase client unavailable — cannot sign out.");
+      clientLogger.error("[AUTH_SIGNOUT_NO_CLIENT] Supabase client unavailable — cannot sign out.");
       return;
     }
     const { error } = await supabase.auth.signOut();
     if (error) {
-      console.error("Error signing out:", error);
+      clientLogger.error("[AUTH_SIGNOUT_FAILURE]", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }, [getSupabaseClient]);

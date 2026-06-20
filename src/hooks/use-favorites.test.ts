@@ -396,8 +396,7 @@ describe("useFavorites", () => {
       // Favorite should be REVERTED since cloud sync failed
       expect(result.current.favorites).not.toContain("story-1");
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Error syncing favorite to cloud:",
-        expect.any(Error)
+        expect.stringContaining("Error syncing favorite to cloud")
       );
 
       consoleSpy.mockRestore();
@@ -433,8 +432,7 @@ describe("useFavorites", () => {
       expect(JSON.parse(lastSetCall![1])).toEqual([]);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Error syncing favorite to cloud:",
-        expect.any(Error)
+        expect.stringContaining("Error syncing favorite to cloud")
       );
 
       consoleSpy.mockRestore();
@@ -519,8 +517,7 @@ describe("useFavorites", () => {
       expect(JSON.parse(lastSetCall![1])).toEqual(["story-1"]);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Error syncing favorite to cloud:",
-        expect.any(Error)
+        expect.stringContaining("Error syncing favorite to cloud")
       );
 
       consoleSpy.mockRestore();
@@ -619,8 +616,7 @@ describe("useFavorites", () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Error syncing favorites:",
-        expect.any(Error)
+        expect.stringContaining("Error syncing favorites")
       );
 
       consoleSpy.mockRestore();

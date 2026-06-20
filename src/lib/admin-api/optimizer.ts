@@ -1,5 +1,6 @@
 import type { AdminApiResponse } from "@/types/admin";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 
 interface OptimizerRunResult {
   success: boolean;
@@ -33,7 +34,7 @@ export async function triggerOptimizerRun(
 
     return { data: await response.json() };
   } catch (error) {
-    console.error("Error triggering optimizer run:", error);
+    clientLogger.error("Error triggering optimizer run", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }

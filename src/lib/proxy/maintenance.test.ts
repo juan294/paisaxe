@@ -124,8 +124,10 @@ describe("isMaintenanceModeEnabled", () => {
     const result = await isMaintenanceModeEnabled();
     expect(result).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      "Failed to fetch maintenance mode flag:",
-      503
+      expect.stringContaining("Failed to fetch maintenance mode flag")
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"status":503')
     );
   });
 
@@ -136,8 +138,7 @@ describe("isMaintenanceModeEnabled", () => {
     const result = await isMaintenanceModeEnabled();
     expect(result).toBe(false);
     expect(consoleError).toHaveBeenCalledWith(
-      "Error checking maintenance mode:",
-      expect.any(Error)
+      expect.stringContaining("Error checking maintenance mode")
     );
   });
 

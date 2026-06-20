@@ -341,7 +341,9 @@ describe('useTranslation', () => {
     render(<TestConsumer />);
 
     expect(spy).toHaveBeenCalledWith(
-      'useTranslation: LanguageProvider not found, using fallback. This may indicate a rendering issue.'
+      expect.stringContaining(
+        'useTranslation: LanguageProvider not found, using fallback. This may indicate a rendering issue.'
+      )
     );
 
     spy.mockRestore();

@@ -122,7 +122,7 @@ describe("embeddings", () => {
     });
 
     it("should log token usage", async () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
       const mockEmbedding = Array(512).fill(0.1);
       mockGet.mockResolvedValue(null);
       mockEmbed.mockResolvedValue({
@@ -134,7 +134,7 @@ describe("embeddings", () => {
       await generateEmbedding("test");
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("42 tokens")
+        expect.stringContaining('"total_tokens":42')
       );
       consoleSpy.mockRestore();
     });
@@ -249,7 +249,7 @@ describe("embeddings", () => {
     });
 
     it("should log total token usage for batch", async () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
       const mockEmbedding = Array(512).fill(0.1);
       mockEmbed.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
@@ -260,7 +260,10 @@ describe("embeddings", () => {
       await generateEmbeddings(["text1"]);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("total: 50 tokens")
+        expect.stringContaining("generateEmbeddings total")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"total_tokens":50')
       );
       consoleSpy.mockRestore();
     });
@@ -506,7 +509,7 @@ describe("embeddings", () => {
     });
 
     it("should log token usage per group", async () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
       const mockEmbedding = Array(1024).fill(0.1);
       mockContextualizedEmbed.mockResolvedValue({
         data: [
@@ -522,16 +525,16 @@ describe("embeddings", () => {
       await generateContextualizedEmbeddings([["chunk1"]]);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("88 tokens")
+        expect.stringContaining('"group_tokens":88')
       );
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("contextualizedEmbed group 0")
+        expect.stringContaining("contextualizedEmbed group")
       );
       consoleSpy.mockRestore();
     });
 
     it("should log total summary across all groups", async () => {
-      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
       const mockEmbedding = Array(1024).fill(0.1);
       mockContextualizedEmbed.mockResolvedValue({
         data: [
@@ -547,7 +550,10 @@ describe("embeddings", () => {
       await generateContextualizedEmbeddings([["chunk1"], ["chunk2"]]);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("generateContextualizedEmbeddings total: 100 tokens for 2 groups")
+        expect.stringContaining("generateContextualizedEmbeddings total")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"total_tokens":100')
       );
       consoleSpy.mockRestore();
     });

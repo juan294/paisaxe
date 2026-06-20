@@ -538,8 +538,7 @@ describe("useFeatureFlags cache behavior", () => {
     expect(result2.current.flags).toEqual(flags);
     // Should have warned about using cached data
     expect(warnSpy).toHaveBeenCalledWith(
-      "Failed to refresh feature flags, using cached:",
-      expect.any(Error)
+      expect.stringContaining("Failed to refresh feature flags, using cached")
     );
 
     warnSpy.mockRestore();

@@ -611,8 +611,10 @@ describe("claude", () => {
 
       expect(response).toBe("Response despite stderr");
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[Claude API] curl stderr:",
-        "* Connection #0 to host api.anthropic.com left intact"
+        expect.stringContaining("[Claude API] curl stderr")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Connection #0 to host api.anthropic.com left intact")
       );
 
       consoleSpy.mockRestore();
@@ -636,8 +638,10 @@ describe("claude", () => {
 
       expect(response).toBe("Oviedo is great");
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[Claude API] curl stderr:",
-        "curl: warning: something minor"
+        expect.stringContaining("[Claude API] curl stderr")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("curl: warning: something minor")
       );
 
       consoleSpy.mockRestore();
@@ -656,9 +660,11 @@ describe("claude", () => {
       const response = await generateChatResponse("Test", []);
 
       expect(response).toBe("Clean response");
-      // console.error should NOT be called with the stderr prefix
+      // logger.error should NOT be called with the stderr message
       const stderrCalls = consoleSpy.mock.calls.filter(
-        (call) => call[0] === "[Claude API] curl stderr:"
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("[Claude API] curl stderr")
       );
       expect(stderrCalls).toHaveLength(0);
 
@@ -913,8 +919,10 @@ describe("claude", () => {
       }
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[Claude Streaming] curl stderr:",
-        "curl warning"
+        expect.stringContaining("[Claude Streaming] curl stderr")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("curl warning")
       );
       consoleSpy.mockRestore();
     });

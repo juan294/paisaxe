@@ -719,8 +719,7 @@ describe("VoiceChatElevenLabs", () => {
       // The error should be caught silently (logged to console)
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith(
-          "Failed to end conversation:",
-          expect.any(Error)
+          expect.stringContaining("[VOICE_END_FAILURE]")
         );
       });
 

@@ -228,7 +228,7 @@ export async function checkRateLimit(
       return result;
     } catch (err) {
       _rateLimitDegraded = true;
-      console.error("[RATE_LIMIT_FALLBACK]", {
+      logger.error("[RATE_LIMIT_FALLBACK]", {
         identifier,
         error: err instanceof Error ? err.message : String(err),
       });

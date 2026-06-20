@@ -9,6 +9,7 @@ const VoiceAgentChat = dynamic(
 );
 import { ELEVENLABS_AGENT_IDS } from "@/config/elevenlabs-agents";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 import type {
   MarketingDashboardSummary,
   MarketingPlatform,
@@ -84,7 +85,7 @@ export function MarketingDashboard() {
       }
       loadData();
     } catch (err) {
-      console.error("Toggle account error:", err);
+      clientLogger.error("Toggle account error", { error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -103,7 +104,7 @@ export function MarketingDashboard() {
       }
       loadData();
     } catch (err) {
-      console.error("Disconnect account error:", err);
+      clientLogger.error("Disconnect account error", { error: err instanceof Error ? err.message : String(err) });
     }
   };
 

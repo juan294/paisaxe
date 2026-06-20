@@ -439,8 +439,10 @@ describe("MarketingDashboard", () => {
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Disconnect account error:",
-        expect.any(Error)
+        expect.stringContaining("Disconnect account error")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"Disconnect failed"')
       );
     });
 
@@ -470,8 +472,10 @@ describe("MarketingDashboard", () => {
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Toggle account error:",
-        expect.any(Error)
+        expect.stringContaining("Toggle account error")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"Pause failed"')
       );
     });
 
@@ -631,8 +635,10 @@ describe("MarketingDashboard", () => {
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Toggle account error:",
-        expect.any(Error)
+        expect.stringContaining("Toggle account error")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"Resume failed"')
       );
     });
 
@@ -729,8 +735,10 @@ describe("MarketingDashboard", () => {
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Toggle account error:",
-        expect.objectContaining({ message: "Failed to pause account" })
+        expect.stringContaining("Toggle account error")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"Failed to pause account"')
       );
     });
 
@@ -766,8 +774,10 @@ describe("MarketingDashboard", () => {
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Toggle account error:",
-        expect.objectContaining({ message: "Failed to resume account" })
+        expect.stringContaining("Toggle account error")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"Failed to resume account"')
       );
     });
 
@@ -826,8 +836,10 @@ describe("MarketingDashboard", () => {
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Disconnect account error:",
-        expect.objectContaining({ message: "Failed to disconnect account" })
+        expect.stringContaining("Disconnect account error")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"Failed to disconnect account"')
       );
     });
 

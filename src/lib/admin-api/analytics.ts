@@ -4,6 +4,7 @@ import type { ElevenLabsAnalyticsDashboardData } from "@/types/elevenlabs-analyt
 import type { StripeAnalyticsDashboardData } from "@/types/stripe-analytics";
 import type { GitHubAnalyticsDashboardData } from "@/types/github-analytics";
 import { csrfHeaders } from "@/lib/csrf-client";
+import { clientLogger } from "@/lib/client-logger";
 
 const API_BASE = "/api/admin";
 
@@ -30,7 +31,7 @@ export async function fetchAnalytics(
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching analytics:", error);
+    clientLogger.error("Error fetching analytics", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -56,7 +57,7 @@ export async function fetchElevenLabsAnalytics(
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching ElevenLabs analytics:", error);
+    clientLogger.error("Error fetching ElevenLabs analytics", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -86,7 +87,7 @@ export async function fetchStripeAnalytics(
       warning: result.warning,
     };
   } catch (error) {
-    console.error("Error fetching Stripe analytics:", error);
+    clientLogger.error("Error fetching Stripe analytics", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -112,7 +113,7 @@ export async function fetchGithubAnalytics(
 
     return await response.json();
   } catch (error) {
-    console.error("Error fetching GitHub analytics:", error);
+    clientLogger.error("Error fetching GitHub analytics", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }
@@ -134,7 +135,7 @@ export async function syncGithubTraffic(): Promise<AdminApiResponse<{ synced: bo
 
     return { data: await response.json() };
   } catch (error) {
-    console.error("Error syncing GitHub traffic:", error);
+    clientLogger.error("Error syncing GitHub traffic", { error: error instanceof Error ? error.message : String(error) });
     return { error: "Network error" };
   }
 }

@@ -260,8 +260,10 @@ describe("rate-limit", () => {
       expect(result.limit).toBe(10);
       expect(result.retryAfter).toBe(60);
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[RATE_LIMIT_FALLBACK]",
-        expect.objectContaining({ identifier: "user1" })
+        expect.stringContaining("[RATE_LIMIT_FALLBACK]")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"identifier":"user1"')
       );
 
       vi.unstubAllEnvs();

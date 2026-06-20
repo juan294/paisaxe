@@ -974,10 +974,14 @@ describe("Auth session refresh - error logging", () => {
     await proxy(request);
 
     // The timeout error message is "Auth refresh timeout" — should be silently caught
-    expect(console.error).not.toHaveBeenCalledWith(
-      "Error refreshing auth session:",
-      expect.anything()
-    );
+    const refreshCalls = vi
+      .mocked(console.error)
+      .mock.calls.filter(
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("Error refreshing auth session")
+      );
+    expect(refreshCalls).toHaveLength(0);
   }, 10_000);
 
   it("should log when error is an Error with non-timeout message", async () => {
@@ -991,8 +995,10 @@ describe("Auth session refresh - error logging", () => {
     await proxy(request);
 
     expect(console.error).toHaveBeenCalledWith(
-      "Error refreshing auth session:",
-      realError
+      expect.stringContaining("Error refreshing auth session")
+    );
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("fetch failed")
     );
   });
 
@@ -1006,10 +1012,14 @@ describe("Auth session refresh - error logging", () => {
     await proxy(request);
 
     // Not an Error instance, so the condition (error instanceof Error) is false
-    expect(console.error).not.toHaveBeenCalledWith(
-      "Error refreshing auth session:",
-      expect.anything()
-    );
+    const refreshCalls = vi
+      .mocked(console.error)
+      .mock.calls.filter(
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("Error refreshing auth session")
+      );
+    expect(refreshCalls).toHaveLength(0);
   });
 });
 
