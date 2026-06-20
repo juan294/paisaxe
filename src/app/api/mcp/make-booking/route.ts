@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
-import { createAdminClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 import { getMcpIdempotencyKey, validateMcpSecret } from "@/lib/mcp-auth";
 import { makeBookingRequestSchema } from "@/lib/schemas";
+import {
+  ACTIVE_BOOKING_STATUSES,
+  claimPendingBooking,
+  isValidSpanishPhone,
+  markPendingBookingFailed,
+  normalizePhoneNumber,
+  persistBookingConversationId,
+  type BookingStatus,
+  type PendingBookingSnapshot,
+} from "@/lib/services/booking-service";
+import { initiateCall } from "@/lib/services/elevenlabs-call-service";
 
 /**
  * MCP-compatible Make Booking API endpoint for ElevenLabs voice agents.
@@ -23,56 +33,23 @@ import { makeBookingRequestSchema } from "@/lib/schemas";
  * 5. ElevenLabs orchestrates Twilio to call the business with Pelayo's voice
  * 6. Pelayo conducts a real conversation with the business staff
  * 7. Returns call status to Pelayo to communicate back to the user
+ *
+ * Business logic (phone validation/normalization, Spanish date/time formatting,
+ * pending_bookings persistence, and the outbound call) lives in
+ * `src/lib/services/booking-service.ts` and
+ * `src/lib/services/elevenlabs-call-service.ts` (#625). This handler stays thin:
+ * authenticate → validate → call services → format response.
  */
-
-interface MakeBookingRequest {
-  // Required fields
-  venue_name: string;
-  phone_number: string;
-  party_size: number;
-  date: string; // ISO date string or natural language like "hoy", "mañana"
-  time: string; // e.g., "20:00" or "9pm" or "esta noche"
-  customer_name: string;
-  customer_phone: string; // Contact number for the restaurant to call back
-
-  // Optional fields
-  special_requests?: string;
-  language?: "es" | "en"; // Default to Spanish for Asturias
-}
 
 interface MakeBookingResponse {
   success: boolean;
   message: string;
   call_sid?: string;
-  status?:
-    | "initiated"
-    | "queued"
-    | "failed"
-    | "not_configured"
-    | "duplicate"
-    | "degraded"
-    | "initiating"
-    | "pending"
-    | "confirmed"
-    | "denied"
-    | "no_answer";
+  status?: BookingStatus;
   estimated_wait?: string;
   fallback_action?: string;
   recovery_action?: string;
 }
-
-interface PendingBookingSnapshot {
-  conversation_id: string | null;
-  status: NonNullable<MakeBookingResponse["status"]> | string | null;
-  venue_name: string | null;
-  outcome_message: string | null;
-}
-
-const ACTIVE_BOOKING_STATUSES = new Set<string>([
-  "initiating",
-  "pending",
-  "confirmed",
-]);
 
 function buildClaimPersistenceFailureResponse(): NextResponse<MakeBookingResponse> {
   return NextResponse.json<MakeBookingResponse>(
@@ -88,8 +65,7 @@ function buildClaimPersistenceFailureResponse(): NextResponse<MakeBookingRespons
 function buildPriorBookingStateResponse(
   booking: PendingBookingSnapshot
 ): NextResponse<MakeBookingResponse> {
-  const status =
-    (booking.status as MakeBookingResponse["status"] | null) ?? "pending";
+  const status = (booking.status as BookingStatus | null) ?? "pending";
   const venueName = booking.venue_name ?? "the venue";
 
   return NextResponse.json<MakeBookingResponse>({
@@ -102,25 +78,16 @@ function buildPriorBookingStateResponse(
   });
 }
 
-async function getPriorBookingByIdempotencyKey(
-  idempotencyKey: string
-): Promise<PendingBookingSnapshot | null> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("pending_bookings")
-    .select("conversation_id, status, venue_name, outcome_message")
-    .eq("idempotency_key", idempotencyKey)
-    .maybeSingle();
-
-  if (error) {
-    logger.error("[MAKE_BOOKING_IDEMPOTENCY_LOOKUP_FAILED]", {
-      idempotency_key: idempotencyKey,
-      error,
-    });
-    return null;
-  }
-
-  return (data as PendingBookingSnapshot | null) ?? null;
+function buildIdempotencyConflictResponse(): NextResponse<MakeBookingResponse> {
+  return NextResponse.json<MakeBookingResponse>(
+    {
+      success: false,
+      message:
+        "A booking request with this Idempotency Key is already being processed.",
+      status: "duplicate",
+    },
+    { status: 409 }
+  );
 }
 
 function buildConversationPersistenceFailureResponse(
@@ -138,243 +105,6 @@ function buildConversationPersistenceFailureResponse(
     },
     { status: 202 }
   );
-}
-
-async function markPendingBookingFailed(
-  pendingRowId: string,
-  idempotencyKey: string,
-  outcomeMessage: string,
-  logContext: Record<string, unknown> = {}
-): Promise<void> {
-  try {
-    const supabase = createAdminClient();
-    const { error } = await supabase
-      .from("pending_bookings")
-      .update({
-        status: "failed",
-        outcome_message: outcomeMessage,
-      })
-      .eq("id", pendingRowId);
-
-    if (error) {
-      logger.error("[MAKE_BOOKING_PENDING_FAIL_MARK_FAILED]", {
-        pending_booking_id: pendingRowId,
-        idempotency_key: idempotencyKey,
-        error,
-        ...logContext,
-      });
-    }
-  } catch (error) {
-    logger.error("[MAKE_BOOKING_PENDING_FAIL_MARK_DB_ERROR]", {
-      pending_booking_id: pendingRowId,
-      idempotency_key: idempotencyKey,
-      error,
-      ...logContext,
-    });
-  }
-}
-
-// Validate Spanish phone number format
-function isValidSpanishPhone(phone: string): boolean {
-  // Remove spaces and dashes
-  const cleaned = phone.replace(/[\s-]/g, "");
-
-  // Spanish phone numbers:
-  // - Start with +34 followed by 9 digits, OR
-  // - Start with 34 followed by 9 digits, OR
-  // - Just 9 digits starting with 6, 7, 8, or 9
-  const patterns = [
-    /^\+34[6789]\d{8}$/, // International format
-    /^34[6789]\d{8}$/, // International without +
-    /^[6789]\d{8}$/, // National format
-  ];
-
-  return patterns.some((pattern) => pattern.test(cleaned));
-}
-
-// Normalize phone to E.164 format for Twilio
-function normalizePhoneNumber(phone: string): string {
-  const cleaned = phone.replace(/[\s-]/g, "");
-
-  if (cleaned.startsWith("+34")) {
-    return cleaned;
-  }
-  if (cleaned.startsWith("34")) {
-    return `+${cleaned}`;
-  }
-  // Assume Spanish number
-  return `+34${cleaned}`;
-}
-
-// Format date with correct Spanish grammar
-// "hoy" → "hoy" (no article)
-// "mañana" → "mañana" (no article)
-// "viernes" → "el viernes" (needs article)
-// "15 de febrero" → "el 15 de febrero" (needs article)
-function formatDateNatural(date: string): string {
-  const lowerDate = date.toLowerCase().trim();
-
-  // These don't need "el" prefix
-  const noArticle = ["hoy", "mañana", "pasado mañana"];
-  if (noArticle.includes(lowerDate)) {
-    return lowerDate;
-  }
-
-  // If it already starts with "el", return as-is
-  if (lowerDate.startsWith("el ")) {
-    return date;
-  }
-
-  // Everything else needs "el" (days of week, specific dates)
-  return `el ${date}`;
-}
-
-// Convert 24-hour time to natural Spanish format
-// "21:00" → "nueve de la noche"
-// "14:30" → "dos y media de la tarde"
-// "9:00" → "nueve de la mañana"
-function formatTimeNatural(time: string): string {
-  // If already in natural format, return as-is
-  if (!/^\d{1,2}[:.]\d{2}$/.test(time)) {
-    return time;
-  }
-
-  const [hourStr, minStr] = time.split(/[:.]/);
-  const hour = parseInt(hourStr, 10);
-  const min = parseInt(minStr, 10);
-
-  // Spanish number words
-  const numbers: Record<number, string> = {
-    1: "una",
-    2: "dos",
-    3: "tres",
-    4: "cuatro",
-    5: "cinco",
-    6: "seis",
-    7: "siete",
-    8: "ocho",
-    9: "nueve",
-    10: "diez",
-    11: "once",
-    12: "doce",
-  };
-
-  // Convert 24h to 12h
-  const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-  const hourWord = numbers[hour12] || String(hour12);
-
-  // Time of day
-  let period: string;
-  if (hour >= 6 && hour < 13) {
-    period = "de la mañana";
-  } else if (hour >= 13 && hour < 20) {
-    period = "de la tarde";
-  } else {
-    period = "de la noche";
-  }
-
-  // Handle minutes
-  if (min === 0) {
-    return `${hourWord} ${period}`;
-  } else if (min === 30) {
-    return `${hourWord} y media ${period}`;
-  } else if (min === 15) {
-    return `${hourWord} y cuarto ${period}`;
-  } else if (min === 45) {
-    const nextHour = hour12 === 12 ? 1 : hour12 + 1;
-    const nextHourWord = numbers[nextHour] || String(nextHour);
-    return `${nextHourWord} menos cuarto ${period}`;
-  } else {
-    return `${hourWord} y ${min} ${period}`;
-  }
-}
-
-// Make the outbound call via ElevenLabs API
-async function initiateCall(
-  phoneNumber: string,
-  request: MakeBookingRequest
-): Promise<{ success: boolean; callSid?: string; conversationId?: string; error?: string }> {
-  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
-  const phoneNumberId = process.env.ELEVENLABS_PHONE_NUMBER_ID?.trim();
-  // Use dedicated booking agent - NOT the tourism guide Pelayo
-  const bookingAgentId = process.env.ELEVENLABS_BOOKING_AGENT_ID?.trim();
-
-  if (!apiKey || !phoneNumberId || !bookingAgentId) {
-    return {
-      success: false,
-      error: "ElevenLabs booking agent not configured. Set ELEVENLABS_BOOKING_AGENT_ID in environment.",
-    };
-  }
-
-  try {
-    // Build request body for the dedicated booking agent
-    // The booking agent only needs reservation-specific variables
-    const requestBody: Record<string, unknown> = {
-      agent_id: bookingAgentId,
-      agent_phone_number_id: phoneNumberId,
-      to_number: phoneNumber,
-      conversation_initiation_client_data: {
-        dynamic_variables: {
-          customer_name: request.customer_name,
-          // Format phone for natural reading: remove +34 prefix for Spanish numbers
-          customer_phone: request.customer_phone.replace(/^\+34\s?/, ""),
-          party_size: String(request.party_size),
-          // Format date with correct grammar: "hoy" stays "hoy", "viernes" → "el viernes"
-          date: formatDateNatural(request.date),
-          // Convert 24h time to natural Spanish: "21:00" → "nueve de la noche"
-          time: formatTimeNatural(request.time),
-          special_requests: request.special_requests || "ninguna",
-        },
-      },
-    };
-
-    // Use US regional endpoint to match Twilio webhook configuration.
-    // 15-second timeout prevents hung requests from leaving pending_bookings rows
-    // stuck in 'initiating' state and causing 409 conflicts on retry (BE-H4).
-    const response = await fetch(
-      "https://api.us.elevenlabs.io/v1/convai/twilio/outbound-call",
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(15_000),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      logger.error("[MAKE_BOOKING_ELEVENLABS_REQUEST_FAILED]", {
-        response_status: response.status,
-        error_body: data,
-      });
-      return {
-        success: false,
-        error: data.detail?.message || data.message || `ElevenLabs API error: ${response.status}`,
-      };
-    }
-
-    return {
-      success: true,
-      callSid:
-        typeof data.callSid === "string" && data.callSid.trim()
-          ? data.callSid
-          : undefined,
-      conversationId:
-        typeof data.conversation_id === "string" && data.conversation_id.trim()
-          ? data.conversation_id
-          : undefined,
-    };
-  } catch (error) {
-    logger.error("[MAKE_BOOKING_CALL_INITIATION_FAILED]", { error });
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -435,7 +165,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json<MakeBookingResponse>(
         {
           success: false,
-          message: "Invalid Spanish phone number. Please provide a valid Spanish phone number.",
+          message:
+            "Invalid Spanish phone number. Please provide a valid Spanish phone number.",
           status: "failed",
           fallback_action:
             "Ask the user to confirm the phone number or search for the restaurant again.",
@@ -458,20 +189,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
     }
 
-    // Build the full request object (party_size already validated as number by Zod)
-    const callRequest: MakeBookingRequest = {
-      venue_name,
-      phone_number,
-      party_size,
-      date,
-      time,
-      customer_name,
-      customer_phone,
-      special_requests: params.special_requests,
-      language: params.language || "es",
-    };
-
-    // Normalize phone number for calling
+    // Normalize phone numbers for calling
     const normalizedPhone = normalizePhoneNumber(phone_number);
     const normalizedCustomerPhone = normalizePhoneNumber(customer_phone);
     const idempotencyKey = getMcpIdempotencyKey(request);
@@ -490,74 +208,40 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     // Claim the booking request before the outbound call so retries cannot place duplicates.
-    let pendingRowId: string | null = null;
-    try {
-      const supabase = createAdminClient();
-      const { data: insertedRows, error: insertError } = await supabase
-        .from("pending_bookings")
-        .insert({
-          idempotency_key: idempotencyKey,
-          conversation_id: null,
-          venue_name,
-          venue_phone: normalizedPhone,
-          customer_name,
-          customer_phone: normalizedCustomerPhone,
-          party_size: Number(party_size),
-          booking_date: date,
-          booking_time: time,
-          special_requests: params.special_requests || null,
-          status: "initiating",
-        })
-        .select("id");
+    const claim = await claimPendingBooking({
+      idempotencyKey,
+      venueName: venue_name,
+      venuePhone: normalizedPhone,
+      customerName: customer_name,
+      customerPhone: normalizedCustomerPhone,
+      partySize: party_size,
+      bookingDate: date,
+      bookingTime: time,
+      specialRequests: params.special_requests || null,
+    });
 
-      if (insertError) {
-        if ((insertError as { code?: string }).code === "23505") {
-          const priorBooking = await getPriorBookingByIdempotencyKey(idempotencyKey);
-          if (priorBooking) {
-            return buildPriorBookingStateResponse(priorBooking);
-          }
-
-          logger.error("[MAKE_BOOKING_IDEMPOTENCY_CONFLICT]", {
-            idempotency_key: idempotencyKey,
-            error: insertError,
-          });
-          return NextResponse.json<MakeBookingResponse>(
-            {
-              success: false,
-              message:
-                "A booking request with this Idempotency Key is already being processed.",
-              status: "duplicate",
-            },
-            { status: 409 }
-          );
-        }
-
-        logger.error("[MAKE_BOOKING_PENDING_INSERT_FAILED]", {
-          idempotency_key: idempotencyKey,
-          error: insertError,
-        });
-        return buildClaimPersistenceFailureResponse();
+    if (claim.kind === "duplicate") {
+      if (claim.priorBooking) {
+        return buildPriorBookingStateResponse(claim.priorBooking);
       }
+      return buildIdempotencyConflictResponse();
+    }
 
-      pendingRowId = (insertedRows?.[0] as { id?: string } | undefined)?.id ?? null;
-
-      if (!pendingRowId) {
-        logger.error("[MAKE_BOOKING_PENDING_INSERT_MISSING_ID]", {
-          idempotency_key: idempotencyKey,
-          inserted_rows: insertedRows,
-        });
-        return buildClaimPersistenceFailureResponse();
-      }
-    } catch (dbError) {
-      logger.error("[MAKE_BOOKING_PENDING_INSERT_DB_ERROR]", {
-        idempotency_key: idempotencyKey,
-        error: dbError,
-      });
+    if (claim.kind === "persistence_failed") {
       return buildClaimPersistenceFailureResponse();
     }
 
+    const pendingRowId = claim.pendingRowId;
+
     // Initiate the call via ElevenLabs
-    const result = await initiateCall(normalizedPhone, callRequest);
+    const result = await initiateCall(normalizedPhone, {
+      customer_name,
+      customer_phone,
+      party_size,
+      date,
+      time,
+      special_requests: params.special_requests,
+    });
 
     if (result.success) {
       // BE-B6: Now that we have the call ID, update the row with conversation_id and status='pending'.
@@ -583,44 +267,17 @@ export async function POST(request: Request): Promise<NextResponse> {
         );
       }
 
-      try {
-        const supabase = createAdminClient();
-        const { error: updateError } = await supabase
-          .from("pending_bookings")
-          .update({
-            conversation_id: conversationId,
-            status: "pending",
-          })
-          .eq("id", pendingRowId);
+      const persisted = await persistBookingConversationId(
+        pendingRowId,
+        conversationId,
+        idempotencyKey
+      );
 
-        if (updateError) {
-          logger.error("[MAKE_BOOKING_PENDING_UPDATE_FAILED]", {
-            pending_booking_id: pendingRowId,
-            idempotency_key: idempotencyKey,
-            conversation_id: conversationId,
-            error: updateError,
-          });
-          await markPendingBookingFailed(
-            pendingRowId,
-            idempotencyKey,
-            `Call initiated but conversation_id persistence failed for ${conversationId}. Manual recovery required.`,
-            { conversation_id: conversationId }
-          );
-          return buildConversationPersistenceFailureResponse(
-            result.callSid || result.conversationId
-          );
-        }
-      } catch (dbError) {
-        logger.error("[MAKE_BOOKING_PENDING_UPDATE_DB_ERROR]", {
-          pending_booking_id: pendingRowId,
-          idempotency_key: idempotencyKey,
-          conversation_id: conversationId,
-          error: dbError,
-        });
+      if (!persisted) {
         await markPendingBookingFailed(
           pendingRowId,
           idempotencyKey,
-          `Call initiated but conversation_id persistence threw for ${conversationId}. Manual recovery required.`,
+          `Call initiated but conversation_id persistence failed for ${conversationId}. Manual recovery required.`,
           { conversation_id: conversationId }
         );
         return buildConversationPersistenceFailureResponse(
