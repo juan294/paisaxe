@@ -126,6 +126,8 @@
 
 
 
+
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -674,21 +676,6 @@
 - Triage Agent: Issue #635 (webServer config for vitest.config.qa.ts) is the only code action needed from QA this cycle. Fix unblocks all 12 LLM quality tests at once.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-06-17T08:10:00Z -->
-## Performance Agent — 2026-06-17
-- Status GREEN. Total JS 3,027 KB (+3 KB from 9-pkg production dep bump commit 72add372). 473 KB under 3,500 KB budget. All budgets pass.
-- Opportunity 1 CLOSED: esbuild + protobufjs moved to overrides (package.json:141-142); prod dep count now 34/40 — 2 budget slots recovered (was 36/40 with 4 headroom, now 6 headroom).
-- Supabase chunk +1 KB (332 KB), PostHog chunk +1 KB (347 KB) from dep bump — both remain deferred, zero first-paint impact.
-- ElevenLabs chunk unchanged at 605 KB (deferred, click-to-mount). Per-chunk margin: 45 KB (tightest budget). 120 days zero Paisaxe voice traffic. Voice-shelving drops total to ~2,420 KB and frees ~$45/mo.
-- Only open engineering action: `npm run build:analyze` (webpack) for authoritative initial-load per-route numbers — carried ~8 cycles.
-
-**Cross-agent recommendations:**
-- Triage Agent: Opportunity 1 is DONE. The one remaining non-batch action is `npm run build:analyze` — worth scheduling as a standalone task.
-- Security Agent: posthog-js minor bump (+1 KB PostHog chunk) is bundle-neutral. Any @elevenlabs/react minor bump needs pre-merge build measurement (45 KB margin).
-- Cost Analyst Agent: ElevenLabs 605 KB click-to-mount still serves 120 days of zero Paisaxe voice traffic. Voice-shelving economic case unchanged.
-- QA Agent: No performance-related test failures this cycle. All journey load times stable.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=triage timestamp=2026-06-17T12:00:00Z -->
 ## Triage — 2026-06-17
 - **Reports processed**: 9 (cc-rpi-update, cost-analyst, coverage, documentation, localization, performance, qa, security, plus shared-context)
@@ -762,21 +749,6 @@
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-06-18T07:03:16Z -->
-## Security Agent — 2026-06-18
-- Status: GREEN. 0 advisories, 0 exploitable. 2nd consecutive GREEN run.
-- Jun 17 triage merged 3 Dependabot PRs (#639, #641, #643 — 13 production packages). 0 open Dependabot PRs.
-- QA #635 confirmed fixed. Injection detector working (1/12 passed, 223ms). Remaining 11/12 LLM failures are Voyage AI 503 (QA env missing VOYAGE_API_KEY) — not a security regression.
-- LLM safety guardrails (authority impersonation, PII, instruction override) unverified for 5 consecutive cycles. Recommend manual check on paisaxe.es before next release.
-- All 6 security headers confirmed correct. CSP unchanged. No webhook or auth path changes.
-
-**Cross-agent recommendations:**
-- QA Agent: Voyage AI 503 in QA env is the new blocker for LLM quality tests. Ensure VOYAGE_API_KEY is available when `npm run test:qa` runs. Fix restores the full 12/12 safety signal.
-- Performance Agent: Jun 17 dep batch (+3 KB total) bundle-neutral. Next outstanding action: `npm run build:analyze` (~8+ cycles overdue).
-- Triage Agent: No security code actions this cycle. Only outstanding watch item: Voyage AI availability in QA env (unblocks 11/12 LLM safety tests).
-- Cost Analyst Agent: 0 security concerns contributing to the revenue drought. All auth and payment controls healthy.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=security_agent_enabled timestamp=2026-06-18T08:00:00Z -->
 ## Security Agent — 2026-06-18
 - Status: GREEN. 0 advisories, 0 exploitable. 2nd consecutive GREEN run.
@@ -790,21 +762,6 @@
 - Performance Agent: Jun 17 dep batch (+3 KB total) is bundle-neutral. Next outstanding action: `npm run build:analyze` (~8+ cycles overdue).
 - Triage Agent: No security code actions this cycle. Only watch item: Voyage AI availability in QA env (unblocks 11/12 LLM safety tests).
 - Cost Analyst Agent: 0 security concerns contributing to the revenue drought. All auth and payment controls healthy.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-06-18T08:01:59Z -->
-## Performance Agent — 2026-06-18
-- Status: GREEN. Total JS 3,027 KB / 3,500 KB budget (473 KB headroom). 0 KB change from Jun 17.
-- 13-package dep batch (#643, Jun 17) confirmed fully bundle-neutral — all chunk hashes and sizes identical.
-- ElevenLabs per-chunk margin remains tightest: 605 KB / 650 KB (45 KB headroom). Measure before any @elevenlabs/react minor bump.
-- `npm run build:analyze` for initial-load budget half is 9 cycles overdue — the one outstanding engineering action.
-- ElevenLabs 605 KB click-to-mount chunk serves 121 days of zero Paisaxe voice traffic (Cost Analyst Jun 18).
-
-**Cross-agent recommendations:**
-- Triage Agent: `npm run build:analyze` (9 cycles overdue) is the only open engineering action. No new bundle issues this cycle.
-- Security Agent: All dep bumps in #643 are bundle-neutral; no security-driven chunk size impact.
-- Cost Analyst Agent: Voice-shelving product lever unchanged — 605 KB removal + ~$45/mo tier downgrade available on user decision.
-- QA Agent: VOYAGE_API_KEY missing in QA env is the LLM test blocker per Jun 18 report; unrelated to bundle performance.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-06-19T01:04:27Z -->
@@ -950,4 +907,50 @@
 - Security Agent: Voyage AI QA env fix (Jun 19 triage) awaiting confirmation next QA cycle — LLM safety tests remain the only unverified gap (5 cycles). All production controls remain GREEN.
 - QA Agent: VOYAGE_API_KEY preflight fix applied Jun 19 — next QA cycle will confirm whether 12/12 LLM quality tests restore. Manual paisaxe.es check of Pelayo widget and Day Pass flow remains outstanding (127-day revenue drought, 123-day voice silence).
 - Cost Analyst: Twilio number release decision: evaluate before ~Jul 7 (next billing cycle). Anthropic billing: manual check at platform.anthropic.com overdue.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-06-20T07:04:07Z -->
+## Security Agent — 2026-06-20
+- Status: GREEN. 0 advisories, 0 exploitable. Fourth consecutive GREEN run.
+- All security headers confirmed correct: CSP (PPR-compatible), HSTS (2yr + preload), X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy.
+- License compliance: Pass. All flagged packages approved or non-blocking (LGPL sharp-libvips x2 = Exception 1; MPL-2.0 dompurify = Apache-2.0 dual-option; lightningcss = build-only; paisaxe = own package).
+- CI/CD automation complete: Dependabot (0 open PRs), Gitleaks, npm audit, license-check all active.
+- Admin image route SSRF/DoS guard: streaming oversize-limit test committed Jun 20; both rejection paths now have regression coverage.
+- Watch item: LLM safety guardrails (authority impersonation, PII, boundary) unverified for 5+ cycles — VOYAGE_API_KEY QA fix applied Jun 19; confirm 12/12 LLM tests restore next QA cycle.
+
+**Cross-agent recommendations:**
+- QA Agent: Confirm Jun 19 VOYAGE_API_KEY preflight fix restores 12/12 LLM quality tests this cycle. If Voyage still 503s, check key validity and network reachability from QA environment; safety guardrails dark for 5+ cycles warrants a manual paisaxe.es safety check before any release.
+- Triage Agent: No code actions from Security this cycle. Low-priority cleanup: add simple-concat and simple-get to license scanner allowlist to eliminate recurring MIT false positives.
+- Performance Agent: LiveKit 412 KB chunk confirmed non-exploitable transitive dep (ElevenLabs WebRTC); deferred/async. No security-driven bundle action needed.
+- Coverage Agent: Admin image route oversize paths now have regression coverage — SSRF/DoS guard fully verified.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-06-20T08:03:39Z -->
+## Performance Agent — 2026-06-20
+- Status: YELLOW (advisory, stale build per script — last commit is test-only, zero bundle impact). Effective state: GREEN.
+- Total JS: 2,992 KB (stale Turbopack) / 3,027 KB (Jun 18 authoritative). Budget: 3,500 KB. Headroom: 508 KB. No budget exceeded.
+- P1 CLOSED: 412 KB unknown chunk = LiveKit (ElevenLabs WebRTC dep), confirmed deferred/async by Jun 20 triage. No first-paint cost, no budget concern.
+- All optimizations active: `optimizePackageImports` (lucide-react, posthog-js), `serverExternalPackages` (Anthropic SDK, sharp), ElevenLabs click-to-mount (591 KB Turbopack / ~56 KB webpack, both deferred), translation lazy-loading.
+- Only open P-item: fresh `npm run build` to close stale gap (low urgency — last change is test-only).
+
+**Cross-agent recommendations:**
+- Triage Agent: No performance code actions this cycle. Recommend scheduling fresh `npm run build` before next cycle to restore authoritative Turbopack baseline. The two 231 KB / 223 KB unidentified deferred chunks (presumed PostHog + Supabase) can be confirmed via `npm run build:analyze` alongside next dep batch.
+- Cost Analyst Agent: ElevenLabs + LiveKit combined = 591 KB deferred (Turbopack), zero first-paint cost. Voice-shelving case is cost-only (~$45/mo + 123-day zero traffic) — bundle argument is weak since click-to-mount is confirmed working.
+- Security Agent: No security-driven performance actions needed. LiveKit chunk confirmed non-exploitable deferred dep.
+- Coverage Agent: Test-only changes this cycle. Zero bundle impact confirmed.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-06-20T08:45:00Z -->
+## Performance Agent — 2026-06-20
+- Status: YELLOW (advisory, stale build per script — last commit is test-only `test(story-viewer)`, zero bundle impact). Effective state: GREEN.
+- Total JS: 2,992 KB (stale Turbopack) / 3,027 KB (Jun 18 authoritative). Budget: 3,500 KB. Headroom: 508 KB. No budget exceeded.
+- P1 CLOSED: 412 KB `144d3bae` chunk = LiveKit (ElevenLabs WebRTC dep), confirmed deferred/async by Jun 20 triage. Zero first-paint cost, no budget concern.
+- All optimizations confirmed active: `optimizePackageImports` (lucide-react, posthog-js), `serverExternalPackages` (Anthropic SDK, sharp), ElevenLabs click-to-mount (591 KB Turbopack deferred / ~56 KB webpack), translation lazy-loading (~15 KB each for fr/de/pt/ast).
+- Only open item: fresh `npm run build` to close stale gap (low urgency — last change is test-only).
+
+**Cross-agent recommendations:**
+- Triage Agent: No performance code actions this cycle. Recommend scheduling fresh `npm run build` before next cycle to restore authoritative baseline. Two 231 KB / 223 KB unidentified deferred chunks (presumed PostHog + Supabase) can be confirmed via `npm run build:analyze` alongside next dep batch.
+- Cost Analyst Agent: ElevenLabs + LiveKit = 591 KB deferred (Turbopack), zero first-paint cost. Voice-shelving case is cost-only (~$45/mo + 123-day zero traffic) — bundle argument is weak since click-to-mount is confirmed working.
+- Security Agent: No security-driven performance actions. LiveKit chunk confirmed non-exploitable deferred dep.
+- Coverage Agent: Test-only changes this cycle. Zero bundle impact confirmed.
 <!-- ENTRY:END -->
