@@ -1,12 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-06-18 06:00:03
-
-## Changes Made This Run
-
-No changes made to documentation files this run.
-
-- **Feature flags**: All 17 FeatureFlagKey values verified against `docs/project/features.md`. Zero gaps. Source: `src/types/feature-flags.ts`.
-- **API routes**: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, app-internal user APIs, internal health probes). The `health/db` endpoint (`GET /api/health/db`) is an internal diagnostic probe used by the QA agent, not for external consumption. No new documentation warranted.
+> Auto-generated on 2026-06-20 06:00:05
 
 ## CLAUDE.md Status
 
@@ -21,12 +14,15 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ```
 src/app/api/admin/agents/run/route.test.ts
 src/app/api/admin/agents/run/route.ts
+src/app/api/admin/agents/run/state.ts
 src/app/api/admin/feature-flags/[key]/route.test.ts
 src/app/api/admin/stories/[id]/image/route.test.ts
 src/app/api/chat/route.test.ts
 src/app/api/favorites/route.test.ts
 src/app/api/mcp/make-booking/route.test.ts
+src/app/api/mcp/places/route.test.ts
 src/app/auth/callback/route.test.ts
+src/app/favorites/page.test.tsx
 src/components/auth/auth-provider.test.tsx
 src/components/markdown/basic-markdown.test.tsx
 src/lib/proxy/cors.ts
@@ -119,7 +115,22 @@ webhooks/translate
 | CLAUDE.md | 2026-06-13 |
 | README.md | 2026-06-13 |
 
----
+## Changes Made This Run
+
+> Documentation Agent run on 2026-06-20. Status: GREEN. No documentation changes required.
+
+- **Feature flags**: No changes. All 17 keys in `src/types/feature-flags.ts` (`FeatureFlagKey`) are present in the Feature Flags Reference of `docs/project/features.md` (Discovery 7, Experience 4, Social 2, Voice 3, System 1). All 10 agent flags (Agents tab) are also documented. The `UNDOCUMENTED_FEATURE_FLAGS` gap list was empty. Zero gaps.
+- **API routes**: No changes. All 54 flagged routes are internal or already documented:
+  - Webhooks (`webhooks/elevenlabs`, `webhooks/stripe`, `webhooks/supabase`, `webhooks/translate`) are documented in the Infrastructure > Webhooks table.
+  - MCP voice-agent tools (`mcp/places`, `mcp/weather`, `mcp/make-booking`, `mcp/make-booking/status`) are documented in the Premium Voice Agent section.
+  - Health probes (`health/live`, `health/db`) are documented in the Infrastructure section.
+  - Admin APIs (`admin/*`), cron endpoints (`cron/*`), checkout endpoints (`checkout/*`), and app-internal user APIs (`chat`, `chat/stream`, `favorites`, `feature-flags`, `suggestions`, `voice-access`) are all internal — not meant for external consumption.
+  - No externally-consumable routes require new documentation.
+- **CLAUDE.md**: Current (last modified 2026-06-13). No additions needed.
+- **features.md**: Complete. No additions needed.
+- **Migrations**: No new migrations since the last documentation update.
+
+This is the thirtieth consecutive clean run.
 
 ---
 
