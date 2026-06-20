@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { verifyWebhookSignature, calculateExpiryDate } from "@/lib/stripe";
+import type { PurchaseType } from "@/lib/stripe";
 import { logger } from "@/lib/logger";
 import type Stripe from "stripe";
+
+const VALID_PURCHASE_TYPES = new Set<string>(["day_pass", "weekly_pass", "monthly_pass"]);
+const RPC_TIMEOUT_MS = 10_000;
+
+function resolvePurchaseType(raw: string | undefined): PurchaseType {
+  if (raw && VALID_PURCHASE_TYPES.has(raw)) {
+    return raw as PurchaseType;
+  }
+  return "day_pass";
+}
 
 type StripeUnrecoverableReason = "missing_user_id" | "missing_payment_intent";
 
@@ -70,17 +81,45 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return unrecoverableResponse(event.id, "missing_payment_intent");
     }
 
-    const expiresAt = calculateExpiryDate("day_pass");
+    const purchaseType = resolvePurchaseType(session.metadata?.purchase_type ?? undefined);
+    const expiresAt = calculateExpiryDate(purchaseType);
     const amountPaid = session.amount_total ?? 0;
     const supabase = createAdminClient();
-    const { data, error } = await supabase.rpc("grant_day_pass_idempotent", {
-      p_event_id: event.id,
-      p_event_type: event.type,
-      p_user_id: userId,
-      p_payment_provider_id: paymentProviderId,
-      p_expires_at: expiresAt.toISOString(),
-      p_amount_paid: amountPaid,
-    });
+
+    // BE-L2: wrap in a client-side timeout so Stripe retries if the DB is slow.
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("RPC_TIMEOUT")), RPC_TIMEOUT_MS)
+    );
+
+    let data: string | null;
+    let error: { message: string } | null;
+    try {
+      const result = await Promise.race([
+        supabase.rpc("grant_day_pass_idempotent", {
+          p_event_id: event.id,
+          p_event_type: event.type,
+          p_user_id: userId,
+          p_payment_provider_id: paymentProviderId,
+          p_expires_at: expiresAt.toISOString(),
+          p_amount_paid: amountPaid,
+          p_purchase_type: purchaseType,
+        }),
+        timeoutPromise,
+      ]);
+      data = result.data as string | null;
+      error = result.error as { message: string } | null;
+    } catch (raceErr) {
+      const isTimeout =
+        raceErr instanceof Error && raceErr.message === "RPC_TIMEOUT";
+      if (isTimeout) {
+        logger.error("[STRIPE_RPC_TIMEOUT]", {
+          eventId: event.id,
+          purchaseType,
+        });
+        return NextResponse.json({ error: "Database timeout" }, { status: 500 });
+      }
+      throw raceErr;
+    }
 
     if (error) {
       logger.error("[STRIPE_RPC_FAILURE]", {
@@ -93,6 +132,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     logger.info("[STRIPE_WEBHOOK_PROCESSED]", {
       eventId: event.id,
       status: data,
+      purchaseType,
       paymentProviderId,
       expiresAt: expiresAt.toISOString(),
       amountPaid,

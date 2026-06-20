@@ -38,11 +38,8 @@ export default function FavoritesPage() {
     if (isLoadingMore || !hasMore) return;
 
     setIsLoadingMore(true);
-    // Small delay to show loading state and prevent rapid firing
-    setTimeout(() => {
-      setDisplayCount(prev => Math.min(prev + ITEMS_PER_PAGE, favoriteStories.length));
-      setIsLoadingMore(false);
-    }, 300);
+    setDisplayCount(prev => Math.min(prev + ITEMS_PER_PAGE, favoriteStories.length));
+    setIsLoadingMore(false);
   }, [isLoadingMore, hasMore, favoriteStories.length]);
 
   // Intersection Observer for infinite scroll

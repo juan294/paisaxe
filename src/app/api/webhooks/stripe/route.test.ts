@@ -36,7 +36,8 @@ function createCheckoutSessionEvent(
   userId: string | undefined,
   paymentIntentId: string | null,
   eventId: string = "evt_test123",
-  amountTotal: number = 199
+  amountTotal: number = 199,
+  purchaseType?: string
 ): Stripe.Event {
   return {
     id: eventId,
@@ -60,7 +61,9 @@ function createCheckoutSessionEvent(
         payment_intent: paymentIntentId,
         payment_status: "paid",
         status: "complete",
-        metadata: userId ? { user_id: userId } : {},
+        metadata: userId
+          ? { user_id: userId, ...(purchaseType ? { purchase_type: purchaseType } : {}) }
+          : {},
       } as Stripe.Checkout.Session,
     },
   } as Stripe.Event;
@@ -201,6 +204,7 @@ describe("POST /api/webhooks/stripe", () => {
       p_payment_provider_id: "pi_duplicate",
       p_expires_at: "2024-01-02T00:00:00.000Z",
       p_amount_paid: 199,
+      p_purchase_type: "day_pass",
     });
   });
 
@@ -226,6 +230,7 @@ describe("POST /api/webhooks/stripe", () => {
       p_payment_provider_id: "pi_granted",
       p_expires_at: "2024-01-02T00:00:00.000Z",
       p_amount_paid: 299,
+      p_purchase_type: "day_pass",
     });
   });
 
@@ -350,6 +355,7 @@ describe("POST /api/webhooks/stripe", () => {
       p_payment_provider_id: "pi_zero_amount",
       p_expires_at: "2024-01-02T00:00:00.000Z",
       p_amount_paid: 0,
+      p_purchase_type: "day_pass",
     });
   });
 
@@ -412,6 +418,7 @@ describe("POST /api/webhooks/stripe", () => {
         p_payment_provider_id: "pi_atomic",
         p_expires_at: "2024-01-02T00:00:00.000Z",
         p_amount_paid: 199,
+        p_purchase_type: "day_pass",
       };
       expect(mockRpc).toHaveBeenNthCalledWith(
         1,
@@ -472,6 +479,7 @@ describe("POST /api/webhooks/stripe", () => {
         p_payment_provider_id: "pi_audit_shape",
         p_expires_at: "2024-01-02T00:00:00.000Z",
         p_amount_paid: 499,
+        p_purchase_type: "day_pass",
       });
       // The route must NOT do its own mismatched direct audit insert.
       expect(mockAuditFrom).not.toHaveBeenCalled();
@@ -500,6 +508,7 @@ describe("POST /api/webhooks/stripe", () => {
         p_payment_provider_id: "pi_audit_test",
         p_expires_at: "2024-01-02T00:00:00.000Z",
         p_amount_paid: 199,
+        p_purchase_type: "day_pass",
       });
     });
 
@@ -524,6 +533,7 @@ describe("POST /api/webhooks/stripe", () => {
         p_payment_provider_id: "pi_dup",
         p_expires_at: "2024-01-02T00:00:00.000Z",
         p_amount_paid: 199,
+        p_purchase_type: "day_pass",
       });
     });
 
@@ -567,5 +577,124 @@ describe("POST /api/webhooks/stripe", () => {
     expect(logger.error).toHaveBeenCalledWith("[STRIPE_WEBHOOK_FAILURE]", {
       error: "non-error-string-throw",
     });
+  });
+
+  // ─── BE-B1: purchase_type tier fulfillment ────────────────────────────────
+  describe("BE-B1: purchase_type read from metadata", () => {
+    it("uses weekly_pass expiry (7d) and passes purchase_type when metadata has weekly_pass", async () => {
+      // Arrange: calculateExpiryDate returns different dates per tier
+      const { calculateExpiryDate: realCalc } = await import("@/lib/stripe");
+      const weeklyExpiry = new Date("2024-01-08T00:00:00Z");
+      vi.mocked(realCalc).mockReturnValue(weeklyExpiry);
+
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent("user-weekly", "pi_weekly", "evt_weekly", 499, "weekly_pass")
+      );
+      mockRpc.mockResolvedValue({ data: "granted", error: null });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ status: "granted" });
+      // The RPC must receive p_purchase_type: 'weekly_pass' (not 'day_pass')
+      expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", expect.objectContaining({
+        p_purchase_type: "weekly_pass",
+        p_expires_at: weeklyExpiry.toISOString(),
+      }));
+    });
+
+    it("uses monthly_pass expiry (30d) and passes purchase_type when metadata has monthly_pass", async () => {
+      const { calculateExpiryDate: realCalc } = await import("@/lib/stripe");
+      const monthlyExpiry = new Date("2024-01-31T00:00:00Z");
+      vi.mocked(realCalc).mockReturnValue(monthlyExpiry);
+
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent("user-monthly", "pi_monthly", "evt_monthly", 999, "monthly_pass")
+      );
+      mockRpc.mockResolvedValue({ data: "granted", error: null });
+
+      const response = await POST(
+        createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", expect.objectContaining({
+        p_purchase_type: "monthly_pass",
+        p_expires_at: monthlyExpiry.toISOString(),
+      }));
+    });
+
+    it("defaults to day_pass when purchase_type is absent from metadata", async () => {
+      const { calculateExpiryDate: realCalc } = await import("@/lib/stripe");
+      const dayExpiry = new Date("2024-01-02T00:00:00Z");
+      vi.mocked(realCalc).mockReturnValue(dayExpiry);
+
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent("user-default", "pi_default", "evt_default", 199)
+        // no purchaseType — omitted
+      );
+      mockRpc.mockResolvedValue({ data: "granted", error: null });
+
+      await POST(createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" }));
+
+      expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", expect.objectContaining({
+        p_purchase_type: "day_pass",
+      }));
+    });
+
+    it("defaults to day_pass when purchase_type metadata value is invalid/unknown", async () => {
+      const { calculateExpiryDate: realCalc } = await import("@/lib/stripe");
+      const dayExpiry = new Date("2024-01-02T00:00:00Z");
+      vi.mocked(realCalc).mockReturnValue(dayExpiry);
+
+      vi.mocked(verifyWebhookSignature).mockReturnValue(
+        createCheckoutSessionEvent("user-bad-type", "pi_bad_type", "evt_bad_type", 199, "unknown_tier")
+      );
+      mockRpc.mockResolvedValue({ data: "granted", error: null });
+
+      await POST(createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" }));
+
+      expect(mockRpc).toHaveBeenCalledWith("grant_day_pass_idempotent", expect.objectContaining({
+        p_purchase_type: "day_pass",
+      }));
+    });
+  });
+
+  // ─── BE-L2: RPC timeout ───────────────────────────────────────────────────
+  describe("BE-L2: RPC client-side timeout", () => {
+    it("returns 500 and logs STRIPE_RPC_TIMEOUT when the RPC takes longer than 10s", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.mocked(verifyWebhookSignature).mockReturnValue(
+          createCheckoutSessionEvent("user-timeout", "pi_timeout", "evt_timeout")
+        );
+        // RPC hangs forever (simulates a slow DB call)
+        mockRpc.mockImplementation(() => new Promise(() => {}));
+
+        // Start the request and immediately advance time past the 10s timeout.
+        // Promise.race in the route should resolve the timeout branch.
+        const postPromise = POST(
+          createRequest(JSON.stringify({}), { "stripe-signature": "valid-signature" })
+        );
+        // Flush microtasks so the route's Promise.race is set up before we tick
+        await Promise.resolve();
+        await vi.advanceTimersByTimeAsync(11000);
+
+        const response = await postPromise;
+        const data = await response.json();
+
+        expect(response.status).toBe(500);
+        expect(data.error).toBe("Database timeout");
+        expect(logger.error).toHaveBeenCalledWith(
+          "[STRIPE_RPC_TIMEOUT]",
+          expect.objectContaining({ eventId: "evt_timeout" })
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    }, 15000);
   });
 });
