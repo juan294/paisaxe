@@ -133,6 +133,29 @@ describe("POST /api/cron/fail-stale-bookings", () => {
     expect(response.status).toBe(200);
   });
 
+  // BE-M1: When webhook secret is missing/wrong but admin auth succeeds, emit a warn
+  it("BE-M1: emits [CRON_AUTH_FALLBACK] warn when falling back from webhook secret to admin auth", async () => {
+    vi.mocked(verifyWebhookSecret).mockReturnValue(false);
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "admin-user",
+    });
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-bookings", {
+      method: "POST",
+    });
+
+    await POST(request);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "[CRON_AUTH_FALLBACK]",
+      expect.objectContaining({
+        source: "webhook",
+        fellBackTo: "admin_auth",
+      })
+    );
+  });
+
   it("returns 401 when neither webhook secret nor admin auth is valid", async () => {
     vi.mocked(verifyWebhookSecret).mockReturnValue(false);
     vi.mocked(validateAdminAuth).mockResolvedValue({

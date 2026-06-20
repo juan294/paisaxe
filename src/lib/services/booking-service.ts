@@ -29,7 +29,9 @@ export type BookingStatus =
   | "pending"
   | "confirmed"
   | "denied"
-  | "no_answer";
+  | "no_answer"
+  /** BE-H2: call timed out — row stays in 'initiating', cron/webhook reconciles */
+  | "timed_out";
 
 export interface PendingBookingSnapshot {
   conversation_id: string | null;

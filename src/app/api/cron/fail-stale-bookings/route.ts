@@ -70,6 +70,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!auth.valid) {
       return auth.error;
     }
+    // BE-M1: webhook secret was absent/wrong but admin auth succeeded — log for ops visibility
+    logger.warn("[CRON_AUTH_FALLBACK]", { source: "webhook", fellBackTo: "admin_auth" });
   }
 
   return failStaleBookings();

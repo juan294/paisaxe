@@ -24,6 +24,13 @@ export interface InitiateCallResult {
   callSid?: string;
   conversationId?: string;
   error?: string;
+  /**
+   * BE-H2: true when the call timed out or was aborted before ElevenLabs
+   * could respond. The caller should NOT mark the booking 'failed' — the
+   * row stays in 'initiating' so the stale-bookings cron or a late webhook
+   * can reconcile.
+   */
+  timedOut?: true;
 }
 
 /** Make the outbound call via the ElevenLabs Twilio integration. */
@@ -110,10 +117,25 @@ export async function initiateCall(
           : undefined,
     };
   } catch (error) {
-    logger.error("[MAKE_BOOKING_CALL_INITIATION_FAILED]", { error });
+    // BE-H2: Distinguish a timeout/abort (AbortError / TimeoutError emitted by
+    // AbortSignal.timeout) from a definitive ElevenLabs error.  On timeout we
+    // do NOT know whether ElevenLabs accepted the call, so callers must leave
+    // the pending_bookings row in 'initiating' for later reconciliation.
+    // We check .name directly (not just instanceof Error) because DOMException
+    // may not extend Error in all JS runtimes/environments.
+    const errorName = (error as { name?: string } | null)?.name;
+    const isTimeout =
+      errorName === "AbortError" || errorName === "TimeoutError";
+
+    logger.error("[MAKE_BOOKING_CALL_INITIATION_FAILED]", {
+      error,
+      timed_out: isTimeout,
+    });
+
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
+      ...(isTimeout ? { timedOut: true as const } : {}),
     };
   }
 }

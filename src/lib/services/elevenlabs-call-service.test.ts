@@ -151,4 +151,35 @@ describe("elevenlabs-call-service.initiateCall", () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe("Unknown error");
   });
+
+  // BE-H2: timeout/abort must set timedOut=true so callers can leave the row in
+  // 'initiating' rather than marking it 'failed' (late webhooks or cron can reconcile).
+  it("BE-H2: sets timedOut=true when fetch throws an AbortError (timeout signal)", async () => {
+    const abortError = new Error("The operation was aborted");
+    abortError.name = "AbortError";
+    mockFetch.mockRejectedValueOnce(abortError);
+
+    const result = await initiateCall("+34985887797", baseRequest);
+    expect(result.success).toBe(false);
+    expect(result.timedOut).toBe(true);
+    expect(result.error).toContain("aborted");
+  });
+
+  it("BE-H2: sets timedOut=true when fetch throws a TimeoutError", async () => {
+    const timeoutError = new Error("The operation timed out");
+    timeoutError.name = "TimeoutError";
+    mockFetch.mockRejectedValueOnce(timeoutError);
+
+    const result = await initiateCall("+34985887797", baseRequest);
+    expect(result.success).toBe(false);
+    expect(result.timedOut).toBe(true);
+  });
+
+  it("BE-H2: does NOT set timedOut for a generic non-timeout error", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("connection refused"));
+
+    const result = await initiateCall("+34985887797", baseRequest);
+    expect(result.success).toBe(false);
+    expect(result.timedOut).toBeUndefined();
+  });
 });

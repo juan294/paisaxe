@@ -2486,21 +2486,28 @@ describe("/api/mcp/make-booking", () => {
       expect(options.signal).toBeInstanceOf(AbortSignal);
     });
 
-    it("BE-H4: should return 500 with failed status when ElevenLabs fetch times out (AbortError)", async () => {
+    // BE-H2 regression: a timeout/abort must NOT produce a terminal 'failed' row.
+    // The pending_bookings row must stay in 'initiating' so the stale-bookings cron
+    // or a late webhook can reconcile.  The response must NOT be 500.
+    it("BE-H2: timeout leaves pending_bookings row in 'initiating' (does not call markPendingBookingFailed)", async () => {
       process.env.ELEVENLABS_API_KEY = "test-api-key";
       process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
       process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
 
-      // Simulate a timeout by throwing a DOMException with name "TimeoutError"
-      const abortError = new DOMException("The operation was aborted due to timeout", "TimeoutError");
-      mockFetch.mockRejectedValueOnce(abortError);
+      // Simulate AbortSignal.timeout() firing — name is "TimeoutError"
+      const timeoutError = new DOMException("The operation timed out", "TimeoutError");
+      mockFetch.mockRejectedValueOnce(timeoutError);
+
+      // Track whether markPendingBookingFailed is called (it calls update().eq())
+      const mockEq = vi.fn().mockResolvedValue({ error: null });
+      mockUpdate.mockReturnValue({ eq: mockEq });
 
       const request = new Request("http://localhost:3000/api/mcp/make-booking", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-mcp-secret": MCP_SECRET,
-          "idempotency-key": "be-h4-timeout-key",
+          "idempotency-key": "be-h2-timeout-key",
         },
         body: JSON.stringify({
           venue_name: "Casa Gerardo",
@@ -2516,9 +2523,48 @@ describe("/api/mcp/make-booking", () => {
       const response = await POST(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.success).toBe(false);
-      expect(data.status).toBe("failed");
+      // Must NOT be 500 (that would imply terminal failure)
+      expect(response.status).not.toBe(500);
+      // Must NOT mark the booking as definitively failed
+      expect(data.status).not.toBe("failed");
+      // markPendingBookingFailed calls update().eq() — verify it was NOT called
+      expect(mockEq).not.toHaveBeenCalled();
+    });
+
+    it("BE-H2: late webhook can still match booking row after a timeout (row stays in initiating)", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // AbortError variant (e.g., AbortController fires)
+      const abortError = new DOMException("The operation was aborted", "AbortError");
+      mockFetch.mockRejectedValueOnce(abortError);
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "be-h2-abort-key",
+        },
+        body: JSON.stringify({
+          venue_name: "El Molino",
+          phone_number: "+34985123456",
+          party_size: 3,
+          date: "mañana",
+          time: "14:00",
+          customer_name: "María González",
+          customer_phone: "612987654",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Response must be non-terminal: 202 (accepted but outcome unknown)
+      expect(response.status).toBe(202);
+      // Status must communicate that reconciliation is pending
+      expect(data.status).toBe("timed_out");
     });
   });
 });
