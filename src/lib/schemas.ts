@@ -117,7 +117,8 @@ export const makeBookingRequestSchema = z.preprocess((body) => {
 export const favoritesPostSchema = z.object({
   storyIds: z
     .array(uuidSchema)
-    .min(1, "storyIds array must not be empty"),
+    .min(1, "storyIds array must not be empty")
+    .max(200, "storyIds array must not exceed 200 items"),
 });
 
 // ---------------------------------------------------------------------------
@@ -325,7 +326,9 @@ export const chatRequestSchema = z
     };
   });
 
-export type ChatRequest = z.infer<typeof chatRequestSchema>;
+// AR-L1: ChatRequest type removed — was an unused export (Knip). The inferred
+// type of chatRequestSchema is available via z.infer<typeof chatRequestSchema>
+// at call sites if needed.
 
 // ---------------------------------------------------------------------------
 // admin/agent-config PUT

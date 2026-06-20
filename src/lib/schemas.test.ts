@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chatRequestSchema } from "./schemas";
+import { chatRequestSchema, favoritesPostSchema } from "./schemas";
 
 /**
  * BE-L3 (#524): the chat schema is now the single validation path. These tests
@@ -85,5 +85,37 @@ describe("chatRequestSchema", () => {
     if (result.success) {
       expect(result.data.messageIndex).toBe(0);
     }
+  });
+});
+
+// ─── BE-L1: favoritesPostSchema array bounds ───────────────────────────────
+describe("favoritesPostSchema", () => {
+  const validUuid = "550e8400-e29b-41d4-a716-446655440000";
+
+  it("accepts an array of 1 UUID", () => {
+    const result = favoritesPostSchema.safeParse({ storyIds: [validUuid] });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts an array of 200 UUIDs", () => {
+    // Generate 200 unique-enough UUIDs by varying the last segment
+    const ids = Array.from({ length: 200 }, (_, i) =>
+      `550e8400-e29b-41d4-a716-${String(i).padStart(12, "0")}`
+    );
+    const result = favoritesPostSchema.safeParse({ storyIds: ids });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an array of 201 UUIDs (BE-L1: missing .max(200))", () => {
+    const ids = Array.from({ length: 201 }, (_, i) =>
+      `550e8400-e29b-41d4-a716-${String(i).padStart(12, "0")}`
+    );
+    const result = favoritesPostSchema.safeParse({ storyIds: ids });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty array", () => {
+    const result = favoritesPostSchema.safeParse({ storyIds: [] });
+    expect(result.success).toBe(false);
   });
 });
