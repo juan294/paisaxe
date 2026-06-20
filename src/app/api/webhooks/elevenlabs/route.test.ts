@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { createHmac } from "crypto";
 
 // Mock modules before importing route
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
@@ -21,7 +21,7 @@ vi.mock("@/lib/twilio-sms", () => ({
 
 import { POST } from "./route";
 import { logger } from "@/lib/logger";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { isFeatureFlagEnabled } from "@/lib/feature-flags-server";
 import { sendSMS } from "@/lib/twilio-sms";
 

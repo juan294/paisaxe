@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
 import { verifyVercelCron, verifyWebhookSecret } from "@/lib/cron-auth";
 import { logger } from "@/lib/logger";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 /**
  * GET|POST /api/cron/fail-stale-bookings

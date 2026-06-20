@@ -65,6 +65,9 @@ jobs:
       - name: Validate migrations
         run: npm run check-migrations
 
+      - name: Check circular dependencies
+        run: npm run lint:deps
+
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -199,13 +202,18 @@ jobs:
 
               if [ "$state" = "success" ] && [ -n "$preview_url" ]; then
                 echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+                echo "vercel_outcome=success" >> "$GITHUB_OUTPUT"
                 echo "Preview URL: $preview_url"
                 exit 0
               fi
 
               if [ "$state" = "failure" ] || [ "$state" = "error" ]; then
-                echo "Vercel deployment failed with state=$state — skipping smoke probes"
+                echo "::warning::Vercel preview deployment FAILED (state=$state) — smoke probes skipped. Check Vercel dashboard for build logs."
+                echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
+                echo ":x: **Vercel preview deployment failed** (state=\`$state\`). Smoke probes were not run." >> "$GITHUB_STEP_SUMMARY"
+                echo "Check the [Vercel dashboard](https://vercel.com/dashboard) for build error details." >> "$GITHUB_STEP_SUMMARY"
                 echo "url=" >> "$GITHUB_OUTPUT"
+                echo "vercel_outcome=failed" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             else
@@ -215,11 +223,16 @@ jobs:
             sleep 15
           done
 
-          echo "Timed out waiting for Vercel preview deployment — skipping smoke probes"
+          echo "::warning::Timed out waiting for Vercel preview deployment after 5 minutes — smoke probes skipped. Verify the deployment manually."
+          echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
+          echo ":warning: **Vercel preview deployment timed out** after 5 minutes. Smoke probes were not run." >> "$GITHUB_STEP_SUMMARY"
+          echo "Verify the deployment at the [Vercel dashboard](https://vercel.com/dashboard) manually." >> "$GITHUB_STEP_SUMMARY"
           echo "url=" >> "$GITHUB_OUTPUT"
+          echo "vercel_outcome=timeout" >> "$GITHUB_OUTPUT"
 
       - name: Smoke check - liveness endpoint
         if: steps.vercel-wait.outputs.url != ''
+        id: smoke-live
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
@@ -230,7 +243,9 @@ jobs:
             "$PREVIEW_URL/api/health/live" \
             -o /tmp/live.json -w "%{http_code}")
           if [ "$response" != "200" ]; then
-            echo "Liveness check failed: HTTP $response"
+            echo "::warning::Smoke probe FAILED: /api/health/live returned HTTP $response on $PREVIEW_URL"
+            echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
+            echo ":x: **Liveness probe failed**: \`/api/health/live\` returned HTTP $response on \`$PREVIEW_URL\`" >> "$GITHUB_STEP_SUMMARY"
             cat /tmp/live.json
             exit 1
           fi
@@ -239,8 +254,18 @@ jobs:
 
       - name: Smoke check - health endpoint
         if: steps.vercel-wait.outputs.url != ''
+        id: smoke-health
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           PREVIEW_URL="${{ steps.vercel-wait.outputs.url }}"
-          node scripts/check-health-readiness.mjs "$PREVIEW_URL"
+          if node scripts/check-health-readiness.mjs "$PREVIEW_URL"; then
+            echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
+            echo ":white_check_mark: **Smoke probes passed** — \`/api/health/live\` and \`/api/health\` returned healthy on \`$PREVIEW_URL\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Smoke probe FAILED: /api/health returned unhealthy on $PREVIEW_URL — check Sentry/logs for runtime errors."
+            echo "## Develop Smoke Check" >> "$GITHUB_STEP_SUMMARY"
+            echo ":x: **Health probe failed**: \`/api/health\` returned unhealthy on \`$PREVIEW_URL\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "Check Sentry and Vercel function logs for runtime errors." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

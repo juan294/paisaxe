@@ -6,7 +6,7 @@
  * API access is available) and manual posting workflow (copy/paste).
  */
 
-import { createAdminClient } from "./supabase";
+import { createAdminClient } from "./supabase-admin";
 import { validateContent } from "./platforms";
 import { logger } from "./logger";
 import type {

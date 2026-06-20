@@ -17,12 +17,12 @@ vi.mock("@/lib/admin-auth", () => ({
 }));
 
 // Mock supabase
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(),
 }));
 
 import { validateAdminAuth } from "@/lib/admin-auth";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 const mockValidateAdminAuth = validateAdminAuth as ReturnType<typeof vi.fn>;
 const mockCreateAdminClient = createAdminClient as ReturnType<typeof vi.fn>;

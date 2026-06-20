@@ -8,7 +8,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { StoryLocale, StoryTranslation, TranslationStatus, StoryMetadata } from "@/types/immersive";
 import { callAnthropicAPI } from "./claude";
-import { createAdminClient } from "./supabase";
+import { createAdminClient } from "./supabase-admin";
 import { LOCALE_NAMES, TRANSLATION_LOCALES } from "./translation-locales";
 
 export { LOCALE_NAMES, TRANSLATION_LOCALES };

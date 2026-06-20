@@ -16,7 +16,7 @@ const mockInsert = vi.fn();
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
 const mockDbSelect = vi.fn();
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(() => ({
     from: vi.fn(() => ({
       insert: mockInsert,

@@ -13,7 +13,7 @@ const { mockRpc, mockAuditFrom, mockAuditInsert, logger } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: vi.fn(() => ({
     rpc: mockRpc,
     from: mockAuditFrom,

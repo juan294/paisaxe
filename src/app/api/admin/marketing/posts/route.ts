@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     // For other statuses, query directly
-    const { createAdminClient } = await import("@/lib/supabase");
+    const { createAdminClient } = await import("@/lib/supabase-admin");
     const supabase = createAdminClient();
 
     let query = supabase

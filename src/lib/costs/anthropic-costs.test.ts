@@ -24,7 +24,8 @@ const { mockFrom, setRows, setError } = vi.hoisted(() => {
   return { mockFrom, setRows, setError };
 });
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: () => ({ from: mockFrom }),
 }));
 

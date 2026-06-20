@@ -52,7 +52,7 @@ let mockDeleteEqResult: { error: { message: string; code?: string } | null } = {
 let mockCreateAdminClientThrows = false;
 
 // Mock Supabase
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase-admin", () => ({
   createAdminClient: () => {
     if (mockCreateAdminClientThrows) {
       throw new Error("Supabase client creation failed");

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { translateWebhookSchema } from "@/lib/schemas";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { translateStory } from "@/lib/translate-story";
 import type { StoryLocale } from "@/types/immersive";
 

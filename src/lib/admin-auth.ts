@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { createAdminClient } from "./supabase";
+import { createAdminClient } from "./supabase-admin";
 import { getSupabaseUrl, getSupabaseAnonKey } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
