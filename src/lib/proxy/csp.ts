@@ -24,6 +24,18 @@ type BuildCspHeaderOptions = {
 };
 
 export function buildCspHeader({ nodeEnv = process.env.NODE_ENV }: BuildCspHeaderOptions = {}): string {
+  // SE-L2: 'unsafe-inline' is intentional for PPR compatibility (see file header).
+  // Compensating controls that MUST remain active CI gates to justify this trade-off:
+  //   1. XSS canary — e2e/xss-canary.spec.ts verifies injected <script> and
+  //      onerror attributes are stripped before reaching the DOM. This runs in
+  //      the default `desktop` and `mobile` Playwright projects on every push.
+  //   2. Render-sink registry — docs/project/markdown-render-sinks.md enumerates
+  //      every component authorised to render markdown. New renderers MUST be
+  //      added to the registry AND covered by xss-canary before merging.
+  //   3. No raw HTML passthrough — chat-markdown.tsx and safe-markdown.tsx use
+  //      allowlisted safe-link renderers with no dangerouslySetInnerHTML.
+  // DO NOT remove 'unsafe-inline' without first re-enabling nonces in the root
+  // layout (which forces the layout dynamic and breaks PPR static shells).
   const scriptSrc = [
     "script-src 'self' 'unsafe-inline'",
     nodeEnv === "development" ? "'unsafe-eval'" : null,

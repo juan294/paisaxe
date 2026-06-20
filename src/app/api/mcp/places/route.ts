@@ -181,6 +181,13 @@ async function searchPlaces(
   }
 
   // Build request for Places API (New)
+  //
+  // SE-L1 (SSRF guard): baseUrl MUST remain a hardcoded constant pointing to the
+  // official Google Places API. It MUST NOT be derived from, influenced by, or
+  // interpolated with any value sourced from the incoming request (query params,
+  // body, headers). All user-supplied input goes into the JSON body (textQuery,
+  // locationBias) which is sent to this fixed endpoint — never into the URL itself.
+  // Any future refactor that parameterises this URL MUST undergo security review.
   const baseUrl = "https://places.googleapis.com/v1/places:searchText";
 
   // Build the request body

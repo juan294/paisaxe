@@ -16,9 +16,14 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: isCI,
+  // QA-M3: Retries keep the gate green on transient CI flakes but obscure
+  // which tests needed >1 attempt. The "list" reporter surfaces flaky counts
+  // (tests that passed on retry) alongside the HTML report so they remain
+  // visible and actionable — a retry-only pass is NOT a clean pass.
+  // Monitor: if flaky count grows, investigate root cause rather than raising retries.
   retries: isCI ? 2 : 0,
   workers: isCI ? 2 : undefined,
-  reporter: isCI ? [["html"], ["github"]] : [["html"]],
+  reporter: isCI ? [["html"], ["github"], ["list"]] : [["html"]],
   timeout: isCI ? 15_000 : 30_000,
 
   expect: {
