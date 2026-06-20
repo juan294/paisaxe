@@ -6,8 +6,8 @@ import { chatRequestSchema } from "@/lib/schemas";
 // Static here so they are resolved once at module load, not on every request.
 // This removes 100-300 ms of cold-start dynamic-import cost for rejected
 // requests (rate-limit, validation, injection) that never need the AI stack.
-import { validateChatRequest } from "@/lib/validation";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { withRouteContext } from "@/lib/request-validation";
 import { getClientIp } from "@/lib/request-utils";
 import {
   detectInjectionAttempt,
@@ -36,6 +36,12 @@ interface SecureChatResponse extends ChatResponse {
 }
 
 export async function POST(request: NextRequest) {
+  // DO-M1 (#619): bind X-Request-ID into the request context so handler logs
+  // carry request_id.
+  return withRouteContext(request, () => handlePost(request));
+}
+
+async function handlePost(request: NextRequest) {
   try {
     // Rate limiting - check before any processing
     const ip = getClientIp(request);
@@ -51,7 +57,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Input validation — Zod runtime schema check first
+    // Input validation — single Zod parse path (BE-L3 #524).
+    // The schema sanitizes message/context and validates post-sanitization
+    // lengths, so the former validateChatRequest helper is no longer needed.
     const body = await request.json().catch(() => null);
     const zodResult = chatRequestSchema.safeParse(body);
     if (!zodResult.success) {
@@ -61,13 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validation = validateChatRequest(body);
-
-    if (!validation.valid) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
-    }
-
-    const { sanitizedMessage: message, sanitizedContext: context, messageIndex } = validation;
+    const { message, context, messageIndex } = zodResult.data;
 
     // === SECURITY PRE-PROCESSING ===
 
@@ -116,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Sanitize input (remove potential delimiters)
-    const cleanMessage = sanitizeInput(message!);
+    const cleanMessage = sanitizeInput(message);
 
     // Assess topic relevance for analytics
     const topicRelevance = assessTopicRelevance(cleanMessage);

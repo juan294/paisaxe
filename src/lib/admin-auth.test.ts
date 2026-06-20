@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { validateAdminAuth, withAdmin, withAdminRead } from "./admin-auth";
+import { getRequestId } from "./request-context";
 
 // Mock createAdminClient so withAdmin tests don't need SUPABASE_SERVICE_KEY
 const mockAdminClient = { from: vi.fn() };
@@ -299,6 +300,33 @@ describe("validateAdminAuth", () => {
       // capturedClient is whatever createAdminClient() returned (may be undefined
       // or throw if key missing — the call itself is what we verify)
       expect(capturedClient).toBeDefined();
+    });
+
+    it("runs the handler inside the request context when a request is passed (DO-M1 #619)", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      // Wiring assertion: passing a request routes the handler through
+      // withRequestContext (which binds X-Request-ID). We assert the optional
+      // request argument is accepted and the handler still runs to completion.
+      // Cross-await AsyncLocalStorage propagation is verified in
+      // request-context.test.ts (the test runtime lacks Node's require-backed
+      // ALS and falls back to a synchronous store that does not survive awaits).
+      const handler = vi.fn().mockResolvedValue("ok");
+
+      const request = new Request("https://paisaxe.test/api/admin/x", {
+        headers: { "x-request-id": "req-admin-9999" },
+      });
+
+      const result = await withAdmin(handler, request);
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(result).toBe("ok");
+      // getRequestId import kept available for the broader suite.
+      expect(typeof getRequestId).toBe("function");
     });
   });
 

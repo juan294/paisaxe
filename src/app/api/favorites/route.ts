@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSupabaseClient, getUserFromRequest } from "@/lib/supabase-auth";
 import { favoritesPostSchema } from "@/lib/schemas";
+import { readJsonBody } from "@/lib/request-validation";
 import { logger } from "@/lib/logger";
 
 // GET /api/favorites - Get user's favorites
@@ -46,8 +47,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const rawBody = await request.json();
-  const parsed = favoritesPostSchema.safeParse(rawBody);
+  const bodyResult = await readJsonBody(request);
+  if (!bodyResult.ok) {
+    return bodyResult.error;
+  }
+  const parsed = favoritesPostSchema.safeParse(bodyResult.data);
 
   if (!parsed.success) {
     return NextResponse.json(

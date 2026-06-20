@@ -163,12 +163,19 @@ describe("PUT /api/admin/stories/bulk-status", () => {
   });
 
   it("should return 500 on unexpected error (catch block)", async () => {
-    // Make request.json() throw to trigger the outer catch block
+    // After BE-M2 (#570) a malformed body is a 400, so trigger the outer catch
+    // via an unexpected error deeper in the handler (Supabase client throws).
+    mockCreateAdminClient.mockImplementation(() => {
+      throw new Error("Unexpected client error");
+    });
+
     const request = new NextRequest("http://localhost/api/admin/stories/bulk-status", {
       method: "PUT",
-      body: "not valid json",
+      body: JSON.stringify({
+        storyIds: ["11111111-1111-4111-8111-111111111111"],
+        status: "approved",
+      }),
     });
-    vi.spyOn(request, "json").mockRejectedValue(new Error("Unexpected parse error"));
 
     const response = await PUT(request);
     expect(response.status).toBe(500);
@@ -177,6 +184,17 @@ describe("PUT /api/admin/stories/bulk-status", () => {
     });
     const data = await response.json();
     expect(data.error).toBe("Internal server error");
+  });
+
+  it("returns 400 when the body is malformed JSON (BE-M2 #570)", async () => {
+    const request = new NextRequest("http://localhost/api/admin/stories/bulk-status", {
+      method: "PUT",
+      body: "not valid json",
+    });
+    vi.spyOn(request, "json").mockRejectedValue(new Error("Unexpected parse error"));
+
+    const response = await PUT(request);
+    expect(response.status).toBe(400);
   });
 
   it("should return 500 on database error", async () => {
