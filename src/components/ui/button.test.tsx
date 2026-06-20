@@ -188,7 +188,7 @@ describe("Button", () => {
       render(<Button variant="glassIcon" aria-label="icon">X</Button>);
       const button = screen.getByRole("button");
       expect(button).toHaveClass("focus-visible:ring-white/70");
-      expect(button).toHaveClass("focus-visible:ring-offset-black");
+      expect(button).toHaveClass("focus-visible:ring-offset-neutral-950");
     });
 
     it("should respect motion-reduce preference", () => {

@@ -6,6 +6,7 @@ import { useTranslation } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { UpsellReason } from "@/lib/chat-upsell-detection";
+import { MIN_PRICE } from "@/lib/pricing";
 
 interface ChatUpsellCTAProps {
   /** The reason that triggered this upsell */
@@ -27,6 +28,7 @@ const REASON_ICONS: Record<UpsellReason, typeof Cloud> = {
 /**
  * Contextual upsell CTA shown inline after chat messages.
  * Displays different messaging based on the trigger reason.
+ * Routes to /pricing so users can select their preferred tier.
  */
 export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAProps) {
   const { user, session, signInWithGoogle } = useAuth();
@@ -37,12 +39,13 @@ export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAPro
 
   const handlePurchase = () => {
     if (!user || !session) {
-      signInWithGoogle();
+      signInWithGoogle("/pricing");
       return;
     }
 
-    // Navigate to embedded checkout page
-    router.push("/pricing/checkout");
+    // Route to the pricing page so the user can choose their tier.
+    // The pricing page always passes an explicit ?tier= to checkout.
+    router.push("/pricing");
   };
 
   return (
@@ -70,7 +73,7 @@ export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAPro
             {t(`upsell.${reason}_subtitle`)}
           </p>
 
-          {/* CTA Button */}
+          {/* CTA Button — shows price range anchored to shared MIN_PRICE constant */}
           <button
             onClick={handlePurchase}
             className={cn(
@@ -79,10 +82,10 @@ export function ChatUpsellCTA({ reason, onDismiss, className }: ChatUpsellCTAPro
               "hover:from-green-400 hover:to-green-300",
               "transition-all duration-200",
               "flex items-center gap-1.5",
-              "focus-visible:ring-2 focus-visible:ring-green-200 focus-visible:ring-offset-2"
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
             )}
           >
-            {t("upsell.try_voice")} - €1.99
+            {t("upsell.try_voice")} - desde {MIN_PRICE}
           </button>
         </div>
 

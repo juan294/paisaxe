@@ -8,20 +8,7 @@ import PricingLoading from "./loading";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Clock, Check, RefreshCw, Phone, MapPin } from "lucide-react";
-
-/** Voice-pass tiers offered on the pricing page (#137). */
-type PricingTier = {
-  id: "day_pass" | "weekly_pass" | "monthly_pass";
-  price: string;
-  durationKey: string;
-  fallbackLabel: string;
-};
-
-const PRICING_TIERS: PricingTier[] = [
-  { id: "day_pass", price: "€1.99", durationKey: "premium.tier_day", fallbackLabel: "24 horas" },
-  { id: "weekly_pass", price: "€4.99", durationKey: "premium.tier_week", fallbackLabel: "7 días" },
-  { id: "monthly_pass", price: "€9.99", durationKey: "premium.tier_month", fallbackLabel: "30 días" },
-];
+import { PRICING_TIERS, type PricingTierId } from "@/lib/pricing";
 
 export default function PricingPage() {
   return (
@@ -45,7 +32,7 @@ function PricingPageContent() {
     : "/pricing";
 
   // #137: selected pass tier — defaults to the Day Pass.
-  const [selectedTier, setSelectedTier] = useState<PricingTier["id"]>("day_pass");
+  const [selectedTier, setSelectedTier] = useState<PricingTierId>("day_pass");
 
   const checkoutParams = new URLSearchParams();
   if (returnTo) checkoutParams.set("returnTo", returnTo);
