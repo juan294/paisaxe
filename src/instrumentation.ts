@@ -1,4 +1,11 @@
+import * as Sentry from "@sentry/nextjs";
 import { sanitizeValue } from "@/lib/logger-sanitize";
+
+/**
+ * DO-H1: Next.js 15/16 calls this named export to forward server-side errors to Sentry.
+ * Without it, unhandled route/middleware errors are never captured.
+ */
+export const onRequestError = Sentry.captureRequestError;
 
 declare global {
   var __paisaxeConsolePatched: boolean | undefined;

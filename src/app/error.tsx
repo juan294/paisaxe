@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
 import { useTranslation } from "@/lib/i18n";
+import { Logo } from "@/components/ui/logo";
 
 export default function RootError({
   error,
@@ -21,6 +22,9 @@ export default function RootError({
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-950 px-4 text-center">
+      <div className="mb-8 h-16 w-16 text-primary">
+        <Logo />
+      </div>
       <h1 className="text-2xl font-bold text-white">{t("errors.generic_title")}</h1>
       <p className="mt-4 max-w-md text-white/70">
         {t("errors.generic_description")}
@@ -28,7 +32,7 @@ export default function RootError({
       <div className="mt-8 flex flex-col items-center gap-4">
         <button
           onClick={reset}
-          className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-6 py-3 text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          className="bg-primary hover:bg-primary/90 rounded-full px-6 py-3 text-white font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
         >
           {t("errors.retry")}
         </button>
