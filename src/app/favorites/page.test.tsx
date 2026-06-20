@@ -593,11 +593,30 @@ describe("FavoritesPage", () => {
     }));
     const manyFavoriteIds = manyStories.map((s) => s.id);
 
-    it("should prevent concurrent loadMore calls when isLoadingMore is true", async () => {
-      // Override IntersectionObserver so we control when callbacks fire
+    it("loads the next page synchronously on intersection and stops at the end (UX-L2: no artificial delay)", async () => {
+      // Override IntersectionObserver so we control when the page-level loadMore fires.
+      // The artificial 300ms loading delay was removed (UX-L2), so loadMore now applies
+      // synchronously: an intersection immediately reveals the next page, and once all
+      // items are shown (hasMore === false) further intersections are no-ops.
       let pageLoadMoreCallback: IntersectionObserverCallback | null = null;
       let pageLoadMoreTarget: Element | null = null;
       const originalIO = global.IntersectionObserver;
+
+      const fire = (cb: IntersectionObserverCallback, target: Element, observer: IntersectionObserver) =>
+        cb(
+          [
+            {
+              isIntersecting: true,
+              target,
+              boundingClientRect: target.getBoundingClientRect(),
+              intersectionRatio: 1,
+              intersectionRect: target.getBoundingClientRect(),
+              rootBounds: null,
+              time: Date.now(),
+            },
+          ],
+          observer
+        );
 
       try {
         class ControlledObserver implements IntersectionObserver {
@@ -606,48 +625,24 @@ describe("FavoritesPage", () => {
           readonly scrollMargin: string = "";
           readonly thresholds: ReadonlyArray<number> = [];
 
+          private readonly isPageSentinel: boolean;
           constructor(
             private callback: IntersectionObserverCallback,
-            _options?: IntersectionObserverInit
-          ) {}
+            options?: IntersectionObserverInit
+          ) {
+            // The page-level loadMore sentinel uses rootMargin "200px";
+            // GalleryItem visibility observers use "100px".
+            this.isPageSentinel = options?.rootMargin === "200px";
+          }
 
           observe(target: Element): void {
-            // Store the first observer's callback (page-level loadMore sentinel)
-            // but only fire immediately for GalleryItem observers
-            if (!pageLoadMoreCallback) {
+            // Capture (do NOT fire) the page-level loadMore sentinel so we can control
+            // its timing; fire immediately for GalleryItem observers so text renders.
+            if (this.isPageSentinel) {
               pageLoadMoreCallback = this.callback;
               pageLoadMoreTarget = target;
-              // Fire immediately for the page-level observer to trigger first loadMore
-              this.callback(
-                [
-                  {
-                    isIntersecting: true,
-                    target,
-                    boundingClientRect: target.getBoundingClientRect(),
-                    intersectionRatio: 1,
-                    intersectionRect: target.getBoundingClientRect(),
-                    rootBounds: null,
-                    time: Date.now(),
-                  },
-                ],
-                this
-              );
             } else {
-              // GalleryItem observers: fire immediately for visibility
-              this.callback(
-                [
-                  {
-                    isIntersecting: true,
-                    target,
-                    boundingClientRect: target.getBoundingClientRect(),
-                    intersectionRatio: 1,
-                    intersectionRect: target.getBoundingClientRect(),
-                    rootBounds: null,
-                    time: Date.now(),
-                  },
-                ],
-                this
-              );
+              fire(this.callback, target, this);
             }
           }
 
@@ -659,8 +654,6 @@ describe("FavoritesPage", () => {
         }
 
         global.IntersectionObserver = ControlledObserver as unknown as typeof IntersectionObserver;
-
-        vi.useFakeTimers();
 
         mockUseStories.mockReturnValue({
           stories: manyStories,
@@ -676,51 +669,31 @@ describe("FavoritesPage", () => {
 
         const { unmount } = render(<FavoritesPage />);
 
-        // Initially only 20 stories displayed (ITEMS_PER_PAGE)
+        // Initially only 20 stories displayed (ITEMS_PER_PAGE) — page-level observer captured, not fired.
         expect(screen.getByText("Story Title 0")).toBeInTheDocument();
         expect(screen.getByText("Story Title 19")).toBeInTheDocument();
         expect(screen.queryByText("Story Title 20")).not.toBeInTheDocument();
 
-        // The first IntersectionObserver callback already fired (from the page-level
-        // observer on the loadMore sentinel), setting isLoadingMore = true.
-        // The 300ms timeout hasn't elapsed yet, so isLoadingMore is still true.
-
-        // Fire the observer callback a second time to simulate a rapid intersection.
-        // This should hit the `isLoadingMore` guard on line 36 and return early.
+        // One intersection synchronously loads the remaining page (no 300ms wait).
         act(() => {
           if (pageLoadMoreCallback && pageLoadMoreTarget) {
-            (pageLoadMoreCallback as IntersectionObserverCallback)(
-              [
-                {
-                  isIntersecting: true,
-                  target: pageLoadMoreTarget,
-                  boundingClientRect: (pageLoadMoreTarget as Element).getBoundingClientRect(),
-                  intersectionRatio: 1,
-                  intersectionRect: (pageLoadMoreTarget as Element).getBoundingClientRect(),
-                  rootBounds: null,
-                  time: Date.now(),
-                },
-              ],
-              {} as IntersectionObserver
-            );
+            fire(pageLoadMoreCallback, pageLoadMoreTarget, {} as IntersectionObserver);
           }
         });
 
-        // Advance past the 300ms setTimeout in loadMore
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(300);
-        });
-
-        // After advancing timers, the first loadMore completes and shows remaining items.
-        // Only one batch of additional items loaded (not two), proving the guard worked.
         expect(screen.getByText("Story Title 24")).toBeInTheDocument();
+        expect(screen.getByText(`25 ${mockT("favorites.place_plural")}`)).toBeInTheDocument();
 
-        // Total stories shown: all 25 (20 initial + 5 from one loadMore call)
+        // A further intersection is a no-op now that hasMore is false — count stays at 25.
+        act(() => {
+          if (pageLoadMoreCallback && pageLoadMoreTarget) {
+            fire(pageLoadMoreCallback, pageLoadMoreTarget, {} as IntersectionObserver);
+          }
+        });
         expect(screen.getByText(`25 ${mockT("favorites.place_plural")}`)).toBeInTheDocument();
 
         unmount();
       } finally {
-        vi.useRealTimers();
         global.IntersectionObserver = originalIO;
       }
     });
