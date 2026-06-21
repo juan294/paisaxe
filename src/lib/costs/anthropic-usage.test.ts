@@ -62,4 +62,42 @@ describe("recordAnthropicUsage", () => {
       })
     ).resolves.toBeUndefined();
   });
+
+  it("defaults missing input_tokens and output_tokens to 0 via ?? operator", async () => {
+    // Usage without input/output tokens but with cache tokens — avoids the
+    // all-zero early-return guard and exercises the ?? 0 fallback at lines 42-43.
+    await recordAnthropicUsage({
+      model: "claude-sonnet-4-20250514",
+      usage: { cache_creation_input_tokens: 1000 },
+    });
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const row = mockInsert.mock.calls[0][0];
+    expect(row.input_tokens).toBe(0);
+    expect(row.output_tokens).toBe(0);
+    expect(row.cache_creation_input_tokens).toBe(1000);
+  });
+
+  it("never throws when createAdminClient throws an Error instance", async () => {
+    mockFrom.mockImplementationOnce(() => {
+      throw new Error("connection refused");
+    });
+    await expect(
+      recordAnthropicUsage({
+        model: "claude-sonnet-4-20250514",
+        usage: { input_tokens: 10, output_tokens: 5 },
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it("never throws when createAdminClient throws a non-Error value", async () => {
+    mockFrom.mockImplementationOnce(() => {
+      throw "string error";
+    });
+    await expect(
+      recordAnthropicUsage({
+        model: "claude-sonnet-4-20250514",
+        usage: { input_tokens: 10, output_tokens: 5 },
+      })
+    ).resolves.toBeUndefined();
+  });
 });

@@ -529,6 +529,25 @@ describe("validateAdminAuth", () => {
       expect(result).toBe(handlerResult);
     });
 
+    it("runs the handler inside the request context when a request is passed", async () => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      const handler = vi.fn().mockResolvedValue("read-ok");
+
+      const request = new Request("https://paisaxe.test/api/admin/x", {
+        headers: { "x-request-id": "req-read-1234" },
+      });
+
+      const result = await withAdminRead(handler, request);
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(result).toBe("read-ok");
+    });
+
     it("getAll and setAll callbacks work correctly in withAdminRead cookie context", async () => {
       const fakeCookies = [{ name: "sb-token", value: "abc" }];
       mockGetAll.mockReturnValue(fakeCookies);

@@ -129,6 +129,32 @@ describe("manual-costs", () => {
       const result = await fetchManualCosts("2024-01-01", "2024-01-31");
       expect(result).toEqual([]);
     });
+
+    it("returns empty array when database error is an Error instance", async () => {
+      mockSupabase({
+        select: vi.fn().mockReturnValue({
+          gte: vi.fn().mockReturnValue({
+            lte: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: null,
+                error: new Error("connection refused"),
+              }),
+            }),
+          }),
+        }),
+      });
+
+      const result = await fetchManualCosts("2024-01-01", "2024-01-31");
+      expect(result).toEqual([]);
+    });
+
+    it("returns empty array when createAdminClient throws a non-Error value", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw "non-error string";
+      });
+      const result = await fetchManualCosts("2024-01-01", "2024-01-31");
+      expect(result).toEqual([]);
+    });
   });
 
   describe("createManualCost", () => {
@@ -191,6 +217,26 @@ describe("manual-costs", () => {
       const result = await createManualCost(request);
       expect(result).toBeNull();
     });
+
+    it("returns null when database error is an Error instance", async () => {
+      mockSupabase({
+        insert: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: null, error: new Error("unique violation") }),
+          }),
+        }),
+      });
+      const result = await createManualCost(request);
+      expect(result).toBeNull();
+    });
+
+    it("returns null when createAdminClient throws a non-Error value", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw "non-error string";
+      });
+      const result = await createManualCost(request);
+      expect(result).toBeNull();
+    });
   });
 
   describe("updateManualCost", () => {
@@ -248,6 +294,28 @@ describe("manual-costs", () => {
       const result = await updateManualCost("cost-1", { costUsd: 25 });
       expect(result).toBeNull();
     });
+
+    it("returns null when database error is an Error instance", async () => {
+      mockSupabase({
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: null, error: new Error("deadlock") }),
+            }),
+          }),
+        }),
+      });
+      const result = await updateManualCost("cost-1", { costUsd: 25 });
+      expect(result).toBeNull();
+    });
+
+    it("returns null when createAdminClient throws a non-Error value", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw "non-error string";
+      });
+      const result = await updateManualCost("cost-1", { costUsd: 25 });
+      expect(result).toBeNull();
+    });
   });
 
   describe("deleteManualCost", () => {
@@ -276,6 +344,24 @@ describe("manual-costs", () => {
     it("returns false when createAdminClient throws", async () => {
       vi.mocked(createAdminClient).mockImplementation(() => {
         throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+      });
+      const result = await deleteManualCost("cost-1");
+      expect(result).toBe(false);
+    });
+
+    it("returns false when database error is an Error instance", async () => {
+      mockSupabase({
+        delete: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ error: new Error("permission denied") }),
+        }),
+      });
+      const result = await deleteManualCost("cost-1");
+      expect(result).toBe(false);
+    });
+
+    it("returns false when createAdminClient throws a non-Error value", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw "non-error string";
       });
       const result = await deleteManualCost("cost-1");
       expect(result).toBe(false);
@@ -330,6 +416,26 @@ describe("manual-costs", () => {
     it("returns null when createAdminClient throws", async () => {
       vi.mocked(createAdminClient).mockImplementation(() => {
         throw new Error("SUPABASE_SERVICE_KEY is required for admin operations");
+      });
+      const result = await getManualCost("cost-1");
+      expect(result).toBeNull();
+    });
+
+    it("returns null when database error is an Error instance", async () => {
+      mockSupabase({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: null, error: new Error("not found") }),
+          }),
+        }),
+      });
+      const result = await getManualCost("cost-1");
+      expect(result).toBeNull();
+    });
+
+    it("returns null when createAdminClient throws a non-Error value", async () => {
+      vi.mocked(createAdminClient).mockImplementation(() => {
+        throw "non-error string";
       });
       const result = await getManualCost("cost-1");
       expect(result).toBeNull();

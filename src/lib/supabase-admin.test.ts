@@ -45,6 +45,15 @@ describe("supabase-admin", () => {
       );
     });
 
+    it("should throw error if NEXT_PUBLIC_SUPABASE_URL is not set", async () => {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "some-key";
+
+      const { createAdminClient } = await import("./supabase-admin");
+
+      expect(() => createAdminClient()).toThrow("NEXT_PUBLIC_SUPABASE_URL is required");
+    });
+
     it("should create admin client when SUPABASE_SERVICE_KEY is set", async () => {
       process.env.SUPABASE_SERVICE_KEY = "test-service-key";
 
