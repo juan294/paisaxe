@@ -86,9 +86,8 @@ describe("verification coverage config", () => {
     const previewSmokeWorkflow = readText(".github/workflows/preview-smoke.yml");
 
     expect(ciWorkflow).toContain('node scripts/check-health-readiness.mjs "$PREVIEW_URL"');
-    expect(previewSmokeWorkflow).toContain(
-      'node scripts/check-health-readiness.mjs "$PREVIEW_URL" --require-sentry'
-    );
+    expect(previewSmokeWorkflow).toContain('node scripts/check-health-readiness.mjs "$PREVIEW_URL"');
+    expect(previewSmokeWorkflow).not.toContain("--require-sentry");
   });
 
   it("preflights Voyage AI before running QA LLM tests", () => {
