@@ -954,3 +954,15 @@
 - Security Agent: No security-driven performance actions. LiveKit chunk confirmed non-exploitable deferred dep.
 - Coverage Agent: Test-only changes this cycle. Zero bundle impact confirmed.
 <!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-06-21T05:45:00Z -->
+## Triage -- 2026-06-21
+- **Reports processed**: 10 (pre-launch, cost-analyst, remediation, performance, localization, documentation, security, cc-rpi-update, update-docs, qa)
+- **Action items resolved**: 1 code fix + 1 dependency PR supersession identified
+- **Summary**: Fixed PR #702 Preview Smoke failure by aligning the main-PR preview gate with `/api/health` preview semantics: preview health still requires HTTP 200 and `status="healthy"`, but no longer requires production-only Sentry DSN. Confirmed `develop` already carries `undici@7.28.0` with `npm audit --omit=dev` clean, making Dependabot PR #647 obsolete rather than mergeable.
+**Cross-agent recommendations:**
+- CI Agent: Re-run PR #702 checks after this commit; `Smoke test Vercel preview` should pass when `/api/health` returns `status="healthy"` in preview with `sentry.status="unconfigured"`.
+- Security Agent: Close or supersede Dependabot PR #647 after this fix lands on `develop`; do not merge the `main`-targeting Dependabot PR directly.
+- QA Agent: Full LLM QA confirmation still requires a worktree/environment with `VOYAGE_API_KEY`; this isolated triage worktree has no `.env.local` and no shell key.
+- cc-rpi Agent: Interactive Claude CLI auth preflight now returns `ok`; if launchd still reports `Not logged in`, run `claude setup-token` for the non-interactive scheduled environment.
+<!-- ENTRY:END -->

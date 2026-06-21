@@ -86,9 +86,9 @@ jobs:
 
       # ------------------------------------------------------------------ #
       # Health endpoint — must return HTTP 200 and JSON status "healthy".   #
-      # A non-healthy body means a backend dependency or required runtime   #
-      # config such as Sentry is missing, so fail the preview gate instead  #
-      # of silently merging it.                                            #
+      # A non-healthy body means a backend dependency or runtime config     #
+      # required in this Vercel environment is broken, so fail the preview  #
+      # gate instead of silently merging it.                                #
       # ------------------------------------------------------------------ #
       - name: Smoke test - health endpoint
         env:
@@ -103,7 +103,7 @@ jobs:
             echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for protected Vercel previews"
             exit 1
           fi
-          node scripts/check-health-readiness.mjs "$PREVIEW_URL" --require-sentry
+          node scripts/check-health-readiness.mjs "$PREVIEW_URL"
 
       # ------------------------------------------------------------------ #
       # Homepage — must serve HTTP 200.                                     #

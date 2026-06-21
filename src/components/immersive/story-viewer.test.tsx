@@ -37,14 +37,17 @@ vi.mock("next/dynamic", () => ({
 // load, so a single `await Promise.resolve()` is racy. Fake timers block
 // findBy*/waitFor polling, so drain the microtask queue manually until the
 // control appears (bounded, deterministic).
-async function flushUntil(query: () => HTMLElement | null): Promise<void> {
-  await act(async () => {
-    for (let i = 0; i < 50; i++) {
-       
+async function flushUntil(query: () => HTMLElement | null): Promise<HTMLElement> {
+  for (let i = 0; i < 500; i++) {
+    await act(async () => {
       await Promise.resolve();
-      if (query()) return;
-    }
-  });
+    });
+
+    const result = query();
+    if (result) return result;
+  }
+
+  throw new Error("Timed out waiting for dynamically imported StoryViewer control");
 }
 
 // Mock i18n
@@ -307,8 +310,8 @@ describe("StoryViewer", () => {
       fireEvent.click(screen.getByRole("button", { name: "Más opciones" }));
       // #569: SuggestPlaceButton is now dynamically imported — flush the import
       // until the menuitem mounts (fake timers are active, so findBy* can't poll).
-      await flushUntil(() => screen.queryByRole("menuitem"));
-      fireEvent.click(screen.getByRole("menuitem"));
+      const suggestMenuItem = await flushUntil(() => screen.queryByRole("menuitem"));
+      fireEvent.click(suggestMenuItem);
 
       expect(querySelectorSpy).not.toHaveBeenCalled();
     });
@@ -1487,8 +1490,9 @@ describe("StoryViewer", () => {
 
       // #569: SuggestPlaceButton is dynamically imported — flush the import
       // until the action mounts (fake timers block findBy* polling).
-      await flushUntil(() => screen.queryByText("suggestions.suggest_short"));
-      const suggestItem = screen.getByText("suggestions.suggest_short");
+      const suggestItem = await flushUntil(() =>
+        screen.queryByText("suggestions.suggest_short")
+      );
       fireEvent.click(suggestItem);
 
       expect(querySelectorSpy).not.toHaveBeenCalled();
