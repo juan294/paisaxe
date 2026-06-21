@@ -129,6 +129,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -454,22 +455,6 @@
 - Code Quality Agent: No coverage-driven refactoring needed. All new tests follow established patterns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=documentation_agent timestamp=2026-05-07T06:00:00Z -->
-## Documentation Agent -- 2026-05-07
-- Status: GREEN -- No documentation gaps found. Twenty-second consecutive clean run.
-- Feature flags: All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
-- API routes: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, app-internal user APIs, internal health probes). No external-consumption routes require new documentation.
-- New test files and migration 089 (RLS on admin_audit_log) introduce no new user-facing features or flags.
-- features.md: Complete -- no additions needed.
-
-**Cross-agent recommendations:**
-- Coverage Agent: No documentation-related coverage gaps. All feature descriptions align with test coverage targets.
-- Security Agent: No documentation changes needed this cycle. Twenty-second consecutive GREEN.
-- QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 in `FeatureFlagKey` + 10 agent flags.
-- Cost Analyst Agent: No cost-related documentation concerns.
-- Performance Agent: No documentation-impacting changes.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=localization_agent timestamp=2026-05-07T07:00:00Z -->
 ## Localization Agent — 2026-05-07
 - Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. Forty-seventh consecutive clean run.
@@ -650,20 +635,6 @@
 - Cost Analyst Agent: No cost-related documentation concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-06-17T06:03:31Z -->
-## QA Agent — 2026-06-17
-- Status: YELLOW — LLM tests 0/12 (harness preflight, 4th consecutive cycle), browser journeys 10/10 (stable), integration health 3/3.
-- Root cause unchanged: no server on :3000 when test:qa runs. Issue #635 still open. Jun 16 triage added cleaner preflight error; permanent webServer fix still pending.
-- Safety guardrails unverified for 4 consecutive cycles — cannot confirm injection/PII/role-play resistance.
-- 163 data-testid attributes not covered by E2E (low priority). Auth journeys 9-12 still skipped (require storageState fixture).
-
-**Cross-agent recommendations:**
-- Security Agent: Safety guardrails remain unverified (4 cycles). No regression evidence, but no confirmation either. Fix #635 to restore the safety signal.
-- Cost Analyst Agent: 124-day revenue drought and 120-day voice silence confirmed by journey tests (chat and story load correctly in browser). Automated tests cannot explain the production gap — manual paisaxe.es verification remains the top priority.
-- Coverage Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) remain the top Playwright E2E targets. story-editor save/approve/curate handlers are also E2E-only.
-- Performance Agent: No performance-related test failures. All journey load times within acceptable range.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-06-17T08:00:00Z -->
 ## QA Agent — 2026-06-17
 - Status YELLOW. LLM quality 0/12 — harness preflight failed (4th consecutive blind cycle). Root cause unchanged: no server on :3000 when test:qa runs. Jun 16 triage added the preflight error message; permanent #635 fix (webServer config) still open.
@@ -675,18 +646,6 @@
 - Cost Analyst Agent: 124-day revenue drought / 120-day voice silence confirmed unresolved. Manual paisaxe.es verification of Pelayo and Day Pass remains the #1 outstanding action.
 - Coverage Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) remain top Playwright E2E targets. story-editor save/approve/curate handlers also E2E-only.
 - Triage Agent: Issue #635 (webServer config for vitest.config.qa.ts) is the only code action needed from QA this cycle. Fix unblocks all 12 LLM quality tests at once.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-06-17T12:00:00Z -->
-## Triage — 2026-06-17
-- **Reports processed**: 9 (cc-rpi-update, cost-analyst, coverage, documentation, localization, performance, qa, security, plus shared-context)
-- **Action items resolved**: 3 (port 3006 QA harness fix #635, CORS origin fix, test isolation bug in agents/run/route.test.ts)
-- **Summary**: Fixed QA harness hardcoded localhost:3000 → 3006 across cors.ts, llm-quality.test.ts, qa-agent.sh, all test fixtures; resolved pre-existing test isolation bug (runningAgents Map state leak + vi.useFakeTimers leak); merged 3 Dependabot PRs (#639 dev-and-types patches, #641 npm_and_yarn security patches, #643 production group 13 updates).
-**Cross-agent recommendations:**
-- QA Agent: Issue #635 (port mismatch) is CLOSED — llm-quality tests now target localhost:3006 and qa-agent.sh exports NEXT_PUBLIC_SITE_URL=http://localhost:3006 before the test run. Next cycle should report green LLM quality tests.
-- Security Agent: All 3 Dependabot PRs merged — 0 remaining open Dependabot PRs. npm_and_yarn group (#641) included security patches.
-- Performance Agent: npm run build:analyze remains the one outstanding action (~8+ cycles). Consider scheduling alongside next dep batch.
-- Coverage Agent: agents/run/route.ts gained resetRunningAgentsForTests() export; route.test.ts now fully isolated. No coverage regression expected.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-06-18T04:01:24Z -->
@@ -981,4 +940,19 @@
 - Security Agent: No documentation changes needed this cycle. Thirtieth consecutive GREEN.
 - QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 in `FeatureFlagKey` + 10 agent flags.
 - Triage Agent: VOYAGE_API_KEY QA env confirmation and Twilio release decision remain the two outstanding time-sensitive actions from prior cycle.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-06-21T06:07:15Z -->
+## QA Agent — 2026-06-21
+- Status: YELLOW. 2/12 LLM tests pass (both injection tests, pre-LLM path). 10/12 fail with Chat API 503 (search_unavailable) — VOYAGE_API_KEY not flowing into dev server process despite Jun 19 triage fix.
+- Voyage AI integration health passes (4/4); failure is dev-server environment isolation, not network or key invalidity.
+- Journey tests: 10/10 pass (14 total, 4 auth journeys skipped — expected).
+- Safety concern: authority impersonation test unverified for 6th consecutive cycle (last clean run Mar 23).
+- Revenue drought 128 days, voice silence 124 days — still unexplained by automated tests; manual paisaxe.es check critical before next release.
+
+**Cross-agent recommendations:**
+- Triage Agent: Priority fix — qa-agent.sh must read VOYAGE_API_KEY from .env.local if not in shell, then pass it explicitly to the Next.js dev process. The export fix landed but only works when the key is already in the runner's environment.
+- Security Agent: Authority impersonation safety test has not produced a passing result in 6 cycles. Manual check on paisaxe.es recommended before any production release.
+- Cost Analyst Agent: Journey tests stable at 10/10. Automated tests cannot explain revenue or voice silence — manual production verification remains the only way to investigate.
+- Coverage Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) remain the top Playwright E2E targets. Webhook routes (/api/webhooks/*) are the highest-risk uncovered API surface — 4 routes, no E2E tests.
 <!-- ENTRY:END -->
