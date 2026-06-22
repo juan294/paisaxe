@@ -2,18 +2,6 @@
 > Cross-agent intelligence — agents read this before running and write findings after finishing.
 > Pruned automatically to keep the last 3 entries per agent.
 
-<!-- ENTRY:START agent=triage timestamp=2026-06-22T07:45:00Z -->
-## Triage — 2026-06-22
-- **Status: GREEN** — QA LLM blocker resolved on `develop` via merge `97d82db2` (`fix/triage-qa-env` commit `937bbdea`).
-- **QA recovery:** `VOYAGE_API_KEY` is loaded/exported before the QA dev server starts and passed explicitly to `npm run dev`; embedding cache writes no longer block chat latency; missing Upstash config skips Redis entirely; embedding timeout raised from 8s to 12s after observed Voyage tail latency.
-- **Anthropic model recovery:** Removed obsolete `claude-sonnet-4-20250514` call sites and centralized runtime callers on `CHAT_MODEL = "claude-sonnet-4-6"`. Anthropic's model docs list `claude-sonnet-4-6` as the current Sonnet 4.6 API ID and note 4.6 IDs are dateless pinned snapshots.
-- **Verification:** targeted tests 82/82, full Vitest 6,956/6,956, typecheck, lint, build, build:analyze, and live QA 12/12 all passed. Production smoke checks: `/api/health` 200, `/api/checkout/health` 401 expected, `/immersive` chat + voice upgrade entry point visible, `/pricing` €1.99 visible, `/pricing/checkout` sign-in gate visible.
-- **Remaining owner/external decisions:** full production Day Pass purchase was not executed because it would create a real payment; Anthropic billing console still requires owner/account access; Twilio number was not released because it removes booking capability; ElevenLabs voice-shelving remains product/renewal decision.
-- **Watch:** local QA logs still show best-effort `ANTHROPIC_USAGE_INSERT_FAILED` if the selected Supabase target lacks `public.anthropic_usage` in schema cache.
-<!-- ENTRY:END -->
-
-
-
 
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
@@ -391,19 +379,6 @@
 - Cost Analyst Agent: No cost-related documentation concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-06-17T08:00:00Z -->
-## QA Agent — 2026-06-17
-- Status YELLOW. LLM quality 0/12 — harness preflight failed (4th consecutive blind cycle). Root cause unchanged: no server on :3000 when test:qa runs. Jun 16 triage added the preflight error message; permanent #635 fix (webServer config) still open.
-- Browser journeys 10/10 passing (4 auth journeys skipped). Integration health 3/3 pass. Safety guardrails unverified for 4 consecutive cycles — no regression evidence, no confirmation either.
-- E2E gap: 163 untested data-testid attrs (low priority). Auth journeys 9-12 need storageState fixture. No new high/medium priority gaps.
-
-**Cross-agent recommendations:**
-- Security Agent: Safety guardrails (injection/PII/boundary) unverified 4th cycle — no server was reached. Re-confirm once #635 lands; no regression evidence either way.
-- Cost Analyst Agent: 124-day revenue drought / 120-day voice silence confirmed unresolved. Manual paisaxe.es verification of Pelayo and Day Pass remains the #1 outstanding action.
-- Coverage Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) remain top Playwright E2E targets. story-editor save/approve/curate handlers also E2E-only.
-- Triage Agent: Issue #635 (webServer config for vitest.config.qa.ts) is the only code action needed from QA this cycle. Fix unblocks all 12 LLM quality tests at once.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-06-18T04:01:24Z -->
 ## Documentation Agent — 2026-06-18
 - Status: GREEN -- No documentation gaps found. Twenty-eighth consecutive clean run.
@@ -479,18 +454,6 @@
 - Performance Agent: `npm run build:analyze` completed Jun 19 — analyzer reports now available under `.next/analyze/`. No longer a carry-forward action.
 - Triage Agent: No code actions from Security this cycle. Watch Sentry for future OTel re-introduction of moderate advisories (transitive via @opentelemetry/core).
 - Coverage Agent: basic-markdown.tsx XSS-relevant branches remain at 100% coverage; no regressions expected.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-06-19T08:15:00Z -->
-## Triage -- 2026-06-19
-- **Reports processed**: 9 (cc-rpi-update, cost-analyst, coverage, documentation, localization, performance, qa, security, previous triage)
-- **Action items resolved**: 5 (Voyage AI QA preflight/export/reachability, QA error-body diagnostics, Next route export contract fix, build:analyze run, coverage tests preserved)
-- **Summary**: QA now reads a trimmed `VOYAGE_API_KEY` from the shell or `.env.local`, exports it for `npm run test:qa`, probes Voyage embeddings before LLM tests, and reports 503 bodies such as `search_unavailable`; analyzer build now passes after moving agent-runner test state out of the Next route module.
-**Cross-agent recommendations:**
-- QA Agent: Next cycle should distinguish missing/invalid/unreachable Voyage AI before running the LLM suite. If Voyage passes, LLM tests should no longer spend 8s/test on opaque embedding 503s.
-- Security Agent: LLM safety signal remains the watch item until QA produces a full green run; injection detector was already confirmed by the Jun 18 QA report.
-- Performance Agent: `npm run build:analyze` is no longer carried for lack of execution; analyzer reports were generated under `.next/analyze/`.
-- Coverage Agent: Existing uncommitted coverage tests were preserved and full `npm run test` passes at 6675 tests.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=coverage_agent_enabled timestamp=2026-06-20T00:12:24Z -->
@@ -759,6 +722,22 @@
 - Triage Agent: VOYAGE_API_KEY QA env propagation (qa-agent.sh sourcing from .env.local) remains the outstanding blocker for LLM quality tests (7th consecutive blind cycle). Twilio number release decision window closing (~Jul 7).
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-06-22T06:05:45Z -->
+## QA Agent -- 2026-06-22
+- **Status: GREEN** -- LLM tests 12/12 (100% -- FULLY RECOVERED after 6 blind cycles). Browser journeys 10/10 (100%). Integration health 4/4.
+- VOYAGE_API_KEY fix (Jun 19 triage + qa-agent.sh .env.local sourcing for launchd context) confirmed working end-to-end.
+- All safety guardrails verified for first time in 7 weeks: injection resistance, role-play override, authority impersonation all pass.
+- RAG quality fully verified: hallucination resistance, cross-PDF synthesis, no external fabrication all pass.
+- 4 authenticated journey tests (Journeys 9-12) remain skipped -- need QA_TEST_USER credentials in harness.
+- Revenue drought 129 days / voice silence 125 days -- manual paisaxe.es verification remains top outstanding action.
+
+**Cross-agent recommendations:**
+- Security Agent: All LLM safety guardrails confirmed GREEN this cycle -- no manual production safety check needed before the next release from a QA perspective.
+- Cost Analyst Agent: Automated tests confirm application is healthy end-to-end. Manual Pelayo voice widget and Day Pass verification on paisaxe.es remains the only unexplained gap.
+- Triage Agent: Dependabot PR #647 (undici) is obsolete -- close/supersede it. QA_TEST_USER credentials would unlock authenticated journey coverage without code changes.
+- Coverage Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) remain E2E-only targets. No regressions in LLM or journey coverage this cycle.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=localization_agent timestamp=2026-06-22T07:06:00Z -->
 ## Localization Agent -- 2026-06-22
 - Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 58th consecutive clean run.
@@ -772,4 +751,14 @@
 - Coverage Agent: translations.test.ts dynamically compares each locale key count to ES — any future key additions without locale parity are caught in CI automatically.
 - QA Agent: No locale-related issues. All translations stable for 58 consecutive cycles.
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-06-22T07:45:00Z -->
+## Triage — 2026-06-22
+- **Status: GREEN** — QA LLM blocker resolved on `develop` via merge `97d82db2` (`fix/triage-qa-env` commit `937bbdea`).
+- **QA recovery:** `VOYAGE_API_KEY` is loaded/exported before the QA dev server starts and passed explicitly to `npm run dev`; embedding cache writes no longer block chat latency; missing Upstash config skips Redis entirely; embedding timeout raised from 8s to 12s after observed Voyage tail latency.
+- **Anthropic model recovery:** Removed obsolete `claude-sonnet-4-20250514` call sites and centralized runtime callers on `CHAT_MODEL = "claude-sonnet-4-6"`. Anthropic's model docs list `claude-sonnet-4-6` as the current Sonnet 4.6 API ID and note 4.6 IDs are dateless pinned snapshots.
+- **Verification:** targeted tests 82/82, full Vitest 6,956/6,956, typecheck, lint, build, build:analyze, and live QA 12/12 all passed. Production smoke checks: `/api/health` 200, `/api/checkout/health` 401 expected, `/immersive` chat + voice upgrade entry point visible, `/pricing` €1.99 visible, `/pricing/checkout` sign-in gate visible.
+- **Remaining owner/external decisions:** full production Day Pass purchase was not executed because it would create a real payment; Anthropic billing console still requires owner/account access; Twilio number was not released because it removes booking capability; ElevenLabs voice-shelving remains product/renewal decision.
+- **Watch:** local QA logs still show best-effort `ANTHROPIC_USAGE_INSERT_FAILED` if the selected Supabase target lacks `public.anthropic_usage` in schema cache.
 <!-- ENTRY:END -->
