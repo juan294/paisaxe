@@ -12,6 +12,7 @@ METRICS_FILE="$PROJECT_DIR/.qa-metrics.tmp"
 JOURNEY_METRICS_FILE="$PROJECT_DIR/.qa-journey-metrics.tmp"
 SERVER_PID=""
 SERVER_LOG="$LOG_DIR/qa-agent-server.log"
+VOYAGE_API_KEY_VALUE=""
 
 # Test user configuration (for authenticated journey tests)
 QA_TEST_USER_EMAIL="${QA_TEST_USER_EMAIL:-}"
@@ -96,6 +97,11 @@ ENABLE_GITHUB_ISSUES=$(get_agent_config "qa_agent_enabled" "enableGithubIssues" 
 ENABLE_GAP_ANALYSIS=$(get_agent_config "qa_agent_enabled" "enableGapAnalysis" || echo "true")
 log_info "Configuration: $TESTS_PER_CATEGORY tests/category, journeyTests=$ENABLE_JOURNEY_TESTS, githubIssues=$ENABLE_GITHUB_ISSUES, gapAnalysis=$ENABLE_GAP_ANALYSIS" | tee -a "$LOG_FILE"
 
+VOYAGE_API_KEY_VALUE="$(get_config_value "VOYAGE_API_KEY")"
+if [[ -n "$VOYAGE_API_KEY_VALUE" ]]; then
+  export VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE"
+fi
+
 # Check if server is already running (any HTTP response = server is up)
 PRECHECK_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:3006/api/health 2>/dev/null || true)
 [[ -z "$PRECHECK_CODE" ]] && PRECHECK_CODE="000"
@@ -105,7 +111,11 @@ else
   log_info "Starting Next.js dev server..." | tee -a "$LOG_FILE"
 
   # Start the server in the background
-  npm run dev > "$SERVER_LOG" 2>&1 &
+  if [[ -n "$VOYAGE_API_KEY_VALUE" ]]; then
+    VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE" npm run dev > "$SERVER_LOG" 2>&1 &
+  else
+    npm run dev > "$SERVER_LOG" 2>&1 &
+  fi
   SERVER_PID=$!
 
   # Wait for server to respond (max 240 seconds)
@@ -140,7 +150,6 @@ log_info "=== Phase 0: Integration Health Checks ===" | tee -a "$LOG_FILE"
 HEALTH_CHECKS_PASSED=0
 HEALTH_CHECKS_FAILED=0
 HEALTH_CHECK_DETAILS=""
-VOYAGE_API_KEY_VALUE=""
 VOYAGE_HEALTH_STATUS="unknown"
 VOYAGE_HEALTH_DETAILS=""
 # Declare CI_E2E_STATUS/RUN_ID early so they are never unbound under set -u
@@ -195,7 +204,6 @@ fi
 
 # Check 4: Voyage AI Embedding Availability
 log_info "Checking Voyage AI embedding availability..." | tee -a "$LOG_FILE"
-VOYAGE_API_KEY_VALUE="$(get_config_value "VOYAGE_API_KEY")"
 if [[ -z "$VOYAGE_API_KEY_VALUE" ]]; then
   VOYAGE_HEALTH_STATUS="FAIL"
   VOYAGE_HEALTH_DETAILS="VOYAGE_API_KEY is not set in the shell environment or .env.local"

@@ -13,6 +13,10 @@ const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 // are not yet set (e.g. during Next.js build-time module evaluation).
 let _redis: Redis | null = null;
 
+function hasRedisConfig(): boolean {
+  return Boolean(upstashUrl && upstashToken);
+}
+
 function getRedis(): Redis {
   if (!_redis) {
     _redis = new Redis({ url: upstashUrl!, token: upstashToken! });
@@ -26,6 +30,8 @@ export class EmbeddingCache {
   }
 
   async get(text: string): Promise<number[] | null> {
+    if (!hasRedisConfig()) return null;
+
     const key = this.hashKey(text);
     try {
       const raw = await getRedis().get<string>(key);
@@ -42,9 +48,17 @@ export class EmbeddingCache {
   }
 
   async set(text: string, embedding: number[]): Promise<void> {
+    if (!hasRedisConfig()) return;
+
     const key = this.hashKey(text);
     try {
-      await getRedis().set(key, JSON.stringify(embedding), { ex: TTL_SECONDS });
+      void getRedis()
+        .set(key, JSON.stringify(embedding), { ex: TTL_SECONDS })
+        .catch((err: unknown) => {
+          logger.warn("[EMBEDDING_CACHE_SET_FAILED]", {
+            reason: err instanceof Error ? err.message : String(err),
+          });
+        });
     } catch (err) {
       // Fire-and-forget: a write failure is non-fatal. The embedding was
       // already computed; the worst outcome is a cache miss next time.
