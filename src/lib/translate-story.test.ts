@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { translateStory, parseTranslationResponse, buildTranslationPrompt, updateStoryTranslation, getStoryTranslations } from "./translate-story";
 import type { StoryTranslation } from "@/types/immersive";
+import { CHAT_MODEL } from "./models";
 
 // Mock the claude module
 vi.mock("./claude", () => ({
@@ -310,7 +311,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },
@@ -319,6 +320,7 @@ describe("translate-story", () => {
       const result = await translateStory("test-story-id");
 
       expect(callAnthropicAPI).toHaveBeenCalled();
+      expect(vi.mocked(callAnthropicAPI).mock.calls[0][2]).toBe(CHAT_MODEL);
       expect(result.success).toBe(true);
       expect(result.results?.en?.success).toBe(true);
     });
@@ -368,7 +370,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },
@@ -454,7 +456,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },
@@ -566,7 +568,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },
@@ -707,7 +709,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },
@@ -765,7 +767,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },
@@ -815,7 +817,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },
@@ -861,7 +863,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },
@@ -914,7 +916,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },
@@ -974,7 +976,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },
@@ -1053,7 +1055,7 @@ describe("translate-story", () => {
         id: "test",
         type: "message",
         role: "assistant",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 200 },

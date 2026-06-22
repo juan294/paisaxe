@@ -7,6 +7,7 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { StoryLocale, StoryTranslation, TranslationStatus, StoryMetadata } from "@/types/immersive";
+import { CHAT_MODEL } from "./models";
 import { callAnthropicAPI } from "./claude";
 import { createAdminClient } from "./supabase-admin";
 import { LOCALE_NAMES, TRANSLATION_LOCALES } from "./translation-locales";
@@ -228,7 +229,7 @@ export async function translateStory(
     const response = await callAnthropicAPI(
       "You are a professional translator. Return only valid JSON, no other text.",
       [{ role: "user", content: prompt }],
-      "claude-sonnet-4-20250514",
+      CHAT_MODEL,
       2048
     );
 

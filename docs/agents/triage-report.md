@@ -1,59 +1,88 @@
 # Triage Report
-> Generated on 2026-06-20 | 6 reports processed | 2 action items resolved | 0 Dependabot PRs
+> Generated on 2026-06-22 | 6 reports processed | 5 action groups resolved | 0 Dependabot PRs
 
 ## Agent Failures
-None — all agents ran successfully.
+
+`cc-rpi-update-report.md` recorded `Not logged in · Please run /login` from the Jun 21 scheduled run. The failure no longer reproduces in this shell:
+
+```bash
+/Users/juan/.local/bin/claude -p "echo ok" --output-format text
+# ok
+```
+
+The autonomous `scripts/agents/cc-rpi-update.sh` was not run inside the dirty triage worktree because it can make its own commits. Next scheduled run should confirm launchd/noninteractive auth.
 
 ## Reports Reviewed
 
-| # | Report | Agent | Status | Action Items |
-|---|--------|-------|--------|--------------|
-| 1 | `cc-rpi-update-report.md` | cc-rpi update | GREEN | 0 — sync committed by agent (`abaaf76a`) |
-| 2 | `coverage-report.md` | Coverage | GREEN | 1 — commit streaming oversize-image test |
-| 3 | `cost-analyst-report.md` | Cost Analyst | WATCH | 0 code — 3 user-decision items (see below) |
-| 4 | `documentation-report.md` | Documentation | GREEN | 0 — 30th consecutive clean run |
-| 5 | `security-report.md` | Security | GREEN | 0 — 3rd consecutive, 0 advisories |
-| 6 | `performance-report.md` | Performance | YELLOW→GREEN | 1 — 412 KB chunk identified as LiveKit (deferred) |
-
-Also committed: `localization-report.md` (pre-marker, GREEN — 55th clean run, no action items).
+| # | Report | Agent | Status | Triage Outcome |
+|---|--------|-------|--------|----------------|
+| 1 | `cc-rpi-update-report.md` | cc-rpi update | Failed | Auth preflight now passes locally |
+| 2 | `cost-analyst-report.md` | Cost Analyst | WATCH | Production voice/pricing smoke checked; external billing and Twilio mutations left untouched |
+| 3 | `documentation-report.md` | Documentation | GREEN | No doc changes required |
+| 4 | `performance-report.md` | Performance | YELLOW advisory | Fresh build and analyzer run completed |
+| 5 | `qa-report.md` | QA | YELLOW | QA environment fixed; LLM quality recovered to 12/12 |
+| 6 | `security-report.md` | Security | GREEN | QA safety blocker resolved; no advisories |
 
 ## Overall Status: GREEN
 
-All 6,676 tests passing. 0 security advisories. Documentation current (30th clean run). Coverage stable at 98.74%. Blueprint synced to v1.21.0.
+The main code issue was the QA/dev-server LLM path. It is now resolved:
+
+- `VOYAGE_API_KEY` is read and exported before the QA dev server starts.
+- The dev server launch passes `VOYAGE_API_KEY` explicitly when present.
+- Embedding cache writes are fire-and-forget and skipped entirely when Upstash config is absent, so Redis cache latency cannot consume the embedding-stage timeout.
+- The embedding stage timeout is now 12s, matching observed Voyage tail latency while preserving the existing search and response limits.
+- Anthropic model IDs were updated from the removed `claude-sonnet-4-20250514` to `claude-sonnet-4-6`, which Anthropic lists as the current Claude Sonnet 4.6 API ID.
 
 ## Action Items Completed
 
-| # | Item | Source Report | Tests Added | Status |
-|---|------|--------------|-------------|--------|
-| 1 | Commit `src/app/api/admin/stories/[id]/image/route.test.ts` — streaming oversize-body regression test (DoS/SSRF guard for `readRemoteImageBufferWithLimit` streaming path) | coverage-report | +1 test | Done |
-| 2 | Identify 412 KB unknown chunk `144d3bae` | performance-report | — | **LiveKit** (ElevenLabs WebRTC dep, confirmed deferred/async — not first-paint) |
+| # | Item | Source Report | Status |
+|---|------|--------------|--------|
+| 1 | Fix QA dev server missing `VOYAGE_API_KEY` | QA, Security | Done |
+| 2 | Remove embedding cache as a live chat latency blocker | QA | Done |
+| 3 | Update obsolete Anthropic Sonnet model ID | QA live verification | Done |
+| 4 | Run fresh production build and bundle analyzer | Performance | Done |
+| 5 | Verify production health, voice entry point, and pricing/checkout surfaces | QA, Cost Analyst | Done |
+
+## Production Checks
+
+| Check | Result |
+|-------|--------|
+| `https://paisaxe.es/api/health` | 200, healthy |
+| `https://paisaxe.es/api/checkout/health` | 401, expected admin-auth gate |
+| `https://paisaxe.es/immersive` | 200; Ask button visible; chat dialog opens; voice upgrade entry point visible; no page errors |
+| `https://paisaxe.es/pricing` | 200; €1.99 Day Pass price visible; no page errors |
+| `https://paisaxe.es/pricing/checkout` | 200; unauthenticated sign-in gate visible |
+
+Full live Day Pass purchase was not executed because that would create a real production payment. Anthropic billing was not changed or read from the web console. Twilio number release was not performed because it would remove booking capability and is a product decision despite the low monthly cost.
 
 ## Dependabot PRs
-None — no open Dependabot PRs.
 
-## Performance Chunk Investigation
-
-The `144d3bae.07e3d4f37ae764e1.js` chunk (412 KB) is the **LiveKit** WebRTC SDK — a transitive dependency of `@elevenlabs/react`. It is referenced from the webpack runtime as an async/deferred chunk, **not on the first-paint path**. No code change needed. The performance YELLOW advisory (stale build) is resolved: the bundle budget (3,027 KB / 3,500 KB, 473 KB headroom) holds.
-
-Recommended follow-up: run `npm run build` before the next performance cycle to get a fresh authoritative Turbopack total.
-
-## User-Decision Items (no code action)
-
-| Item | Priority | Notes |
-|------|----------|-------|
-| Manual check: Pelayo voice widget + Day Pass flow on paisaxe.es | P1 | 127-day revenue drought, 123-day voice silence — root cause still unexplained |
-| Manual check: Anthropic billing at platform.anthropic.com | P2 | Config estimate $25/mo; actual may be $40–60/mo |
-| Tier-downgrade decision (Vercel + Supabase + ElevenLabs) | P2 | Up to ~$45/mo saving if no growth event expected; annual ElevenLabs plan locked until 2027-02-07 |
-| Twilio phone number release | P3 | Evaluate before ~Jul 7 (next billing cycle); 123 days without a booking call |
+No open Dependabot PRs were found.
 
 ## Verification
-- [x] All 6,676 tests passing (0 failures)
-- [x] Typecheck clean (CI will verify)
-- [x] Lint clean (CI will verify)
-- [ ] CI green (pending push)
 
-## Carried Items
-- **VOYAGE_API_KEY in QA env** — Jun 19 triage applied preflight/export fix. Next QA cycle (Wed) will confirm whether 12/12 LLM quality tests restore. LLM safety tests (authority impersonation, PII extraction, instruction override) remain unverified for 5 consecutive cycles.
-- **Dev-tooling major upgrades** — typescript v6, knip v6, `@vitejs/plugin-react` v6. No CVEs; low urgency. Schedule as a dedicated batch when ready.
-- **Fresh authoritative build** — current `.next` is a stale webpack `build:analyze` output (13 min gap from security pin commit). Run `npm run build` before next performance cycle.
-- **Manual production checks** — Pelayo voice widget and Day Pass flow on paisaxe.es; Anthropic billing at platform.anthropic.com. No automated verification available.
+- [x] Targeted tests: 5 files, 82 tests passed
+- [x] Full test suite: 379 files, 6,956 tests passed
+- [x] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npm run build`
+- [x] `npm run build:analyze`
+- [x] `NEXT_PUBLIC_SITE_URL=http://localhost:3006 npm run test:qa`: 12/12 passed
+- [ ] Push/CI green (pending commit and push)
+
+Build warnings observed but non-blocking: local build environment has no `CRON_SECRET`/`WEBHOOK_SECRET` and no local Supabase URL/anon key, so cron and health config warnings were emitted during static generation.
+
+## Observations
+
+- QA logs still show `ANTHROPIC_USAGE_INSERT_FAILED` when the local Supabase target does not expose `public.anthropic_usage` in the schema cache. This is non-blocking because usage recording is intentionally best-effort, but it should be checked against the intended database/migration state.
+- The production anonymous voice path is an upgrade entry point, not a live Pelayo conversation. A true Pelayo conversation check requires an active paid/authorized voice pass and microphone permission.
+- Running `scripts/agents/cc-rpi-update.sh` should be done from a clean checkout because the script can apply updates and commit independently.
+
+## External Decisions Still Requiring Owner Action
+
+| Item | Why it was not mutated in triage |
+|------|----------------------------------|
+| Anthropic billing console | Requires account-console access; no billing API for this personal account |
+| Twilio number release | Saves $1.39/mo but removes booking capability |
+| Full production Day Pass purchase | Would create a live payment |
+| ElevenLabs voice-shelving/tier decision | Product and renewal decision; annual plan sunk until 2027-02-07 |

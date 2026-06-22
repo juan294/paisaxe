@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { config } from "dotenv";
 import Anthropic from "@anthropic-ai/sdk";
+import { CHAT_MODEL } from "../src/lib/models";
 
 // Load environment variables from .env.local
 config({ path: ".env.local" });
@@ -248,7 +249,7 @@ Generate up to ${maxStories} stories. Return ONLY valid JSON, no explanations.`;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: CHAT_MODEL,
         max_tokens: 8000,
         messages: [
           { role: "user", content: prompt }

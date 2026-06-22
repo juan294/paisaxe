@@ -201,7 +201,7 @@ export const GENERIC_REDIRECT_RESPONSE_ES =
  */
 export const CHAT_CONFIG = {
   /** Claude model to use for chat */
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet-4-6",
   /** Maximum tokens in response */
   maxTokens: 1024,
   /** Maximum input message length */

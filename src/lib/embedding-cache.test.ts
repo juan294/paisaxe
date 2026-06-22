@@ -29,7 +29,10 @@ function redisKey(text: string): string {
 // ── Tests ────────────────────────────────────────────────────────────────────
 describe("EmbeddingCache (Redis-backed)", () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.resetAllMocks();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example.com");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "test-token");
     // Default: cache miss
     mockRedisGet.mockResolvedValue(null);
     mockRedisSet.mockResolvedValue("OK");
@@ -125,6 +128,19 @@ describe("EmbeddingCache (Redis-backed)", () => {
     expect(mockRedisSet).not.toHaveBeenCalled();
   });
 
+  it("skips Redis calls when cache env vars are missing", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    await expect(cache.get("text")).resolves.toBeNull();
+    await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
+    expect(mockRedisGet).not.toHaveBeenCalled();
+    expect(mockRedisSet).not.toHaveBeenCalled();
+  });
+
   it("silently absorbs Redis.set errors (fire-and-forget)", async () => {
     mockRedisGet.mockResolvedValue(null);
     mockRedisSet.mockRejectedValue(new Error("Write failed"));
@@ -134,6 +150,20 @@ describe("EmbeddingCache (Redis-backed)", () => {
 
     // Should not throw
     await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
+  });
+
+  it("does not wait for Redis.set to finish", async () => {
+    mockRedisSet.mockReturnValue(new Promise(() => {}));
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    const result = await Promise.race([
+      cache.set("slow write", [0.1, 0.2]).then(() => "returned"),
+      new Promise((resolve) => setTimeout(() => resolve("blocked"), 10)),
+    ]);
+
+    expect(result).toBe("returned");
   });
 
   it("different texts produce different Redis keys", async () => {

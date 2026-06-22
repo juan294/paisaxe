@@ -21,7 +21,7 @@ describe("recordAnthropicUsage", () => {
 
   it("persists a usage row with an estimated cost", async () => {
     await recordAnthropicUsage({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       source: "chat",
       usage: {
         input_tokens: 1_000_000,
@@ -32,7 +32,7 @@ describe("recordAnthropicUsage", () => {
     expect(mockFrom).toHaveBeenCalledWith("anthropic_usage");
     expect(mockInsert).toHaveBeenCalledTimes(1);
     const row = mockInsert.mock.calls[0][0];
-    expect(row.model).toBe("claude-sonnet-4-20250514");
+    expect(row.model).toBe("claude-sonnet-4-6");
     expect(row.input_tokens).toBe(1_000_000);
     expect(row.output_tokens).toBe(1_000_000);
     expect(row.source).toBe("chat");
@@ -41,13 +41,13 @@ describe("recordAnthropicUsage", () => {
   });
 
   it("does nothing when usage is null", async () => {
-    await recordAnthropicUsage({ model: "claude-sonnet-4-20250514", usage: null });
+    await recordAnthropicUsage({ model: "claude-sonnet-4-6", usage: null });
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it("does nothing when all token counts are zero", async () => {
     await recordAnthropicUsage({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       usage: { input_tokens: 0, output_tokens: 0 },
     });
     expect(mockInsert).not.toHaveBeenCalled();
@@ -57,7 +57,7 @@ describe("recordAnthropicUsage", () => {
     mockInsert.mockResolvedValueOnce({ error: { message: "boom" } });
     await expect(
       recordAnthropicUsage({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         usage: { input_tokens: 10, output_tokens: 5 },
       })
     ).resolves.toBeUndefined();
@@ -67,7 +67,7 @@ describe("recordAnthropicUsage", () => {
     // Usage without input/output tokens but with cache tokens — avoids the
     // all-zero early-return guard and exercises the ?? 0 fallback at lines 42-43.
     await recordAnthropicUsage({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       usage: { cache_creation_input_tokens: 1000 },
     });
     expect(mockInsert).toHaveBeenCalledTimes(1);
@@ -83,7 +83,7 @@ describe("recordAnthropicUsage", () => {
     });
     await expect(
       recordAnthropicUsage({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         usage: { input_tokens: 10, output_tokens: 5 },
       })
     ).resolves.toBeUndefined();
@@ -95,7 +95,7 @@ describe("recordAnthropicUsage", () => {
     });
     await expect(
       recordAnthropicUsage({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         usage: { input_tokens: 10, output_tokens: 5 },
       })
     ).resolves.toBeUndefined();
