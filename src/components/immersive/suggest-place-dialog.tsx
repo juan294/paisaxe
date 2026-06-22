@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { csrfHeaders } from "@/lib/csrf-client";
 import {
   Dialog,
@@ -34,6 +34,15 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
   const [website, setWebsite] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const successResetTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (successResetTimeoutRef.current !== null) {
+        window.clearTimeout(successResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,13 +83,17 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
       setSubmitState("success");
 
       // Reset form after success
-      setTimeout(() => {
+      if (successResetTimeoutRef.current !== null) {
+        window.clearTimeout(successResetTimeoutRef.current);
+      }
+      successResetTimeoutRef.current = window.setTimeout(() => {
         setPlaceName("");
         setComment("");
         setAttribution("");
         setWebsite("");
         setSubmitState("idle");
         onClose();
+        successResetTimeoutRef.current = null;
       }, 2000);
     } catch (error) {
       setSubmitState("error");
@@ -94,6 +107,10 @@ export function SuggestPlaceDialog({ isOpen, onClose }: SuggestPlaceDialogProps)
     if (!open) {
       // Only close if not in loading state
       if (submitState !== "loading") {
+        if (successResetTimeoutRef.current !== null) {
+          window.clearTimeout(successResetTimeoutRef.current);
+          successResetTimeoutRef.current = null;
+        }
         onClose();
         // Reset state when dialog closes
         setSubmitState("idle");
