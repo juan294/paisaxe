@@ -4,7 +4,7 @@ import { getModelPricing, estimateCostUsd } from "./anthropic-pricing";
 describe("anthropic-pricing", () => {
   describe("getModelPricing", () => {
     it("matches a sonnet-4 model id with a date suffix", () => {
-      const p = getModelPricing("claude-sonnet-4-20250514");
+      const p = getModelPricing("claude-sonnet-4-6");
       expect(p.input).toBeCloseTo(3 / 1_000_000, 12);
       expect(p.output).toBeCloseTo(15 / 1_000_000, 12);
     });
@@ -22,7 +22,7 @@ describe("anthropic-pricing", () => {
     });
 
     it("derives cache rates from the input rate", () => {
-      const p = getModelPricing("claude-sonnet-4-20250514");
+      const p = getModelPricing("claude-sonnet-4-6");
       expect(p.cacheWrite).toBeCloseTo(p.input * 1.25, 12);
       expect(p.cacheRead).toBeCloseTo(p.input * 0.1, 12);
     });
@@ -31,7 +31,7 @@ describe("anthropic-pricing", () => {
   describe("estimateCostUsd", () => {
     it("computes input + output cost for sonnet-4", () => {
       // 1M input @ $3 + 1M output @ $15 = $18
-      const cost = estimateCostUsd("claude-sonnet-4-20250514", {
+      const cost = estimateCostUsd("claude-sonnet-4-6", {
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,
       });
@@ -39,7 +39,7 @@ describe("anthropic-pricing", () => {
     });
 
     it("includes cache tokens", () => {
-      const cost = estimateCostUsd("claude-sonnet-4-20250514", {
+      const cost = estimateCostUsd("claude-sonnet-4-6", {
         inputTokens: 0,
         outputTokens: 0,
         cacheReadInputTokens: 1_000_000, // 0.1x of $3 = $0.30
@@ -49,7 +49,7 @@ describe("anthropic-pricing", () => {
     });
 
     it("treats negative/NaN token counts as zero", () => {
-      const cost = estimateCostUsd("claude-sonnet-4-20250514", {
+      const cost = estimateCostUsd("claude-sonnet-4-6", {
         inputTokens: -5,
         outputTokens: Number.NaN as unknown as number,
       });

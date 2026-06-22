@@ -1,7 +1,7 @@
 import { logger } from "@/lib/logger";
 
 export const CHAT_STREAM_STAGE_TIMEOUTS_MS = {
-  embedding: 8_000,
+  embedding: 12_000,
   search: 5_000,
   featureFlag: 2_000,
   response: 30_000,

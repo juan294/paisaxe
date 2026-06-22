@@ -76,7 +76,7 @@ describe("claude", () => {
       expect(response).toBe("This is a response about Asturias");
 
       const body = getCurlBody();
-      expect(body.model).toBe("claude-sonnet-4-20250514");
+      expect(body.model).toBe("claude-sonnet-4-6");
       expect(body.max_tokens).toBe(1024);
       expect(body.messages).toEqual(
         expect.arrayContaining([
@@ -189,7 +189,7 @@ describe("claude", () => {
       await generateChatResponse("Test", []);
 
       const body = getCurlBody();
-      expect(body.model).toBe("claude-sonnet-4-20250514");
+      expect(body.model).toBe("claude-sonnet-4-6");
       expect(body.max_tokens).toBe(1024);
       expect(body.system).toBeDefined();
       expect(body.messages).toHaveLength(1);
@@ -1037,7 +1037,7 @@ describe("claude", () => {
       const dIndex = curlArgs.indexOf("-d");
       const body = JSON.parse(curlArgs[dIndex + 1]);
       expect(body.stream).toBe(true);
-      expect(body.model).toBe("claude-sonnet-4-20250514");
+      expect(body.model).toBe("claude-sonnet-4-6");
     });
 
     it("throws AbortError immediately when signal is already aborted before streaming starts (line 106)", async () => {
@@ -1289,12 +1289,12 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       const result = await callAnthropicAPI(
         "system prompt",
         [{ role: "user", content: "Hello" }],
-        "claude-sonnet-4-20250514",
+        "claude-sonnet-4-6",
         1024
       );
 
       expect(mockCreate).toHaveBeenCalledWith({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 1024,
         system: [{ type: "text", text: "system prompt", cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: "Hello" }],
@@ -1311,7 +1311,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
         callAnthropicAPI(
           "system prompt",
           [{ role: "user", content: "Test" }],
-          "claude-sonnet-4-20250514",
+          "claude-sonnet-4-6",
           1024
         )
       ).rejects.toThrow("SDK authentication failed");
@@ -1331,7 +1331,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       expect(mockCreate).toHaveBeenCalledTimes(1);
 
       const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.model).toBe("claude-sonnet-4-20250514");
+      expect(callArgs.model).toBe("claude-sonnet-4-6");
       expect(callArgs.max_tokens).toBe(1024);
     });
 
@@ -1414,7 +1414,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
 
       expect(mockStream).toHaveBeenCalledTimes(1);
       const callArgs = mockStream.mock.calls[0][0];
-      expect(callArgs.model).toBe("claude-sonnet-4-20250514");
+      expect(callArgs.model).toBe("claude-sonnet-4-6");
       expect(callArgs.max_tokens).toBe(1024);
       // PE-M5: system is an array with cache_control
       expect(Array.isArray(callArgs.system)).toBe(true);
@@ -1492,7 +1492,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       });
 
       const { callAnthropicAPI } = await import("./claude");
-      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-4-20250514", 512);
+      await callAnthropicAPI("sys", [{ role: "user", content: "hi" }], "claude-sonnet-4-6", 512);
 
       expect(capturedConstructorOptions).toMatchObject({ maxRetries: 3 });
     });
@@ -1571,7 +1571,7 @@ describe("claude SDK path (NODE_ENV=production)", () => {
       await callAnthropicAPI(
         "my system prompt",
         [{ role: "user", content: "question" }],
-        "claude-sonnet-4-20250514",
+        "claude-sonnet-4-6",
         512
       );
 
