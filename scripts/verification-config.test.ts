@@ -96,6 +96,10 @@ describe("verification coverage config", () => {
     expect(qaAgent).toContain("VOYAGE_API_KEY_VALUE");
     expect(qaAgent).toContain("Checking Voyage AI embedding availability");
     expect(qaAgent).toContain("QA PREFLIGHT: Voyage AI embedding availability failed");
+    expect(qaAgent.indexOf("export VOYAGE_API_KEY")).toBeLessThan(
+      qaAgent.indexOf("npm run dev")
+    );
+    expect(qaAgent).toContain('VOYAGE_API_KEY="$VOYAGE_API_KEY_VALUE" npm run dev');
   });
 
   it("includes chat API response bodies in QA LLM failures", () => {

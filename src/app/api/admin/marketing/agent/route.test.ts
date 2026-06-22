@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
+import { CHAT_MODEL } from "@/lib/models";
 
 const logger = vi.hoisted(() => ({
   error: vi.fn(),
@@ -186,7 +187,7 @@ describe("/api/admin/marketing/agent", () => {
 
       expect(mocks.anthropicCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: "claude-sonnet-4-20250514",
+          model: CHAT_MODEL,
         })
       );
     });
