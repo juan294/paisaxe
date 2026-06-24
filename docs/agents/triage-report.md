@@ -61,9 +61,9 @@ None — all agents ran successfully.
 ## Manual Items (Owner Action Required)
 These cannot be automated and require your direct action:
 
-- **[P1 CRITICAL]** Verify Pelayo voice widget + Day Pass purchase on paisaxe.es — 131-day revenue drought / 127-day voice silence unexplained by automated means
-- **[P2]** Check Anthropic billing at platform.anthropic.com — overdue multiple cycles
-- **[P2]** Twilio number release decision before ~Jul 7 (~13 days until next $1.39 charge)
+- **[P1 DEFER → 2026-07-24]** Verify Pelayo voice widget + Day Pass purchase on paisaxe.es — 131-day revenue drought / 127-day voice silence unexplained by automated means
+- **[P2 DEFER → 2026-07-24]** Check Anthropic billing at platform.anthropic.com — overdue multiple cycles
+- **[P2 DEFER → 2026-07-24]** Twilio number release decision
 
 ## Carried Items
 - @babel/core alert #73 (LOW, dev-only) — no action; will resolve when babel ships a patch
