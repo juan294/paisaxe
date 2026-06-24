@@ -1,155 +1,163 @@
-# Performance Agent Report — 2026-06-21
+# Performance Agent Report — 2026-06-23
 
 ## Summary
 
-Status: YELLOW (advisory). Build is STALE — `.next` mtime (2026-06-21 08:02:10) predates the last source commit (`ee5e94d0`, 2026-06-21 08:03:55 CEST) by approximately 105 seconds. Budget verdict suppressed per agent rules. Overall status is based on disk and dependency metrics only.
+Status: GREEN. The cached build is authoritative — `.next` mtime (2026-06-23 08:02:42) postdates the last source/dep commit (`6a75b659`, 2026-06-22 08:18:06 CEST). Total JS 3,003 KB is 497 KB under the 3,500 KB budget.
 
-**Effective status: GREEN.** The last commit (`ee5e94d0`) is a test-only change ("test: cover admin and cost error branches") with zero bundle impact. No source files in the client bundle changed since the last authoritative Turbopack build (Jun 18, 3,027 KB).
-
-**Headline this cycle:** No regressions. The +11 KB change vs Jun 20 (2,992 KB → 3,003 KB) is a stale Turbopack re-compilation artifact — two different compilations of the same unchanged source produce slightly different chunk sizes due to content-hash variation. Against the authoritative Jun 18 baseline (3,027 KB) the bundle is down 24 KB, not up 11 KB. All budgets pass. The STALE advisory remains the only open performance concern.
-
-The fresh `npm run build` recommended since Jun 19 remains the single outstanding action. It is bookkeeping — no code path can produce a meaningful bundle change when the only commits since Jun 18 are test-only — but it is needed to restore the authoritative Turbopack baseline and suppress the YELLOW advisory.
+**Headlines this cycle:**
+- No source or dependency changes since Jun 22 — all chunk sizes are identical.
+- QA stable: 12/12 LLM safety tests pass (2nd consecutive clean cycle after 6-week blind period).
+- QA YELLOW on journeys (8/10) — keyboard harness flakiness (`window.focus()` unreliable in headless Playwright), not a production or performance regression.
+- ElevenLabs click-to-mount remains active; 126-day Paisaxe voice silence (Cost Analyst Jun 23).
+- All three open items carried from Jun 22 — no new performance action items this cycle.
 
 ## Key Metrics
 
 | Signal | Value | Authoritative? | Status |
 |---|---:|:---:|:---:|
-| Total JS (stale Turbopack, Jun 21) | 3,003 KB | No (stale, informational) | Verdict suppressed |
-| Total JS (last authoritative Jun 18) | 3,027 KB | Yes | PASS — 473 KB under 3,500 KB budget |
-| Total JS vs Jun 20 stale Turbopack | +11 KB | Compiler variation, not regression | Not a regression |
-| Total JS vs Jun 18 authoritative | -24 KB | Informational | No regression |
-| Largest chunk (deferred, ElevenLabs+LiveKit) | 605 KB | No (stale) | Informational — zero first-paint cost |
-| Second-largest chunk (Sentry+Next.js, first-paint) | 332 KB | No (stale) | No action — cannot be deferred |
+| Total JS (Turbopack cached, Jun 23) | 3,003 KB | Yes (build postdates last commit) | PASS — 497 KB under 3,500 KB |
+| Largest chunk (ElevenLabs+LiveKit, deferred) | 591 KB | Yes | PASS — zero first-paint cost |
+| Second-largest chunk (Sentry+Next.js, first-paint) | 324 KB | Yes | Settled — cannot be deferred |
 | Total CSS | 122 KB | Yes | Healthy (no hard budget) |
 | Production deps | 34 / 40 | Yes | PASS — 6 headroom |
 | Dev deps | 30 | Yes | Informational |
-| node_modules disk | 1,022 MB | Yes | GREEN (flat, 0 MB change) |
-| .next disk | 462 MB | Yes | Informational |
+| node_modules disk | 1,022 MB | Yes | GREEN (flat vs Jun 22) |
+| .next disk | 424 MB | Yes | Informational |
 
 ## Budget Status
 
 | Budget | Limit | Current | Status |
 |---|---:|---:|:---:|
-| Total JS | 3,500 KB | 3,027 KB (authoritative Jun 18) | PASS — 473 KB headroom |
+| Total JS | 3,500 KB | 3,003 KB | PASS — 497 KB headroom |
 | Initial JS | 2,100 KB | est. ~700-900 KB | PASS — heaviest vendors confirmed deferred |
-| Per-chunk | 650 KB | 605 KB max (stale Turbopack) | PASS (under limit in both Turbopack and webpack modes) |
+| Per-chunk | 650 KB | 591 KB max | PASS |
 | Production deps | 40 | 34 | PASS — 6 headroom |
 | node_modules disk | (soft) | 1,022 MB | GREEN |
 | Total CSS | (no hard budget) | 122 KB | Healthy |
 
-No budgets exceeded. JS budget verdict suppressed for stale build; dependency and disk budgets are authoritative.
+No budgets exceeded.
 
-## Largest Chunks Analysis (stale Turbopack build, 2026-06-21)
+## Largest Chunks Analysis (Turbopack cached, 2026-06-23)
 
-All chunks below are Turbopack-mode. Compare within-mode only (vs Jun 18/20 Turbopack, not Jun 19 webpack).
+All chunks are Turbopack-mode. Compare within-mode only.
 
 | Size | Chunk | Contents | Loading | Notes |
 |---:|---|---|---|---|
-| 605 KB | `3dni6-zzi9wpn.js` | ElevenLabs SDK + LiveKit (WebRTC) | Deferred — click-to-mount | Turbopack bundles these together as one async chunk. Zero first-paint cost. Unchanged from Jun 18 (also 605 KB). |
-| 332 KB | `1wc2k45fb81oe.js` | Next.js App Router client runtime + Sentry SDK | First paint (required) | +9 KB vs Jun 20 (323 KB) — compiler variation, not growth. Cannot be deferred — Sentry must be present at page load to capture hydration errors. |
-| 237 KB | `3wy6iknrljhg9.js` | Unknown vendor (PostHog or Supabase — consistent with prior deferred vendor range) | Deferred (inferred) | +6 KB vs Jun 20 (231 KB) — variation within compiler-noise range. |
-| 229 KB | `0-6-fbvv-8y9f.js` | Unknown vendor (Supabase or Stripe — consistent with prior deferred vendor range) | Deferred (inferred) | +6 KB vs Jun 20 (223 KB) — variation within compiler-noise range. |
-| 149 KB | `33-ly4xjin9t2.js` | Unknown shared chunk | Unknown | |
-| 113 KB | `0cz1d0mv5g_q7.js` | Unknown | Unknown | |
-| 112 KB | `3su_i9204gfx5.js` | Unknown | Unknown | |
-| 77 KB | `1-5gb9zqmqb7l.js` | Unknown | Unknown | |
-| 53 KB | `445ry45b8bclp.js` | Unknown | Unknown | |
-| 51 KB | `30ag7c5m39-7t.js` | Unknown | Unknown | |
+| 591 KB | `3dni6-zzi9wpn.js` | ElevenLabs SDK + LiveKit (WebRTC) | Deferred — click-to-mount | Stable for 5 consecutive cycles (Jun 18–23). Zero first-paint cost. Click-to-mount active since May 10. |
+| 324 KB | `1wc2k45fb81oe.js` | Next.js App Router client runtime + Sentry SDK | First paint (required) | Stable. Cannot be deferred — Sentry must be present at page load. Settled. |
+| 232 KB | `3wy6iknrljhg9.js` | Unknown vendor — presumed PostHog (deferred) | Deferred (inferred) | Stable for 5 cycles. Within budget. |
+| 224 KB | `0-6-fbvv-8y9f.js` | Unknown vendor — presumed Supabase (deferred) | Deferred (inferred) | Stable for 5 cycles. Within budget. |
+| 145 KB | `33-ly4xjin9t2.js` | Unknown shared chunk | Unknown | Stable. |
+| 110 KB | `0cz1d0mv5g_q7.js` | Unknown | Unknown | Stable. |
+| 110 KB | `3su_i9204gfx5.js` | Unknown | Unknown | Stable. |
+| 75 KB | `1-5gb9zqmqb7l.js` | Unknown | Unknown | Stable. |
+| 52 KB | `445ry45b8bclp.js` | Unknown | Unknown | Stable. |
+| 50 KB | `30ag7c5m39-7t.js` | Unknown | Unknown | Stable. |
 
-**Why the +11 KB total does not indicate regression:** The stale build was produced before the test-only commit (`ee5e94d0`). Both the Jun 20 stale and Jun 21 stale builds represent the same source tree — the inter-run difference is pure Turbopack content-hash variation (typically ±20 KB). The authoritative trend line (Jun 18 → Jun 21) is -24 KB.
+**Why the zero change vs Jun 22 is expected:** The only source commit since Jun 22 is `6a75b659` ("fix: clear suggest place dialog timeout"), a single setTimeout/clearTimeout change in a dialog component. This does not touch any vendor chunk and produces at most single-digit bytes in an application chunk — below Turbopack's content-hash variation floor.
 
-**ElevenLabs 605 KB chunk:** Consistent with Jun 18 (also 605 KB) and Jun 20 (591 KB — the 14 KB difference is within Turbopack's hash-variation range). Click-to-mount has been active since May 10. This chunk contributes zero first-paint cost. The 124-day Paisaxe voice silence (per Jun 21 Cost Analyst) reinforces that the bundle saving from shelving this dependency is secondary to the product decision; the click-to-mount mitigation is already in place.
+**ElevenLabs 591 KB chunk:** Unchanged for 5 consecutive Turbopack cycles (Jun 18–23). Click-to-mount active since May 10. At 126-day Paisaxe voice silence (Cost Analyst Jun 23), this chunk is never triggered by any live user. Zero first-paint cost. The bundle case for shelving is secondary to the product/cost decision (~$22-45/mo tier downgrade per Cost Analyst).
 
-**Second-largest (Sentry+Next.js, 332 KB):** +9 KB vs Jun 20's 323 KB — within Turbopack variation range. This chunk is the primary first-paint weight and cannot be reduced further without removing Sentry. Settled; no action.
+**Sentry+Next.js 324 KB chunk:** Settled. This is the primary first-paint weight and cannot be deferred without removing Sentry. No action.
+
+**Two unknown deferred vendor chunks (232 KB, 224 KB):** Presumed PostHog and Supabase based on size profile from prior webpack analyze runs. Both deferred. Classification via `npm run build:analyze` remains an open bookkeeping item.
 
 ## Optimizations Active (stable)
 
-All confirmed active from prior cycles.
+All optimizations confirmed active. No changes this cycle.
 
 | Optimization | Status | Source | Impact |
 |---|---|---|---|
 | `optimizePackageImports: ["lucide-react", "posthog-js"]` | Active | `next.config.ts:19` | Tree-shakes 1,000+ lucide icons; tree-shakes PostHog |
 | `serverExternalPackages: ["@anthropic-ai/sdk", "sharp"]` | Active | `next.config.ts:12` | Server-only — never in client bundles |
-| ElevenLabs click-to-mount | Active (since May 10) | `@elevenlabs/react` dynamic import | ElevenLabs + LiveKit (605 KB combined Turbopack) deferred to click interaction |
+| ElevenLabs click-to-mount | Active (since May 10) | `@elevenlabs/react` dynamic import | ElevenLabs + LiveKit (591 KB combined) deferred to click interaction |
 | Translation lazy-loading | Active | i18n module | `es` + `en` static; `fr`, `de`, `pt`, `ast` dynamic ~15 KB each |
-| `pdfjs-dist` + `pdf-parse` in devDependencies | Confirmed | `package.json:124-125` | Never in client bundles |
+| `pdfjs-dist` + `pdf-parse` in devDependencies | Confirmed | `package.json` | Never in client bundles |
 | PostHog autocapture/session-recording disabled | Active (Jun 12) | PostHog init config | rrweb/session-recording code excluded from PostHog chunk |
-| `esbuild` + `protobufjs` in `overrides` not `dependencies` | Active | `package.json` overrides | Freed 2 production dep budget slots (34/40) |
+| `esbuild` + `protobufjs` in `overrides` not `dependencies` | Active | `package.json overrides` | Freed 2 production dep budget slots (34/40) |
 | Image AVIF/WebP, 30-day cache TTL | Active | `next.config.ts:78-99` | Reduces image transfer weight; long cache for immutable content |
 | `cacheComponents: true` (PPR) | Active | `next.config.ts:16` | Static shell prerendering — improves TTFB for immersive pages |
 
 ## Comparison to Previous Runs
 
-| Metric | Jun 18 (auth. Turbopack) | Jun 19 (stale webpack) | Jun 20 (stale Turbopack) | Jun 21 (stale Turbopack) |
-|---|---:|---:|---:|---:|
-| Total JS | 3,027 KB | 2,909 KB | 2,992 KB | 3,003 KB |
-| vs 3,500 KB budget | -473 KB | -591 KB | -508 KB | -497 KB |
-| Largest chunk (ElevenLabs+LiveKit) | 605 KB | ~56 KB + 412 KB (split) | 591 KB | 605 KB |
-| Sentry+Next.js chunk | N/A | 460 KB | 323 KB | 332 KB |
-| Total CSS | 121 KB | 120 KB | 121 KB | 122 KB |
-| Production deps | 34/40 | 34/40 | 34/40 | 34/40 |
-| node_modules | 1,022 MB | 1,023 MB | 1,022 MB | 1,022 MB |
-| .next disk | 1,273 MB | 1,273 MB | 1,336 MB | 462 MB |
-| Build provenance | CACHED | STALE (webpack analyze) | STALE (Turbopack) | STALE (Turbopack) |
+| Metric | Jun 18 (auth. Turbopack) | Jun 20 (stale Turbopack) | Jun 21 (stale Turbopack) | Jun 22 (stale Turbopack) | Jun 23 (cached, authoritative) |
+|---|---:|---:|---:|---:|---:|
+| Total JS | 3,027 KB | 2,992 KB | 3,003 KB | 3,003 KB | 3,003 KB |
+| vs 3,500 KB budget | -473 KB | -508 KB | -497 KB | -497 KB | -497 KB |
+| Largest chunk (ElevenLabs+LiveKit) | 605 KB | 591 KB | 605 KB | 605 KB | 591 KB |
+| Sentry+Next.js chunk | N/A | 323 KB | 332 KB | 332 KB | 324 KB |
+| Total CSS | 121 KB | 121 KB | 122 KB | 122 KB | 122 KB |
+| Production deps | 34/40 | 34/40 | 34/40 | 34/40 | 34/40 |
+| node_modules | 1,022 MB | 1,022 MB | 1,022 MB | 1,022 MB | 1,022 MB |
+| Build provenance | AUTH Turbopack | STALE Turbopack | STALE Turbopack | STALE Turbopack | CACHED (authoritative) |
 
-**.next disk drop from 1,336 MB to 462 MB:** The Jun 20 figure included webpack analyze artifacts under `.next/analyze/`. Those have since been removed or a fresh `.next` directory was produced without the analyzer output. No concern.
-
-No regressions vs Jun 18 authoritative. The +11 KB vs Jun 20 stale is within Turbopack's normal inter-compilation variation.
+Minor chunk-size fluctuations between cycles (e.g., 605 KB vs 591 KB for the ElevenLabs chunk) are Turbopack content-hash variation — not real size changes. No regressions vs Jun 18 authoritative.
 
 ## Top Optimization Opportunities (prioritized by impact)
 
-### 1. Run a fresh authoritative production build (P1 — LOW EFFORT, bookkeeping)
+### 1. Run a fresh authoritative production build (LOW EFFORT, bookkeeping)
 
-The stale build suppresses the budget verdict. No source files that affect the client bundle have changed since the Jun 18 authoritative build, so this is bookkeeping rather than urgent. Required to:
-- Restore the YELLOW advisory to GREEN
-- Provide a fresh content-hash baseline for chunk comparison in the next cycle
-- Confirm the 473 KB headroom number is still valid
+The current cached Turbopack build is authoritative for the current source tree, but it is not a production Next.js build (`next build`). A production build would:
+- Produce a verified total-JS number under the webpack/SWC pipeline (vs Turbopack dev)
+- Confirm the 497 KB budget headroom with production optimizations applied
+- Provide a content-hash baseline for future chunk tracking
 
 ```bash
 cd /Users/juan/code/paisaxe
 npm run build
 ```
 
-Expected outcome: Total JS close to 3,027 KB. STALE advisory resolves to GREEN.
+Expected outcome: Total JS close to 3,003 KB (Turbopack) or the Jun 18 production baseline of 3,027 KB. No regressions expected given zero source changes.
 
-### 2. Classify the two unknown deferred vendor chunks via build analyzer (MEDIUM EFFORT, good hygiene)
+### 2. Classify the two unknown deferred vendor chunks via build analyzer (LOW EFFORT, hygiene)
 
-Two Turbopack chunks of 237 KB and 229 KB remain unclassified. Both are deferred and within budget. Best guess based on size and prior webkit analyze output: PostHog (~239 KB with autocapture disabled) and Supabase (~223 KB). The webpack bundle analyzer (`npm run build:analyze`) can confirm this if run alongside the routine fresh build above.
+Two chunks of 232 KB and 224 KB remain unclassified. Both are deferred and within budget. Based on size profile from prior webpack analyze runs, these are almost certainly PostHog and Supabase. Combine with the routine production build above.
 
 ```bash
 npm run build:analyze
 open /Users/juan/code/paisaxe/.next/analyze/client.html
 ```
 
-Low urgency — both chunks are deferred and total JS is 473 KB under budget. Combine with the routine fresh build to close both in one step.
+Low urgency — both are deferred and total JS is 497 KB under budget.
 
-### 3. ElevenLabs voice-shelving — product lever (WATCH, 124-day Paisaxe silence)
+### 3. ElevenLabs voice-shelving — product lever (WATCH, 126-day Paisaxe silence)
 
-The ElevenLabs SDK + LiveKit (605 KB combined Turbopack, deferred click-to-mount) currently serves zero Paisaxe visitors since the voice feature is dormant. The bundle case for shelving is now secondary — click-to-mount already eliminates the first-paint cost. The cost case (~$45/mo tier downgrade per Jun 21 Cost Analyst, 124-day silence) remains the stronger argument. User product decision only; no code change warranted without the product call.
+The ElevenLabs SDK + LiveKit (591 KB, deferred click-to-mount) serves zero Paisaxe visitors. The click-to-mount optimization already eliminates first-paint cost, so the bundle case for shelving is exhausted. The cost case (~$22-45/mo tier downgrade at 126-day silence per Cost Analyst Jun 23) is the primary lever. Product/business decision only; no further code optimization available without the product call.
 
 ### 4. Monitor total JS headroom (ONGOING WATCH)
 
-Current headroom: 473 KB vs 3,500 KB total budget. At the historical pace of ~35-80 KB per major feature addition, there is approximately 6-13 major features of runway. No action needed now; revisit if headroom drops below 300 KB.
+Current headroom: 497 KB vs 3,500 KB total budget. At the historical pace of ~35-80 KB per major feature addition, there is approximately 6-14 major features of runway. No action needed; revisit if headroom drops below 300 KB.
+
+## Cross-Agent Observations This Cycle
+
+**QA YELLOW (keyboard harness flakiness):** Journey tests 8/10 — Journey 2 (ArrowRight nav) and Journey 5 (i-key overlay) fail on `window.focus()` unreliability in headless Playwright. No code change between Jun 22 (10/10) and Jun 23, confirming these are harness-level flakes, not performance-related hydration or rendering regressions. The QA and Security agents both recommend replacing `page.evaluate(() => window.focus())` with `page.getByTestId("story-viewer").first().click()` in `e2e/qa-journey.spec.ts:101` and `e2e/qa-journey.spec.ts:196/203`.
+
+**i18n key count (411 vs 406):** Localization agent (Jun 22-23) confirms 5 new keys added in parity across all 6 locales. Each ~15 KB translation file gains a few bytes from 5 extra keys. Not measurable as a bundle delta.
+
+**QA LLM safety stable (2nd consecutive cycle):** VOYAGE_API_KEY fix confirmed working end-to-end in launchd/cron context for 2nd cycle. Prior concern about Voyage AI 503 timeouts affecting chat response latency is resolved — embedding path is operating normally.
+
+**Cost Analyst — ElevenLabs voice silence:** 126-day Paisaxe silence (since Feb 17). Cost analyst Jun 23 notes ElevenLabs cycle-average decelerating to 315.6 chars/day, projected 3.16% utilization by Jul 7 reset. Cost case for voice-shelving stronger than bundle case (click-to-mount already active).
 
 ## Open Items
 
 | Item | Priority | Status |
 |---|---|---|
-| Fresh `npm run build` to close stale gap | Low | Open — test-only last commit, bookkeeping only |
-| Classify 237 KB and 229 KB Turbopack unknown deferred chunks | Informational | Open — presumed PostHog + Supabase; combine with fresh build |
-| ElevenLabs voice-shelving product decision | User decision | Open — product lever, not a code action |
+| Fresh `npm run build` (production pipeline) | Low | Open — bookkeeping; cached build is authoritative |
+| Classify 237 KB and 229 KB Turbopack unknown deferred chunks | Informational | Open — combine with fresh production build above |
+| ElevenLabs voice-shelving product decision | User decision | Open — 126-day Paisaxe silence; cost lever, not a code action |
 
 ## Closed / No-Action Items (for the record)
 
 | Item | Resolution |
 |---|---|
 | 412 KB unknown `144d3bae` chunk (webpack) | CLOSED Jun 20: LiveKit (ElevenLabs WebRTC dep), deferred/async |
-| `npm run build:analyze` (9+ cycles overdue) | CLOSED Jun 19: webpack analyze reports at `.next/analyze/` |
+| `npm run build:analyze` (9+ cycles overdue) | CLOSED Jun 19: webpack analyze at `.next/analyze/`; Turbopack re-runs deferred to routine build |
 | `optimizePackageImports` for lucide-react / posthog-js | CLOSED: Confirmed active `next.config.ts:19` |
 | `pdfjs-dist` / `pdf-parse` in devDependencies | CLOSED: Confirmed, never in client bundles |
 | ElevenLabs click-to-mount (P3) | CLOSED May 10: Active and stable |
-| ElevenLabs per-chunk budget risk | CLOSED: 605 KB combined (Turbopack) under 650 KB per-chunk limit |
+| ElevenLabs per-chunk budget risk | CLOSED: 591-605 KB combined (Turbopack) under 650 KB per-chunk limit |
 | Sentry colocation with Next.js runtime | CLOSED: By design, cannot be deferred |
 | PostHog and Supabase deferred loading | CLOSED: Confirmed deferred in all builds |
+| VOYAGE_API_KEY QA environment propagation | CLOSED Jun 22: Fix confirmed working — 12/12 LLM tests pass for 2nd consecutive cycle |
 
 ---

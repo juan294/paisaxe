@@ -1,13 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-06-22 06:00:05
-
-## Changes Made This Run (2026-06-22)
-
-No changes. All documentation is current.
-
-- Feature flags: All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps.
-- API routes: All 51 flagged routes confirmed internal. Spot-checked categories: admin APIs (admin panel backend), cron endpoints (Vercel cron jobs), webhooks (Stripe/ElevenLabs/Supabase/translate), MCP voice-agent tools (Pelayo internal tools), health probes, client-side access checks (`favorites`, `feature-flags`, `voice-access`, `suggestions`). No external-consumption routes require documentation.
-- Previously documented routes `health/live`, `health/db`, and all webhooks already covered in `features.md` Infrastructure section.
+> Auto-generated on 2026-06-24 06:00:11
 
 ## CLAUDE.md Status
 
@@ -32,6 +24,8 @@ src/app/api/admin/marketing/accounts/route.test.ts
 src/app/api/admin/marketing/accounts/route.ts
 src/app/api/admin/marketing/agent-logs/route.test.ts
 src/app/api/admin/marketing/agent-logs/route.ts
+src/app/api/admin/marketing/agent/route.test.ts
+src/app/api/admin/marketing/agent/route.ts
 src/app/api/admin/marketing/dashboard/route.test.ts
 src/app/api/admin/marketing/dashboard/route.ts
 src/app/api/admin/marketing/posts/route.test.ts
@@ -144,6 +138,7 @@ src/components/immersive/story-progress-bar.tsx
 src/components/immersive/story-toolbar.tsx
 src/components/immersive/story-viewer.test.tsx
 src/components/immersive/story-viewer.tsx
+src/components/immersive/suggest-place-dialog.tsx
 src/components/immersive/voice-chat-elevenlabs.test.tsx
 src/components/immersive/voice-chat-elevenlabs.tsx
 src/components/immersive/voice-chat/chat-message-list.tsx
@@ -179,12 +174,15 @@ src/lib/admin-api/stories.ts
 src/lib/admin-api/suggestions.ts
 src/lib/admin-auth.test.ts
 src/lib/admin-auth.ts
+src/lib/chat-config.ts
 src/lib/chat-route-utils.test.ts
 src/lib/chat-stream-timeouts.test.ts
+src/lib/chat-stream-timeouts.ts
 src/lib/claude.test.ts
 src/lib/claude.ts
 src/lib/client-logger.test.ts
 src/lib/client-logger.ts
+src/lib/content-discovery.ts
 src/lib/costs/anthropic-costs.test.ts
 src/lib/costs/anthropic-costs.ts
 src/lib/costs/anthropic-pricing.test.ts
@@ -199,6 +197,8 @@ src/lib/costs/twilio-costs.ts
 src/lib/cron-auth.test.ts
 src/lib/cron-auth.ts
 src/lib/email.ts
+src/lib/embedding-cache.test.ts
+src/lib/embedding-cache.ts
 src/lib/embeddings.test.ts
 src/lib/embeddings.ts
 src/lib/env.ts
@@ -217,6 +217,8 @@ src/lib/localize-story.test.ts
 src/lib/localize-story.ts
 src/lib/logger.test.ts
 src/lib/logger.ts
+src/lib/models.test.ts
+src/lib/models.ts
 src/lib/platforms/x-client.ts
 src/lib/posthog-query.test.ts
 src/lib/posthog-query.ts
@@ -281,6 +283,7 @@ supabase/migrations/099_grant_day_pass_purchase_type.sql
 ```
 scripts/agents/cc-rpi-update.sh
 scripts/check-verification-coverage.ts
+scripts/generate-stories.ts
 scripts/qa-agent.sh
 scripts/run-prelaunch-gate.test.ts
 scripts/run-prelaunch-gate.ts
@@ -361,6 +364,27 @@ webhooks/translate
 | docs/health-report-2026-02-16.md | 2026-02-16 |
 | CLAUDE.md | 2026-06-13 |
 | README.md | 2026-06-13 |
+
+## Changes Made This Run
+
+Run date: 2026-06-24. Status: GREEN -- No documentation changes required. Thirty-second consecutive clean run.
+
+### Feature Flags
+- No undocumented feature flags. The `UNDOCUMENTED_FEATURE_FLAGS` gap section was empty.
+- Verified all 17 flags in `src/types/feature-flags.ts` (`FeatureFlagKey`) are documented in the Feature Flags Reference of `docs/project/features.md` (17 Features-tab flags across 5 categories). Count stable, zero gaps.
+- All 10 agent flags (Agents tab) remain documented and accurate.
+
+### API Routes
+- All 56 flagged routes confirmed internal -- no external-consumption routes require documentation.
+  - `admin/*` -- admin-only, gated by `validateAdminAuth()` / `withAdmin` / `withAdminRead`.
+  - `cron/*` -- scheduled jobs protected by `cron-auth`.
+  - `webhooks/*` -- server-to-server, signature/shared-secret verified.
+  - `mcp/*` -- Pelayo voice-agent tool endpoints (internal, used by ElevenLabs agent config).
+  - `chat`, `chat/stream`, `favorites`, `feature-flags`, `suggestions`, `voice-access`, `checkout/*` -- client-driven app routes consumed by the Paisaxe frontend only.
+  - `health/*` -- internal liveness/diagnostic probes (Upptime, CI smoke).
+
+### CLAUDE.md
+- Current as of 2026-06-13. No new feature flags, user-facing migrations, or external-facing API routes since the last run. No additions needed.
 
 ---
 

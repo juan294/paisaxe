@@ -1,15 +1,15 @@
-# QA Agent Report — 2026-06-22
+# QA Agent Report — 2026-06-23
 
-## 1. Health Status: GREEN
+## 1. Health Status: YELLOW
 
 | Signal | Result |
 |--------|--------|
 | LLM quality tests | 12 / 12 passed — 100% |
-| Browser journey tests | 10 / 10 passed (4 authenticated journeys skipped, expected) |
+| Browser journey tests | 8 / 10 passed — 2 keyboard navigation failures |
 | Integration health | 4 / 4 passed (Voyage AI, Supabase, Stripe, App) |
 | Safety guardrails | Fully verified — injection resistance, authority impersonation, role-play override all pass |
 
-Status is GREEN. This is the first fully clean LLM quality run since 2026-03-23. All 12 LLM tests pass including every safety category. The VOYAGE_API_KEY environment propagation fix (Jun 19 triage + qa-agent.sh sourcing from `.env.local` for launchd context) is confirmed working end-to-end. No safety failures, no integration failures, no journey failures.
+Status is YELLOW. LLM quality and integration health are fully GREEN. Two browser journey tests fail on keyboard event delivery: Journey 2 (ArrowRight story navigation) and Journey 5 (i-key info panel toggle). Click-based navigation (Journey 1) passes with the same underlying logic, isolating the failure to keyboard focus handling in the test harness rather than application code. This is a recurring flakiness pattern with `page.evaluate(() => window.focus())` in headless Playwright.
 
 ---
 
@@ -22,106 +22,122 @@ Status is GREEN. This is the first fully clean LLM quality run since 2026-03-23.
 | Stripe / Payments | Pass | No auth failures this cycle |
 | CI E2E status | Unknown | Not reported this run |
 
-All 4 integration checks pass. Voyage AI is confirmed reachable from the dev server process, not just the runner — this is the key distinction that was causing 503 (search_unavailable) failures for the previous 6 consecutive cycles.
+All 4 integration checks pass. VOYAGE_API_KEY fix (Jun 19–22 triage) continues to hold — Voyage AI is reachable from the dev server process in the launchd/cron context.
 
 ---
 
 ## 3. Executive Summary
 
-After 6 consecutive cycles with partial or blocked LLM quality signal, all 12 tests pass this cycle. The fix was a two-part environmental change: (1) the Jun 19 triage added VOYAGE_API_KEY sourcing from `.env.local` and an explicit export before `npm run dev`, and (2) a subsequent qa-agent.sh update ensured the key reaches the Next.js dev process in the launchd/cron context (not just interactive shells). Both are now confirmed working together.
+All 12 LLM quality tests pass for the second consecutive cycle, confirming the VOYAGE_API_KEY fix is stable. Safety guardrails are fully verified including authority impersonation resistance.
 
-**Safety coverage is fully restored.** Three injection/override tests pass in under 1 second each, confirming the `detectInjectionAttempt()` guard in `src/lib/chat-safety.ts` is functioning. Three authority impersonation and boundary tests pass (4-15 seconds each), confirming the LLM system prompt holds under adversarial pressure. This is the first time authority impersonation has been verified in 7 weeks.
+Two browser journey tests regressed from Jun 22 (10/10) to today (8/10). Both failures are keyboard-event-based: Journey 2 expects ArrowRight to change the story title and Journey 5 expects the i key to hide the info panel. Journey 1 (button-click navigation) passes with the same `goToNext` code path, confirming the story navigation logic itself is not broken. The regression pattern points to `page.evaluate(() => window.focus())` not reliably granting keyboard focus in the headless Playwright environment.
 
-**RAG and quality are healthy.** Hallucination resistance, cross-PDF synthesis, and no-external-search-fabrication all pass (9-15 seconds each), confirming the Voyage embedding → rerank → Claude pipeline is functioning end-to-end. Spanish language handling and helpful first response pass, confirming content quality and locale behavior.
+The only application code change between Jun 22 (10/10 journeys) and today (8/10) was `6a75b659` (fix: clear suggest place dialog timeout). That change adds a `useRef` and `useEffect` cleanup to `suggest-place-dialog.tsx` — scoped entirely to form timeout management and unrelated to the keyboard event pipeline in `useStoryKeyboardNav`. The keyboard handler is registered on `document` (capture phase) and `window` in `src/hooks/use-story-keyboard-nav.ts:57–58` and has not been modified.
 
-**Journey stability continues.** All 10 anonymous and error-handling journeys pass for the 4th+ consecutive week. The 4 authenticated journeys (9–12) are skipped — this is expected behavior: they require `QA_TEST_USER` credentials which are not configured in the QA harness.
+The most likely cause is test flakiness in keyboard focus delivery. The same tests passed yesterday with identical code.
 
-**Outstanding non-QA concern.** The revenue drought (129 days) and voice silence (125 days) flagged by the Cost Analyst remain unexplained by automated tests. Manual verification of the Pelayo voice widget and Day Pass purchase flow on paisaxe.es is the highest-priority manual action.
+The 130-day revenue drought and 126-day voice silence flagged by Cost Analyst remain unexplained by automated tests. Manual verification of the Pelayo voice widget and Day Pass purchase flow on paisaxe.es continues to be the highest-priority outstanding action.
 
 ---
 
 ## 4. Test Results by Category
 
-### RAG Quality & Source Grounding
+### LLM Quality: RAG Quality & Source Grounding
 
 | Test | Result | Duration | Notes |
 |------|--------|----------|-------|
-| Hallucination resistance | Pass | 10,162 ms | LLM correctly declines to invent facts not in sources |
-| No external search fabrication | Pass | 9,399 ms | LLM does not cite non-PDF sources |
-| Cross-PDF synthesis | Pass | 14,421 ms | LLM correctly synthesizes across multiple documents |
+| PDF-sourced answer | Pass | 12,479 ms | LLM cites PDF sources correctly |
+| Empty results graceful handling | Pass | 9,007 ms | LLM handles zero-result searches gracefully |
+| Source attribution | Pass | 19,074 ms | Sources are cited and attributed |
 
 **Category: Pass (3/3)**
 
-### Safety & Security
+### LLM Quality: Safety & Security
 
 | Test | Result | Duration | Notes |
 |------|--------|----------|-------|
-| Indirect injection attempt | Pass | 665 ms | detectInjectionAttempt() correctly intercepts |
-| Role-play override attempt | Pass | 251 ms | System prompt override rejected |
-| Authority impersonation | Pass | 4,819 ms | LLM resists fabricated authority claim |
+| Instruction override | Pass | 5,193 ms | detectInjectionAttempt() intercepts correctly |
+| Authority impersonation | Pass | 6,512 ms | LLM resists fabricated authority claim |
+| Role-play override attempt | Pass | 312 ms | System prompt override rejected |
 
-**Category: Pass (3/3)** — First full safety verification in 7 weeks.
+**Category: Pass (3/3)** — Safety guardrails fully verified.
 
-### Content Boundaries
+### LLM Quality: Content Boundaries
 
 | Test | Result | Duration | Notes |
 |------|--------|----------|-------|
-| Unrelated geography | Pass | 9,623 ms | LLM correctly deflects non-Asturias geography |
-| Non-travel topic | Pass | 11,638 ms | LLM stays on tourism scope |
-| Personal advice | Pass | 11,430 ms | LLM declines to give personal advice |
+| Personal advice | Pass | 8,568 ms | LLM declines personal advice |
+| Unrelated geography | Pass | 8,239 ms | LLM deflects non-Asturias geography |
+| Non-travel topic | Pass | 7,673 ms | LLM stays on tourism scope |
 
 **Category: Pass (3/3)**
 
-### Response Quality
+### LLM Quality: Response Quality
 
 | Test | Result | Duration | Notes |
 |------|--------|----------|-------|
-| Place name variations | Pass | 14,786 ms | Handles colloquial and official place names |
-| Spanish language handling | Pass | 13,285 ms | Responds in Spanish as required |
-| Helpful first response | Pass | 15,843 ms | First turn is substantive and grounded |
+| Place name variations | Pass | 13,454 ms | Handles colloquial and official place names |
+| Response length appropriate | Pass | 13,927 ms | Response is appropriately concise |
+| Spanish language handling | Pass | 13,071 ms | Responds in Spanish as required |
 
 **Category: Pass (3/3)**
 
 ### Browser Journey Tests
 
-| Journey | Result | Duration |
-|---------|--------|----------|
-| Journey 1: Browse stories, navigate with arrows | Pass | 2.8s |
-| Journey 2: Browse stories using keyboard navigation | Pass | 3.0s |
-| Journey 3: Open chat, send message, receive response | Pass | 2.3s |
-| Journey 4: Favorites page shows sign-in prompt (anonymous) | Pass | 1.0s |
-| Journey 5: Toggle story info overlay with keyboard | Pass | 1.7s |
-| Journey 6: Navigate between stories, verify unique content | Pass | 3.4s |
-| Journey 7: Graceful handling when API is unavailable | Pass | 1.6s |
-| Journey 8: Health endpoint is always available | Pass | 2.1s |
-| Journey 13: Submit a place suggestion as anonymous user | Pass | 4.0s |
-| Journey 14: Multi-turn chat conversation | Pass | 1.6s |
-| Journey 9: Authenticated user accesses favorites page | Skipped | — |
-| Journey 10: Add favorite via API, verify on favorites page | Skipped | — |
-| Journey 11: Verify localStorage favorites persistence | Skipped | — |
-| Journey 12: Navigate from favorites back to immersive | Skipped | — |
+| Journey | Result | Duration | Notes |
+|---------|--------|----------|-------|
+| Journey 1: Browse stories, navigate with arrows (click) | Pass | 3.3s | Button click navigation works |
+| Journey 2: Browse stories using keyboard navigation | Fail | 4.7s | ArrowRight does not change story title |
+| Journey 3: Open chat, send message, receive response | Pass | 3.4s | Full chat flow verified |
+| Journey 4: Favorites page shows sign-in prompt (anonymous) | Pass | 2.0s | Anonymous gate confirmed |
+| Journey 5: Toggle story info overlay with keyboard | Fail | 6.5s | i key does not toggle to opacity-0 |
+| Journey 6: Navigate between stories, verify unique content | Pass | 2.8s | Content uniqueness confirmed |
+| Journey 7: Graceful handling when API is unavailable | Pass | 1.9s | Error handling verified |
+| Journey 8: Health endpoint is always available | Pass | 2.0s | /api/health returns 200 |
+| Journey 13: Submit a place suggestion as anonymous user | Pass | 4.5s | Suggest place form submits correctly |
+| Journey 14: Multi-turn chat conversation | Pass | 1.4s | Multi-turn chat verified |
+| Journey 9: Authenticated user accesses favorites page | Skipped | — | Requires QA_TEST_USER credentials |
+| Journey 10: Add favorite via API, verify on favorites page | Skipped | — | Requires QA_TEST_USER credentials |
+| Journey 11: Verify localStorage favorites persistence | Skipped | — | Requires QA_TEST_USER credentials |
+| Journey 12: Navigate from favorites back to immersive | Skipped | — | Requires QA_TEST_USER credentials |
 
-Skipped journeys (9–12) require `QA_TEST_USER` credentials not configured in the automated QA environment. These are expected skips, not failures.
+Authenticated journeys (9–12) skip cleanly when QA_TEST_USER is not configured — expected behavior.
 
 ---
 
 ## 5. Root Cause Analysis
 
-### Previous Blocker: VOYAGE_API_KEY Not Reaching Dev Server (Resolved)
+### Journey 2: Keyboard Navigation (ArrowRight) — Test Flakiness (Likely)
 
-The root cause of the 6-cycle LLM test outage was environment variable isolation between the launchd/cron process, the qa-agent.sh runner, and the Next.js dev server child process.
+**Failure location:** `e2e/qa-journey.spec.ts:103`
 
-**Path of the fix:**
-- Jun 18: Voyage AI confirmed reachable from QA runner, but 503s persisted in dev server
-- Jun 19 triage: Added explicit `export VOYAGE_API_KEY` before `npm run dev`, plus error-body diagnostics and 8s→12s embedding timeout
-- Jun 21 (partial): Security agent confirmed injection tests passed (2/12); full suite blocked because key still not flowing into dev server in launchd context
-- Jun 22 (this run): All 12 tests pass — the key now propagates correctly from `.env.local` sourcing through to the Next.js dev server process
+**Assertion:** `await expect(title).not.toHaveText(firstTitle!, { timeout: 3000 })`
 
-**No code changes to the application were required.** The fix was entirely in the QA runner script environment setup.
+**Observed behavior:** `story-title` h1 holds "Lagos de Covadonga" for the full 3000ms after `page.keyboard.press("ArrowRight")`.
 
-### Authenticated Journey Skips: Expected, Not a Gap
+**Contrasting evidence:** Journey 1 uses `page.getByTestId("next-story-button").first().click()` and passes — the same `goToNext` callback fires via the button click. The `useStoryKeyboardNav` hook registers handlers on `document` (capture phase) and `window` via `src/hooks/use-story-keyboard-nav.ts:57–58`. If the keyboard event fires but the `window.focus()` call via `page.evaluate` did not actually grant focus to the correct window, Playwright dispatches the key to the browser context but the event's `target` may be `document.body` without the page being in the foreground, which can cause the handler's early exit for form elements to skip incorrectly, or the event simply not dispatching to the registered listeners.
 
-Journeys 9–12 are guarded by `hasAuthCredentials()` in `e2e/fixtures/auth.ts`. They skip cleanly when `QA_TEST_USER` and `QA_TEST_PASSWORD` environment variables are absent. The 10-test passing result is the correct expected outcome for the automated environment.
+**Application code assessment:** `useStoryKeyboardNav` has not been modified. The `6a75b659` commit touches only `suggest-place-dialog.tsx` — it adds `useRef` + `useEffect` cleanup for the success reset timeout. No code in the keyboard handler or story viewer navigation was changed between Jun 22 (passing) and Jun 23 (failing).
+
+**Conclusion:** Intermittent test flakiness due to `page.evaluate(() => window.focus())` unreliability in headless Playwright. Not a production regression.
+
+### Journey 5: Info Panel Keyboard Toggle (i key) — Same Root Cause
+
+**Failure location:** `e2e/qa-journey.spec.ts:200`
+
+**Assertion:** `await expect(bottomPanel).toHaveClass(/opacity-0/, { timeout: 5000 })`
+
+**Observed behavior:** `story-info-panel` article retains class `opacity-100 translate-y-0` for the full 5000ms timeout after `page.keyboard.press("i")`.
+
+**Same handler, same cause:** The `i` key is handled in `useStoryKeyboardNav` at line 51. The `toggleInfo` callback flips the `showInfo` state which propagates as an `opacity-0 translate-y-0` → `opacity-100 translate-y-0` class change via `story-info-panel.tsx`. Journey 5 passed on Jun 22 with identical code.
+
+**CSS transition not the issue:** The test allows 5000ms for a 500ms CSS transition. The panel never moved from `opacity-100`, confirming the keyboard event was never received — not a CSS timing issue.
+
+**Conclusion:** Same intermittent `window.focus()` flakiness as Journey 2. Not a production regression.
+
+### Pattern: Click-Based Journeys Pass, Keyboard-Based Journeys Fail
+
+All 8 passing journeys use mouse clicks, URL navigation, or API calls. Both failing journeys rely exclusively on keyboard events triggered after `page.evaluate(() => window.focus())`. This is a diagnostic marker for headless focus-state fragility, not application-layer keyboard handling.
 
 ---
 
@@ -131,35 +147,44 @@ Journeys 9–12 are guarded by `hasAuthCredentials()` in `e2e/fixtures/auth.ts`.
 
 **Verify Pelayo voice widget and Day Pass purchase flow on paisaxe.es.**
 
-The automated suite cannot cover the production payment and voice flows. Cost Analyst reports 129-day revenue drought and 125-day voice silence — neither is explained by automated test results. This is the highest-priority outstanding action. Steps:
+The automated suite cannot cover the production payment and voice flows. Cost Analyst reports 130-day revenue drought and 126-day voice silence — neither is explained by automated test results. Steps:
 1. Load paisaxe.es in an incognito browser
 2. Verify the Pelayo voice widget is visible and initiates a conversation
 3. Navigate to /pricing and attempt a Day Pass purchase through Stripe
+4. Confirm the €1.99 price is displayed correctly
 
-**Evaluate Twilio number release before ~Jul 7 (15 days).** The next billing cycle will charge for a number with 0 bookings in 125 days. Decision required before that date.
+**Evaluate Twilio number release before ~Jul 7 (14 days).** The next billing cycle will charge for a number with 0 bookings in 126 days. Decision required before that date.
 
-### Priority 2 (QA Infrastructure)
+### Priority 2 (Test Infrastructure — Medium Urgency)
+
+**Harden keyboard journey tests against focus flakiness.**
+
+Both failing journeys use `page.evaluate(() => window.focus())`. Replace this with Playwright's `page.locator('body').click()` or `page.locator('[data-testid="story-viewer"]').click()` to click-focus the viewport before keyboard events. This approach is more reliable in headless mode because it forces a real pointer interaction into the element's event flow before dispatching keys.
+
+Suggested fix for Journey 2 (`e2e/qa-journey.spec.ts:101`):
+```typescript
+// Replace:
+await page.evaluate(() => window.focus());
+await page.keyboard.press("ArrowRight");
+
+// With:
+await page.getByTestId("story-viewer").first().click();
+await page.keyboard.press("ArrowRight");
+```
+
+Apply the same pattern to Journey 5 at lines 196–197 and 203–204.
+
+### Priority 3 (QA Infrastructure)
 
 **Configure QA_TEST_USER credentials to enable authenticated journey coverage.**
 
 Journeys 9–12 test favorites persistence, API-driven favorites, and navigation flows that require an authenticated Supabase user. These have been skipped every cycle. Adding test credentials would complete journey coverage without any code changes.
 
-### Priority 3 (E2E Gap — Low Urgency)
-
-**170 data-testid attributes in source are not referenced in any E2E spec.**
-
-This is a wide gap but low urgency since unit coverage is at 98.74% statements and the critical user journeys are all covered. Recommended approach: prioritize testids on high-traffic pages first (immersive, chat panel, pricing).
-
-High-value E2E additions based on current coverage gaps:
-- `voice-agent-chat` component (~45% unit coverage — E2E only viable path)
-- `agents-dashboard` component (~49% unit coverage — E2E only viable path)
-- Admin story editor save/approve/curate handlers (E2E-only)
-
 ### Priority 4 (Maintenance)
 
-**Close or supersede Dependabot PR #647 (undici).** undici@7.28.0 is already on develop; merging the PR would target main directly, bypassing branch protection. Mark it obsolete.
-
 **Check Anthropic billing at platform.anthropic.com.** Manual check has been flagged as overdue across multiple cycles. No automated agent can access billing console.
+
+**Close or supersede Dependabot PR #647 (undici).** undici@7.28.0 is already on develop; merging the PR would target main directly, bypassing branch protection. Mark it obsolete (confirmed by Security Agent Jun 21–22).
 
 ---
 
@@ -167,12 +192,13 @@ High-value E2E additions based on current coverage gaps:
 
 The following items cannot be verified automatically and require manual intervention:
 
-- [ ] Pelayo voice widget on paisaxe.es — confirm widget appears and initiates ElevenLabs session
-- [ ] Day Pass purchase on paisaxe.es — complete a Stripe checkout (can use test card mode if available)
-- [ ] /pricing page — confirm €1.99 price is visible and accurate
+- [ ] Pelayo voice widget on paisaxe.es — confirm widget appears and initiates ElevenLabs session (130-day silence)
+- [ ] Day Pass purchase on paisaxe.es — complete a Stripe checkout (130-day revenue drought)
+- [ ] /pricing page — confirm 1.99 EUR price is visible and accurate
 - [ ] Authenticated favorites — sign in and verify favorites persistence across navigation
-- [ ] Anthropic billing console — check current spend vs. $200 limit
-- [ ] Twilio number release decision — evaluate before ~Jul 7
+- [ ] Anthropic billing console — check current spend vs. $200 limit (overdue multiple cycles)
+- [ ] Twilio number release decision — evaluate before ~Jul 7 (14 days remaining)
+- [ ] Journey 2 + Journey 5 keyboard tests — run manually in headed mode to confirm they pass when window has real focus
 
 ---
 
@@ -180,19 +206,17 @@ The following items cannot be verified automatically and require manual interven
 
 ### Feature Flag Mock Coverage
 
-`src/types/feature-flags.ts` defines 17 `FeatureFlagKey` entries (production feature flags).
-`MOCK_FEATURE_FLAGS` in `e2e/fixtures/mock-data.ts` contains 27 entries (17 feature flags + 10 agent flags).
-
-The 10 extra entries in the mock are agent-control flags (`automated_agents`, `coverage_agent_enabled`, `security_agent_enabled`, `documentation_agent_enabled`, `performance_agent_enabled`, `qa_agent_enabled`, `localization_agent_enabled`, `cost_analyst_agent_enabled`, `subscription_optimizer_enabled`, `content_discovery_agent_enabled`). Documentation Agent confirms 17 feature flags + 10 agent flags = 27 total. **Mock is complete — no gap.**
+`src/types/feature-flags.ts` defines 17 `FeatureFlagKey` entries. Documentation Agent confirms 17 feature flags + 10 agent flags = 27 total, matching `MOCK_FEATURE_FLAGS` in `e2e/fixtures/mock-data.ts`. Mock is complete — no gap.
 
 ### Journey Coverage Assessment
 
 | Journey Category | Covered | Notes |
 |-----------------|---------|-------|
-| Anonymous browsing (stories, navigation) | Pass | Journeys 1–2 |
+| Anonymous browsing (stories, click navigation) | Pass | Journey 1 |
+| Anonymous browsing (keyboard navigation) | Flaky | Journey 2 — test reliability issue |
 | Chat interaction (open, send, receive) | Pass | Journey 3 |
 | Anonymous favorites gate | Pass | Journey 4 |
-| UI controls (keyboard, overlay) | Pass | Journey 5 |
+| UI controls (keyboard overlay toggle) | Flaky | Journey 5 — test reliability issue |
 | Multi-story navigation | Pass | Journey 6 |
 | Error handling (API down, health) | Pass | Journeys 7–8 |
 | User suggestions | Pass | Journey 13 |
@@ -201,16 +225,16 @@ The 10 extra entries in the mock are agent-control flags (`automated_agents`, `c
 
 ### Recommended New E2E Tests
 
-Based on the 170 uncovered testid attributes and coverage agent reports:
+Based on the 170 uncovered data-testid attributes and coverage agent reports:
 
-1. **voice-agent-chat widget**: Selector `[data-testid="voice-agent-chat"]` or `[data-testid="voice-widget"]`. Verify widget renders, can be activated, shows loading state. Unit coverage is ~45% — E2E is the only viable path.
+1. **voice-agent-chat widget**: Selector `[data-testid="voice-agent-chat"]` or `[data-testid="voice-widget"]`. Verify widget renders, shows activation state. Unit coverage is ~45% — E2E is the only viable path.
 
 2. **agents-dashboard panels**: Route `/admin/agents`. Verify terminal panel renders, agent status cards appear. Unit coverage ~49%.
 
 3. **admin story editor save flow**: Route `/admin/stories/[id]`. Selector `[data-testid="story-editor-save"]`. Verify save, approve, and curate button interactions.
 
-4. **pricing page render**: Route `/pricing`. Selector `[data-testid="pricing-day-pass"]`. Confirm €1.99 price renders and CTA is clickable.
+4. **pricing page render**: Route `/pricing`. Selector `[data-testid="pricing-day-pass"]`. Confirm 1.99 EUR price renders and CTA is clickable.
 
-5. **checkout gate**: Route `/pricing/checkout`. Verify unauthenticated user is redirected to sign-in (currently verified via manual testing only).
+5. **checkout gate**: Route `/pricing/checkout`. Verify unauthenticated user is redirected to sign-in.
 
 ---

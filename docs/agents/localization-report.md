@@ -1,67 +1,114 @@
-# Localization Agent Report — 2026-06-22
+# Localization Agent Report — 2026-06-24
 
 ## Summary
 
-**Status: 100% complete. No edits needed. 58th consecutive clean run.**
+Coverage: **100% complete** across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 60th consecutive clean run.
 
-All UI string keys and story translations are fully covered across all supported locales.
+| Locale | Keys | Complete | Missing | Orphaned |
+|--------|------|----------|---------|---------|
+| es (Spanish — source) | 411 | — | — | — |
+| en (English) | 411 | 100% | 0 | 0 |
+| fr (French) | 411 | 100% | 0 | 0 |
+| de (German) | 411 | 100% | 0 | 0 |
+| pt (Portuguese) | 411 | 100% | 0 | 0 |
+| ast (Asturian) | 411 | 100% | 0 | 0 |
 
-### UI Translations (src/lib/i18n/)
+**Story translations**: 113 stories x 5 target locales = 565 translation records. All complete (title + description present for every entry).
 
-| Locale | Leaf Keys | Missing | Orphaned | Status |
-|--------|-----------|---------|----------|--------|
-| es (source) | 411 | — | — | Complete |
-| en | 411 | 0 | 0 | Complete |
-| fr | 411 | 0 | 0 | Complete |
-| de | 411 | 0 | 0 | Complete |
-| pt | 411 | 0 | 0 | Complete |
-| ast | 411 | 0 | 0 | Complete |
+**Type safety**: Pass — 0 TypeScript errors project-wide.
 
-Total: 6 locales x 411 leaf keys = 2,466 translation entries. 100% parity.
+**Test suite**: 105/105 translation tests passing (translations.test.ts + story-translations-coverage.test.ts).
 
-Note: Key count increased from 406 (June 20) to 411 (June 22) — 5 new keys added to all locales in full parity. No missing or orphaned keys detected.
+---
 
-### Story Translations (content/translations/story-translations.ts)
+## Analysis: UI Translations
 
-| Locale | Stories Covered | Missing | Status |
-|--------|----------------|---------|--------|
-| en | 113 / 113 | 0 | Complete |
-| fr | 113 / 113 | 0 | Complete |
-| de | 113 / 113 | 0 | Complete |
-| pt | 113 / 113 | 0 | Complete |
-| ast | 113 / 113 | 0 | Complete |
+### Key Count
 
-Total: 113 stories x 5 target locales = 565 translation records. 100% coverage.
+The Spanish source (es.ts) has 411 leaf keys. All 5 non-Spanish locales were verified to hold exactly the same 411 keys via a programmatic leaf-key diff (recursive descent over every nested object, comparing each locale's key set to Spanish bi-directionally).
 
-## Fixed Translations
+### Key Count Verification
 
-No translations added this cycle. All locales were already complete.
+All 5 non-Spanish locales confirmed at exactly 411 keys via the programmatic test (translations.test.ts — "same number of keys as Spanish") and an independent leaf-key extraction run this cycle. Bi-directional comparison confirms: every Spanish key exists in each locale, and no locale carries keys absent from Spanish.
+
+### Missing Keys
+
+None. All locales are in full parity with Spanish.
+
+### Orphaned Keys
+
+None. No locale contains keys not present in Spanish.
+
+---
+
+## Analysis: Story Translations
+
+**File**: `content/translations/story-translations.ts`
+
+- Total story slugs with translations: 113
+- Target locales per story: 5 (en, fr, de, pt, ast)
+- Total translation records: 565
+- Empty/blank title or description fields: 0
+
+Locale coverage per story:
+
+| Locale | Stories Translated | Missing |
+|--------|--------------------|---------|
+| en | 113 / 113 | 0 |
+| fr | 113 / 113 | 0 |
+| de | 113 / 113 | 0 |
+| pt | 113 / 113 | 0 |
+| ast | 113 / 113 | 0 |
+
+### Source-Slug Cross-Check
+
+Verified the 113 translated slugs against the full set of known source story slugs this cycle:
+
+- seed-database.ts: 20 slugs
+- seed-cycling-stories.ts: 5 slugs
+- content/fallback-stories.json: 8 slugs (present)
+- content/processed/extracted-stories.json: 81 slugs (present)
+- content/processed/generated-stories.json: 8 slugs (present)
+- **Total known source slugs: 113**
+
+Result: every known source slug has a translation entry (0 missing entries), and every translation entry maps to a known source slug (0 orphan stories). Matches story-translations-coverage.test.ts, which asserts the same coverage in CI.
+
+---
+
+## Fixed This Cycle
+
+No translations added. No changes made.
+
+---
 
 ## Remaining Gaps
 
-None.
+None. Coverage is 100% complete.
+
+---
 
 ## Orphaned Keys
 
-None detected. All keys in non-Spanish locales have a corresponding Spanish source key.
+None detected — neither in UI strings nor in story translations.
 
-## Type Safety
+---
 
-- tsc --noEmit: Pass — 0 TypeScript errors across locale files
-- Translation tests: Pass — 105/105 tests pass (translations.test.ts + story-translations-coverage.test.ts)
+## Cross-Agent Context
 
-## Verification Method
+### From shared context (relevant findings)
 
-1. Programmatically counted leaf keys per locale via npx tsx script — all 6 locales: 411 keys, 0 missing, 0 orphaned.
-2. Counted story slugs and per-locale entries in story-translations.ts — 113 slugs, all 5 target locales fully covered (title + description present for every entry).
-3. Ran vitest on translations.test.ts and story-translations-coverage.test.ts — 105/105 pass in 1.63s.
-4. TypeScript check: no errors emitted.
+- **Security Agent (Jun 23)**: 7th consecutive GREEN; no PII, tokens, or secrets in any locale or story-translations file. No action needed.
+- **Performance Agent (Jun 23)**: i18n bundle sizes stable. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. Total JS 3,003 KB, 497 KB under budget.
+- **QA Agent (Jun 23)**: No locale-related issues. LLM tests 12/12 stable. Journey failures (Journey 2, 5) are keyboard-harness flakiness, not locale-related.
+- **Coverage Agent (Jun 20)**: translations.test.ts dynamically compares each locale key count to ES — any key additions without locale parity are caught in CI automatically.
 
-## Cross-Agent Notes
+---
 
-- 5 new keys added to all locales since June 20 run — additions are in full parity, no CI risk.
-- translations.test.ts dynamically compares each locale key count to es so any future key additions without parity fail CI immediately.
-- Lazy-loading setup (es+en static, fr/de/pt/ast dynamic) confirmed unchanged. No i18n bundle size impact.
-- No PII, tokens, or secrets in any locale or story-translations file (Security Agent confirmed).
+## Cross-Agent Recommendations
+
+- **Performance Agent**: i18n bundle sizes stable (~15 KB each). Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. No optimization needed.
+- **Coverage Agent**: translations.test.ts + story-translations-coverage.test.ts dynamically enforce locale parity and full story coverage — any future key/story additions without parity are caught in CI automatically. 105/105 translation tests passing.
+- **QA Agent**: No locale-related issues. All translations stable for 60 consecutive cycles.
+- **Security Agent**: No PII, tokens, or secrets in any locale or story-translations file.
 
 ---
