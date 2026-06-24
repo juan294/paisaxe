@@ -1,88 +1,72 @@
 # Triage Report
-> Generated on 2026-06-22 | 6 reports processed | 5 action groups resolved | 0 Dependabot PRs
+> Generated on 2026-06-24 | 7 reports processed | 5 action items | 4 Dependabot PRs
 
 ## Agent Failures
-
-`cc-rpi-update-report.md` recorded `Not logged in · Please run /login` from the Jun 21 scheduled run. The failure no longer reproduces in this shell:
-
-```bash
-/Users/juan/.local/bin/claude -p "echo ok" --output-format text
-# ok
-```
-
-The autonomous `scripts/agents/cc-rpi-update.sh` was not run inside the dirty triage worktree because it can make its own commits. Next scheduled run should confirm launchd/noninteractive auth.
+None — all agents ran successfully.
 
 ## Reports Reviewed
-
-| # | Report | Agent | Status | Triage Outcome |
-|---|--------|-------|--------|----------------|
-| 1 | `cc-rpi-update-report.md` | cc-rpi update | Failed | Auth preflight now passes locally |
-| 2 | `cost-analyst-report.md` | Cost Analyst | WATCH | Production voice/pricing smoke checked; external billing and Twilio mutations left untouched |
-| 3 | `documentation-report.md` | Documentation | GREEN | No doc changes required |
-| 4 | `performance-report.md` | Performance | YELLOW advisory | Fresh build and analyzer run completed |
-| 5 | `qa-report.md` | QA | YELLOW | QA environment fixed; LLM quality recovered to 12/12 |
-| 6 | `security-report.md` | Security | GREEN | QA safety blocker resolved; no advisories |
+| # | Report | Agent | Status | Action Items |
+|---|--------|-------|--------|--------------|
+| 1 | cc-rpi-update-report.md | cc-rpi Update | GREEN | None — blueprint synced v1.21.0→v1.23.0 |
+| 2 | cost-analyst-report.md | Cost Analyst | WATCH | Manual only (see below) |
+| 3 | documentation-report.md | Documentation | GREEN | None — 32nd consecutive clean run |
+| 4 | localization-report.md | Localization | GREEN | None — 60th consecutive clean run |
+| 5 | performance-report.md | Performance | GREEN | None — 3,003 KB / 3,500 KB budget |
+| 6 | qa-report.md | QA | YELLOW → FIXED | E2E keyboard focus fix applied |
+| 7 | security-report.md | Security | GREEN | Security PRs merged |
 
 ## Overall Status: GREEN
 
-The main code issue was the QA/dev-server LLM path. It is now resolved:
-
-- `VOYAGE_API_KEY` is read and exported before the QA dev server starts.
-- The dev server launch passes `VOYAGE_API_KEY` explicitly when present.
-- Embedding cache writes are fire-and-forget and skipped entirely when Upstash config is absent, so Redis cache latency cannot consume the embedding-stage timeout.
-- The embedding stage timeout is now 12s, matching observed Voyage tail latency while preserving the existing search and response limits.
-- Anthropic model IDs were updated from the removed `claude-sonnet-4-20250514` to `claude-sonnet-4-6`, which Anthropic lists as the current Claude Sonnet 4.6 API ID.
+7/7 reports processed. QA YELLOW resolved by code fix. All Dependabot security alerts addressed.
 
 ## Action Items Completed
+| # | Item | Source | Status |
+|---|------|---------|--------|
+| 1 | Fix E2E keyboard journey tests: replace `window.focus()` with `page.getByTestId("story-viewer").first().click()` at 5 sites in `e2e/qa-journey.spec.ts` | qa-report + security-report | ✅ Committed `e1d59273` |
+| 2 | Approve + merge PR #707 (undici 7.25.0→7.28.0 + dompurify 3.4.11 security release) | GitHub Dependabot security alerts | ✅ MERGED |
+| 3 | Merge PR #705 (production group: 9 patch/minor updates) | Dependabot | ✅ MERGED |
+| 4 | Merge PR #706 (@types/node 25.9.3→26.0.0) | Dependabot | ✅ MERGED |
+| 5 | Merge PR #704 (actions/checkout 6→7) | Dependabot | ✅ MERGED |
 
-| # | Item | Source Report | Status |
-|---|------|--------------|--------|
-| 1 | Fix QA dev server missing `VOYAGE_API_KEY` | QA, Security | Done |
-| 2 | Remove embedding cache as a live chat latency blocker | QA | Done |
-| 3 | Update obsolete Anthropic Sonnet model ID | QA live verification | Done |
-| 4 | Run fresh production build and bundle analyzer | Performance | Done |
-| 5 | Verify production health, voice entry point, and pricing/checkout surfaces | QA, Cost Analyst | Done |
-
-## Production Checks
-
-| Check | Result |
-|-------|--------|
-| `https://paisaxe.es/api/health` | 200, healthy |
-| `https://paisaxe.es/api/checkout/health` | 401, expected admin-auth gate |
-| `https://paisaxe.es/immersive` | 200; Ask button visible; chat dialog opens; voice upgrade entry point visible; no page errors |
-| `https://paisaxe.es/pricing` | 200; €1.99 Day Pass price visible; no page errors |
-| `https://paisaxe.es/pricing/checkout` | 200; unauthenticated sign-in gate visible |
-
-Full live Day Pass purchase was not executed because that would create a real production payment. Anthropic billing was not changed or read from the web console. Twilio number release was not performed because it would remove booking capability and is a product decision despite the low monthly cost.
+## GitHub Security & Quality Alerts
+| # | Type | Severity | Package | Advisory | Status | Notes |
+|---|------|----------|---------|----------|--------|-------|
+| 84 | Dependabot | HIGH | undici | GHSA-vmh5-mc38-953g (TLS bypass) | ✅ CLOSED | undici 7.28.0 via PR #707 |
+| 87 | Dependabot | HIGH | undici | GHSA-hm92-r4w5-c3mj (SOCKS5 cross-origin) | ✅ CLOSED | undici 7.28.0 via PR #707 |
+| 89 | Dependabot | HIGH | undici | GHSA-vxpw-j846-p89q (WebSocket DoS) | ✅ CLOSED | undici 7.28.0 via PR #707 |
+| 85 | Dependabot | MEDIUM | undici | GHSA-pr7r-676h-xcf6 (cross-user disclosure) | ✅ CLOSED | undici 7.28.0 via PR #707 |
+| 86 | Dependabot | MEDIUM | dompurify | GHSA-cmwh-pvxp-8882 (setConfig pollution) | ✅ CLOSED | Already at 3.4.11 in lockfile |
+| 90 | Dependabot | MEDIUM | undici | GHSA-p88m-4jfj-68fv (header injection) | ✅ CLOSED | undici 7.28.0 via PR #707 |
+| 88 | Dependabot | LOW | undici | GHSA-35p6-xmwp-9g52 (keep-alive poisoning) | ✅ CLOSED | undici 7.28.0 via PR #707 |
+| 91 | Dependabot | LOW | undici | GHSA-g8m3-5g58-fq7m (SameSite downgrade) | ✅ CLOSED | undici 7.28.0 via PR #707 |
+| 73 | Dependabot | LOW | @babel/core | GHSA-4x5r-pxfx-6jf8 (file read) | ⚠️ OPEN | Dev-only build tool; no production path; no action needed |
+| — | Code scanning | — | — | Disabled | ⚠️ YELLOW | 403 — requires GitHub repo settings |
+| — | Secret scanning | — | — | Disabled | ⚠️ YELLOW | 404 — not configured for this repo |
 
 ## Dependabot PRs
-
-No open Dependabot PRs were found.
+| # | PR | Update Type | Disposition |
+|---|----|----|-----|
+| 707 | undici 7.25.0→7.28.0 + dompurify 3.4.11 (security) | minor/patch | ✅ MERGED |
+| 705 | 9 production deps (all minor/patch) | minor/patch | ✅ MERGED |
+| 706 | @types/node 25.9.3→26.0.0 (dev) | major | ✅ MERGED (user authorized) |
+| 704 | actions/checkout 6→7 | major | ✅ MERGED (user authorized) |
 
 ## Verification
+- [x] All 6956 unit tests passing (pre-commit hook)
+- [x] Typecheck clean
+- [x] Lint clean
+- [x] CI green on develop
+- [x] .last-triage marker updated (Jun 24 08:11)
 
-- [x] Targeted tests: 5 files, 82 tests passed
-- [x] Full test suite: 379 files, 6,956 tests passed
-- [x] `npm run typecheck`
-- [x] `npm run lint`
-- [x] `npm run build`
-- [x] `npm run build:analyze`
-- [x] `NEXT_PUBLIC_SITE_URL=http://localhost:3006 npm run test:qa`: 12/12 passed
-- [ ] Push/CI green (pending commit and push)
+## Manual Items (Owner Action Required)
+These cannot be automated and require your direct action:
 
-Build warnings observed but non-blocking: local build environment has no `CRON_SECRET`/`WEBHOOK_SECRET` and no local Supabase URL/anon key, so cron and health config warnings were emitted during static generation.
+- **[P1 CRITICAL]** Verify Pelayo voice widget + Day Pass purchase on paisaxe.es — 131-day revenue drought / 127-day voice silence unexplained by automated means
+- **[P2]** Check Anthropic billing at platform.anthropic.com — overdue multiple cycles
+- **[P2]** Twilio number release decision before ~Jul 7 (~13 days until next $1.39 charge)
 
-## Observations
-
-- QA logs still show `ANTHROPIC_USAGE_INSERT_FAILED` when the local Supabase target does not expose `public.anthropic_usage` in the schema cache. This is non-blocking because usage recording is intentionally best-effort, but it should be checked against the intended database/migration state.
-- The production anonymous voice path is an upgrade entry point, not a live Pelayo conversation. A true Pelayo conversation check requires an active paid/authorized voice pass and microphone permission.
-- Running `scripts/agents/cc-rpi-update.sh` should be done from a clean checkout because the script can apply updates and commit independently.
-
-## External Decisions Still Requiring Owner Action
-
-| Item | Why it was not mutated in triage |
-|------|----------------------------------|
-| Anthropic billing console | Requires account-console access; no billing API for this personal account |
-| Twilio number release | Saves $1.39/mo but removes booking capability |
-| Full production Day Pass purchase | Would create a live payment |
-| ElevenLabs voice-shelving/tier decision | Product and renewal decision; annual plan sunk until 2027-02-07 |
+## Carried Items
+- @babel/core alert #73 (LOW, dev-only) — no action; will resolve when babel ships a patch
+- Code scanning + secret scanning disabled — informational, requires GitHub repo settings
+- ElevenLabs voice-shelving — product/business decision
+- Fresh `npm run build` (production pipeline check) — low priority bookkeeping
