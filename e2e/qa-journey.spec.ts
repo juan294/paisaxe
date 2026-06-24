@@ -97,8 +97,11 @@ test.describe("QA Journey: Anonymous User", () => {
 
     const firstTitle = await title.textContent();
 
+    // Click story-title to establish keyboard focus — it sits at z-10 (info panel),
+    // above the full-screen toggle button at z-[5], so no panel-toggle side effect.
+    await title.click();
+
     // Navigate with right arrow key
-    await page.locator("body").click();
     await page.keyboard.press("ArrowRight");
     await expect(title).not.toHaveText(firstTitle!, {
       timeout: 3000,
@@ -107,8 +110,7 @@ test.describe("QA Journey: Anonymous User", () => {
     const secondTitle = await title.textContent();
     expect(secondTitle).not.toBe(firstTitle);
 
-    // Navigate with left arrow key
-    await page.locator("body").click();
+    // Navigate with left arrow key — window retains focus from the click above
     await page.keyboard.press("ArrowLeft");
     await expect(title).not.toHaveText(secondTitle!, {
       timeout: 3000,
@@ -192,15 +194,17 @@ test.describe("QA Journey: Anonymous User", () => {
     const bottomPanel = page.getByTestId("story-info-panel").first();
     await expect(bottomPanel).toHaveClass(/opacity-100/);
 
+    // Click story-title to establish keyboard focus while the panel is visible
+    // (z-10 > z-[5] full-screen toggle button — no panel-toggle side effect)
+    await page.getByTestId("story-title").first().click();
+
     // Press 'i' to hide info
-    await page.locator("body").click();
     await page.keyboard.press("i");
 
     // Bottom panel should be hidden (wait for CSS transition to complete)
     await expect(bottomPanel).toHaveClass(/opacity-0/, { timeout: 5000 });
 
-    // Press 'i' again to show info
-    await page.locator("body").click();
+    // Press 'i' again to show info — window retains focus from the click above
     await page.keyboard.press("i");
 
     // Bottom panel should be visible again
@@ -219,10 +223,14 @@ test.describe("QA Journey: Anonymous User", () => {
     const titleText = await title.textContent();
     if (titleText) titles.push(titleText);
 
+    // Establish keyboard focus once — story-title is at z-10 (info panel),
+    // above the full-screen toggle button at z-[5], no panel-toggle side effect.
+    // Window retains focus for all subsequent key presses in this loop.
+    await title.click();
+
     // Navigate through 3 more stories, waiting for title to actually change
     for (let i = 0; i < 3; i++) {
       const prevTitle = titles[titles.length - 1];
-      await page.locator("body").click();
       await page.keyboard.press("ArrowRight");
       await expect(title).not.toHaveText(prevTitle!, { timeout: 5000 });
       const currentTitle = await title.textContent();
