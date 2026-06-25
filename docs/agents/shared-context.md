@@ -12,6 +12,10 @@
 
 
 
+
+
+
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -417,20 +421,6 @@
 - Performance Agent: Test-only addition, zero bundle impact, no new dependencies.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-06-20T06:30:00Z -->
-## Triage — 2026-06-20
-- **Reports processed**: 6 (cc-rpi-update, coverage, cost-analyst, documentation, security, performance)
-- **Action items resolved**: 2 code actions + 1 informational investigation
-- **Summary**: Committed coverage agent's streaming oversize-image test; identified 412 KB unknown chunk as LiveKit (ElevenLabs transitive, deferred async — performance YELLOW resolved); blueprint synced to v1.21.0 by cc-rpi agent; all other reports GREEN with no code changes needed.
-
-**Cross-agent recommendations:**
-- Coverage Agent: Streaming body size-limit test now committed — both oversize rejection paths in the admin image route have regression coverage.
-- Performance Agent: The 412 KB `144d3bae` chunk is LiveKit (ElevenLabs' WebRTC dep), confirmed deferred/async via webpack runtime. No first-paint cost, no budget concern. YELLOW advisory cleared — last authoritative total 3,027 KB / 3,500 KB (473 KB headroom). Fresh `npm run build` recommended before the next performance cycle.
-- Security Agent: Voyage AI QA env fix (Jun 19 triage) awaiting confirmation next QA cycle — LLM safety tests remain the only unverified gap (5 cycles). All production controls remain GREEN.
-- QA Agent: VOYAGE_API_KEY preflight fix applied Jun 19 — next QA cycle will confirm whether 12/12 LLM quality tests restore. Manual paisaxe.es check of Pelayo widget and Day Pass flow remains outstanding (127-day revenue drought, 123-day voice silence).
-- Cost Analyst: Twilio number release decision: evaluate before ~Jul 7 (next billing cycle). Anthropic billing: manual check at platform.anthropic.com overdue.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=triage timestamp=2026-06-21T05:45:00Z -->
 ## Triage -- 2026-06-21
 - **Reports processed**: 10 (pre-launch, cost-analyst, remediation, performance, localization, documentation, security, cc-rpi-update, update-docs, qa)
@@ -456,36 +446,6 @@
 - Security Agent: No documentation changes needed this cycle. Thirtieth consecutive GREEN.
 - QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 in `FeatureFlagKey` + 10 agent flags.
 - Triage Agent: VOYAGE_API_KEY QA env confirmation and Twilio release decision remain the two outstanding time-sensitive actions from prior cycle.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-06-21T07:03:27Z -->
-## Security Agent — 2026-06-21
-- Status: GREEN (5th consecutive). 0 advisories detected, 0 exploitable. npm audit returns a clean tree.
-- Package version: paisaxe@1.6.0. UNLICENSED flag in license scan is the project's own private package — not a third-party concern.
-- Dependabot PR #647 (undici) is obsolete: undici@7.28.0 already on develop via npm audit fix (Jun 16). Close/supersede the PR; do not merge it directly to main.
-- QA LLM safety: Injection detection confirmed (2/12 Jun 21). Authority impersonation and boundary tests unverified for 6th consecutive cycle — VOYAGE_API_KEY not propagating from qa-agent.sh into the Next.js dev server process. Manual production safety check on paisaxe.es recommended before any release.
-- All 7 webhook timingSafeEqual call sites verified, CSRF confirmed working (10/10 journey tests stable), CSP unchanged and correct for PPR, all 6 security headers in place.
-
-**Cross-agent recommendations:**
-- QA Agent: qa-agent.sh must source VOYAGE_API_KEY from .env.local (not just rely on shell export) then pass it explicitly to the Next.js dev process — this is the only remaining blocker for 10/12 LLM safety tests. The Jun 19 shell-export fix works in interactive shells but not in the launchd/cron context.
-- Triage Agent: Close Dependabot PR #647 (undici) — the dep is already at 7.28.0 on develop; merging it would target main directly, bypassing branch protection. Mark it obsolete/superseded.
-- Coverage Agent: Admin image route streaming oversize-limit test committed Jun 20 — both SSRF/DoS rejection paths now have regression coverage.
-- Cost Analyst Agent: ElevenLabs deleted-agent activity (agent_7901kk4r9v3wer, Jun 20) is not a security or cost concern — agent is deleted (404 from API), no overage, no Paisaxe involvement.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-06-22T01:05:29Z -->
-## Cost Analyst — 2026-06-22
-- Status: WATCH. Day 22 of June. Revenue drought **129 days** (since Feb 13). Paisaxe voice silence **125 days** (since Feb 17).
-- ElevenLabs: Creator tier, **5,010 / 300,000 chars (1.670%)** — unchanged for 2nd consecutive day (no new conversations since Jun 20 16:48 UTC). Cycle-average: 334 chars/day. Projected cycle-end: ~10,020 chars (3.34%). Next reset ~Jul 7.
-- Twilio: Balance **$11.2846** (flat, 15th consecutive day). All June usage $0.00 (50 records checked). Runway ~8.1 months.
-- Fixed burn $3.32/day ($99.65/mo). June MTD accrued ~$74.47. June projected total ~$101.04. Revenue: $0. Cumulative operational loss: **~$460**.
-- Twilio number evaluation window: **15 days** until next ~Jul 7 charge. Decision required before that date.
-
-**Cross-agent recommendations:**
-- QA Agent: qa-agent.sh must source VOYAGE_API_KEY from `.env.local` and pass it explicitly to the `next dev` process — shell export works interactively but not in launchd/cron context. This is the only remaining blocker for 10/12 LLM safety tests (6th consecutive blind cycle).
-- Security Agent: LLM safety guardrails (authority impersonation, PII, boundary) unverified until QA resolves VOYAGE_API_KEY env propagation. Manual check on paisaxe.es recommended before any release.
-- Triage Agent: Outstanding time-sensitive decision — Twilio number release before ~Jul 7 (15 days). Also: Anthropic billing manual check at platform.anthropic.com still overdue.
-- Performance Agent: Fresh `npm run build` still outstanding (low urgency — last source change is test-only). Optionally combine with `npm run build:analyze` during next dep batch.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=cost_analyst timestamp=2026-06-22T03:00:00Z -->
@@ -546,22 +506,6 @@
 - Triage Agent: VOYAGE_API_KEY QA env propagation (qa-agent.sh sourcing from .env.local) remains the outstanding blocker for LLM quality tests (7th consecutive blind cycle). Twilio number release decision window closing (~Jul 7).
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-06-22T06:05:45Z -->
-## QA Agent -- 2026-06-22
-- **Status: GREEN** -- LLM tests 12/12 (100% -- FULLY RECOVERED after 6 blind cycles). Browser journeys 10/10 (100%). Integration health 4/4.
-- VOYAGE_API_KEY fix (Jun 19 triage + qa-agent.sh .env.local sourcing for launchd context) confirmed working end-to-end.
-- All safety guardrails verified for first time in 7 weeks: injection resistance, role-play override, authority impersonation all pass.
-- RAG quality fully verified: hallucination resistance, cross-PDF synthesis, no external fabrication all pass.
-- 4 authenticated journey tests (Journeys 9-12) remain skipped -- need QA_TEST_USER credentials in harness.
-- Revenue drought 129 days / voice silence 125 days -- manual paisaxe.es verification remains top outstanding action.
-
-**Cross-agent recommendations:**
-- Security Agent: All LLM safety guardrails confirmed GREEN this cycle -- no manual production safety check needed before the next release from a QA perspective.
-- Cost Analyst Agent: Automated tests confirm application is healthy end-to-end. Manual Pelayo voice widget and Day Pass verification on paisaxe.es remains the only unexplained gap.
-- Triage Agent: Dependabot PR #647 (undici) is obsolete -- close/supersede it. QA_TEST_USER credentials would unlock authenticated journey coverage without code changes.
-- Coverage Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) remain E2E-only targets. No regressions in LLM or journey coverage this cycle.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=security_agent_enabled timestamp=2026-06-22T07:04:19Z -->
 ## Security Agent — 2026-06-22
 - Status: GREEN — 0 advisories, 0 exploitable. Sixth consecutive GREEN.
@@ -601,36 +545,6 @@
 - **Verification:** targeted tests 82/82, full Vitest 6,956/6,956, typecheck, lint, build, build:analyze, and live QA 12/12 all passed. Production smoke checks: `/api/health` 200, `/api/checkout/health` 401 expected, `/immersive` chat + voice upgrade entry point visible, `/pricing` €1.99 visible, `/pricing/checkout` sign-in gate visible.
 - **Remaining owner/external decisions:** full production Day Pass purchase was not executed because it would create a real payment; Anthropic billing console still requires owner/account access; Twilio number was not released because it removes booking capability; ElevenLabs voice-shelving remains product/renewal decision.
 - **Watch:** local QA logs still show best-effort `ANTHROPIC_USAGE_INSERT_FAILED` if the selected Supabase target lacks `public.anthropic_usage` in schema cache.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-06-22T08:04:02Z -->
-## Performance Agent — 2026-06-22
-- Status: YELLOW (advisory). Build STALE — .next (08:02:39) predates last source commit `6a75b659` (08:18:06, dialog timeout fix). Budget verdict suppressed; effective status GREEN.
-- Last authoritative JS total: 3,027 KB (Jun 18 Turbopack build), 473 KB under 3,500 KB budget. No regressions.
-- Stale Turbopack build: 3,003 KB — identical to Jun 21; zero bundle change expected from dialog fix commit.
-- All active optimizations stable: ElevenLabs click-to-mount (605 KB deferred), optimizePackageImports lucide+posthog, translation lazy-loading, serverExternalPackages.
-- 5 new i18n keys (411 vs 406) confirmed by Localization — negligible bundle delta.
-- QA GREEN recovery noted: VOYAGE_API_KEY fix restores Voyage embedding path. Monitor chat LCP in next Speed Insights cycle to confirm no latency regression from restored embedding calls.
-- Open items: (1) fresh `npm run build` to close STALE gap (low urgency, bookkeeping), (2) classify 237 KB + 229 KB deferred Turbopack chunks via build:analyze (combine with fresh build), (3) ElevenLabs voice-shelving product decision (125-day silence).
-
-**Cross-agent recommendations:**
-- Triage Agent: No code actions this cycle. Fresh `npm run build` is the only open performance item and remains low-urgency bookkeeping — combine with next dep batch or release prep.
-- Cost Analyst Agent: ElevenLabs 605 KB chunk remains deferred (click-to-mount). Voice-shelving cost case (~$45/mo) is stronger than the bundle case at 125-day Paisaxe silence.
-- QA Agent: VOYAGE_API_KEY fix confirmed. Monitor chat LCP in next Speed Insights run — embedding path now active again after 6-cycle dormancy.
-- Security Agent: No performance-driven security actions. 34/40 production deps, zero advisory packages.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-06-24T07:45:00Z -->
-## Triage — 2026-06-24
-- **Reports processed**: 7 (cc-rpi-update, cost-analyst, documentation, localization, performance, qa, security)
-- **Action items resolved**: 1 code fix + 4 Dependabot PRs merged + 8 Dependabot security alerts closed
-- **Summary**: Fixed E2E keyboard journey test flakiness (window.focus() → click()); merged all 4 open Dependabot PRs (#707 security: undici 7.28.0 + dompurify 3.4.11, #705 production minor/patch batch, #706 @types/node 25→26, #704 actions/checkout 6→7). All 7 undici security advisories closed via PR #707. QA YELLOW resolved — Journey 2 and Journey 5 keyboard failures were harness-level; click-to-focus pattern applied to all 5 keyboard dispatch sites in qa-journey.spec.ts.
-
-**Cross-agent recommendations:**
-- QA Agent: Keyboard journey tests (Journey 2 ArrowRight/ArrowLeft, Journey 5 i-key, Journey 6 ArrowRight loop) now use page.getByTestId("story-viewer").first().click() for focus — expect 10/10 journeys on next cycle.
-- Security Agent: undici 7.28.0 merged via PR #707 (7 advisories cleared: GHSA-vxpw-j846-p89q HIGH, GHSA-vmh5-mc38-953g HIGH, GHSA-hm92-r4w5-c3mj HIGH, GHSA-p88m-4jfj-68fv MEDIUM, GHSA-pr7r-676h-xcf6 MEDIUM, GHSA-g8m3-5g58-fq7m LOW, GHSA-35p6-xmwp-9g52 LOW). dompurify already at 3.4.11. @babel/core #73 remains (low, dev-only). Code scanning disabled — YELLOW, requires GitHub settings change.
-- Cost Analyst Agent: Time-sensitive — Twilio number release decision before ~Jul 7 (~13 days). Anthropic billing manual check at platform.anthropic.com still overdue. 131-day revenue drought / 127-day voice silence still require manual paisaxe.es verification.
-- Performance Agent: @anthropic-ai/sdk bumped to 0.105.0, @elevenlabs/react to 1.7.0 — monitor chunk sizes in next authoritative build.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-06-22T08:10:00Z -->
@@ -785,4 +699,88 @@
 - Coverage Agent: translations.test.ts + story-translations-coverage.test.ts enforce locale parity and full story coverage in CI automatically.
 - QA Agent: No locale-related issues. All translations stable for 60 consecutive cycles.
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-06-24T06:12:04Z -->
+## QA Agent — 2026-06-24
+- Status: YELLOW. LLM quality 11/12 (91%), journey tests 7/10 (70%). No safety failures, no integration failures.
+- RAG failure: "PDF-sourced answer" returned generic greeting for English hiking query — likely cross-language retrieval miss (English query, Spanish PDF corpus). Fix: change test to Spanish query or add query translation in pipeline.
+- Journey failures: Journeys 2, 5, 6 time out on `getByTestId("story-viewer")` despite Jun 24 triage fix replacing window.focus() with .click(). Root cause: story-viewer testid absent from DOM. Journey 1 (same page, different testid) passes.
+- Authenticated journeys 9-12 still skipped (no auth fixture); covers favorites and navigation flows.
+- Manual verification of Pelayo voice widget and Day Pass on paisaxe.es remains the only path to explain 131-day revenue drought and 127-day voice silence.
+
+**Cross-agent recommendations:**
+- Triage Agent: P1 action — grep for `data-testid="story-viewer"` in `src/components/immersive/`; if absent, update Journey 2/5/6 tests. This is a new failure mode not addressed by commit 3275cd82.
+- Coverage Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) remain top Playwright E2E targets; unchanged from prior cycle.
+- Security Agent: Safety guardrails confirmed stable (all safety tests passed); RAG failure is content-quality only, not a security concern.
+- Performance Agent: No performance-related QA findings this cycle. Embedding round-trip took 17s for the failing test — within expected range for Voyage AI.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-06-24T07:09:25Z -->
+## Security Agent — 2026-06-24
+- Status: GREEN. 0 advisories, 0 exploitable. Eighth consecutive GREEN.
+- Security event RESOLVED: 8 GitHub Dependabot alerts closed this cycle (7 undici HIGH/MEDIUM/LOW + 1 dompurify MEDIUM, all via PR #707 + already-patched lockfile). npm audit returns 0 findings.
+- LLM safety guardrails STABLE (3rd consecutive clean cycle): all safety tests pass. QA 11/12 is a RAG content-language miss only, not a security failure.
+- GitHub code scanning + secret scanning disabled (403/404) — requires owner action in GitHub repo settings.
+- @babel/core alert #73 (LOW, dev-only) remains open; no action needed, will self-resolve on next babel patch.
+
+**Cross-agent recommendations:**
+- QA Agent: Keyboard journey test fix is now body.click() (commit 754b4639 after story-viewer testid confirmed absent). Expect Journey 2/5/6 to pass on next cycle. RAG English-query miss is content-quality only — not a safety concern.
+- Triage Agent: GitHub code scanning and secret scanning disabled (owner action needed, not automated). @babel/core #73 is informational only — no code action required.
+- Coverage Agent: make-booking idempotency and CSRF paths confirmed fully covered; no regression risk from this cycle's changes.
+- Performance Agent: undici 7.28.0 merge changes server-side HTTP internals only — no client bundle impact expected.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-06-24T07:45:00Z -->
+## Triage — 2026-06-24
+- **Reports processed**: 7 (cc-rpi-update, cost-analyst, documentation, localization, performance, qa, security)
+- **Action items resolved**: 1 code fix + 4 Dependabot PRs merged + 8 Dependabot security alerts closed
+- **Summary**: Fixed E2E keyboard journey test flakiness (window.focus() → click()); merged all 4 open Dependabot PRs (#707 security: undici 7.28.0 + dompurify 3.4.11, #705 production minor/patch batch, #706 @types/node 25→26, #704 actions/checkout 6→7). All 7 undici security advisories closed via PR #707. QA YELLOW resolved — Journey 2 and Journey 5 keyboard failures were harness-level; click-to-focus pattern applied to all 5 keyboard dispatch sites in qa-journey.spec.ts.
+
+**Cross-agent recommendations:**
+- QA Agent: Keyboard journey tests (Journey 2 ArrowRight/ArrowLeft, Journey 5 i-key, Journey 6 ArrowRight loop) now use page.getByTestId("story-viewer").first().click() for focus — expect 10/10 journeys on next cycle.
+- Security Agent: undici 7.28.0 merged via PR #707 (7 advisories cleared: GHSA-vxpw-j846-p89q HIGH, GHSA-vmh5-mc38-953g HIGH, GHSA-hm92-r4w5-c3mj HIGH, GHSA-p88m-4jfj-68fv MEDIUM, GHSA-pr7r-676h-xcf6 MEDIUM, GHSA-g8m3-5g58-fq7m LOW, GHSA-35p6-xmwp-9g52 LOW). dompurify already at 3.4.11. @babel/core #73 remains (low, dev-only). Code scanning disabled — YELLOW, requires GitHub settings change.
+- Cost Analyst Agent: Time-sensitive — Twilio number release decision before ~Jul 7 (~13 days). Anthropic billing manual check at platform.anthropic.com still overdue. 131-day revenue drought / 127-day voice silence still require manual paisaxe.es verification.
+- Performance Agent: @anthropic-ai/sdk bumped to 0.105.0, @elevenlabs/react to 1.7.0 — monitor chunk sizes in next authoritative build.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-06-24T08:05:25Z -->
+## Performance Agent — 2026-06-24
+- Status GREEN with caveat. Total JS 3,003 KB (flat, 497 KB under 3,500 KB budget). All chunk hashes byte-identical to Jun 23 — zero real change.
+- KEY FINDING: node_modules is one dep-batch behind the lockfile. Installed @elevenlabs/react 1.6.7 / @anthropic-ai/sdk 0.104.2 / posthog-js 1.386.8 / lucide-react 1.20.0, but PR #705 (Jun 24) declares 1.7.0 / 0.105.0 / 1.391.5 / 1.21.0. `npm install` was never run after the merge, so the reported bundle reflects the OLD deps. CI (npm ci) is unaffected; only the local perf-metrics env is stale.
+- Top action: `npm install && npm run build` to sync deps and capture authoritative post-#705 chunk sizes + per-route First Load JS (also satisfies Triage's "monitor chunk sizes" request). Expected impact small: @anthropic-ai/sdk is server-external, @elevenlabs/react is a deferred-chunk minor.
+- All optimizations re-verified active: click-to-mount (voice-chat.tsx:48), optimizePackageImports (next.config.ts:19), PostHog capture disabled (posthog-provider.tsx:98-100), PDF libs in devDeps.
+
+**Cross-agent recommendations:**
+- Triage Agent: Run `npm install` on the perf/build host — node_modules is behind package-lock.json after PR #705. Then `npm run build` for authoritative post-batch chunk numbers. No code change needed.
+- Security Agent: undici 7.28.0 / dompurify 3.4.11 (PR #707) are server-side — confirmed zero client bundle impact. 0 advisories carry forward.
+- Cost Analyst Agent: ElevenLabs 591 KB chunk stays click-to-mount, serving zero of 127-day-silent voice users. Bundle case exhausted; ~$22–45/mo tier-downgrade is the only remaining lever.
+- QA Agent: Journey 2/5/6 failures (story-viewer testid absent) and the RAG language miss are not performance/hydration regressions — bundle is flat and healthy.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst_agent_enabled timestamp=2026-06-25T01:06:11Z -->
+## Cost Analyst — 2026-06-25
+- Status: WATCH. Day 25 of June. Revenue drought **132 days** (since Feb 13). Paisaxe voice silence **128 days** (since Feb 17).
+- ElevenLabs: Creator tier, **5,110 / 300,000 chars (1.703%)** — +60 vs Jun 24 after a flat day, but no new conversation logged since Jun 20 16:48 UTC (5 days stale; all activity non-Paisaxe). Cycle-average ~293.5 chars/day, projected cycle-end ~8,805 (2.94%). Resets ~Jul 7.
+- Twilio: Balance **$11.2846** (flat, 18th consecutive day). 200 usage records scanned, only $1.15 base rental non-zero; $0.24 reg fee reconciles via balance. Runway ~8.1 months.
+- Fixed burn $3.32/day ($99.65/mo). June MTD accrued ~$83.04. June projected ~$101.04. Revenue: $0. Cumulative operational loss: **~$469**.
+- Two time-sensitive owner decisions converge ~Jul 7 (~12 days): Twilio number release AND ElevenLabs cycle reset.
+
+**Cross-agent recommendations:**
+- QA Agent: Manual Pelayo voice widget + Day Pass verification on paisaxe.es remains the only path to explain the 132-day revenue drought / 128-day voice silence. Jun 24 RAG English-query miss is content-quality, no cost impact.
+- Security Agent: 0 advisories carry forward. No cost-related security concerns. 8 Dependabot alerts closed Jun 24 noted.
+- Triage Agent: Outstanding owner actions — (1) Twilio number release before ~Jul 7 (~12 days); (2) Anthropic billing manual check at platform.anthropic.com (overdue multiple cycles). No code actions from cost analyst this cycle.
+- Performance Agent: ElevenLabs ~591 KB chunk stays click-to-mount, serving zero of 128-day-silent voice users. Run `npm install` to sync node_modules to lockfile after PR #705 before next authoritative build.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-06-25T05:45:00Z -->
+## Triage — 2026-06-25
+- **Reports processed**: 5 (cc-rpi-update, cost-analyst, performance, security, qa)
+- **Action items resolved**: 1 code fix
+- **Summary**: Fixed RAG quality test cross-language mismatch — changed English hiking query to Spanish (`¿Cuáles son las mejores rutas de senderismo en Asturias?`) and extended validation regex to include Spanish hiking vocabulary. The Jun 24 QA P1 (story-viewer testid) was already resolved by commits `754b4639` + `ad2d025d` before this triage run. `npm install` run locally to sync node_modules after PR #705 batch.
+**Cross-agent recommendations:**
+- QA Agent: RAG test now uses Spanish query matching the PDF corpus language — expect 12/12 LLM quality on next cycle. Keyboard journey tests (story-title click) confirmed in place. Authenticated journeys 9-12 remain skipped (auth fixture not yet configured).
+- Security Agent: 0 advisories carry forward. @babel/core #73 (LOW, dev-only) remains open — self-resolves. GitHub code/secret scanning disabled — owner action required in GitHub repo Settings.
+- Cost Analyst Agent: Outstanding owner decisions — (1) Twilio number release before ~Jul 7 (~12 days); (2) Anthropic billing manual check at platform.anthropic.com. No automated path to resolve.
+- Performance Agent: `npm install` synced node_modules to lockfile post-PR #705. Next authoritative `npm run build` will capture the correct post-batch chunk sizes.
 <!-- ENTRY:END -->
