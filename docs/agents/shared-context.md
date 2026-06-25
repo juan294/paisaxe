@@ -17,6 +17,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -449,21 +450,6 @@
 - Triage Agent: VOYAGE_API_KEY QA env propagation remains the outstanding blocker for LLM quality tests (7th consecutive blind cycle). Twilio number release decision window closing (~Jul 7).
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-06-22T05:14:05Z -->
-## Localization Agent -- 2026-06-22
-- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 58th consecutive clean run.
-- UI strings: 411 leaf keys per locale (up from 406 on June 20 — 5 new keys added to all locales in parity). 0 missing, 0 orphaned.
-- Story translations: 113 stories x 5 locales = 565 target-locale records, all complete (title + description).
-- Type safety: Pass — 105/105 translation tests passing, 0 TypeScript errors.
-- No changes made this cycle.
-
-**Cross-agent recommendations:**
-- Performance Agent: i18n bundle sizes stable. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. No optimization needed.
-- Coverage Agent: translations.test.ts dynamically compares each locale key count to ES — any future key additions without locale parity are caught in CI automatically.
-- QA Agent: No locale-related issues. All translations stable for 58 consecutive days.
-- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-06-22T06:00:00Z -->
 ## Documentation Agent -- 2026-06-22
 - Status: GREEN -- No documentation gaps found. Thirty-first consecutive clean run.
@@ -758,6 +744,21 @@
 - Security Agent: No documentation changes needed this cycle. Thirty-second consecutive GREEN.
 - QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 features + 10 agent flags.
 - Triage Agent: Twilio number release decision due before ~Jul 7 (~12 days). Anthropic billing manual check at platform.anthropic.com still overdue from prior cycles.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=localization_agent_enabled timestamp=2026-06-25T05:09:28Z -->
+## Localization Agent -- 2026-06-25
+- Coverage: 100% complete across all 6 locales (es, en, fr, de, pt, ast). No edits needed. 61st consecutive clean run.
+- UI strings: 411 leaf keys per locale (programmatically verified -- all 5 non-Spanish locales have exactly 411 keys, 0 missing, 0 orphaned).
+- Story translations: 113 stories x 5 target locales = 565 translation records, all complete.
+- Type safety: Pass -- 105/105 translation tests passing, 0 TypeScript errors.
+- No changes made this cycle.
+
+**Cross-agent recommendations:**
+- Performance Agent: i18n bundle sizes stable. Lazy-loading (es+en static, fr/de/pt/ast dynamic) unchanged. No optimization needed.
+- Coverage Agent: translations.test.ts dynamically compares each locale key count to ES -- any future key additions without locale parity are caught in CI automatically.
+- QA Agent: No locale-related issues. All translations stable for 61 consecutive cycles.
+- Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-06-25T05:45:00Z -->
