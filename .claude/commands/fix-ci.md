@@ -40,6 +40,6 @@ Rules:
 - If a failure is flaky (passes locally, fails in CI), note it but don't skip.
 - If stuck after 3 fix cycles, stop and report what remains broken.
 - Verify the current branch before committing.
-   - Normal CI repair happens on the branch under test.
-   Never push directly to a protected production branch without explicit
-   approval.
+- Normal CI repair happens on the branch under test.
+  Never push directly to a protected production branch without explicit
+  approval.
