@@ -1,5 +1,5 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-06-24 06:00:11
+> Auto-generated on 2026-06-25 06:00:05
 
 ## CLAUDE.md Status
 
@@ -367,24 +367,16 @@ webhooks/translate
 
 ## Changes Made This Run
 
-Run date: 2026-06-24. Status: GREEN -- No documentation changes required. Thirty-second consecutive clean run.
+**Status: GREEN -- No documentation gaps found. Thirty-second consecutive clean run.**
 
-### Feature Flags
-- No undocumented feature flags. The `UNDOCUMENTED_FEATURE_FLAGS` gap section was empty.
-- Verified all 17 flags in `src/types/feature-flags.ts` (`FeatureFlagKey`) are documented in the Feature Flags Reference of `docs/project/features.md` (17 Features-tab flags across 5 categories). Count stable, zero gaps.
-- All 10 agent flags (Agents tab) remain documented and accurate.
+- Feature flags: All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps. Count stable.
+- API routes: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, internal health probes, client-side access checks). No external-consumption routes require documentation.
+- CLAUDE.md current (last modified 2026-06-13). features.md complete -- no additions needed.
+- No new feature flags, migrations with user-facing impact, or external-facing API routes since last run.
 
-### API Routes
-- All 56 flagged routes confirmed internal -- no external-consumption routes require documentation.
-  - `admin/*` -- admin-only, gated by `validateAdminAuth()` / `withAdmin` / `withAdminRead`.
-  - `cron/*` -- scheduled jobs protected by `cron-auth`.
-  - `webhooks/*` -- server-to-server, signature/shared-secret verified.
-  - `mcp/*` -- Pelayo voice-agent tool endpoints (internal, used by ElevenLabs agent config).
-  - `chat`, `chat/stream`, `favorites`, `feature-flags`, `suggestions`, `voice-access`, `checkout/*` -- client-driven app routes consumed by the Paisaxe frontend only.
-  - `health/*` -- internal liveness/diagnostic probes (Upptime, CI smoke).
+**No changes made to any documentation files this run.**
 
-### CLAUDE.md
-- Current as of 2026-06-13. No new feature flags, user-facing migrations, or external-facing API routes since the last run. No additions needed.
+---
 
 ---
 
