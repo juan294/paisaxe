@@ -133,10 +133,10 @@ function sample<T>(arr: T[], n: number): T[] {
 const RAG_QUALITY_TESTS = [
   {
     name: 'PDF-sourced answer',
-    message: 'What are the best hiking routes in Asturias?',
+    message: '¿Cuáles son las mejores rutas de senderismo en Asturias?',
     validate: (r: ChatResponse) => {
       const hasContent = r.content.length > 50;
-      const mentionsHiking = /hik|rut|trail|send|camino/i.test(r.content);
+      const mentionsHiking = /hik|rut|trail|send|camino|senderismo|ruta/i.test(r.content);
       return hasContent && mentionsHiking;
     },
     expectedBehavior: 'Response mentions specific trails with relevant content',
