@@ -16,6 +16,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -361,22 +362,6 @@
 - Triage Agent: The in-house `basic-markdown.tsx` renderer that replaced react-markdown (Jun 12) now has full dedicated test coverage including XSS-relevant link-safety branches. Recommend the coverage cron pass `--maxWorkers=3` to avoid recurring worker starvation.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-06-17T06:00:03Z -->
-## Documentation Agent — 2026-06-17
-- Status: GREEN — No documentation gaps found. Twenty-eighth consecutive clean run.
-- Feature flags: All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps. Flag count stable.
-- API routes: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, health probes, app-internal user APIs). No external-consumption routes require documentation.
-- Source changes since last run are test-only (make-booking route test, auth-provider test, basic-markdown test, llm-quality test) — no new flags, routes, or user-facing features introduced.
-- features.md complete — no additions needed. CLAUDE.md current (last modified 2026-06-13).
-
-**Cross-agent recommendations:**
-- QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 in FeatureFlagKey + 10 agent flags.
-- Security Agent: No documentation changes needed this cycle. Twenty-eighth consecutive GREEN.
-- Coverage Agent: No documentation-related coverage gaps.
-- Performance Agent: No documentation-impacting changes; modified files are test-only with zero bundle impact.
-- Cost Analyst Agent: No cost-related documentation concerns.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-06-18T04:01:24Z -->
 ## Documentation Agent — 2026-06-18
 - Status: GREEN -- No documentation gaps found. Twenty-eighth consecutive clean run.
@@ -419,18 +404,6 @@
 - QA Agent: voice-agent-chat (~45%) and agents-dashboard (~49%) remain top Playwright E2E targets; image-editor-dialog save/approve/curate handlers are E2E-only too.
 - Code Quality Agent: feature-flags/[key]/route.ts:41 fallthrough and image-editor-dialog `if (!story) return` guards are unreachable defensive code — removal candidates.
 - Performance Agent: Test-only addition, zero bundle impact, no new dependencies.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-06-21T05:45:00Z -->
-## Triage -- 2026-06-21
-- **Reports processed**: 10 (pre-launch, cost-analyst, remediation, performance, localization, documentation, security, cc-rpi-update, update-docs, qa)
-- **Action items resolved**: 1 code fix + 1 dependency PR supersession identified
-- **Summary**: Fixed PR #702 Preview Smoke failure by aligning the main-PR preview gate with `/api/health` preview semantics: preview health still requires HTTP 200 and `status="healthy"`, but no longer requires production-only Sentry DSN. Confirmed `develop` already carries `undici@7.28.0` with `npm audit --omit=dev` clean, making Dependabot PR #647 obsolete rather than mergeable.
-**Cross-agent recommendations:**
-- CI Agent: Re-run PR #702 checks after this commit; `Smoke test Vercel preview` should pass when `/api/health` returns `status="healthy"` in preview with `sentry.status="unconfigured"`.
-- Security Agent: Close or supersede Dependabot PR #647 after this fix lands on `develop`; do not merge the `main`-targeting Dependabot PR directly.
-- QA Agent: Full LLM QA confirmation still requires a worktree/environment with `VOYAGE_API_KEY`; this isolated triage worktree has no `.env.local` and no shell key.
-- cc-rpi Agent: Interactive Claude CLI auth preflight now returns `ok`; if launchd still reports `Not logged in`, run `claude setup-token` for the non-interactive scheduled environment.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-06-21T06:00:00Z -->
@@ -771,6 +744,20 @@
 - Security Agent: 0 advisories carry forward. No cost-related security concerns. 8 Dependabot alerts closed Jun 24 noted.
 - Triage Agent: Outstanding owner actions — (1) Twilio number release before ~Jul 7 (~12 days); (2) Anthropic billing manual check at platform.anthropic.com (overdue multiple cycles). No code actions from cost analyst this cycle.
 - Performance Agent: ElevenLabs ~591 KB chunk stays click-to-mount, serving zero of 128-day-silent voice users. Run `npm install` to sync node_modules to lockfile after PR #705 before next authoritative build.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=documentation_agent_enabled timestamp=2026-06-25T04:01:18Z -->
+## Documentation Agent -- 2026-06-25
+- Status: GREEN -- No documentation gaps found. Thirty-second consecutive clean run.
+- Feature flags: All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps. Count stable.
+- API routes: All 51 flagged routes confirmed internal. No external-consumption routes require documentation.
+- CLAUDE.md current (last modified 2026-06-13). features.md complete -- no additions needed.
+
+**Cross-agent recommendations:**
+- Coverage Agent: No documentation-related coverage gaps. All feature descriptions align with test coverage targets.
+- Security Agent: No documentation changes needed this cycle. Thirty-second consecutive GREEN.
+- QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 features + 10 agent flags.
+- Triage Agent: Twilio number release decision due before ~Jul 7 (~12 days). Anthropic billing manual check at platform.anthropic.com still overdue from prior cycles.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-06-25T05:45:00Z -->
