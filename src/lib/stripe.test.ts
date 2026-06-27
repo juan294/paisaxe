@@ -32,6 +32,7 @@ import {
   createDayPassCheckoutSession,
   createEmbeddedCheckoutSession,
   verifyWebhookSignature,
+  type PurchaseType,
 } from "./stripe";
 
 describe("stripe", () => {
@@ -108,6 +109,11 @@ describe("stripe", () => {
     it("returns null when a tier's price ID is unset", () => {
       vi.stubEnv("STRIPE_WEEKLY_PRICE_ID", "");
       expect(getPriceIdForPurchaseType("weekly_pass")).toBeNull();
+    });
+
+    it("returns null for an unknown purchase type (runtime defensive default)", () => {
+      // TypeScript prevents reaching this default at compile time; test the runtime guard
+      expect(getPriceIdForPurchaseType("unknown_tier" as PurchaseType)).toBeNull();
     });
   });
 
