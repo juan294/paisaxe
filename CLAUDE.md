@@ -192,15 +192,6 @@ git branch -d feature/short-name
 8. **Background agents use `.worktrees/`**: Agents spawned with `run_in_background: true` or as team members are sandboxed to the project directory. They CANNOT access `../paisaxe-*` paths. Always use `.worktrees/short-name` inside the project.
 9. **If merge conflicts arise**: Resolve them in the main repo during merge, never in the worktree.
 
-## TDD Protocol
-
-All code changes follow Red-Green-Refactor:
-1. **Red** -- Write a failing test FIRST
-2. **Green** -- Minimum code to pass
-3. **Refactor** -- Clean up with green tests
-
-No exceptions. Bug fixes need a regression test. Refactors need existing coverage. No "tests later."
-
 ## Key Commands
 
 ```bash
@@ -384,49 +375,6 @@ All significant changes go through four phases:
 - Manual testing is ONLY for: sudo, hardware, new installs, truly visual-only validation.
 - If you can verify it with a command or tool, do so automatically.
 - Don't use Claude for linting/formatting — use automated tools and hooks instead.
-
-## Working Patterns
-
-<examples>
-<example name="push-sequence">
-Commit before pulling -- hook blocks dirty pulls.
-
-```bash
-git add src/feature.ts && git commit -m "feat: add feature"
-git pull --rebase && git push
-```
-
-</example>
-
-<example name="verification">
-Run checks sequentially, never as parallel tool calls.
-
-```bash
-npm run typecheck 2>&1; npm run lint 2>&1; npm run test 2>&1
-```
-
-</example>
-
-<example name="worktree-cleanup">
-Remove worktrees before merging PRs. Use -D (uppercase) for branches.
-
-```bash
-git worktree remove --force ../feature-branch; git branch -D feature-branch
-```
-
-</example>
-
-<example name="file-paths">
-Use absolute paths in all file tools and worktree commands. Never use ~.
-
-```bash
-cd /Users/juan/code/paisaxe && npm run test
-```
-
-</example>
-</examples>
-
-Domain-specific rules (git, CI, deployment, Python, macOS, Supabase, GitHub CLI, multi-agent) are in `.claude/skills/` -- loaded automatically when relevant.
 
 ## Project File Locations
 
