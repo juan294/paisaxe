@@ -3,10 +3,25 @@ import { NextRequest } from "next/server";
 
 const mockGetUser = vi.fn().mockResolvedValue({ data: { user: null }, error: null });
 
+// Captures the `cookies` option object passed to createServerClient so tests
+// can invoke `getAll()`/`setAll()` directly to exercise those code paths
+// (they're normally only invoked internally by the real @supabase/ssr client).
+let capturedCookiesOption:
+  | {
+      getAll: () => { name: string; value: string }[];
+      setAll: (
+        cookies: { name: string; value: string; options?: Record<string, unknown> }[]
+      ) => void;
+    }
+  | undefined;
+
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: vi.fn((_url: string, _key: string, _options: unknown) => {
-    return { auth: { getUser: mockGetUser } };
-  }),
+  createServerClient: vi.fn(
+    (_url: string, _key: string, options: { cookies: typeof capturedCookiesOption }) => {
+      capturedCookiesOption = options.cookies;
+      return { auth: { getUser: mockGetUser } };
+    }
+  ),
 }));
 
 import {
@@ -118,6 +133,14 @@ describe("hasSupabaseAuthCookies", () => {
     });
     expect(hasSupabaseAuthCookies(req)).toBe(false);
   });
+
+  it("returns false when NEXT_PUBLIC_SUPABASE_URL is malformed (URL constructor throws)", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "not a valid url");
+    const req = makeRequest("https://paisaxe.es/", {
+      "sb-abcdef-auth-token": "val",
+    });
+    expect(hasSupabaseAuthCookies(req)).toBe(false);
+  });
 });
 
 // ── refreshAuthSession ─────────────────────────────────────────────────────────
@@ -223,5 +246,164 @@ describe("refreshAuthSession", () => {
     mockGetUser.mockRejectedValue(new Error("Network error"));
     const res = await refreshAuthSession(req);
     expect(res.status).toBe(200);
+  });
+
+  it("swallows non-Error thrown values without logging", async () => {
+    const projectRef = "abcdef";
+    const nearExp = Math.floor(Date.now() / 1000) + 60;
+    const nearJwt = makeJwt(nearExp);
+    const sessionValue = encodeURIComponent(JSON.stringify({ access_token: nearJwt }));
+    const req = makeRequest("https://paisaxe.es/dashboard", {
+      [`sb-${projectRef}-auth-token`]: sessionValue,
+    });
+
+    mockGetUser.mockRejectedValue("a plain string rejection, not an Error");
+    const res = await refreshAuthSession(req);
+    expect(res.status).toBe(200);
+  });
+
+  it("calls getUser when neither the exact nor `.0` chunked cookie is present (only a later chunk)", async () => {
+    const projectRef = "abcdef";
+    const req = makeRequest("https://paisaxe.es/dashboard", {
+      // Matches hasSupabaseAuthCookies' startsWith check but not `.get(prefix)`
+      // nor `.get(`${prefix}.0`)`, so `sessionCookie` is undefined and the
+      // `?? ""` fallback on line 110 is exercised.
+      [`sb-${projectRef}-auth-token.1`]: "some-chunk-value",
+    });
+    await refreshAuthSession(req);
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the chunked session cookie (`${prefix}.0`) when the exact cookie is absent", async () => {
+    const projectRef = "abcdef";
+    const nearExp = Math.floor(Date.now() / 1000) + 60; // near expiry -> triggers getUser
+    const nearJwt = makeJwt(nearExp);
+    const sessionValue = encodeURIComponent(JSON.stringify({ access_token: nearJwt }));
+    const req = makeRequest("https://paisaxe.es/dashboard", {
+      [`sb-${projectRef}-auth-token.0`]: sessionValue,
+    });
+    await refreshAuthSession(req);
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("invokes the Supabase cookies adapter's getAll/setAll and reflects them on the response", async () => {
+    const projectRef = "abcdef";
+    const nearExp = Math.floor(Date.now() / 1000) + 60;
+    const nearJwt = makeJwt(nearExp);
+    const sessionValue = encodeURIComponent(JSON.stringify({ access_token: nearJwt }));
+    const req = makeRequest("https://paisaxe.es/dashboard", {
+      [`sb-${projectRef}-auth-token`]: sessionValue,
+    });
+
+    capturedCookiesOption = undefined;
+    const res = await refreshAuthSession(req);
+    expect(capturedCookiesOption).toBeDefined();
+
+    // getAll() should reflect the request's cookies (covers line 123).
+    const all = capturedCookiesOption!.getAll();
+    expect(all.some((c) => c.name === `sb-${projectRef}-auth-token`)).toBe(true);
+
+    // setAll() rebuilds `response` and writes cookies onto both the request
+    // and the new response (covers lines 126, 127, 129, 132, 133).
+    capturedCookiesOption!.setAll([
+      { name: "sb-abcdef-auth-token", value: "new-session-value", options: { path: "/" } },
+    ]);
+    expect(req.cookies.get("sb-abcdef-auth-token")?.value).toBe("new-session-value");
+
+    // The response returned from refreshAuthSession is still a valid NextResponse.
+    expect(res.status).toBe(200);
+  });
+
+  it("emits a PostHog event on timeout when NEXT_PUBLIC_POSTHOG_KEY is configured", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key");
+
+    const mockPostHogFetch = vi.fn().mockResolvedValue({ ok: true });
+    const originalFetch = global.fetch;
+    global.fetch = mockPostHogFetch as unknown as typeof fetch;
+
+    try {
+      const projectRef = "abcdef";
+      const nearExp = Math.floor(Date.now() / 1000) + 60;
+      const nearJwt = makeJwt(nearExp);
+      const sessionValue = encodeURIComponent(JSON.stringify({ access_token: nearJwt }));
+      const req = makeRequest("https://paisaxe.es/dashboard", {
+        [`sb-${projectRef}-auth-token`]: sessionValue,
+      });
+
+      mockGetUser.mockImplementation(() => new Promise(() => {})); // never resolves
+
+      const promise = refreshAuthSession(req);
+      await vi.advanceTimersByTimeAsync(AUTH_REFRESH_TIMEOUT_MS + 100);
+      const res = await promise;
+
+      expect(res.status).toBe(200);
+      expect(mockPostHogFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = mockPostHogFetch.mock.calls[0];
+      expect(url).toContain("/capture/");
+      expect(init.method).toBe("POST");
+      const body = JSON.parse(init.body);
+      expect(body.event).toBe("auth_refresh_timeout");
+      expect(body.api_key).toBe("phc_test_key");
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("does not throw when the PostHog capture fetch itself rejects", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key");
+
+    const mockPostHogFetch = vi.fn().mockRejectedValue(new Error("PostHog unreachable"));
+    const originalFetch = global.fetch;
+    global.fetch = mockPostHogFetch as unknown as typeof fetch;
+
+    try {
+      const projectRef = "abcdef";
+      const nearExp = Math.floor(Date.now() / 1000) + 60;
+      const nearJwt = makeJwt(nearExp);
+      const sessionValue = encodeURIComponent(JSON.stringify({ access_token: nearJwt }));
+      const req = makeRequest("https://paisaxe.es/dashboard", {
+        [`sb-${projectRef}-auth-token`]: sessionValue,
+      });
+
+      mockGetUser.mockImplementation(() => new Promise(() => {}));
+
+      const promise = refreshAuthSession(req);
+      await vi.advanceTimersByTimeAsync(AUTH_REFRESH_TIMEOUT_MS + 100);
+      const res = await promise;
+      expect(res.status).toBe(200);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("does not call fetch on timeout when NEXT_PUBLIC_POSTHOG_KEY is not configured", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "");
+
+    const mockPostHogFetch = vi.fn();
+    const originalFetch = global.fetch;
+    global.fetch = mockPostHogFetch as unknown as typeof fetch;
+
+    try {
+      const projectRef = "abcdef";
+      const nearExp = Math.floor(Date.now() / 1000) + 60;
+      const nearJwt = makeJwt(nearExp);
+      const sessionValue = encodeURIComponent(JSON.stringify({ access_token: nearJwt }));
+      const req = makeRequest("https://paisaxe.es/dashboard", {
+        [`sb-${projectRef}-auth-token`]: sessionValue,
+      });
+
+      mockGetUser.mockImplementation(() => new Promise(() => {}));
+
+      const promise = refreshAuthSession(req);
+      await vi.advanceTimersByTimeAsync(AUTH_REFRESH_TIMEOUT_MS + 100);
+      await promise;
+
+      expect(mockPostHogFetch).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });

@@ -129,4 +129,22 @@ describe("sitemap", () => {
       }
     });
   });
+
+  describe("falls back to LOCATION_CONFIG.domain when NEXT_PUBLIC_SITE_URL is unset", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("uses the default domain fallback for all URLs", async () => {
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+      const entries = await sitemap();
+      expect(entries).toContainEqual(expect.objectContaining({ url: SITE_URL }));
+    });
+
+    it("uses the default domain fallback when the env var is whitespace-only", async () => {
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "   ");
+      const entries = await sitemap();
+      expect(entries).toContainEqual(expect.objectContaining({ url: SITE_URL }));
+    });
+  });
 });

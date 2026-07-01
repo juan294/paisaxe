@@ -579,4 +579,30 @@ describe("PricingPage", () => {
       expect(button.className).not.toContain("disabled:opacity-50");
     });
   });
+
+  describe("tier duration label translation fallback (line 151)", () => {
+    it("uses the real translation when t(tier.durationKey) differs from the key itself", async () => {
+      // The default mock `t: (key) => key` always makes
+      // `t(tier.durationKey) === tier.durationKey` true, so the fallbackLabel
+      // branch is the only one exercised elsewhere in this file. Override the
+      // i18n mock so `t()` returns an actual translated string, exercising the
+      // `: t(tier.durationKey)` branch instead.
+      vi.doMock("@/lib/i18n", () => ({
+        useTranslation: () => ({
+          t: (key: string) =>
+            key === "premium.tier_day" ? "24 hours (translated)" : key,
+        }),
+      }));
+      vi.resetModules();
+      const { default: FreshPricingPage } = await import("./page");
+
+      render(<FreshPricingPage />);
+
+      expect(screen.getByText("24 hours (translated)")).toBeInTheDocument();
+      expect(screen.queryByText("24 horas")).not.toBeInTheDocument();
+
+      vi.doUnmock("@/lib/i18n");
+      vi.resetModules();
+    });
+  });
 });
