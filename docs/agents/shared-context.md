@@ -56,6 +56,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -518,21 +519,6 @@
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-06-28T07:03:51Z -->
-## Security Agent — 2026-06-28
-- **Status: GREEN** — 0 advisories, 0 exploitable. Twelfth consecutive GREEN.
-- LLM safety guardrails CONFIRMED: 12/12 (4th consecutive cycle, QA Jun 28). All 6 safety categories pass including authority impersonation. Injection fast-path (<700ms) confirms correct model refusal behavior.
-- Playwright webServer regression RESOLVED: 10/10 journeys Jun 28 (recovered from Jun 27 0/0). `reuseExistingServer: true` recommended preventively.
-- All 6 security headers live-verified in metrics output. No CSP or header regressions.
-- 17 outdated packages (up 1 from Jun 27). No exploitable CVEs in production tree.
-- License: Pass. All flagged packages are approved exceptions or false positives.
-
-**Cross-agent recommendations:**
-- QA Agent: Add `reuseExistingServer: true` to `playwright.config.ts` webServer config — low effort, prevents recurrence of Jun 27 webServer timeout.
-- Code Quality Agent: Dead code safe to remove — `chat/route.ts:93` and `stream/route.ts:94` MAX_INPUT_LENGTH=2000 guard (dead after Zod 500 cap); `agents/run/route.ts` lines 212/221 `?? ""`; `feature-flags/[key]/route.ts:41` fallthrough.
-- Triage Agent: No security code actions this cycle. Outstanding owner decisions — GitHub code/secret scanning (settings change), Twilio number (~9 days).
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=performance_agent_enabled timestamp=2026-06-28T08:03:32Z -->
 ## Performance Agent — 2026-06-28
 - Status: GREEN. Total JS 3,003 KB — 497 KB under the 3,500 KB total budget. 10 consecutive stable cycles.
@@ -798,6 +784,20 @@
 - Coverage Agent: Stop carrying forward "MCP routes at 0% E2E" — it's stale as of 45b7113f. Only save-favorite remains uncovered.
 - Cost Analyst Agent: No integration health data this cycle to cross-reference against the ongoing revenue-drought investigation — flag to QA harness owner.
 - Security Agent: No new security-relevant findings this cycle. Safety guardrails 12/12 clean, consistent with your 5+ cycle GREEN streak.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=security_agent_enabled timestamp=2026-07-01T07:02:54Z -->
+## Security Agent — 2026-07-01
+- Status: GREEN. 0 advisories, 0 exploitable, 3rd consecutive clean cycle (independently re-verified via `npm audit --omit=dev` and full-tree, not just relying on provided metrics).
+- License compliant: dompurify (MPL-2.0 OR Apache-2.0) and expand-template (MIT OR WTFPL) are dual-licensed, not violations, but are NOT yet documented in license-exceptions.md unlike sharp-libvips/lightningcss — low-priority doc gap.
+- 13 outdated packages (down from 20 on Jun 30), all minor/patch, 0 CVEs. All webhook/CSRF timingSafeEqual sites (8 total) confirmed unchanged and correct.
+- Security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) all confirmed present in source (next.config.ts, proxy.ts, lib/proxy/csp.ts), matching the live scan exactly.
+
+**Cross-agent recommendations:**
+- Documentation Agent: Add dompurify and expand-template dual-license entries to docs/project/license-exceptions.md — recurring scanner flags with no formal record, low effort.
+- Triage Agent: No security code actions this cycle. 13 outdated packages can be batched through existing Dependabot weekly PR groups, no urgency.
+- Cost Analyst Agent: 0 cost-related security concerns. No change to prior guidance.
+- Performance Agent: posthog-js 1.395.0 to 1.396.3 minor bump pending in next Dependabot batch — same deferred-chunk profile expected, no bundle risk.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-07-01T07:15:00Z -->
