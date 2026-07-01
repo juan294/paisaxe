@@ -391,6 +391,63 @@ describe("translate webhook", () => {
     expect(translateStory).not.toHaveBeenCalled();
   });
 
+  it("falls back to 'queued' status when the enqueue RPC returns no data (line 237)", async () => {
+    // Covers translate/route.ts:237 — `enqueueStatus = data ?? "queued"`.
+    // All other tests have enqueue_translate_webhook_event resolve with an
+    // explicit string ("queued"/"duplicate"), so the `?? "queued"` fallback
+    // is only exercised when the RPC resolves with null/undefined data.
+    const { translateStory } = await import("@/lib/translate-story");
+
+    vi.mocked(translateStory).mockResolvedValue({
+      success: true,
+      successCount: 1,
+      failedCount: 0,
+    });
+
+    mockRpc.mockImplementation((fn: string, args?: Record<string, unknown>) => {
+      if (fn === "enqueue_translate_webhook_event") {
+        return Promise.resolve({ data: null, error: null, args });
+      }
+
+      if (fn === "pg_try_advisory_lock") {
+        return Promise.resolve({ data: true, error: null });
+      }
+
+      if (fn === "claim_next_translate_webhook_event") {
+        return Promise.resolve({
+          data: [
+            {
+              event_key: `${VALID_STORY_ID}:default:all`,
+              story_id: VALID_STORY_ID,
+              locales: null,
+              force_retranslate: false,
+            },
+          ],
+          error: null,
+        });
+      }
+
+      if (
+        fn === "complete_translate_webhook_event" ||
+        fn === "pg_advisory_unlock"
+      ) {
+        return Promise.resolve({ data: true, error: null });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const response = await POST(createRequest({ storyId: VALID_STORY_ID }));
+    const json = await response.json();
+
+    // The job is claimed and processed immediately, so the "queued" fallback
+    // value never surfaces in the response body directly, but the branch at
+    // line 237 must still execute (and not throw) when data is null.
+    expect(response.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.status).toBe("processed");
+  });
+
   it("marks the job failed instead of deleting the claim when translation fails", async () => {
     const { translateStory } = await import("@/lib/translate-story");
 
@@ -426,6 +483,87 @@ describe("translate webhook", () => {
     expect(mockRpc).toHaveBeenCalledWith("fail_translate_webhook_event", {
       p_event_key: `${VALID_STORY_ID}:default:all`,
       p_error: "Unexpected crash",
+    });
+  });
+
+  it("falls back to a generic error message when a non-Error value is thrown during processing (line 335)", async () => {
+    // Covers translate/route.ts:335 — `error instanceof Error ? error.message : "Internal server error"`.
+    // All other throwing tests reject with a real Error instance, so the
+    // false side of `error instanceof Error` is never exercised. Here
+    // translateStory rejects with a plain string to hit that branch.
+    const { translateStory } = await import("@/lib/translate-story");
+
+    vi.mocked(translateStory).mockRejectedValue("plain string failure");
+
+    const response = await POST(createRequest({ storyId: VALID_STORY_ID }));
+    const json = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(json.error).toBe("Internal server error");
+    expect(mockRpc).toHaveBeenCalledWith("fail_translate_webhook_event", {
+      p_event_key: `${VALID_STORY_ID}:default:all`,
+      p_error: "Internal server error",
+    });
+  });
+
+  it("marks a non-matching claimed job as failed without overwriting the response when it throws (line 339)", async () => {
+    // Covers translate/route.ts:339 — `if (job.event_key === requestedEventKey)`
+    // false branch inside the catch block. The claimed job has a different
+    // event_key than the one requested, so failTranslateJob still runs (to
+    // mark that job failed) but preferredResponse/preferredStatus are left
+    // untouched, and the handler falls through to the generic "processed"
+    // response for the originally requested event.
+    const { translateStory } = await import("@/lib/translate-story");
+    const OTHER_STORY_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
+    vi.mocked(translateStory).mockRejectedValue(new Error("Other job crash"));
+
+    mockRpc.mockImplementation((fn: string, _args?: Record<string, unknown>) => {
+      if (fn === "enqueue_translate_webhook_event") {
+        return Promise.resolve({ data: "queued", error: null });
+      }
+
+      if (fn === "pg_try_advisory_lock") {
+        return Promise.resolve({ data: true, error: null });
+      }
+
+      if (fn === "claim_next_translate_webhook_event") {
+        // Return a job for a DIFFERENT story (event_key !== requestedEventKey)
+        return Promise.resolve({
+          data: [
+            {
+              event_key: `${OTHER_STORY_ID}:default:all`,
+              story_id: OTHER_STORY_ID,
+              locales: null,
+              force_retranslate: false,
+            },
+          ],
+          error: null,
+        });
+      }
+
+      if (
+        fn === "fail_translate_webhook_event" ||
+        fn === "pg_advisory_unlock"
+      ) {
+        return Promise.resolve({ data: true, error: null });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const response = await POST(createRequest({ storyId: VALID_STORY_ID }));
+    const json = await response.json();
+
+    // The non-matching job's crash still marks it failed, but the response
+    // falls through to the generic "processed" success for the requested event.
+    expect(response.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.status).toBe("processed");
+    expect(json.eventKey).toBe(`${VALID_STORY_ID}:default:all`);
+    expect(mockRpc).toHaveBeenCalledWith("fail_translate_webhook_event", {
+      p_event_key: `${OTHER_STORY_ID}:default:all`,
+      p_error: "Other job crash",
     });
   });
 

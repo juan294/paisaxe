@@ -1015,6 +1015,79 @@ describe("POST /api/webhooks/elevenlabs", () => {
       loggerSpy.mockRestore();
     });
 
+    it("should include the dotted field path when a known field has the wrong type (line 115 path.length > 0 branch)", async () => {
+      // A wrong-typed known field (conversation_id as number) produces an
+      // "invalid_type" issue with no `keys` array, so unknownFields falls
+      // through to `i.path.length > 0 ? [i.path.join(".")] : []` — exercising
+      // the `> 0` (true) side of the ternary at route.ts:115.
+      const loggerSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      const payload = JSON.stringify({ conversation_id: 12345 });
+      const sigHeader = createSignatureHeader(payload);
+      const request = new NextRequest(
+        "http://localhost:3000/api/webhooks/elevenlabs",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "elevenlabs-signature": sigHeader,
+          },
+          body: payload,
+        }
+      );
+
+      const response = await POST(request);
+      // The zod schema only warns on unknown shape — it does not block the
+      // request. Since `body.conversation_id` (12345) is still truthy at
+      // runtime, the handler proceeds through the normal (mocked) booking
+      // lookup and succeeds after logging the shape warning.
+      expect(response.status).toBe(200);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "[WEBHOOK_UNKNOWN_SHAPE]",
+        expect.objectContaining({
+          webhook: "elevenlabs",
+          fields: ["conversation_id"],
+        })
+      );
+
+      loggerSpy.mockRestore();
+    });
+
+    it("should emit an empty fields list when the root payload is not an object (line 115 path.length === 0 branch)", async () => {
+      // A root-level JSON primitive (e.g. a bare string) parses fine via
+      // JSON.parse but fails the object schema with a root issue whose
+      // `path` is `[]` — exercising the `=== 0` (false) side of the
+      // ternary at route.ts:115, falling through to the empty-array branch.
+      const loggerSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      const payload = JSON.stringify("just a string, not an object");
+      const sigHeader = createSignatureHeader(payload);
+      const request = new NextRequest(
+        "http://localhost:3000/api/webhooks/elevenlabs",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "elevenlabs-signature": sigHeader,
+          },
+          body: payload,
+        }
+      );
+
+      const response = await POST(request);
+      // No conversation_id can be derived from a string body, so it's
+      // reported missing after the shape warning is logged.
+      expect(response.status).toBe(400);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "[WEBHOOK_UNKNOWN_SHAPE]",
+        expect.objectContaining({ webhook: "elevenlabs", fields: [] })
+      );
+
+      loggerSpy.mockRestore();
+    });
+
     it("should handle data-nested analysis path in Zod schema validation", async () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -1476,6 +1549,61 @@ describe("POST /api/webhooks/elevenlabs", () => {
       );
 
       logSpy.mockRestore();
+    });
+
+    it("falls back to a generic message when sendSMS throws a non-Error value (line 280 else branch)", async () => {
+      // sendError instanceof Error ? sendError.message : "SMS send threw unexpectedly"
+      // Throwing a plain string (not an Error instance) exercises the ":" side.
+      vi.mocked(sendSMS).mockRejectedValue("raw string rejection, not an Error");
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      // Booking state was still committed — return 200, not 500.
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(false);
+      expect(data.smsError).toBe("SMS send threw unexpectedly");
+      expect(mockRpc).toHaveBeenCalledWith("fail_booking_sms_job", {
+        p_event_key: "post_call_transcription:conv_456",
+        p_error: "SMS send threw unexpectedly",
+      });
+    });
+
+    it("falls back to a default error message when a failed SMS result has no error string (line 301 ?? branch)", async () => {
+      // p_error: smsResult.error ?? "SMS delivery failed"
+      // success: false with `error` omitted exercises the ?? fallback.
+      vi.mocked(sendSMS).mockResolvedValue({ success: false });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(false);
+      expect(data.smsError).toBeUndefined();
+      expect(mockRpc).toHaveBeenCalledWith("fail_booking_sms_job", {
+        p_event_key: "post_call_transcription:conv_456",
+        p_error: "SMS delivery failed",
+      });
+    });
+
+    it("passes null as the provider sid when a successful SMS result has no sid (line 342 ?? branch)", async () => {
+      // p_provider_sid: smsResult.sid ?? null
+      // success: true with `sid` omitted exercises the ?? fallback to null.
+      vi.mocked(sendSMS).mockResolvedValue({ success: true });
+
+      const request = createSignedRequest(successTranscript);
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.smsSent).toBe(true);
+      expect(mockRpc).toHaveBeenCalledWith("complete_booking_sms_job", {
+        p_event_key: "post_call_transcription:conv_456",
+        p_provider_sid: null,
+        p_outcome_message: "Confirmation SMS",
+      });
     });
   });
 });
