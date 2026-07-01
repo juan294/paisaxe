@@ -473,6 +473,30 @@ describe("GET /api/admin/stories/[id]/content-images", () => {
       expect(data.data.total).toBe(0);
     });
 
+    it("should fall back to an empty filename when the path has no segment after the last slash", async () => {
+      // path.split("/").pop() returns "" when the path ends in a trailing slash,
+      // exercising the `|| ""` fallback branch on line 153.
+      const trailingSlashImage = {
+        path: "https://supabase.co/storage/v1/object/public/pdf-images/test-pdf/",
+        caption: "No filename",
+        source_pdf: "test-pdf.pdf",
+        page_number: 1,
+      };
+      const mockClient = createMockSupabase({
+        story: { id: "story-123", title: "Test Story", source_pdf: "test-pdf.pdf" },
+        chunks: [{ page_number: 1 }],
+        images: [trailingSlashImage],
+      });
+      vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/content-images");
+      const response = await GET(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.data.images[0].filename).toBe("");
+    });
+
     it("should score page 6+ images with 0 page points", async () => {
       const page10Image = {
         path: "https://supabase.co/storage/v1/object/public/pdf-images/test/test_page10_full.png",

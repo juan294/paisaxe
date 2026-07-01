@@ -256,6 +256,29 @@ describe("/api/admin/marketing/agent-logs", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
     });
+
+    it("should return 500 when a non-Error value is thrown (line 70)", async () => {
+      vi.resetModules();
+
+      vi.doMock("@/lib/admin-auth", () => ({
+        validateAdminAuth: vi.fn().mockResolvedValue({ valid: true, userId: "test-user" }),
+      }));
+
+      vi.doMock("@/lib/supabase-admin", () => ({
+        createAdminClient: () => {
+          throw "string error without Error class";
+        },
+      }));
+
+      const { GET: GET6 } = await import("./route");
+      const request = new NextRequest("http://localhost/api/admin/marketing/agent-logs");
+
+      const response = await GET6(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+    });
   });
 
   it("should use logger.error (not console.error) on unhandled GET error", async () => {

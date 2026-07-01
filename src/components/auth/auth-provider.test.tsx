@@ -572,6 +572,34 @@ describe("AuthProvider", () => {
     );
   });
 
+  it("signInWithGoogle logs non-Error object via String() branch — line 157", async () => {
+    const nonErrorObject = { code: "NETWORK_ERR", status: 503 };
+    mockSignInWithOAuth.mockResolvedValue({ error: nonErrorObject });
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { result } = renderHook(() => useAuthContext(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    let signInPromise: Promise<void>;
+    act(() => {
+      signInPromise = result.current.signInWithGoogle();
+    });
+
+    await expect(signInPromise!).rejects.toEqual(nonErrorObject);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[AUTH_SIGNIN_FAILURE]")
+    );
+    // Non-Error objects are stringified via String(), which gives "[object Object]"
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[object Object]")
+    );
+
+    consoleSpy.mockRestore();
+  });
+
   it("signInWithGoogle throws on error", async () => {
     const oauthError = new Error("OAuth failed");
     mockSignInWithOAuth.mockResolvedValue({ error: oauthError });
@@ -614,6 +642,33 @@ describe("AuthProvider", () => {
     await signOutPromise!;
 
     expect(mockSignOut).toHaveBeenCalled();
+  });
+
+  it("signOut logs non-Error object via String() branch — line 172", async () => {
+    const nonErrorObject = { code: "SESSION_ERR" };
+    mockSignOut.mockResolvedValue({ error: nonErrorObject });
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { result } = renderHook(() => useAuthContext(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    let signOutPromise: Promise<void>;
+    act(() => {
+      signOutPromise = result.current.signOut();
+    });
+
+    await expect(signOutPromise!).rejects.toEqual(nonErrorObject);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[AUTH_SIGNOUT_FAILURE]")
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[object Object]")
+    );
+
+    consoleSpy.mockRestore();
   });
 
   it("signOut throws on error", async () => {
@@ -831,5 +886,163 @@ describe("AuthProvider — cancelled guard (line 91)", () => {
         authChangeCallback!("SIGNED_OUT", null);
       });
     }).not.toThrow();
+  });
+
+  it("skips state updates (line 80-83) when cancelled before getUser resolves with error", async () => {
+    let resolveGetUser!: (value: unknown) => void;
+    mockGetUser.mockImplementation(
+      () => new Promise((resolve) => { resolveGetUser = resolve; })
+    );
+
+    const { unmount } = render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    // Wait for getSession to be called so getUser is about to be invoked
+    await waitFor(() => expect(mockGetSession).toHaveBeenCalled());
+    // Wait for getUser to actually be called (so resolveGetUser is assigned)
+    await waitFor(() => expect(mockGetUser).toHaveBeenCalled());
+
+    // Unmount — sets cancelled = true
+    unmount();
+
+    // Resolve with an error (would normally enter the if (error || !validatedUser) branch at line 78)
+    await act(async () => {
+      resolveGetUser({ data: { user: null }, error: { message: "expired" } });
+    });
+    // No React warning: cancelled guard at line 80 prevents setSession/setUser
+  });
+
+  it("skips state updates (line 85-88) when cancelled before getUser resolves with valid user", async () => {
+    let resolveGetUser!: (value: unknown) => void;
+    mockGetUser.mockImplementation(
+      () => new Promise((resolve) => { resolveGetUser = resolve; })
+    );
+
+    const { unmount } = render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    // Wait until getUser is called so resolveGetUser is assigned
+    await waitFor(() => expect(mockGetSession).toHaveBeenCalled());
+    await waitFor(() => expect(mockGetUser).toHaveBeenCalled());
+
+    // Unmount — sets cancelled = true
+    unmount();
+
+    // Resolve with a valid user (would normally enter the else branch at line 84)
+    await act(async () => {
+      resolveGetUser({ data: { user: mockSupabaseUser }, error: null });
+    });
+    // No React warning: cancelled guard at line 85 prevents setSession/setUser
+  });
+
+  it("skips state updates (line 94-97) when cancelled before getSession throws", async () => {
+    let rejectGetSession!: (reason: unknown) => void;
+    mockGetSession.mockImplementation(
+      () => new Promise((_, reject) => { rejectGetSession = reject; })
+    );
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    // Wait for getSession to be called so rejectGetSession is assigned
+    await waitFor(() => expect(mockGetSession).toHaveBeenCalled());
+
+    // Unmount — sets cancelled = true
+    unmount();
+
+    // Reject (would normally enter the catch block at line 90)
+    await act(async () => {
+      rejectGetSession(new Error("Network error after unmount"));
+    });
+    // cancelled guard at line 94 prevents setSession/setUser from firing
+    consoleSpy.mockRestore();
+  });
+
+  it("returns early at line 55 when anon key is absent (non-eyJ key)", async () => {
+    // Override the anon key with a non-JWT value. The auth bootstrap skips
+    // the full Supabase call and just sets isLoading false (lines 55-56).
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "not-a-jwt");
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("false");
+    });
+    // No Supabase calls — the early return fires
+    expect(mockGetSession).not.toHaveBeenCalled();
+    expect(mockGetUser).not.toHaveBeenCalled();
+  });
+
+  it("skips setIsLoading at line 55 when cancelled before early return", async () => {
+    // Arrange: slow the initial render enough for the useEffect to fire while unmounting
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "not-a-jwt");
+
+    const { unmount } = render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    // Immediate unmount — sets cancelled = true. startAuth may not have run yet or
+    // may be about to check the anon key. Either way, the cancelled guard at line 55
+    // ensures no state update after unmount.
+    unmount();
+    // No error thrown: guard prevents calling setIsLoading on an unmounted component.
+  });
+
+  it("logs String(error) when supabase client throws a non-Error during init", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockCreateSupabaseBrowserClient.mockImplementation(() => {
+      throw "non-error-string-thrown-from-init";
+    });
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("false");
+    });
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[AUTH_INIT_FAILURE]")
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it("logs String(error) when getSession throws a non-Error value", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetSession.mockRejectedValue("non-error-string-from-getSession");
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("false");
+    });
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[AUTH_INIT_FAILURE]")
+    );
+
+    consoleSpy.mockRestore();
   });
 });

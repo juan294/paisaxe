@@ -689,5 +689,33 @@ describe("admin-api/stories", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("logs String(error) when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("non-error string");
+
+      const result = await generateStoryTranslations("s1");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+  });
+
+  describe("non-Error throw coverage for instanceof ternary", () => {
+    it("searchContentImages logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(42);
+      const result = await searchContentImages("s1");
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("fetchStoryTranslations logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue({ code: "ETIMEDOUT" });
+      const result = await fetchStoryTranslations("s1");
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("updateStoryTranslation logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(null);
+      const result = await updateStoryTranslation("s1", "es" as never, {} as never);
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 });

@@ -130,6 +130,7 @@ RAG settings: Multilingual embeddings, 5 chunks max, 15K character limit, 0.40 d
 - `get_weather`: Current weather for Asturian cities and towns
 - `make_booking`: Initiate outbound voice call to make restaurant/hotel reservations (gated by `booking_system` flag)
 - `check_booking_status`: Check status of a pending booking request
+- `save_favorite`: Bookmark a place mid-conversation, stored in the visitor's saved places keyed by ElevenLabs conversation ID
 
 See `docs/operations/elevenlabs-pelayo-config.md` for full configuration details.
 

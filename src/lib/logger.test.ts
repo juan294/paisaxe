@@ -210,12 +210,14 @@ describe("logger", () => {
       vi.stubEnv("NODE_ENV", "production");
 
       const mockChild = {
+        debug: vi.fn(),
         info: vi.fn(),
         warn: vi.fn(),
         error: vi.fn(),
         child: vi.fn(),
       };
       const mockPinoInstance = {
+        debug: vi.fn(),
         info: vi.fn(),
         warn: vi.fn(),
         error: vi.fn(),
@@ -237,7 +239,11 @@ describe("logger", () => {
       logger.warn("[WARN]");
       expect(mockPinoInstance.warn).toHaveBeenCalledTimes(1);
 
-      // error (line 128)
+      // debug (line 128 — previously uncovered)
+      logger.debug("[DEBUG]");
+      expect(mockPinoInstance.debug).toHaveBeenCalledTimes(1);
+
+      // error (line 131)
       logger.error("[ERROR]");
       expect(mockPinoInstance.error).toHaveBeenCalledTimes(1);
 

@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
   child.stdout?.on("data", (chunk: Buffer) => {
     stdoutBuffer += chunk.toString();
     const lines = stdoutBuffer.split("\n");
-    stdoutBuffer = lines.pop() ?? "";
+    stdoutBuffer = lines.pop()!; // split() always returns >=1 element
     for (const line of lines) {
       if (line.trim()) appendLog(agent, line);
     }
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
   child.stderr?.on("data", (chunk: Buffer) => {
     stderrBuffer += chunk.toString();
     const lines = stderrBuffer.split("\n");
-    stderrBuffer = lines.pop() ?? "";
+    stderrBuffer = lines.pop()!; // split() always returns >=1 element
     for (const line of lines) {
       if (line.trim()) appendLog(agent, `[stderr] ${line}`);
     }

@@ -347,6 +347,24 @@ describe("VisitorVoiceConfigPanel", () => {
       });
     });
 
+    it("should not call onUpdate when result has no data and no error", async () => {
+      // Covers line 87 false branch: `if (result.data)` when result.data is
+      // falsy but result.error is also falsy (e.g. an empty success response).
+      mockUpdateFeatureFlagConfig.mockResolvedValue({});
+
+      const flag = makeMockFlag({ whitelisted_emails: [], agent_id: "" });
+      render(<VisitorVoiceConfigPanel flag={flag} onUpdate={mockOnUpdate} />);
+
+      const saveButton = screen.getByRole("button", { name: /^Save$/i });
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockUpdateFeatureFlagConfig).toHaveBeenCalled();
+      });
+
+      expect(mockOnUpdate).not.toHaveBeenCalled();
+    });
+
     it("should disable Save button while saving", async () => {
       let resolvePromise: (value: unknown) => void;
       mockUpdateFeatureFlagConfig.mockImplementation(

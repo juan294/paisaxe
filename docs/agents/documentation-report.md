@@ -1,9 +1,9 @@
 # Documentation Freshness Report
-> Auto-generated on 2026-06-25 06:00:05
+> Auto-generated on 2026-07-01 06:00:04
 
 ## CLAUDE.md Status
 
-Last modified: **2026-06-13**
+Last modified: **2026-06-27**
 
 ## Files Modified Since Documentation Update
 
@@ -12,285 +12,65 @@ These source files have been modified since CLAUDE.md was last updated and may n
 ### Source Files (src/)
 
 ```
-src/app/admin/admin-page-suspense.test.tsx
-src/app/admin/page.tsx
-src/app/api/admin/agents/run/route.test.ts
-src/app/api/admin/agents/run/route.ts
-src/app/api/admin/agents/run/state.ts
-src/app/api/admin/costs-analytics/[id]/route.ts
-src/app/api/admin/feature-flags/[key]/route.test.ts
-src/app/api/admin/feature-flags/[key]/route.ts
-src/app/api/admin/marketing/accounts/route.test.ts
-src/app/api/admin/marketing/accounts/route.ts
+src/app/api/admin/agent-config/route.test.ts
+src/app/api/admin/agents-summary/route.test.ts
+src/app/api/admin/costs-analytics/[id]/route.test.ts
+src/app/api/admin/costs-analytics/route.test.ts
+src/app/api/admin/elevenlabs-analytics/route.test.ts
+src/app/api/admin/github-analytics/route.test.ts
 src/app/api/admin/marketing/agent-logs/route.test.ts
-src/app/api/admin/marketing/agent-logs/route.ts
 src/app/api/admin/marketing/agent/route.test.ts
-src/app/api/admin/marketing/agent/route.ts
 src/app/api/admin/marketing/dashboard/route.test.ts
-src/app/api/admin/marketing/dashboard/route.ts
 src/app/api/admin/marketing/posts/route.test.ts
-src/app/api/admin/marketing/posts/route.ts
-src/app/api/admin/marketing/schedule/route.test.ts
-src/app/api/admin/marketing/schedule/route.ts
 src/app/api/admin/stories/[id]/content-images/route.test.ts
-src/app/api/admin/stories/[id]/content-images/route.ts
 src/app/api/admin/stories/[id]/image-source/route.test.ts
-src/app/api/admin/stories/[id]/image-source/route.ts
-src/app/api/admin/stories/[id]/image/route.test.ts
-src/app/api/admin/stories/[id]/image/route.ts
-src/app/api/admin/stories/[id]/route.test.ts
-src/app/api/admin/stories/[id]/route.ts
 src/app/api/admin/stories/[id]/status/route.test.ts
-src/app/api/admin/stories/[id]/status/route.ts
 src/app/api/admin/stories/approve-all/route.test.ts
-src/app/api/admin/stories/approve-all/route.ts
-src/app/api/admin/stories/bulk-delete/route.test.ts
-src/app/api/admin/stories/bulk-delete/route.ts
-src/app/api/admin/stories/bulk-status/route.test.ts
-src/app/api/admin/stories/bulk-status/route.ts
 src/app/api/admin/stories/route.test.ts
-src/app/api/admin/stories/route.ts
+src/app/api/admin/stripe-analytics/route.test.ts
 src/app/api/admin/suggestions/[id]/route.test.ts
-src/app/api/admin/suggestions/[id]/route.ts
 src/app/api/admin/suggestions/route.test.ts
-src/app/api/admin/suggestions/route.ts
-src/app/api/chat/route.test.ts
-src/app/api/chat/route.ts
-src/app/api/chat/stream/route.test.ts
-src/app/api/chat/stream/route.ts
 src/app/api/checkout/day-pass/route.test.ts
-src/app/api/checkout/day-pass/route.ts
 src/app/api/checkout/embedded/route.test.ts
-src/app/api/checkout/embedded/route.ts
-src/app/api/cron/content-discovery/route.ts
 src/app/api/cron/fail-stale-bookings/route.test.ts
-src/app/api/cron/fail-stale-bookings/route.ts
 src/app/api/cron/fail-stale-translations/route.test.ts
-src/app/api/cron/fail-stale-translations/route.ts
-src/app/api/cron/github-traffic-sync/route.test.ts
-src/app/api/cron/github-traffic-sync/route.ts
 src/app/api/cron/retry-booking-sms/route.test.ts
-src/app/api/cron/retry-booking-sms/route.ts
-src/app/api/cron/subscription-optimizer/route.test.ts
-src/app/api/cron/subscription-optimizer/route.ts
-src/app/api/favorites/route.test.ts
-src/app/api/favorites/route.ts
 src/app/api/feature-flags/route.test.ts
-src/app/api/feature-flags/route.ts
-src/app/api/health/route.test.ts
-src/app/api/health/route.ts
 src/app/api/mcp/make-booking/route.test.ts
-src/app/api/mcp/make-booking/route.ts
-src/app/api/mcp/places/route.test.ts
-src/app/api/mcp/places/route.ts
 src/app/api/mcp/save-favorite/route.test.ts
-src/app/api/mcp/save-favorite/route.ts
-src/app/api/mcp/weather/route.test.ts
-src/app/api/mcp/weather/route.ts
-src/app/api/webhooks/elevenlabs/route.test.ts
-src/app/api/webhooks/elevenlabs/route.ts
-src/app/api/webhooks/stripe/route.test.ts
-src/app/api/webhooks/stripe/route.ts
-src/app/api/webhooks/translate/route.test.ts
-src/app/api/webhooks/translate/route.ts
-src/app/auth/callback/route.test.ts
-src/app/error.test.tsx
-src/app/error.tsx
-src/app/favorites/page.test.tsx
-src/app/favorites/page.tsx
-src/app/global-error.test.tsx
-src/app/immersive/immersive-page-content.tsx
-src/app/layout.test.tsx
-src/app/layout.tsx
-src/app/not-found.test.tsx
-src/app/not-found.tsx
-src/app/pricing/checkout/page.test.tsx
-src/app/pricing/checkout/page.tsx
-src/app/pricing/page.test.tsx
-src/app/pricing/page.tsx
-src/app/providers.tsx
-src/app/story/[slug]/page.test.tsx
-src/app/story/[slug]/page.tsx
+src/components/admin/admin-shell.test.tsx
+src/components/admin/agent-config-panel.test.tsx
 src/components/admin/agents-dashboard/terminal-display.test.tsx
-src/components/admin/agents-dashboard/terminal-display.tsx
+src/components/admin/analytics-cache-context.test.tsx
 src/components/admin/marketing-dashboard/drafts-panel.test.tsx
-src/components/admin/marketing-dashboard/drafts-panel.tsx
 src/components/admin/marketing-dashboard/marketing-dashboard.test.tsx
-src/components/admin/marketing-dashboard/marketing-dashboard.tsx
-src/components/admin/voice-agent-chat.tsx
-src/components/auth/auth-provider.memostability.test.tsx
+src/components/admin/stories-tab-panel.test.tsx
+src/components/admin/visitor-voice-config-panel.test.tsx
 src/components/auth/auth-provider.test.tsx
-src/components/auth/auth-provider.tsx
-src/components/immersive/chat-upsell-cta.test.tsx
-src/components/immersive/chat-upsell-cta.tsx
-src/components/immersive/fullscreen-button.tsx
-src/components/immersive/language-switcher.gating.test.tsx
-src/components/immersive/language-switcher.test.tsx
-src/components/immersive/language-switcher.tsx
-src/components/immersive/navigation-hint.test.tsx
-src/components/immersive/navigation-hint.tsx
-src/components/immersive/related-stories.test.tsx
-src/components/immersive/related-stories.tsx
-src/components/immersive/story-info-panel.test.tsx
-src/components/immersive/story-info-panel.tsx
-src/components/immersive/story-progress-bar.test.tsx
-src/components/immersive/story-progress-bar.tsx
-src/components/immersive/story-toolbar.tsx
 src/components/immersive/story-viewer.test.tsx
-src/components/immersive/story-viewer.tsx
-src/components/immersive/suggest-place-dialog.tsx
+src/components/immersive/suggest-place-dialog.test.tsx
 src/components/immersive/voice-chat-elevenlabs.test.tsx
-src/components/immersive/voice-chat-elevenlabs.tsx
-src/components/immersive/voice-chat/chat-message-list.tsx
-src/components/markdown/basic-markdown.test.tsx
-src/components/posthog-provider.idlecallback.test.tsx
-src/components/posthog-provider.tsx
-src/components/premium/voice-purchase-cta.test.tsx
-src/components/premium/voice-purchase-cta.tsx
-src/components/ui/button.test.tsx
-src/components/ui/button.tsx
-src/components/ui/component-error-boundary.tsx
-src/config/next-externals.test.ts
+src/components/immersive/voice-chat.test.tsx
+src/components/immersive/voice-chat/chat-message-list.test.tsx
+src/components/ui/component-error-boundary.test.tsx
 src/hooks/use-favorites.test.ts
-src/hooks/use-favorites.ts
 src/hooks/use-feature-flags.test.ts
-src/hooks/use-feature-flags.ts
-src/hooks/use-sse-stream.test.ts
-src/hooks/use-sse-stream.ts
 src/hooks/use-stories.test.ts
-src/hooks/use-stories.ts
 src/hooks/use-stream-chat.test.ts
-src/hooks/use-stream-chat.ts
-src/hooks/use-voice-access.ts
-src/instrumentation.test.ts
-src/instrumentation.ts
-src/lib/admin-api/agent-config.ts
-src/lib/admin-api/agents.ts
-src/lib/admin-api/analytics.ts
-src/lib/admin-api/costs.ts
-src/lib/admin-api/feature-flags.ts
-src/lib/admin-api/optimizer.ts
-src/lib/admin-api/stories.ts
-src/lib/admin-api/suggestions.ts
-src/lib/admin-auth.test.ts
-src/lib/admin-auth.ts
-src/lib/chat-config.ts
-src/lib/chat-route-utils.test.ts
-src/lib/chat-stream-timeouts.test.ts
-src/lib/chat-stream-timeouts.ts
-src/lib/claude.test.ts
-src/lib/claude.ts
-src/lib/client-logger.test.ts
-src/lib/client-logger.ts
-src/lib/content-discovery.ts
-src/lib/costs/anthropic-costs.test.ts
-src/lib/costs/anthropic-costs.ts
-src/lib/costs/anthropic-pricing.test.ts
-src/lib/costs/anthropic-pricing.ts
-src/lib/costs/anthropic-usage.test.ts
-src/lib/costs/anthropic-usage.ts
-src/lib/costs/elevenlabs-costs.ts
-src/lib/costs/index.ts
-src/lib/costs/manual-costs.test.ts
-src/lib/costs/manual-costs.ts
-src/lib/costs/twilio-costs.ts
-src/lib/cron-auth.test.ts
-src/lib/cron-auth.ts
-src/lib/email.ts
-src/lib/embedding-cache.test.ts
-src/lib/embedding-cache.ts
-src/lib/embeddings.test.ts
-src/lib/embeddings.ts
-src/lib/env.ts
-src/lib/feature-flags-server.test.ts
-src/lib/feature-flags-server.ts
-src/lib/i18n/ast.ts
-src/lib/i18n/de.ts
-src/lib/i18n/en.ts
-src/lib/i18n/es.ts
-src/lib/i18n/fr.ts
-src/lib/i18n/provider.initiallocale.test.tsx
-src/lib/i18n/provider.test.tsx
-src/lib/i18n/pt.ts
-src/lib/i18n/use-translation.ts
-src/lib/localize-story.test.ts
-src/lib/localize-story.ts
-src/lib/logger.test.ts
-src/lib/logger.ts
-src/lib/models.test.ts
-src/lib/models.ts
-src/lib/platforms/x-client.ts
-src/lib/posthog-query.test.ts
-src/lib/posthog-query.ts
-src/lib/posting-service.test.ts
-src/lib/posting-service.ts
-src/lib/pricing.test.ts
-src/lib/pricing.ts
-src/lib/proxy/auth-refresh.ts
-src/lib/proxy/cors.ts
-src/lib/proxy/csp.ts
-src/lib/proxy/maintenance.test.ts
-src/lib/proxy/maintenance.ts
-src/lib/rate-limit.test.ts
-src/lib/rate-limit.ts
-src/lib/request-utils.test.ts
-src/lib/request-validation.test.ts
-src/lib/request-validation.ts
-src/lib/rerank.test.ts
-src/lib/rerank.ts
+src/lib/admin-api/agent-config.test.ts
+src/lib/admin-api/agents.test.ts
+src/lib/admin-api/analytics.test.ts
+src/lib/admin-api/costs.test.ts
+src/lib/admin-api/feature-flags.test.ts
+src/lib/admin-api/optimizer.test.ts
+src/lib/admin-api/stories.test.ts
+src/lib/admin-api/suggestions.test.ts
 src/lib/schemas.test.ts
-src/lib/schemas.ts
-src/lib/services/booking-service.test.ts
-src/lib/services/booking-service.ts
-src/lib/services/elevenlabs-call-service.test.ts
-src/lib/services/elevenlabs-call-service.ts
-src/lib/services/elevenlabs-webhook-service.test.ts
-src/lib/services/elevenlabs-webhook-service.ts
-src/lib/stories-data.test.ts
-src/lib/stories-data.ts
-src/lib/stories-server.test.ts
-src/lib/stories-server.ts
 src/lib/stripe.test.ts
-src/lib/stripe.ts
-src/lib/supabase-admin.test.ts
-src/lib/supabase-admin.ts
-src/lib/supabase.test.ts
-src/lib/supabase.ts
-src/lib/translate-story.test.ts
-src/lib/translate-story.ts
-src/lib/twilio-sms.ts
-src/lib/validation.test.ts
-src/lib/validation.ts
-src/proxy.test.ts
-src/proxy.ts
-src/tests/qa/llm-quality.test.ts
-src/types/navigator.d.ts
+src/lib/supabase-auth.test.ts
 ```
 
-### Database Migrations
-
-```
-supabase/migrations/094_create_story_from_suggestion.sql
-supabase/migrations/095_stripe_webhook_audit_shape.sql
-supabase/migrations/096_marketing_post_stats.sql
-supabase/migrations/097_anthropic_usage.sql
-supabase/migrations/098_voice_saved_places.sql
-supabase/migrations/099_grant_day_pass_purchase_type.sql
-```
-
-### Scripts
-
-```
-scripts/agents/cc-rpi-update.sh
-scripts/check-verification-coverage.ts
-scripts/generate-stories.ts
-scripts/qa-agent.sh
-scripts/run-prelaunch-gate.test.ts
-scripts/run-prelaunch-gate.ts
-scripts/security-agent.sh
-scripts/seed-database.ts
-scripts/verification-config.test.ts
-```
+No new migrations since documentation update.
 
 ## Documentation Gaps
 
@@ -362,21 +142,25 @@ webhooks/translate
 | File | Last Modified |
 |------|--------------|
 | docs/health-report-2026-02-16.md | 2026-02-16 |
-| CLAUDE.md | 2026-06-13 |
+| CLAUDE.md | 2026-06-27 |
 | README.md | 2026-06-13 |
 
 ## Changes Made This Run
 
-**Status: GREEN -- No documentation gaps found. Thirty-second consecutive clean run.**
+Status: GREEN — No documentation changes needed. 32nd consecutive clean run.
 
-- Feature flags: All 17 feature flags (Features tab) and 10 agent flags (Agents tab) verified against `docs/project/features.md`. Zero gaps. Count stable.
-- API routes: All 51 flagged routes confirmed internal (admin APIs, cron endpoints, webhooks, MCP voice-agent tools, internal health probes, client-side access checks). No external-consumption routes require documentation.
-- CLAUDE.md current (last modified 2026-06-13). features.md complete -- no additions needed.
-- No new feature flags, migrations with user-facing impact, or external-facing API routes since last run.
-
-**No changes made to any documentation files this run.**
-
----
+- **Feature flags**: Zero undocumented flags (gaps file confirms). `FeatureFlagKey` type (`src/types/feature-flags.ts`) still lists exactly 17 flags, all present in the Feature Flags Reference table in `docs/project/features.md`. Agent flags (10, including master toggle) unchanged and fully documented.
+- **API routes**: 55 routes flagged (up from 51 on 2026-06-22 — 4 net-new since last run: `admin/agents/run`, `admin/stories/[id]/translations`, `cron/github-traffic-sync`, `cron/subscription-optimizer`). Spot-checked all previously-unconfirmed routes by reading source:
+  - `admin/tunnel`, `cron/github-traffic-sync`, `cron/subscription-optimizer`, `checkout/health` — admin-auth (`validateAdminAuth`/`withAdmin`) or cron-secret (`verifyVercelCron`/`verifyWebhookSecret`) gated. Internal.
+  - `health/db` — internal QA diagnostic probe (confirmed in code comment: "Used by QA agent to detect configuration issues").
+  - `mcp/make-booking/status` — Twilio status-callback receiver (passive webhook-style endpoint, not a public API for consumption).
+  - `admin/stories/[id]/translations`, `admin/marketing/accounts` — admin-auth gated (`withAdmin`/`validateAdminAuth`).
+  - `chat`, `chat/stream`, `checkout/day-pass`, `checkout/embedded`, `favorites`, `feature-flags`, `voice-access`, `suggestions` — internal app API surface for the Paisaxe frontend itself, not third-party-consumable; chat flow already documented in prose (features.md lines 93-101).
+  - `mcp/places`, `mcp/weather`, `mcp/make-booking`, `mcp/save-favorite` — already documented as the "Custom MCP tools" list in features.md (lines 128-133).
+  - `webhooks/supabase`, `webhooks/stripe`, `webhooks/elevenlabs`, `webhooks/translate` — already documented in the Webhooks table (features.md lines 638-647).
+  - All remaining `admin/*` and `cron/*` routes confirmed session/cron-secret gated, consistent with prior cycles.
+  - No routes meet the "external consumption" bar for a public API reference — all confirmed internal.
+- CLAUDE.md (last modified 2026-06-27) and features.md require no updates this cycle.
 
 ---
 

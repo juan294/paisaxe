@@ -152,6 +152,38 @@ describe("GET /api/admin/stories", () => {
     expect(data.error).toBe("Failed to fetch stories");
   });
 
+  it("should fall back to page=1 and pageSize=20 when query params are non-numeric", async () => {
+    const { mockFrom, mockRange } = buildGetMock(mockStories, 2);
+    mockWithAdminAuthorized({ from: mockFrom });
+
+    // parseInt("abc", 10) is NaN → the `|| 1` / `|| 20` fallback branch kicks in
+    const request = new NextRequest("http://localhost:3000/api/admin/stories?page=abc&pageSize=xyz");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.page).toBe(1);
+    expect(data.data.pageSize).toBe(20);
+    // offset=0, end=19
+    expect(mockRange).toHaveBeenCalledWith(0, 19);
+  });
+
+  it("should default total to 0 when count is null", async () => {
+    // Supabase can resolve count: null (e.g. exact count unavailable) — the `count ?? 0` fallback
+    const mockRange = vi.fn().mockResolvedValue({ data: mockStories, error: null, count: null });
+    const mockOrder = vi.fn().mockReturnValue({ range: mockRange });
+    const mockSelect = vi.fn().mockReturnValue({ order: mockOrder });
+    const nullCountFrom = vi.fn().mockReturnValue({ select: mockSelect });
+    mockWithAdminAuthorized({ from: nullCountFrom });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.total).toBe(0);
+  });
+
   it("should return 500 on unexpected error", async () => {
     // withAdmin calls through but the handler throws due to bad mock
     mockWithAdminAuthorized({

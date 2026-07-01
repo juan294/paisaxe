@@ -801,6 +801,31 @@ describe("stories-data", () => {
 
       expect(result).toBeNull();
     });
+
+    it("falls back to metadata and logs error when DB query throws — lines 260-263", async () => {
+      const mockSingle = vi.fn().mockRejectedValue(new Error("Network timeout"));
+      const mockEqCuration = vi.fn().mockReturnValue({ single: mockSingle });
+      const mockEqActive = vi.fn().mockReturnValue({ eq: mockEqCuration });
+      const mockEqSlug = vi.fn().mockReturnValue({ eq: mockEqActive });
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEqSlug });
+      mockSupabaseFrom.mockReturnValue({ select: mockSelect });
+
+      const mockLoggerError = logger.error as ReturnType<typeof vi.fn>;
+      mockLoggerError.mockClear();
+
+      const fallback = FALLBACK_STORIES[0];
+      const result = await getStoryMetadataBySlug(fallback.slug || fallback.id);
+
+      expect(result).toEqual({
+        slug: fallback.slug || fallback.id,
+        title: fallback.title,
+        description: fallback.description ?? null,
+      });
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        "[TABLE_FALLBACK]",
+        expect.objectContaining({ table: "stories", filter: "metadata", error: "Network timeout" })
+      );
+    });
   });
 
   describe("isBuildPhase", () => {

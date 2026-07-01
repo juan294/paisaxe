@@ -181,6 +181,25 @@ describe("AdminShell", () => {
       expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
     });
 
+    it("calls signInWithGoogle('/admin') when Sign in with Google is clicked", async () => {
+      mockUseAuth.mockReturnValue({
+        user: null,
+        isLoading: false,
+        signInWithGoogle: mockSignInWithGoogle,
+        signOut: mockSignOut,
+      });
+      mockUseAdminRole.mockReturnValue({ isAdmin: false, isLoading: false });
+
+      render(<AdminShell />);
+
+      const signInButton = screen.getByText("Sign in with Google").closest("button")!;
+      await act(async () => {
+        fireEvent.click(signInButton);
+      });
+
+      expect(mockSignInWithGoogle).toHaveBeenCalledWith("/admin");
+    });
+
     it("shows access denied for non-admin users", () => {
       mockUseAuth.mockReturnValue({
         user: { id: "user-2", email: "user@example.com" },
@@ -368,6 +387,124 @@ describe("AdminShell", () => {
       });
 
       expect(mockSignOut).toHaveBeenCalled();
+    });
+  });
+
+  describe("Keyboard shortcuts (Cmd/Ctrl+1..N switches tabs)", () => {
+    beforeEach(() => {
+      setupAdminAuth();
+    });
+
+    it("ignores keydown events without metaKey or ctrlKey", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "2" }));
+      });
+
+      // No metaKey/ctrlKey → early return, no tab change, no router.push
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+    });
+
+    it("ignores metaKey keydown when key number is out of TABS range", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "9", metaKey: true })
+        );
+      });
+
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+    });
+
+    it("ignores metaKey keydown when key is not a number", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "k", metaKey: true })
+        );
+      });
+
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+    });
+
+    it("switches tab via Cmd+<N> matching a TABS index", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      // TABS[1] === "stories" (index 1 → key "2")
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "2", metaKey: true })
+        );
+      });
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.stringContaining("tab=stories"),
+        expect.anything()
+      );
+      await waitFor(() => {
+        expect(screen.getByTestId("stories-tab-panel")).toBeInTheDocument();
+      });
+    });
+
+    it("switches tab via Ctrl+<N> as well as Cmd", async () => {
+      render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      // TABS[2] === "features" (index 2 → key "3")
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "3", ctrlKey: true })
+        );
+      });
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.stringContaining("tab=features"),
+        expect.anything()
+      );
+    });
+
+    it("removes the keydown listener on unmount", async () => {
+      const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+
+      const { unmount } = render(<AdminShell />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("analytics-dashboard")).toBeInTheDocument();
+      });
+
+      unmount();
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        "keydown",
+        expect.any(Function)
+      );
+
+      removeEventListenerSpy.mockRestore();
     });
   });
 

@@ -1124,4 +1124,23 @@ describe("ElevenLabs Analytics API Route", () => {
 
     consoleSpy.mockRestore();
   });
+
+  it("stringifies a non-Error thrown value in the outer catch block (line 250)", async () => {
+    vi.stubEnv("ELEVENLABS_API_KEY", "test-key");
+
+    // Reject with a non-Error value (e.g. a plain string) to exercise the
+    // String(error) fallback branch of the `error instanceof Error` ternary.
+    global.fetch = vi.fn().mockRejectedValue("upstream unavailable");
+
+    const request = new NextRequest("http://localhost/api/admin/elevenlabs-analytics");
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.summary.totalConversations).toBe(0);
+    expect(logger.error).toHaveBeenCalledWith(
+      "ElevenLabs analytics API error:",
+      { error: "upstream unavailable" },
+    );
+  });
 });

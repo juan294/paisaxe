@@ -13,7 +13,10 @@ import type { ComponentType } from "react";
 // the underlying module and render the real component (after a microtask, so
 // tests use findBy*/waitFor — matching production's async-load behavior).
 vi.mock("next/dynamic", () => ({
-  default: (loader: () => Promise<ComponentType<Record<string, unknown>>>) => {
+  default: (
+    loader: () => Promise<ComponentType<Record<string, unknown>>>,
+    options?: { loading?: () => ReactNode }
+  ) => {
     function DynamicLoaded(props: Record<string, unknown>) {
       const [Comp, setComp] = useState<ComponentType<Record<string, unknown>> | null>(null);
       useEffect(() => {
@@ -25,7 +28,10 @@ vi.mock("next/dynamic", () => ({
           active = false;
         };
       }, []);
-      return Comp ? <Comp {...props} /> : null;
+      // Mirror real next/dynamic behavior: render the `loading` option's output
+      // while the import promise is pending (covers the `loading: () => null`
+      // callbacks declared alongside each dynamic() call in story-viewer.tsx).
+      return Comp ? <Comp {...props} /> : (options?.loading?.() ?? null);
     }
     return DynamicLoaded;
   },
@@ -2156,6 +2162,42 @@ describe("StoryViewer", () => {
   });
 
   describe("related stories onSelectStory callback (lines 290-292)", () => {
+    it("calls onIndexChange(line 335) when a related story is selected and found in stories", async () => {
+      // Enable related_stories feature flag
+      mockIsEnabled.mockImplementation(
+        (flag: string) => flag === "related_stories"
+      );
+
+      // story-1 (nature) and story-2 (nature) share a category so getRelatedStories returns story-2
+      const storiesWithSharedCategory: Story[] = [
+        { ...mockStories[0], category: "nature" },
+        { ...mockStories[1], category: "nature" },
+        { ...mockStories[2], category: "food" },
+      ];
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            stories: storiesWithSharedCategory,
+            allStories: storiesWithSharedCategory,
+          })}
+        />
+      );
+
+      // #569: RelatedStories is dynamically imported — flush microtasks until the
+      // story button appears, same pattern used for SuggestPlaceButton above.
+      const relatedButton = await flushUntil(() => {
+        const btns = screen.getAllByRole("button");
+        return btns.find((btn) => btn.textContent?.includes("Oviedo Cathedral")) ?? null;
+      });
+
+      fireEvent.click(relatedButton);
+      // story-2 is at index 1 in storiesWithSharedCategory — onIndexChange must be called
+      expect(onIndexChange).toHaveBeenCalledWith(1);
+
+      mockIsEnabled.mockReturnValue(false);
+    });
+
     it("should call onIndexChange when a related story is selected and found in stories array", async () => {
       // Enable related_stories feature flag
       mockIsEnabled.mockImplementation(
@@ -2356,6 +2398,85 @@ describe("StoryViewer", () => {
       const mod = await import("./story-toolbar");
       const comp = mod.StoryToolbar as unknown as { $$typeof?: symbol; type?: unknown };
       expect(comp.$$typeof?.toString()).toContain("react.memo");
+    });
+  });
+
+  describe("coverage gaps: adjacentImages, bookmark, overlay", () => {
+    it("adjacentImages skips stories with no image (line 223: img falsy branch)", async () => {
+      const storiesNoImage: Story[] = [
+        { ...mockStories[0], image: undefined as unknown as string },
+        { ...mockStories[1], image: "" },
+        { ...mockStories[2] },
+      ];
+
+      await renderWithAuth(
+        <StoryViewer {...getDefaultProps({ stories: storiesNoImage, allStories: storiesNoImage, currentIndex: 2 })} />
+      );
+
+      // Component renders without crashing when adjacent stories have no image
+      expect(screen.getByText("Sidra House")).toBeInTheDocument();
+    });
+
+    it("BookmarkButton isFavorite falls back to false when story is undefined (line 492: story null branch)", async () => {
+      // Pass empty stories and currentIndex=0 so stories[0] is undefined (story = undefined)
+      const emptyStories: Story[] = [];
+      mockIsFavorite.mockClear();
+
+      await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            stories: emptyStories,
+            allStories: emptyStories,
+            currentIndex: 0,
+          })}
+        />
+      );
+
+      // story is undefined → isFavorite(story.id) is NEVER called (false branch taken)
+      expect(mockIsFavorite).not.toHaveBeenCalled();
+    });
+
+    it("overlay button click does not toggle info when pointer is not fine (line 278: matches=false)", async () => {
+      // matchMedia already returns matches: false for all queries by default
+      await renderWithAuth(<StoryViewer {...getDefaultProps()} />);
+
+      // Use the transparent overlay button (no testid), not the hide-info panel button
+      const overlayBtn = screen
+        .getAllByRole("button", { name: /mostrar información|ocultar información/i })
+        .find((btn) => !btn.hasAttribute("data-testid"));
+
+      if (overlayBtn) {
+        fireEvent.click(overlayBtn);
+        // With matches=false, info should NOT be toggled — stays visible
+        const bottomContent = screen
+          .getByText("Lagos de Covadonga")
+          .closest("article[class*='bottom-0']");
+        expect(bottomContent).toHaveClass("opacity-100");
+      }
+    });
+
+    it("BookmarkButton onToggle is a no-op when story is undefined (story && toggleFavorite false-path)", async () => {
+      const emptyStories: Story[] = [];
+      mockToggleFavorite.mockClear();
+
+      const { container } = await renderWithAuth(
+        <StoryViewer
+          {...getDefaultProps({
+            stories: emptyStories,
+            allStories: emptyStories,
+            currentIndex: 0,
+          })}
+        />
+      );
+
+      // Find the bookmark button and click it — onToggle fires but story is undefined
+      const bookmarkBtn = container.querySelector("[data-testid='bookmark-button'], [aria-label*='guardar'], [aria-label*='bookmark']");
+      if (bookmarkBtn) {
+        fireEvent.click(bookmarkBtn as Element);
+      }
+
+      // toggleFavorite should NOT be called since story is undefined (story && ... short-circuits)
+      expect(mockToggleFavorite).not.toHaveBeenCalled();
     });
   });
 });

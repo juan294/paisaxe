@@ -229,6 +229,31 @@ describe("PUT /api/admin/stories/[id]/image-source", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Internal server error");
     });
+
+    it("should stringify a non-Error thrown value when logging the unexpected error", async () => {
+      // Exercises the `error instanceof Error ? error.message : String(error)` fallback branch
+      vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+      vi.mocked(createAdminClient).mockImplementation(() => {
+         
+        throw "a plain string failure";
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/image-source", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageSource: "Test Source" }),
+      });
+
+      const response = await PUT(request, mockParams);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
+      expect(logger.error).toHaveBeenCalledWith(
+        "Admin image source API error:",
+        { error: "a plain string failure" }
+      );
+    });
   });
 
   it("should use logger.error (not console.error) on unhandled PUT error", async () => {

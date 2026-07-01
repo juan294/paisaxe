@@ -1687,4 +1687,21 @@ describe("VoiceChat error UI for API failures", () => {
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
   });
+
+  // Line 173: `if (!lastMessage || isLoading) return;` inside handleRetry.
+  // Both operands are architecturally unreachable via the component's public UI:
+  //  - `!lastMessage`: the retry button only renders when `chatError` is set,
+  //    and `chatError` is only ever set inside useStreamChat's `sendMessage`,
+  //    which VoiceChat only calls from `handleSubmit` after `setLastMessage`
+  //    has already run — so `lastMessage` is always truthy whenever the retry
+  //    button exists.
+  //  - `isLoading`: ChatErrorBanner passes `disabled={isLoading}` to the retry
+  //    button, and React's synthetic event system does not invoke onClick
+  //    handlers on disabled buttons (confirmed empirically — fireEvent.click
+  //    on a disabled React-rendered button never reaches handleRetry). The
+  //    only way to re-enter handleRetry while a retry is in flight would be a
+  //    programmatic call bypassing the DOM entirely, which is not exercised
+  //    by this component's public API. useStreamChat's own `sendMessage` also
+  //    has an independent `isStreaming` re-entrancy guard, so this is a
+  //    defensive, structurally dead duplicate check.
 });

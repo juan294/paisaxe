@@ -952,4 +952,165 @@ describe("VoiceChatElevenLabs", () => {
       });
     });
   });
+
+  describe("startConversation error handling (lines 260-265)", () => {
+    it("shows error and calls onFallbackToText when startSession throws an Error", async () => {
+      mockStartSession.mockRejectedValue(new Error("WebRTC failed"));
+      const onFallbackToText = vi.fn();
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={onFallbackToText}
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /Háblame/i }));
+
+      await waitFor(() => {
+        expect(onFallbackToText).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        const alerts = screen.getAllByRole("alert");
+        expect(alerts.some((a) => a.textContent?.includes("Error de conexión"))).toBe(true);
+      });
+
+      consoleSpy.mockRestore();
+    });
+
+    it("covers String(err) branch when startSession throws a non-Error value (line 261 false branch)", async () => {
+      // Throwing a non-Error (e.g. a string) exercises the `String(err)` else-branch of
+      // `err instanceof Error ? err.message : String(err)` inside the catch block.
+      mockStartSession.mockRejectedValue("plain string error");
+      const onFallbackToText = vi.fn();
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={onFallbackToText}
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /Háblame/i }));
+
+      await waitFor(() => {
+        expect(onFallbackToText).toHaveBeenCalled();
+      });
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("endConversation non-Error throw (line 273 false branch)", () => {
+    it("covers String(err) branch when endSession throws a non-Error value", async () => {
+      mockEndSession.mockRejectedValue("connection closed unexpectedly");
+
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connected",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+        };
+      });
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      const stopButton = screen.getByRole("button", { name: /Parar/i });
+      fireEvent.click(stopButton);
+
+      await waitFor(() => {
+        expect(mockEndSession).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining("[VOICE_END_FAILURE]")
+        );
+      });
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("auto-scroll with prefersReducedMotion (line 196)", () => {
+    it("calls scrollIntoView with behavior='auto' when reduced motion is preferred", async () => {
+      // Configure matchMedia to signal prefers-reduced-motion
+      Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+          matches: query.includes("prefers-reduced-motion: reduce"),
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      });
+
+      const scrollSpy = vi.fn();
+      window.HTMLElement.prototype.scrollIntoView = scrollSpy;
+
+      mockUseConversation.mockImplementation((options) => {
+        conversationHandlers = options;
+        return {
+          status: "connected",
+          isSpeaking: false,
+          startSession: mockStartSession,
+          endSession: mockEndSession,
+        };
+      });
+
+      render(
+        <VoiceChatElevenLabs
+          story={mockStory}
+          agentId="test-agent"
+          onFallbackToText={() => {}}
+        />
+      );
+
+      // Trigger a message so the messages state changes and the scroll effect fires
+      act(() => {
+        conversationHandlers.onMessage?.({ message: "Hola!", source: "ai" });
+      });
+
+      await waitFor(() => {
+        // With prefersReducedMotion=true the effect uses behavior:"auto"
+        expect(scrollSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ behavior: "auto" })
+        );
+      });
+
+      // Restore matchMedia
+      Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+          matches: false,
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      });
+    });
+  });
 });

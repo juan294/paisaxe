@@ -813,6 +813,65 @@ describe("MarketingDashboard", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("handles non-Error thrown value in handleToggleAccount catch (line 88 String(err) branch)", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) })
+      .mockRejectedValueOnce("toggle string failure");
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("toggle-x"));
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Toggle account error")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"toggle string failure"')
+      );
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("handles non-Error thrown value in handleDisconnectAccount catch (line 107 String(err) branch)", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockData }) })
+      .mockRejectedValueOnce("disconnect string failure");
+    global.fetch = fetchMock;
+
+    render(<MarketingDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("disconnect-x")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("disconnect-x"));
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Disconnect account error")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"disconnect string failure"')
+      );
+    });
+
+    consoleSpy.mockRestore();
+  });
+
   it("uses fallback error message when disconnect response has no error field (line 102)", async () => {
     const user = userEvent.setup();
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
