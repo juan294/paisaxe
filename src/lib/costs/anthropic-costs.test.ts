@@ -149,5 +149,19 @@ describe("anthropic-costs (#138 — token-usage aggregation)", () => {
       const result = await fetchAnthropicCosts("2026-06-01", "2026-06-30");
       expect(result).toBeNull();
     });
+
+    it("treats a nullish data payload as an empty row set (line 118 ?? [] fallback)", async () => {
+      // Supabase can resolve with data: null and no error (e.g. RLS edge cases).
+      // queryUsageRows should fall back to [] rather than propagate null.
+      const mockSelectNullData = vi.fn(() => ({
+        gte: () => ({
+          lte: () => Promise.resolve({ data: null, error: null }),
+        }),
+      }));
+      mockFrom.mockReturnValueOnce({ select: mockSelectNullData });
+      const result = await fetchAnthropicCosts("2026-06-01", "2026-06-30");
+      // rows.length === 0 (from the [] fallback) => early-return null, not a crash.
+      expect(result).toBeNull();
+    });
   });
 });

@@ -94,6 +94,24 @@ describe("DO-M1: validateAdminAuth trims Supabase env vars", () => {
 
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
   });
+
+  it("falls back to an empty string for both URL and anon key when env vars are unset", async () => {
+    const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await validateAdminAuth();
+
+    // getSupabaseUrl()/getSupabaseAnonKey() return undefined -> `?? ""` fallback
+    expect(capturedUrl).toBe("");
+    expect(capturedAnonKey).toBe("");
+
+    process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
+  });
 });
 
 describe("validateAdminAuth", () => {
@@ -527,6 +545,29 @@ describe("validateAdminAuth", () => {
       const result = await withAdminRead(vi.fn().mockResolvedValue(handlerResult));
 
       expect(result).toBe(handlerResult);
+    });
+
+    it("falls back to an empty string for URL and anon key when env vars are unset", async () => {
+      const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-123", email: "admin@example.com" } },
+        error: null,
+      });
+      setupProfileMock({ role: "admin" });
+
+      await withAdminRead(vi.fn().mockResolvedValue("ok"));
+
+      // withAdminRead's own createServerClient call (lines 192-193) overwrites
+      // capturedUrl/capturedAnonKey — assert the `?? ""` fallback fired.
+      expect(capturedUrl).toBe("");
+      expect(capturedAnonKey).toBe("");
+
+      process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
     });
 
     it("runs the handler inside the request context when a request is passed", async () => {

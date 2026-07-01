@@ -152,6 +152,72 @@ describe("EmbeddingCache (Redis-backed)", () => {
     await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
   });
 
+  it("stringifies a non-Error rejection when Redis.get throws (falls to String(err) branch)", async () => {
+    mockRedisGet.mockRejectedValue("plain string rejection");
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    const result = await cache.get("weird error text");
+
+    expect(result).toBeNull();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[EMBEDDING_CACHE_MISS]",
+      { reason: "plain string rejection" }
+    );
+  });
+
+  it("stringifies a non-Error rejection from Redis.set's async .catch() (fire-and-forget path)", async () => {
+    mockRedisGet.mockResolvedValue(null);
+    mockRedisSet.mockRejectedValue({ code: "ECONNRESET" });
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    await cache.set("text", [0.1, 0.2]);
+    // Allow the fire-and-forget .catch() microtask to run.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[EMBEDDING_CACHE_SET_FAILED]",
+      { reason: String({ code: "ECONNRESET" }) }
+    );
+  });
+
+  it("stringifies a non-Error value thrown synchronously by getRedis().set (outer catch)", async () => {
+    mockRedisGet.mockResolvedValue(null);
+    // Throwing synchronously (not returning a rejected promise) exercises the
+    // outer try/catch in set(), not the inner .catch() on the returned promise.
+    mockRedisSet.mockImplementation(() => {
+      throw "synchronous non-Error throw";
+    });
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[EMBEDDING_CACHE_SET_FAILED]",
+      { reason: "synchronous non-Error throw" }
+    );
+  });
+
+  it("uses err.message when getRedis().set throws a real Error synchronously (outer catch, Error branch)", async () => {
+    mockRedisGet.mockResolvedValue(null);
+    mockRedisSet.mockImplementation(() => {
+      throw new Error("sync boom");
+    });
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[EMBEDDING_CACHE_SET_FAILED]",
+      { reason: "sync boom" }
+    );
+  });
+
   it("does not wait for Redis.set to finish", async () => {
     mockRedisSet.mockReturnValue(new Promise(() => {}));
 

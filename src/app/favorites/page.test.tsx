@@ -1056,8 +1056,8 @@ describe("FavoritesPage", () => {
   });
 
   describe("coverage notes — unreachable guards", () => {
-    it("documents loadMore guard (line 36) as dead code — IntersectionObserver pre-guards before invoking loadMore", async () => {
-      // Line 36: `if (isLoadingMore || !hasMore) return;` inside loadMore is dead code.
+    it("documents loadMore guard (line 38) as dead code — IntersectionObserver pre-guards before invoking loadMore", async () => {
+      // Line 38: `if (isLoadingMore || !hasMore) return;` inside loadMore is dead code.
       //
       // Reason: The ONLY call site is the IntersectionObserver callback (page.tsx lines 49-52):
       //   if (entries[0].isIntersecting && hasMore && !isLoadingMore) { loadMore(); }
@@ -1067,7 +1067,14 @@ describe("FavoritesPage", () => {
       //
       // There is no "Load More" button or other call site. The guard is defensive dead code.
       // The tests in "loadMore guard (line 36)" and "loadMore isLoadingMore guard" above verify
-      // correct behavior but cannot cover line 36 for this structural reason.
+      // correct behavior but cannot cover line 38 for this structural reason.
+      //
+      // Empirically verified (isolated renderHook probe): calling loadMore() twice
+      // synchronously back-to-back still results in both calls seeing isLoadingMore=false,
+      // because setIsLoadingMore(true) and setIsLoadingMore(false) both fire within the
+      // same synchronous call (no await/yield between them), so React never commits an
+      // intermediate render where isLoadingMore is observably true, and both closures
+      // captured the same stale `false` value from the render that created them.
 
       // Demonstrate: 20 stories (hasMore=false) → IO fires immediately → no items beyond 20 loaded
       const twentyStories = Array.from({ length: 20 }, (_, i) => ({
@@ -1087,8 +1094,60 @@ describe("FavoritesPage", () => {
 
       // IO fires immediately (mock) but loadMore() is never called because IO's own guard blocks it
       await waitFor(() => expect(screen.getByText("Story 19")).toBeInTheDocument());
-      // Still exactly 20 items — line 36's return was never executed (IO prevented the call)
+      // Still exactly 20 items — line 38's return was never executed (IO prevented the call)
       expect(screen.queryByText(`21 ${mockT("favorites.place_plural")}`)).not.toBeInTheDocument();
+    });
+
+    it("documents the isLoadingMore spinner (line 157) as unreachable — setIsLoadingMore(true)/(false) are synchronous with no yield between them", async () => {
+      // Line 157: `{isLoadingMore && (<div>...spinner...</div>)}` never renders true.
+      //
+      // Reason: loadMore() calls setIsLoadingMore(true) and setIsLoadingMore(false)
+      // synchronously in the same function body, with no `await` or async gap between
+      // them (UX-L2 removed the artificial 300ms delay that used to create that gap).
+      // React batches these two updates from the same synchronous callback into a
+      // single re-render, so isLoadingMore is never observably true in any committed
+      // render — the spinner branch is dead code left over from before UX-L2.
+      const manyStories = Array.from({ length: 25 }, (_, i) => ({
+        id: `story-${i}`,
+        slug: `slug-${i}`,
+        title: `Story ${i}`,
+        subtitle: `Sub ${i}`,
+        description: `Desc ${i}`,
+        image: `/img/${i}.jpg`,
+        category: "nature" as const,
+        sourcePdf: "x.pdf",
+      }));
+      mockUseStories.mockReturnValue({ stories: manyStories, isLoading: false, error: null, refresh: vi.fn() });
+      mockUseFavorites.mockReturnValue({ favorites: manyStories.map((s) => s.id), toggleFavorite: mockToggleFavorite, isLoading: false });
+
+      render(<FavoritesPage />);
+
+      // All 25 load synchronously via the IO mock; the "loading_more" spinner text
+      // is never present at any point because isLoadingMore is never true during a render.
+      await waitFor(() => expect(screen.getByText("Story 24")).toBeInTheDocument());
+      expect(screen.queryByText(mockT("favorites.loading_more"))).not.toBeInTheDocument();
+    });
+
+    it("documents GalleryItem's itemRef null-guards (lines 205, 210) as architecturally unreachable", () => {
+      // Lines 205 and 210: `if (currentRef) { observer.observe/unobserve(currentRef); }`
+      // inside GalleryItem's IntersectionObserver effect are defensive null-safety guards.
+      //
+      // itemRef.current is always set to the rendered root <div ref={itemRef}> before
+      // useEffect fires, because React assigns refs synchronously during the commit
+      // phase, strictly before effects run. So `currentRef` is always truthy by the time
+      // this effect body executes for any GalleryItem that is actually mounted — the
+      // false branch (null ref) cannot be reached without mocking React internals in a
+      // way that doesn't represent real usage. Already covered by the same reasoning
+      // documented above for the GalleryItem observer registration.
+      mockUseFavorites.mockReturnValue({
+        favorites: ["story-1"],
+        toggleFavorite: mockToggleFavorite,
+        isLoading: false,
+      });
+
+      render(<FavoritesPage />);
+
+      expect(screen.getByAltText("Lagos de Covadonga")).toBeInTheDocument();
     });
   });
 });

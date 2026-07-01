@@ -67,6 +67,14 @@ describe("admin-api/agents", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await fetchAgentsSummary();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── triggerAgentRun ─────────────────────────────────────────────
@@ -107,6 +115,14 @@ describe("admin-api/agents", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("Connection refused"));
+
+      const result = await triggerAgentRun("xander");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await triggerAgentRun("xander");
 
@@ -154,6 +170,14 @@ describe("admin-api/agents", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await fetchRunningAgents();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── stopAgent ───────────────────────────────────────────────────
@@ -194,6 +218,14 @@ describe("admin-api/agents", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("Timeout"));
+
+      const result = await stopAgent("xander");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await stopAgent("xander");
 
@@ -260,6 +292,14 @@ describe("admin-api/agents", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("DNS failure"));
+
+      const result = await fetchAgentLogs("xander");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await fetchAgentLogs("xander");
 

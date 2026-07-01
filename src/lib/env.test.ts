@@ -83,10 +83,22 @@ describe("env module", () => {
       expect(getSupabaseUrl()).toBe("https://abc.supabase.co");
     });
 
+    it("getSupabaseUrl returns undefined when SUPABASE_URL is unset", async () => {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const { getSupabaseUrl } = await import("./env");
+      expect(getSupabaseUrl()).toBeUndefined();
+    });
+
     it("getSupabaseAnonKey returns trimmed SUPABASE_ANON_KEY", async () => {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJtest";
       const { getSupabaseAnonKey } = await import("./env");
       expect(getSupabaseAnonKey()).toBe("eyJtest");
+    });
+
+    it("getSupabaseAnonKey returns undefined when SUPABASE_ANON_KEY is unset", async () => {
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const { getSupabaseAnonKey } = await import("./env");
+      expect(getSupabaseAnonKey()).toBeUndefined();
     });
 
     it("getStripeSecretKey returns trimmed STRIPE_SECRET_KEY", async () => {
@@ -113,10 +125,22 @@ describe("env module", () => {
       expect(getSiteUrl()).toBe("https://paisaxe.es");
     });
 
+    it("getSiteUrl returns undefined when SITE_URL is unset", async () => {
+      delete process.env.NEXT_PUBLIC_SITE_URL;
+      const { getSiteUrl } = await import("./env");
+      expect(getSiteUrl()).toBeUndefined();
+    });
+
     it("getPostHogKey returns trimmed POSTHOG_KEY", async () => {
       process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_testkey";
       const { getPostHogKey } = await import("./env");
       expect(getPostHogKey()).toBe("phc_testkey");
+    });
+
+    it("getPostHogKey returns undefined when POSTHOG_KEY is unset", async () => {
+      delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+      const { getPostHogKey } = await import("./env");
+      expect(getPostHogKey()).toBeUndefined();
     });
   });
 
