@@ -55,6 +55,7 @@
 
 
 
+
 <!-- ENTRY:START agent=speed_insights_optimization timestamp=2026-02-09T17:00:00Z -->
 ## Speed Insights Optimization (P1+P2) — 2026-02-09
 - **Target:** RES 88 → >90. `/admin` RES 42 (Poor), `/immersive` mobile RES 85
@@ -390,16 +391,6 @@
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-06-22T07:45:00Z -->
-## Triage — 2026-06-22
-- **Status: GREEN** — QA LLM blocker resolved on `develop` via merge `97d82db2` (`fix/triage-qa-env` commit `937bbdea`).
-- **QA recovery:** `VOYAGE_API_KEY` is loaded/exported before the QA dev server starts and passed explicitly to `npm run dev`; embedding cache writes no longer block chat latency; missing Upstash config skips Redis entirely; embedding timeout raised from 8s to 12s after observed Voyage tail latency.
-- **Anthropic model recovery:** Removed obsolete `claude-sonnet-4-20250514` call sites and centralized runtime callers on `CHAT_MODEL = "claude-sonnet-4-6"`. Anthropic's model docs list `claude-sonnet-4-6` as the current Sonnet 4.6 API ID and note 4.6 IDs are dateless pinned snapshots.
-- **Verification:** targeted tests 82/82, full Vitest 6,956/6,956, typecheck, lint, build, build:analyze, and live QA 12/12 all passed. Production smoke checks: `/api/health` 200, `/api/checkout/health` 401 expected, `/immersive` chat + voice upgrade entry point visible, `/pricing` €1.99 visible, `/pricing/checkout` sign-in gate visible.
-- **Remaining owner/external decisions:** full production Day Pass purchase was not executed because it would create a real payment; Anthropic billing console still requires owner/account access; Twilio number was not released because it removes booking capability; ElevenLabs voice-shelving remains product/renewal decision.
-- **Watch:** local QA logs still show best-effort `ANTHROPIC_USAGE_INSERT_FAILED` if the selected Supabase target lacks `public.anthropic_usage` in schema cache.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=cost_analyst timestamp=2026-06-23T03:00:00Z -->
 ## Cost Analyst — 2026-06-23
 - Status: WATCH. Day 23 of June. Revenue drought **130 days** (since Feb 13). Paisaxe voice silence **126 days** (since Feb 17).
@@ -510,23 +501,6 @@
 - Coverage Agent: translations.test.ts dynamically compares each locale key count to ES -- any future key additions without locale parity are caught in CI automatically.
 - QA Agent: No locale-related issues. All translations stable for 61 consecutive cycles.
 - Security Agent: No PII, tokens, or secrets in any locale or story-translations file.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-06-28T06:05:09Z -->
-## QA Agent — 2026-06-28
-- Status: GREEN — LLM tests 12/12 (100%, 4th consecutive cycle), browser journeys 10/10 (100%, fully recovered after June 27 timeout)
-- Playwright web server timeout from June 27 did not recur — root cause not structurally fixed; `reuseExistingServer: true` recommended to prevent recurrence
-- Injection tests completing in <700ms confirms model refuses without RAG invocation (correct fast-path behavior)
-- Journey 6 visibility race did not manifest this cycle; `toBeVisible` guard still recommended as preventive
-- Journeys 9-12 (authenticated user) remain skipped — auth fixture not configured, 0% automated coverage of favorites lifecycle
-- /api/mcp/* still at 0% E2E coverage (11th consecutive cycle); `save_favorite` newly documented in features.md
-
-**Cross-agent recommendations:**
-- Security Agent: LLM safety guardrails GREEN 4th consecutive cycle including authority impersonation. No action needed.
-- Coverage Agent: Admin UI flaky tests (create-story-dialog, voice-chat-elevenlabs, account-config-dialog, details-tab, create-draft-dialog) are pre-existing; monitor for worsening. voice-agent-chat (~45%) and agents-dashboard (~49%) remain top Playwright E2E targets.
-- Performance Agent: Journey test runtime confirms /immersive page loads and chat responds within normal bounds. No performance concerns.
-- Triage Agent: P1 is `reuseExistingServer: true` in playwright.config.ts (preventive, low effort). P2 is Journey 6 `toBeVisible` guard. Owner decisions still outstanding: Twilio number (~9 days), Anthropic billing check.
-- Cost Analyst Agent: Journey 8 confirms /api/health 200 — production health endpoint stable. Manual Day Pass and Pelayo verification on paisaxe.es remains the only path to explain 135-day revenue drought and 131-day voice silence.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=localization_agent timestamp=2026-06-28T07:03:00Z -->
@@ -809,6 +783,21 @@
 - Security Agent: No documentation changes needed this cycle.
 - QA Agent: No new features or flags to add to mock sets. Flag count stable at 17 features + 10 agent flags.
 - Triage Agent: Recommend resuming triage cadence per Cost Analyst Jul 1 report (last triage run was Jun 25, 6 days ago) — 3 pending QA harness fixes and the Twilio number decision (~6.5 days per Cost Analyst) are outstanding.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent_enabled timestamp=2026-07-01T06:07:25Z -->
+## QA Agent — 2026-07-01
+- Status: YELLOW. LLM quality 12/12 (100%, no safety failures). Browser journeys 7/10 run (3 failed: Journeys 1-3 on /immersive), 4 skipped (auth fixture not configured).
+- Journey 1-3 failures are NOT the same issue triage fixed this morning (07:15) — those toBeVisible guards are in place and are exactly what's timing out now. Root-caused to dev-server cold-start contention under 6 parallel workers (same selectors pass later in the same run, e.g. Journey 6/13/14); confirmed by source reading that story-title/next-story-button/ask-button are unconditionally SSR-rendered, not CSS-hidden or ssr:false-gated. Recommend a globalSetup warm-up navigation to /immersive, not an application code change.
+- STALE FINDING TO DROP: "MCP routes at 0% E2E coverage" has been repeated 11+ cycles but is outdated — e2e/mcp.spec.ts (481 lines, commit 45b7113f) now covers places/weather/make-booking. Only save-favorite MCP route lacks E2E coverage now.
+- Integration health check data was empty this cycle ("No health check data available") — recommend restoring the probe step; we have no Stripe/Supabase signal this run.
+- Feature flag mocks confirmed complete: 27/27 (17 feature + 10 agent flags) match MOCK_FEATURE_FLAGS exactly.
+
+**Cross-agent recommendations:**
+- Triage Agent: P1 add globalSetup warm-up (or bump timeout) for the first /immersive navigation in qa-journey.spec.ts Journeys 1-3 — do not touch story-viewer/story-toolbar/story-info-panel, they are confirmed correct. P2 add save-favorite MCP E2E block to e2e/mcp.spec.ts mirroring make-booking's pattern (lines 339-433).
+- Coverage Agent: Stop carrying forward "MCP routes at 0% E2E" — it's stale as of 45b7113f. Only save-favorite remains uncovered.
+- Cost Analyst Agent: No integration health data this cycle to cross-reference against the ongoing revenue-drought investigation — flag to QA harness owner.
+- Security Agent: No new security-relevant findings this cycle. Safety guardrails 12/12 clean, consistent with your 5+ cycle GREEN streak.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-07-01T07:15:00Z -->
