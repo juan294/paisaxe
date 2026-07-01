@@ -98,6 +98,14 @@ describe("admin-api/costs", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await fetchCostsAnalytics();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── createManualCostEntry ───────────────────────────────────────
@@ -159,6 +167,14 @@ describe("admin-api/costs", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await createManualCostEntry(costData as never);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── updateManualCostEntry ───────────────────────────────────────
@@ -208,6 +224,14 @@ describe("admin-api/costs", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("Connection lost"));
+
+      const result = await updateManualCostEntry("c1", {} as never);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await updateManualCostEntry("c1", {} as never);
 
@@ -272,6 +296,14 @@ describe("admin-api/costs", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("Timeout"));
+
+      const result = await deleteManualCostEntry("c1");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await deleteManualCostEntry("c1");
 

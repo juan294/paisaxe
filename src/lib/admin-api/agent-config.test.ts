@@ -74,6 +74,14 @@ describe("admin-api/agent-config", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await fetchAgentConfig();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── updateAgentMaster ────────────────────────────────────────────
@@ -127,6 +135,14 @@ describe("admin-api/agent-config", () => {
       global.fetch = vi
         .fn()
         .mockRejectedValue(new Error("Connection refused"));
+
+      const result = await updateAgentMaster(true);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await updateAgentMaster(true);
 
@@ -197,6 +213,17 @@ describe("admin-api/agent-config", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("Timeout"));
+
+      const result = await updateAgentEnabled(
+        "coverage_agent_enabled",
+        true,
+      );
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await updateAgentEnabled(
         "coverage_agent_enabled",
@@ -302,6 +329,18 @@ describe("admin-api/agent-config", () => {
       global.fetch = vi
         .fn()
         .mockRejectedValue(new Error("DNS resolution failed"));
+
+      const result = await updateAgentConfigValue(
+        "coverage_agent_enabled",
+        "schedule",
+        "daily",
+      );
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await updateAgentConfigValue(
         "coverage_agent_enabled",

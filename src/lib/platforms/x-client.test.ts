@@ -270,6 +270,14 @@ describe("XClient", () => {
 
       expect(result).toBeNull();
     });
+
+    it("returns null when a non-Error value is thrown (String(error) fallback, line 226)", async () => {
+      mockSingleTweet.mockRejectedValue("string rejection");
+      const client = new XClient(validCredentials);
+      const result = await client.getEngagement("tweet-123");
+
+      expect(result).toBeNull();
+    });
   });
 
   describe("uploadMedia", () => {
@@ -284,6 +292,15 @@ describe("XClient", () => {
 
     it("returns null on error", async () => {
       mockUploadMedia.mockRejectedValue(new Error("Upload failed"));
+      const client = new XClient(validCredentials);
+      const buffer = Buffer.from("test");
+      const result = await client.uploadMedia(buffer, "image/png");
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null when a non-Error value is thrown (String(error) fallback, line 251)", async () => {
+      mockUploadMedia.mockRejectedValue("string rejection");
       const client = new XClient(validCredentials);
       const buffer = Buffer.from("test");
       const result = await client.uploadMedia(buffer, "image/png");

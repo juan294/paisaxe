@@ -63,6 +63,14 @@ describe("triggerOptimizerRun", () => {
     expect(result).toEqual({ error: "Network error" });
   });
 
+  it("returns error on network failure with a non-Error value", async () => {
+    global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+    const result = await triggerOptimizerRun();
+
+    expect(result).toEqual({ error: "Network error" });
+  });
+
   it("returns fallback error message when response has no error field", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,

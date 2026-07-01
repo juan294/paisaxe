@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { handleCanonicalDomain } from "./canonical-domain";
 import { LOCATION_CONFIG } from "@/config/location";
@@ -70,5 +70,30 @@ describe("handleCanonicalDomain", () => {
   it("returns null for an unrecognised domain (neither canonical nor alternate)", () => {
     const req = makeRequest("staging.example.com");
     expect(handleCanonicalDomain(req)).toBeNull();
+  });
+});
+
+describe("handleCanonicalDomain — no alternateDomain configured", () => {
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock("@/config/location");
+  });
+
+  it("filters out the null www-alternate entry when alternateDomain is falsy (line 24 branch)", async () => {
+    vi.doMock("@/config/location", () => ({
+      LOCATION_CONFIG: {
+        domain: "paisaxe.es",
+        alternateDomain: "",
+      },
+    }));
+    vi.resetModules();
+    const { handleCanonicalDomain: handleCanonicalDomainNoAlt } = await import(
+      "./canonical-domain"
+    );
+
+    // The alternate domain itself is falsy, so it should NOT trigger a redirect
+    // (it's filtered out of the alternateDomains list via Boolean()).
+    const req = makeRequest("random-host.example.com");
+    expect(handleCanonicalDomainNoAlt(req)).toBeNull();
   });
 });

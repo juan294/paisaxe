@@ -4,8 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import GlobalError from "./global-error";
 
 // Mock resolveLocale to return 'es' (jsdom defaults to 'en-US')
+const mockResolveLocale = vi.fn((..._args: unknown[]) => "es");
 vi.mock("@/lib/i18n/detect-language", () => ({
-  resolveLocale: vi.fn(() => "es"),
+  resolveLocale: (...args: unknown[]) => mockResolveLocale(...args),
 }));
 
 const mockCaptureException = vi.fn();
@@ -21,6 +22,7 @@ describe("GlobalError", () => {
   afterEach(() => {
     consoleSpy.mockClear();
     mockCaptureException.mockClear();
+    mockResolveLocale.mockReturnValue("es");
   });
 
   const defaultProps = {
@@ -96,5 +98,15 @@ describe("GlobalError", () => {
     rerender(<GlobalError error={error2} reset={vi.fn()} />);
     expect(mockCaptureException).toHaveBeenCalledTimes(2);
     expect(mockCaptureException).toHaveBeenLastCalledWith(error2);
+  });
+
+  it("falls back to Spanish copy when resolveLocale returns an unsupported locale", () => {
+    // errorCopy[locale] ?? errorCopy.es -- exercise the ?? fallback for a
+    // locale string that isn't a key in errorCopy (defensive guard).
+    mockResolveLocale.mockReturnValue("xx" as unknown as ReturnType<typeof mockResolveLocale>);
+    render(<GlobalError {...defaultProps} />);
+    expect(screen.getByText("Algo salió mal")).toBeInTheDocument();
+    const html = document.documentElement;
+    expect(html.getAttribute("lang")).toBe("xx");
   });
 });

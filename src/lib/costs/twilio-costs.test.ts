@@ -123,6 +123,17 @@ describe("twilio-costs", () => {
       expect(result).toBeNull();
     });
 
+    it("returns null when fetch throws a non-Error value (String(error) fallback)", async () => {
+      process.env.TWILIO_ACCOUNT_SID = "AC123";
+      process.env.TWILIO_AUTH_TOKEN = "token123";
+
+      global.fetch = vi.fn().mockRejectedValue("string rejection");
+
+      const result = await fetchTwilioCosts("2024-01-01", "2024-01-31");
+
+      expect(result).toBeNull();
+    });
+
     it("uses correct Basic auth header", async () => {
       process.env.TWILIO_ACCOUNT_SID = "AC123";
       process.env.TWILIO_AUTH_TOKEN = "token123";
