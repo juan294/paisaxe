@@ -165,6 +165,19 @@ describe("booking-service", () => {
         const result = await getPriorBookingByIdempotencyKey("key-2");
         expect(result).toBeNull();
       });
+
+      it("returns null when no row is found (no error, nullish data — line 213 ?? null fallback)", async () => {
+        // maybeSingle() resolves with data: null and no error when there's simply
+        // no matching row — distinct from the error path above.
+        mockDbSelect.mockReturnValueOnce({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        });
+
+        const result = await getPriorBookingByIdempotencyKey("key-3");
+        expect(result).toBeNull();
+      });
     });
 
     describe("claimPendingBooking", () => {
@@ -269,6 +282,17 @@ describe("booking-service", () => {
 
         const result = await claimPendingBooking(baseInput);
         expect(result).toEqual({ kind: "persistence_failed" });
+      });
+
+      it("defaults special_requests to null when omitted (line 243 ?? null fallback)", async () => {
+        const { specialRequests: _omit, ...inputWithoutSpecialRequests } = baseInput;
+        void _omit;
+
+        await claimPendingBooking(inputWithoutSpecialRequests);
+
+        expect(mockInsert).toHaveBeenCalledWith(
+          expect.objectContaining({ special_requests: null })
+        );
       });
     });
 

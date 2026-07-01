@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getOrCreateRequestId } from "./request-id";
+import { getOrCreateRequestId, getRequestIdHeaderName } from "./request-id";
+
+describe("getRequestIdHeaderName", () => {
+  it("returns the x-request-id header name", () => {
+    expect(getRequestIdHeaderName()).toBe("x-request-id");
+  });
+});
 
 describe("getOrCreateRequestId", () => {
   it("uses a well-formed upstream request ID", () => {

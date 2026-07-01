@@ -345,6 +345,28 @@ describe("CheckoutPage", () => {
         expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
       });
     });
+
+    it("falls back to the errors.unknown translation when a non-Error value is thrown (line 69)", async () => {
+      // err instanceof Error ? err.message : t("errors.unknown") -- exercise the
+      // else branch by rejecting with a plain string instead of an Error instance.
+      mockFetch.mockRejectedValue("network down");
+
+      render(<CheckoutPage />);
+
+      let caught: unknown;
+      await act(async () => {
+        try {
+          await capturedFetchClientSecret!();
+        } catch (err) {
+          caught = err;
+        }
+      });
+
+      expect(caught).toBe("network down");
+      await waitFor(() => {
+        expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
+      });
+    });
   });
 
   describe("error state and retry", () => {

@@ -61,6 +61,14 @@ describe("admin-api/feature-flags", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await fetchFeatureFlags();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── updateFeatureFlag ───────────────────────────────────────────
@@ -121,6 +129,14 @@ describe("admin-api/feature-flags", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("Timeout"));
+
+      const result = await updateFeatureFlag("visitor_voice_agent", true);
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await updateFeatureFlag("visitor_voice_agent", true);
 

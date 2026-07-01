@@ -86,6 +86,14 @@ describe("admin-api/suggestions", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
+
+      const result = await fetchSuggestions();
+
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 
   // ─── updateSuggestion ───────────────────────────────────────────
@@ -135,6 +143,14 @@ describe("admin-api/suggestions", () => {
 
     it("returns network error when fetch throws", async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error("Timeout"));
+
+      const result = await updateSuggestion("sug-1", {});
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("returns network error when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("plain string failure");
 
       const result = await updateSuggestion("sug-1", {});
 

@@ -138,6 +138,25 @@ describe("StoryPage", () => {
       expect(twitter?.card).toBe("summary_large_image");
       expect(twitter?.title).toBe("Test Story");
     });
+
+    it("falls back to undefined description when story.description is null (line 31)", async () => {
+      // const description = story.description ?? undefined; -- exercise the ??
+      // fallback for a story whose description column is null.
+      mockGetStoryMetadataBySlug.mockResolvedValue({
+        slug: "no-description-story",
+        title: "No Description Story",
+        description: null,
+      });
+
+      const metadata = await generateMetadata({
+        params: Promise.resolve({ slug: "no-description-story" }),
+      });
+
+      expect(metadata.description).toBeUndefined();
+      expect(metadata.openGraph?.description).toBeUndefined();
+      const twitter = metadata.twitter as { description?: string };
+      expect(twitter?.description).toBeUndefined();
+    });
   });
 
   describe("StoryPage component", () => {

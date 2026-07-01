@@ -1026,6 +1026,70 @@ describe("claude", () => {
       expect(chunks).toEqual([]);
     });
 
+    // #138: message_start/message_delta usage capture (lines 241-248) feeds
+    // trackUsage() once the stream drains cleanly.
+    it("captures usage from message_start and message_delta events and records it on close", async () => {
+      const { recordAnthropicUsage } = await import("@/lib/costs/anthropic-usage");
+      vi.mocked(recordAnthropicUsage).mockClear();
+
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        proc.stdout.emit(
+          "data",
+          sseData({
+            type: "message_start",
+            message: {
+              usage: {
+                input_tokens: 120,
+                cache_creation_input_tokens: 5,
+                cache_read_input_tokens: 0,
+              },
+            },
+          })
+        );
+        proc.stdout.emit("data", sseDelta("hi"));
+        proc.stdout.emit(
+          "data",
+          sseData({ type: "message_delta", usage: { output_tokens: 42 } })
+        );
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["hi"]);
+
+      expect(recordAnthropicUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usage: expect.objectContaining({
+            input_tokens: 120,
+            cache_creation_input_tokens: 5,
+            cache_read_input_tokens: 0,
+            output_tokens: 42,
+          }),
+          source: "chat_stream",
+        })
+      );
+    });
+
+    it("ignores a message_start event with no usage field on the message (line 241 branch)", async () => {
+      const proc = setupMockSpawn();
+      setTimeout(() => {
+        // message present but no `usage` key — the `event.message?.usage` guard is falsy.
+        proc.stdout.emit("data", sseData({ type: "message_start", message: {} }));
+        proc.stdout.emit("data", sseDelta("hi"));
+        proc.emit("close");
+      }, 10);
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChatResponse("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["hi"]);
+    });
+
     it("should include stream:true in the request body", async () => {
       const proc = setupMockSpawn();
       setTimeout(() => proc.emit("close"), 10);
@@ -1480,6 +1544,57 @@ describe("claude SDK path (NODE_ENV=production)", () => {
         chunks.push(chunk);
       }
       expect(chunks).toEqual([]);
+    });
+
+    // #138: on the SDK path, usage is read from stream.finalMessage() after the
+    // stream drains (line 112-113), not from individual SSE events.
+    it("records usage from stream.finalMessage() once the SDK stream completes", async () => {
+      const { recordAnthropicUsage } = await import("@/lib/costs/anthropic-usage");
+      vi.mocked(recordAnthropicUsage).mockClear();
+
+      const finalMessage = vi.fn().mockResolvedValue({
+        usage: { input_tokens: 10, output_tokens: 20 },
+      });
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          yield { type: "content_block_delta", delta: { type: "text_delta", text: "hi" } };
+        },
+        finalMessage,
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["hi"]);
+      expect(finalMessage).toHaveBeenCalledOnce();
+      expect(recordAnthropicUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usage: { input_tokens: 10, output_tokens: 20 },
+          source: "chat_stream",
+        })
+      );
+    });
+
+    it("swallows errors from stream.finalMessage() without affecting the yielded text", async () => {
+      const finalMessage = vi.fn().mockRejectedValue(new Error("stream errored after text drained"));
+      mockStream.mockReturnValue({
+        async *[Symbol.asyncIterator]() {
+          yield { type: "content_block_delta", delta: { type: "text_delta", text: "hi" } };
+        },
+        finalMessage,
+      });
+
+      const { streamChatResponse: streamChat } = await import("./claude");
+
+      const chunks: string[] = [];
+      for await (const chunk of streamChat("Test", [])) {
+        chunks.push(chunk);
+      }
+      expect(chunks).toEqual(["hi"]);
+      expect(finalMessage).toHaveBeenCalledOnce();
     });
   });
 

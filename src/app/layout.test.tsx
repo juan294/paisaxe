@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import fs from "fs";
 import path from "path";
@@ -166,6 +166,26 @@ describe("RootLayout", () => {
 
     it("should keep Unsplash preconnect links", () => {
       expect(layoutSource).toContain("images.unsplash.com");
+    });
+  });
+
+  describe("SITE_URL fallback", () => {
+    afterEach(() => {
+      vi.doUnmock("@/lib/env");
+      vi.resetModules();
+    });
+
+    it("falls back to LOCATION_CONFIG.domain when getSiteUrl() returns undefined", async () => {
+      // SITE_URL = getSiteUrl() ?? `https://${LOCATION_CONFIG.domain}` -- exercise
+      // the ?? fallback for when NEXT_PUBLIC_SITE_URL is unset (getSiteUrl()
+      // returns undefined per src/lib/env.ts).
+      vi.doMock("@/lib/env", () => ({
+        getSiteUrl: () => undefined,
+        getSupabaseUrl: () => undefined,
+      }));
+      vi.resetModules();
+      const { metadata: freshMetadata } = await import("./layout");
+      expect(freshMetadata.metadataBase!.toString()).toBe("https://paisaxe.es/");
     });
   });
 

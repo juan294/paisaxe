@@ -66,4 +66,19 @@ describe("robots", () => {
       expect(result.sitemap).toBe(`${CUSTOM_URL}/sitemap.xml`);
     });
   });
+
+  describe("falls back to LOCATION_CONFIG.domain when NEXT_PUBLIC_SITE_URL is unset", () => {
+    beforeEach(() => {
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("uses the default domain fallback for sitemap URL", () => {
+      const result = robots();
+      expect(result.sitemap).toBe("https://paisaxe.es/sitemap.xml");
+    });
+  });
 });
