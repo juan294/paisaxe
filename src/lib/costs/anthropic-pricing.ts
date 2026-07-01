@@ -34,10 +34,11 @@ function pricing(inputPerM: number, outputPerM: number): ModelPricing {
 /**
  * Per-model pricing table. Keys are matched as prefixes against the model id
  * returned by the API (which may carry a dated or dateless suffix, e.g.
- * "claude-sonnet-4-6"), so list more specific keys first.
+ * "claude-sonnet-5"), so list more specific keys first.
  */
 const MODEL_PRICING: Array<{ prefix: string; pricing: ModelPricing }> = [
   { prefix: "claude-opus-4", pricing: pricing(5, 25) },
+  { prefix: "claude-sonnet-5", pricing: pricing(3, 15) },
   { prefix: "claude-sonnet-4", pricing: pricing(3, 15) },
   { prefix: "claude-haiku-4", pricing: pricing(1, 5) },
   { prefix: "claude-3-5-haiku", pricing: pricing(0.8, 4) },

@@ -13,6 +13,6 @@ describe("CHAT_MODEL", () => {
   });
 
   it("is the expected model ID", () => {
-    expect(CHAT_MODEL).toBe("claude-sonnet-4-6");
+    expect(CHAT_MODEL).toBe("claude-sonnet-5");
   });
 });
