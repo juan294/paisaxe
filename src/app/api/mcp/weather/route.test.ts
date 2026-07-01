@@ -572,6 +572,15 @@ describe("/api/mcp/weather", () => {
     });
   });
 
+  // NOTE on route.ts lines 156 and 221 (`firstIssue?.message ?? "Invalid query parameters"`):
+  // This `??` fallback is unreachable given the current schemas (weatherQuerySchema /
+  // weatherPostRequestSchema, see src/lib/schemas.ts). `safeParse` failing guarantees
+  // `error.issues.length >= 1`, and every issue this schema can produce (min(1), max(200),
+  // or a base type mismatch) carries a Zod-generated message, so `firstIssue` is never
+  // `undefined` when `!success`. The `?? "..."` exists purely to satisfy
+  // `ZodIssue[number] | undefined` typing from array indexing, not a reachable runtime
+  // path. No test is added for it to avoid faking an artificial issues[] shape that Zod
+  // itself would never produce.
   describe("GET - Zod query parameter validation", () => {
     it("should return 400 with 'City parameter is required' for empty city string", async () => {
       const request = new Request(
