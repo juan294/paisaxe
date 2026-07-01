@@ -33,6 +33,22 @@ describe("DO-M1: getSupabaseClient trims env vars (no bare process.env reads)", 
     vi.clearAllMocks();
   });
 
+  it("uses empty string fallback when NEXT_PUBLIC_SUPABASE_URL is not set (line 14: ?? '' branch)", async () => {
+    const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const savedKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    await getSupabaseClient();
+
+    const [url, anonKey] = mockCreateServerClient.mock.calls[0];
+    expect(url).toBe("");
+    expect(anonKey).toBe("");
+
+    process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = savedKey;
+  });
+
   it("strips trailing newline from NEXT_PUBLIC_SUPABASE_URL before passing to createServerClient", async () => {
     // Save and inject a value with a trailing newline (typical Vercel CLI artifact)
     const saved = process.env.NEXT_PUBLIC_SUPABASE_URL;

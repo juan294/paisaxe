@@ -805,6 +805,29 @@ describe("GET /api/admin/agents/run", () => {
     expect(data.running).toHaveProperty("performance_agent_enabled");
     expect(data.running.performance_agent_enabled.startedAt).toBeDefined();
   });
+
+  it("skips recently-finished agents in the running status list", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    const mockChild = createMockChild(10099);
+    mockSpawn.mockReturnValue(mockChild);
+
+    // Start an agent
+    await POST(makeRequest({ agentKey: "coverage_agent_enabled" }));
+
+    // Emit exit to mark the agent finished (stays in map within the 1-hour TTL)
+    (mockChild as EventEmitter).emit("exit", 0);
+
+    // GET without agentKey lists all running agents
+    const response = await GET(makeGetRequest());
+    const data = await response.json();
+
+    // Finished agent should be skipped (line 284: `if (agent.finished) continue;`)
+    expect(data.running).not.toHaveProperty("coverage_agent_enabled");
+  });
 });
 
 describe("DELETE /api/admin/agents/run", () => {

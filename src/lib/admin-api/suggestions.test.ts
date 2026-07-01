@@ -192,5 +192,27 @@ describe("admin-api/suggestions", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("logs String(error) when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("non-error string");
+
+      const result = await deleteSuggestion("sug-1");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+  });
+
+  describe("non-Error throw coverage for instanceof ternary", () => {
+    it("fetchSuggestions logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(42);
+      const result = await fetchSuggestions();
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("updateSuggestion logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue({ code: "ETIMEDOUT" });
+      const result = await updateSuggestion("sug-1", { status: "approved" as never });
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 });

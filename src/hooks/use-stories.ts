@@ -261,13 +261,7 @@ function useStoriesState(
     function handleFocus() {
       const isStale = Date.now() - cache.timestamp > CACHE_TTL;
       if (isStale && cache.data) {
-        fetchStories()
-          .then(setStories)
-          .catch((err: unknown) =>
-            clientLogger.error("[STORIES_FOCUS_REVALIDATE_FAILURE]", {
-              error: err instanceof Error ? err.message : String(err),
-            }),
-          );
+        fetchStories().then(setStories);
       }
     }
 

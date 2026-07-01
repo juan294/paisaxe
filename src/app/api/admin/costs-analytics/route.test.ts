@@ -655,6 +655,77 @@ describe("GET /api/admin/costs-analytics", () => {
     vi.unstubAllEnvs();
   });
 
+  it("should skip falsy agent IDs when building the config fallback set", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({
+      valid: true,
+      userId: "user-1",
+    });
+
+    vi.mocked(fetchAnthropicCosts).mockResolvedValue(null);
+    vi.mocked(fetchTwilioCosts).mockResolvedValue(null);
+    vi.mocked(fetchElevenLabsCosts).mockResolvedValue(null);
+    vi.mocked(fetchManualCosts).mockResolvedValue([]);
+    vi.mocked(generateRecurringCosts).mockReturnValue([]);
+    vi.mocked(fetchAnthropicCostsByDay).mockResolvedValue([]);
+
+    vi.stubEnv("POSTHOG_PROJECT_ID", "");
+    vi.stubEnv("POSTHOG_PERSONAL_API_KEY", "");
+    vi.stubEnv("ELEVENLABS_API_KEY", "xi-test");
+
+    // Simulate a config with a falsy agent ID entry (e.g. unset for a new
+    // replication) to exercise the `if (id)` guard's false branch when
+    // building the fallback ID set from ELEVENLABS_AGENT_IDS.
+    vi.doMock("@/config/elevenlabs-agents", () => ({
+      ELEVENLABS_API_BASE: "https://api.elevenlabs.io/v1",
+      ELEVENLABS_AGENT_IDS: {
+        pelayo: "agent_1201kgqhsdzxfkk9x7m1bjaew9mv",
+        xander: "",
+      },
+    }));
+    vi.resetModules();
+    const { GET: GetWithMockedConfig } = await import("./route");
+
+    // Agents API returns non-ok — so paisaxeAgentIds stays empty, triggers
+    // the config fallback loop that includes the falsy `xander` entry.
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/convai/agents")) {
+        return Promise.resolve({ ok: false, status: 500 });
+      }
+      if (url.includes("/convai/conversations")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            conversations: [
+              {
+                agent_id: "agent_1201kgqhsdzxfkk9x7m1bjaew9mv",
+                start_time_unix_secs: Math.floor(new Date("2026-02-03").getTime() / 1000),
+                call_duration_secs: 120,
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    }) as unknown as typeof fetch;
+
+    const request = new NextRequest(
+      "http://localhost/api/admin/costs-analytics?includeUsage=true&from=2026-02-01&to=2026-02-06"
+    );
+    const response = await GetWithMockedConfig(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.usageMetrics).toBeDefined();
+    // pelayo (truthy) is added to the fallback set and matches the conversation
+    expect(data.data.usageMetrics.voiceConversations).toBe(1);
+
+    global.fetch = originalFetch;
+    vi.unstubAllEnvs();
+    vi.doUnmock("@/config/elevenlabs-agents");
+    vi.resetModules();
+  });
+
   it("should return undefined usageMetrics when outer catch is triggered in fetchUsageMetrics", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({
       valid: true,

@@ -92,6 +92,23 @@ describe("GET /api/cron/fail-stale-bookings", () => {
     const response = await GET(request);
     expect(response.status).toBe(500);
   });
+
+  it("falls back to failed_count=0 when RPC data is not a number (line 42 else branch)", async () => {
+    vi.mocked(verifyVercelCron).mockReturnValue(true);
+    // RPC succeeded (no error) but returned a non-numeric payload — exercises the
+    // `typeof data === "number" ? data : 0` else branch.
+    mockRpc.mockResolvedValue({ data: null, error: null });
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-bookings", {
+      method: "GET",
+    });
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.failed_count).toBe(0);
+  });
 });
 
 describe("POST /api/cron/fail-stale-bookings", () => {

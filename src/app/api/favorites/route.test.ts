@@ -259,6 +259,29 @@ describe("Favorites API", () => {
       expect(json.success).toBe(true);
     });
 
+    it("should return 400 when body is not valid JSON", async () => {
+      mockCreateServerClient.mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: "user-123" } },
+            error: null,
+          }),
+        },
+        from: vi.fn(),
+      } as never);
+
+      const request = new NextRequest("http://localhost:3006/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "not-valid-json",
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(400);
+      const json = await response.json();
+      expect(json.error).toBe("Invalid JSON body");
+    });
+
     it("should return 500 on database error", async () => {
       mockCreateServerClient.mockReturnValue({
         auth: {

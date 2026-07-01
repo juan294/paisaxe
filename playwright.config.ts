@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const isCI = !!process.env.CI;
 const useDevServer = process.env.PLAYWRIGHT_USE_DEV_SERVER === "true";
-const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === "true";
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER !== "false";
 const e2ePort = process.env.PLAYWRIGHT_PORT ?? "3100";
 const baseURL = `http://localhost:${e2ePort}`;
 const chromeChannel = process.env.PLAYWRIGHT_CHROME_CHANNEL;

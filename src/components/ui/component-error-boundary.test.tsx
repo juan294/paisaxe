@@ -20,6 +20,13 @@ function ThrowingChild({ shouldThrow }: { shouldThrow: boolean }) {
   return <div>Child content</div>;
 }
 
+// Component that throws a non-Error value (e.g. a plain string), which React
+// error boundaries still catch via componentDidCatch(error, errorInfo).
+function ThrowingNonErrorChild(): never {
+   
+  throw "raw string failure";
+}
+
 function renderWithI18n(ui: React.ReactElement) {
   return render(
     <LanguageProvider initialLocale="en">{ui}</LanguageProvider>
@@ -132,5 +139,16 @@ describe("ComponentErrorBoundary", () => {
     // Without a provider, t falls back to identity function — renders raw translation keys
     expect(screen.getByText("errors.generic_title")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "errors.retry" })).toBeInTheDocument();
+  });
+
+  it("handles non-Error throws via String(error) fallback", () => {
+    renderWithI18n(
+      <ComponentErrorBoundary>
+        <ThrowingNonErrorChild />
+      </ComponentErrorBoundary>
+    );
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(console.error).toHaveBeenCalled();
   });
 });

@@ -511,6 +511,157 @@ describe("StoriesTabPanel", () => {
         expect(screen.getByText("Failed to load")).toBeInTheDocument();
       });
     });
+
+    it("loadStories tolerates a response with neither error nor data (line 108 else-if false path)", async () => {
+      // Defensive branch: `if (result.error) {...} else if (result.data) {...}`
+      // with no trailing `else`. An ambiguous response (neither field set)
+      // should just leave stories/total at their initial values without throwing.
+      mockFetchStories.mockResolvedValue({});
+
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByText("No stories found")).toBeInTheDocument();
+      });
+    });
+
+    it("bulk mark approved tolerates a response with neither error nor data (line 198 else-if false path)", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [makeStory({ id: "s1", curationStatus: "approved" })],
+          total: 1,
+        },
+      });
+      mockBulkUpdateStoryStatus.mockResolvedValue({});
+
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("story-toggle-s1")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("story-toggle-s1"));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-approve"));
+      });
+
+      // Neither branch body runs — selection is NOT cleared, no error shown,
+      // and the story is left unchanged (still selected/visible).
+      await waitFor(() => {
+        expect(screen.getByTestId("selection-toolbar")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("story-edit-s1")).toBeInTheDocument();
+    });
+
+    it("bulk mark pending tolerates a response with neither error nor data (line 221 else-if false path)", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [makeStory({ id: "s1", curationStatus: "approved" })],
+          total: 1,
+        },
+      });
+      mockBulkUpdateStoryStatus.mockResolvedValue({});
+
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("story-toggle-s1")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("story-toggle-s1"));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-pending"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("selection-toolbar")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("story-edit-s1")).toBeInTheDocument();
+    });
+
+    it("Approve All tolerates a response with neither error nor data (line 248 else-if false path)", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [makeStory({ id: "p", curationStatus: "needs_curation" })],
+          total: 1,
+        },
+      });
+      mockApproveAllPendingStories.mockResolvedValue({});
+
+      render(<StoriesTabPanel />);
+
+      const approveAllBtn = await screen.findByText(/Approve All \(1\)/);
+      await act(async () => {
+        fireEvent.click(approveAllBtn);
+      });
+
+      const dialog = await screen.findByRole("dialog");
+      const confirmBtn = within(dialog).getByRole("button", { name: /Approve All/i });
+      await act(async () => {
+        fireEvent.click(confirmBtn);
+      });
+
+      // Dialog still closes (setIsApproveAllConfirmOpen(false) runs
+      // unconditionally), but no error is shown and stories are unchanged.
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+      expect(screen.queryByText(/^fail$/)).not.toBeInTheDocument();
+    });
+
+    it("bulk delete tolerates a response with neither error nor data (line 278 else-if false path)", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [makeStory({ id: "s1", curationStatus: "approved" })],
+          total: 1,
+        },
+      });
+      mockBulkDeleteStories.mockResolvedValue({});
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("story-toggle-s1")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("story-toggle-s1"));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-delete"));
+      });
+
+      // Neither branch body runs — selection stays, story stays in the grid.
+      await waitFor(() => {
+        expect(mockBulkDeleteStories).toHaveBeenCalledWith(["s1"]);
+      });
+      expect(screen.getByTestId("story-edit-s1")).toBeInTheDocument();
+      expect(screen.getByTestId("selection-toolbar")).toBeInTheDocument();
+      confirmSpy.mockRestore();
+    });
   });
 
   describe("Filter switching", () => {
@@ -604,6 +755,52 @@ describe("StoriesTabPanel", () => {
         // partial translations metadata is also kept (missing locales).
         const grid = screen.getByTestId("story-grid");
         expect(grid).toBeInTheDocument();
+      });
+    });
+
+    it("Missing i18n filter excludes a story whose translations are fully complete (line 140 true path)", async () => {
+      const completeTranslation = { title: "T", subtitle: "S", description: "D" };
+      const completeStatus = { status: "complete" as const };
+      const fullyTranslated = makeStory({
+        id: "complete",
+        curationStatus: "approved",
+        metadata: {
+          translations: {
+            en: completeTranslation,
+            fr: completeTranslation,
+            de: completeTranslation,
+            pt: completeTranslation,
+            ast: completeTranslation,
+          },
+          translation_status: {
+            en: completeStatus,
+            fr: completeStatus,
+            de: completeStatus,
+            pt: completeStatus,
+            ast: completeStatus,
+          },
+        },
+      } as Partial<AdminStory>);
+
+      mockFetchStories.mockResolvedValue({
+        data: { stories: [...mixed, fullyTranslated], total: mixed.length + 1 },
+      });
+
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-missing i18n"));
+      });
+
+      await waitFor(() => {
+        // The 3 `mixed` stories are all missing translations and are kept;
+        // the fully-translated story is excluded via the `!hasMissingTranslations`
+        // early-return, so the grid shows only 3 (not 4).
+        expect(screen.getByTestId("story-grid")).toHaveTextContent("3 stories");
       });
     });
 
@@ -842,6 +1039,119 @@ describe("StoriesTabPanel", () => {
         expect(screen.queryByTestId("selection-toolbar")).not.toBeInTheDocument();
       });
     });
+
+    it("bulk mark approved only updates the selected story, leaving others unchanged (line 201 false path)", async () => {
+      mockBulkUpdateStoryStatus.mockResolvedValue({
+        data: { updatedIds: ["s1"], status: "approved" },
+      });
+
+      await renderAndSelect(["s1"]);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-approve"));
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("selection-toolbar")).not.toBeInTheDocument();
+      });
+
+      // s2 was never selected, so it must still render (map's ternary false
+      // path — story object passed through unchanged).
+      expect(screen.getByTestId("story-edit-s2")).toBeInTheDocument();
+    });
+
+    it("bulk mark pending only updates the selected story, leaving others unchanged (line 224-226 false path)", async () => {
+      mockBulkUpdateStoryStatus.mockResolvedValue({
+        data: { updatedIds: ["s1"], status: "needs_curation" },
+      });
+
+      await renderAndSelect(["s1"]);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("bulk-pending"));
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("selection-toolbar")).not.toBeInTheDocument();
+      });
+
+      // s2 was never selected, so the ternary's false branch (return story
+      // unchanged) must have executed for it.
+      expect(screen.getByTestId("story-edit-s2")).toBeInTheDocument();
+    });
+
+    it("bulk mark approved is a no-op when nothing is selected (line 191)", async () => {
+      render(<StoriesTabPanel />);
+
+      // Default filter is "needs_curation"; these fixture stories are all
+      // "approved", so switch to "Total" to ensure the grid (and toolbarProps)
+      // are wired up, matching the pattern used by renderAndSelect().
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      // No selection made — call the handler directly via toolbar props,
+      // since the toolbar itself is hidden when selectedCount is 0.
+      await act(async () => {
+        toolbarProps.onMarkApproved!();
+      });
+
+      expect(mockBulkUpdateStoryStatus).not.toHaveBeenCalled();
+    });
+
+    it("bulk mark pending is a no-op when nothing is selected (line 211)", async () => {
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        toolbarProps.onMarkPending!();
+      });
+
+      expect(mockBulkUpdateStoryStatus).not.toHaveBeenCalled();
+    });
+
+    it("bulk delete is a no-op when nothing is selected (line 263)", async () => {
+      const confirmSpy = vi.spyOn(window, "confirm");
+
+      render(<StoriesTabPanel />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("stat-card-total")).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-total"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        toolbarProps.onDelete!();
+      });
+
+      // Early return happens before window.confirm is ever invoked.
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(mockBulkDeleteStories).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
   });
 
   describe("Approve all", () => {
@@ -948,6 +1258,77 @@ describe("StoriesTabPanel", () => {
 
       await waitFor(() => {
         expect(screen.getByText("fail")).toBeInTheDocument();
+      });
+    });
+
+    it("Approve All only flips needs_curation stories, leaving already-approved ones untouched (lines 249-253)", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [
+            makeStory({ id: "p1", curationStatus: "needs_curation" }),
+            makeStory({ id: "p2", curationStatus: "needs_curation" }),
+            makeStory({ id: "already", curationStatus: "approved" }),
+          ],
+          total: 3,
+        },
+      });
+      mockApproveAllPendingStories.mockResolvedValue({
+        data: { approvedCount: 2, approvedIds: ["p1", "p2"] },
+      });
+
+      render(<StoriesTabPanel />);
+
+      // Default filter is needs_curation; switch to "all" so we can observe
+      // both the flipped and untouched stories in the grid afterward.
+      const approveAllBtn = await screen.findByText(/Approve All \(2\)/);
+      await act(async () => {
+        fireEvent.click(approveAllBtn);
+      });
+
+      const dialog = await screen.findByRole("dialog");
+      const confirmBtn = within(dialog).getByRole("button", { name: /Approve All/i });
+      await act(async () => {
+        fireEvent.click(confirmBtn);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
+
+      // Switch to "Approved" filter — now all 3 stories should be approved:
+      // the 2 flipped ones (ternary true path) plus the 1 already-approved
+      // one that passed through the map untouched (ternary false path).
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("stat-card-approved"));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("story-grid")).toHaveTextContent("3 stories");
+      });
+    });
+
+    it("pluralizes the confirm dialog copy when more than one story is pending (line 468)", async () => {
+      mockFetchStories.mockResolvedValue({
+        data: {
+          stories: [
+            makeStory({ id: "p1", curationStatus: "needs_curation" }),
+            makeStory({ id: "p2", curationStatus: "needs_curation" }),
+          ],
+          total: 2,
+        },
+      });
+
+      render(<StoriesTabPanel />);
+
+      const approveAllBtn = await screen.findByText(/Approve All \(2\)/);
+      await act(async () => {
+        fireEvent.click(approveAllBtn);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/This will approve 2 pending stories\./)
+        ).toBeInTheDocument();
       });
     });
   });

@@ -277,5 +277,40 @@ describe("admin-api/costs", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("logs String(error) when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("non-error string");
+
+      const result = await deleteManualCostEntry("c1");
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+  });
+
+  describe("non-Error throw coverage for instanceof ternary", () => {
+    it("fetchCostsAnalytics logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(42);
+      const result = await fetchCostsAnalytics();
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("createManualCostEntry logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue({ code: "ETIMEDOUT" });
+      const result = await createManualCostEntry({
+        serviceId: "elevenlabs",
+        serviceName: "ElevenLabs",
+        category: "ai",
+        costUsd: 22,
+        billingPeriodStart: "2026-06-01",
+        billingPeriodEnd: "2026-06-30",
+      });
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("updateManualCostEntry logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(null);
+      const result = await updateManualCostEntry("c1", { costUsd: 10 });
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 });

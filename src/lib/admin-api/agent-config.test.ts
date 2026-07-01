@@ -311,5 +311,37 @@ describe("admin-api/agent-config", () => {
 
       expect(result).toEqual({ error: "Network error" });
     });
+
+    it("logs String(error) when fetch throws a non-Error value", async () => {
+      global.fetch = vi.fn().mockRejectedValue("non-error string");
+
+      const result = await updateAgentConfigValue(
+        "coverage_agent_enabled",
+        "schedule",
+        "daily",
+      );
+
+      expect(result).toEqual({ error: "Network error" });
+    });
+  });
+
+  describe("non-Error throw coverage for instanceof ternary", () => {
+    it("fetchAgentConfig logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(42);
+      const result = await fetchAgentConfig();
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("updateAgentMaster logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue({ code: "ETIMEDOUT" });
+      const result = await updateAgentMaster(true);
+      expect(result).toEqual({ error: "Network error" });
+    });
+
+    it("updateAgentEnabled logs String(error) when non-Error thrown", async () => {
+      global.fetch = vi.fn().mockRejectedValue(null);
+      const result = await updateAgentEnabled("key", true);
+      expect(result).toEqual({ error: "Network error" });
+    });
   });
 });

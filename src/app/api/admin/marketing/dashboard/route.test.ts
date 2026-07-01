@@ -207,6 +207,41 @@ describe("GET /api/admin/marketing/dashboard", () => {
     expect(data.data.stats.byPlatform.pinterest.posts).toBe(0);
   });
 
+  it("fills in per-platform field defaults when a present platform is missing individual stats", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    // byPlatform.x is present (truthy) but omits posts/scheduled/engagement,
+    // exercising the `p.posts ?? 0`, `p.scheduled ?? 0`, `p.engagement ?? {}`
+    // fallback branches inside normalizeMarketingStats.
+    vi.mocked(createAdminClient).mockReturnValue(
+      buildClient({
+        stats: {
+          data: {
+            totalPosts: 1,
+            postsThisWeek: 0,
+            postsThisMonth: 1,
+            failedPosts: 0,
+            totalEngagement: {},
+            byPlatform: {
+              x: { lastPostedAt: "2025-01-15T14:00:00.000Z" },
+            },
+          },
+          error: null,
+        },
+      }) as never
+    );
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.stats.byPlatform.x).toEqual({
+      posts: 0,
+      scheduled: 0,
+      engagement: {},
+      lastPostedAt: "2025-01-15T14:00:00.000Z",
+    });
+  });
+
   it("returns empty stats when the RPC returns no data", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
     vi.mocked(createAdminClient).mockReturnValue(
@@ -407,6 +442,25 @@ describe("GET /api/admin/marketing/dashboard", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("Internal server error");
+  });
+
+  it("should return 500 and stringify non-Error throw values in the catch block", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    // Throwing a non-Error value exercises the `String(error)` branch of
+    // `error instanceof Error ? error.message : String(error)`.
+    vi.mocked(createAdminClient).mockImplementation(() => {
+      throw "raw string failure";
+    });
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
+    expect(logger.error).toHaveBeenCalledWith(
+      "Marketing dashboard API error:",
+      { error: "raw string failure" }
+    );
   });
 
   it("should use logger.error (not console.error) on unhandled GET error", async () => {

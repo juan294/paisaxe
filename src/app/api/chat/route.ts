@@ -13,7 +13,6 @@ import {
   detectInjectionAttempt,
   sanitizeInput,
   assessTopicRelevance,
-  MAX_INPUT_LENGTH,
 } from "@/lib/chat-safety";
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
@@ -87,23 +86,6 @@ async function handlePost(request: NextRequest) {
     const { message, context, messageIndex } = zodResult.data;
 
     // === SECURITY PRE-PROCESSING ===
-
-    // Check message length (additional check beyond validation)
-    if (message && message.length > MAX_INPUT_LENGTH) {
-      return NextResponse.json(
-        {
-          message:
-            "Your message is quite long. Could you please summarize your question about Asturias?",
-          flagged: true,
-          flagReason: "length_exceeded",
-        } satisfies SecureChatResponse,
-        {
-          headers: {
-            "X-RateLimit-Remaining": String(rateLimit.remaining),
-          },
-        }
-      );
-    }
 
     // Detect injection attempts
     if (message && detectInjectionAttempt(message)) {

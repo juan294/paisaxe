@@ -43,6 +43,23 @@ describe("PATCH /api/admin/stories/[id]", () => {
     expect(response.status).toBe(401);
   });
 
+  it("should return 400 when body is not valid JSON", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "not-valid-json",
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }),
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Invalid JSON body");
+  });
+
   it("should return 400 when category is invalid", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
 

@@ -534,6 +534,40 @@ describe("useStories", () => {
     });
   });
 
+  it("should log an error when focus revalidation fetch fails (line 267)", async () => {
+    // Arrange: populate cache with valid data
+    const { result } = renderHook(() => useStories(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.stories).toEqual(mockStories);
+
+    // Make the cache stale
+    const realDateNow = Date.now;
+    const futureTime = realDateNow() + 6 * 60 * 1000;
+    vi.spyOn(Date, "now").mockReturnValue(futureTime);
+
+    // Make the next fetch fail so the .catch in handleFocus fires (line 266-270)
+    const fetchError = new Error("Focus revalidation failed");
+    mockGetStoriesFromDB.mockRejectedValueOnce(fetchError);
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Act: dispatch focus event — triggers handleFocus, which calls fetchStories().catch(...)
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      // Allow the async .catch callback to settle
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    vi.spyOn(Date, "now").mockRestore();
+    errorSpy.mockRestore();
+
+    // Stories remain unchanged (catch silently logs, does not update state)
+    expect(result.current.stories).toEqual(mockStories);
+  });
+
 });
 
 describe("useStories with initialStories", () => {

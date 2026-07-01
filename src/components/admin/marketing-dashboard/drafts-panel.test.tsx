@@ -297,6 +297,25 @@ describe("DraftsPanel", () => {
     consoleSpy.mockRestore();
   });
 
+  it("handles non-Error thrown value on load (line 26 String(error) branch)", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    global.fetch = vi.fn().mockRejectedValue("string load failure");
+
+    render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to load drafts")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"string load failure"')
+      );
+    });
+
+    consoleSpy.mockRestore();
+  });
+
   it("handles non-ok response gracefully", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
@@ -419,6 +438,102 @@ describe("DraftsPanel", () => {
       );
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('"error":"Clipboard denied"')
+      );
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("handles non-Error thrown value on copy failure (line 42 String(error) branch)", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockRejectedValue("clipboard denied string") },
+      writable: true,
+      configurable: true,
+    });
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: mockDrafts }),
+    });
+
+    render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Check out the stunning Covadonga lakes!")).toBeInTheDocument();
+    });
+
+    const copyButtons = screen.getAllByTitle("Copy content");
+    await user.click(copyButtons[0]);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to copy")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"clipboard denied string"')
+      );
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("handles non-Error thrown value on mark-as-posted failure (line 57 String(error) branch)", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockDrafts }) })
+      .mockRejectedValueOnce("mark-posted string failure");
+    global.fetch = fetchMock;
+
+    render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTitle("Mark as posted")).toHaveLength(2);
+    });
+
+    const postedButtons = screen.getAllByTitle("Mark as posted");
+    await user.click(postedButtons[0]);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to mark as posted")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"mark-posted string failure"')
+      );
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("handles non-Error thrown value on delete failure (line 72 String(error) branch)", async () => {
+    const user = userEvent.setup();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: mockDrafts }) })
+      .mockRejectedValueOnce("delete string failure");
+    global.fetch = fetchMock;
+
+    render(<DraftsPanel onDraftPosted={onDraftPosted} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTitle("Delete draft")).toHaveLength(2);
+    });
+
+    const deleteButtons = screen.getAllByTitle("Delete draft");
+    await user.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to delete draft")
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"error":"delete string failure"')
       );
     });
 

@@ -53,6 +53,21 @@ describe("clientLogger", () => {
     expect(console.error).toHaveBeenCalledTimes(1);
   });
 
+  it("emits debug messages in development — line 52", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const spy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const { clientLogger } = await import("./client-logger");
+
+    clientLogger.debug("[DEBUG_EVENT]", { detail: "test" });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const arg = (spy as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    const parsed = JSON.parse(arg);
+    expect(parsed.level).toBe("debug");
+    expect(parsed.msg).toBe("[DEBUG_EVENT]");
+    expect(parsed.detail).toBe("test");
+  });
+
   it("merges child bindings into emitted entries", async () => {
     vi.stubEnv("NODE_ENV", "development");
     const { clientLogger } = await import("./client-logger");

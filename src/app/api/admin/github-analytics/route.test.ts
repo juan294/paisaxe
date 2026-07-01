@@ -548,4 +548,30 @@ describe("GET /api/admin/github-analytics", () => {
 
     if (originalImpl) mockFrom.mockImplementation(originalImpl);
   });
+
+  it("stringifies a non-Error thrown value in the catch block", async () => {
+    // Throw a non-Error value (e.g. a plain string) to exercise the
+    // String(error) fallback branch of the `error instanceof Error` ternary.
+    const originalImpl = mockFrom.getMockImplementation();
+    mockFrom.mockImplementation(() => {
+       
+      throw "upstream unavailable";
+    });
+
+    const { GET } = await import("./route");
+    const request = new (await import("next/server")).NextRequest(
+      "https://paisaxe.es/api/admin/github-analytics?from=2026-02-01&to=2026-02-07"
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await GET(request as never) as any;
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.summary.totalViews).toBe(0);
+    expect(logger.error).toHaveBeenCalledWith("GitHub analytics API error:", {
+      error: "upstream unavailable",
+    });
+
+    if (originalImpl) mockFrom.mockImplementation(originalImpl);
+  });
 });

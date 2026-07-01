@@ -8,11 +8,7 @@ import { chatRequestSchema } from "@/lib/schemas";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { withRouteContext } from "@/lib/request-validation";
 import { getClientIp } from "@/lib/request-utils";
-import {
-  detectInjectionAttempt,
-  sanitizeInput,
-  MAX_INPUT_LENGTH,
-} from "@/lib/chat-safety";
+import { detectInjectionAttempt, sanitizeInput } from "@/lib/chat-safety";
 import { GENERIC_REDIRECT_RESPONSE } from "@/lib/chat-config";
 import { logger } from "@/lib/logger";
 import { buildEnrichedChatMessage, buildRateLimitHeaders } from "@/lib/chat-route-utils";
@@ -90,18 +86,6 @@ async function handlePost(request: NextRequest) {
     const { message, context, messageIndex } = zodResult.data;
 
     // Security checks
-    if (message && message.length > MAX_INPUT_LENGTH) {
-      return new Response(
-        JSON.stringify({
-          error: "Message too long",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
     if (message && detectInjectionAttempt(message)) {
       // Return a non-streaming response with generic redirect
       return new Response(

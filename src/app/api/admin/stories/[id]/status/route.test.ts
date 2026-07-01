@@ -198,6 +198,29 @@ describe("PUT /api/admin/stories/[id]/status", () => {
     expect(data.error).toBe("Internal server error");
   });
 
+  it("should stringify a non-Error thrown value on unexpected error", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    vi.mocked(createAdminClient).mockImplementation(() => {
+       
+      throw "raw string failure";
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/admin/stories/story-123/status", {
+      method: "PUT",
+      body: JSON.stringify({ status: "approved" }),
+    });
+
+    const response = await PUT(request, mockParams);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Internal server error");
+    expect(logger.error).toHaveBeenCalledWith(
+      "Admin status API error:",
+      { error: "raw string failure" }
+    );
+  });
+
   it("should use logger.error (not console.error) on unhandled PUT error", async () => {
     vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "admin-1" });
     vi.mocked(createAdminClient).mockImplementation(() => {

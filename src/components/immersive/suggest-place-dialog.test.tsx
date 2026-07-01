@@ -500,4 +500,83 @@ describe("SuggestPlaceDialog", () => {
     });
   });
 
+  it("clears success auto-close timer when dialog is manually closed in success state (lines 111-112)", async () => {
+    // Submit successfully so successResetTimeoutRef is set (non-null).
+    // Then immediately trigger onOpenChange(false) before the 2000ms auto-close fires.
+    // This exercises the `if (successResetTimeoutRef.current !== null)` branch inside
+    // handleOpenChange, which clears the pending timer at lines 111-112.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: "suggestion-1" }),
+    });
+
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    fireEvent.change(placeNameInput, { target: { value: "Lago Enol" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    // Wait for success state — the 2000ms auto-close timer starts now.
+    await waitFor(() => {
+      expect(screen.getByText("Thank you!")).toBeInTheDocument();
+    });
+
+    // capturedOnOpenChange is set by the Dialog mock. Trigger close while
+    // the success timer is still pending (before the 2000ms elapses).
+    expect(capturedOnOpenChange).not.toBeNull();
+    act(() => {
+      capturedOnOpenChange!(false);
+    });
+
+    // onClose must be called (success state is not "loading", so close is allowed).
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it("clears a pending success timer when a second submission also succeeds (line 87)", async () => {
+    // Two overlapping submissions can both resolve successfully if the form is
+    // submitted twice before the first fetch settles (e.g. a rapid double-submit
+    // race). The second success handler must clear the first success's pending
+    // auto-close timeout (`successResetTimeoutRef.current !== null`) before
+    // scheduling its own — this exercises the true branch at line 86-88.
+    let resolveFirst!: (value: { ok: boolean; json: () => Promise<unknown> }) => void;
+    const firstResponse = new Promise<{ ok: boolean; json: () => Promise<unknown> }>((resolve) => {
+      resolveFirst = resolve;
+    });
+    mockFetch.mockReturnValueOnce(firstResponse);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: "suggestion-2" }),
+    });
+
+    render(<SuggestPlaceDialog isOpen={true} onClose={mockOnClose} />);
+
+    const placeNameInput = screen.getByLabelText(/Place Name/);
+    fireEvent.change(placeNameInput, { target: { value: "Lago Enol" } });
+
+    const form = placeNameInput.closest("form")!;
+
+    // First submission: fetch is in-flight (not yet resolved).
+    fireEvent.submit(form);
+
+    // Second submission fires while the first is still pending — both handlers
+    // are now in-flight concurrently, and the form is still mounted (submitState
+    // is "loading", not yet "success").
+    fireEvent.submit(form);
+
+    // Resolve the second submission's fetch first, so it sets the timeout ref.
+    await waitFor(() => {
+      expect(screen.getByText("Thank you!")).toBeInTheDocument();
+    });
+
+    // Now resolve the first submission — its success handler runs while the
+    // ref from the second submission's success is still pending, hitting the
+    // `successResetTimeoutRef.current !== null` guard at line 86.
+    await act(async () => {
+      resolveFirst({ ok: true, json: async () => ({ id: "suggestion-1" }) });
+    });
+
+    // Component remains in a valid success state without throwing.
+    expect(screen.getByText("Thank you!")).toBeInTheDocument();
+  });
+
 });

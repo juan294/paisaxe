@@ -26,6 +26,27 @@ vi.mock("@/lib/supabase-admin", () => ({
   })),
 }));
 
+// Partial mock of the ElevenLabs call service: delegates to the real
+// implementation by default (so all fetch-based tests below are unaffected),
+// but lets one test override initiateCall's return value directly. This is
+// needed to reach the `result.error ?? "Unknown error"` fallback on a failed,
+// non-timed-out call — the real initiateCall() always sets a truthy `error`
+// string on every failure path (missing config / non-ok response / caught
+// exception), so that fallback is otherwise unreachable via fetch mocking alone.
+const mockInitiateCallOverride = vi.hoisted(
+  () => ({ current: null as null | (() => Promise<{ success: boolean; error?: string; timedOut?: true }>) })
+);
+vi.mock("@/lib/services/elevenlabs-call-service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/elevenlabs-call-service")>();
+  return {
+    ...actual,
+    initiateCall: (...args: Parameters<typeof actual.initiateCall>) =>
+      mockInitiateCallOverride.current
+        ? mockInitiateCallOverride.current()
+        : actual.initiateCall(...args),
+  };
+});
+
 // Mock environment variable
 const originalEnv = process.env;
 
@@ -57,6 +78,9 @@ describe("/api/mcp/make-booking", () => {
     delete process.env.ELEVENLABS_API_KEY;
     delete process.env.ELEVENLABS_PHONE_NUMBER_ID;
     delete process.env.ELEVENLABS_BOOKING_AGENT_ID;
+    // Reset the initiateCall override so each test defaults to the real
+    // implementation (driven by mockFetch) unless it opts in explicitly.
+    mockInitiateCallOverride.current = null;
   });
 
   afterEach(() => {
@@ -558,6 +582,65 @@ describe("/api/mcp/make-booking", () => {
       expect(data.status).toBe("pending");
       expect(data.call_sid).toBe("conv_existing_pending");
       expect(data.message).toContain("already in progress");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("falls back to defaults when the prior pending booking row has null status/venue_name/conversation_id", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      mockInsert.mockReturnValueOnce({
+        select: vi.fn().mockResolvedValueOnce({
+          data: null,
+          error: { code: "23505", message: "duplicate key value violates unique constraint" },
+        }),
+      });
+      mockDbSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValueOnce({
+          maybeSingle: vi.fn().mockResolvedValueOnce({
+            data: {
+              id: "existing-pending-row-null-fields",
+              conversation_id: null,
+              status: null,
+              venue_name: null,
+              outcome_message: null,
+            },
+            error: null,
+          }),
+        }),
+      });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-mcp-secret": MCP_SECRET,
+          "idempotency-key": "booking-dup-pending-null-fields",
+        },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612 345 678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // null status defaults to "pending", which is an ACTIVE_BOOKING_STATUSES member
+      expect(data.status).toBe("pending");
+      expect(data.success).toBe(true);
+      // null venue_name defaults to "the venue" in the generated message
+      expect(data.message).toContain("the venue");
+      expect(data.message).toContain("already in progress");
+      // null conversation_id means call_sid is omitted from the response body
+      expect(data.call_sid).toBeUndefined();
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -1662,6 +1745,47 @@ describe("/api/mcp/make-booking", () => {
       expect(data.success).toBe(false);
       // Should fall back to "ElevenLabs API error: 502"
       expect(data.message).toContain("ElevenLabs API error: 502");
+    });
+
+    it("falls back to 'Unknown error' when a failed, non-timed-out call result has no error string", async () => {
+      process.env.ELEVENLABS_API_KEY = "test-api-key";
+      process.env.ELEVENLABS_PHONE_NUMBER_ID = "test-phone-id";
+      process.env.ELEVENLABS_BOOKING_AGENT_ID = "test-booking-agent-id";
+
+      // The real initiateCall() always sets a truthy `error` string on every
+      // failure path, so `result.error ?? "Unknown error"` (route.ts:326) can
+      // only be reached by simulating a call result the real implementation
+      // could never actually produce (defensive fallback for future callers).
+      mockInitiateCallOverride.current = () =>
+        Promise.resolve({ success: false, error: undefined });
+
+      const request = new Request("http://localhost:3000/api/mcp/make-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-mcp-secret": MCP_SECRET, "idempotency-key": "no-error-string-key" },
+        body: JSON.stringify({
+          venue_name: "Casa Gerardo",
+          phone_number: "+34 985 88 77 97",
+          party_size: 4,
+          date: "hoy",
+          time: "21:00",
+          customer_name: "Juan García López",
+          customer_phone: "612345678",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.success).toBe(false);
+      expect(data.status).toBe("failed");
+      // markPendingBookingFailed is called with the "Unknown error" fallback text
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          outcome_message: expect.stringContaining("Unknown error"),
+        })
+      );
     });
 
     it("should handle midnight time (0:00) correctly", async () => {

@@ -1350,4 +1350,106 @@ describe("useStreamChat", () => {
       "Has alcanzado el límite de mensajes. Empieza un nuevo chat para continuar."
     );
   });
+
+  it("onError: sets connection_lost when AbortError arrives after 60s timeout aborts the controller (line 235)", async () => {
+    vi.useFakeTimers();
+
+    // Stream hangs — we'll error it manually after the timeout fires
+    let triggerStreamError!: (err: Error) => void;
+    const hangingStream = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        triggerStreamError = (err) => streamController.error(err);
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body: hangingStream,
+    });
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    let sendPromise!: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // Advance 60 s → fires controller.abort() → controller.signal.aborted = true
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    // Manually error the stream with an AbortError now that signal.aborted is true.
+    // readSseStream's catch fires → calls onError(abortError).
+    // onError: err.name === "AbortError" && controller.signal.aborted → line 235 fires.
+    const abortError = new Error("The operation was aborted");
+    abortError.name = "AbortError";
+    await act(async () => {
+      triggerStreamError!(abortError);
+      await sendPromise;
+    });
+
+    vi.useRealTimers();
+
+    expect(result.current.error).toBe("Se perdió la conexión. Reintentar");
+  });
+
+  it("catch block: pushes new timeout message when assistantIndex is out of bounds after reset (line 293)", async () => {
+    vi.useFakeTimers();
+
+    let resolvePromise!: (value: unknown) => void;
+    const neverResolvingFetch = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockFetch.mockReturnValueOnce(neverResolvingFetch);
+
+    const { result } = renderHook(() => useStreamChat({ canUseVoice: false }));
+
+    let sendPromise!: Promise<void>;
+    act(() => {
+      sendPromise = result.current.sendMessage("Question", {
+        context: "ctx",
+        locale: "es",
+        messageIndex: 0,
+      });
+    });
+
+    // messages = [user, assistant], assistantIndex = 1
+    expect(result.current.messages).toHaveLength(2);
+
+    // Reset messages while the request is in flight → messages = [], but assistantIndex is still 1
+    act(() => {
+      result.current.resetMessages();
+    });
+    expect(result.current.messages).toEqual([]);
+
+    // Advance 60 s → fires controller.abort() → signal.aborted = true
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    // Reject fetch with AbortError so the outer catch fires
+    const abortError = new Error("The operation was aborted");
+    abortError.name = "AbortError";
+    resolvePromise(Promise.reject(abortError));
+
+    await act(async () => {
+      await sendPromise;
+    });
+
+    vi.useRealTimers();
+
+    // Catch: AbortError + signal.aborted=true + updated[1] undefined → line 293 pushes new message
+    expect(result.current.error).toBe("Se perdió la conexión. Reintentar");
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]).toMatchObject({
+      role: "assistant",
+      content: "La respuesta tardó demasiado. Por favor, inténtalo de nuevo.",
+    });
+  });
 });

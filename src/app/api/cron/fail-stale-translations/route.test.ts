@@ -165,6 +165,29 @@ describe("fail stale translations cron", () => {
     expect(json.error).toBe("Failed to fail stale translations");
   });
 
+  it("falls back to failed_count=0 when RPC data is not a number (line 46 else branch)", async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === "fail_stale_story_translations_locked") {
+        // RPC succeeded (no error) but returned a non-numeric, non-(-1) payload —
+        // exercises the `typeof data === "number" ? data : 0` else branch.
+        return Promise.resolve({ data: null, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
+      headers: {
+        authorization: "Bearer cron-secret",
+      },
+    });
+
+    const response = await GET(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.failed_count).toBe(0);
+  });
+
   it("performs the work in a single RPC call (no separate lock/unlock round-trips)", async () => {
     const request = new NextRequest("http://localhost/api/cron/fail-stale-translations", {
       headers: {

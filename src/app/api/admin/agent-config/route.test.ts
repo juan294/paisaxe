@@ -135,6 +135,22 @@ describe("GET /api/admin/agent-config", () => {
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to read agent config");
   });
+
+  it("returns 500 and stringifies a non-Error thrown value", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    // Both readFile calls reject with a non-Error value (e.g. a plain string)
+    mockReadFile.mockRejectedValue("disk unavailable");
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to read agent config");
+    expect(logger.error).toHaveBeenCalledWith(
+      "Failed to read agent config:",
+      { error: "disk unavailable" },
+    );
+  });
 });
 
 describe("PUT /api/admin/agent-config", () => {
@@ -335,6 +351,24 @@ describe("PUT /api/admin/agent-config", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("Failed to update agent config");
+  });
+
+  it("returns 500 and stringifies a non-Error thrown value on write failure", async () => {
+    vi.mocked(validateAdminAuth).mockResolvedValue({ valid: true, userId: "user-1" });
+    mockReadFile.mockResolvedValue(JSON.stringify(sampleConfig));
+    // Reject with a non-Error value to exercise the String(error) fallback branch
+    mockWriteFile.mockRejectedValue({ code: "EACCES" });
+
+    const request = makeRequest({ master_enabled: true });
+    const response = await PUT(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe("Failed to update agent config");
+    expect(logger.error).toHaveBeenCalledWith(
+      "Failed to update agent config:",
+      { error: String({ code: "EACCES" }) },
+    );
   });
 
   describe("Zod validation", () => {

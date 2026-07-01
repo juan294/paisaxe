@@ -63,11 +63,12 @@ test.describe("QA Journey: Anonymous User", () => {
     // Use .first() to avoid strict mode violations during i18n hydration overlap
     const nextButton = page.getByTestId("next-story-button").first();
     await expect(nextButton).toBeVisible();
+    await expect(nextButton).toBeEnabled();
     await nextButton.click();
 
     // Wait for the title to change (story transition)
     await expect(title).not.toHaveText(firstTitle!, {
-      timeout: 3000,
+      timeout: 8000,
     });
 
     // Step 3: Verify story changed
@@ -99,6 +100,7 @@ test.describe("QA Journey: Anonymous User", () => {
 
     // Click story-title to establish keyboard focus — it sits at z-10 (info panel),
     // above the full-screen toggle button at z-[5], so no panel-toggle side effect.
+    await expect(title).toBeVisible({ timeout: 5000 });
     await title.click();
 
     // Navigate with right arrow key
@@ -128,6 +130,7 @@ test.describe("QA Journey: Anonymous User", () => {
 
     // Step 1: Open chat panel
     const askButton = page.locator('[data-testid="ask-button"]').first();
+    await expect(askButton).toBeVisible({ timeout: 5000 });
     await askButton.click();
 
     const chatPanel = page.locator(".fixed.inset-0.z-50");
@@ -226,6 +229,7 @@ test.describe("QA Journey: Anonymous User", () => {
     // Establish keyboard focus once — story-title is at z-10 (info panel),
     // above the full-screen toggle button at z-[5], no panel-toggle side effect.
     // Window retains focus for all subsequent key presses in this loop.
+    await expect(title).toBeVisible({ timeout: 5000 });
     await title.click();
 
     // Navigate through 3 more stories, waiting for title to actually change

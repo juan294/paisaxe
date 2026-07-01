@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chatRequestSchema, favoritesPostSchema } from "./schemas";
+import { chatRequestSchema, favoritesPostSchema, makeBookingRequestSchema } from "./schemas";
 
 /**
  * BE-L3 (#524): the chat schema is now the single validation path. These tests
@@ -116,6 +116,66 @@ describe("favoritesPostSchema", () => {
 
   it("rejects an empty array", () => {
     const result = favoritesPostSchema.safeParse({ storyIds: [] });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── normalizeMakeBookingKeys early-return branch (line 83) ───────────────────
+describe("makeBookingRequestSchema", () => {
+  const validPayload = {
+    venue_name: "Restaurante El Gaitero",
+    phone_number: "+34 985 11 22 33",
+    party_size: 2,
+    date: "2026-07-15",
+    time: "20:00",
+    customer_name: "María García",
+    customer_phone: "+34 611 22 33 44",
+  };
+
+  it("accepts a valid snake_case booking payload", () => {
+    const result = makeBookingRequestSchema.safeParse(validPayload);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts camelCase keys (ElevenLabs push normalisation)", () => {
+    const result = makeBookingRequestSchema.safeParse({
+      venueName: "Restaurante El Gaitero",
+      phoneNumber: "+34 985 11 22 33",
+      partySize: 2,
+      date: "2026-07-15",
+      time: "20:00",
+      customerName: "María García",
+      customerPhone: "+34 611 22 33 44",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("unwraps an MCP-style arguments envelope", () => {
+    const result = makeBookingRequestSchema.safeParse({
+      arguments: validPayload,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("hits normalizeMakeBookingKeys early-return when input is null (line 83)", () => {
+    // null passes through normalizeMakeBookingKeys unchanged (line 83),
+    // then fails makeBookingSchema validation (missing required fields).
+    const result = makeBookingRequestSchema.safeParse(null);
+    expect(result.success).toBe(false);
+  });
+
+  it("hits normalizeMakeBookingKeys early-return when input is a string", () => {
+    const result = makeBookingRequestSchema.safeParse("booking");
+    expect(result.success).toBe(false);
+  });
+
+  it("hits normalizeMakeBookingKeys early-return when input is an array", () => {
+    const result = makeBookingRequestSchema.safeParse([validPayload]);
+    expect(result.success).toBe(false);
+  });
+
+  it("unwraps arguments envelope where arguments is null (normalizeMakeBookingKeys receives null)", () => {
+    const result = makeBookingRequestSchema.safeParse({ arguments: null });
     expect(result.success).toBe(false);
   });
 });

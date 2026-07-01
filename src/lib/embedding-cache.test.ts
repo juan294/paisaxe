@@ -166,6 +166,23 @@ describe("EmbeddingCache (Redis-backed)", () => {
     expect(result).toBe("returned");
   });
 
+  it("handles synchronous throw from getRedis().set — outer catch at line 65", async () => {
+    // mockRedisSet throws synchronously (not a rejected promise) — this hits the outer
+    // catch block in EmbeddingCache.set(), not the .catch() on the promise chain.
+    mockRedisSet.mockImplementation(() => {
+      throw new Error("sync Redis error");
+    });
+
+    const { EmbeddingCache } = await import("./embedding-cache");
+    const cache = new EmbeddingCache();
+
+    await expect(cache.set("text", [0.1, 0.2])).resolves.toBeUndefined();
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[EMBEDDING_CACHE_SET_FAILED]",
+      expect.objectContaining({ reason: "sync Redis error" })
+    );
+  });
+
   it("different texts produce different Redis keys", async () => {
     const { EmbeddingCache } = await import("./embedding-cache");
     const cache = new EmbeddingCache();
